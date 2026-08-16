@@ -6,8 +6,26 @@ describe('NcfService', () => {
   let repository: jest.Mocked<NcfRepository>;
 
   beforeEach(() => {
-    repository = { listar: jest.fn(), crear: jest.fn(), actualizar: jest.fn() } as unknown as jest.Mocked<NcfRepository>;
+    repository = {
+      listar: jest.fn(),
+      crear: jest.fn(),
+      actualizar: jest.fn(),
+      obtenerModalidad: jest.fn(),
+      actualizarModalidad: jest.fn(),
+    } as unknown as jest.Mocked<NcfRepository>;
     service = new NcfService(repository);
+  });
+
+  it('obtenerModalidad() delega al repositorio con el tenantId', async () => {
+    repository.obtenerModalidad.mockResolvedValue('ECF' as never);
+
+    await expect(service.obtenerModalidad('tenant-1')).resolves.toBe('ECF');
+    expect(repository.obtenerModalidad).toHaveBeenCalledWith('tenant-1');
+  });
+
+  it('actualizarModalidad() delega al repositorio con tenantId y la modalidad', async () => {
+    await service.actualizarModalidad('tenant-1', 'ECF');
+    expect(repository.actualizarModalidad).toHaveBeenCalledWith('tenant-1', 'ECF');
   });
 
   it('crear() usa secuenciaInicial=1 por defecto cuando no se especifica', async () => {

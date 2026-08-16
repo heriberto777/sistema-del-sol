@@ -24,6 +24,10 @@ model Tenant {
   subdominio String      @unique
   estado    EstadoTenant @default(ACTIVO)
   planBase  String       @default("base")
+  // Ver ModalidadFacturacion — vive acá (no en TenantSettings) porque a
+  // diferencia de esa tabla, Tenant siempre tiene una fila garantizada
+  // desde su creación (TenantSettings hoy no se crea en ningún flujo).
+  modalidadFacturacion ModalidadFacturacion @default(NCF)
   createdAt DateTime     @default(now())
   updatedAt DateTime     @updatedAt
 
@@ -245,6 +249,21 @@ enum TipoNcf {
   B15 // Gubernamental
   B04 // Nota de Crédito
   B03 // Nota de Débito
+  // e-CF (comprobantes electrónicos DGII) — mismo ambiente de NcfAsignado/
+  // siguienteNcfEnTx que B0x, solo cambia el prefijo. Ver ARCHITECTURE.md:
+  // ambiente de numeración propio; firma digital y envío a la DGII (o a un
+  // proveedor certificado de e-CF) quedan fuera de esta fase a propósito.
+  E31 // Crédito Fiscal Electrónico
+  E32 // Consumo Electrónico
+  E34 // Nota de Crédito Electrónica
+  E33 // Nota de Débito Electrónica
+}
+
+// Decide, por tenant, si Facturación pide NCF tradicional (B0x) o e-CF (E3x)
+// para el mismo tipoFactura — ver FacturacionService.crear (NCF_POR_TIPO/ECF_POR_TIPO).
+enum ModalidadFacturacion {
+  NCF
+  ECF
 }
 
 enum TipoFactura {

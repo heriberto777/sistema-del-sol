@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { TipoNcf } from '@prisma/client';
+import { ModalidadFacturacion, TipoNcf } from '@prisma/client';
 import { TenantPrismaService } from '../prisma/tenant-prisma.service';
 
 @Injectable()
@@ -8,6 +8,24 @@ export class NcfRepository {
 
   private get db() {
     return this.tenantPrisma.client;
+  }
+
+  /** `Tenant` no es tenant-scoped (es la tabla raíz) — se filtra por `id` directo. */
+  async obtenerModalidad(tenantId: string): Promise<ModalidadFacturacion> {
+    const tenant = await this.db.tenant.findUniqueOrThrow({
+      where: { id: tenantId },
+      select: { modalidadFacturacion: true },
+    });
+    return tenant.modalidadFacturacion;
+  }
+
+  async actualizarModalidad(tenantId: string, modalidad: ModalidadFacturacion) {
+    const tenant = await this.db.tenant.update({
+      where: { id: tenantId },
+      data: { modalidadFacturacion: modalidad },
+      select: { modalidadFacturacion: true },
+    });
+    return tenant.modalidadFacturacion;
   }
 
   listar() {

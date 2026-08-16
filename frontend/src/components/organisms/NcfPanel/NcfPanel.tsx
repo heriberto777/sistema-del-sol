@@ -13,7 +13,9 @@ interface NcfAsignado {
   activo: boolean;
 }
 
-const TIPOS_NCF = ['B01', 'B02', 'B03', 'B04', 'B14', 'B15'];
+// e-CF (E3x): mismo ambiente de numeración que B0x, ver docs/ARCHITECTURE.md
+// ("e-NCF propio") — la firma/envío a la DGII todavía no está implementada.
+const TIPOS_NCF = ['B01', 'B02', 'B03', 'B04', 'B14', 'B15', 'E31', 'E32', 'E33', 'E34'];
 
 export function NcfPanel() {
   const queryClient = useQueryClient();
@@ -25,6 +27,16 @@ export function NcfPanel() {
   const { data: secuencias } = useQuery({
     queryKey: ['admin-ncf'],
     queryFn: async () => (await apiClient.get<NcfAsignado[]>('/admin/ncf')).data,
+  });
+
+  const { data: modalidad } = useQuery({
+    queryKey: ['admin-ncf-modalidad'],
+    queryFn: async () => (await apiClient.get<'NCF' | 'ECF'>('/admin/ncf/modalidad')).data,
+  });
+
+  const cambiarModalidad = useMutation({
+    mutationFn: async (nueva: 'NCF' | 'ECF') => apiClient.patch('/admin/ncf/modalidad', { modalidad: nueva }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin-ncf-modalidad'] }),
   });
 
   const crear = useMutation({
@@ -51,6 +63,28 @@ export function NcfPanel() {
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+      <div className="lg:col-span-3 rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+        <h2 className="font-medium text-slate-900 dark:text-slate-100">Modalidad de facturación</h2>
+        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+          NCF tradicional o e-CF (comprobante electrónico DGII). En modalidad e-CF, las facturas se numeran con
+          secuencias E3x — la firma digital y el envío a la DGII todavía no están implementados (ver el panel de
+          reportes fiscales para más detalle sobre esta brecha).
+        </p>
+        <div className="mt-3 flex gap-2">
+          {(['NCF', 'ECF'] as const).map((opcion) => (
+            <Button
+              key={opcion}
+              type="button"
+              variante={modalidad === opcion ? 'primario' : 'secundario'}
+              disabled={cambiarModalidad.isPending}
+              onClick={() => cambiarModalidad.mutate(opcion)}
+            >
+              {opcion === 'NCF' ? 'NCF tradicional' : 'e-CF'}
+            </Button>
+          ))}
+        </div>
+      </div>
+
       <form onSubmit={onSubmit} className="space-y-3 rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
         <h2 className="font-medium text-slate-900 dark:text-slate-100">Nueva secuencia de NCF</h2>
         <div>

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { TenantPrismaService } from '../prisma/tenant-prisma.service';
-import { MetodoPago, Prisma, TipoFactura, TipoNcf } from '@prisma/client';
+import { MetodoPago, ModalidadFacturacion, Prisma, TipoFactura, TipoNcf } from '@prisma/client';
 
 interface LineaCalculada {
   productoId: string;
@@ -18,6 +18,15 @@ export class FacturacionRepository {
 
   private get db() {
     return this.tenantPrisma.client;
+  }
+
+  /** `Tenant` no es un modelo tenant-scoped (es la tabla raíz) — TenantPrismaService lo deja pasar sin inyectar tenantId, así que se filtra por `id` directo. */
+  async obtenerModalidadFacturacion(tenantId: string): Promise<ModalidadFacturacion> {
+    const tenant = await this.db.tenant.findUniqueOrThrow({
+      where: { id: tenantId },
+      select: { modalidadFacturacion: true },
+    });
+    return tenant.modalidadFacturacion;
   }
 
   obtenerProductoConPrecioVigente(productoId: string) {

@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { TipoNcf } from '@prisma/client';
+import { ModalidadFacturacion, TipoNcf } from '@prisma/client';
 import { NcfRepository } from './ncf.repository';
 import { CrearNcfDto } from './dto/crear-ncf.dto';
 import { ActualizarNcfDto } from './dto/actualizar-ncf.dto';
@@ -7,6 +7,14 @@ import { ActualizarNcfDto } from './dto/actualizar-ncf.dto';
 @Injectable()
 export class NcfService {
   constructor(private readonly ncfRepository: NcfRepository) {}
+
+  obtenerModalidad(tenantId: string) {
+    return this.ncfRepository.obtenerModalidad(tenantId);
+  }
+
+  actualizarModalidad(tenantId: string, modalidad: ModalidadFacturacion) {
+    return this.ncfRepository.actualizarModalidad(tenantId, modalidad);
+  }
 
   listar() {
     return this.ncfRepository.listar();

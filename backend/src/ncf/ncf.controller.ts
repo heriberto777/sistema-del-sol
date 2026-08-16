@@ -4,6 +4,7 @@ import { TipoNcf } from '@prisma/client';
 import { NcfService } from './ncf.service';
 import { CrearNcfDto } from './dto/crear-ncf.dto';
 import { ActualizarNcfDto } from './dto/actualizar-ncf.dto';
+import { ActualizarModalidadFacturacionDto } from './dto/actualizar-modalidad-facturacion.dto';
 import { Permissions } from '../common/decorators/permissions.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtPayloadUser } from '../common/types/authenticated-request';
@@ -18,6 +19,22 @@ export class NcfController {
   @Permissions('admin.configuracion')
   listar() {
     return this.ncfService.listar();
+  }
+
+  // Rutas literales ('modalidad') declaradas ANTES de la ruta comodín
+  // (':tipoNcf' más abajo) — Nest matchea en orden de declaración, así
+  // que si ':tipoNcf' fuera primero, "modalidad" se interpretaría como un
+  // tipoNcf en vez de llegar acá.
+  @Get('modalidad')
+  @Permissions('admin.configuracion')
+  obtenerModalidad(@CurrentUser() user: JwtPayloadUser) {
+    return this.ncfService.obtenerModalidad(user.tenantId);
+  }
+
+  @Patch('modalidad')
+  @Permissions('admin.configuracion')
+  actualizarModalidad(@Body() dto: ActualizarModalidadFacturacionDto, @CurrentUser() user: JwtPayloadUser) {
+    return this.ncfService.actualizarModalidad(user.tenantId, dto.modalidad);
   }
 
   @Post()

@@ -26,6 +26,16 @@ const NCF_POR_TIPO: Record<TipoFactura, TipoNcf> = {
   NOTA_CREDITO: 'B04',
 };
 
+// e-CF (comprobantes electrónicos DGII): mismo TipoFactura, prefijo distinto.
+// Reutiliza el mismo NcfAsignado/siguienteNcfEnTx — ver ARCHITECTURE.md,
+// "e-NCF propio": esta fase solo cubre la numeración, no la firma/envío.
+const ECF_POR_TIPO: Record<TipoFactura, TipoNcf> = {
+  CREDITO: 'E31',
+  CONTADO: 'E32',
+  NOTA_DEBITO: 'E33',
+  NOTA_CREDITO: 'E34',
+};
+
 @Injectable()
 export class FacturacionService {
   constructor(
@@ -78,7 +88,8 @@ export class FacturacionService {
     const subtotal = subtotalLineas * signo;
     const itbis = itbisLineas * signo;
     const total = (subtotalLineas + itbisLineas) * signo;
-    const tipoNcf = NCF_POR_TIPO[dto.tipoFactura];
+    const modalidad = await this.facturacionRepository.obtenerModalidadFacturacion(tenantId);
+    const tipoNcf = (modalidad === 'ECF' ? ECF_POR_TIPO : NCF_POR_TIPO)[dto.tipoFactura];
 
     const factura = await this.tenantPrisma.client.$transaction(async (tx) => {
       // Una nota de crédito devuelve al cliente lo comprado: el inventario

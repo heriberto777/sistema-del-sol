@@ -41,6 +41,7 @@ describe('FacturacionService', () => {
   beforeEach(() => {
     repository = {
       obtenerProductoConPrecioVigente: jest.fn(),
+      obtenerModalidadFacturacion: jest.fn().mockResolvedValue('NCF'),
       siguienteNcfEnTx: jest.fn().mockResolvedValue('B0200000001'),
       crearFacturaEnTx: jest.fn(),
       buscarPorId: jest.fn(),
@@ -127,6 +128,21 @@ describe('FacturacionService', () => {
     await service.crear(dto({ tipoFactura: tipoFactura as CrearFacturaDto['tipoFactura'] }), 'tenant-1', 'vendedor-1');
 
     expect(repository.siguienteNcfEnTx).toHaveBeenCalledWith(TX, tipoNcfEsperado);
+  });
+
+  it.each([
+    ['CONTADO', 'E32'],
+    ['CREDITO', 'E31'],
+    ['NOTA_DEBITO', 'E33'],
+    ['NOTA_CREDITO', 'E34'],
+  ])('en modalidad ECF asigna e-NCF %s -> %s en vez de NCF tradicional', async (tipoFactura, tipoEcfEsperado) => {
+    repository.obtenerProductoConPrecioVigente.mockResolvedValue(producto(18, 100) as never);
+    repository.obtenerModalidadFacturacion.mockResolvedValue('ECF' as never);
+    repository.crearFacturaEnTx.mockResolvedValue(facturaCreada() as never);
+
+    await service.crear(dto({ tipoFactura: tipoFactura as CrearFacturaDto['tipoFactura'] }), 'tenant-1', 'vendedor-1');
+
+    expect(repository.siguienteNcfEnTx).toHaveBeenCalledWith(TX, tipoEcfEsperado);
   });
 
   it('verifica y descuenta stock de cada línea antes de crear la factura (venta normal)', async () => {
