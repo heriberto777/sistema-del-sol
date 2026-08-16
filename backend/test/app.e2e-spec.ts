@@ -120,6 +120,10 @@ describe('App (e2e)', () => {
       'compras.recibir',
       'compras.ver',
       'reportes.ver',
+      'bancos.ver',
+      'bancos.editar',
+      'gastosmenores.ver',
+      'gastosmenores.crear',
     ]);
 
     const tenantA = await crearTenantConUsuario({
@@ -130,6 +134,8 @@ describe('App (e2e)', () => {
         'cotizaciones.crear', 'cotizaciones.editar', 'cotizaciones.ver',
         'remisiones.crear', 'remisiones.editar', 'remisiones.ver',
         'contabilidad.ver', 'contabilidad.editar',
+        'bancos.ver', 'bancos.editar',
+        'gastosmenores.ver', 'gastosmenores.crear',
         'nomina.ver', 'nomina.editar',
         'pos.ver', 'pos.editar',
         'ia.usar',
@@ -193,6 +199,9 @@ describe('App (e2e)', () => {
     unAnio.setFullYear(unAnio.getFullYear() + 1);
     await prisma.ncfAsignado.create({
       data: { tenantId: tenantAId, tipoNcf: 'B02', secuenciaActual: 1, secuenciaFinal: 1000, vigenciaHasta: unAnio },
+    });
+    await prisma.ncfAsignado.create({
+      data: { tenantId: tenantAId, tipoNcf: 'B11', secuenciaActual: 1, secuenciaFinal: 1000, vigenciaHasta: unAnio },
     });
 
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
@@ -1464,6 +1473,81 @@ describe('App (e2e)', () => {
       const totalCredito = gasto.body.lineas.reduce((acc: number, l: { credito: string }) => acc + Number(l.credito), 0);
       expect(totalDebito).toBe(15000);
       expect(totalCredito).toBe(15000);
+    });
+  });
+
+  describe('Gastos Menores y Bancos', () => {
+    let cuentaBancariaId: string;
+    let gastosOperativosId: string;
+
+    // El asiento se genera de forma asíncrona (fire-and-forget sobre el event
+    // bus, ver ContabilidadEventosService.alCrearGastoMenor) — mismo patrón
+    // ya usado más abajo en este archivo para Contabilidad/Nómina.
+    const esperarListener = () => new Promise((resolve) => setTimeout(resolve, 300));
+
+    beforeAll(async () => {
+      const token = await login('admin@e2e-a.com', SUBDOMINIO_A);
+      const cuentas = await request(app.getHttpServer())
+        .get('/api/contabilidad/cuentas')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+      const cajaId = cuentas.body.find((c: { codigo: string }) => c.codigo === '1010').id;
+      gastosOperativosId = cuentas.body.find((c: { codigo: string }) => c.codigo === '5020').id;
+
+      const banco = await request(app.getHttpServer())
+        .post('/api/bancos')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ banco: 'Banco Popular', numeroCuenta: '123456789', tipoCuenta: 'CORRIENTE', cuentaContableId: cajaId })
+        .expect(201);
+      cuentaBancariaId = banco.body.id;
+    });
+
+    it('crea un gasto menor con NCF tipo B11 y calcula monto/ITBIS/total sumando sus líneas', async () => {
+      const token = await login('admin@e2e-a.com', SUBDOMINIO_A);
+
+      const gasto = await request(app.getHttpServer())
+        .post('/api/gastos-menores')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          cuentaBancariaId,
+          notas: 'Compra de suministros al mercado informal',
+          lineas: [
+            { cuentaContableId: gastosOperativosId, concepto: 'Suministros', valor: 500, porcentajeItbis: 18, cantidad: 1 },
+            { cuentaContableId: gastosOperativosId, concepto: 'Transporte', valor: 200, cantidad: 2 },
+          ],
+        })
+        .expect(201);
+
+      expect(gasto.body.ncf).toMatch(/^B11/);
+      expect(gasto.body.tipoNcf).toBe('B11');
+      // línea 1: 500 base, itbis 90; línea 2: 200*2=400 base, itbis 0 => monto 900, itbis 90, total 990
+      expect(Number(gasto.body.monto)).toBe(900);
+      expect(Number(gasto.body.itbis)).toBe(90);
+      expect(Number(gasto.body.total)).toBe(990);
+
+      await esperarListener();
+      const asientos = await request(app.getHttpServer())
+        .get('/api/contabilidad/asientos')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+      const asiento = asientos.body.datos.find(
+        (a: { origen: string; origenId: string }) => a.origen === 'GASTO_MENOR' && a.origenId === gasto.body.id,
+      );
+      expect(asiento).toBeDefined();
+      const totalDebito = asiento.lineas.reduce((acc: number, l: { debito: string }) => acc + Number(l.debito), 0);
+      const totalCredito = asiento.lineas.reduce((acc: number, l: { credito: string }) => acc + Number(l.credito), 0);
+      expect(totalDebito).toBeCloseTo(totalCredito, 2);
+      expect(totalCredito).toBeCloseTo(990, 2);
+    });
+
+    it('rechaza un gasto menor sin al menos una línea', async () => {
+      const token = await login('admin@e2e-a.com', SUBDOMINIO_A);
+
+      await request(app.getHttpServer())
+        .post('/api/gastos-menores')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ cuentaBancariaId, lineas: [] })
+        .expect(400);
     });
   });
 

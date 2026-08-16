@@ -5,19 +5,20 @@ import { PrismaService } from '../prisma/prisma.service';
 describe('ContabilidadEventosService', () => {
   let service: ContabilidadEventosService;
   let asientosContablesService: jest.Mocked<AsientosContablesService>;
-  let prisma: { recepcionCompra: { findUniqueOrThrow: jest.Mock } };
+  let prisma: { recepcionCompra: { findUniqueOrThrow: jest.Mock }; gastoMenor: { findUniqueOrThrow: jest.Mock } };
 
   beforeEach(() => {
     asientosContablesService = {
       generarDesdeFactura: jest.fn(),
       generarReversaFactura: jest.fn(),
       generarDesdeCompra: jest.fn(),
+      generarDesdeGastoMenor: jest.fn(),
       generarDesdeNomina: jest.fn(),
       generarDesdePagoFactura: jest.fn(),
       generarDesdePagoOrdenCompra: jest.fn(),
       generarReversaCompra: jest.fn(),
     } as unknown as jest.Mocked<AsientosContablesService>;
-    prisma = { recepcionCompra: { findUniqueOrThrow: jest.fn() } };
+    prisma = { recepcionCompra: { findUniqueOrThrow: jest.fn() }, gastoMenor: { findUniqueOrThrow: jest.fn() } };
     service = new ContabilidadEventosService(asientosContablesService, prisma as unknown as PrismaService);
   });
 
@@ -130,6 +131,39 @@ describe('ContabilidadEventosService', () => {
       await expect(
         service.alRegistrarPagoOrdenCompra({ tenantId: 't1', pagoId: 'pago-1', ordenCompraId: 'oc1', monto: '500' }),
       ).resolves.not.toThrow();
+    });
+  });
+
+  describe('alCrearGastoMenor', () => {
+    it('re-consulta el gasto menor y genera el asiento con sus líneas y la cuenta bancaria', async () => {
+      prisma.gastoMenor.findUniqueOrThrow.mockResolvedValue({
+        id: 'gm1',
+        itbis: 27,
+        cuentaBancaria: { cuentaContableId: 'cuenta-banco-1' },
+        lineas: [
+          { cuentaContableId: 'cuenta-gasto-1', valor: 100, cantidad: 1 },
+          { cuentaContableId: 'cuenta-gasto-2', valor: 50, cantidad: 2 },
+        ],
+      });
+
+      await service.alCrearGastoMenor({ tenantId: 't1', gastoMenorId: 'gm1' });
+
+      expect(asientosContablesService.generarDesdeGastoMenor).toHaveBeenCalledWith({
+        tenantId: 't1',
+        gastoMenorId: 'gm1',
+        cuentaBancariaCuentaContableId: 'cuenta-banco-1',
+        itbis: 27,
+        lineas: [
+          { cuentaContableId: 'cuenta-gasto-1', monto: 100 },
+          { cuentaContableId: 'cuenta-gasto-2', monto: 100 }, // 50 * 2
+        ],
+      });
+    });
+
+    it('no propaga el error si falla generar el asiento (el gasto ya se registró)', async () => {
+      prisma.gastoMenor.findUniqueOrThrow.mockRejectedValue(new Error('no encontrado'));
+
+      await expect(service.alCrearGastoMenor({ tenantId: 't1', gastoMenorId: 'gm1' })).resolves.not.toThrow();
     });
   });
 

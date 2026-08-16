@@ -234,6 +234,41 @@ export class AsientosContablesService {
   }
 
   /**
+   * Gasto menor (ver GastosMenoresService) -> un débito por cada línea de
+   * gasto a su propia cuenta contable, un débito agregado a ITBIS
+   * Adelantado (si aplica), y un crédito a la cuenta contable vinculada a
+   * la cuenta bancaria de origen por el total. `lineas` ya viene con
+   * `valor * cantidad` resuelto (sin ITBIS) — el ITBIS se agrega aparte,
+   * mismo patrón que `generarDesdeCompra`.
+   */
+  async generarDesdeGastoMenor(params: {
+    tenantId: string;
+    gastoMenorId: string;
+    cuentaBancariaCuentaContableId: string;
+    itbis: number;
+    lineas: { cuentaContableId: string; monto: number }[];
+  }) {
+    const descripcion = `Gasto menor — ${params.gastoMenorId}`;
+    const lineas = params.lineas.map((l) => this.lineaSegunSigno(l.cuentaContableId, l.monto, 'debito', descripcion));
+
+    if (params.itbis !== 0) {
+      const cuentaItbis = await this.cuentasRepository.buscarPorCodigoGlobal(params.tenantId, CODIGOS_CUENTA.ITBIS_ADELANTADO);
+      lineas.push(this.lineaSegunSigno(cuentaItbis.id, params.itbis, 'debito', descripcion));
+    }
+
+    const total = params.lineas.reduce((acc, l) => acc + l.monto, 0) + params.itbis;
+    lineas.push(this.lineaSegunSigno(params.cuentaBancariaCuentaContableId, total, 'credito', descripcion));
+
+    return this.crearAsientoAutomatico({
+      tenantId: params.tenantId,
+      concepto: descripcion,
+      origen: 'GASTO_MENOR',
+      origenId: params.gastoMenorId,
+      lineas,
+    });
+  }
+
+  /**
    * "Gasto rápido": envoltorio amigable sobre `crear()` para quien no
    * conoce partida doble — el usuario solo elige la cuenta de gasto y de
    * dónde sale el dinero (Caja/Bancos si es al contado, Cuentas por Pagar
@@ -257,7 +292,7 @@ export class AsientosContablesService {
     });
   }
 
-  private async crearAsientoAutomatico(params: { tenantId: string; concepto: string; origen: 'FACTURA' | 'COMPRA' | 'NOMINA' | 'PAGO'; origenId: string; lineas: LineaCalculada[] }) {
+  private async crearAsientoAutomatico(params: { tenantId: string; concepto: string; origen: 'FACTURA' | 'COMPRA' | 'NOMINA' | 'PAGO' | 'GASTO_MENOR'; origenId: string; lineas: LineaCalculada[] }) {
     this.validarBalance(params.lineas);
     return this.asientosRepository.crearGlobal(params);
   }

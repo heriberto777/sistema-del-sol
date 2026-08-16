@@ -10,6 +10,7 @@ describe('ReportesFiscalesService', () => {
       ventasEnRango: jest.fn(),
       anuladasEnRango: jest.fn(),
       comprasRecibidasEnRango: jest.fn(),
+      gastosMenoresEnRango: jest.fn().mockResolvedValue([]),
       retencionesNominaEnRango: jest.fn(),
     } as unknown as jest.Mocked<ReportesFiscalesRepository>;
     service = new ReportesFiscalesService(repository);
@@ -104,6 +105,23 @@ describe('ReportesFiscalesService', () => {
       expect(filas[0].montoFacturado).toBe(110);
       expect(filas[0].itbisFacturado).toBe(9);
       expect(filas[0].rncProveedor).toBe('');
+    });
+
+    it('incluye los gastos menores (NCF B11/E43, mercado informal) junto a las compras formales', async () => {
+      repository.comprasRecibidasEnRango.mockResolvedValue([
+        { fecha: new Date('2026-01-10'), facturaProveedorNumero: 'FACT-003', ordenCompra: { proveedor: { rnc: '13100000001' } }, lineas: [] },
+      ] as never);
+      repository.gastosMenoresEnRango.mockResolvedValue([
+        { fecha: new Date('2026-01-05'), ncf: 'B1100000001', monto: 500, itbis: 90 },
+      ] as never);
+
+      const { filas, resumen } = await service.formato606();
+
+      expect(filas).toHaveLength(2);
+      expect(filas.find((f) => f.numeroComprobante === 'B1100000001')).toEqual(
+        expect.objectContaining({ rncProveedor: '', montoFacturado: 500, itbisFacturado: 90 }),
+      );
+      expect(resumen).toEqual({ cantidad: 2, montoFacturado: 500, itbisFacturado: 90 });
     });
   });
 

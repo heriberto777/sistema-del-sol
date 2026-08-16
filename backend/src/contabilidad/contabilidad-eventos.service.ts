@@ -5,6 +5,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import {
   EVENTOS,
   FacturaCreadaPayload,
+  GastoMenorCreadoPayload,
   NominaPeriodoPagadoPayload,
   OrdenCompraDevueltaPayload,
   OrdenCompraRecibidaPayload,
@@ -124,6 +125,29 @@ export class ContabilidadEventosService {
       });
     } catch (error) {
       this.logger.error(`No se pudo generar el asiento del pago a proveedor ${payload.pagoId}`, error as Error);
+    }
+  }
+
+  @OnEvent(EVENTOS.GASTO_MENOR_CREADO)
+  async alCrearGastoMenor(payload: GastoMenorCreadoPayload) {
+    try {
+      const gastoMenor = await this.prisma.gastoMenor.findUniqueOrThrow({
+        where: { id: payload.gastoMenorId },
+        include: { lineas: true, cuentaBancaria: true },
+      });
+
+      await this.asientosContablesService.generarDesdeGastoMenor({
+        tenantId: payload.tenantId,
+        gastoMenorId: payload.gastoMenorId,
+        cuentaBancariaCuentaContableId: gastoMenor.cuentaBancaria.cuentaContableId,
+        itbis: Number(gastoMenor.itbis),
+        lineas: gastoMenor.lineas.map((l) => ({
+          cuentaContableId: l.cuentaContableId,
+          monto: Number(l.valor) * Number(l.cantidad),
+        })),
+      });
+    } catch (error) {
+      this.logger.error(`No se pudo generar el asiento del gasto menor ${payload.gastoMenorId}`, error as Error);
     }
   }
 

@@ -37,4 +37,6 @@ export const TENANT_SCOPED_MODELS = new Set([
   'TurnoCaja',
   'Pago',
   'DevolucionCompra',
+  'CuentaBancaria',
+  'GastoMenor',
 ]);

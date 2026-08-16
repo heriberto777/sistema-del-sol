@@ -68,9 +68,12 @@ export class ReportesFiscalesService {
 
   async formato606(desde?: string, hasta?: string) {
     const rango = rangoPorDefecto(desde, hasta);
-    const recepciones = await this.repository.comprasRecibidasEnRango(rango.desde, rango.hasta);
+    const [recepciones, gastosMenores] = await Promise.all([
+      this.repository.comprasRecibidasEnRango(rango.desde, rango.hasta),
+      this.repository.gastosMenoresEnRango(rango.desde, rango.hasta),
+    ]);
 
-    const filas = recepciones.map((r) => {
+    const filasCompras = recepciones.map((r) => {
       const montoFacturado = r.lineas.reduce((acc, l) => acc + Number(l.costoUnitario) * Number(l.cantidadRecibida), 0);
       const itbisFacturado = r.lineas.reduce(
         (acc, l) => acc + Number(l.costoUnitario) * Number(l.cantidadRecibida) * (Number(l.producto.porcentajeItbis) / 100),
@@ -84,6 +87,17 @@ export class ReportesFiscalesService {
         itbisFacturado,
       };
     });
+
+    // Mercado informal (NCF B11/E43, ver GastoMenor) — sin RNC de proveedor.
+    const filasGastosMenores = gastosMenores.map((g) => ({
+      rncProveedor: '',
+      numeroComprobante: g.ncf ?? '',
+      fecha: g.fecha,
+      montoFacturado: Number(g.monto),
+      itbisFacturado: Number(g.itbis),
+    }));
+
+    const filas = [...filasCompras, ...filasGastosMenores].sort((a, b) => a.fecha.getTime() - b.fecha.getTime());
 
     const resumen = filas.reduce(
       (acc, f) => ({ cantidad: acc.cantidad + 1, montoFacturado: acc.montoFacturado + f.montoFacturado, itbisFacturado: acc.itbisFacturado + f.itbisFacturado }),

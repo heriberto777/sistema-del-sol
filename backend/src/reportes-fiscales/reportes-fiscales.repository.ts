@@ -45,6 +45,15 @@ export class ReportesFiscalesRepository {
     });
   }
 
+  /** Comprobantes de compra al mercado informal (NCF B11/E43) — también van al 606, sin RNC de proveedor. */
+  gastosMenoresEnRango(desde: Date, hasta: Date) {
+    return this.db.gastoMenor.findMany({
+      where: { fecha: { gte: desde, lte: finDelDia(hasta) } },
+      orderBy: { fecha: 'asc' },
+      include: { lineas: true },
+    });
+  }
+
   /**
    * ReciboNomina no tiene columna tenantId propia (ver tenant-scoped-models.ts)
    * y acá no llegamos a través del id de un período ya validado — por eso se

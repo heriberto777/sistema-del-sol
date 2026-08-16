@@ -173,6 +173,56 @@ describe('AsientosContablesService', () => {
     });
   });
 
+  describe('generarDesdeGastoMenor', () => {
+    it('debita cada línea de gasto por su cuenta contable, debita ITBIS Adelantado, y acredita la cuenta bancaria por el total', async () => {
+      asientosRepository.crearGlobal.mockResolvedValue({ id: 'a1' } as never);
+
+      await service.generarDesdeGastoMenor({
+        tenantId: 't1',
+        gastoMenorId: 'gm1',
+        cuentaBancariaCuentaContableId: 'cuenta-banco-1',
+        itbis: 27,
+        lineas: [
+          { cuentaContableId: 'cuenta-gasto-combustible', monto: 100 },
+          { cuentaContableId: 'cuenta-gasto-oficina', monto: 50 },
+        ],
+      });
+
+      const [llamada] = asientosRepository.crearGlobal.mock.calls[0];
+      expect(llamada.origen).toBe('GASTO_MENOR');
+      expect(llamada.origenId).toBe('gm1');
+      const lineas = llamada.lineas;
+      expect(lineas).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ cuentaContableId: 'cuenta-gasto-combustible', debito: 100 }),
+          expect.objectContaining({ cuentaContableId: 'cuenta-gasto-oficina', debito: 50 }),
+          expect.objectContaining({ cuentaContableId: `cuenta-${CODIGOS_CUENTA.ITBIS_ADELANTADO}`, debito: 27 }),
+          expect.objectContaining({ cuentaContableId: 'cuenta-banco-1', credito: 177 }), // 100+50+27
+        ]),
+      );
+      const totalDebito = lineas.reduce((acc: number, l: { debito: number }) => acc + l.debito, 0);
+      const totalCredito = lineas.reduce((acc: number, l: { credito: number }) => acc + l.credito, 0);
+      expect(totalDebito).toBeCloseTo(totalCredito, 5);
+    });
+
+    it('sin ITBIS, no agrega la línea de ITBIS Adelantado', async () => {
+      asientosRepository.crearGlobal.mockResolvedValue({ id: 'a1' } as never);
+
+      await service.generarDesdeGastoMenor({
+        tenantId: 't1',
+        gastoMenorId: 'gm2',
+        cuentaBancariaCuentaContableId: 'cuenta-banco-1',
+        itbis: 0,
+        lineas: [{ cuentaContableId: 'cuenta-gasto-combustible', monto: 100 }],
+      });
+
+      const [llamada] = asientosRepository.crearGlobal.mock.calls[0];
+      expect(llamada.lineas).not.toEqual(
+        expect.arrayContaining([expect.objectContaining({ cuentaContableId: `cuenta-${CODIGOS_CUENTA.ITBIS_ADELANTADO}` })]),
+      );
+    });
+  });
+
   describe('generarDesdeNomina', () => {
     it('debita Gastos de Nómina (bruto + aportes patronales), acredita Caja (neto) y TSS/ISR por Pagar (retenciones + aportes)', async () => {
       asientosRepository.crearGlobal.mockResolvedValue({ id: 'a1' } as never);

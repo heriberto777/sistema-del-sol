@@ -17,6 +17,8 @@ const ENLACES: { ruta: string; etiqueta: string; permisos?: string[] }[] = [
   { ruta: '/productos', etiqueta: 'Productos', permisos: ['precios.ver'] },
   { ruta: '/reportes', etiqueta: 'Reportes', permisos: ['reportes.ver'] },
   { ruta: '/contabilidad', etiqueta: 'Contabilidad', permisos: ['contabilidad.ver'] },
+  { ruta: '/bancos', etiqueta: 'Bancos', permisos: ['bancos.ver'] },
+  { ruta: '/gastos-menores', etiqueta: 'Gastos menores', permisos: ['gastosmenores.ver'] },
   { ruta: '/nomina', etiqueta: 'Nómina', permisos: ['nomina.ver'] },
   { ruta: '/pos', etiqueta: 'Punto de venta', permisos: ['pos.ver'] },
   { ruta: '/ia', etiqueta: 'IA', permisos: ['ia.usar'] },

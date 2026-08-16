@@ -308,6 +308,44 @@ así que se deriva del producto en el momento de generar el reporte.
 alimenta la declaración de ITBIS; se agregó porque es un subproducto
 directo de tener ambos formatos ya calculados.
 
+**606 también incluye gastos menores** (ver sección de abajo): las filas
+de `comprasRecibidasEnRango` (compras formales, con RNC de proveedor) y
+`gastosMenoresEnRango` (mercado informal, `rncProveedor: ''`) se
+mezclan y ordenan por fecha en `formato606()`.
+
+## Gastos menores y Bancos
+
+Dos flujos coexisten a propósito y no se deben confundir:
+
+- **`crearGasto`** (dentro de Contabilidad, `AsientosContablesService`):
+  un asiento manual de 2 líneas (débito a una cuenta de gasto, crédito a
+  una cuenta genérica), sin NCF, para quien solo necesita registrar un
+  movimiento contable rápido.
+- **`backend/src/gastos-menores/`** (`GastoMenorService.crear`): un flujo
+  completo pensado para compras en el mercado informal — múltiples
+  líneas (cada una con su propia cuenta de gasto, ITBIS % y cantidad),
+  un **NCF autoasignado tipo `B11`** (o `E43` si el tenant está en
+  modalidad e-CF, mismo campo `Tenant.modalidadFacturacion` de
+  facturación) obtenido con el mismo mecanismo atómico
+  (`NcfAsignado` + `{ increment: 1 }`) que usa `FacturacionService`, y
+  una **cuenta bancaria** (`backend/src/bancos/`, modelo
+  `CuentaBancaria`) como origen del dinero en vez de una cuenta contable
+  cruda.
+
+`CuentaBancaria` es deliberadamente una capa fina de UX, no un módulo de
+conciliación bancaria (eso sigue fuera de alcance, ver más abajo): no
+guarda saldo propio, no importa extractos ni concilia transacciones — el
+saldo real vive en el libro mayor de la `cuentaContable` que tiene
+vinculada (`GET /contabilidad/libro-mayor/:cuentaId`, ya existente).
+
+Al crear un gasto menor, `GastoMenorService` emite
+`EVENTOS.GASTO_MENOR_CREADO` (mismo patrón fire-and-forget del Event
+Bus) y `ContabilidadEventosService.alCrearGastoMenor` genera el asiento
+(`AsientosContablesService.generarDesdeGastoMenor`): un débito por cada
+línea a su cuenta de gasto, un débito a "ITBIS Adelantado" por el ITBIS
+total (si > 0), y un crédito a la cuenta contable vinculada a la cuenta
+bancaria por el total — `origen: 'GASTO_MENOR'`.
+
 ## Listados: búsqueda y paginación
 
 Todos los endpoints de listado que pueden crecer sin límite (facturas,

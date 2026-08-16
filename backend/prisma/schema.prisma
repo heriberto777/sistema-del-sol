@@ -57,6 +57,8 @@ model Tenant {
   periodosNomina PeriodoNomina[]
   turnosCaja    TurnoCaja[]
   pagos         Pago[]
+  cuentasBancarias CuentaBancaria[]
+  gastosMenores GastoMenor[]
 
   @@map("tenants")
 }
@@ -257,6 +259,8 @@ enum TipoNcf {
   E32 // Consumo Electrónico
   E34 // Nota de Crédito Electrónica
   E33 // Nota de Débito Electrónica
+  B11 // Comprobante de Compras (mercado informal) — ver GastoMenor
+  E43 // Gastos Menores Electrónico
 }
 
 // Decide, por tenant, si Facturación pide NCF tradicional (B0x) o e-CF (E3x)
@@ -505,6 +509,8 @@ model CuentaContable {
   createdAt     DateTime            @default(now())
 
   lineasAsiento LineaAsiento[]
+  cuentasBancarias CuentaBancaria[]
+  lineasGastoMenor LineaGastoMenor[]
 
   @@unique([tenantId, codigo])
   @@map("cuentas_contables")
@@ -517,7 +523,91 @@ enum OrigenAsiento {
   NOMINA
   PAGO
   GASTO
+  GASTO_MENOR
   CIERRE
+}
+
+enum TipoCuentaBancaria {
+  CORRIENTE
+  AHORROS
+}
+
+model CuentaBancaria {
+  id               String             @id @default(uuid())
+  tenantId         String
+  tenant           Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  banco            String
+  numeroCuenta     String
+  tipoCuenta       TipoCuentaBancaria
+  // A qué cuenta del catálogo contable representa (tipo ACTIVO, ej. "Caja
+  // y Bancos") — el saldo real vive en el libro mayor de ESA cuenta, no
+  // acá; CuentaBancaria es solo una capa de UX para elegir "de qué banco
+  // sale el dinero" en vez de un código de cuenta contable crudo. Sin
+  // saldo propio ni conciliación — eso sigue fuera de alcance.
+  // Cascade (no la falta por defecto de Postgres/Prisma): CuentaContable y
+  // CuentaBancaria son ramas hermanas desde Tenant (Tenant -> CuentaContable
+  // vs Tenant -> CuentaBancaria) que compiten al borrar un tenant completo
+  // — mismo patrón ya documentado en DATABASE.md para turnos_caja/
+  // recibos_nomina. Sin esto, borrar el tenant falla con FK violation si
+  // alguna CuentaBancaria todavía referencia la CuentaContable que se
+  // intenta borrar en esa misma cascada.
+  cuentaContableId String
+  cuentaContable   CuentaContable     @relation(fields: [cuentaContableId], references: [id], onDelete: Cascade)
+  activa           Boolean            @default(true)
+  createdAt        DateTime           @default(now())
+
+  gastosMenores GastoMenor[]
+
+  @@unique([tenantId, numeroCuenta])
+  @@map("cuentas_bancarias")
+}
+
+model GastoMenor {
+  id               String         @id @default(uuid())
+  tenantId         String
+  tenant           Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  // NCF tipo B11 (Comprobante de Compras — norma DGII para compras a
+  // proveedores informales sin su propio NCF) o E43 si el tenant está en
+  // modalidad e-CF (ver ModalidadFacturacion). Mismo NcfAsignado/
+  // siguienteNcf ya usado por Facturación.
+  ncf              String?
+  tipoNcf          TipoNcf?
+  notas            String?
+  fecha            DateTime       @default(now())
+  // Cascade — misma razón que CuentaBancaria.cuentaContable arriba (ramas
+  // hermanas desde Tenant que compiten al borrarlo completo).
+  cuentaBancariaId String
+  cuentaBancaria   CuentaBancaria @relation(fields: [cuentaBancariaId], references: [id], onDelete: Cascade)
+  monto            Decimal        @db.Decimal(14, 2)
+  itbis            Decimal        @db.Decimal(14, 2)
+  total            Decimal        @db.Decimal(14, 2)
+  createdAt        DateTime       @default(now())
+
+  lineas LineaGastoMenor[]
+
+  @@unique([tenantId, ncf])
+  @@map("gastos_menores")
+}
+
+// Tabla hija sin tenantId propio (mismo patrón que LineaFactura/LineaAsiento
+// — ver DATABASE.md): su aislamiento depende de llegar siempre vía un
+// GastoMenor ya resuelto contra el tenant.
+model LineaGastoMenor {
+  id               String         @id @default(uuid())
+  gastoMenorId     String
+  gastoMenor       GastoMenor     @relation(fields: [gastoMenorId], references: [id], onDelete: Cascade)
+  // Cascade — misma razón que las de arriba (rama hermana desde Tenant vía
+  // GastoMenor -> LineaGastoMenor compitiendo con Tenant -> CuentaContable).
+  cuentaContableId String
+  cuentaContable   CuentaContable @relation(fields: [cuentaContableId], references: [id], onDelete: Cascade)
+  concepto         String?
+  valor            Decimal        @db.Decimal(14, 2)
+  porcentajeItbis  Decimal        @default(0) @db.Decimal(5, 2)
+  montoItbis       Decimal        @db.Decimal(14, 2)
+  cantidad         Decimal        @default(1) @db.Decimal(14, 4)
+  montoTotal       Decimal        @db.Decimal(14, 2)
+
+  @@map("lineas_gasto_menor")
 }
 
 model AsientoContable {

@@ -35,6 +35,8 @@ import { ContabilidadModule } from './contabilidad/contabilidad.module';
 import { NominaModule } from './nomina/nomina.module';
 import { PosModule } from './pos/pos.module';
 import { IaModule } from './ia/ia.module';
+import { BancosModule } from './bancos/bancos.module';
+import { GastosMenoresModule } from './gastos-menores/gastos-menores.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { PermissionsGuard } from './common/guards/permissions.guard';
 import { AuditLogInterceptor } from './common/interceptors/audit-log.interceptor';
@@ -82,6 +84,8 @@ import { TenantMiddleware } from './common/middleware/tenant.middleware';
     NominaModule,
     PosModule,
     IaModule,
+    BancosModule,
+    GastosMenoresModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

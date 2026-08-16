@@ -27,7 +27,8 @@ BEGIN
       'cotizaciones', 'remisiones',
       'cuentas_contables', 'asientos_contables',
       'empleados', 'periodos_nomina', 'turnos_caja',
-      'pagos', 'devolucion_compra'
+      'pagos', 'devolucion_compra',
+      'cuentas_bancarias', 'gastos_menores'
     ])
   LOOP
     EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY;', tabla);

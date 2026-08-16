@@ -43,6 +43,7 @@ PostgreSQL 16 + Prisma. Schema completo en `backend/prisma/schema.prisma`.
 | Webhooks | `webhooks`, `webhook_deliveries` |
 | Notificaciones | `notificacion_plantillas`, `notificaciones` |
 | Contabilidad | `cuentas_contables`, `asientos_contables`, `lineas_asiento` |
+| Bancos / Gastos menores | `cuentas_bancarias`, `gastos_menores`, `lineas_gasto_menor` |
 | Nómina | `empleados`, `periodos_nomina`, `recibos_nomina` |
 | POS | `turnos_caja`, `movimientos_caja` (+ `facturas.metodoPago`/`facturas.turnoCajaId`) |
 | Plataforma | `platform_admins`, `platform_audit_logs` |
@@ -137,6 +138,16 @@ token, así que un token nunca puede reusarse.
   CASCADE` hacia `bodegas`/`users` — mismo patrón de ramas hermanas que
   compiten al borrar un tenant completo (ver el punto anterior sobre
   `recibos_nomina`/`lineas_asiento`).
+- **`cuentas_bancarias.cuentaContableId`, `gastos_menores.cuentaBancariaId`
+  y `lineas_gasto_menor.cuentaContableId`** son `ON DELETE CASCADE` por el
+  mismo patrón de ramas hermanas: `Tenant -> CuentaContable` y
+  `Tenant -> CuentaBancaria -> GastoMenor -> LineaGastoMenor` compiten al
+  borrar un tenant completo. Encontrado (otra vez) corriendo los e2e —
+  ver los puntos anteriores sobre `linea_oc`/`recibos_nomina` para el
+  mismo patrón ya documentado varias veces en este archivo.
+- **`gastos_menores.ncf`/`tipoNcf`** reutilizan el mismo mecanismo de
+  `ncf_asignados` que facturación (tipo `B11` tradicional o `E43` si el
+  tenant está en modalidad e-CF) — no es una secuencia propia.
 
 ## Migraciones
 

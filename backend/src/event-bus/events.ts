@@ -11,6 +11,7 @@ export const EVENTOS = {
   PAGO_FACTURA_REGISTRADO: 'pagos.factura_registrado',
   PAGO_ORDEN_COMPRA_REGISTRADO: 'pagos.orden_compra_registrado',
   COTIZACION_ENVIADA: 'cotizaciones.enviada',
+  GASTO_MENOR_CREADO: 'gastos_menores.creado',
 } as const;
 
 export type NombreEvento = (typeof EVENTOS)[keyof typeof EVENTOS];
@@ -85,4 +86,10 @@ export interface CotizacionEnviadaPayload {
   clienteId: string;
   numero: string;
   total: string;
+}
+
+/** El listener re-consulta el GastoMenor completo (líneas, cuenta bancaria) — mismo patrón que OrdenCompraRecibidaPayload. */
+export interface GastoMenorCreadoPayload {
+  tenantId: string;
+  gastoMenorId: string;
 }

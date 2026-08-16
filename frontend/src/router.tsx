@@ -22,6 +22,8 @@ import { Nomina } from './pages/Nomina';
 import { Pos } from './pages/Pos';
 import { Ia } from './pages/Ia';
 import { Notificaciones } from './pages/Notificaciones';
+import { Bancos } from './pages/Bancos';
+import { GastosMenores } from './pages/GastosMenores';
 import { Admin } from './pages/Admin';
 import { PlatformLogin } from './pages/PlatformLogin';
 import { PlatformTenants } from './pages/PlatformTenants';
@@ -55,6 +57,8 @@ export const router = createBrowserRouter([
           { path: '/productos', element: <Productos /> },
           { path: '/reportes', element: <Reportes /> },
           { path: '/contabilidad', element: <Contabilidad /> },
+          { path: '/bancos', element: <Bancos /> },
+          { path: '/gastos-menores', element: <GastosMenores /> },
           { path: '/nomina', element: <Nomina /> },
           { path: '/pos', element: <Pos /> },
           { path: '/ia', element: <Ia /> },
