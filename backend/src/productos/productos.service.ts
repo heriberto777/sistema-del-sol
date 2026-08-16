@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { ProductosRepository } from './productos.repository';
 import { CrearProductoDto } from './dto/crear-producto.dto';
 import { ListadoQueryDto } from '../common/dto/listado-query.dto';
@@ -20,6 +21,10 @@ export class ProductosService {
 
   buscarPorId(id: string) {
     return this.productosRepository.buscarPorId(id);
+  }
+
+  buscarPorIdEnTx(tx: Prisma.TransactionClient, id: string) {
+    return this.productosRepository.buscarPorIdEnTx(tx, id);
   }
 
   actualizar(id: string, dto: Partial<CrearProductoDto>) {

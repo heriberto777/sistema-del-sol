@@ -23,10 +23,30 @@ export class InventarioService {
    * tenant. Sin esto, cualquier bodegaId/productoId adivinado permitía
    * leer/corromper stock de otro negocio (ver ARCHITECTURE.md).
    */
-  private async validarPertenencia(params: { productoId?: string; bodegaId?: string }) {
+  /**
+   * `tx` opcional: cuando quien llama ya está dentro de una transacción
+   * abierta (ver `verificarYDescontarStockEnTx`/`entradaStockEnTx`), esta
+   * validación tiene que correr sobre ESE MISMO `tx` — no sobre
+   * `this.db` (el cliente top-level) — para que el `SET LOCAL` de RLS que
+   * esa transacción ya aplicó también cubra esta consulta. Sin esto, la
+   * consulta caía en una conexión distinta sin `app.tenant_id` seteado y
+   * RLS la bloqueaba (0 filas, 404 "no encontrado") aunque el producto/
+   * bodega sí pertenecieran al tenant — bug real encontrado corriendo el
+   * e2e contra Postgres con RLS activo, no algo que un mock hubiera
+   * detectado.
+   */
+  private async validarPertenencia(params: { productoId?: string; bodegaId?: string }, tx?: Prisma.TransactionClient) {
     await Promise.all([
-      params.productoId ? this.productosService.buscarPorId(params.productoId) : undefined,
-      params.bodegaId ? this.inventarioRepository.buscarBodegaPorId(params.bodegaId) : undefined,
+      params.productoId
+        ? tx
+          ? this.productosService.buscarPorIdEnTx(tx, params.productoId)
+          : this.productosService.buscarPorId(params.productoId)
+        : undefined,
+      params.bodegaId
+        ? tx
+          ? this.inventarioRepository.buscarBodegaPorIdEnTx(tx, params.bodegaId)
+          : this.inventarioRepository.buscarBodegaPorId(params.bodegaId)
+        : undefined,
     ]);
   }
 
@@ -108,7 +128,7 @@ export class InventarioService {
     tx: Prisma.TransactionClient,
     params: { tenantId: string; productoId: string; bodegaId: string; cantidad: number; userId: string; referencia: string },
   ) {
-    await this.validarPertenencia({ productoId: params.productoId, bodegaId: params.bodegaId });
+    await this.validarPertenencia({ productoId: params.productoId, bodegaId: params.bodegaId }, tx);
 
     const stock = await this.inventarioRepository.descontarStockCondicionalEnTx(tx, {
       tenantId: params.tenantId,
@@ -136,7 +156,7 @@ export class InventarioService {
     tx: Prisma.TransactionClient,
     params: { tenantId: string; productoId: string; bodegaId: string; cantidad: number; userId: string; motivo: string },
   ) {
-    await this.validarPertenencia({ productoId: params.productoId, bodegaId: params.bodegaId });
+    await this.validarPertenencia({ productoId: params.productoId, bodegaId: params.bodegaId }, tx);
     return this.inventarioRepository.ajustarCantidadEnTx(tx, {
       tenantId: params.tenantId,
       productoId: params.productoId,

@@ -12,9 +12,16 @@ pnpm install
 docker-compose up -d postgres redis n8n
 pnpm --filter ./backend prisma:migrate
 pnpm --filter ./backend prisma:seed
+pnpm --filter ./backend db:app-role
 pnpm --filter ./backend db:rls
 pnpm dev
 ```
+
+`db:app-role` crea (o actualiza) el rol de Postgres restringido
+(`APP_DB_USER`/`APP_DATABASE_URL` del `.env`) que usa `TenantPrismaService`
+para que Row-Level Security proteja de verdad — solo hace falta correrlo
+una vez (y de nuevo si cambia `APP_DB_PASSWORD`), antes de `db:rls`. Ver
+`docs/ARCHITECTURE.md`, sección "Multi-tenancy".
 
 `pnpm dev` levanta backend (`:3000`, watch mode) y frontend (`:5173`,
 Vite) en paralelo. El frontend proxea `/api` hacia el backend

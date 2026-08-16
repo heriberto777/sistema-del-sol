@@ -59,6 +59,7 @@ services:
       - .env
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-sol}:${POSTGRES_PASSWORD:-sol}@postgres:5432/${POSTGRES_DB:-sistema_del_sol}
+      APP_DATABASE_URL: postgresql://${APP_DB_USER:-sol_app}:${APP_DB_PASSWORD:-sol_app}@postgres:5432/${POSTGRES_DB:-sistema_del_sol}
       REDIS_URL: redis://redis:6379
       # Usado solo para construir el link dentro del correo de "olvidé mi
       # contraseña" — debe ser la URL que el usuario realmente abre en su

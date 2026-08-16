@@ -1,13 +1,14 @@
--- Row-Level Security por tenant, pensado como defensa en profundidad además
--- del filtro por tenantId a nivel de aplicación (ver
--- src/prisma/tenant-prisma.service.ts). Ejecutar después de cada
+-- Row-Level Security por tenant, defensa en profundidad además del filtro
+-- por tenantId a nivel de aplicación (ver src/prisma/tenant-prisma.service.ts).
+-- Ejecutar UNA VEZ pnpm --filter ./backend db:app-role (crea el rol
+-- restringido que hace que esto proteja de verdad) y después de cada
 -- `prisma migrate deploy`: pnpm --filter ./backend db:rls
 --
--- ADVERTENCIA: esta policy por sí sola NO protege nada todavía. Nadie
--- ejecuta `SET app.tenant_id` en el backend, y el rol de la app en
--- docker-compose.yml es superusuario (ignora RLS). Ver la sección
--- "Multi-tenancy" de docs/ARCHITECTURE.md antes de asumir que esta capa
--- está activa.
+-- El rol que corre migraciones (POSTGRES_USER, superusuario y dueño de las
+-- tablas) ignora RLS por completo, con o sin FORCE — eso es intencional y
+-- esperado. Solo el rol restringido (APP_DB_USER, usado por
+-- TenantPrismaService vía AppPrismaService) queda sujeto a estas policies.
+-- Ver la sección "Multi-tenancy" de docs/ARCHITECTURE.md.
 
 DO $$
 DECLARE
@@ -30,6 +31,10 @@ BEGIN
     ])
   LOOP
     EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY;', tabla);
+    -- FORCE, no solo ENABLE: sin esto, el dueño de la tabla (el rol de
+    -- migraciones) seguiría ignorando la policy aunque no fuera superusuario
+    -- — Postgres exime al dueño de RLS por defecto salvo que se fuerce.
+    EXECUTE format('ALTER TABLE %I FORCE ROW LEVEL SECURITY;', tabla);
     EXECUTE format(
       'DROP POLICY IF EXISTS tenant_isolation ON %I;', tabla
     );

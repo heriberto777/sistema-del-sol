@@ -20,6 +20,7 @@ pnpm install
 docker-compose up -d
 pnpm --filter ./backend prisma:migrate
 pnpm --filter ./backend prisma:seed
+pnpm --filter ./backend db:app-role
 pnpm --filter ./backend db:rls
 pnpm dev
 ```

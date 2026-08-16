@@ -45,6 +45,11 @@ export class InventarioRepository {
     return this.db.bodega.findUniqueOrThrow({ where: { id } });
   }
 
+  /** Ver ProductosRepository.buscarPorIdEnTx — misma razón: participar del `tx` para que el SET LOCAL de RLS cubra esta consulta. */
+  buscarBodegaPorIdEnTx(tx: Prisma.TransactionClient, id: string) {
+    return tx.bodega.findUniqueOrThrow({ where: { id } });
+  }
+
   obtenerStock(productoId: string, bodegaId: string) {
     return this.db.stock.findUnique({ where: { productoId_bodegaId: { productoId, bodegaId } } });
   }

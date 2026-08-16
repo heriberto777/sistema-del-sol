@@ -20,6 +20,7 @@ pnpm install
 docker-compose up -d postgres redis n8n
 pnpm --filter ./backend prisma:migrate
 pnpm --filter ./backend prisma:seed
+pnpm --filter ./backend db:app-role   # crea el rol restringido de RLS, una sola vez
 pnpm --filter ./backend db:rls        # aplica RLS, correr después de cada migrate
 pnpm dev                              # backend :3000 (watch) + frontend :5173 (Vite), en paralelo
 ```
@@ -79,20 +80,42 @@ aislamiento:
    `TENANT_SCOPED_MODELS` (`backend/src/prisma/tenant-scoped-models.ts`).
    Los repositorios usan `tenantPrisma.client`, nunca `PrismaService`
    directo (salvo listeners de eventos/crons fuera de contexto de request).
-2. **Base de datos (RLS, defensa en profundidad, parcialmente
-   implementada)**: las policies existen pero **no protegen todavía** —
-   nadie ejecuta `SET app.tenant_id` y el rol de Postgres es superusuario.
-   No confiar en esta capa en producción sin antes crear un rol sin
-   privilegios y envolver cada operación en `SET LOCAL` por transacción.
+2. **Base de datos (RLS, defensa en profundidad — implementada y
+   verificada)**: `AppPrismaService` (`backend/src/prisma/app-prisma.service.ts`)
+   es un singleton conectado con un rol de Postgres restringido
+   (`sol_app`/`APP_DATABASE_URL`, sin superusuario ni `BYPASSRLS`,
+   creado con `pnpm --filter ./backend db:app-role`). `TenantPrismaService`
+   lo extiende por request y aplica `SELECT set_config('app.tenant_id', ...)`
+   dentro de cada transacción (la ya abierta, interceptada con un `Proxy`
+   sobre `$transaction`, o una nueva de una sola operación si la llamada es
+   suelta) — con un `AsyncLocalStorage` para no re-envolver ni re-setear
+   dentro de un mismo `tx`. Solo cubre el tráfico que pasa por
+   `TenantPrismaService` (HTTP normal) — los listeners de eventos y el cron
+   de `RecordatoriosService` siguen en el rol de siempre (`sol`, sin RLS),
+   a propósito (ver ARCHITECTURE.md).
 
 **Tablas "hijas" sin `tenantId` propio** (`stock`, `precios`,
-`linea_factura`, etc.): la inyección automática solo protege si se llega
-a ellas vía el padre ya scoped. Si un endpoint recibe un id de la tabla
-hija (o del padre) directo del cliente y consulta la hija sin antes
-validar que el padre pertenece al tenant, **no hay filtro automático**
-(fue un IDOR real). Patrón correcto: resolver primero el padre vía
-`TenantPrismaService` (404 si no pertenece) antes de tocar la hija — ver
+`linea_factura`, `linea_asiento`, etc.): la inyección automática de
+`tenantId` en `where`/`data` solo protege si se llega a ellas vía el
+padre ya scoped. Si un endpoint recibe un id de la tabla hija (o del
+padre) directo del cliente y consulta la hija sin antes validar que el
+padre pertenece al tenant, **no hay filtro automático** (fue un IDOR
+real). Patrón correcto: resolver primero el padre vía `TenantPrismaService`
+(404 si no pertenece) antes de tocar la hija — ver
 `InventarioService.validarPertenencia`, `PreciosService`.
+
+Además, con RLS activo, **cualquier query (aunque sea a una tabla hija)
+necesita `SET LOCAL app.tenant_id` en la MISMA conexión** si su `where`/
+`include` toca (por relación) una tabla padre con RLS forzado — un
+`JOIN` implícito hacia una tabla sin ese `SET` la filtra a cero filas
+aunque los datos sí pertenezcan al tenant. Por eso el wrapping de SET
+LOCAL en `TenantPrismaService` aplica a **toda** operación, no solo a
+`TENANT_SCOPED_MODELS`. Y si un helper (ej.
+`InventarioService.validarPertenencia`) se invoca desde dentro de una
+transacción ya abierta, tiene que recibir y usar ESE `tx` (variantes
+`*EnTx`) — si en cambio usa el cliente top-level, la query cae en otra
+conexión sin el `SET LOCAL` de esa transacción y RLS la bloquea (bug
+real encontrado activando RLS por primera vez, ver ARCHITECTURE.md).
 
 ### RBAC
 

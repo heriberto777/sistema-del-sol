@@ -38,36 +38,70 @@ El aislamiento tiene dos capas:
    antes de llegar a la tabla hija. Cualquier módulo nuevo que reciba un
    id de una tabla padre tenant-scoped para operar sobre una tabla hija
    sin `tenantId` propio debe seguir este mismo patrón.
-2. **Base de datos** (defensa en profundidad, **parcialmente implementada**):
-   `prisma/sql/enable-rls.sql` activa Row-Level Security en Postgres para
-   las mismas tablas, con una policy que compara `"tenantId"` contra
-   `current_setting('app.tenant_id', true)`. Se aplica con
-   `pnpm --filter ./backend db:rls` después de cada migración.
+2. **Base de datos** (defensa en profundidad — implementada y verificada):
+   `prisma/sql/enable-rls.sql` activa Row-Level Security en Postgres
+   (`ENABLE` + `FORCE`) para las tablas tenant-scoped, con una policy que
+   compara `"tenantId"` contra `current_setting('app.tenant_id', true)`.
+   Esto protege de verdad porque, a diferencia del rol de migraciones
+   (`sol`/`POSTGRES_USER`, superusuario, ignora RLS por completo), el
+   tráfico HTTP normal corre con un rol restringido nuevo (`sol_app`,
+   `APP_DB_USER`/`APP_DATABASE_URL`) sin privilegios de superusuario ni
+   `BYPASSRLS` — creado con `pnpm --filter ./backend db:app-role` (una
+   vez) y las policies aplicadas con `db:rls` (después de cada
+   migración).
 
-   **Lo que falta para que esta capa proteja de verdad, y por qué no se
-   implementó en este scaffold:**
-   - Nadie ejecuta todavía `SET app.tenant_id = '<tenant>'` — el backend
-     no lo hace. Sin eso, la policy compara contra `NULL` y **oculta
-     todas las filas** para cualquier rol sin `BYPASSRLS`.
-   - El rol `sol` que crea el contenedor de Postgres (`POSTGRES_USER` en
-     `docker-compose.yml`) es **superusuario**, y los superusuarios (y
-     dueños de tabla, salvo `FORCE ROW LEVEL SECURITY`) ignoran RLS por
-     completo — por eso hoy esta capa no hace nada en desarrollo, aunque
-     las policies existan.
-   - Implementarlo correctamente requiere que `TenantPrismaService`
-     envuelva cada operación en una transacción interactiva
-     (`$transaction(async tx => { await tx.$executeRawUnsafe('SET LOCAL app.tenant_id = ...'); return tx[model][operation](args) })`),
-     porque `SET LOCAL` solo dura una transacción — y un `SET` de sesión
-     (sin `LOCAL`) es inseguro con un pool de conexiones reutilizadas
-     entre requests de distintos tenants. Envolver cada query en una
-     transacción añade latencia y complejidad no trivial.
+   `AppPrismaService` (`backend/src/prisma/app-prisma.service.ts`) es el
+   singleton conectado como `sol_app` — un `PrismaClient` nuevo, no el
+   `PrismaService` de siempre, para no agotar el pool de conexiones
+   abriendo una conexión nueva por request. `TenantPrismaService` lo
+   extiende por request (barato, no abre conexión) y, antes de cada
+   operación, aplica `SELECT set_config('app.tenant_id', ...)` dentro de
+   una transacción — o bien la que ya esté abierta (`$transaction`,
+   interceptado con un `Proxy` porque Prisma no permite overridearlo vía
+   extensión), o bien una transacción de una sola operación abierta para
+   ese propósito si la llamada es suelta. Un `AsyncLocalStorage` marca
+   "esta transacción ya tiene SET LOCAL aplicado" para no volver a
+   envolver ni a re-setear innecesariamente dentro de un mismo `tx`.
 
-   **Antes de confiar en esta capa en producción**: crear un rol de
-   aplicación sin privilegios de superusuario (distinto del que corre las
-   migraciones), aplicar `FORCE ROW LEVEL SECURITY` a las tablas, e
-   implementar el `SET LOCAL` por request como se describe arriba. Hasta
-   entonces, **el aislamiento real depende enteramente de la capa 1**
-   (`TenantPrismaService`), que sí está implementada y probada.
+   **Ojo con las tablas "hijas" también acá**: la wrapping de SET LOCAL
+   no se puede limitar a `TENANT_SCOPED_MODELS` (eso solo decide si se
+   inyecta `tenantId` en el `where`/`data`) — un modelo hijo sin
+   `tenantId` propio (`LineaAsiento`, `LineaFactura`, `Stock`, etc.)
+   puede filtrar/incluir una relación hacia un padre con RLS forzado
+   (ej. `lineaAsiento.findMany({ where: { asiento: { fecha: {...} } } })`
+   hace un `JOIN` contra `asientos_contables`); sin SET LOCAL en esa
+   misma conexión, ese `JOIN` queda filtrado por la policy y devuelve
+   cero filas aunque los datos sí pertenezcan al tenant — bug real
+   encontrado en `CierrePeriodoService.cerrarPeriodo` al activar RLS
+   (`lineasEnRango` no traía ninguna línea). Por eso el SET LOCAL se
+   aplica a **toda** operación que pase por `TenantPrismaService`, no
+   solo a los modelos tenant-scoped.
+
+   También hay que threadear el `tx` explícitamente en cualquier helper
+   invocado desde dentro de una transacción ya abierta — antes de RLS,
+   `InventarioService.validarPertenencia` llamaba `this.db.producto...`
+   (el cliente top-level) incluso cuando la invocaba
+   `verificarYDescontarStockEnTx(tx, ...)`; sin RLS eso era inofensivo
+   (cada conexión aplicaba el mismo filtro de `tenantId` en el `where`),
+   pero con RLS esa consulta cae en una conexión sin `app.tenant_id`
+   seteado y la policy la bloquea (0 filas, 404 "no encontrado") aunque
+   el producto sí exista. Se corrigió agregando variantes `*EnTx`
+   (`ProductosRepository.buscarPorIdEnTx`,
+   `InventarioRepository.buscarBodegaPorIdEnTx`) y pasando el `tx` desde
+   `validarPertenencia`.
+
+   **Alcance de esta capa (decisión deliberada)**: RLS solo cubre el
+   tráfico que pasa por `TenantPrismaService` (todo el HTTP normal). Los
+   listeners de eventos (`ContabilidadEventosService`,
+   `NotificacionesService`, `WebhooksService`) y el cron de
+   `RecordatoriosService` (que además consulta **todos los tenants a la
+   vez**, sin `tenantId` en el `WHERE`) siguen usando el `PrismaService`
+   de siempre (rol `sol`, sin RLS) — ya filtran correctamente por
+   `tenantId` en código y no procesan input de un atacante directamente,
+   así que el riesgo que RLS mitiga (un bug futuro en un endpoint) no
+   aplica ahí de la misma forma. Extenderles RLS requeriría reescribir
+   `RecordatoriosService` para iterar tenant por tenant, fuera de
+   alcance de esta pasada.
 
 `TenantMiddleware` decodifica (sin verificar) el JWT lo antes posible en
 el ciclo del request solo para tener `tenantId` disponible en logs/rate
