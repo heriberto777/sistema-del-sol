@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { MetodoPago, TipoFactura, TipoNcf } from '@prisma/client';
+import { MetodoPago, Prisma, TipoFactura, TipoNcf, TipoProducto } from '@prisma/client';
 import { FacturacionRepository } from './facturacion.repository';
 import { InventarioService } from '../inventario/inventario.service';
 import { TenantPrismaService } from '../prisma/tenant-prisma.service';
@@ -35,6 +35,30 @@ const ECF_POR_TIPO: Record<TipoFactura, TipoNcf> = {
   NOTA_DEBITO: 'E33',
   NOTA_CREDITO: 'E34',
 };
+
+/**
+ * Un SERVICIO nunca mueve inventario. Un COMBO expande a sus componentes
+ * físicos (cantidad de la línea × cantidad del componente) — el combo en sí
+ * nunca tiene fila propia en Stock. Un componente está restringido en
+ * ProductosService a PRODUCTO/SERVICIO (nunca otro COMBO), así que un solo
+ * nivel de expansión alcanza, sin necesidad de recursión.
+ */
+function expandirParaInventario(
+  producto: {
+    tipoProducto: TipoProducto;
+    componentesCombo: Array<{ cantidad: Prisma.Decimal; componente: { id: string; tipo: TipoProducto } }>;
+  },
+  productoId: string,
+  cantidad: number,
+): Array<{ productoId: string; cantidad: number }> {
+  if (producto.tipoProducto === 'SERVICIO') return [];
+  if (producto.tipoProducto === 'COMBO') {
+    return producto.componentesCombo
+      .filter((c) => c.componente.tipo !== 'SERVICIO')
+      .map((c) => ({ productoId: c.componente.id, cantidad: cantidad * Number(c.cantidad) }));
+  }
+  return [{ productoId, cantidad }];
+}
 
 @Injectable()
 export class FacturacionService {
@@ -74,6 +98,11 @@ export class FacturacionService {
           porcentajeItbis,
           montoItbis,
           montoTotal: totalLinea + montoItbis,
+          // Solo para decidir el efecto en inventario más abajo — no se
+          // persisten en LineaFactura (crearFacturaEnTx solo toma los
+          // campos que sí son columnas propias).
+          tipoProducto: producto.tipo,
+          componentesCombo: producto.componentes,
         };
       }),
     );
@@ -98,26 +127,30 @@ export class FacturacionService {
       // que no toca inventario. Solo una venta normal (CONTADO/CREDITO)
       // descuenta.
       if (dto.tipoFactura === 'NOTA_CREDITO') {
-        for (const linea of dto.lineas) {
-          await this.inventarioService.entradaStockEnTx(tx, {
-            tenantId,
-            productoId: linea.productoId,
-            bodegaId: dto.bodegaId,
-            cantidad: linea.cantidad,
-            userId: vendedorId,
-            motivo: 'Devolución por nota de crédito',
-          });
+        for (const linea of lineasCalculadas) {
+          for (const item of expandirParaInventario(linea, linea.productoId, linea.cantidad)) {
+            await this.inventarioService.entradaStockEnTx(tx, {
+              tenantId,
+              productoId: item.productoId,
+              bodegaId: dto.bodegaId,
+              cantidad: item.cantidad,
+              userId: vendedorId,
+              motivo: 'Devolución por nota de crédito',
+            });
+          }
         }
       } else if (dto.tipoFactura !== 'NOTA_DEBITO') {
-        for (const linea of dto.lineas) {
-          await this.inventarioService.verificarYDescontarStockEnTx(tx, {
-            tenantId,
-            productoId: linea.productoId,
-            bodegaId: dto.bodegaId,
-            cantidad: linea.cantidad,
-            userId: vendedorId,
-            referencia: 'Venta por factura',
-          });
+        for (const linea of lineasCalculadas) {
+          for (const item of expandirParaInventario(linea, linea.productoId, linea.cantidad)) {
+            await this.inventarioService.verificarYDescontarStockEnTx(tx, {
+              tenantId,
+              productoId: item.productoId,
+              bodegaId: dto.bodegaId,
+              cantidad: item.cantidad,
+              userId: vendedorId,
+              referencia: 'Venta por factura',
+            });
+          }
         }
       }
 
@@ -197,14 +230,17 @@ export class FacturacionService {
         if (factura.tipoFactura === 'NOTA_CREDITO') {
           // La nota había devuelto stock al crearse; anularla lo retira de nuevo.
           for (const linea of factura.lineas) {
-            await this.inventarioService.verificarYDescontarStockEnTx(tx, {
-              tenantId,
-              productoId: linea.productoId,
-              bodegaId: factura.bodegaId,
-              cantidad: Number(linea.cantidad),
-              userId,
-              referencia: `Anulación de nota de crédito ${factura.ncf ?? factura.id}`,
-            });
+            const producto = { tipoProducto: linea.producto.tipo, componentesCombo: linea.producto.componentes };
+            for (const item of expandirParaInventario(producto, linea.productoId, Number(linea.cantidad))) {
+              await this.inventarioService.verificarYDescontarStockEnTx(tx, {
+                tenantId,
+                productoId: item.productoId,
+                bodegaId: factura.bodegaId,
+                cantidad: item.cantidad,
+                userId,
+                referencia: `Anulación de nota de crédito ${factura.ncf ?? factura.id}`,
+              });
+            }
           }
         } else if (factura.tipoFactura !== 'NOTA_DEBITO') {
           // Si ya se emitieron notas de crédito (parciales) contra esta
@@ -224,14 +260,17 @@ export class FacturacionService {
             const yaDevuelto = yaDevueltoPorProducto.get(linea.productoId) ?? 0;
             const cantidadAReintegrar = Number(linea.cantidad) - yaDevuelto;
             if (cantidadAReintegrar > 0) {
-              await this.inventarioService.entradaStockEnTx(tx, {
-                tenantId,
-                productoId: linea.productoId,
-                bodegaId: factura.bodegaId,
-                cantidad: cantidadAReintegrar,
-                userId,
-                motivo: `Anulación de factura ${factura.ncf ?? factura.id}`,
-              });
+              const producto = { tipoProducto: linea.producto.tipo, componentesCombo: linea.producto.componentes };
+              for (const item of expandirParaInventario(producto, linea.productoId, cantidadAReintegrar)) {
+                await this.inventarioService.entradaStockEnTx(tx, {
+                  tenantId,
+                  productoId: item.productoId,
+                  bodegaId: factura.bodegaId,
+                  cantidad: item.cantidad,
+                  userId,
+                  motivo: `Anulación de factura ${factura.ncf ?? factura.id}`,
+                });
+              }
             }
           }
         }

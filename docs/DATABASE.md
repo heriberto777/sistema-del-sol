@@ -36,7 +36,7 @@ PostgreSQL 16 + Prisma. Schema completo en `backend/prisma/schema.prisma`.
 | Auditoría | `audit_logs` (tenant), `platform_audit_logs` (plataforma, sin `tenantId`) |
 | Facturación | `ncf_asignados`, `facturas`, `linea_factura` |
 | Cotizaciones / Remisiones | `cotizaciones`, `linea_cotizacion`, `remisiones`, `linea_remision` |
-| Productos / precios | `productos`, `precios` |
+| Productos / precios | `productos`, `precios`, `componentes_combo` |
 | Inventario | `bodegas`, `stock`, `movimiento_inventario` |
 | Compras | `proveedores`, `orden_compra`, `linea_oc`, `recepcion_compra`, `linea_recepcion` |
 | Clientes | `clientes`, `direccion_cliente` |
@@ -71,6 +71,17 @@ token, así que un token nunca puede reusarse.
   disponible; nunca se permite que una venta lo deje negativo
   (`InventarioService.verificarYDescontarStock`). Cada movimiento queda
   también en `movimiento_inventario` (ENTRADA/SALIDA/TRANSFERENCIA/AJUSTE).
+- **`productos.tipo`** (`PRODUCTO`/`SERVICIO`/`COMBO`): un `SERVICIO`
+  nunca tiene fila en `stock` (no mueve inventario al facturarse); un
+  `COMBO` tampoco tiene fila propia — al facturarse expande a sus
+  `componentes_combo` (cantidad de la línea × cantidad del componente) y
+  descuenta stock de esos, nunca del combo. Un componente está
+  restringido a `PRODUCTO`/`SERVICIO` (validado en `ProductosService`) —
+  no se permiten combos anidados. Ver `FacturacionService.
+  expandirParaInventario`, el único lugar que resuelve esto (Cotizaciones/
+  Remisiones/POS lo heredan al convertir vía `FacturacionService.crear()`).
+  `ComprasService` rechaza comprar un `COMBO` directamente y no mueve
+  stock al recibir/devolver una línea `SERVICIO`.
 - **Compras**: `linea_oc.cantidadRecibida` se incrementa con cada
   `recepcion_compra`; la orden pasa a `RECIBIDA_TOTAL` cuando toda línea
   recibió >= lo pedido, o `RECIBIDA_PARCIAL` en caso contrario.

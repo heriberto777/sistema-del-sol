@@ -735,6 +735,12 @@ model MovimientoCaja {
 // PRODUCTOS, PRECIOS, INVENTARIO
 // ============================================================
 
+enum TipoProducto {
+  PRODUCTO
+  SERVICIO
+  COMBO
+}
+
 model Producto {
   id               String   @id @default(uuid())
   tenantId         String
@@ -744,6 +750,10 @@ model Producto {
   categoria        String?
   unidadMedida     String   @default("UND")
   porcentajeItbis  Decimal  @default(18) @db.Decimal(5, 2)
+  // PRODUCTO mueve inventario normal; SERVICIO nunca toca Stock; COMBO
+  // expande a sus `componentes` al facturarse (ver FacturacionService.
+  // expandirParaInventario) — nunca tiene fila propia en Stock.
+  tipo             TipoProducto @default(PRODUCTO)
   activo           Boolean  @default(true)
   origenMssql      Boolean  @default(false)
   createdAt        DateTime @default(now())
@@ -758,9 +768,30 @@ model Producto {
   lineasCotizacion LineaCotizacion[]
   lineasRemision   LineaRemision[]
   lineasDevolucionCompra LineaDevolucionCompra[]
+  // Componentes de ESTE producto cuando `tipo: COMBO`.
+  componentes    ComponenteCombo[] @relation("ComboComponentes")
+  // Combos de los que este producto forma parte (como componente).
+  partesDeCombos ComponenteCombo[] @relation("ComponenteDeCombos")
 
   @@unique([tenantId, codigo])
   @@map("productos")
+}
+
+// Tabla "hija" sin tenantId propio (mismo patrón que LineaFactura/Stock/
+// Precio, ver DATABASE.md) — su aislamiento depende de llegar siempre vía
+// un Producto (combo) ya resuelto contra el tenant. `componenteId` está
+// restringido en ProductosService a productos PRODUCTO/SERVICIO (nunca
+// COMBO) para no permitir combos anidados.
+model ComponenteCombo {
+  id           String   @id @default(uuid())
+  comboId      String
+  combo        Producto @relation("ComboComponentes", fields: [comboId], references: [id], onDelete: Cascade)
+  componenteId String
+  componente   Producto @relation("ComponenteDeCombos", fields: [componenteId], references: [id], onDelete: Cascade)
+  cantidad     Decimal  @db.Decimal(14, 4)
+
+  @@unique([comboId, componenteId])
+  @@map("componentes_combo")
 }
 
 model Precio {

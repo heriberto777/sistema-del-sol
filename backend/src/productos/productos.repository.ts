@@ -11,8 +11,18 @@ export class ProductosRepository {
     return this.tenantPrisma.client;
   }
 
+  /** `componentes` no es una columna de Producto — se crea aparte, en la misma transacción, como filas de ComponenteCombo. */
   crear(dto: CrearProductoDto, tenantId: string) {
-    return this.db.producto.create({ data: { ...dto, tenantId } });
+    const { componentes, ...datosProducto } = dto;
+    return this.db.$transaction(async (tx) => {
+      const producto = await tx.producto.create({ data: { ...datosProducto, tenantId } });
+      if (componentes?.length) {
+        await tx.componenteCombo.createMany({
+          data: componentes.map((c) => ({ comboId: producto.id, componenteId: c.productoId, cantidad: c.cantidad })),
+        });
+      }
+      return producto;
+    });
   }
 
   listar(params: { skip: number; take: number; busqueda?: string }) {
@@ -34,7 +44,10 @@ export class ProductosRepository {
   }
 
   buscarPorId(id: string) {
-    return this.db.producto.findUniqueOrThrow({ where: { id } });
+    return this.db.producto.findUniqueOrThrow({
+      where: { id },
+      include: { componentes: { include: { componente: true } } },
+    });
   }
 
   /**
@@ -48,7 +61,26 @@ export class ProductosRepository {
     return tx.producto.findUniqueOrThrow({ where: { id } });
   }
 
+  /**
+   * `componentes: undefined` (no se envió el campo) deja los componentes
+   * existentes tal cual. `componentes: []` o con elementos SÍ los
+   * reemplaza — mismo patrón que RemisionesRepository/ComprasRepository
+   * para reemplazar líneas: borrar todas las existentes y crear las
+   * nuevas, dentro de una sola transacción.
+   */
   actualizar(id: string, dto: Partial<CrearProductoDto>) {
-    return this.db.producto.update({ where: { id }, data: dto });
+    const { componentes, ...datosProducto } = dto;
+    return this.db.$transaction(async (tx) => {
+      const producto = await tx.producto.update({ where: { id }, data: datosProducto });
+      if (componentes !== undefined) {
+        await tx.componenteCombo.deleteMany({ where: { comboId: id } });
+        if (componentes.length) {
+          await tx.componenteCombo.createMany({
+            data: componentes.map((c) => ({ comboId: id, componenteId: c.productoId, cantidad: c.cantidad })),
+          });
+        }
+      }
+      return producto;
+    });
   }
 }

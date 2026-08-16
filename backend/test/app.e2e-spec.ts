@@ -611,6 +611,91 @@ describe('App (e2e)', () => {
     });
   });
 
+  describe('Producto tipo Servicio/Combo', () => {
+    let componenteXId: string;
+    let componenteYId: string;
+    let comboId: string;
+    let servicioId: string;
+
+    beforeAll(async () => {
+      const componenteX = await prisma.producto.create({
+        data: { tenantId: tenantAId, codigo: 'E2E-COMP-X', nombre: 'Componente X', porcentajeItbis: 18 },
+      });
+      componenteXId = componenteX.id;
+      await prisma.stock.create({ data: { productoId: componenteXId, bodegaId: bodegaAId, cantidadActual: 100, stockMinimo: 5 } });
+
+      const componenteY = await prisma.producto.create({
+        data: { tenantId: tenantAId, codigo: 'E2E-COMP-Y', nombre: 'Componente Y', porcentajeItbis: 18 },
+      });
+      componenteYId = componenteY.id;
+      await prisma.stock.create({ data: { productoId: componenteYId, bodegaId: bodegaAId, cantidadActual: 100, stockMinimo: 5 } });
+
+      const combo = await prisma.producto.create({
+        data: { tenantId: tenantAId, codigo: 'E2E-COMBO', nombre: 'Combo E2E', porcentajeItbis: 18, tipo: 'COMBO' },
+      });
+      comboId = combo.id;
+      await prisma.precio.create({
+        data: { productoId: comboId, listaPrecio: 'GENERAL', costo: 100, margenPct: 100, precioVenta: 200 },
+      });
+      await prisma.componenteCombo.createMany({
+        data: [
+          { comboId, componenteId: componenteXId, cantidad: 2 },
+          { comboId, componenteId: componenteYId, cantidad: 1 },
+        ],
+      });
+
+      const servicio = await prisma.producto.create({
+        data: { tenantId: tenantAId, codigo: 'E2E-SERVICIO', nombre: 'Servicio E2E', porcentajeItbis: 18, tipo: 'SERVICIO' },
+      });
+      servicioId = servicio.id;
+      await prisma.precio.create({
+        data: { productoId: servicioId, listaPrecio: 'GENERAL', costo: 0, margenPct: 100, precioVenta: 500 },
+      });
+    });
+
+    it('facturar un SERVICIO no toca inventario (no tiene fila en Stock)', async () => {
+      const token = await login('admin@e2e-a.com', SUBDOMINIO_A);
+
+      await request(app.getHttpServer())
+        .post('/api/facturas')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ clienteId: clienteAId, bodegaId: bodegaAId, tipoFactura: 'CONTADO', lineas: [{ productoId: servicioId, cantidad: 1 }] })
+        .expect(201);
+
+      const stock = await prisma.stock.findUnique({ where: { productoId_bodegaId: { productoId: servicioId, bodegaId: bodegaAId } } });
+      expect(stock).toBeNull();
+    });
+
+    it('facturar un COMBO descuenta stock de cada componente (cantidad de la línea × cantidad del componente), nunca del combo', async () => {
+      const token = await login('admin@e2e-a.com', SUBDOMINIO_A);
+
+      const factura = await request(app.getHttpServer())
+        .post('/api/facturas')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ clienteId: clienteAId, bodegaId: bodegaAId, tipoFactura: 'CONTADO', lineas: [{ productoId: comboId, cantidad: 3 }] })
+        .expect(201);
+
+      const stockX = await prisma.stock.findUniqueOrThrow({ where: { productoId_bodegaId: { productoId: componenteXId, bodegaId: bodegaAId } } });
+      const stockY = await prisma.stock.findUniqueOrThrow({ where: { productoId_bodegaId: { productoId: componenteYId, bodegaId: bodegaAId } } });
+      expect(Number(stockX.cantidadActual)).toBe(94); // 100 - 3*2
+      expect(Number(stockY.cantidadActual)).toBe(97); // 100 - 3*1
+      const stockCombo = await prisma.stock.findUnique({ where: { productoId_bodegaId: { productoId: comboId, bodegaId: bodegaAId } } });
+      expect(stockCombo).toBeNull();
+
+      // Anular la factura reintegra el stock de cada componente.
+      await request(app.getHttpServer())
+        .post(`/api/facturas/${factura.body.id}/anular`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ motivo: 'Reversa de prueba e2e' })
+        .expect(201);
+
+      const stockXTrasAnular = await prisma.stock.findUniqueOrThrow({ where: { productoId_bodegaId: { productoId: componenteXId, bodegaId: bodegaAId } } });
+      const stockYTrasAnular = await prisma.stock.findUniqueOrThrow({ where: { productoId_bodegaId: { productoId: componenteYId, bodegaId: bodegaAId } } });
+      expect(Number(stockXTrasAnular.cantidadActual)).toBe(100);
+      expect(Number(stockYTrasAnular.cantidadActual)).toBe(100);
+    });
+  });
+
   describe('Reportes', () => {
     it('el dashboard refleja la factura creada más arriba', async () => {
       const token = await login('admin@e2e-a.com', SUBDOMINIO_A);

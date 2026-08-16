@@ -37,6 +37,9 @@ export class FacturacionRepository {
           where: { listaPrecio: 'GENERAL', vigenteHasta: null },
           take: 1,
         },
+        // Solo tiene filas si el producto es COMBO — ver
+        // FacturacionService.expandirParaInventario.
+        componentes: { include: { componente: true } },
       },
     });
   }
@@ -146,7 +149,7 @@ export class FacturacionRepository {
     return this.db.factura.findUniqueOrThrow({
       where: { id },
       include: {
-        lineas: { include: { producto: true } },
+        lineas: { include: { producto: { include: { componentes: { include: { componente: true } } } } } },
         cliente: true,
         // Necesario para anular(): si ya se emitieron notas de crédito
         // parciales contra esta factura, solo hay que reintegrar lo que

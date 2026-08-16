@@ -2,7 +2,9 @@ import { FormEvent, useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 import { apiClient } from '../lib/api-client';
+import { Badge } from '../components/atoms/Badge/Badge';
 import { Button } from '../components/atoms/Button/Button';
+import { Select } from '../components/atoms/Select/Select';
 import { FormField } from '../components/molecules/FormField/FormField';
 import { Modal } from '../components/molecules/Modal/Modal';
 import { SearchInput } from '../components/molecules/SearchInput/SearchInput';
@@ -13,6 +15,8 @@ import { RequierePermiso } from '../components/organisms/RequierePermiso/Requier
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { PaginaResultado } from '../types/pagina-resultado';
 
+type TipoProducto = 'PRODUCTO' | 'SERVICIO' | 'COMBO';
+
 interface Producto {
   id: string;
   codigo: string;
@@ -20,6 +24,16 @@ interface Producto {
   categoria: string | null;
   unidadMedida: string;
   porcentajeItbis: string;
+  tipo: TipoProducto;
+}
+
+interface ComponenteComboDetalle {
+  cantidad: string;
+  componente: { id: string; codigo: string; nombre: string };
+}
+
+interface ProductoDetalle extends Producto {
+  componentes: ComponenteComboDetalle[];
 }
 
 interface Precio {
@@ -36,9 +50,18 @@ interface ProductoFormValues {
   categoria: string;
   unidadMedida: string;
   porcentajeItbis: string;
+  tipo: TipoProducto;
 }
 
-const PRODUCTO_VACIO: ProductoFormValues = { codigo: '', nombre: '', categoria: '', unidadMedida: 'UND', porcentajeItbis: '18' };
+interface ComponenteComboForm {
+  productoId: string;
+  cantidad: string;
+}
+
+const PRODUCTO_VACIO: ProductoFormValues = { codigo: '', nombre: '', categoria: '', unidadMedida: 'UND', porcentajeItbis: '18', tipo: 'PRODUCTO' };
+
+const ETIQUETA_TIPO: Record<TipoProducto, string> = { PRODUCTO: 'Producto', SERVICIO: 'Servicio', COMBO: 'Combo' };
+const TONO_TIPO: Record<TipoProducto, 'neutro' | 'exito'> = { PRODUCTO: 'neutro', SERVICIO: 'exito', COMBO: 'exito' };
 
 export function Productos() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -113,6 +136,7 @@ export function Productos() {
                 <tr>
                   <th className="px-4 py-2">Código</th>
                   <th className="px-4 py-2">Nombre</th>
+                  <th className="px-4 py-2">Tipo</th>
                   <th className="px-4 py-2">Categoría</th>
                   <th className="px-4 py-2">Unidad</th>
                   <th className="px-4 py-2">ITBIS %</th>
@@ -125,6 +149,9 @@ export function Productos() {
                   <tr key={producto.id}>
                     <td className="px-4 py-2">{producto.codigo}</td>
                     <td className="px-4 py-2">{producto.nombre}</td>
+                    <td className="px-4 py-2">
+                      <Badge tono={TONO_TIPO[producto.tipo]}>{ETIQUETA_TIPO[producto.tipo]}</Badge>
+                    </td>
                     <td className="px-4 py-2">{producto.categoria ?? '—'}</td>
                     <td className="px-4 py-2">{producto.unidadMedida}</td>
                     <td className="px-4 py-2">{Number(producto.porcentajeItbis)}%</td>
@@ -184,10 +211,33 @@ function FormularioProducto({ producto, onGuardado }: { producto: Producto | nul
           categoria: producto.categoria ?? '',
           unidadMedida: producto.unidadMedida,
           porcentajeItbis: producto.porcentajeItbis,
+          tipo: producto.tipo,
         }
       : PRODUCTO_VACIO,
   );
+  const [componentes, setComponentes] = useState<ComponenteComboForm[]>([]);
   const [error, setError] = useState<string | null>(null);
+
+  // Editar un combo existente: la lista de productos (GET /productos) no trae
+  // los componentes — hay que pedir el detalle completo para precargarlos.
+  useEffect(() => {
+    if (!producto || producto.tipo !== 'COMBO') return;
+    apiClient.get<ProductoDetalle>(`/productos/${producto.id}`).then(({ data }) => {
+      setComponentes(data.componentes.map((c) => ({ productoId: c.componente.id, cantidad: c.cantidad })));
+    });
+  }, [producto]);
+
+  const { data: productosDisponibles } = useQuery({
+    queryKey: ['productos-select-combo'],
+    queryFn: async () => (await apiClient.get<PaginaResultado<Producto>>('/productos', { params: { tamanoPagina: 200 } })).data.datos,
+    enabled: valores.tipo === 'COMBO',
+  });
+  // Un combo no puede componerse de otro combo ni de sí mismo.
+  const opcionesComponente = (productosDisponibles ?? []).filter((p) => p.tipo !== 'COMBO' && p.id !== producto?.id);
+
+  function actualizarComponente(i: number, cambios: Partial<ComponenteComboForm>) {
+    setComponentes((prev) => prev.map((c, idx) => (idx === i ? { ...c, ...cambios } : c)));
+  }
 
   function payload() {
     return {
@@ -196,6 +246,11 @@ function FormularioProducto({ producto, onGuardado }: { producto: Producto | nul
       categoria: valores.categoria || undefined,
       unidadMedida: valores.unidadMedida || undefined,
       porcentajeItbis: valores.porcentajeItbis ? Number(valores.porcentajeItbis) : undefined,
+      tipo: valores.tipo,
+      componentes:
+        valores.tipo === 'COMBO'
+          ? componentes.filter((c) => c.productoId).map((c) => ({ productoId: c.productoId, cantidad: Number(c.cantidad) || 1 }))
+          : undefined,
     };
   }
 
@@ -206,17 +261,35 @@ function FormularioProducto({ producto, onGuardado }: { producto: Producto | nul
       queryClient.invalidateQueries({ queryKey: ['productos'] });
       onGuardado();
     },
-    onError: () => setError('No se pudo guardar el producto. Revisa los datos.'),
+    onError: () => setError('No se pudo guardar el producto. Revisa los datos (un combo necesita al menos un componente, y no puede incluirse a sí mismo ni a otro combo).'),
   });
 
   function onSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
+    if (valores.tipo === 'COMBO' && componentes.filter((c) => c.productoId).length === 0) {
+      setError('Un combo necesita al menos un componente.');
+      return;
+    }
     guardar.mutate();
   }
 
   return (
     <form onSubmit={onSubmit} className="space-y-3">
+      <div className="flex flex-col gap-1">
+        <label htmlFor="producto-tipo" className="text-sm font-medium text-slate-700 dark:text-slate-300">
+          Tipo
+        </label>
+        <Select
+          id="producto-tipo"
+          value={valores.tipo}
+          onChange={(e) => setValores((v) => ({ ...v, tipo: e.target.value as TipoProducto }))}
+        >
+          <option value="PRODUCTO">Producto (mueve inventario)</option>
+          <option value="SERVICIO">Servicio (no mueve inventario)</option>
+          <option value="COMBO">Combo (bundle de otros productos)</option>
+        </Select>
+      </div>
       <FormField
         id="producto-codigo"
         label="Código"
@@ -252,6 +325,56 @@ function FormularioProducto({ producto, onGuardado }: { producto: Producto | nul
         value={valores.porcentajeItbis}
         onChange={(e) => setValores((v) => ({ ...v, porcentajeItbis: e.target.value }))}
       />
+
+      {valores.tipo === 'COMBO' && (
+        <div className="space-y-2 rounded-md border border-slate-200 p-3 dark:border-slate-800">
+          <p className="text-sm font-medium text-slate-700 dark:text-slate-300">
+            Componentes (se descuentan del inventario al facturar el combo)
+          </p>
+          {componentes.map((componente, i) => (
+            <div key={i} className="flex gap-2">
+              <Select
+                value={componente.productoId}
+                onChange={(e) => actualizarComponente(i, { productoId: e.target.value })}
+                required
+                className="flex-1"
+              >
+                <option value="">Producto…</option>
+                {opcionesComponente.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.codigo} — {p.nombre} {p.tipo === 'SERVICIO' ? '(servicio)' : ''}
+                  </option>
+                ))}
+              </Select>
+              <input
+                type="number"
+                min={1}
+                step="0.01"
+                placeholder="Cant."
+                value={componente.cantidad}
+                onChange={(e) => actualizarComponente(i, { cantidad: e.target.value })}
+                className="w-20 rounded-md border border-slate-300 px-2 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+              />
+              <button
+                type="button"
+                onClick={() => setComponentes((prev) => prev.filter((_, idx) => idx !== i))}
+                className="text-red-600 hover:text-red-700"
+                aria-label="Quitar componente"
+              >
+                ×
+              </button>
+            </div>
+          ))}
+          <button
+            type="button"
+            onClick={() => setComponentes((prev) => [...prev, { productoId: '', cantidad: '1' }])}
+            className="text-sm font-medium text-sol-600 hover:text-sol-700 dark:text-sol-400"
+          >
+            + Agregar componente
+          </button>
+        </div>
+      )}
+
       {error && <p className="text-sm text-red-600">{error}</p>}
       <Button type="submit" disabled={guardar.isPending} className="w-full">
         {guardar.isPending ? 'Guardando…' : 'Guardar'}

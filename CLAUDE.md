@@ -174,6 +174,13 @@ referencia para plugins nuevos.
 
 - **Cotizaciones/Remisiones**: reutilizan `FacturacionService.crear()`
   para convertir a factura; no duplican NCF/ITBIS/stock.
+- **`Producto.tipo`** (PRODUCTO/SERVICIO/COMBO): un SERVICIO nunca mueve
+  stock; un COMBO expande a sus `componentes` (tabla `ComponenteCombo`)
+  al facturarse — nunca tiene fila propia en `Stock`. Todo resuelto en
+  `FacturacionService.expandirParaInventario`, el único punto de cambio
+  (Cotizaciones/Remisiones/POS lo heredan). Componentes restringidos a
+  PRODUCTO/SERVICIO — sin combos anidados. `ComprasService` rechaza
+  comprar un COMBO directo y no mueve stock al recibir/devolver SERVICIO.
 - **Contabilidad**: partida doble generada automáticamente vía Event Bus
   (`ContabilidadEventosService`), nunca bloquea la venta/compra que la
   originó (try/catch solo loguea). `balanceGeneral()` inyecta una línea

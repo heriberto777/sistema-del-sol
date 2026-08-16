@@ -21,9 +21,11 @@ describe('FacturacionService', () => {
   // valor en cada llamada, no hace falta que se comporte como un Prisma.TransactionClient real.
   const TX = { esTransaccion: true };
 
-  const producto = (porcentajeItbis: number, precioVenta: number) => ({
+  const producto = (porcentajeItbis: number, precioVenta: number, tipo: 'PRODUCTO' | 'SERVICIO' | 'COMBO' = 'PRODUCTO', componentes: unknown[] = []) => ({
     precios: [{ precioVenta }],
     porcentajeItbis,
+    tipo,
+    componentes,
   });
 
   function facturaCreada(overrides: Record<string, unknown> = {}) {
@@ -160,6 +162,39 @@ describe('FacturacionService', () => {
     expect(ordenDescuento).toBeLessThan(ordenCreacion);
   });
 
+  it('un producto SERVICIO no descuenta stock (no tiene fila propia en Stock)', async () => {
+    repository.obtenerProductoConPrecioVigente.mockResolvedValue(producto(18, 500, 'SERVICIO') as never);
+    repository.crearFacturaEnTx.mockResolvedValue(facturaCreada() as never);
+
+    await service.crear(dto({ lineas: [{ productoId: 'servicio-1', cantidad: 1 }] }), 'tenant-1', 'vendedor-1');
+
+    expect(inventarioService.verificarYDescontarStockEnTx).not.toHaveBeenCalled();
+  });
+
+  it('un producto COMBO expande a sus componentes físicos (cantidad de la línea × cantidad del componente)', async () => {
+    repository.obtenerProductoConPrecioVigente.mockResolvedValue(
+      producto(18, 500, 'COMBO', [
+        { cantidad: 2, componente: { id: 'comp-1', tipo: 'PRODUCTO' } },
+        { cantidad: 1, componente: { id: 'comp-2', tipo: 'PRODUCTO' } },
+        // Un componente SERVICIO dentro de un combo tampoco mueve stock.
+        { cantidad: 1, componente: { id: 'comp-servicio', tipo: 'SERVICIO' } },
+      ]) as never,
+    );
+    repository.crearFacturaEnTx.mockResolvedValue(facturaCreada() as never);
+
+    await service.crear(dto({ lineas: [{ productoId: 'combo-1', cantidad: 3 }] }), 'tenant-1', 'vendedor-1');
+
+    expect(inventarioService.verificarYDescontarStockEnTx).toHaveBeenCalledTimes(2);
+    expect(inventarioService.verificarYDescontarStockEnTx).toHaveBeenCalledWith(
+      TX,
+      expect.objectContaining({ productoId: 'comp-1', cantidad: 6 }), // 3 combos × 2 c/u
+    );
+    expect(inventarioService.verificarYDescontarStockEnTx).toHaveBeenCalledWith(
+      TX,
+      expect.objectContaining({ productoId: 'comp-2', cantidad: 3 }), // 3 combos × 1 c/u
+    );
+  });
+
   it('si falta stock, no crea la factura ni emite el evento (y el intento de descuento se revierte junto con todo lo demás de la transacción)', async () => {
     repository.obtenerProductoConPrecioVigente.mockResolvedValue(producto(18, 100) as never);
     inventarioService.verificarYDescontarStockEnTx.mockRejectedValue(new Error('Stock insuficiente'));
@@ -244,7 +279,7 @@ describe('FacturacionService', () => {
         tipoFactura: 'CONTADO',
         bodegaId: 'bodega-1',
         ncf: 'B0200000001',
-        lineas: [{ productoId: 'prod-1', cantidad: 3 }],
+        lineas: [{ productoId: 'prod-1', cantidad: 3, producto: { tipo: 'PRODUCTO', componentes: [] } }],
         notasRelacionadas: [],
         ...overrides,
       };
@@ -300,7 +335,7 @@ describe('FacturacionService', () => {
     it('anular una venta con una nota de crédito parcial ya emitida solo reintegra lo que falta (no duplica lo ya devuelto)', async () => {
       repository.buscarPorId.mockResolvedValue(
         facturaExistente({
-          lineas: [{ productoId: 'prod-1', cantidad: 5 }],
+          lineas: [{ productoId: 'prod-1', cantidad: 5, producto: { tipo: 'PRODUCTO', componentes: [] } }],
           notasRelacionadas: [{ lineas: [{ productoId: 'prod-1', cantidad: 2 }] }],
         }) as never,
       );
@@ -319,7 +354,7 @@ describe('FacturacionService', () => {
     it('anular una venta ya cubierta por completo por notas de crédito no reintegra nada', async () => {
       repository.buscarPorId.mockResolvedValue(
         facturaExistente({
-          lineas: [{ productoId: 'prod-1', cantidad: 3 }],
+          lineas: [{ productoId: 'prod-1', cantidad: 3, producto: { tipo: 'PRODUCTO', componentes: [] } }],
           notasRelacionadas: [{ lineas: [{ productoId: 'prod-1', cantidad: 3 }] }],
         }) as never,
       );
@@ -328,6 +363,31 @@ describe('FacturacionService', () => {
       await service.anular('f1', 'Motivo de prueba', 'tenant-1', 'user-1');
 
       expect(inventarioService.entradaStockEnTx).not.toHaveBeenCalled();
+    });
+
+    it('anular una venta con una línea COMBO reintegra stock a cada componente físico', async () => {
+      repository.buscarPorId.mockResolvedValue(
+        facturaExistente({
+          lineas: [
+            {
+              productoId: 'combo-1',
+              cantidad: 2,
+              producto: {
+                tipo: 'COMBO',
+                componentes: [{ cantidad: 3, componente: { id: 'comp-1', tipo: 'PRODUCTO' } }],
+              },
+            },
+          ],
+        }) as never,
+      );
+      repository.anularEnTx.mockResolvedValue(facturaCreada({ total: 200, subtotal: 200 }) as never);
+
+      await service.anular('f1', 'Motivo de prueba', 'tenant-1', 'user-1');
+
+      expect(inventarioService.entradaStockEnTx).toHaveBeenCalledWith(
+        TX,
+        expect.objectContaining({ productoId: 'comp-1', cantidad: 6 }), // 2 combos × 3 c/u
+      );
     });
 
     it('anular una NOTA_DEBITO no mueve inventario', async () => {

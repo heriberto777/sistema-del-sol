@@ -22,7 +22,17 @@ export class ComprasService {
     private readonly pagosService: PagosService,
   ) {}
 
-  crear(dto: CrearOrdenCompraDto, userId: string, tenantId: string) {
+  async crear(dto: CrearOrdenCompraDto, userId: string, tenantId: string) {
+    // Un combo es un bundle armado para el cliente al vender, no algo que
+    // se le compre a un proveedor — lo que se compra son sus componentes.
+    const productos = await this.tenantPrisma.client.producto.findMany({
+      where: { id: { in: dto.lineas.map((l) => l.productoId) } },
+    });
+    const combo = productos.find((p) => p.tipo === 'COMBO');
+    if (combo) {
+      throw new BadRequestException(`"${combo.nombre}" es un combo — no se puede comprar directamente, comprá sus componentes`);
+    }
+
     const total = dto.lineas.reduce((acc, l) => acc + l.cantidad * l.costoUnitario, 0);
     return this.comprasRepository.crearOrden({ ...dto, tenantId, userId, total });
   }
@@ -62,14 +72,18 @@ export class ComprasService {
         if (lineaOc) {
           await this.comprasRepository.actualizarCantidadRecibida(tx, lineaOc.id, linea.cantidadRecibida);
         }
-        await this.inventarioService.entradaStockEnTx(tx, {
-          tenantId,
-          productoId: linea.productoId,
-          bodegaId: dto.bodegaId,
-          cantidad: linea.cantidadRecibida,
-          userId,
-          motivo: `Recepción de OC ${orden.numero}`,
-        });
+        // Un servicio comprado (ej. una consultoría) no mueve inventario —
+        // "recibirlo" solo actualiza la cantidad recibida de la línea.
+        if (lineaOc?.producto.tipo !== 'SERVICIO') {
+          await this.inventarioService.entradaStockEnTx(tx, {
+            tenantId,
+            productoId: linea.productoId,
+            bodegaId: dto.bodegaId,
+            cantidad: linea.cantidadRecibida,
+            userId,
+            motivo: `Recepción de OC ${orden.numero}`,
+          });
+        }
       }
 
       const ordenActualizada = await this.comprasRepository.buscarPorIdEnTx(tx, ordenCompraId);
@@ -141,14 +155,18 @@ export class ComprasService {
       for (const linea of lineasConCosto) {
         const lineaOc = orden.lineas.find((l) => l.productoId === linea.productoId)!;
         await this.comprasRepository.actualizarCantidadRecibida(tx, lineaOc.id, -linea.cantidad);
-        await this.inventarioService.verificarYDescontarStockEnTx(tx, {
-          tenantId,
-          productoId: linea.productoId,
-          bodegaId: dto.bodegaId,
-          cantidad: linea.cantidad,
-          userId,
-          referencia: `Devolución a proveedor de OC ${orden.numero}`,
-        });
+        // Un servicio nunca entró a Stock al recibirse (ver recibir()) —
+        // "devolverlo" tampoco le corresponde descontar inventario.
+        if (lineaOc.producto.tipo !== 'SERVICIO') {
+          await this.inventarioService.verificarYDescontarStockEnTx(tx, {
+            tenantId,
+            productoId: linea.productoId,
+            bodegaId: dto.bodegaId,
+            cantidad: linea.cantidad,
+            userId,
+            referencia: `Devolución a proveedor de OC ${orden.numero}`,
+          });
+        }
       }
 
       const ordenActualizada = await this.comprasRepository.buscarPorIdEnTx(tx, ordenCompraId);

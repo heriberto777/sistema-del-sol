@@ -53,8 +53,8 @@ describe('ComprasService', () => {
   });
 
   describe('crear', () => {
-    it('calcula el total como suma de cantidad * costoUnitario de cada línea', () => {
-      service.crear(
+    it('calcula el total como suma de cantidad * costoUnitario de cada línea', async () => {
+      await service.crear(
         {
           proveedorId: 'prov-1',
           numero: 'OC-001',
@@ -71,6 +71,19 @@ describe('ComprasService', () => {
         expect.objectContaining({ tenantId: 'tenant-1', userId: 'user-1', total: 110 }),
       );
     });
+
+    it('rechaza una línea cuyo producto es un COMBO — no se compra armado, se compran sus componentes', async () => {
+      tenantPrisma.client.producto.findMany.mockResolvedValue([{ id: 'p1', nombre: 'Combo X', tipo: 'COMBO' }] as never);
+
+      await expect(
+        service.crear(
+          { proveedorId: 'prov-1', numero: 'OC-001', lineas: [{ productoId: 'p1', cantidad: 1, costoUnitario: 100 }] },
+          'user-1',
+          'tenant-1',
+        ),
+      ).rejects.toThrow(BadRequestException);
+      expect(repository.crearOrden).not.toHaveBeenCalled();
+    });
   });
 
   describe('recibir', () => {
@@ -79,7 +92,7 @@ describe('ComprasService', () => {
         numero: 'OC-001',
         proveedorId: 'prov-1',
         total: 500,
-        lineas: [{ id: 'linea-1', productoId: 'p1', cantidad: 10, cantidadRecibida: cantidadRecibidaLinea }],
+        lineas: [{ id: 'linea-1', productoId: 'p1', cantidad: 10, cantidadRecibida: cantidadRecibidaLinea, producto: { tipo: 'PRODUCTO' } }],
       };
     }
 
@@ -126,6 +139,23 @@ describe('ComprasService', () => {
       );
       expect(tenantPrisma.client.$transaction).toHaveBeenCalledTimes(1);
       expect(repository.crearRecepcion).toHaveBeenCalledWith(TX, expect.anything());
+    });
+
+    it('un producto SERVICIO no mueve inventario al recibirse (solo actualiza la cantidad recibida)', async () => {
+      const ordenConServicio = {
+        numero: 'OC-001',
+        proveedorId: 'prov-1',
+        total: 500,
+        lineas: [{ id: 'linea-1', productoId: 'p1', cantidad: 10, cantidadRecibida: 0, producto: { tipo: 'SERVICIO' } }],
+      };
+      repository.buscarPorId.mockResolvedValue(ordenConServicio as never);
+      repository.buscarPorIdEnTx.mockResolvedValue(ordenConServicio as never);
+      repository.crearRecepcion.mockResolvedValue({ id: 'rec-1' } as never);
+
+      await service.recibir('oc-1', dtoRecepcion, 'user-1', 'tenant-1');
+
+      expect(inventarioService.entradaStockEnTx).not.toHaveBeenCalled();
+      expect(repository.actualizarCantidadRecibida).toHaveBeenCalledWith(TX, 'linea-1', 10);
     });
 
     it('no rompe si una línea recibida no corresponde a ninguna línea de la OC original (igual descuenta stock)', async () => {
@@ -238,7 +268,7 @@ describe('ComprasService', () => {
         id: 'oc-1',
         numero: 'OC-001',
         proveedorId: 'prov-1',
-        lineas: [{ id: 'linea-1', productoId: 'p1', cantidad: 10, cantidadRecibida: 10, costoUnitario: 20 }],
+        lineas: [{ id: 'linea-1', productoId: 'p1', cantidad: 10, cantidadRecibida: 10, costoUnitario: 20, producto: { tipo: 'PRODUCTO' } }],
       };
     }
 
@@ -260,6 +290,26 @@ describe('ComprasService', () => {
         expect.objectContaining({ tenantId: 'tenant-1', productoId: 'p1', bodegaId: 'bodega-1', cantidad: 4, userId: 'user-1' }),
       );
       expect(repository.actualizarEstado).toHaveBeenCalledWith(TX, 'oc-1', 'RECIBIDA_PARCIAL');
+    });
+
+    it('un producto SERVICIO no descuenta stock al devolverse (nunca entró a Stock al recibirse)', async () => {
+      const ordenConServicio = {
+        id: 'oc-1',
+        numero: 'OC-001',
+        proveedorId: 'prov-1',
+        lineas: [{ id: 'linea-1', productoId: 'p1', cantidad: 10, cantidadRecibida: 10, costoUnitario: 20, producto: { tipo: 'SERVICIO' } }],
+      };
+      repository.buscarPorId.mockResolvedValue(ordenConServicio as never);
+      tenantPrisma.client.producto.findMany.mockResolvedValue([{ id: 'p1', porcentajeItbis: 18 }] as never);
+      repository.crearDevolucionEnTx.mockResolvedValue({ id: 'dev-1' } as never);
+      repository.buscarPorIdEnTx.mockResolvedValue({
+        lineas: [{ productoId: 'p1', cantidad: 10, cantidadRecibida: 6 }],
+      } as never);
+
+      await service.devolver('oc-1', dtoDevolucion, 'user-1', 'tenant-1');
+
+      expect(inventarioService.verificarYDescontarStockEnTx).not.toHaveBeenCalled();
+      expect(repository.actualizarCantidadRecibida).toHaveBeenCalledWith(TX, 'linea-1', -4);
     });
 
     it('rechaza devolver más cantidad de la que se recibió', async () => {

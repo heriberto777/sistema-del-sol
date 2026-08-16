@@ -34,7 +34,9 @@ export class ComprasRepository {
   buscarPorId(id: string) {
     return this.db.ordenCompra.findUniqueOrThrow({
       where: { id },
-      include: { lineas: true, recepciones: true, devoluciones: { include: { lineas: true } } },
+      // producto: para que ComprasService.recibir() sepa si una línea es
+      // SERVICIO (no mueve stock al recibirse).
+      include: { lineas: { include: { producto: true } }, recepciones: true, devoluciones: { include: { lineas: true } } },
     });
   }
 
