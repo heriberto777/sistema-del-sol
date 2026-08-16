@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { TenantPrismaService } from '../prisma/tenant-prisma.service';
 import { Prisma, TipoMovimientoInventario } from '@prisma/client';
 
@@ -10,6 +10,26 @@ interface ParamsAjuste {
   tipo: TipoMovimientoInventario;
   userId: string;
   motivo?: string;
+}
+
+interface ParamsDescuento {
+  tenantId: string;
+  productoId: string;
+  bodegaId: string;
+  cantidad: number;
+  tipo: TipoMovimientoInventario;
+  userId: string;
+  motivo?: string;
+}
+
+interface StockRow {
+  id: string;
+  productoId: string;
+  bodegaId: string;
+  cantidadActual: Prisma.Decimal;
+  cantidadReservada: Prisma.Decimal;
+  stockMinimo: Prisma.Decimal;
+  updatedAt: Date;
 }
 
 @Injectable()
@@ -62,24 +82,76 @@ export class InventarioRepository {
   }
 
   /**
+   * Resta stock solo si hay disponible suficiente, en una única sentencia
+   * `UPDATE` condicional — reemplaza el patrón anterior de "leer
+   * `cantidadActual`/`cantidadReservada`, decidir en JS, y recién después
+   * `UPDATE`", que dejaba una ventana entre el `SELECT` y el `UPDATE` sin
+   * ningún lock: dos descuentos concurrentes sobre el mismo producto/
+   * bodega podían ambos leer "disponible" y ambos restar, dejando
+   * `cantidadActual` negativo (TOCTOU real, ver docs/ARCHITECTURE.md).
+   *
+   * Postgres toma el lock de fila al ejecutar el `UPDATE`; si dos
+   * transacciones concurrentes intentan restar la misma fila, la segunda
+   * espera a que la primera termine y su `WHERE` se reevalúa contra el
+   * valor YA actualizado por la primera — por eso esto cierra la ventana
+   * de carrera, no solo la reduce. Devuelve `null` (sin lanzar) si no
+   * alcanza — el caller decide el mensaje/excepción.
+   */
+  async descontarStockCondicionalEnTx(tx: Prisma.TransactionClient, params: ParamsDescuento) {
+    const { tenantId, productoId, bodegaId, cantidad, tipo, userId, motivo } = params;
+
+    const filas = await tx.$queryRaw<StockRow[]>`
+      UPDATE stock
+      SET "cantidadActual" = "cantidadActual" - ${cantidad}, "updatedAt" = now()
+      WHERE "productoId" = ${productoId} AND "bodegaId" = ${bodegaId}
+        AND ("cantidadActual" - "cantidadReservada") >= ${cantidad}
+      RETURNING *
+    `;
+    const stock = filas[0];
+    if (!stock) {
+      return null;
+    }
+
+    await tx.movimientoInventario.create({
+      data: { tenantId, productoId, bodegaId, tipo, cantidad, motivo, userId },
+    });
+
+    return stock;
+  }
+
+  descontarStockCondicional(params: ParamsDescuento) {
+    return this.db.$transaction((tx) => this.descontarStockCondicionalEnTx(tx, params));
+  }
+
+  /**
    * Resta en la bodega origen y suma en la destino dentro de UNA sola
    * transacción — antes eran dos llamadas a `ajustarCantidad` con su
    * propia transacción cada una: si la resta en origen tenía éxito y la
    * suma en destino fallaba (error de red, timeout, restart del proceso),
    * el producto quedaba descontado del origen sin acreditarse en ningún
    * lado — inventario perdido de verdad, no solo un dato inconsistente.
+   *
+   * El lado origen usa `descontarStockCondicionalEnTx` (antes usaba
+   * `ajustarCantidadEnTx` con delta negativo, que resta sin validar nada):
+   * sin el chequeo, una transferencia podía dejar `cantidadActual`
+   * negativo en la bodega origen incluso sin concurrencia de por medio.
    */
-  transferir(params: { tenantId: string; productoId: string; bodegaOrigenId: string; bodegaDestinoId: string; cantidad: number; userId: string }) {
+  async transferir(params: { tenantId: string; productoId: string; bodegaOrigenId: string; bodegaDestinoId: string; cantidad: number; userId: string }) {
     return this.db.$transaction(async (tx) => {
-      await this.ajustarCantidadEnTx(tx, {
+      const origen = await this.descontarStockCondicionalEnTx(tx, {
         tenantId: params.tenantId,
         productoId: params.productoId,
         bodegaId: params.bodegaOrigenId,
-        delta: -params.cantidad,
+        cantidad: params.cantidad,
         tipo: 'TRANSFERENCIA',
         userId: params.userId,
         motivo: `Transferencia hacia bodega ${params.bodegaDestinoId}`,
       });
+      if (!origen) {
+        throw new BadRequestException(
+          `Stock insuficiente en la bodega de origen para transferir el producto ${params.productoId}`,
+        );
+      }
       return this.ajustarCantidadEnTx(tx, {
         tenantId: params.tenantId,
         productoId: params.productoId,

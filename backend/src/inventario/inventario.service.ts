@@ -30,7 +30,15 @@ export class InventarioService {
     ]);
   }
 
-  /** Regla de negocio: el stock nunca puede quedar negativo. */
+  /**
+   * Regla de negocio: el stock nunca puede quedar negativo. El chequeo de
+   * disponible y el descuento ocurren en una sola sentencia `UPDATE`
+   * condicional (`InventarioRepository.descontarStockCondicional*`) — antes
+   * se leía el disponible, se decidía en JS, y recién después se
+   * descontaba, dejando una ventana sin lock entre ambos pasos donde dos
+   * descuentos concurrentes podían pasar la validación a la vez (TOCTOU
+   * real, ver docs/ARCHITECTURE.md, "Concurrencia y atomicidad").
+   */
   async verificarYDescontarStock(params: {
     tenantId: string;
     productoId: string;
@@ -40,36 +48,52 @@ export class InventarioService {
     referencia: string;
   }) {
     await this.validarPertenencia({ productoId: params.productoId, bodegaId: params.bodegaId });
-    const stockActual = await this.inventarioRepository.obtenerStock(params.productoId, params.bodegaId);
-    const disponible = Number(stockActual?.cantidadActual ?? 0) - Number(stockActual?.cantidadReservada ?? 0);
 
-    if (disponible < params.cantidad) {
-      throw new BadRequestException(
-        `Stock insuficiente para el producto ${params.productoId} en la bodega ${params.bodegaId}`,
-      );
-    }
-
-    const stock = await this.inventarioRepository.ajustarCantidad({
+    const stock = await this.inventarioRepository.descontarStockCondicional({
       tenantId: params.tenantId,
       productoId: params.productoId,
       bodegaId: params.bodegaId,
-      delta: -params.cantidad,
+      cantidad: params.cantidad,
       tipo: 'SALIDA',
       userId: params.userId,
       motivo: params.referencia,
     });
 
+    if (!stock) {
+      await this.lanzarStockInsuficiente(params.productoId, params.bodegaId);
+    }
+
+    // `lanzarStockInsuficiente` siempre lanza — si llegamos acá, `stock` no es null (TS no infiere
+    // la ausencia de retorno a través de un `await` a una función `never`, por eso el `!`).
+    this.emitirSiStockBajo(params.tenantId, params.productoId, params.bodegaId, stock!);
+
+    return stock;
+  }
+
+  /** Mensaje de error con el disponible real — solo se lee en el camino de error, no afecta la atomicidad del descuento. */
+  private async lanzarStockInsuficiente(productoId: string, bodegaId: string): Promise<never> {
+    const stockActual = await this.inventarioRepository.obtenerStock(productoId, bodegaId);
+    const disponible = Number(stockActual?.cantidadActual ?? 0) - Number(stockActual?.cantidadReservada ?? 0);
+    throw new BadRequestException(
+      `Stock insuficiente para el producto ${productoId} en la bodega ${bodegaId} (disponible: ${disponible})`,
+    );
+  }
+
+  private emitirSiStockBajo(
+    tenantId: string,
+    productoId: string,
+    bodegaId: string,
+    stock: { cantidadActual: Prisma.Decimal; stockMinimo: Prisma.Decimal },
+  ) {
     if (Number(stock.cantidadActual) < Number(stock.stockMinimo)) {
       this.eventBus.emit(EVENTOS.STOCK_BAJO, {
-        tenantId: params.tenantId,
-        productoId: params.productoId,
-        bodegaId: params.bodegaId,
+        tenantId,
+        productoId,
+        bodegaId,
         cantidadActual: stock.cantidadActual.toString(),
         stockMinimo: stock.stockMinimo.toString(),
       });
     }
-
-    return stock;
   }
 
   /**
@@ -85,34 +109,24 @@ export class InventarioService {
     params: { tenantId: string; productoId: string; bodegaId: string; cantidad: number; userId: string; referencia: string },
   ) {
     await this.validarPertenencia({ productoId: params.productoId, bodegaId: params.bodegaId });
-    const stockActual = await this.inventarioRepository.obtenerStock(params.productoId, params.bodegaId);
-    const disponible = Number(stockActual?.cantidadActual ?? 0) - Number(stockActual?.cantidadReservada ?? 0);
 
-    if (disponible < params.cantidad) {
-      throw new BadRequestException(
-        `Stock insuficiente para el producto ${params.productoId} en la bodega ${params.bodegaId}`,
-      );
-    }
-
-    const stock = await this.inventarioRepository.ajustarCantidadEnTx(tx, {
+    const stock = await this.inventarioRepository.descontarStockCondicionalEnTx(tx, {
       tenantId: params.tenantId,
       productoId: params.productoId,
       bodegaId: params.bodegaId,
-      delta: -params.cantidad,
+      cantidad: params.cantidad,
       tipo: 'SALIDA',
       userId: params.userId,
       motivo: params.referencia,
     });
 
-    if (Number(stock.cantidadActual) < Number(stock.stockMinimo)) {
-      this.eventBus.emit(EVENTOS.STOCK_BAJO, {
-        tenantId: params.tenantId,
-        productoId: params.productoId,
-        bodegaId: params.bodegaId,
-        cantidadActual: stock.cantidadActual.toString(),
-        stockMinimo: stock.stockMinimo.toString(),
-      });
+    if (!stock) {
+      await this.lanzarStockInsuficiente(params.productoId, params.bodegaId);
     }
+
+    // `lanzarStockInsuficiente` siempre lanza — si llegamos acá, `stock` no es null (TS no infiere
+    // la ausencia de retorno a través de un `await` a una función `never`, por eso el `!`).
+    this.emitirSiStockBajo(params.tenantId, params.productoId, params.bodegaId, stock!);
 
     return stock;
   }

@@ -15,6 +15,8 @@ describe('InventarioService', () => {
     repository = {
       obtenerStock: jest.fn(),
       ajustarCantidad: jest.fn(),
+      descontarStockCondicional: jest.fn(),
+      descontarStockCondicionalEnTx: jest.fn(),
       transferir: jest.fn(),
       listarStockPorBodega: jest.fn(),
       listarBodegas: jest.fn(),
@@ -36,31 +38,26 @@ describe('InventarioService', () => {
       referencia: 'Venta por factura',
     };
 
-    it('lanza BadRequestException si el disponible es menor a lo pedido y NO descuenta', async () => {
+    it('lanza BadRequestException si el UPDATE condicional no afecta ninguna fila (stock insuficiente) y NO descuenta', async () => {
+      // El UPDATE atómico devuelve null cuando el WHERE (incluyendo el chequeo de disponible) no matchea —
+      // reemplaza el patrón anterior de "leer + decidir en JS" (TOCTOU real, ver ARCHITECTURE.md).
+      repository.descontarStockCondicional.mockResolvedValue(null as never);
       repository.obtenerStock.mockResolvedValue({ cantidadActual: 3, cantidadReservada: 0 } as never);
 
       await expect(service.verificarYDescontarStock(params)).rejects.toThrow(BadRequestException);
       expect(repository.ajustarCantidad).not.toHaveBeenCalled();
     });
 
-    it('considera la cantidad reservada al calcular el disponible', async () => {
-      // 10 en existencia pero 8 reservadas -> solo 2 disponibles, se piden 5
-      repository.obtenerStock.mockResolvedValue({ cantidadActual: 10, cantidadReservada: 8 } as never);
-
-      await expect(service.verificarYDescontarStock(params)).rejects.toThrow(BadRequestException);
-    });
-
-    it('descuenta el stock (delta negativo, tipo SALIDA) cuando hay disponible suficiente', async () => {
-      repository.obtenerStock.mockResolvedValue({ cantidadActual: 20, cantidadReservada: 0 } as never);
-      repository.ajustarCantidad.mockResolvedValue({ cantidadActual: 15, stockMinimo: 5 } as never);
+    it('descuenta el stock (tipo SALIDA) en una sola llamada atómica cuando hay disponible suficiente', async () => {
+      repository.descontarStockCondicional.mockResolvedValue({ cantidadActual: 15, stockMinimo: 5 } as never);
 
       await service.verificarYDescontarStock(params);
 
-      expect(repository.ajustarCantidad).toHaveBeenCalledWith({
+      expect(repository.descontarStockCondicional).toHaveBeenCalledWith({
         tenantId: 't1',
         productoId: 'p1',
         bodegaId: 'b1',
-        delta: -5,
+        cantidad: 5,
         tipo: 'SALIDA',
         userId: 'u1',
         motivo: 'Venta por factura',
@@ -68,8 +65,7 @@ describe('InventarioService', () => {
     });
 
     it('emite STOCK_BAJO cuando el resultado queda por debajo del mínimo', async () => {
-      repository.obtenerStock.mockResolvedValue({ cantidadActual: 20, cantidadReservada: 0 } as never);
-      repository.ajustarCantidad.mockResolvedValue({ cantidadActual: 3, stockMinimo: 10 } as never);
+      repository.descontarStockCondicional.mockResolvedValue({ cantidadActual: 3, stockMinimo: 10 } as never);
 
       await service.verificarYDescontarStock(params);
 
@@ -80,15 +76,15 @@ describe('InventarioService', () => {
     });
 
     it('NO emite STOCK_BAJO cuando el resultado queda por encima del mínimo', async () => {
-      repository.obtenerStock.mockResolvedValue({ cantidadActual: 20, cantidadReservada: 0 } as never);
-      repository.ajustarCantidad.mockResolvedValue({ cantidadActual: 50, stockMinimo: 10 } as never);
+      repository.descontarStockCondicional.mockResolvedValue({ cantidadActual: 50, stockMinimo: 10 } as never);
 
       await service.verificarYDescontarStock(params);
 
       expect(eventBus.emit).not.toHaveBeenCalled();
     });
 
-    it('trata un stock inexistente (producto nunca cargado en esa bodega) como cero disponible', async () => {
+    it('trata un stock inexistente (producto nunca cargado en esa bodega) igual que uno insuficiente', async () => {
+      repository.descontarStockCondicional.mockResolvedValue(null as never);
       repository.obtenerStock.mockResolvedValue(null);
 
       await expect(service.verificarYDescontarStock(params)).rejects.toThrow(BadRequestException);
