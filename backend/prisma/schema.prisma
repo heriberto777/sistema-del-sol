@@ -1,0 +1,1107 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================
+// CORE: TENANTS & CONFIGURACIÓN
+// ============================================================
+
+enum EstadoTenant {
+  ACTIVO
+  SUSPENDIDO
+  CANCELADO
+}
+
+model Tenant {
+  id        String       @id @default(uuid())
+  nombre    String
+  rnc       String?
+  subdominio String      @unique
+  estado    EstadoTenant @default(ACTIVO)
+  planBase  String       @default("base")
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  settings      TenantSettings?
+  configuraciones Configuracion[]
+  plugins       TenantPlugin[]
+  users         User[]
+  roles         Role[]
+  auditLogs     AuditLog[]
+  facturas      Factura[]
+  ncfAsignados  NcfAsignado[]
+  productos     Producto[]
+  bodegas       Bodega[]
+  movimientosInventario MovimientoInventario[]
+  clientes      Cliente[]
+  proveedores   Proveedor[]
+  ordenesCompra OrdenCompra[]
+  webhooks      Webhook[]
+  notificaciones Notificacion[]
+  plantillasNotificacion NotificacionPlantilla[]
+  cotizaciones  Cotizacion[]
+  remisiones    Remision[]
+  cuentasContables  CuentaContable[]
+  asientosContables AsientoContable[]
+  periodosContablesCerrados PeriodoContableCerrado[]
+  empleados     Empleado[]
+  periodosNomina PeriodoNomina[]
+  turnosCaja    TurnoCaja[]
+  pagos         Pago[]
+
+  @@map("tenants")
+}
+
+// Administradores de la PLATAFORMA (tú, tu equipo) — deliberadamente sin
+// tenantId: no pertenecen a ningún tenant, gestionan el alta/baja de
+// tenants. Login y JWT separados de los usuarios de tenant (ver
+// src/platform-auth/).
+model PlatformAdmin {
+  id                      String    @id @default(uuid())
+  email                   String    @unique
+  passwordHash            String
+  nombre                  String
+  activo                  Boolean   @default(true)
+  resetPasswordTokenHash  String?
+  resetPasswordExpiraEn   DateTime?
+  createdAt               DateTime  @default(now())
+
+  auditLogs PlatformAuditLog[]
+
+  @@map("platform_admins")
+}
+
+// Datos estructurados de integración/config por tenant (MSSQL, canales habilitados, moneda)
+model TenantSettings {
+  id                  String  @id @default(uuid())
+  tenantId            String  @unique
+  tenant              Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  moneda              String  @default("DOP")
+  timezone            String  @default("America/Santo_Domingo")
+  emailHabilitado     Boolean @default(true)
+  smsHabilitado       Boolean @default(false)
+  mssqlHabilitado     Boolean @default(false)
+  mssqlHost           String?
+  mssqlPort           Int?
+  mssqlDatabase       String?
+  mssqlUserEncrypted  String?
+  mssqlPasswordEncrypted String?
+  updatedAt           DateTime @updatedAt
+
+  @@map("tenant_settings")
+}
+
+// Parámetros configurables clave/valor con default heredado de .env (ITBIS_GENERAL, PLAZO_PAGO_DIAS, etc.)
+model Configuracion {
+  id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  clave     String
+  valor     String
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, clave])
+  @@map("configuraciones")
+}
+
+model TenantPlugin {
+  id           String   @id @default(uuid())
+  tenantId     String
+  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  pluginKey    String
+  activo       Boolean  @default(true)
+  config       Json     @default("{}")
+  instaladoEn  DateTime @default(now())
+
+  @@unique([tenantId, pluginKey])
+  @@map("tenant_plugins")
+}
+
+// ============================================================
+// CORE: USUARIOS, ROLES, PERMISOS, AUDITORÍA
+// ============================================================
+
+model User {
+  id                     String    @id @default(uuid())
+  tenantId               String
+  tenant                 Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  email                  String
+  passwordHash           String
+  nombre                 String
+  activo                 Boolean   @default(true)
+  resetPasswordTokenHash String?
+  resetPasswordExpiraEn  DateTime?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  roles         UserRole[]
+  auditLogs     AuditLog[]
+  facturasVendedor Factura[] @relation("FacturaVendedor")
+  movimientosInventario MovimientoInventario[]
+  ordenesCompra OrdenCompra[]
+  cotizaciones  Cotizacion[]
+  remisiones    Remision[]
+  turnosCaja    TurnoCaja[]
+  pagos         Pago[]
+
+  @@unique([tenantId, email])
+  @@map("users")
+}
+
+model Role {
+  id          String   @id @default(uuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  nombre      String
+  descripcion String?
+  esSistema   Boolean  @default(false)
+
+  permisos UserRole[] @relation("RoleUserRole")
+  rolePermissions RolePermission[]
+
+  @@unique([tenantId, nombre])
+  @@map("roles")
+}
+
+// Catálogo global de permisos, ej: "facturacion.crear", "inventario.ajustar"
+model Permission {
+  id          String @id @default(uuid())
+  clave       String @unique
+  descripcion String?
+
+  roles RolePermission[]
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId       String
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permissionId String
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model UserRole {
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  roleId String
+  role   Role   @relation("RoleUserRole", fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@map("user_roles")
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  accion    String
+  entidad   String
+  entidadId String?
+  antes     Json?
+  despues   Json?
+  ip        String?
+  createdAt DateTime @default(now())
+
+  @@index([tenantId, entidad, entidadId])
+  @@map("audit_logs")
+}
+
+/// Bitácora de acciones del super admin de plataforma (crear/suspender
+/// tenants, etc.) — separada de AuditLog porque no tiene tenantId.
+model PlatformAuditLog {
+  id            String        @id @default(uuid())
+  adminId       String?
+  admin         PlatformAdmin? @relation(fields: [adminId], references: [id], onDelete: SetNull)
+  accion        String
+  entidad       String
+  entidadId     String?
+  despues       Json?
+  ip            String?
+  createdAt     DateTime      @default(now())
+
+  @@index([entidad, entidadId])
+  @@map("platform_audit_logs")
+}
+
+// ============================================================
+// FACTURACIÓN
+// ============================================================
+
+enum TipoNcf {
+  B01 // Crédito Fiscal
+  B02 // Consumo
+  B14 // Régimen Especial
+  B15 // Gubernamental
+  B04 // Nota de Crédito
+  B03 // Nota de Débito
+}
+
+enum TipoFactura {
+  CONTADO
+  CREDITO
+  NOTA_DEBITO
+  NOTA_CREDITO
+}
+
+enum EstadoFactura {
+  BORRADOR
+  EMITIDA
+  ANULADA
+}
+
+model NcfAsignado {
+  id               String   @id @default(uuid())
+  tenantId         String
+  tenant           Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tipoNcf          TipoNcf
+  secuenciaActual  Int
+  secuenciaFinal   Int
+  vigenciaHasta    DateTime
+  activo           Boolean  @default(true)
+
+  @@unique([tenantId, tipoNcf])
+  @@map("ncf_asignados")
+}
+
+model Factura {
+  id              String        @id @default(uuid())
+  tenantId        String
+  tenant          Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  clienteId       String
+  cliente         Cliente       @relation(fields: [clienteId], references: [id])
+  vendedorId      String
+  vendedor        User          @relation("FacturaVendedor", fields: [vendedorId], references: [id])
+  // Nullable porque las facturas creadas antes de esta columna no lo tienen;
+  // sin esto no hay forma de saber a qué bodega devolver stock al anular.
+  bodegaId        String?
+  bodega          Bodega?       @relation(fields: [bodegaId], references: [id])
+  ncf             String?
+  tipoNcf         TipoNcf?
+  tipoFactura     TipoFactura
+  estado          EstadoFactura @default(BORRADOR)
+  motivoAnulacion String?
+  motivoNota      String?
+  fecha           DateTime      @default(now())
+  subtotal        Decimal       @db.Decimal(14, 2)
+  descuento       Decimal       @default(0) @db.Decimal(14, 2)
+  itbis           Decimal       @db.Decimal(14, 2)
+  total           Decimal       @db.Decimal(14, 2)
+  plazoPagoDias   Int           @default(30)
+  pagada          Boolean       @default(false)
+  fechaPago       DateTime?
+  facturaOrigenId String?
+  facturaOrigen   Factura?      @relation("FacturaOrigenNota", fields: [facturaOrigenId], references: [id])
+  notasRelacionadas Factura[]   @relation("FacturaOrigenNota")
+  // Solo lo llenan las ventas de POS (ver PosService.registrarVenta) — el resto de
+  // flujos de facturación (venta normal, conversión de cotización/remisión) los deja null.
+  metodoPago      MetodoPago?
+  turnoCajaId     String?
+  // SetNull (no Cascade): si el turno se borra, la factura (documento fiscal) debe
+  // sobrevivir siempre — solo se pierde el vínculo con el turno de caja.
+  turnoCaja       TurnoCaja?    @relation(fields: [turnoCajaId], references: [id], onDelete: SetNull)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  lineas LineaFactura[]
+  cotizacionOrigen Cotizacion?
+  remisionOrigen   Remision?
+  pagos            Pago[]
+
+  @@unique([tenantId, ncf])
+  @@index([tenantId, clienteId])
+  @@map("facturas")
+}
+
+model LineaFactura {
+  id                String  @id @default(uuid())
+  facturaId         String
+  factura           Factura @relation(fields: [facturaId], references: [id], onDelete: Cascade)
+  productoId        String
+  producto          Producto @relation(fields: [productoId], references: [id])
+  cantidad          Decimal @db.Decimal(14, 4)
+  precioUnitario    Decimal @db.Decimal(14, 4)
+  porcentajeItbis   Decimal @db.Decimal(5, 2)
+  descuento         Decimal @default(0) @db.Decimal(14, 2)
+  montoItbis        Decimal @db.Decimal(14, 2)
+  montoTotal        Decimal @db.Decimal(14, 2)
+
+  @@map("linea_factura")
+}
+
+// ============================================================
+// COTIZACIONES Y REMISIONES
+// Documentos sin efecto fiscal que preceden a una factura.
+// ============================================================
+
+enum EstadoCotizacion {
+  BORRADOR
+  ENVIADA
+  ACEPTADA
+  RECHAZADA
+  VENCIDA
+}
+
+model Cotizacion {
+  id                 String           @id @default(uuid())
+  tenantId           String
+  tenant             Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  clienteId          String
+  cliente            Cliente          @relation(fields: [clienteId], references: [id])
+  vendedorId         String
+  vendedor           User             @relation(fields: [vendedorId], references: [id])
+  numero             String
+  estado             EstadoCotizacion @default(BORRADOR)
+  fechaVigenciaHasta DateTime
+  subtotal           Decimal          @db.Decimal(14, 2)
+  descuento          Decimal          @default(0) @db.Decimal(14, 2)
+  itbis              Decimal          @db.Decimal(14, 2)
+  total              Decimal          @db.Decimal(14, 2)
+  // Se completa al convertirla en factura; a partir de ahí es de solo lectura.
+  facturaId          String?          @unique
+  factura            Factura?         @relation(fields: [facturaId], references: [id])
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  lineas LineaCotizacion[]
+
+  @@unique([tenantId, numero])
+  @@index([tenantId, estado])
+  @@map("cotizaciones")
+}
+
+model LineaCotizacion {
+  id              String     @id @default(uuid())
+  cotizacionId    String
+  cotizacion      Cotizacion @relation(fields: [cotizacionId], references: [id], onDelete: Cascade)
+  productoId      String
+  // Cascade (a diferencia de LineaFactura, que preserva historial fiscal):
+  // una cotización no es un documento fiscal, y sin esto un borrado en
+  // cascada del tenant puede fallar por una carrera en el orden en que
+  // Postgres resuelve las cascadas de "productos" vs. "cotizaciones".
+  producto        Producto   @relation(fields: [productoId], references: [id], onDelete: Cascade)
+  cantidad        Decimal    @db.Decimal(14, 4)
+  precioUnitario  Decimal    @db.Decimal(14, 4)
+  porcentajeItbis Decimal    @db.Decimal(5, 2)
+  descuento       Decimal    @default(0) @db.Decimal(14, 2)
+  montoItbis      Decimal    @db.Decimal(14, 2)
+  montoTotal      Decimal    @db.Decimal(14, 2)
+
+  @@map("linea_cotizacion")
+}
+
+enum EstadoRemision {
+  BORRADOR
+  ENTREGADA
+  FACTURADA
+  ANULADA
+}
+
+/// v1 simplificado a propósito: a diferencia de una remisión "real" (que
+/// mueve inventario físico al entregarse, antes de facturar), esta
+/// remisión no toca stock por sí sola — el descuento de inventario ocurre
+/// al convertirla en factura (mismo flujo que ya usa FacturacionService).
+/// Modelar la reserva/entrega física por separado de la facturación es
+/// una mejora futura si el negocio lo necesita; por ahora evita duplicar
+/// la lógica de movimiento de stock en dos lugares.
+model Remision {
+  id         String         @id @default(uuid())
+  tenantId   String
+  tenant     Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  numero     String
+  clienteId  String
+  cliente    Cliente        @relation(fields: [clienteId], references: [id])
+  bodegaId   String
+  bodega     Bodega         @relation(fields: [bodegaId], references: [id])
+  vendedorId String
+  vendedor   User           @relation(fields: [vendedorId], references: [id])
+  estado     EstadoRemision @default(BORRADOR)
+  fecha      DateTime       @default(now())
+  facturaId  String?        @unique
+  factura    Factura?       @relation(fields: [facturaId], references: [id])
+  createdAt  DateTime       @default(now())
+
+  lineas LineaRemision[]
+
+  @@unique([tenantId, numero])
+  @@map("remisiones")
+}
+
+model LineaRemision {
+  id         String   @id @default(uuid())
+  remisionId String
+  remision   Remision @relation(fields: [remisionId], references: [id], onDelete: Cascade)
+  productoId String
+  // Ver comentario equivalente en LineaCotizacion.producto.
+  producto   Producto @relation(fields: [productoId], references: [id], onDelete: Cascade)
+  cantidad   Decimal  @db.Decimal(14, 4)
+
+  @@map("linea_remision")
+}
+
+// ============================================================
+// CONTABILIDAD (partida doble)
+// ============================================================
+
+enum TipoCuentaContable {
+  ACTIVO
+  PASIVO
+  PATRIMONIO
+  INGRESO
+  GASTO
+}
+
+/// Determina si un débito o un crédito AUMENTA el saldo de la cuenta.
+/// ACTIVO/GASTO son deudoras (débito aumenta); PASIVO/PATRIMONIO/INGRESO
+/// son acreedoras (crédito aumenta). Se guarda explícito en vez de
+/// derivarlo del tipo en cada cálculo, para permitir la excepción rara
+/// (cuentas contra-activo, etc.) sin tener que tocar la lógica de saldo.
+enum NaturalezaCuenta {
+  DEUDORA
+  ACREEDORA
+}
+
+model CuentaContable {
+  id            String              @id @default(uuid())
+  tenantId      String
+  tenant        Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  codigo        String
+  nombre        String
+  tipo          TipoCuentaContable
+  naturaleza    NaturalezaCuenta
+  cuentaPadreId String?
+  cuentaPadre   CuentaContable?     @relation("JerarquiaCuenta", fields: [cuentaPadreId], references: [id])
+  subcuentas    CuentaContable[]    @relation("JerarquiaCuenta")
+  activa        Boolean             @default(true)
+  createdAt     DateTime            @default(now())
+
+  lineasAsiento LineaAsiento[]
+
+  @@unique([tenantId, codigo])
+  @@map("cuentas_contables")
+}
+
+enum OrigenAsiento {
+  FACTURA
+  COMPRA
+  MANUAL
+  NOMINA
+  PAGO
+  GASTO
+  CIERRE
+}
+
+model AsientoContable {
+  id       String        @id @default(uuid())
+  tenantId String
+  tenant   Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  numero   Int
+  fecha    DateTime      @default(now())
+  concepto String
+  origen   OrigenAsiento
+  origenId String?
+  anulado  Boolean       @default(false)
+  createdAt DateTime     @default(now())
+
+  lineas LineaAsiento[]
+  periodoCerrado PeriodoContableCerrado?
+
+  @@unique([tenantId, numero])
+  @@map("asientos_contables")
+}
+
+/// Un registro por período contable ya cerrado (ver CierrePeriodoService).
+/// `fecha` es la fecha de corte; el cierre siguiente debe ser posterior a
+/// ella. `asientoCierre` es el asiento automático (origen CIERRE) que
+/// traspasa el saldo neto de INGRESO/GASTO del período a Utilidades
+/// Retenidas — ver el comentario en estados-financieros.service.ts sobre
+/// por qué esto hacía falta.
+model PeriodoContableCerrado {
+  id              String          @id @default(uuid())
+  tenantId        String
+  tenant          Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  fecha           DateTime
+  utilidadNeta    Decimal         @db.Decimal(14, 2)
+  asientoCierreId String          @unique
+  asientoCierre   AsientoContable @relation(fields: [asientoCierreId], references: [id], onDelete: Cascade)
+  createdAt       DateTime        @default(now())
+
+  @@unique([tenantId, fecha])
+  @@map("periodos_contables_cerrados")
+}
+
+/// Cada línea es débito O crédito, nunca ambos (uno de los dos queda en
+/// 0) — es la representación normal de partida doble. El asiento
+/// completo balancea cuando sum(debito) == sum(credito) entre todas sus
+/// líneas; esa invariante se valida en AsientosContablesService, nunca
+/// a nivel de fila.
+model LineaAsiento {
+  id               String          @id @default(uuid())
+  asientoId        String
+  asiento          AsientoContable @relation(fields: [asientoId], references: [id], onDelete: Cascade)
+  cuentaContableId String
+  // Cascade: ver el comentario equivalente en LineaCotizacion.producto —
+  // misma carrera de Postgres al borrar un tenant completo (Tenant ->
+  // CuentaContable y Tenant -> AsientoContable -> LineaAsiento son ramas
+  // hermanas que compiten por borrar primero).
+  cuentaContable   CuentaContable  @relation(fields: [cuentaContableId], references: [id], onDelete: Cascade)
+  debito           Decimal         @default(0) @db.Decimal(14, 2)
+  credito          Decimal         @default(0) @db.Decimal(14, 2)
+  descripcion      String?
+
+  @@map("lineas_asiento")
+}
+
+// ============================================================
+// NÓMINA
+// ============================================================
+
+enum TipoContrato {
+  INDEFINIDO
+  DETERMINADO
+}
+
+enum TipoPeriodoNomina {
+  QUINCENAL
+  MENSUAL
+}
+
+enum EstadoPeriodoNomina {
+  BORRADOR
+  PROCESADO
+  PAGADO
+}
+
+model Empleado {
+  id                  String        @id @default(uuid())
+  tenantId            String
+  tenant              Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  nombre              String
+  cedula              String
+  cargo               String
+  departamento        String?
+  fechaIngreso        DateTime
+  fechaSalida         DateTime?
+  salarioBrutoMensual Decimal       @db.Decimal(14, 2)
+  tipoContrato        TipoContrato  @default(INDEFINIDO)
+  activo              Boolean       @default(true)
+  email               String?
+  telefono            String?
+  createdAt           DateTime      @default(now())
+
+  recibos             ReciboNomina[]
+
+  @@unique([tenantId, cedula])
+  @@map("empleados")
+}
+
+model PeriodoNomina {
+  id          String              @id @default(uuid())
+  tenantId    String
+  tenant      Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tipo        TipoPeriodoNomina
+  fechaInicio DateTime
+  fechaFin    DateTime
+  fechaPago   DateTime?
+  estado      EstadoPeriodoNomina @default(BORRADOR)
+  createdAt   DateTime            @default(now())
+
+  recibos     ReciboNomina[]
+
+  @@map("periodos_nomina")
+}
+
+/// Un recibo por empleado por período. Los montos patronales (sfsEmpleador,
+/// afpEmpleador, infotep) no afectan el neto pagado al empleado — se
+/// guardan igual porque son costo laboral real y alimentan el asiento
+/// contable automático (ver NominaEventosService/AsientosContablesService).
+model ReciboNomina {
+  id               String        @id @default(uuid())
+  periodoId        String
+  periodo          PeriodoNomina @relation(fields: [periodoId], references: [id], onDelete: Cascade)
+  empleadoId       String
+  // Cascade: mismo patrón/razón que LineaAsiento.cuentaContable — Tenant ->
+  // Empleado y Tenant -> PeriodoNomina -> ReciboNomina son ramas hermanas
+  // que compiten al borrar un tenant completo.
+  empleado         Empleado      @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+  salarioBruto     Decimal       @db.Decimal(14, 2)
+  sfsEmpleado      Decimal       @db.Decimal(14, 2)
+  afpEmpleado      Decimal       @db.Decimal(14, 2)
+  isr              Decimal       @db.Decimal(14, 2)
+  otrasDeducciones Decimal       @default(0) @db.Decimal(14, 2)
+  salarioNeto      Decimal       @db.Decimal(14, 2)
+  sfsEmpleador     Decimal       @db.Decimal(14, 2)
+  afpEmpleador     Decimal       @db.Decimal(14, 2)
+  infotep          Decimal       @db.Decimal(14, 2)
+  createdAt        DateTime      @default(now())
+
+  @@unique([periodoId, empleadoId])
+  @@map("recibos_nomina")
+}
+
+// ============================================================
+// POS (punto de venta) — sin modo offline en v1, ver ARCHITECTURE.md
+// ============================================================
+
+enum MetodoPago {
+  EFECTIVO
+  TARJETA
+  TRANSFERENCIA
+}
+
+enum EstadoTurnoCaja {
+  ABIERTO
+  CERRADO
+}
+
+enum TipoMovimientoCaja {
+  ENTRADA
+  SALIDA
+}
+
+/// Un turno de caja por bodega/cajero. Solo puede haber un ABIERTO a la
+/// vez por bodega (lo valida PosService, no una constraint de DB, porque
+/// "a la vez" depende del estado, no de una combinación de columnas fija).
+model TurnoCaja {
+  id                String          @id @default(uuid())
+  tenantId          String
+  tenant            Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  bodegaId          String
+  // Cascade: mismo patrón que LineaAsiento.cuentaContable — Tenant -> Bodega
+  // y Tenant -> TurnoCaja son ramas hermanas que compiten al borrar el tenant.
+  bodega            Bodega          @relation(fields: [bodegaId], references: [id], onDelete: Cascade)
+  cajeroId          String
+  // Cascade por la misma razón (Tenant -> User es otra rama hermana).
+  cajero            User            @relation(fields: [cajeroId], references: [id], onDelete: Cascade)
+  montoInicial      Decimal         @db.Decimal(14, 2)
+  montoFinalContado Decimal?        @db.Decimal(14, 2)
+  montoEsperado     Decimal?        @db.Decimal(14, 2)
+  diferencia        Decimal?        @db.Decimal(14, 2)
+  estado            EstadoTurnoCaja @default(ABIERTO)
+  abiertoEn         DateTime        @default(now())
+  cerradoEn         DateTime?
+
+  movimientos MovimientoCaja[]
+  facturas    Factura[]
+
+  @@map("turnos_caja")
+}
+
+/// Entradas/salidas de efectivo dentro de un turno abierto que NO son una
+/// venta (retiro para gasto menor, ingreso de vuelto adicional, etc.) —
+/// las ventas ya se contabilizan directamente vía Factura.turnoCajaId.
+model MovimientoCaja {
+  id        String             @id @default(uuid())
+  turnoId   String
+  turno     TurnoCaja          @relation(fields: [turnoId], references: [id], onDelete: Cascade)
+  tipo      TipoMovimientoCaja
+  monto     Decimal            @db.Decimal(14, 2)
+  concepto  String
+  createdAt DateTime           @default(now())
+
+  @@map("movimientos_caja")
+}
+
+// ============================================================
+// PRODUCTOS, PRECIOS, INVENTARIO
+// ============================================================
+
+model Producto {
+  id               String   @id @default(uuid())
+  tenantId         String
+  tenant           Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  codigo           String
+  nombre           String
+  categoria        String?
+  unidadMedida     String   @default("UND")
+  porcentajeItbis  Decimal  @default(18) @db.Decimal(5, 2)
+  activo           Boolean  @default(true)
+  origenMssql      Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  precios     Precio[]
+  stock       Stock[]
+  movimientos MovimientoInventario[]
+  lineasFactura LineaFactura[]
+  lineasOc    LineaOc[]
+  lineasRecepcion LineaRecepcion[]
+  lineasCotizacion LineaCotizacion[]
+  lineasRemision   LineaRemision[]
+  lineasDevolucionCompra LineaDevolucionCompra[]
+
+  @@unique([tenantId, codigo])
+  @@map("productos")
+}
+
+model Precio {
+  id             String    @id @default(uuid())
+  productoId     String
+  producto       Producto  @relation(fields: [productoId], references: [id], onDelete: Cascade)
+  listaPrecio    String    @default("GENERAL")
+  costo          Decimal   @db.Decimal(14, 4)
+  margenPct      Decimal   @db.Decimal(6, 2)
+  precioVenta    Decimal   @db.Decimal(14, 4)
+  vigenteDesde   DateTime  @default(now())
+  vigenteHasta   DateTime?
+
+  @@index([productoId, listaPrecio, vigenteDesde])
+  @@map("precios")
+}
+
+model Bodega {
+  id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  nombre    String
+  direccion String?
+  activa    Boolean  @default(true)
+
+  stock        Stock[]
+  movimientos  MovimientoInventario[]
+  facturas     Factura[]
+  remisiones   Remision[]
+  turnosCaja   TurnoCaja[]
+  devoluciones DevolucionCompra[]
+
+  @@unique([tenantId, nombre])
+  @@map("bodegas")
+}
+
+model Stock {
+  id                 String   @id @default(uuid())
+  productoId         String
+  producto           Producto @relation(fields: [productoId], references: [id], onDelete: Cascade)
+  bodegaId           String
+  bodega             Bodega   @relation(fields: [bodegaId], references: [id], onDelete: Cascade)
+  cantidadActual     Decimal  @default(0) @db.Decimal(14, 4)
+  cantidadReservada  Decimal  @default(0) @db.Decimal(14, 4)
+  stockMinimo        Decimal  @default(10) @db.Decimal(14, 4)
+  updatedAt          DateTime @updatedAt
+
+  @@unique([productoId, bodegaId])
+  @@map("stock")
+}
+
+enum TipoMovimientoInventario {
+  ENTRADA
+  SALIDA
+  TRANSFERENCIA
+  AJUSTE
+}
+
+model MovimientoInventario {
+  id             String                   @id @default(uuid())
+  tenantId       String
+  tenant         Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  productoId     String
+  producto       Producto                 @relation(fields: [productoId], references: [id])
+  bodegaId       String
+  bodega         Bodega                   @relation(fields: [bodegaId], references: [id])
+  tipo           TipoMovimientoInventario
+  cantidad       Decimal                  @db.Decimal(14, 4)
+  motivo         String?
+  referenciaTipo String?
+  referenciaId   String?
+  userId         String
+  user           User                     @relation(fields: [userId], references: [id])
+  createdAt      DateTime                 @default(now())
+
+  @@index([tenantId, productoId, bodegaId])
+  @@map("movimiento_inventario")
+}
+
+// ============================================================
+// COMPRAS
+// ============================================================
+
+model Proveedor {
+  id       String  @id @default(uuid())
+  tenantId String
+  tenant   Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  nombre   String
+  rnc      String?
+  email    String?
+  telefono String?
+  activo   Boolean @default(true)
+
+  ordenesCompra OrdenCompra[]
+
+  @@map("proveedores")
+}
+
+enum EstadoOrdenCompra {
+  BORRADOR
+  ENVIADA
+  RECIBIDA_PARCIAL
+  RECIBIDA_TOTAL
+  CANCELADA
+}
+
+model OrdenCompra {
+  id           String            @id @default(uuid())
+  tenantId     String
+  tenant       Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  proveedorId  String
+  proveedor    Proveedor         @relation(fields: [proveedorId], references: [id])
+  numero       String
+  estado       EstadoOrdenCompra @default(BORRADOR)
+  fecha        DateTime          @default(now())
+  total        Decimal           @db.Decimal(14, 2)
+  // Igual convención que Factura.pagada/fechaPago — ver PagosService: se
+  // recalcula cuando la suma de Pago contra esta orden alcanza el total.
+  pagada       Boolean           @default(false)
+  fechaPago    DateTime?
+  userId       String
+  user         User              @relation(fields: [userId], references: [id])
+  createdAt    DateTime          @default(now())
+
+  lineas       LineaOc[]
+  recepciones  RecepcionCompra[]
+  pagos        Pago[]
+  devoluciones DevolucionCompra[]
+
+  @@unique([tenantId, numero])
+  @@map("orden_compra")
+}
+
+model LineaOc {
+  id                String      @id @default(uuid())
+  ordenCompraId     String
+  ordenCompra       OrdenCompra @relation(fields: [ordenCompraId], references: [id], onDelete: Cascade)
+  productoId        String
+  // Cascade: mismo patrón/razón que LineaCotizacion.producto — Tenant -> Producto
+  // y Tenant -> OrdenCompra -> LineaOc son ramas hermanas que compiten al borrar
+  // el tenant completo (carrera real de Postgres, no solo teórica — encontrada
+  // corriendo los e2e de Compras).
+  producto          Producto    @relation(fields: [productoId], references: [id], onDelete: Cascade)
+  cantidad          Decimal     @db.Decimal(14, 4)
+  costoUnitario     Decimal     @db.Decimal(14, 4)
+  cantidadRecibida  Decimal     @default(0) @db.Decimal(14, 4)
+
+  @@map("linea_oc")
+}
+
+model RecepcionCompra {
+  id                       String      @id @default(uuid())
+  tenantId                 String
+  ordenCompraId            String
+  // Cascade: sin esto, borrar un tenant completo cascadea a OrdenCompra pero
+  // se detiene ahí — RecepcionCompra queda huérfana referenciando una orden ya
+  // borrada y Postgres rechaza el borrado completo (carrera real encontrada
+  // corriendo los e2e de Compras, misma clase de bug que LineaOc.producto).
+  ordenCompra              OrdenCompra @relation(fields: [ordenCompraId], references: [id], onDelete: Cascade)
+  fecha                    DateTime    @default(now())
+  facturaProveedorNumero   String?
+  montoFacturaProveedor    Decimal?    @db.Decimal(14, 2)
+  createdAt                DateTime    @default(now())
+
+  lineas LineaRecepcion[]
+
+  @@map("recepcion_compra")
+}
+
+model LineaRecepcion {
+  id                String          @id @default(uuid())
+  recepcionId       String
+  recepcion         RecepcionCompra @relation(fields: [recepcionId], references: [id], onDelete: Cascade)
+  productoId        String
+  // Cascade: mismo patrón que LineaOc.producto (ver ese comentario).
+  producto          Producto        @relation(fields: [productoId], references: [id], onDelete: Cascade)
+  cantidadRecibida  Decimal         @db.Decimal(14, 4)
+  costoUnitario     Decimal         @db.Decimal(14, 4)
+
+  @@map("linea_recepcion")
+}
+
+/// Devolución de mercancía ya recibida a un proveedor — mismo patrón que
+/// RecepcionCompra (tenantId propio en vez de relación, porque solo se
+/// alcanza vía OrdenCompra; ver el comentario en RecepcionCompra). Reduce
+/// `LineaOc.cantidadRecibida` y saca el stock correspondiente.
+model DevolucionCompra {
+  id            String      @id @default(uuid())
+  tenantId      String
+  ordenCompraId String
+  ordenCompra   OrdenCompra @relation(fields: [ordenCompraId], references: [id], onDelete: Cascade)
+  bodegaId      String
+  // Cascade: mismo patrón de ramas hermanas que TurnoCaja.bodegaId (ver ese
+  // comentario) — Tenant -> Bodega y Tenant -> OrdenCompra -> DevolucionCompra
+  // compiten al borrar el tenant completo; sin Cascade acá, Postgres puede
+  // intentar borrar la Bodega mientras esta fila todavía la referencia.
+  bodega        Bodega      @relation(fields: [bodegaId], references: [id], onDelete: Cascade)
+  motivo        String?
+  fecha         DateTime    @default(now())
+  createdAt     DateTime    @default(now())
+
+  lineas LineaDevolucionCompra[]
+
+  @@map("devolucion_compra")
+}
+
+model LineaDevolucionCompra {
+  id            String           @id @default(uuid())
+  devolucionId  String
+  devolucion    DevolucionCompra @relation(fields: [devolucionId], references: [id], onDelete: Cascade)
+  productoId    String
+  // Cascade: mismo patrón que LineaOc.producto/LineaRecepcion.producto (ver esos comentarios).
+  producto      Producto         @relation(fields: [productoId], references: [id], onDelete: Cascade)
+  cantidad      Decimal          @db.Decimal(14, 4)
+  costoUnitario Decimal          @db.Decimal(14, 4)
+
+  @@map("linea_devolucion_compra")
+}
+
+/// Ledger de pagos — a diferencia de Factura.pagada/OrdenCompra.pagada
+/// (booleanos derivados, ver PagosService), este es el registro real: uno
+/// por cada abono, permitiendo pagos parciales con su método y fecha.
+/// Exactamente uno de facturaId/ordenCompraId debe estar presente — no hay
+/// forma declarativa de exigirlo en Prisma, se valida en PagosService.
+model Pago {
+  id            String       @id @default(uuid())
+  tenantId      String
+  tenant        Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  facturaId     String?
+  factura       Factura?     @relation(fields: [facturaId], references: [id], onDelete: Cascade)
+  ordenCompraId String?
+  ordenCompra   OrdenCompra? @relation(fields: [ordenCompraId], references: [id], onDelete: Cascade)
+  monto         Decimal      @db.Decimal(14, 2)
+  metodoPago    MetodoPago
+  fecha         DateTime     @default(now())
+  userId        String
+  user          User         @relation(fields: [userId], references: [id])
+  createdAt     DateTime     @default(now())
+
+  @@index([facturaId])
+  @@index([ordenCompraId])
+  @@map("pagos")
+}
+
+// ============================================================
+// CLIENTES
+// ============================================================
+
+enum TipoCliente {
+  PERSONA_FISICA
+  PERSONA_JURIDICA
+}
+
+model Cliente {
+  id            String      @id @default(uuid())
+  tenantId      String
+  tenant        Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  nombre        String
+  tipo          TipoCliente @default(PERSONA_FISICA)
+  rncCedula     String?
+  email         String?
+  telefono      String?
+  limiteCredito Decimal     @default(0) @db.Decimal(14, 2)
+  activo        Boolean     @default(true)
+  createdAt     DateTime    @default(now())
+
+  direcciones DireccionCliente[]
+  facturas    Factura[]
+  cotizaciones Cotizacion[]
+  remisiones  Remision[]
+
+  @@map("clientes")
+}
+
+model DireccionCliente {
+  id           String  @id @default(uuid())
+  clienteId    String
+  cliente      Cliente @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  direccion    String
+  ciudad       String?
+  esPrincipal  Boolean @default(false)
+
+  @@map("direccion_cliente")
+}
+
+// ============================================================
+// WEBHOOKS (gestionados por el propio tenant)
+// ============================================================
+
+model Webhook {
+  id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  url       String
+  eventos   String[]
+  secret    String
+  activo    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  entregas WebhookDelivery[]
+
+  @@map("webhooks")
+}
+
+model WebhookDelivery {
+  id         String   @id @default(uuid())
+  webhookId  String
+  webhook    Webhook  @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+  evento     String
+  payload    Json
+  statusCode Int?
+  exitoso    Boolean  @default(false)
+  intentos   Int      @default(0)
+  createdAt  DateTime @default(now())
+
+  @@map("webhook_deliveries")
+}
+
+// ============================================================
+// NOTIFICACIONES
+// ============================================================
+
+enum CanalNotificacion {
+  EMAIL
+  IN_APP
+  WEBHOOK
+  WHATSAPP
+}
+
+enum EstadoNotificacion {
+  PENDIENTE
+  ENVIADA
+  FALLIDA
+}
+
+model NotificacionPlantilla {
+  id        String            @id @default(uuid())
+  tenantId  String
+  tenant    Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  canal     CanalNotificacion
+  clave     String
+  asunto    String?
+  cuerpo    String
+  activa    Boolean           @default(true)
+
+  @@unique([tenantId, canal, clave])
+  @@map("notificacion_plantillas")
+}
+
+model Notificacion {
+  id            String             @id @default(uuid())
+  tenantId      String
+  tenant        Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  canal         CanalNotificacion
+  destinatario  String
+  asunto        String?
+  cuerpo        String
+  estado        EstadoNotificacion @default(PENDIENTE)
+  createdAt     DateTime           @default(now())
+  enviadaEn     DateTime?
+
+  @@map("notificaciones")
+}

@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "composite": true,
+    "skipLibCheck": true,
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "allowSyntheticDefaultImports": true,
+    // Project references de TS exigen emitir (no admiten noEmit), pero sin
+    // outDir el default es emitir junto al .ts fuente — así apareció un
+    // vite.config.js viejo junto a vite.config.ts que Vite terminó
+    // preferiendo sobre el archivo real, sirviendo config obsoleta en
+    // silencio. outDir lo manda a una carpeta ya ignorada por git/docker.
+    "outDir": "node_modules/.tsbuild-node"
+  },
+  "include": ["vite.config.ts"]
+}

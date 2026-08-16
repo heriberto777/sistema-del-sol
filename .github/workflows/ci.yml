@@ -1,0 +1,62 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: sol
+          POSTGRES_PASSWORD: sol
+          POSTGRES_DB: sistema_del_sol_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U sol"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://sol:sol@localhost:5432/sistema_del_sol_test
+      JWT_SECRET: test-secret
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.7.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Crear .env de raíz (prisma:* lo cargan vía dotenv-cli)
+        run: |
+          echo "DATABASE_URL=$DATABASE_URL" >> .env
+          echo "JWT_SECRET=$JWT_SECRET" >> .env
+      - run: pnpm --filter ./backend prisma:generate
+      - run: pnpm --filter ./backend prisma:migrate:deploy
+      - run: pnpm --filter ./backend lint
+      - run: pnpm --filter ./backend build
+      - run: pnpm --filter ./backend test:cov
+      - run: pnpm --filter ./backend test:e2e
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.7.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter ./frontend lint
+      - run: pnpm --filter ./frontend build

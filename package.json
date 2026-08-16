@@ -1,0 +1,20 @@
+{
+  "name": "sistema-del-sol",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "dev": "pnpm --parallel --filter ./backend --filter ./frontend dev",
+    "build:all": "pnpm --filter ./backend build && pnpm --filter ./frontend build",
+    "test": "pnpm --filter ./backend test",
+    "test:cov": "pnpm --filter ./backend test:cov",
+    "test:ui": "pnpm --filter ./frontend test",
+    "lint": "pnpm --filter ./backend lint && pnpm --filter ./frontend lint",
+    "prisma:generate": "pnpm --filter ./backend prisma:generate",
+    "prisma:migrate": "pnpm --filter ./backend prisma:migrate",
+    "prisma:studio": "pnpm --filter ./backend prisma:studio"
+  },
+  "devDependencies": {
+    "prettier": "^3.3.3"
+  },
+  "packageManager": "pnpm@9.7.0"
+}

@@ -1,0 +1,182 @@
+import { ReportesFiscalesService } from './reportes-fiscales.service';
+import { ReportesFiscalesRepository } from './reportes-fiscales.repository';
+
+describe('ReportesFiscalesService', () => {
+  let service: ReportesFiscalesService;
+  let repository: jest.Mocked<ReportesFiscalesRepository>;
+
+  beforeEach(() => {
+    repository = {
+      ventasEnRango: jest.fn(),
+      anuladasEnRango: jest.fn(),
+      comprasRecibidasEnRango: jest.fn(),
+      retencionesNominaEnRango: jest.fn(),
+    } as unknown as jest.Mocked<ReportesFiscalesRepository>;
+    service = new ReportesFiscalesService(repository);
+  });
+
+  describe('formato607 (ventas)', () => {
+    it('mapea RNC, NCF, fecha y montos de cada factura', async () => {
+      repository.ventasEnRango.mockResolvedValue([
+        { ncf: 'B0200000001', fecha: new Date('2026-01-05'), subtotal: 100, itbis: 18, total: 118, cliente: { rncCedula: '13100000001' } },
+      ] as never);
+
+      const { filas, resumen } = await service.formato607();
+
+      expect(filas[0]).toEqual(
+        expect.objectContaining({ rncCedula: '13100000001', ncf: 'B0200000001', montoFacturado: 100, itbisFacturado: 18 }),
+      );
+      expect(resumen).toEqual({ cantidad: 1, montoFacturado: 100, itbisFacturado: 18 });
+    });
+
+    it('usa cadena vacía si el cliente no tiene RNC/cédula registrado', async () => {
+      repository.ventasEnRango.mockResolvedValue([
+        { ncf: 'B0200000002', fecha: new Date('2026-01-05'), subtotal: 100, itbis: 18, total: 118, cliente: { rncCedula: null } },
+      ] as never);
+
+      const { filas } = await service.formato607();
+
+      expect(filas[0].rncCedula).toBe('');
+    });
+  });
+
+  describe('exportar607Txt', () => {
+    it('genera un TXT delimitado por | con fecha en AAAAMMDD', async () => {
+      repository.ventasEnRango.mockResolvedValue([
+        { ncf: 'B0200000001', fecha: new Date(2026, 0, 5), subtotal: 100, itbis: 18, total: 118, cliente: { rncCedula: '13100000001' } },
+      ] as never);
+
+      const txt = await service.exportar607Txt();
+
+      expect(txt).toBe('13100000001|B0200000001|20260105|01|100.00|18.00');
+    });
+  });
+
+  describe('formato608 (anulados)', () => {
+    it('mapea NCF y fecha de cada factura anulada', async () => {
+      repository.anuladasEnRango.mockResolvedValue([{ ncf: 'B0200000003', fecha: new Date('2026-01-10') }] as never);
+
+      const { filas, resumen } = await service.formato608();
+
+      expect(filas).toEqual([{ ncf: 'B0200000003', fecha: new Date('2026-01-10'), tipoAnulacion: '01' }]);
+      expect(resumen).toEqual({ cantidad: 1 });
+    });
+  });
+
+  describe('formato606 (compras)', () => {
+    it('calcula monto e ITBIS por línea usando el porcentajeItbis del producto', async () => {
+      repository.comprasRecibidasEnRango.mockResolvedValue([
+        {
+          fecha: new Date('2026-01-05'),
+          facturaProveedorNumero: 'FACT-001',
+          ordenCompra: { proveedor: { rnc: '13100000099' } },
+          lineas: [
+            { costoUnitario: 100, cantidadRecibida: 2, producto: { porcentajeItbis: 18 } },
+          ],
+        },
+      ] as never);
+
+      const { filas, resumen } = await service.formato606();
+
+      // 100 * 2 = 200 monto; itbis 18% = 36
+      expect(filas[0]).toEqual(
+        expect.objectContaining({ rncProveedor: '13100000099', numeroComprobante: 'FACT-001', montoFacturado: 200, itbisFacturado: 36 }),
+      );
+      expect(resumen).toEqual({ cantidad: 1, montoFacturado: 200, itbisFacturado: 36 });
+    });
+
+    it('suma varias líneas de la misma recepción', async () => {
+      repository.comprasRecibidasEnRango.mockResolvedValue([
+        {
+          fecha: new Date('2026-01-05'),
+          facturaProveedorNumero: 'FACT-002',
+          ordenCompra: { proveedor: { rnc: null } },
+          lineas: [
+            { costoUnitario: 50, cantidadRecibida: 1, producto: { porcentajeItbis: 18 } },
+            { costoUnitario: 30, cantidadRecibida: 2, producto: { porcentajeItbis: 0 } },
+          ],
+        },
+      ] as never);
+
+      const { filas } = await service.formato606();
+
+      // linea 1: 50*1=50, itbis 9; linea 2: 30*2=60, itbis 0 => total monto 110, itbis 9
+      expect(filas[0].montoFacturado).toBe(110);
+      expect(filas[0].itbisFacturado).toBe(9);
+      expect(filas[0].rncProveedor).toBe('');
+    });
+  });
+
+  describe('resumenItbis', () => {
+    it('calcula el neto como ventas menos compras', async () => {
+      repository.ventasEnRango.mockResolvedValue([
+        { ncf: 'B01', fecha: new Date(), subtotal: 1000, itbis: 180, total: 1180, cliente: { rncCedula: null } },
+      ] as never);
+      repository.comprasRecibidasEnRango.mockResolvedValue([
+        {
+          fecha: new Date(),
+          facturaProveedorNumero: 'F1',
+          ordenCompra: { proveedor: { rnc: null } },
+          lineas: [{ costoUnitario: 500, cantidadRecibida: 1, producto: { porcentajeItbis: 18 } }],
+        },
+      ] as never);
+
+      const resultado = await service.resumenItbis();
+
+      expect(resultado.itbisEnVentas).toBe(180);
+      expect(resultado.itbisEnCompras).toBe(90);
+      expect(resultado.itbisNetoAPagar).toBe(90);
+    });
+  });
+
+  describe('formatoIT1', () => {
+    it('clasifica el neto positivo como ITBIS a pagar', async () => {
+      repository.ventasEnRango.mockResolvedValue([
+        { ncf: 'B01', fecha: new Date(), subtotal: 1000, itbis: 180, total: 1180, cliente: { rncCedula: null } },
+      ] as never);
+      repository.comprasRecibidasEnRango.mockResolvedValue([]);
+
+      const resultado = await service.formatoIT1();
+
+      expect(resultado.itbisEnVentas).toBe(180);
+      expect(resultado.itbisAPagar).toBe(180);
+      expect(resultado.itbisSaldoAFavor).toBe(0);
+    });
+
+    it('clasifica el neto negativo como saldo a favor', async () => {
+      repository.ventasEnRango.mockResolvedValue([]);
+      repository.comprasRecibidasEnRango.mockResolvedValue([
+        {
+          fecha: new Date(),
+          facturaProveedorNumero: 'F1',
+          ordenCompra: { proveedor: { rnc: null } },
+          lineas: [{ costoUnitario: 500, cantidadRecibida: 1, producto: { porcentajeItbis: 18 } }],
+        },
+      ] as never);
+
+      const resultado = await service.formatoIT1();
+
+      expect(resultado.itbisAPagar).toBe(0);
+      expect(resultado.itbisSaldoAFavor).toBe(90);
+    });
+  });
+
+  describe('retencionesNomina', () => {
+    it('agrupa el ISR y el salario bruto por empleado a través de varios recibos', async () => {
+      repository.retencionesNominaEnRango.mockResolvedValue([
+        { empleadoId: 'e1', salarioBruto: 30000, isr: 500, empleado: { cedula: '001-1', nombre: 'Ana Pérez' } },
+        { empleadoId: 'e1', salarioBruto: 30000, isr: 500, empleado: { cedula: '001-1', nombre: 'Ana Pérez' } },
+        { empleadoId: 'e2', salarioBruto: 20000, isr: 0, empleado: { cedula: '002-2', nombre: 'Beto Ruiz' } },
+      ] as never);
+
+      const resultado = await service.retencionesNomina('tenant-1');
+
+      expect(repository.retencionesNominaEnRango).toHaveBeenCalledWith('tenant-1', expect.any(Date), expect.any(Date));
+      expect(resultado.empleados).toEqual([
+        { cedula: '001-1', nombre: 'Ana Pérez', salarioBruto: 60000, isr: 1000 },
+        { cedula: '002-2', nombre: 'Beto Ruiz', salarioBruto: 20000, isr: 0 },
+      ]);
+      expect(resultado.resumen).toEqual({ salarioBruto: 80000, isr: 1000 });
+    });
+  });
+});

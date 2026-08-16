@@ -1,0 +1,113 @@
+import PDFDocument from 'pdfkit';
+
+const MARGEN = 40;
+const ALTO_FILA = 20;
+
+export interface LineaDocumentoPdf {
+  concepto: string;
+  cantidad: string;
+  precioUnitario?: string;
+  total?: string;
+}
+
+export interface DocumentoPdfParams {
+  tipoDocumento: string;
+  numero: string;
+  fecha: Date;
+  cliente: string;
+  lineas: LineaDocumentoPdf[];
+  /** Si es false (ej. remisiones, que no guardan precio), omite las columnas de precio/total y el resumen final. */
+  mostrarPrecios?: boolean;
+  subtotal?: number;
+  descuento?: number;
+  itbis?: number;
+  total?: number;
+  notas?: string;
+}
+
+const formatearMonto = (monto: number) => `RD$ ${monto.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+/**
+ * Documento imprimible tipo factura/cotización/remisión — a diferencia de
+ * `generarPdf` (tabla genérica de reportes), este incluye encabezado con
+ * número/fecha/cliente y un resumen de totales al final.
+ */
+export function generarDocumentoPdf(params: DocumentoPdfParams): Promise<Buffer> {
+  const mostrarPrecios = params.mostrarPrecios ?? true;
+
+  return new Promise((resolve, reject) => {
+    const doc = new PDFDocument({ margin: MARGEN, size: 'letter' });
+    const chunks: Buffer[] = [];
+    doc.on('data', (chunk) => chunks.push(chunk));
+    doc.on('end', () => resolve(Buffer.concat(chunks)));
+    doc.on('error', reject);
+
+    const anchoUtil = doc.page.width - MARGEN * 2;
+
+    doc.font('Helvetica-Bold').fontSize(18).text(params.tipoDocumento, { width: anchoUtil });
+    doc.font('Helvetica').fontSize(10);
+    doc.text(`Número: ${params.numero}`);
+    doc.text(`Fecha: ${params.fecha.toLocaleDateString('es-DO')}`);
+    doc.text(`Cliente: ${params.cliente}`);
+    doc.moveDown();
+
+    const columnas = mostrarPrecios
+      ? [
+          { header: 'Concepto', width: anchoUtil * 0.45 },
+          { header: 'Cantidad', width: anchoUtil * 0.15 },
+          { header: 'Precio unit.', width: anchoUtil * 0.2 },
+          { header: 'Total', width: anchoUtil * 0.2 },
+        ]
+      : [
+          { header: 'Concepto', width: anchoUtil * 0.7 },
+          { header: 'Cantidad', width: anchoUtil * 0.3 },
+        ];
+
+    function dibujarEncabezado() {
+      doc.font('Helvetica-Bold').fontSize(9);
+      let x = MARGEN;
+      const y = doc.y;
+      for (const columna of columnas) {
+        doc.text(columna.header, x, y, { width: columna.width, ellipsis: true });
+        x += columna.width;
+      }
+      doc.moveDown(0.7);
+      doc.font('Helvetica').fontSize(9);
+    }
+
+    dibujarEncabezado();
+
+    for (const linea of params.lineas) {
+      if (doc.y + ALTO_FILA > doc.page.height - MARGEN) {
+        doc.addPage();
+        dibujarEncabezado();
+      }
+      const valores = mostrarPrecios
+        ? [linea.concepto, linea.cantidad, linea.precioUnitario ?? '—', linea.total ?? '—']
+        : [linea.concepto, linea.cantidad];
+      let x = MARGEN;
+      const y = doc.y;
+      valores.forEach((valor, i) => {
+        doc.text(valor, x, y, { width: columnas[i].width, ellipsis: true });
+        x += columnas[i].width;
+      });
+      doc.moveDown(0.7);
+    }
+
+    if (mostrarPrecios) {
+      doc.moveDown();
+      doc.font('Helvetica').fontSize(10);
+      if (params.subtotal !== undefined) doc.text(`Subtotal: ${formatearMonto(params.subtotal)}`, { align: 'right' });
+      if (params.descuento) doc.text(`Descuento: ${formatearMonto(params.descuento)}`, { align: 'right' });
+      if (params.itbis !== undefined) doc.text(`ITBIS: ${formatearMonto(params.itbis)}`, { align: 'right' });
+      if (params.total !== undefined) doc.font('Helvetica-Bold').text(`Total: ${formatearMonto(params.total)}`, { align: 'right' });
+    }
+
+    if (params.notas) {
+      doc.moveDown();
+      doc.font('Helvetica').fontSize(9).text(`Notas: ${params.notas}`);
+    }
+
+    doc.end();
+  });
+}

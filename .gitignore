@@ -1,0 +1,43 @@
+node_modules/
+**/node_modules/
+
+.env
+**/.env
+!.env.example
+
+dist/
+build/
+**/dist/
+**/build/
+
+# tsc -b puede compilar vite.config.ts a .js/.d.ts en el mismo directorio
+# si tsconfig.node.json no tiene noEmit — Vite prefiere ese .js viejo por
+# encima del .ts fuente, así que un archivo así queda sirviendo config
+# obsoleta en silencio. No debería pasar (noEmit ya está puesto), pero
+# por si acaso.
+frontend/vite.config.js
+frontend/vite.config.d.ts
+
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+backend/prisma/migrations/dev/
+coverage/
+**/coverage/
+
+.jest-cache/
+**/.jest-cache/
+*.tsbuildinfo
+
+.pnpm-store/
+**/.pnpm-store/
+
+.DS_Store
+Thumbs.db
+
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
+*.zip

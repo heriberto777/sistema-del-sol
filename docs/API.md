@@ -1,0 +1,264 @@
+# API
+
+Swagger interactivo en `http://localhost:3000/api/docs` (incluye todos los
+DTOs y permite probar con Bearer token). Este documento es un mapa rápido;
+la fuente de verdad son los controllers en `backend/src/*/*.controller.ts`.
+
+Todas las rutas (salvo `/auth/login`) requieren `Authorization: Bearer <token>`
+y el permiso indicado.
+
+Los endpoints marcados con `?pagina&tamanoPagina&busqueda` devuelven
+`{ datos, total, pagina, tamanoPagina }` (nunca un array plano) — `total`
+es la cantidad real que matchea el filtro, no el tamaño de `datos`. Los
+tres query params son opcionales (`pagina=1`, `tamanoPagina=20` por
+defecto); `busqueda` es texto libre, filtrado por cada endpoint sobre sus
+propios campos relevantes (ver docs/ARCHITECTURE.md).
+
+## Auth
+
+| Método | Ruta | Permiso | Descripción |
+|---|---|---|---|
+| POST | `/api/auth/login` | público | `{ email, password, tenantSubdominio }` → `{ accessToken, usuario }` |
+| POST | `/api/auth/password/olvide` | público (5/hora) | `{ email, tenantSubdominio }` → mensaje genérico siempre (no filtra si el email existe); envía el link por correo |
+| POST | `/api/auth/password/restablecer` | público | `{ token, tenantSubdominio, password }` — token de un solo uso, vence en 1h |
+
+## Plataforma (super admin — token y secreto separados del de tenants)
+
+No hay alta de super admins por HTTP — se crean con
+`pnpm --filter ./backend platform:bootstrap-admin` (ver
+`docs/ARCHITECTURE.md`, sección "Auth de plataforma vs. tenant").
+
+| Método | Ruta | Auth | Descripción |
+|---|---|---|---|
+| POST | `/api/platform/auth/login` | público | `{ email, password }` → `{ accessToken, admin }` |
+| POST | `/api/platform/auth/password/olvide` | público (5/hora) | `{ email }` → mensaje genérico siempre |
+| POST | `/api/platform/auth/password/restablecer` | público | `{ token, password }` — token de un solo uso, vence en 1h |
+| POST | `/api/platform/tenants` | Bearer de plataforma | Crea el tenant + roles/permisos/configuración/usuario admin inicial, todo en una transacción |
+| GET | `/api/platform/tenants` | Bearer de plataforma | Lista todos los tenants |
+| GET | `/api/platform/tenants/:id` | Bearer de plataforma | |
+| PATCH | `/api/platform/tenants/:id` | Bearer de plataforma | `{ nombre?, estado?, planBase? }` — `estado: SUSPENDIDO` bloquea el login de ese tenant |
+| GET | `/api/platform/audit-log?pagina&tamanoPagina&busqueda` | Bearer de plataforma | Bitácora de acciones de plataforma (crear/suspender tenants, etc.) |
+
+## NCF (por tenant)
+
+| Método | Ruta | Permiso |
+|---|---|---|
+| GET | `/api/admin/ncf` | `admin.configuracion` |
+| POST | `/api/admin/ncf` | `admin.configuracion` — `{ tipoNcf, secuenciaInicial?, secuenciaFinal, vigenciaHasta }` |
+| PATCH | `/api/admin/ncf/:tipoNcf` | `admin.configuracion` — `{ secuenciaFinal?, vigenciaHasta?, activo? }` |
+
+## Facturación
+
+| Método | Ruta | Permiso |
+|---|---|---|
+| POST | `/api/facturas` | `facturacion.crear` — `{ clienteId, bodegaId, tipoFactura, lineas[], facturaOrigenId? }`; `facturaOrigenId` requerido para `NOTA_CREDITO`/`NOTA_DEBITO` |
+| GET | `/api/facturas?pagina&tamanoPagina&busqueda` | `facturacion.ver` — `busqueda` filtra por NCF o nombre de cliente |
+| GET | `/api/facturas/:id` | `facturacion.ver` |
+| POST | `/api/facturas/:id/anular` | `facturacion.anular` — reversa el efecto de inventario (ver ARCHITECTURE.md); 400 si ya estaba anulada |
+| POST | `/api/facturas/:id/registrar-pago` | `facturacion.cobrar` — `{ fechaPago? }` (default: ahora); 400 si no está EMITIDA o ya estaba pagada |
+
+## Cotizaciones
+
+| Método | Ruta | Permiso |
+|---|---|---|
+| POST | `/api/cotizaciones` | `cotizaciones.crear` — `{ clienteId, fechaVigenciaHasta, lineas[] }` |
+| GET | `/api/cotizaciones?pagina&tamanoPagina&busqueda` | `cotizaciones.ver` — `busqueda` filtra por nombre de cliente |
+| GET | `/api/cotizaciones/:id` | `cotizaciones.ver` |
+| PATCH | `/api/cotizaciones/:id/estado` | `cotizaciones.editar` — `{ estado: ENVIADA\|ACEPTADA\|RECHAZADA }` |
+| POST | `/api/cotizaciones/:id/convertir` | `cotizaciones.editar` — `{ bodegaId, tipoFactura: CONTADO\|CREDITO }`, crea la factura y marca la cotización convertida |
+
+## Remisiones
+
+| Método | Ruta | Permiso |
+|---|---|---|
+| POST | `/api/remisiones` | `remisiones.crear` — `{ clienteId, bodegaId, numero, lineas[] }` (sin efecto en inventario) |
+| GET | `/api/remisiones?pagina&tamanoPagina&busqueda` | `remisiones.ver` — `busqueda` filtra por número o cliente |
+| GET | `/api/remisiones/:id` | `remisiones.ver` |
+| PATCH | `/api/remisiones/:id/estado` | `remisiones.editar` — `{ estado: ENTREGADA\|ANULADA }` |
+| POST | `/api/remisiones/:id/convertir` | `remisiones.editar` — `{ tipoFactura: CONTADO\|CREDITO }`, recién aquí descuenta inventario |
+
+## Productos
+
+| Método | Ruta | Permiso |
+|---|---|---|
+| POST | `/api/productos` | `precios.editar` |
+| GET | `/api/productos?pagina&tamanoPagina&busqueda` | `precios.ver` — `busqueda` filtra por nombre o código |
+| GET | `/api/productos/:id` | `precios.ver` |
+
+## Inventario
+
+| Método | Ruta | Permiso |
+|---|---|---|
+| GET | `/api/inventario/bodegas` | `inventario.ver` |
+| POST | `/api/inventario/bodegas` | `admin.configuracion` |
+| GET | `/api/inventario/stock/:bodegaId` | `inventario.ver` |
+| POST | `/api/inventario/ajustar` | `inventario.ajustar` |
+| POST | `/api/inventario/transferir` | `inventario.transferir` |
+
+## Precios
+
+| Método | Ruta | Permiso |
+|---|---|---|
+| GET | `/api/precios/:productoId?listaPrecio` | `precios.ver` |
+| GET | `/api/precios/:productoId/historial` | `precios.ver` |
+| POST | `/api/precios` | `precios.editar` |
+
+## Compras
+
+| Método | Ruta | Permiso |
+|---|---|---|
+| POST | `/api/compras` | `compras.crear` |
+| GET | `/api/compras?pagina&tamanoPagina&busqueda` | `compras.ver` — `busqueda` filtra por número de orden o nombre de proveedor |
+| GET | `/api/compras/:id` | `compras.ver` |
+| POST | `/api/compras/:id/recibir` | `compras.recibir` |
+
+## Clientes / Proveedores
+
+| Método | Ruta | Permiso |
+|---|---|---|
+| POST / PATCH | `/api/clientes` | `clientes.*` |
+| GET | `/api/clientes?pagina&tamanoPagina&busqueda` | `clientes.ver` — `busqueda` filtra por nombre, email o RNC/cédula |
+| POST | `/api/proveedores` | `compras.*` |
+| GET | `/api/proveedores?pagina&tamanoPagina&busqueda` | `compras.ver` — `busqueda` filtra por nombre o RNC |
+
+## Notificaciones
+
+| Método | Ruta | Permiso |
+|---|---|---|
+| GET | `/api/notificaciones?pagina&tamanoPagina&busqueda` | autenticado — `busqueda` filtra por destinatario o asunto |
+| GET | `/api/notificaciones/plantillas` | `admin.configuracion` |
+| POST | `/api/notificaciones/plantillas` | `admin.configuracion` — `{ canal: EMAIL\|WHATSAPP\|IN_APP\|WEBHOOK, clave, asunto?, cuerpo }`, upsert por `(tenant, canal, clave)` |
+
+## Webhooks
+
+| Método | Ruta | Permiso |
+|---|---|---|
+| POST | `/api/webhooks` | `admin.configuracion` |
+| GET | `/api/webhooks` | `admin.configuracion` |
+| DELETE | `/api/webhooks/:id` | `admin.configuracion` |
+
+Payload que reciben (`POST` a la `url` registrada), firmado con
+`X-Sol-Signature: HMAC-SHA256(body, webhook.secret)`:
+
+```json
+{
+  "evento": "factura.creada",
+  "payload": { "tenantId": "...", "facturaId": "...", "clienteId": "...", "total": "1500.00" },
+  "timestamp": "2026-08-01T12:00:00.000Z"
+}
+```
+
+Reintenta hasta 3 veces (sin espera, luego 2s, luego 8s) antes de marcar
+la entrega como fallida en `webhook_deliveries` — ver ARCHITECTURE.md.
+
+## Plugins
+
+Rutas bajo `/api/plugins/<clave>/...`, protegidas además por
+`@RequiresPlugin('<clave>')` (403 si el tenant no tiene el plugin activo).
+Ver `plugins/inmobiliaria/src/inmobiliaria.controller.ts`.
+
+## Admin (usuarios, plugins, configuración)
+
+| Método | Ruta | Permiso |
+|---|---|---|
+| GET | `/api/admin/roles` | `admin.usuarios` |
+| POST | `/api/admin/usuarios` | `admin.usuarios` |
+| GET | `/api/admin/usuarios?pagina&tamanoPagina&busqueda` | `admin.usuarios` — `busqueda` filtra por nombre o email |
+| GET | `/api/admin/usuarios/:id` | `admin.usuarios` |
+| PATCH | `/api/admin/usuarios/:id` | `admin.usuarios` — `{ nombre?, activo?, rolIds? }` (rolIds reemplaza los roles asignados) |
+| GET | `/api/admin/plugins` | `admin.plugins` — manifiestos descubiertos + `activo` para el tenant actual |
+| POST | `/api/admin/plugins/:pluginKey/activar` | `admin.plugins` |
+| POST | `/api/admin/plugins/:pluginKey/desactivar` | `admin.plugins` |
+| GET | `/api/admin/configuraciones` | `admin.configuracion` |
+| PUT | `/api/admin/configuraciones/:clave` | `admin.configuracion` — `{ valor }`, upsert (crea la clave si no existe) |
+
+## Reportes
+
+| Método | Ruta | Permiso |
+|---|---|---|
+| GET | `/api/reportes/dashboard` | `reportes.ver` — `{ ventasHoyTotal, facturasHoyCantidad, productosStockBajo, ordenesCompraPendientes }`, cacheado en Redis 30s por tenant |
+| GET | `/api/reportes/ventas?desde&hasta` | `reportes.ver` — facturas emitidas en el rango (default: últimos 30 días) + resumen |
+| GET | `/api/reportes/ventas/exportar?desde&hasta&formato=xlsx\|pdf` | `reportes.ver` — descarga binaria (`.xlsx` real vía exceljs, `.pdf` real vía pdfkit) |
+| GET | `/api/reportes/inventario` | `reportes.ver` — snapshot de stock actual por producto/bodega + resumen, cacheado en Redis 30s por tenant |
+| GET | `/api/reportes/inventario/exportar?formato=xlsx\|pdf` | `reportes.ver` |
+| GET | `/api/reportes/compras?desde&hasta` | `reportes.ver` — órdenes de compra en el rango + resumen por estado |
+| GET | `/api/reportes/compras/exportar?desde&hasta&formato=xlsx\|pdf` | `reportes.ver` |
+
+Los endpoints `/exportar` devuelven el archivo directamente (`Content-Type`
++ `Content-Disposition: attachment`), no JSON — el frontend los descarga
+con `responseType: 'blob'` (ver
+`frontend/src/components/molecules/BotonesExportar/BotonesExportar.tsx`).
+
+## Contabilidad
+
+Los asientos generados automáticamente desde facturación/compras (ver
+ARCHITECTURE.md) no pasan por estos endpoints de escritura — se crean
+directamente vía `ContabilidadEventosService`. `POST .../asientos` es
+para asientos manuales (ajustes, apertura, etc.).
+
+| Método | Ruta | Permiso |
+|---|---|---|
+| GET | `/api/contabilidad/cuentas` | `contabilidad.ver` — catálogo de cuentas activas |
+| POST | `/api/contabilidad/cuentas` | `contabilidad.editar` — crear cuenta nueva (código, nombre, tipo, naturaleza) |
+| GET | `/api/contabilidad/asientos?pagina&tamanoPagina&busqueda` | `contabilidad.ver` — paginado |
+| GET | `/api/contabilidad/asientos/:id` | `contabilidad.ver` |
+| POST | `/api/contabilidad/asientos` | `contabilidad.editar` — asiento manual; 400 si débito ≠ crédito |
+| GET | `/api/contabilidad/balance-general?fecha` | `contabilidad.ver` — activo/pasivo/patrimonio a la fecha (default: hoy), incluye `diferencia` (debería ser ~0) |
+| GET | `/api/contabilidad/estado-resultados?desde&hasta` | `contabilidad.ver` — ingresos/gastos/utilidadNeta en el rango (default: mes actual) |
+
+## Nómina
+
+| Método | Ruta | Permiso |
+|---|---|---|
+| GET | `/api/nomina/empleados?pagina&tamanoPagina&busqueda` | `nomina.ver` — busca por nombre/cédula/cargo |
+| GET | `/api/nomina/empleados/:id` | `nomina.ver` |
+| POST | `/api/nomina/empleados` | `nomina.editar` |
+| PATCH | `/api/nomina/empleados/:id` | `nomina.editar` — enviar `fechaSalida` desactiva al empleado automáticamente |
+| GET | `/api/nomina/periodos?pagina&tamanoPagina` | `nomina.ver` |
+| GET | `/api/nomina/periodos/:id` | `nomina.ver` — incluye los recibos con su empleado |
+| POST | `/api/nomina/periodos` | `nomina.editar` — genera recibos para todos los empleados activos (`{ tipo: QUINCENAL\|MENSUAL, fechaInicio, fechaFin }`) |
+| POST | `/api/nomina/periodos/:id/procesar` | `nomina.editar` — `BORRADOR → PROCESADO`, 400 si ya no está en BORRADOR |
+| POST | `/api/nomina/periodos/:id/marcar-pagado` | `nomina.editar` — `PROCESADO → PAGADO`, dispara el asiento contable automático (ver ARCHITECTURE.md) |
+
+## POS
+
+| Método | Ruta | Permiso |
+|---|---|---|
+| POST | `/api/pos/turnos` | `pos.editar` — abre un turno (`{ bodegaId, montoInicial }`); 400 si esa bodega ya tiene uno ABIERTO |
+| GET | `/api/pos/turnos?pagina&tamanoPagina` | `pos.ver` |
+| GET | `/api/pos/turnos/:id` | `pos.ver` — incluye movimientos y facturas del turno |
+| POST | `/api/pos/turnos/:id/movimientos` | `pos.editar` — entrada/salida de efectivo que no es una venta (`{ tipo: ENTRADA\|SALIDA, monto, concepto }`) |
+| POST | `/api/pos/turnos/:id/cerrar` | `pos.editar` — `{ montoFinalContado }`, calcula `montoEsperado`/`diferencia` |
+| POST | `/api/pos/ventas` | `pos.editar` — venta CONTADO contra la bodega del turno (`{ turnoCajaId, clienteId, metodoPago, lineas }`); genera su asiento contable automático igual que cualquier factura |
+
+## IA
+
+**Sin `ANTHROPIC_API_KEY` configurada, cada endpoint degrada a un modo
+heurístico sin IA (ver ARCHITECTURE.md) — no falla, responde con
+`generadaConIa: false` o (para sugerir-cuenta-contable) posiblemente
+`null`.**
+
+| Método | Ruta | Permiso |
+|---|---|---|
+| POST | `/api/ia/asistente` | `ia.usar` — `{ pregunta }`, responde con contexto real del dashboard del tenant |
+| POST | `/api/ia/sugerir-cuenta-contable` | `ia.usar` — `{ concepto }`, devuelve `{ codigo, nombre, fuente: IA\|HEURISTICA }` o `null` |
+| POST | `/api/ia/generar-descripcion-producto` | `ia.usar` — `{ nombre, categoria? }` |
+
+## Reportes fiscales DGII
+
+**Layout preliminar, no verificado byte a byte contra la DGII — ver
+ARCHITECTURE.md antes de usar en producción.**
+
+| Método | Ruta | Permiso |
+|---|---|---|
+| GET | `/api/reportes-fiscales/606?desde&hasta` | `reportes.ver` — compras recibidas en el rango (default: mes actual) |
+| GET | `/api/reportes-fiscales/606/exportar?desde&hasta&formato=txt\|json` | `reportes.ver` — `.txt` delimitado por `\|`, default |
+| GET | `/api/reportes-fiscales/607?desde&hasta` | `reportes.ver` — ventas (facturas EMITIDA) en el rango |
+| GET | `/api/reportes-fiscales/607/exportar?desde&hasta&formato=txt\|json` | `reportes.ver` |
+| GET | `/api/reportes-fiscales/608?desde&hasta` | `reportes.ver` — comprobantes anulados en el rango |
+| GET | `/api/reportes-fiscales/608/exportar?desde&hasta&formato=txt\|json` | `reportes.ver` |
+| GET | `/api/reportes-fiscales/itbis-resumen?desde&hasta` | `reportes.ver` — `{ itbisEnVentas, itbisEnCompras, itbisNetoAPagar }` |
+
+Las respuestas de `/admin/usuarios` nunca incluyen `passwordHash` — el
+repositorio usa `select` explícito, no `include`, precisamente para no
+filtrarlo por accidente.

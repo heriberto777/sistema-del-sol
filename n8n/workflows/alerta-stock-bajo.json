@@ -1,0 +1,86 @@
+{
+  "id": "sol-alerta-stock-bajo",
+  "name": "Alerta de stock bajo",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "stock-bajo",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "1a1b1c1d-0001-4a1a-8a1a-000000000001",
+      "name": "Webhook Sol",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "webhookId": "stock-bajo-webhook"
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "const crypto = require('crypto');\n\n// El secret es el que devuelve POST /api/webhooks al registrar este\n// mismo webhook en El Sistema del Sol (uno distinto por webhook creado).\nconst SECRETO_WEBHOOK = 'REEMPLAZA_CON_EL_SECRET_DEL_WEBHOOK';\n\nconst item = $input.item.json;\nconst firmaRecibida = item.headers['x-sol-signature'];\nconst cuerpoCrudo = JSON.stringify(item.body);\n\nconst firmaEsperada = crypto\n  .createHmac('sha256', SECRETO_WEBHOOK)\n  .update(cuerpoCrudo)\n  .digest('hex');\n\nif (firmaRecibida !== firmaEsperada) {\n  throw new Error('Firma de webhook inválida — revisa SECRETO_WEBHOOK en este nodo');\n}\n\nreturn [{ json: item.body.payload }];"
+      },
+      "id": "1a1b1c1d-0002-4a1a-8a1a-000000000002",
+      "name": "Verificar firma HMAC",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "const p = $input.item.json;\nconst mensaje = `⚠️ Stock bajo — producto ${p.productoId} en bodega ${p.bodegaId}: quedan ${p.cantidadActual} (mínimo ${p.stockMinimo}).`;\nreturn [{ json: { mensaje } }];"
+      },
+      "id": "1a1b1c1d-0003-4a1a-8a1a-000000000003",
+      "name": "Formatear mensaje",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://hooks.slack.com/services/REEMPLAZA/CON/TU_INCOMING_WEBHOOK",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"text\": $json.mensaje } }}",
+        "options": {}
+      },
+      "id": "1a1b1c1d-0004-4a1a-8a1a-000000000004",
+      "name": "Enviar a Slack",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "OK",
+        "options": {}
+      },
+      "id": "1a1b1c1d-0005-4a1a-8a1a-000000000005",
+      "name": "Responder 200",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1120, 300]
+    }
+  ],
+  "connections": {
+    "Webhook Sol": {
+      "main": [[{ "node": "Verificar firma HMAC", "type": "main", "index": 0 }]]
+    },
+    "Verificar firma HMAC": {
+      "main": [[{ "node": "Formatear mensaje", "type": "main", "index": 0 }]]
+    },
+    "Formatear mensaje": {
+      "main": [[{ "node": "Enviar a Slack", "type": "main", "index": 0 }]]
+    },
+    "Enviar a Slack": {
+      "main": [[{ "node": "Responder 200", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "pinData": {}
+}

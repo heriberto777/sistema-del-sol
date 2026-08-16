@@ -1,0 +1,115 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-sol}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sol}
+      POSTGRES_DB: ${POSTGRES_DB:-sistema_del_sol}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      # Sin -d, pg_isready asume una base con el mismo nombre que el
+      # usuario ("sol"), que no existe — eso llenaba el log de
+      # "FATAL: database sol does not exist" cada 5s (inofensivo para el
+      # healthcheck en sí, pero ruidoso y confuso).
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sol} -d ${POSTGRES_DB:-sistema_del_sol}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+
+  n8n:
+    image: n8nio/n8n:latest
+    restart: unless-stopped
+    environment:
+      N8N_HOST: ${N8N_HOST:-localhost}
+      N8N_PORT: 5678
+      N8N_PROTOCOL: http
+      WEBHOOK_URL: ${N8N_WEBHOOK_URL:-http://localhost:5678/}
+      GENERIC_TIMEZONE: America/Santo_Domingo
+    ports:
+      - "${N8N_PORT:-5678}:5678"
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - ./n8n/workflows:/workflows:ro
+    entrypoint: ["/bin/sh"]
+    # Importa las plantillas de n8n/workflows en cada arranque (n8n ignora
+    # las que ya existen por id, así que es seguro repetirlo) y luego sigue
+    # con el arranque normal. Ver n8n/README.md para configurarlas.
+    command: ["-c", "n8n import:workflow --separate --input=/workflows || true; exec n8n start"]
+    depends_on:
+      - postgres
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-sol}:${POSTGRES_PASSWORD:-sol}@postgres:5432/${POSTGRES_DB:-sistema_del_sol}
+      REDIS_URL: redis://redis:6379
+      # Usado solo para construir el link dentro del correo de "olvidé mi
+      # contraseña" — debe ser la URL que el usuario realmente abre en su
+      # navegador (el puerto host mapeado), no la del contenedor.
+      FRONTEND_URL: http://localhost:${FRONTEND_PORT:-5173}
+      # Fijo a propósito: el puerto DENTRO del contenedor siempre es 3000
+      # (coincide con el EXPOSE del Dockerfile). BACKEND_PORT del .env del
+      # host solo controla el lado izquierdo del mapeo de abajo — si se
+      # dejara pasar tal cual vía env_file, la app escucharía en el puerto
+      # del host dentro del contenedor y el mapeo de puertos apuntaría a
+      # un puerto donde no hay nada escuchando.
+      BACKEND_PORT: 3000
+    ports:
+      - "${BACKEND_PORT:-3000}:3000"
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  web:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      # Dentro de este contenedor, 'localhost' es el propio contenedor —
+      # el backend se alcanza por el nombre del servicio en la red de
+      # docker-compose, no por localhost. Ver el comentario en
+      # frontend/vite.config.ts.
+      VITE_API_PROXY_TARGET: http://api:3000
+      # Node 20 activa por defecto un algoritmo Happy-Eyeballs
+      # (autoSelectFamily) en net.connect que, dentro de este contenedor,
+      # hacía fallar la conexión del proxy de Vite hacia `api` con
+      # AggregateError [ECONNREFUSED] pese a que una conexión HTTP
+      # directa (sin ese mecanismo) funcionaba bien.
+      NODE_OPTIONS: --no-network-family-autoselection
+    ports:
+      - "${FRONTEND_PORT:-5173}:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - api
+
+volumes:
+  postgres_data:
+  redis_data:
+  n8n_data:

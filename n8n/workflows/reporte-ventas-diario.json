@@ -1,0 +1,79 @@
+{
+  "id": "sol-reporte-ventas-diario",
+  "name": "Reporte de ventas diario",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "cronExpression", "expression": "0 7 * * *" }]
+        }
+      },
+      "id": "2a2b2c2d-0001-4b2b-8b2b-000000000001",
+      "name": "Todos los días 7am",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.SOL_BACKEND_URL || 'http://api:3000' }}/api/facturas",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer REEMPLAZA_CON_UN_TOKEN_DE_SERVICIO"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "2a2b2c2d-0002-4b2b-8b2b-000000000002",
+      "name": "Traer facturas del día",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "const facturas = $input.item.json;\nconst hoy = new Date().toISOString().slice(0, 10);\nconst deHoy = facturas.filter((f) => f.fecha?.startsWith(hoy) && f.estado === 'EMITIDA');\nconst totalVendido = deHoy.reduce((acc, f) => acc + Number(f.total), 0);\n\nreturn [{\n  json: {\n    fecha: hoy,\n    cantidadFacturas: deHoy.length,\n    totalVendido: totalVendido.toFixed(2),\n  },\n}];"
+      },
+      "id": "2a2b2c2d-0003-4b2b-8b2b-000000000003",
+      "name": "Sumar el día",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "fromEmail": "reportes@sistemadelsol.com",
+        "toEmail": "REEMPLAZA_CON_TU_CORREO",
+        "subject": "=Reporte de ventas — {{ $json.fecha }}",
+        "emailFormat": "text",
+        "text": "=Facturas emitidas hoy: {{ $json.cantidadFacturas }}\nTotal vendido: RD$ {{ $json.totalVendido }}",
+        "options": {}
+      },
+      "id": "2a2b2c2d-0004-4b2b-8b2b-000000000004",
+      "name": "Enviar reporte por email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [900, 300]
+    }
+  ],
+  "connections": {
+    "Todos los días 7am": {
+      "main": [[{ "node": "Traer facturas del día", "type": "main", "index": 0 }]]
+    },
+    "Traer facturas del día": {
+      "main": [[{ "node": "Sumar el día", "type": "main", "index": 0 }]]
+    },
+    "Sumar el día": {
+      "main": [[{ "node": "Enviar reporte por email", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "pinData": {}
+}

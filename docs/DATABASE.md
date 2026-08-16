@@ -1,0 +1,147 @@
+# Base de datos
+
+PostgreSQL 16 + Prisma. Schema completo en `backend/prisma/schema.prisma`.
+
+## Convenciones
+
+- Nombres de tabla en snake_case en español (`facturas`, `linea_factura`,
+  `movimiento_inventario`...) vía `@@map` — los modelos de Prisma quedan
+  en PascalCase para el cliente TypeScript.
+- Toda tabla de negocio que pertenece a un tenant lleva una columna
+  `tenantId` y está listada en
+  `backend/src/prisma/tenant-scoped-models.ts` para el aislamiento
+  automático (ver ARCHITECTURE.md). Las tablas "hijas" que cuelgan de una
+  tabla ya scoped (`linea_factura`, `precios`, `stock`, `linea_oc`,
+  `linea_recepcion`) **no** llevan `tenantId` propio — su aislamiento
+  viene de la relación con el padre, pero **solo si se llega a ellas a
+  través de una consulta ya scoped sobre el padre** (p. ej. `factura.
+  findUniqueOrThrow({where:{id}, include:{lineas:true}})`). Si en cambio
+  se consulta la tabla hija directamente por un id del padre que viene del
+  cliente (`stock.findMany({where:{bodegaId}})`,
+  `precio.findFirst({where:{productoId}})`), **no hay ningún filtro
+  automático** — hay que validar a mano que ese id pertenezca al tenant
+  antes de tocar la tabla hija (ver `InventarioService.validarPertenencia`/
+  `PreciosService`, que hacen exactamente eso resolviendo el
+  padre — `Producto`/`Bodega`, que sí son tenant-scoped — vía
+  `TenantPrismaService` antes de leer/escribir `Stock`/`Precio`). Fue un
+  IDOR real (cualquier `bodegaId`/`productoId` adivinado de otro tenant
+  filtraba o permitía corromper su stock/precios) hasta que se corrigió.
+
+## Módulos y tablas
+
+| Módulo | Tablas |
+|---|---|
+| Core / tenants | `tenants`, `tenant_settings`, `configuraciones`, `tenant_plugins` |
+| Usuarios / RBAC | `users`, `roles`, `permissions`, `role_permissions`, `user_roles` |
+| Auditoría | `audit_logs` (tenant), `platform_audit_logs` (plataforma, sin `tenantId`) |
+| Facturación | `ncf_asignados`, `facturas`, `linea_factura` |
+| Cotizaciones / Remisiones | `cotizaciones`, `linea_cotizacion`, `remisiones`, `linea_remision` |
+| Productos / precios | `productos`, `precios` |
+| Inventario | `bodegas`, `stock`, `movimiento_inventario` |
+| Compras | `proveedores`, `orden_compra`, `linea_oc`, `recepcion_compra`, `linea_recepcion` |
+| Clientes | `clientes`, `direccion_cliente` |
+| Webhooks | `webhooks`, `webhook_deliveries` |
+| Notificaciones | `notificacion_plantillas`, `notificaciones` |
+| Contabilidad | `cuentas_contables`, `asientos_contables`, `lineas_asiento` |
+| Nómina | `empleados`, `periodos_nomina`, `recibos_nomina` |
+| POS | `turnos_caja`, `movimientos_caja` (+ `facturas.metodoPago`/`facturas.turnoCajaId`) |
+| Plataforma | `platform_admins`, `platform_audit_logs` |
+
+`users` y `platform_admins` tienen `resetPasswordTokenHash`/
+`resetPasswordExpiraEn` (ambos nullable) para el flujo de "olvidé mi
+contraseña" — ver ARCHITECTURE.md. Se limpian (`null`) al canjear el
+token, así que un token nunca puede reusarse.
+
+## Reglas de negocio relevantes al modelo
+
+- **NCF**: `ncf_asignados` guarda, por tenant y tipo (`B01` Crédito Fiscal,
+  `B02` Consumo, `B03` Nota de Débito, `B04` Nota de Crédito, `B14`/`B15`
+  regímenes especiales), un rango `secuenciaActual..secuenciaFinal` con
+  vigencia. `FacturacionRepository.siguienteNcf` toma el próximo número
+  con un `UPDATE ... SET secuenciaActual = secuenciaActual + 1`
+  (`{ increment: 1 }` de Prisma) — la transacción sola NO evitaba
+  duplicados (ver ARCHITECTURE.md, "Concurrencia y atomicidad"); el
+  incremento relativo sí, porque Postgres lo resuelve contra el valor
+  real de la fila en el momento del `UPDATE`, no contra un valor leído
+  antes en JS.
+- **Precios**: `precios` es un historial — cada cambio cierra el registro
+  vigente (`vigenteHasta = now()`) y crea uno nuevo con `vigenteHasta:
+  null`. La vigente es siempre `WHERE vigenteHasta IS NULL`.
+- **Stock**: `stock.cantidadActual - stock.cantidadReservada` es el
+  disponible; nunca se permite que una venta lo deje negativo
+  (`InventarioService.verificarYDescontarStock`). Cada movimiento queda
+  también en `movimiento_inventario` (ENTRADA/SALIDA/TRANSFERENCIA/AJUSTE).
+- **Compras**: `linea_oc.cantidadRecibida` se incrementa con cada
+  `recepcion_compra`; la orden pasa a `RECIBIDA_TOTAL` cuando toda línea
+  recibió >= lo pedido, o `RECIBIDA_PARCIAL` en caso contrario.
+  `diferenciaVsFactura` (respuesta de `POST .../recibir`) compara
+  `montoFacturaProveedor` contra el monto de **esta recepción específica**
+  (`Σ cantidadRecibida × costoUnitario` de las líneas que se están
+  recibiendo AHORA) — nunca contra `orden.total` (el total de toda la
+  orden). Comparar contra el total completo fue un bug real: en una
+  orden recibida en varios envíos, la factura del proveedor de un envío
+  parcial nunca va a coincidir con el total pedido originalmente, así
+  que esa comparación producía una "diferencia" sin sentido en cualquier
+  recepción que no fuera la única y completa.
+- **`facturas.bodegaId`** (nullable): de dónde se descontó/reintegró
+  inventario al crearla — nullable porque las facturas de antes de esta
+  columna no lo tienen; `anular()` simplemente no toca inventario si es
+  `null` (dato legado) en vez de fallar.
+- **`linea_cotizacion.productoId`/`linea_remision.productoId`** son
+  `ON DELETE CASCADE` hacia `productos` — a diferencia de
+  `linea_factura.productoId` (`RESTRICT`, preserva historial fiscal),
+  porque cotizaciones/remisiones no son documentos fiscales. Ver el
+  comentario en `schema.prisma` sobre por qué existe esta diferencia (una
+  carrera real en el orden de cascada de Postgres al borrar un tenant
+  completo, encontrada corriendo los e2e).
+- **`recibos_nomina.empleadoId`** y **`lineas_asiento.cuentaContableId`**
+  son `ON DELETE CASCADE` por la misma razón: son ramas hermanas desde
+  `Tenant` que compiten al borrarlo completo (`Tenant -> Empleado` vs.
+  `Tenant -> PeriodoNomina -> ReciboNomina`), y Postgres no garantiza el
+  orden entre ramas hermanas.
+- **`linea_oc.productoId`/`linea_recepcion.productoId`** son también
+  `ON DELETE CASCADE` hacia `productos`, mismo patrón de ramas hermanas
+  (`Tenant -> Producto` vs. `Tenant -> OrdenCompra -> LineaOc`) —
+  encontrado recién al agregar cobertura e2e real para Compras (nadie
+  había ejercitado ese camino de borrado antes).
+- **`recepcion_compra.ordenCompraId`** es `ON DELETE CASCADE` hacia
+  `orden_compra` por una razón ligeramente distinta: no es una carrera
+  entre ramas hermanas, es que `RecepcionCompra` **no tiene relación
+  directa con `Tenant`** (solo la columna `tenantId`, sin `@relation`) —
+  la única forma de alcanzarla al borrar un tenant es transitivamente
+  vía `OrdenCompra`, así que esa cascada debe declararse explícita o la
+  cadena se detiene ahí y Postgres rechaza el borrado del tenant.
+- **Los recibos de nómina no se recalculan si cambia el salario del
+  empleado**: `salarioBrutoMensual` en `empleados` es el valor *vigente*;
+  cada `ReciboNomina` congela el cálculo hecho al momento de generar el
+  período. No hay historial de cambios de salario (a diferencia de
+  `precios`) — si se necesita auditar aumentos salariales, es la
+  extensión natural.
+- **`facturas.turnoCajaId`** es `ON DELETE SET NULL` (no `RESTRICT` ni
+  `CASCADE`) — a diferencia de `recibos_nomina.empleadoId`/
+  `lineas_asiento.cuentaContableId`, aquí el documento fiscal (`Factura`)
+  debe sobrevivir siempre aunque el turno de caja que la originó
+  desaparezca; solo se pierde el vínculo con la caja.
+- **`turnos_caja.bodegaId`/`turnos_caja.cajeroId`** sí son `ON DELETE
+  CASCADE` hacia `bodegas`/`users` — mismo patrón de ramas hermanas que
+  compiten al borrar un tenant completo (ver el punto anterior sobre
+  `recibos_nomina`/`lineas_asiento`).
+
+## Migraciones
+
+```bash
+pnpm --filter ./backend prisma:migrate       # dev, genera migración + aplica
+pnpm --filter ./backend prisma:migrate:deploy # CI/producción
+pnpm --filter ./backend prisma:seed           # tenant demo + roles + admin
+pnpm --filter ./backend db:rls                # aplica policies de RLS (correr después de cada migrate)
+pnpm --filter ./backend prisma:studio         # explorador visual
+```
+
+## Agregar un modelo nuevo (o de un plugin)
+
+1. Agrégalo a `schema.prisma` con `tenantId String` si es una tabla raíz
+   de negocio (no una tabla hija).
+2. Si lleva `tenantId`, agrégalo también a `TENANT_SCOPED_MODELS`
+   (`backend/src/prisma/tenant-scoped-models.ts`) y a la lista de tablas
+   en `prisma/sql/enable-rls.sql`.
+3. `pnpm --filter ./backend prisma:migrate` y luego `db:rls`.
