@@ -4,32 +4,38 @@ import { TenantsService } from './tenants.service';
 import { CrearTenantDto } from './dto/crear-tenant.dto';
 import { ActualizarTenantDto } from './dto/actualizar-tenant.dto';
 import { Public } from '../common/decorators/public.decorator';
+import { PlatformPermissions } from '../common/decorators/platform-permissions.decorator';
 import { PlatformAuthGuard } from '../platform-auth/guards/platform-auth.guard';
+import { PlatformPermissionsGuard } from '../common/guards/platform-permissions.guard';
 
 @ApiBearerAuth()
 @ApiTags('platform-tenants')
 @Public() // el JwtAuthGuard global de tenants no debe intervenir aquí
-@UseGuards(PlatformAuthGuard)
+@UseGuards(PlatformAuthGuard, PlatformPermissionsGuard)
 @Controller('platform/tenants')
 export class TenantsController {
   constructor(private readonly tenantsService: TenantsService) {}
 
   @Post()
+  @PlatformPermissions('platform.tenants.crear')
   crear(@Body() dto: CrearTenantDto) {
     return this.tenantsService.crear(dto);
   }
 
   @Get()
+  @PlatformPermissions('platform.tenants.ver')
   listar() {
     return this.tenantsService.listar();
   }
 
   @Get(':id')
+  @PlatformPermissions('platform.tenants.ver')
   buscarPorId(@Param('id') id: string) {
     return this.tenantsService.buscarPorId(id);
   }
 
   @Patch(':id')
+  @PlatformPermissions('platform.tenants.gestionar')
   actualizar(@Param('id') id: string, @Body() dto: ActualizarTenantDto) {
     return this.tenantsService.actualizar(id, dto);
   }

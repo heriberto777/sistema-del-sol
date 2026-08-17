@@ -3,6 +3,7 @@ import { Request } from 'express';
 export interface PlatformAdminPayload {
   adminId: string;
   email: string;
+  permisos: string[];
 }
 
 // Passport siempre asigna el resultado de la estrategia a `request.user`

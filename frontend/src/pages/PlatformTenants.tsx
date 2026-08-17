@@ -1,17 +1,16 @@
 import { FormEvent, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link } from 'react-router-dom';
 import { platformApiClient } from '../lib/platform-api-client';
 import { FormField } from '../components/molecules/FormField/FormField';
 import { Button } from '../components/atoms/Button/Button';
 import { Badge } from '../components/atoms/Badge/Badge';
+import { Card } from '../components/atoms/Card/Card';
 import { Select } from '../components/atoms/Select/Select';
 import { Switch } from '../components/atoms/Switch/Switch';
 import { Modal } from '../components/molecules/Modal/Modal';
-import { ThemeToggle } from '../components/molecules/ThemeToggle/ThemeToggle';
+import { PlatformHeader } from '../components/organisms/PlatformHeader/PlatformHeader';
 import { Paginacion } from '../components/molecules/Paginacion/Paginacion';
 import { PaginaResultado } from '../types/pagina-resultado';
-import { usePlatformAuth } from '../hooks/usePlatformAuth';
 
 interface Tenant {
   id: string;
@@ -51,6 +50,14 @@ const TONO_POR_ESTADO: Record<Tenant['estado'], 'exito' | 'advertencia' | 'pelig
   CANCELADO: 'peligro',
 };
 
+function tonoPorAccion(accion: string): 'exito' | 'advertencia' | 'peligro' | 'neutro' {
+  const clave = accion.toLowerCase();
+  if (clave.includes('suspend') || clave.includes('cancel') || clave.includes('desactiv')) return 'peligro';
+  if (clave.includes('crea') || clave.includes('activ')) return 'exito';
+  if (clave.includes('actualiz') || clave.includes('edit') || clave.includes('cambi')) return 'advertencia';
+  return 'neutro';
+}
+
 function PanelModulosTenant({ tenant, onClose }: { tenant: Tenant; onClose: () => void }) {
   const queryClient = useQueryClient();
 
@@ -67,9 +74,13 @@ function PanelModulosTenant({ tenant, onClose }: { tenant: Tenant; onClose: () =
 
   return (
     <Modal titulo={`Módulos — ${tenant.nombre}`} onClose={onClose}>
-      <p className="mb-3 text-sm text-slate-500 dark:text-slate-400">
-        Plan: <span className="font-medium">{tenant.plan?.nombre ?? 'Sin plan'}</span>. Los módulos marcados como
-        &quot;excepción&quot; no vienen del plan — fueron activados o desactivados puntualmente para este tenant.
+      <div className="mb-4 flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2 text-sm dark:bg-slate-800/60">
+        <span className="text-slate-500 dark:text-slate-400">Plan:</span>
+        <Badge tono="neutro">{tenant.plan?.nombre ?? 'Sin plan'}</Badge>
+      </div>
+      <p className="mb-3 text-xs text-slate-400">
+        Los módulos marcados como &quot;excepción&quot; no vienen del plan — fueron activados o desactivados puntualmente
+        para este tenant.
       </p>
       <div className="max-h-96 space-y-2 overflow-y-auto">
         {modulos?.map((modulo) => (
@@ -107,7 +118,6 @@ function PanelModulosTenant({ tenant, onClose }: { tenant: Tenant; onClose: () =
 }
 
 export function PlatformTenants() {
-  const { admin, logout } = usePlatformAuth();
   const queryClient = useQueryClient();
 
   const [nombre, setNombre] = useState('');
@@ -186,152 +196,158 @@ export function PlatformTenants() {
 
   return (
     <div className="min-h-screen bg-slate-50 p-6 dark:bg-slate-950">
-      <header className="mb-6 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <h1 className="text-xl font-semibold text-sol-600 dark:text-sol-400">Plataforma — Tenants</h1>
-          <Link to="/plataforma/planes" className="text-sm text-slate-500 hover:underline dark:text-slate-400">
-            Ver planes
-          </Link>
-        </div>
-        <div className="flex items-center gap-3">
-          <span className="text-sm text-slate-500 dark:text-slate-400">{admin?.nombre}</span>
-          <ThemeToggle />
-          <Button variante="secundario" onClick={logout}>
-            Cerrar sesión
-          </Button>
-        </div>
-      </header>
+      <PlatformHeader titulo="Tenants" />
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <form onSubmit={onSubmit} className="space-y-3 rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-          <h2 className="font-medium text-slate-900 dark:text-slate-100">Nuevo tenant</h2>
-          <FormField id="nombre" label="Nombre de la empresa" value={nombre} onChange={(e) => setNombre(e.target.value)} required />
-          <FormField id="subdominio" label="Subdominio" value={subdominio} onChange={(e) => setSubdominio(e.target.value)} required />
-          <FormField id="rnc" label="RNC (opcional)" value={rnc} onChange={(e) => setRnc(e.target.value)} />
-          <div>
-            <label htmlFor="plan" className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
-              Plan
-            </label>
-            <Select id="plan" value={planId} onChange={(e) => setPlanId(e.target.value)} required>
-              <option value="" disabled>
-                Selecciona un plan
-              </option>
-              {planes?.map((plan) => (
-                <option key={plan.id} value={plan.id}>
-                  {plan.nombre}
+        <Card className="lg:col-span-1" titulo="Nuevo tenant" descripcion="Provisiona una empresa nueva con su admin inicial.">
+          <form onSubmit={onSubmit} className="space-y-3">
+            <FormField id="nombre" label="Nombre de la empresa" value={nombre} onChange={(e) => setNombre(e.target.value)} required />
+            <FormField id="subdominio" label="Subdominio" value={subdominio} onChange={(e) => setSubdominio(e.target.value)} required />
+            <FormField id="rnc" label="RNC (opcional)" value={rnc} onChange={(e) => setRnc(e.target.value)} />
+            <div>
+              <label htmlFor="plan" className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+                Plan
+              </label>
+              <Select id="plan" value={planId} onChange={(e) => setPlanId(e.target.value)} required>
+                <option value="" disabled>
+                  Selecciona un plan
                 </option>
-              ))}
-            </Select>
-          </div>
-          <hr className="border-slate-200 dark:border-slate-800" />
-          <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Usuario administrador inicial</p>
-          <FormField id="adminNombre" label="Nombre" value={adminNombre} onChange={(e) => setAdminNombre(e.target.value)} required />
-          <FormField id="adminEmail" label="Email" type="email" value={adminEmail} onChange={(e) => setAdminEmail(e.target.value)} required />
-          <FormField id="adminPassword" label="Contraseña" type="password" value={adminPassword} onChange={(e) => setAdminPassword(e.target.value)} required minLength={8} />
-          {error && <p className="text-sm text-red-600">{error}</p>}
-          <Button type="submit" disabled={crearTenant.isPending} className="w-full">
-            {crearTenant.isPending ? 'Creando…' : 'Crear tenant'}
-          </Button>
-        </form>
+                {planes?.map((plan) => (
+                  <option key={plan.id} value={plan.id}>
+                    {plan.nombre}
+                  </option>
+                ))}
+              </Select>
+            </div>
+            <hr className="border-slate-200 dark:border-slate-800" />
+            <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Usuario administrador inicial</p>
+            <FormField id="adminNombre" label="Nombre" value={adminNombre} onChange={(e) => setAdminNombre(e.target.value)} required />
+            <FormField id="adminEmail" label="Email" type="email" value={adminEmail} onChange={(e) => setAdminEmail(e.target.value)} required />
+            <FormField id="adminPassword" label="Contraseña" type="password" value={adminPassword} onChange={(e) => setAdminPassword(e.target.value)} required minLength={8} />
+            {error && <p className="text-sm text-red-600">{error}</p>}
+            <Button type="submit" disabled={crearTenant.isPending} className="w-full">
+              {crearTenant.isPending ? 'Creando…' : 'Crear tenant'}
+            </Button>
+          </form>
+        </Card>
 
-        <div className="lg:col-span-2 overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-slate-50 text-slate-500 dark:bg-slate-900 dark:text-slate-400">
-              <tr>
-                <th className="px-4 py-2">Nombre</th>
-                <th className="px-4 py-2">Subdominio</th>
-                <th className="px-4 py-2">Plan</th>
-                <th className="px-4 py-2">Estado</th>
-                <th className="px-4 py-2"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {tenants?.map((tenant) => (
-                <tr key={tenant.id}>
-                  <td className="px-4 py-2">{tenant.nombre}</td>
-                  <td className="px-4 py-2 font-mono text-xs">{tenant.subdominio}</td>
-                  <td className="px-4 py-2">
-                    <Select
-                      value={tenant.planId ?? ''}
-                      disabled={cambiarPlan.isPending}
-                      onChange={(e) => cambiarPlan.mutate({ id: tenant.id, planId: e.target.value })}
-                      className="!w-auto py-1"
-                    >
-                      <option value="" disabled>
-                        Sin plan
-                      </option>
-                      {planes?.map((plan) => (
-                        <option key={plan.id} value={plan.id}>
-                          {plan.nombre}
-                        </option>
-                      ))}
-                    </Select>
-                  </td>
-                  <td className="px-4 py-2">
-                    <Badge tono={TONO_POR_ESTADO[tenant.estado]}>{tenant.estado}</Badge>
-                  </td>
-                  <td className="px-4 py-2">
-                    <div className="flex items-center gap-2">
-                      <Button variante="secundario" onClick={() => setTenantModulos(tenant)}>
-                        Ver módulos
-                      </Button>
-                      {tenant.estado === 'ACTIVO' ? (
-                        <Button
-                          variante="peligro"
-                          onClick={() => cambiarEstado.mutate({ id: tenant.id, estado: 'SUSPENDIDO' })}
-                        >
-                          Suspender
-                        </Button>
-                      ) : (
-                        <Button
-                          variante="secundario"
-                          onClick={() => cambiarEstado.mutate({ id: tenant.id, estado: 'ACTIVO' })}
-                        >
-                          Reactivar
-                        </Button>
-                      )}
-                    </div>
-                  </td>
+        <Card
+          className="lg:col-span-2"
+          sinPadding
+          titulo="Tenants"
+          descripcion={tenants ? `${tenants.length} empresa(s) registradas` : undefined}
+        >
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-slate-50 text-slate-500 dark:bg-slate-900/60 dark:text-slate-400">
+                <tr>
+                  <th className="px-5 py-3 font-medium">Nombre</th>
+                  <th className="px-5 py-3 font-medium">Subdominio</th>
+                  <th className="px-5 py-3 font-medium">Plan</th>
+                  <th className="px-5 py-3 font-medium">Estado</th>
+                  <th className="px-5 py-3"></th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                {tenants?.map((tenant) => (
+                  <tr key={tenant.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                    <td className="px-5 py-3">{tenant.nombre}</td>
+                    <td className="px-5 py-3 font-mono text-xs">{tenant.subdominio}</td>
+                    <td className="px-5 py-3">
+                      <Select
+                        value={tenant.planId ?? ''}
+                        disabled={cambiarPlan.isPending}
+                        onChange={(e) => cambiarPlan.mutate({ id: tenant.id, planId: e.target.value })}
+                        className="!w-auto py-1"
+                      >
+                        <option value="" disabled>
+                          Sin plan
+                        </option>
+                        {planes?.map((plan) => (
+                          <option key={plan.id} value={plan.id}>
+                            {plan.nombre}
+                          </option>
+                        ))}
+                      </Select>
+                    </td>
+                    <td className="px-5 py-3">
+                      <Badge tono={TONO_POR_ESTADO[tenant.estado]}>{tenant.estado}</Badge>
+                    </td>
+                    <td className="px-5 py-3">
+                      <div className="flex items-center gap-2">
+                        <Button variante="secundario" onClick={() => setTenantModulos(tenant)}>
+                          Ver módulos
+                        </Button>
+                        {tenant.estado === 'ACTIVO' ? (
+                          <Button
+                            variante="peligro"
+                            onClick={() => cambiarEstado.mutate({ id: tenant.id, estado: 'SUSPENDIDO' })}
+                          >
+                            Suspender
+                          </Button>
+                        ) : (
+                          <Button
+                            variante="secundario"
+                            onClick={() => cambiarEstado.mutate({ id: tenant.id, estado: 'ACTIVO' })}
+                          >
+                            Reactivar
+                          </Button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
       </div>
 
-      <div className="mt-6 space-y-3">
-        <h2 className="font-medium text-slate-900 dark:text-slate-100">Actividad reciente</h2>
-        <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800">
+      <Card className="mt-6" sinPadding titulo="Actividad reciente" descripcion="Bitácora de acciones realizadas desde la plataforma.">
+        <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
-            <thead className="bg-slate-50 text-slate-500 dark:bg-slate-900 dark:text-slate-400">
+            <thead className="bg-slate-50 text-slate-500 dark:bg-slate-900/60 dark:text-slate-400">
               <tr>
-                <th className="px-4 py-2">Fecha</th>
-                <th className="px-4 py-2">Admin</th>
-                <th className="px-4 py-2">Acción</th>
-                <th className="px-4 py-2">Entidad</th>
+                <th className="px-5 py-3 font-medium">Fecha</th>
+                <th className="px-5 py-3 font-medium">Admin</th>
+                <th className="px-5 py-3 font-medium">Acción</th>
+                <th className="px-5 py-3 font-medium">Entidad</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
               {auditoria?.datos.map((registro) => (
-                <tr key={registro.id}>
-                  <td className="px-4 py-2">{new Date(registro.createdAt).toLocaleString('es-DO')}</td>
-                  <td className="px-4 py-2">{registro.admin?.nombre ?? '—'}</td>
-                  <td className="px-4 py-2 font-mono text-xs">{registro.accion}</td>
-                  <td className="px-4 py-2">{registro.entidad}</td>
+                <tr key={registro.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                  <td className="px-5 py-3 text-slate-500 dark:text-slate-400">
+                    {new Date(registro.createdAt).toLocaleString('es-DO')}
+                  </td>
+                  <td className="px-5 py-3">{registro.admin?.nombre ?? '—'}</td>
+                  <td className="px-5 py-3">
+                    <Badge tono={tonoPorAccion(registro.accion)}>{registro.accion}</Badge>
+                  </td>
+                  <td className="px-5 py-3 text-slate-500 dark:text-slate-400">{registro.entidad}</td>
                 </tr>
               ))}
+              {auditoria?.datos.length === 0 && (
+                <tr>
+                  <td colSpan={4} className="px-5 py-6 text-center text-slate-400">
+                    Todavía no hay actividad registrada.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
         {auditoria && (
-          <Paginacion
-            pagina={auditoria.pagina}
-            tamanoPagina={auditoria.tamanoPagina}
-            total={auditoria.total}
-            onCambiarPagina={setPaginaAuditoria}
-          />
+          <div className="px-5 py-3">
+            <Paginacion
+              pagina={auditoria.pagina}
+              tamanoPagina={auditoria.tamanoPagina}
+              total={auditoria.total}
+              onCambiarPagina={setPaginaAuditoria}
+            />
+          </div>
         )}
-      </div>
+      </Card>
 
       {tenantModulos && <PanelModulosTenant tenant={tenantModulos} onClose={() => setTenantModulos(null)} />}
     </div>

@@ -24,26 +24,38 @@ propios campos relevantes (ver docs/ARCHITECTURE.md).
 
 ## Plataforma (super admin — token y secreto separados del de tenants)
 
-No hay alta de super admins por HTTP — se crean con
+No hay alta del primer super admin por HTTP — se crea con
 `pnpm --filter ./backend platform:bootstrap-admin` (ver
-`docs/ARCHITECTURE.md`, sección "Auth de plataforma vs. tenant").
+`docs/ARCHITECTURE.md`, sección "Auth de plataforma vs. tenant"). Admins
+adicionales sí se crean por HTTP (`POST /platform/admins`), una vez que
+existe al menos uno con `platform.admins.gestionar`. Todas las rutas
+"Bearer de plataforma" además exigen el permiso de plataforma indicado
+(RBAC de plataforma, ver ARCHITECTURE.md) — sin rol asignado, un admin no
+pasa ninguna de ellas.
 
 | Método | Ruta | Auth | Descripción |
 |---|---|---|---|
-| POST | `/api/platform/auth/login` | público | `{ email, password }` → `{ accessToken, admin }` |
+| POST | `/api/platform/auth/login` | público | `{ email, password }` → `{ accessToken, admin }` (`admin.permisos` incluido) |
 | POST | `/api/platform/auth/password/olvide` | público (5/hora) | `{ email }` → mensaje genérico siempre |
 | POST | `/api/platform/auth/password/restablecer` | público | `{ token, password }` — token de un solo uso, vence en 1h |
-| POST | `/api/platform/tenants` | Bearer de plataforma | `{ planId, nombre, subdominio, rnc?, adminEmail, adminNombre, adminPassword }` — crea el tenant + roles/permisos/configuración/usuario admin inicial, todo en una transacción |
-| GET | `/api/platform/tenants` | Bearer de plataforma | Lista todos los tenants (con su `plan`) |
-| GET | `/api/platform/tenants/:id` | Bearer de plataforma | |
-| PATCH | `/api/platform/tenants/:id` | Bearer de plataforma | `{ nombre?, estado?, planId? }` — `estado: SUSPENDIDO` bloquea el login de ese tenant |
-| GET | `/api/platform/audit-log?pagina&tamanoPagina&busqueda` | Bearer de plataforma | Bitácora de acciones de plataforma (crear/suspender tenants, etc.) |
-| GET | `/api/platform/planes` | Bearer de plataforma | Catálogo de Planes, cada uno con sus módulos incluidos |
-| GET | `/api/platform/planes/modulos` | Bearer de plataforma | Catálogo completo de `Modulo` (claves gateable, ver ARCHITECTURE.md) |
-| POST | `/api/platform/planes` | Bearer de plataforma | `{ nombre, descripcion?, modulos: string[] }` (claves) |
-| PATCH | `/api/platform/planes/:id` | Bearer de plataforma | `{ nombre?, descripcion?, modulos?: string[] }` |
-| GET | `/api/platform/tenants/:tenantId/modulos` | Bearer de plataforma | Set efectivo de módulos (plan + excepciones) con su origen (`plan`\|`override`) |
-| PATCH | `/api/platform/tenants/:tenantId/modulos/:clave` | Bearer de plataforma | `{ activo: boolean \| null }` — crea/actualiza la excepción; `null` la quita y vuelve a heredar del plan |
+| POST | `/api/platform/tenants` | `platform.tenants.crear` | `{ planId, nombre, subdominio, rnc?, adminEmail, adminNombre, adminPassword }` — crea el tenant + roles/permisos/configuración/usuario admin inicial, todo en una transacción |
+| GET | `/api/platform/tenants` | `platform.tenants.ver` | Lista todos los tenants (con su `plan`) |
+| GET | `/api/platform/tenants/:id` | `platform.tenants.ver` | |
+| PATCH | `/api/platform/tenants/:id` | `platform.tenants.gestionar` | `{ nombre?, estado?, planId? }` — `estado: SUSPENDIDO` bloquea el login de ese tenant |
+| GET | `/api/platform/audit-log?pagina&tamanoPagina&busqueda` | `platform.auditoria.ver` | Bitácora de acciones de plataforma (crear/suspender tenants, etc.) |
+| GET | `/api/platform/planes` | `platform.planes.ver` | Catálogo de Planes, cada uno con sus módulos incluidos y su `precio`/`cicloFacturacion` |
+| GET | `/api/platform/planes/modulos` | `platform.planes.ver` | Catálogo completo de `Modulo` (claves gateable, ver ARCHITECTURE.md) |
+| POST | `/api/platform/planes` | `platform.planes.gestionar` | `{ nombre, descripcion?, precio?, cicloFacturacion?, modulos: string[] }` (claves) |
+| PATCH | `/api/platform/planes/:id` | `platform.planes.gestionar` | `{ nombre?, descripcion?, precio?, cicloFacturacion?, modulos?: string[] }` |
+| GET | `/api/platform/tenants/:tenantId/modulos` | `platform.tenants.ver` | Set efectivo de módulos (plan + excepciones) con su origen (`plan`\|`override`) |
+| PATCH | `/api/platform/tenants/:tenantId/modulos/:clave` | `platform.tenants.gestionar` | `{ activo: boolean \| null }` — crea/actualiza la excepción; `null` la quita y vuelve a heredar del plan |
+| GET | `/api/platform/roles/permisos` | `platform.roles.ver` | Catálogo completo de `PlatformPermission` |
+| GET | `/api/platform/roles` | `platform.roles.ver` | Lista de `PlatformRole` con sus permisos |
+| POST | `/api/platform/roles` | `platform.roles.gestionar` | `{ nombre, permisos: string[] }` (claves) |
+| PATCH | `/api/platform/roles/:id` | `platform.roles.gestionar` | `{ nombre?, permisos?: string[] }` |
+| GET | `/api/platform/admins` | `platform.admins.ver` | Lista de `PlatformAdmin` (sin `passwordHash`), con su rol |
+| POST | `/api/platform/admins` | `platform.admins.gestionar` | `{ email, password, nombre, roleId? }` |
+| PATCH | `/api/platform/admins/:id` | `platform.admins.gestionar` | `{ nombre?, activo?, roleId? }` — 400 si el admin autenticado intenta desactivarse a sí mismo |
 
 ## NCF (por tenant)
 

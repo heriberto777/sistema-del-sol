@@ -137,7 +137,30 @@ Dos sistemas separados sin puntos de cruce. Tenant usa `JwtAuthGuard` +
 `PLATFORM_JWT_SECRET`, sin `tenantId`). Los controllers de plataforma
 llevan `@Public()` + `@UseGuards(PlatformAuthGuard)` explícito para
 esquivar el guard global de tenant. El primer super admin se crea por
-script (`platform:bootstrap-admin`), nunca por HTTP.
+script (`platform:bootstrap-admin`), nunca por HTTP — admins adicionales
+sí se crean por HTTP (`POST /platform/admins`), una vez que existe al
+menos un admin con `platform.admins.gestionar`.
+
+### RBAC de plataforma (equipo del super admin)
+
+Mismo patrón conceptual que el RBAC de tenants, pero como catálogo
+global (no por tenant, ver `backend/src/platform-auth/platform-roles-base.ts`):
+`PlatformRole`/`PlatformPermission`/`PlatformRolePermission`, con
+`PlatformAdmin.roleId` nullable (sin rol asignado, deniega todo lo que
+pida un permiso puntual). `@PlatformPermissions('platform.tenants.crear')`
++ `PlatformPermissionsGuard` (`backend/src/common/guards/platform-permissions.guard.ts`)
+validan por request.
+
+**`PlatformPermissionsGuard` NO está registrado globalmente vía
+`APP_GUARD`** (a diferencia de `ModuloActivoGuard`) — a propósito: Nest
+ejecuta los guards globales antes que los de `@UseGuards()` a nivel de
+controller, y `PlatformAuthGuard` (el que puebla `request.user` para
+rutas de plataforma) es de controller, no global. Si
+`PlatformPermissionsGuard` fuera global, correría primero y
+`request.user` siempre estaría vacío (bug real, encontrado y corregido
+en e2e al implementar esto). Se aplica en cambio junto a
+`PlatformAuthGuard`, en ese orden, en cada controller de plataforma:
+`@UseGuards(PlatformAuthGuard, PlatformPermissionsGuard)`.
 
 ### Concurrencia y atomicidad
 
@@ -187,6 +210,11 @@ Notificaciones y Admin quedan siempre activos, sin excepción posible** —
 Contabilidad porque genera asientos automáticos consumidos por
 Bancos/Gastos Menores (apagarla dejaría huecos en el libro), los demás
 por ser plomería compartida entre varios módulos.
+
+Cada `Plan` tiene además `precio` (Decimal) y `cicloFacturacion`
+(`MENSUAL`/`ANUAL`) — precio de lista editable desde
+`/plataforma/planes`. Un descuento puntual (si aplica) se registra en la
+factura de plataforma de una fase futura, nunca en el Plan.
 
 ### Módulos con lógica no obvia (ver ARCHITECTURE.md para el detalle)
 

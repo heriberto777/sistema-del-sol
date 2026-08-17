@@ -21,6 +21,7 @@ import { NotificacionesModule } from './notificaciones/notificaciones.module';
 import { WebhooksModule } from './webhooks/webhooks.module';
 import { UsuariosModule } from './usuarios/usuarios.module';
 import { PlanesModule } from './planes/planes.module';
+import { PlatformAdminsModule } from './platform-admins/platform-admins.module';
 import { ConfiguracionesModule } from './configuraciones/configuraciones.module';
 import { PlatformAuthModule } from './platform-auth/platform-auth.module';
 import { TenantsModule } from './tenants/tenants.module';
@@ -71,6 +72,7 @@ import { TenantMiddleware } from './common/middleware/tenant.middleware';
     WebhooksModule,
     UsuariosModule,
     PlanesModule,
+    PlatformAdminsModule,
     ConfiguracionesModule,
     PlatformAuthModule,
     TenantsModule,
@@ -93,6 +95,14 @@ import { TenantMiddleware } from './common/middleware/tenant.middleware';
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: PermissionsGuard },
     { provide: APP_GUARD, useClass: ModuloActivoGuard },
+    // PlatformPermissionsGuard NO va acá (a diferencia de los de arriba):
+    // Nest ejecuta los guards globales ANTES que los de @UseGuards() a
+    // nivel de controller, y PlatformAuthGuard (el que realmente puebla
+    // request.user para rutas de plataforma) es de controller, no global
+    // — si PlatformPermissionsGuard fuera global correría primero y
+    // request.user siempre estaría vacío. Por eso se aplica junto a
+    // PlatformAuthGuard en cada controller de plataforma:
+    // @UseGuards(PlatformAuthGuard, PlatformPermissionsGuard).
     { provide: APP_INTERCEPTOR, useClass: AuditLogInterceptor },
   ],
 })

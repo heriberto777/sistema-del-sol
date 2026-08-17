@@ -484,6 +484,14 @@ reactiva después) y los otros cuatro son plomería compartida entre
 varios módulos de negocio (ej. Contactos lo usan Facturación y Compras
 por igual).
 
+Cada `Plan` tiene también `precio` (`Decimal(12,2)`, default `0`) y
+`cicloFacturacion` (enum `MENSUAL`/`ANUAL`, default `MENSUAL`) — precio
+de lista editable desde `/plataforma/planes`
+(`PATCH /platform/planes/:id`). Es la base para la futura Fase 2
+(suscripción + factura de plataforma + pago); un descuento puntual, si
+aplica, se registrará ahí, nunca en el `Plan` (que es siempre el precio
+de lista).
+
 ## Event Bus
 
 `EventBusService` (`backend/src/event-bus/`) envuelve `EventEmitter2` de
@@ -938,18 +946,65 @@ Son dos sistemas completamente separados, sin puntos de cruce:
   payload con `tenantId`/`roles`/`permisos`. Protege todo por defecto
   (son `APP_GUARD` globales).
 - **Plataforma**: `PlatformAuthGuard` (estrategia Passport `'jwt-platform'`
-  separada), secreto `PLATFORM_JWT_SECRET`, payload con `adminId`/`email`
-  únicamente — sin `tenantId`, porque un super admin no pertenece a
-  ningún tenant. Cada controller de plataforma (`TenantsController`) lleva
-  `@Public()` (para que el `JwtAuthGuard` global de tenants no intente
-  validar el token con SU secreto y lo rechace) más
-  `@UseGuards(PlatformAuthGuard)` explícito.
+  separada), secreto `PLATFORM_JWT_SECRET`, payload con
+  `adminId`/`email`/`permisos` — sin `tenantId`, porque un super admin no
+  pertenece a ningún tenant. Cada controller de plataforma
+  (`TenantsController`) lleva `@Public()` (para que el `JwtAuthGuard`
+  global de tenants no intente validar el token con SU secreto y lo
+  rechace) más `@UseGuards(PlatformAuthGuard, PlatformPermissionsGuard)`
+  explícito (ver "RBAC de plataforma" abajo).
 
-No hay alta de super admins por HTTP a propósito: el primer (y cualquier)
-`PlatformAdmin` se crea desde el servidor con
-`pnpm --filter ./backend platform:bootstrap-admin` (ver
-`backend/scripts/bootstrap-platform-admin.ts`), no vía endpoint — es una
-operación de confianza total, no algo que deba quedar expuesto en la API.
+No hay alta del **primer** super admin por HTTP a propósito: se crea
+desde el servidor con `pnpm --filter ./backend platform:bootstrap-admin`
+(ver `backend/scripts/bootstrap-platform-admin.ts`), no vía endpoint —
+es una operación de confianza total antes de que exista ningún admin.
+Una vez que existe al menos uno con `platform.admins.gestionar`, sí puede
+dar de alta admins adicionales por HTTP (`POST /platform/admins`).
+
+## RBAC de plataforma
+
+Mismo patrón conceptual que el RBAC de tenants (arriba), pero como
+catálogo **global** (no por tenant, igual que `Modulo`/`Plan`):
+`PlatformPermission`/`PlatformRole`/`PlatformRolePermission`
+(`backend/prisma/schema.prisma`), sembrado con
+`pnpm --filter ./backend platform-roles:seed` (catálogo en
+`backend/src/platform-auth/platform-roles-base.ts`: roles **Super
+Admin** (todos los permisos), **Ventas** (tenants + planes de solo
+lectura/creación), **Soporte** (solo lectura + auditoría)).
+`PlatformAdmin.roleId` es nullable — sin rol asignado, el guard deniega
+cualquier ruta que pida un permiso puntual (mismo fallback seguro que
+`Tenant.planId` nulo en `ModuloActivoGuard`).
+
+`@PlatformPermissions('platform.tenants.crear')`
+(`backend/src/common/decorators/platform-permissions.decorator.ts`) +
+`PlatformPermissionsGuard`
+(`backend/src/common/guards/platform-permissions.guard.ts`) validan por
+request, mismas semánticas AND (`.every(...)`) que `PermissionsGuard` de
+tenants.
+
+**`PlatformPermissionsGuard` NO se registra globalmente vía `APP_GUARD`**
+(a diferencia de `ModuloActivoGuard`/`PermissionsGuard` de tenants) —
+esto se intentó primero y se revirtió tras encontrarlo roto en e2e (todas
+las rutas de plataforma devolvían 403 incluso para el Super Admin): Nest
+ejecuta los guards globales ANTES que los `@UseGuards()` de controller, y
+`PlatformAuthGuard` (el que realmente puebla `request.user` con el
+payload decodificado) es de controller, no global — un
+`PlatformPermissionsGuard` global correría primero y encontraría
+`request.user` siempre vacío. La diferencia con el lado tenant es que ahí
+`JwtAuthGuard` (el que puebla `request.user`) SÍ es global y corre antes
+que `PermissionsGuard` en la misma cadena; en plataforma no hay
+equivalente global. Solución: aplicar ambos guards juntos, en ese orden,
+en cada controller de plataforma —
+`@UseGuards(PlatformAuthGuard, PlatformPermissionsGuard)` — el orden del
+arreglo garantiza que `PlatformAuthGuard` corra primero.
+
+`PlatformAdminsRepository`/`PlatformRolesRepository`
+(`backend/src/platform-admins/`) exponen la gestión vía
+`POST/PATCH /platform/admins` y `POST/PATCH /platform/roles`. Un admin no
+puede desactivarse a sí mismo (`PlatformAdminsService.actualizar` rechaza
+con 400 si `id === adminAutenticadoId && activo === false`) — único
+candado de auto-bloqueo que vale la pena, sin construir un sistema de
+"último admin con acceso total".
 
 ## Login en dos pasos (identificar la empresa)
 

@@ -81,10 +81,46 @@ model PlatformAdmin {
   resetPasswordTokenHash  String?
   resetPasswordExpiraEn   DateTime?
   createdAt               DateTime  @default(now())
+  roleId                  String?
+  role                    PlatformRole? @relation(fields: [roleId], references: [id])
 
   auditLogs PlatformAuditLog[]
 
   @@map("platform_admins")
+}
+
+// RBAC de plataforma (equipo del super admin) — catálogo global, mismo
+// patrón que Role/Permission de tenants pero sin tenantId. roleId es
+// nullable en PlatformAdmin a propósito: sin rol asignado, el guard
+// deniega cualquier ruta que pida un permiso puntual (fallback seguro).
+model PlatformPermission {
+  id    String @id @default(uuid())
+  clave String @unique
+
+  roles PlatformRolePermission[]
+
+  @@map("platform_permissions")
+}
+
+model PlatformRole {
+  id        String   @id @default(uuid())
+  nombre    String   @unique
+  createdAt DateTime @default(now())
+
+  permisos PlatformRolePermission[]
+  admins   PlatformAdmin[]
+
+  @@map("platform_roles")
+}
+
+model PlatformRolePermission {
+  roleId       String
+  role         PlatformRole       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permissionId String
+  permission   PlatformPermission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("platform_role_permissions")
 }
 
 // Datos estructurados de integración/config por tenant (MSSQL, canales habilitados, moneda)
@@ -139,15 +175,24 @@ model Modulo {
 // uno con un set fijo de módulos incluidos (PlanModulo). Ver
 // ModuloActivoGuard para cómo se combina con TenantModuloOverride.
 model Plan {
-  id          String   @id @default(uuid())
-  nombre      String   @unique
-  descripcion String?
-  createdAt   DateTime @default(now())
+  id               String           @id @default(uuid())
+  nombre           String           @unique
+  descripcion      String?
+  precio           Decimal          @default(0) @db.Decimal(12, 2)
+  cicloFacturacion CicloFacturacion @default(MENSUAL)
+  createdAt        DateTime         @default(now())
 
   modulos PlanModulo[]
   tenants Tenant[]
 
   @@map("planes")
+}
+
+// El descuento (si aplica) se registra en la Factura de plataforma
+// (Fase 2), nunca acá — el precio del Plan es el precio de lista.
+enum CicloFacturacion {
+  MENSUAL
+  ANUAL
 }
 
 model PlanModulo {

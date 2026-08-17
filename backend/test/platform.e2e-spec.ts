@@ -7,6 +7,7 @@ import { PrismaClient } from '@prisma/client';
 import { AppModule } from '../src/app.module';
 import { HttpExceptionFilter } from '../src/common/filters/http-exception.filter';
 import { PERMISOS_BASE, ROLES_BASE } from '../src/tenants/roles-base';
+import { PERMISOS_PLATAFORMA_BASE, ROLES_PLATAFORMA_BASE } from '../src/platform-auth/platform-roles-base';
 import { EmailChannel } from '../src/notificaciones/canales/email.channel';
 
 function extraerTokenDeReset(cuerpoHtml: string): string {
@@ -31,12 +32,65 @@ describe('Plataforma (e2e)', () => {
   let tenantCreadoId: string | undefined;
   let tenantExistenteId: string;
   let planId: string;
+  let adminPrincipalId: string;
 
   async function loginPlataforma() {
     const respuesta = await request(app.getHttpServer())
       .post('/api/platform/auth/login')
       .send({ email: ADMIN_EMAIL, password: ADMIN_PASSWORD });
     return respuesta.body.accessToken as string;
+  }
+
+  // Cacheado como idPlanTodoIncluido()/idPlanTodoIncluido en los otros e2e:
+  // PlatformPermissionsGuard (global) deniega toda ruta con
+  // @PlatformPermissions(...) a un admin sin rol, así que cualquier admin
+  // de fixture de este archivo necesita un rol con TODO el catálogo.
+  let rolSuperAdminId: string | undefined;
+  async function idRolSuperAdmin(): Promise<string> {
+    if (rolSuperAdminId) return rolSuperAdminId;
+    for (const clave of PERMISOS_PLATAFORMA_BASE) {
+      await prisma.platformPermission.upsert({ where: { clave }, update: {}, create: { clave } }).catch((error) => {
+        if (error?.code !== 'P2002') throw error;
+      });
+    }
+    const permisos = await prisma.platformPermission.findMany();
+    const rol = await prisma.platformRole.upsert({
+      where: { nombre: 'E2E Super Admin' },
+      update: {},
+      create: { nombre: 'E2E Super Admin' },
+    });
+    await prisma.platformRolePermission.deleteMany({ where: { roleId: rol.id } });
+    await prisma.platformRolePermission.createMany({
+      data: permisos.map((p) => ({ roleId: rol.id, permissionId: p.id })),
+    });
+    rolSuperAdminId = rol.id;
+    return rol.id;
+  }
+
+  async function crearAdminConRol(params: { email: string; nombreRol: string; permisos: string[] }) {
+    for (const clave of params.permisos) {
+      await prisma.platformPermission.upsert({ where: { clave }, update: {}, create: { clave } }).catch((error) => {
+        if (error?.code !== 'P2002') throw error;
+      });
+    }
+    const rol = await prisma.platformRole.upsert({
+      where: { nombre: params.nombreRol },
+      update: {},
+      create: { nombre: params.nombreRol },
+    });
+    const permisosDb = await prisma.platformPermission.findMany({ where: { clave: { in: params.permisos } } });
+    await prisma.platformRolePermission.deleteMany({ where: { roleId: rol.id } });
+    await prisma.platformRolePermission.createMany({
+      data: permisosDb.map((p) => ({ roleId: rol.id, permissionId: p.id })),
+    });
+
+    const passwordHash = await bcrypt.hash(ADMIN_PASSWORD, 10);
+    const admin = await prisma.platformAdmin.upsert({
+      where: { email: params.email },
+      update: { passwordHash, activo: true, roleId: rol.id },
+      create: { email: params.email, passwordHash, nombre: params.email, roleId: rol.id },
+    });
+    return admin;
   }
 
   beforeAll(async () => {
@@ -49,11 +103,12 @@ describe('Plataforma (e2e)', () => {
     await redis.quit();
 
     const passwordHash = await bcrypt.hash(ADMIN_PASSWORD, 10);
-    await prisma.platformAdmin.upsert({
+    const adminPrincipal = await prisma.platformAdmin.upsert({
       where: { email: ADMIN_EMAIL },
-      update: { passwordHash, activo: true },
-      create: { email: ADMIN_EMAIL, passwordHash, nombre: 'E2E Platform Admin' },
+      update: { passwordHash, activo: true, roleId: await idRolSuperAdmin() },
+      create: { email: ADMIN_EMAIL, passwordHash, nombre: 'E2E Platform Admin', roleId: await idRolSuperAdmin() },
     });
+    adminPrincipalId = adminPrincipal.id;
 
     // Plan global mínimo para poder crear tenants vía POST /platform/tenants
     // (CrearTenantDto exige planId) — el catálogo de Planes/Modulo no es por
@@ -208,6 +263,144 @@ describe('Plataforma (e2e)', () => {
       expect(listado.body).toEqual(
         expect.arrayContaining([expect.objectContaining({ tipoNcf: 'B02', secuenciaFinal: 5000 })]),
       );
+    });
+  });
+
+  describe('RBAC de plataforma (PlatformPermissionsGuard)', () => {
+    const EMAIL_VENTAS = 'e2e-platform-ventas@sistemadelsol.com';
+    const EMAIL_SOPORTE = 'e2e-platform-soporte@sistemadelsol.com';
+    let adminVentasId: string;
+    let adminSoporteId: string;
+
+    beforeAll(async () => {
+      // Por si una corrida previa falló antes de llegar a su propio afterAll.
+      await prisma.platformRole.deleteMany({ where: { nombre: 'E2E Rol Temporal' } });
+
+      const adminVentas = await crearAdminConRol({
+        email: EMAIL_VENTAS,
+        nombreRol: 'E2E Ventas',
+        permisos: ROLES_PLATAFORMA_BASE.Ventas,
+      });
+      adminVentasId = adminVentas.id;
+
+      const adminSoporte = await crearAdminConRol({
+        email: EMAIL_SOPORTE,
+        nombreRol: 'E2E Soporte',
+        permisos: ROLES_PLATAFORMA_BASE.Soporte,
+      });
+      adminSoporteId = adminSoporte.id;
+    });
+
+    afterAll(async () => {
+      await prisma.platformAdmin.deleteMany({ where: { id: { in: [adminVentasId, adminSoporteId] } } });
+      // Rol creado por el propio test de "crear rol" — se limpia acá para
+      // que una corrida siguiente no choque contra el nombre único.
+      await prisma.platformRole.deleteMany({ where: { nombre: 'E2E Rol Temporal' } });
+    });
+
+    async function loginComo(email: string) {
+      const respuesta = await request(app.getHttpServer())
+        .post('/api/platform/auth/login')
+        .send({ email, password: ADMIN_PASSWORD });
+      return respuesta.body.accessToken as string;
+    }
+
+    it('un admin con rol "Soporte" recibe 403 al crear un tenant (le falta platform.tenants.crear)', async () => {
+      const token = await loginComo(EMAIL_SOPORTE);
+
+      await request(app.getHttpServer())
+        .post('/api/platform/tenants')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          nombre: 'E2E Rechazado Por RBAC',
+          subdominio: 'e2e-rechazado-rbac',
+          planId,
+          adminEmail: 'admin@e2e-rechazado-rbac.com',
+          adminNombre: 'Admin',
+          adminPassword: 'Rechazado123!',
+        })
+        .expect(403);
+    });
+
+    it('un admin con rol "Ventas" sí puede crear un tenant', async () => {
+      const token = await loginComo(EMAIL_VENTAS);
+
+      const respuesta = await request(app.getHttpServer())
+        .post('/api/platform/tenants')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          nombre: 'E2E Creado Por Ventas',
+          subdominio: 'e2e-creado-por-ventas',
+          planId,
+          adminEmail: 'admin@e2e-creado-por-ventas.com',
+          adminNombre: 'Admin',
+          adminPassword: 'CreadoVentas123!',
+        })
+        .expect(201);
+
+      await prisma.tenant.delete({ where: { id: respuesta.body.id } });
+    });
+
+    it('un admin con rol "Soporte" recibe 403 al leer /platform/admins (le falta platform.admins.ver)', async () => {
+      const token = await loginComo(EMAIL_SOPORTE);
+
+      await request(app.getHttpServer())
+        .get('/api/platform/admins')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(403);
+    });
+
+    it('un admin no puede desactivarse a sí mismo (aunque tenga permiso para gestionar admins)', async () => {
+      const tokenPlataforma = await loginPlataforma();
+
+      await request(app.getHttpServer())
+        .patch(`/api/platform/admins/${adminPrincipalId}`)
+        .set('Authorization', `Bearer ${tokenPlataforma}`)
+        .send({ activo: false })
+        .expect(400);
+    });
+
+    it('Super Admin puede crear un rol de plataforma nuevo y luego editarlo', async () => {
+      const tokenPlataforma = await loginPlataforma();
+
+      const creado = await request(app.getHttpServer())
+        .post('/api/platform/roles')
+        .set('Authorization', `Bearer ${tokenPlataforma}`)
+        .send({ nombre: 'E2E Rol Temporal', permisos: ['platform.tenants.ver'] })
+        .expect(201);
+
+      expect(creado.body.permisos.map((p: { permission: { clave: string } }) => p.permission.clave)).toEqual([
+        'platform.tenants.ver',
+      ]);
+
+      const editado = await request(app.getHttpServer())
+        .patch(`/api/platform/roles/${creado.body.id}`)
+        .set('Authorization', `Bearer ${tokenPlataforma}`)
+        .send({ permisos: ['platform.tenants.ver', 'platform.planes.ver'] })
+        .expect(200);
+
+      expect(editado.body.permisos.map((p: { permission: { clave: string } }) => p.permission.clave).sort()).toEqual([
+        'platform.planes.ver',
+        'platform.tenants.ver',
+      ]);
+    });
+
+    it('Super Admin puede crear otro admin de plataforma y asignarle un rol', async () => {
+      const tokenPlataforma = await loginPlataforma();
+
+      const respuesta = await request(app.getHttpServer())
+        .post('/api/platform/admins')
+        .set('Authorization', `Bearer ${tokenPlataforma}`)
+        .send({
+          email: 'e2e-nuevo-admin@sistemadelsol.com',
+          password: 'NuevoAdmin123!',
+          nombre: 'Nuevo Admin',
+          roleId: rolSuperAdminId,
+        })
+        .expect(201);
+
+      expect(respuesta.body.email).toBe('e2e-nuevo-admin@sistemadelsol.com');
+      await prisma.platformAdmin.delete({ where: { id: respuesta.body.id } });
     });
   });
 

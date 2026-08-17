@@ -48,6 +48,7 @@ PostgreSQL 16 + Prisma. Schema completo en `backend/prisma/schema.prisma`.
 | Nómina | `empleados`, `periodos_nomina`, `recibos_nomina` |
 | POS | `turnos_caja`, `movimientos_caja` (+ `facturas.metodoPago`/`facturas.turnoCajaId`) |
 | Plataforma | `platform_admins`, `platform_audit_logs` |
+| RBAC de plataforma | `platform_permissions`, `platform_roles`, `platform_role_permissions` (catálogo global, sin `tenantId` — `platform_admins.roleId` es nullable) |
 
 `users` y `platform_admins` tienen `resetPasswordTokenHash`/
 `resetPasswordExpiraEn` (ambos nullable) para el flujo de "olvidé mi

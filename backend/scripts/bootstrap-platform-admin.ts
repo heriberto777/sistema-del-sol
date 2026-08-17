@@ -1,10 +1,14 @@
 import { PrismaClient } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
+import { PERMISOS_PLATAFORMA_BASE } from '../src/platform-auth/platform-roles-base';
 
 /**
  * Crea (o actualiza la contraseña de) el primer super admin de plataforma.
  * No hay alta por HTTP a propósito — el primer admin se siembra desde el
- * servidor, con acceso directo a las variables de entorno.
+ * servidor, con acceso directo a las variables de entorno. Le asigna el
+ * rol "Super Admin" (todos los permisos de plataforma) — lo crea inline
+ * si `platform-roles:seed` no corrió todavía, para que el primer admin
+ * jamás quede sin acceso.
  *
  * Uso:
  *   PLATFORM_ADMIN_EMAIL=tu@correo.com PLATFORM_ADMIN_PASSWORD=algo-seguro \
@@ -29,13 +33,27 @@ async function main() {
   const prisma = new PrismaClient();
   const passwordHash = await bcrypt.hash(password, 10);
 
-  const admin = await prisma.platformAdmin.upsert({
-    where: { email },
-    update: { passwordHash, nombre, activo: true },
-    create: { email, passwordHash, nombre },
+  for (const clave of PERMISOS_PLATAFORMA_BASE) {
+    await prisma.platformPermission.upsert({ where: { clave }, update: {}, create: { clave } });
+  }
+  const superAdminRol = await prisma.platformRole.upsert({
+    where: { nombre: 'Super Admin' },
+    update: {},
+    create: { nombre: 'Super Admin' },
+  });
+  const permisosDb = await prisma.platformPermission.findMany({ where: { clave: { in: PERMISOS_PLATAFORMA_BASE } } });
+  await prisma.platformRolePermission.deleteMany({ where: { roleId: superAdminRol.id } });
+  await prisma.platformRolePermission.createMany({
+    data: permisosDb.map((p) => ({ roleId: superAdminRol.id, permissionId: p.id })),
   });
 
-  console.log(`Platform admin listo: ${admin.email} (${admin.id})`);
+  const admin = await prisma.platformAdmin.upsert({
+    where: { email },
+    update: { passwordHash, nombre, activo: true, roleId: superAdminRol.id },
+    create: { email, passwordHash, nombre, roleId: superAdminRol.id },
+  });
+
+  console.log(`Platform admin listo: ${admin.email} (${admin.id}), rol: Super Admin`);
   await prisma.$disconnect();
 }
 

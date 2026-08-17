@@ -5,6 +5,7 @@ export interface PlatformAdminAutenticado {
   id: string;
   nombre: string;
   email: string;
+  permisos: string[];
 }
 
 interface PlatformAuthContextValue {
@@ -12,6 +13,8 @@ interface PlatformAuthContextValue {
   cargando: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
+  /** Solo UX (ocultar del header) — la aplicación real es 100% PlatformPermissionsGuard en el backend. */
+  tienePermiso: (permiso: string) => boolean;
 }
 
 export const PlatformAuthContext = createContext<PlatformAuthContextValue | undefined>(undefined);
@@ -44,7 +47,12 @@ export function PlatformAuthProvider({ children }: { children: ReactNode }) {
     setAdmin(null);
   }, []);
 
-  const value = useMemo(() => ({ admin, cargando, login, logout }), [admin, cargando, login, logout]);
+  const tienePermiso = useCallback((permiso: string) => admin?.permisos?.includes(permiso) ?? false, [admin]);
+
+  const value = useMemo(
+    () => ({ admin, cargando, login, logout, tienePermiso }),
+    [admin, cargando, login, logout, tienePermiso],
+  );
 
   return <PlatformAuthContext.Provider value={value}>{children}</PlatformAuthContext.Provider>;
 }

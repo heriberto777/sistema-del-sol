@@ -24,18 +24,22 @@ export class PlatformAuthService {
   ) {}
 
   async login({ email, password }: PlatformLoginDto) {
-    const admin = await this.prisma.platformAdmin.findUnique({ where: { email } });
+    const admin = await this.prisma.platformAdmin.findUnique({
+      where: { email },
+      include: { role: { include: { permisos: { include: { permission: true } } } } },
+    });
     if (!admin || !admin.activo || !(await bcrypt.compare(password, admin.passwordHash))) {
       throw new UnauthorizedException('Credenciales inválidas');
     }
 
-    const payload: PlatformAdminPayload = { adminId: admin.id, email: admin.email };
+    const permisos = admin.role?.permisos.map((rp) => rp.permission.clave) ?? [];
+    const payload: PlatformAdminPayload = { adminId: admin.id, email: admin.email, permisos };
     return {
       accessToken: this.jwtService.sign(payload, {
         secret: process.env.PLATFORM_JWT_SECRET ?? 'cambia-este-secreto-de-plataforma-en-produccion',
         expiresIn: process.env.PLATFORM_JWT_EXPIRATION ?? '12h',
       }),
-      admin: { id: admin.id, nombre: admin.nombre, email: admin.email },
+      admin: { id: admin.id, nombre: admin.nombre, email: admin.email, permisos },
     };
   }
 
