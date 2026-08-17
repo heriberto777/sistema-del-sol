@@ -12,6 +12,7 @@ describe('ReportesFiscalesService', () => {
       comprasRecibidasEnRango: jest.fn(),
       gastosMenoresEnRango: jest.fn().mockResolvedValue([]),
       retencionesNominaEnRango: jest.fn(),
+      retencionesProveedoresEnRango: jest.fn().mockResolvedValue([]),
     } as unknown as jest.Mocked<ReportesFiscalesRepository>;
     service = new ReportesFiscalesService(repository);
   });
@@ -195,6 +196,44 @@ describe('ReportesFiscalesService', () => {
         { cedula: '002-2', nombre: 'Beto Ruiz', salarioBruto: 20000, isr: 0 },
       ]);
       expect(resultado.resumen).toEqual({ salarioBruto: 80000, isr: 1000 });
+    });
+  });
+
+  describe('retencionesProveedores', () => {
+    it('mapea proveedor, montos brutos, retenciones y neto pagado', async () => {
+      repository.retencionesProveedoresEnRango.mockResolvedValue([
+        {
+          fecha: new Date('2026-08-10'),
+          monto: 1000,
+          retencionIsr: 150,
+          retencionItbis: 300,
+          ordenCompra: { proveedor: { nombre: 'Juan Pérez', rnc: '00112223334' } },
+        },
+      ] as never);
+
+      const { filas, resumen } = await service.retencionesProveedores();
+
+      expect(filas).toEqual([
+        {
+          proveedorNombre: 'Juan Pérez',
+          proveedorRnc: '00112223334',
+          fecha: new Date('2026-08-10'),
+          montoBruto: 1000,
+          retencionIsr: 150,
+          retencionItbis: 300,
+          netoPagado: 550,
+        },
+      ]);
+      expect(resumen).toEqual({ cantidad: 1, montoBruto: 1000, retencionIsr: 150, retencionItbis: 300, netoPagado: 550 });
+    });
+
+    it('devuelve resumen en cero si no hay pagos con retención en el rango', async () => {
+      repository.retencionesProveedoresEnRango.mockResolvedValue([]);
+
+      const { filas, resumen } = await service.retencionesProveedores();
+
+      expect(filas).toEqual([]);
+      expect(resumen).toEqual({ cantidad: 0, montoBruto: 0, retencionIsr: 0, retencionItbis: 0, netoPagado: 0 });
     });
   });
 });

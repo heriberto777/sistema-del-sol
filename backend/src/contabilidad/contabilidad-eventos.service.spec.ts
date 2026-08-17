@@ -119,17 +119,30 @@ describe('ContabilidadEventosService', () => {
   });
 
   describe('alRegistrarPagoOrdenCompra', () => {
-    it('genera el asiento con el monto convertido a número', async () => {
-      await service.alRegistrarPagoOrdenCompra({ tenantId: 't1', pagoId: 'pago-1', ordenCompraId: 'oc1', monto: '500' });
+    it('genera el asiento con el monto y la retención convertidos a número', async () => {
+      await service.alRegistrarPagoOrdenCompra({
+        tenantId: 't1',
+        pagoId: 'pago-1',
+        ordenCompraId: 'oc1',
+        monto: '500',
+        retencionIsr: '75',
+        retencionItbis: '30',
+      });
 
-      expect(asientosContablesService.generarDesdePagoOrdenCompra).toHaveBeenCalledWith({ tenantId: 't1', pagoId: 'pago-1', monto: 500 });
+      expect(asientosContablesService.generarDesdePagoOrdenCompra).toHaveBeenCalledWith({
+        tenantId: 't1',
+        pagoId: 'pago-1',
+        monto: 500,
+        retencionIsr: 75,
+        retencionItbis: 30,
+      });
     });
 
     it('no propaga el error si falla generar el asiento', async () => {
       asientosContablesService.generarDesdePagoOrdenCompra.mockRejectedValue(new Error('cuenta no encontrada'));
 
       await expect(
-        service.alRegistrarPagoOrdenCompra({ tenantId: 't1', pagoId: 'pago-1', ordenCompraId: 'oc1', monto: '500' }),
+        service.alRegistrarPagoOrdenCompra({ tenantId: 't1', pagoId: 'pago-1', ordenCompraId: 'oc1', monto: '500', retencionIsr: '0', retencionItbis: '0' }),
       ).resolves.not.toThrow();
     });
   });

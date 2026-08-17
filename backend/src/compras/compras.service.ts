@@ -7,7 +7,7 @@ import { EVENTOS } from '../event-bus/events';
 import { CrearOrdenCompraDto } from './dto/crear-orden-compra.dto';
 import { RecibirOrdenCompraDto } from './dto/recibir-orden-compra.dto';
 import { DevolverOrdenCompraDto } from './dto/devolver-orden-compra.dto';
-import { CrearPagoDto } from '../pagos/dto/crear-pago.dto';
+import { CrearPagoOrdenCompraDto } from './dto/crear-pago-orden-compra.dto';
 import { PagosService } from '../pagos/pagos.service';
 import { ListadoQueryDto } from '../common/dto/listado-query.dto';
 import { paginar } from '../common/types/pagina-resultado';
@@ -191,7 +191,7 @@ export class ComprasService {
     return devolucion;
   }
 
-  async registrarPago(id: string, dto: CrearPagoDto, userId: string, tenantId: string) {
+  async registrarPago(id: string, dto: CrearPagoOrdenCompraDto, userId: string, tenantId: string) {
     const orden = await this.comprasRepository.buscarPorId(id);
     if (orden.estado === 'CANCELADA') {
       throw new BadRequestException('No se puede registrar pago de una orden cancelada');

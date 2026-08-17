@@ -313,6 +313,54 @@ de `comprasRecibidasEnRango` (compras formales, con RNC de proveedor) y
 `gastosMenoresEnRango` (mercado informal, `rncProveedor: ''`) se
 mezclan y ordenan por fecha en `formato606()`.
 
+**606 NO incluye todavía las columnas de ITBIS/ISR retenido** que sí
+contempla el layout oficial: la retención (ver "Retenciones a
+proveedores" más abajo) se registra por fecha de **pago** (`Pago`), no
+por fecha de recepción/factura (`RecepcionCompra`, que es la fuente de
+606) — mezclarlas correctamente exigiría relacionar cada pago con la(s)
+línea(s) de recepción que salda, algo que el schema no modela hoy. Se
+optó por un reporte separado (`retenciones-proveedores`, ver abajo) en
+vez de forzar un cruce incorrecto entre dos períodos distintos.
+
+## Retenciones a proveedores (ISR/ITBIS)
+
+Cuando el tenant le paga a un proveedor por servicios, la DGII exige
+retener parte del pago (ISR, Art. 309 — honorarios/alquileres/servicios
+en general prestados por Personas Físicas; ITBIS, Art. 349, en ciertas
+categorías de servicios) y remitirlo aparte a la DGII en vez de pagarlo
+al proveedor. El disparador es **manual**: una casilla al registrar el
+pago de una orden de compra (`PagosService.registrarPagoOrdenCompra`,
+campos `retencionIsr`/`retencionItbis` en `Pago`) — el sistema no intenta
+inferir automáticamente si un proveedor es persona física ni qué
+servicio califica, eso lo decide quien registra el pago.
+
+El monto bruto (`Pago.monto`) sigue siendo el que salda `OrdenCompra.total`
+sin cambios; la retención solo afecta cuánto sale de Caja y a qué cuentas
+se acredita (`AsientosContablesService.generarDesdePagoOrdenCompra`):
+débito Cuentas por Pagar por el bruto, crédito Caja y Bancos por el neto,
+crédito "ISR Retenido a Terceros por Pagar" (`2040`) y/o "ITBIS Retenido a
+Terceros por Pagar" (`2050`) por lo retenido — cuentas nuevas en
+`CUENTAS_BASE`, distintas de `2030 TSS e ISR por Pagar` (esa es de
+nómina/empleados, declaración distinta).
+
+La tasa de referencia (`CONFIGURACIONES_BASE.RETENCION_ISR_TASA`/
+`RETENCION_ITBIS_TASA`, editable en Admin → Configuración general, mismo
+mecanismo que `ITBIS_GENERAL`) es puramente informativa — igual que el
+resto de `CONFIGURACIONES_BASE`, no se lee en ningún cálculo del backend,
+ya que el disparador es manual y el monto retenido lo decide quien
+registra el pago. **Default 15% de ISR**: hay referencias (no verificadas
+contra una fuente oficial en tiempo real) de que la tasa subió de 10% a
+15% para pagos del Art. 309 desde julio 2026 — confirmar antes de
+producción, mismo tipo de brecha ya documentada para las tasas de TSS/ISR
+de Nómina.
+
+`ReportesFiscalesService.retencionesProveedores()` (endpoint
+`GET /reportes-fiscales/retenciones-proveedores`) lista los pagos con
+retención en un rango — junto con `retencionesNomina()` cubre las dos
+secciones de la declaración mensual de retenciones que pide la DGII
+(formulario IR-17); no es el layout oficial del formulario, son los
+montos reales.
+
 ## Gastos menores y Bancos
 
 Dos flujos coexisten a propósito y no se deben confundir:

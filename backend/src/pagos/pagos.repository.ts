@@ -15,6 +15,8 @@ export class PagosRepository {
     facturaId?: string;
     ordenCompraId?: string;
     monto: number;
+    retencionIsr?: number;
+    retencionItbis?: number;
     metodoPago: MetodoPago;
     fecha: Date;
     userId: string;

@@ -148,6 +148,13 @@ token, así que un token nunca puede reusarse.
 - **`gastos_menores.ncf`/`tipoNcf`** reutilizan el mismo mecanismo de
   `ncf_asignados` que facturación (tipo `B11` tradicional o `E43` si el
   tenant está en modalidad e-CF) — no es una secuencia propia.
+- **`pagos.retencionIsr`/`retencionItbis`** (default 0): retención de
+  ISR/ITBIS practicada a un proveedor al pagarle una orden de compra
+  (Art. 309/349), ingresada a mano por quien registra el pago — nunca se
+  usa en pagos de `Factura`. `monto` sigue siendo el bruto que salda
+  `orden_compra.total`; la retención solo cambia cuánto sale de Caja y a
+  qué cuentas se acredita (ver ARCHITECTURE.md, "Retenciones a
+  proveedores").
 
 ## Migraciones
 

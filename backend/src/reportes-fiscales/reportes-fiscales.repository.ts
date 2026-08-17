@@ -54,6 +54,19 @@ export class ReportesFiscalesRepository {
     });
   }
 
+  /** Pagos a proveedores con retención de ISR y/o ITBIS practicada (ver PagosService.registrarPagoOrdenCompra). */
+  retencionesProveedoresEnRango(desde: Date, hasta: Date) {
+    return this.db.pago.findMany({
+      where: {
+        ordenCompraId: { not: null },
+        fecha: { gte: desde, lte: finDelDia(hasta) },
+        OR: [{ retencionIsr: { gt: 0 } }, { retencionItbis: { gt: 0 } }],
+      },
+      include: { ordenCompra: { include: { proveedor: true } } },
+      orderBy: { fecha: 'asc' },
+    });
+  }
+
   /**
    * ReciboNomina no tiene columna tenantId propia (ver tenant-scoped-models.ts)
    * y acá no llegamos a través del id de un período ya validado — por eso se

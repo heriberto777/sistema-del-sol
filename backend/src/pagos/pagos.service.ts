@@ -3,6 +3,7 @@ import { PagosRepository } from './pagos.repository';
 import { EventBusService } from '../event-bus/event-bus.service';
 import { EVENTOS } from '../event-bus/events';
 import { CrearPagoDto } from './dto/crear-pago.dto';
+import type { CrearPagoOrdenCompraDto } from '../compras/dto/crear-pago-orden-compra.dto';
 
 const EPSILON = 0.005; // tolerancia de redondeo en centavos, igual que AsientosContablesService
 
@@ -51,7 +52,7 @@ export class PagosService {
     return pago;
   }
 
-  async registrarPagoOrdenCompra(orden: { id: string; total: unknown }, dto: CrearPagoDto, userId: string, tenantId: string) {
+  async registrarPagoOrdenCompra(orden: { id: string; total: unknown }, dto: CrearPagoOrdenCompraDto, userId: string, tenantId: string) {
     const pagadoAntes = await this.pagosRepository.sumaPagosOrdenCompra(orden.id);
     const total = Number(orden.total);
     const pendiente = total - pagadoAntes;
@@ -59,11 +60,19 @@ export class PagosService {
       throw new BadRequestException(`El monto excede el saldo pendiente (RD$ ${pendiente.toFixed(2)})`);
     }
 
+    const retencionIsr = dto.retencionIsr ?? 0;
+    const retencionItbis = dto.retencionItbis ?? 0;
+    if (retencionIsr + retencionItbis > dto.monto + EPSILON) {
+      throw new BadRequestException('La retención no puede superar el monto del pago');
+    }
+
     const fecha = dto.fecha ? new Date(dto.fecha) : new Date();
     const pago = await this.pagosRepository.crear({
       tenantId,
       ordenCompraId: orden.id,
       monto: dto.monto,
+      retencionIsr,
+      retencionItbis,
       metodoPago: dto.metodoPago,
       fecha,
       userId,
@@ -78,6 +87,8 @@ export class PagosService {
       pagoId: pago.id,
       ordenCompraId: orden.id,
       monto: dto.monto.toString(),
+      retencionIsr: retencionIsr.toString(),
+      retencionItbis: retencionItbis.toString(),
     });
 
     return pago;

@@ -18,7 +18,9 @@
     "db:app-role": "dotenv -e ../.env -- ts-node scripts/setup-app-role.ts",
     "db:rls": "dotenv -e ../.env -- ts-node scripts/apply-rls.ts",
     "platform:bootstrap-admin": "dotenv -e ../.env -- ts-node scripts/bootstrap-platform-admin.ts",
-    "permisos:backfill": "dotenv -e ../.env -- ts-node scripts/backfill-permisos.ts"
+    "permisos:backfill": "dotenv -e ../.env -- ts-node scripts/backfill-permisos.ts",
+    "cuentas:backfill": "dotenv -e ../.env -- ts-node scripts/backfill-cuentas.ts",
+    "configuraciones:backfill": "dotenv -e ../.env -- ts-node scripts/backfill-configuraciones.ts"
   },
   "dependencies": {
     "@nestjs/common": "^10.4.1",

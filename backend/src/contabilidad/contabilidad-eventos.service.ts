@@ -122,6 +122,8 @@ export class ContabilidadEventosService {
         tenantId: payload.tenantId,
         pagoId: payload.pagoId,
         monto: Number(payload.monto),
+        retencionIsr: Number(payload.retencionIsr),
+        retencionItbis: Number(payload.retencionItbis),
       });
     } catch (error) {
       this.logger.error(`No se pudo generar el asiento del pago a proveedor ${payload.pagoId}`, error as Error);

@@ -153,6 +153,42 @@ export class ReportesFiscalesService {
   }
 
   /**
+   * Resumen de ISR/ITBIS retenido a proveedores por servicios (Art. 309/349
+   * — ver PagosService.registrarPagoOrdenCompra) en el rango. Junto con
+   * retencionesNomina() cubre las dos secciones de la declaración mensual
+   * de retenciones que pide la DGII (formulario IR-17). No es el layout
+   * oficial del formulario, igual que formatoIT1()/retencionesNomina(): son
+   * los montos reales, listos para pasar a la declaración correspondiente.
+   */
+  async retencionesProveedores(desde?: string, hasta?: string) {
+    const rango = rangoPorDefecto(desde, hasta);
+    const pagos = await this.repository.retencionesProveedoresEnRango(rango.desde, rango.hasta);
+
+    const filas = pagos.map((p) => ({
+      proveedorNombre: p.ordenCompra?.proveedor.nombre ?? '',
+      proveedorRnc: p.ordenCompra?.proveedor.rnc ?? '',
+      fecha: p.fecha,
+      montoBruto: Number(p.monto),
+      retencionIsr: Number(p.retencionIsr),
+      retencionItbis: Number(p.retencionItbis),
+      netoPagado: Number(p.monto) - Number(p.retencionIsr) - Number(p.retencionItbis),
+    }));
+
+    const resumen = filas.reduce(
+      (acc, f) => ({
+        cantidad: acc.cantidad + 1,
+        montoBruto: acc.montoBruto + f.montoBruto,
+        retencionIsr: acc.retencionIsr + f.retencionIsr,
+        retencionItbis: acc.retencionItbis + f.retencionItbis,
+        netoPagado: acc.netoPagado + f.netoPagado,
+      }),
+      { cantidad: 0, montoBruto: 0, retencionIsr: 0, retencionItbis: 0, netoPagado: 0 },
+    );
+
+    return { rango, filas, resumen };
+  }
+
+  /**
    * Resumen de ISR retenido sobre nómina por empleado en el rango (por
    * defecto, el mes en curso) — la base para la declaración mensual de
    * retenciones de asalariados que la DGII pide (formulario de

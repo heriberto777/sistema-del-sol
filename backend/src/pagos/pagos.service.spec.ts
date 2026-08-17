@@ -91,5 +91,27 @@ describe('PagosService', () => {
       await expect(service.registrarPagoOrdenCompra(orden, dto, 'user-1', 'tenant-1')).rejects.toThrow(BadRequestException);
       expect(repository.crear).not.toHaveBeenCalled();
     });
+
+    it('acepta retención de ISR/ITBIS y la pasa al repositorio y al evento', async () => {
+      repository.sumaPagosOrdenCompra.mockResolvedValue(0);
+      repository.crear.mockResolvedValue({ id: 'pago-1' } as never);
+      const dtoConRetencion = { monto: 1000, metodoPago: 'TRANSFERENCIA', retencionIsr: 150, retencionItbis: 300 } as never;
+
+      await service.registrarPagoOrdenCompra(orden, dtoConRetencion, 'user-1', 'tenant-1');
+
+      expect(repository.crear).toHaveBeenCalledWith(expect.objectContaining({ retencionIsr: 150, retencionItbis: 300 }));
+      expect(eventBus.emit).toHaveBeenCalledWith(
+        EVENTOS.PAGO_ORDEN_COMPRA_REGISTRADO,
+        expect.objectContaining({ retencionIsr: '150', retencionItbis: '300' }),
+      );
+    });
+
+    it('rechaza una retención que supera el monto del pago', async () => {
+      repository.sumaPagosOrdenCompra.mockResolvedValue(0);
+      const dtoConRetencionExcesiva = { monto: 1000, metodoPago: 'TRANSFERENCIA', retencionIsr: 600, retencionItbis: 500 } as never;
+
+      await expect(service.registrarPagoOrdenCompra(orden, dtoConRetencionExcesiva, 'user-1', 'tenant-1')).rejects.toThrow(BadRequestException);
+      expect(repository.crear).not.toHaveBeenCalled();
+    });
   });
 });

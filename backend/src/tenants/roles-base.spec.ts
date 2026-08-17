@@ -29,6 +29,8 @@ describe('roles-base', () => {
         ITBIS_REDUCIDA: '8',
         PLAZO_PAGO_DIAS: '30',
         STOCK_MINIMO_DEFAULT: '10',
+        RETENCION_ISR_TASA: '15',
+        RETENCION_ITBIS_TASA: '30',
       }),
     );
   });

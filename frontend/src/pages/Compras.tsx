@@ -605,6 +605,9 @@ function ModalRegistrarPago({ orden, onClose }: { orden: OrdenCompra; onClose: (
   const queryClient = useQueryClient();
   const [monto, setMonto] = useState('');
   const [metodoPago, setMetodoPago] = useState('TRANSFERENCIA');
+  const [aplicaRetencion, setAplicaRetencion] = useState(false);
+  const [retencionIsr, setRetencionIsr] = useState('');
+  const [retencionItbis, setRetencionItbis] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   const { data: historial } = useQuery({
@@ -614,13 +617,23 @@ function ModalRegistrarPago({ orden, onClose }: { orden: OrdenCompra; onClose: (
 
   const totalPagado = historial ? Number(historial.totalPagado) : 0;
   const pendiente = Number(orden.total) - totalPagado;
+  const netoAPagar = aplicaRetencion ? Number(monto || 0) - Number(retencionIsr || 0) - Number(retencionItbis || 0) : Number(monto || 0);
 
   const registrar = useMutation({
-    mutationFn: async () => apiClient.post(`/compras/${orden.id}/pagos`, { monto: Number(monto), metodoPago }),
+    mutationFn: async () =>
+      apiClient.post(`/compras/${orden.id}/pagos`, {
+        monto: Number(monto),
+        metodoPago,
+        ...(aplicaRetencion && Number(retencionIsr) > 0 ? { retencionIsr: Number(retencionIsr) } : {}),
+        ...(aplicaRetencion && Number(retencionItbis) > 0 ? { retencionItbis: Number(retencionItbis) } : {}),
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['pagos-orden-compra', orden.id] });
       queryClient.invalidateQueries({ queryKey: ['ordenes-compra'] });
       setMonto('');
+      setAplicaRetencion(false);
+      setRetencionIsr('');
+      setRetencionItbis('');
       setError(null);
     },
     onError: () => setError('No se pudo registrar el pago. Revisa el monto.'),
@@ -676,6 +689,43 @@ function ModalRegistrarPago({ orden, onClose }: { orden: OrdenCompra; onClose: (
                 <option value="TARJETA">Tarjeta</option>
               </Select>
             </div>
+
+            <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
+              <input type="checkbox" checked={aplicaRetencion} onChange={(e) => setAplicaRetencion(e.target.checked)} />
+              Aplica retención de ISR/ITBIS al proveedor
+            </label>
+            {aplicaRetencion && (
+              <div className="space-y-2 rounded-md border border-slate-200 p-3 dark:border-slate-800">
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Lo retenido no se le paga al proveedor — se declara luego a la DGII. Ver tasas de referencia en Admin →
+                  Configuración general.
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  <FormField
+                    id="pago-oc-retencion-isr"
+                    label="Retención ISR (RD$)"
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={retencionIsr}
+                    onChange={(e) => setRetencionIsr(e.target.value)}
+                  />
+                  <FormField
+                    id="pago-oc-retencion-itbis"
+                    label="Retención ITBIS (RD$)"
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={retencionItbis}
+                    onChange={(e) => setRetencionItbis(e.target.value)}
+                  />
+                </div>
+                <p className="text-sm font-medium text-slate-900 dark:text-slate-100">
+                  Neto a pagar al proveedor: RD$ {netoAPagar.toLocaleString('es-DO')}
+                </p>
+              </div>
+            )}
+
             {error && <p className="text-sm text-red-600">{error}</p>}
             <Button type="submit" disabled={registrar.isPending} className="w-full">
               {registrar.isPending ? 'Registrando…' : 'Registrar pago'}

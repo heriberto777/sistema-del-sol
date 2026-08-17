@@ -1115,6 +1115,13 @@ model Pago {
   ordenCompraId String?
   ordenCompra   OrdenCompra? @relation(fields: [ordenCompraId], references: [id], onDelete: Cascade)
   monto         Decimal      @db.Decimal(14, 2)
+  // Retención de ISR/ITBIS practicada al proveedor (Art. 309/349) — solo
+  // aplica a pagos de OrdenCompra, ingresada a mano por quien registra el
+  // pago (ver AsientosContablesService.generarDesdePagoOrdenCompra). Nunca
+  // se usa en pagos de Factura; queda en 0 por defecto para no romper la
+  // suma existente contra `orden.total` (ver PagosRepository.sumaPagosOrdenCompra).
+  retencionIsr   Decimal     @default(0) @db.Decimal(14, 2)
+  retencionItbis Decimal     @default(0) @db.Decimal(14, 2)
   metodoPago    MetodoPago
   fecha         DateTime     @default(now())
   userId        String

@@ -30,6 +30,21 @@ interface RetencionesNomina {
   resumen: { salarioBruto: number; isr: number };
 }
 
+interface RetencionProveedor {
+  proveedorNombre: string;
+  proveedorRnc: string;
+  fecha: string;
+  montoBruto: number;
+  retencionIsr: number;
+  retencionItbis: number;
+  netoPagado: number;
+}
+
+interface RetencionesProveedores {
+  filas: RetencionProveedor[];
+  resumen: { cantidad: number; montoBruto: number; retencionIsr: number; retencionItbis: number; netoPagado: number };
+}
+
 function formatoRD(valor: number) {
   return `RD$ ${valor.toLocaleString('es-DO', { minimumFractionDigits: 2 })}`;
 }
@@ -64,6 +79,16 @@ export function ReporteFiscalDgii() {
     queryFn: async () =>
       (
         await apiClient.get<RetencionesNomina>('/reportes-fiscales/retenciones-nomina', {
+          params: { desde: desde || undefined, hasta: hasta || undefined },
+        })
+      ).data,
+  });
+
+  const { data: retencionesProveedores } = useQuery({
+    queryKey: ['reportes-fiscales-retenciones-proveedores', desde, hasta],
+    queryFn: async () =>
+      (
+        await apiClient.get<RetencionesProveedores>('/reportes-fiscales/retenciones-proveedores', {
           params: { desde: desde || undefined, hasta: hasta || undefined },
         })
       ).data,
@@ -170,6 +195,59 @@ export function ReporteFiscalDgii() {
                     <tr>
                       <td className="px-4 py-2 text-slate-400" colSpan={4}>
                         Sin recibos de nómina en el rango
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+      </div>
+
+      <div className="space-y-2 border-t border-slate-200 pt-4 dark:border-slate-800">
+        <h3 className="font-medium text-slate-900 dark:text-slate-100">Retenciones a proveedores (servicios)</h3>
+        <p className="text-xs text-slate-500 dark:text-slate-400">
+          ISR/ITBIS retenido a proveedores por servicios (Art. 309/349) al registrar el pago de una orden de compra —
+          base para la declaración mensual de retenciones a terceros, sin el layout oficial del formulario.
+        </p>
+        {retencionesProveedores && (
+          <>
+            <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+              <Resumen etiqueta="Monto bruto" valor={retencionesProveedores.resumen.montoBruto} />
+              <Resumen etiqueta="ISR retenido" valor={retencionesProveedores.resumen.retencionIsr} />
+              <Resumen etiqueta="ITBIS retenido" valor={retencionesProveedores.resumen.retencionItbis} />
+              <Resumen etiqueta="Neto pagado" valor={retencionesProveedores.resumen.netoPagado} />
+            </div>
+            <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800">
+              <table className="w-full text-left text-sm">
+                <thead className="bg-slate-50 text-slate-500 dark:bg-slate-900 dark:text-slate-400">
+                  <tr>
+                    <th className="px-4 py-2">Proveedor</th>
+                    <th className="px-4 py-2">RNC</th>
+                    <th className="px-4 py-2">Fecha</th>
+                    <th className="px-4 py-2 text-right">Monto bruto</th>
+                    <th className="px-4 py-2 text-right">ISR retenido</th>
+                    <th className="px-4 py-2 text-right">ITBIS retenido</th>
+                    <th className="px-4 py-2 text-right">Neto pagado</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {retencionesProveedores.filas.map((f, i) => (
+                    <tr key={i}>
+                      <td className="px-4 py-2">{f.proveedorNombre}</td>
+                      <td className="px-4 py-2 font-mono text-xs">{f.proveedorRnc || '—'}</td>
+                      <td className="px-4 py-2">{new Date(f.fecha).toLocaleDateString('es-DO')}</td>
+                      <td className="px-4 py-2 text-right">{formatoRD(f.montoBruto)}</td>
+                      <td className="px-4 py-2 text-right">{formatoRD(f.retencionIsr)}</td>
+                      <td className="px-4 py-2 text-right">{formatoRD(f.retencionItbis)}</td>
+                      <td className="px-4 py-2 text-right">{formatoRD(f.netoPagado)}</td>
+                    </tr>
+                  ))}
+                  {retencionesProveedores.filas.length === 0 && (
+                    <tr>
+                      <td className="px-4 py-2 text-slate-400" colSpan={7}>
+                        Sin pagos con retención en el rango
                       </td>
                     </tr>
                   )}

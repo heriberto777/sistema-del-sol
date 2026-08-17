@@ -86,4 +86,10 @@ export class ReportesFiscalesController {
   retencionesNomina(@Query() query: ReporteFiscalQueryDto, @CurrentUser() user: JwtPayloadUser) {
     return this.reportesFiscalesService.retencionesNomina(user.tenantId, query.desde, query.hasta);
   }
+
+  @Get('retenciones-proveedores')
+  @Permissions('reportes.ver')
+  retencionesProveedores(@Query() query: ReporteFiscalQueryDto) {
+    return this.reportesFiscalesService.retencionesProveedores(query.desde, query.hasta);
+  }
 }

@@ -41,4 +41,13 @@ export const CONFIGURACIONES_BASE: Record<string, string> = {
   ITBIS_REDUCIDA: '8',
   PLAZO_PAGO_DIAS: '30',
   STOCK_MINIMO_DEFAULT: '10',
+  // Referencia para quien registra un pago a proveedor con retención (ver
+  // PagosService.registrarPagoOrdenCompra) — el disparador es manual, así
+  // que el backend nunca calcula el %, solo documenta el valor vigente.
+  // Tasa de ISR: hay referencias (no verificadas contra fuente oficial en
+  // tiempo real) de que subió de 10% a 15% para pagos del Art. 309 desde
+  // julio 2026 — confirmar antes de producción, igual que las tasas de
+  // TSS/ISR de Nómina.
+  RETENCION_ISR_TASA: '15',
+  RETENCION_ITBIS_TASA: '30',
 };

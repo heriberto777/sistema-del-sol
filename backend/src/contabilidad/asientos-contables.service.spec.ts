@@ -311,6 +311,43 @@ describe('AsientosContablesService', () => {
         ]),
       );
     });
+
+    it('con retención parcial de ISR e ITBIS, reparte el crédito entre Caja y las cuentas de retención, balanceado', async () => {
+      asientosRepository.crearGlobal.mockResolvedValue({ id: 'a1' } as never);
+
+      await service.generarDesdePagoOrdenCompra({ tenantId: 't1', pagoId: 'pago-1', monto: 500, retencionIsr: 75, retencionItbis: 30 });
+
+      const [llamada] = asientosRepository.crearGlobal.mock.calls[0];
+      expect(llamada.lineas).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ cuentaContableId: `cuenta-${CODIGOS_CUENTA.CUENTAS_POR_PAGAR}`, debito: 500 }),
+          expect.objectContaining({ cuentaContableId: `cuenta-${CODIGOS_CUENTA.CAJA_BANCOS}`, credito: 395 }),
+          expect.objectContaining({ cuentaContableId: `cuenta-${CODIGOS_CUENTA.ISR_RETENIDO_TERCEROS}`, credito: 75 }),
+          expect.objectContaining({ cuentaContableId: `cuenta-${CODIGOS_CUENTA.ITBIS_RETENIDO_TERCEROS}`, credito: 30 }),
+        ]),
+      );
+      const totalDebito = llamada.lineas.reduce((acc: number, l: { debito: number }) => acc + l.debito, 0);
+      const totalCredito = llamada.lineas.reduce((acc: number, l: { credito: number }) => acc + l.credito, 0);
+      expect(totalDebito).toBe(totalCredito);
+    });
+
+    it('con retención total (retiene el 100% del pago), no genera línea de Caja', async () => {
+      asientosRepository.crearGlobal.mockResolvedValue({ id: 'a1' } as never);
+
+      await service.generarDesdePagoOrdenCompra({ tenantId: 't1', pagoId: 'pago-1', monto: 100, retencionIsr: 70, retencionItbis: 30 });
+
+      const [llamada] = asientosRepository.crearGlobal.mock.calls[0];
+      expect(llamada.lineas).not.toEqual(
+        expect.arrayContaining([expect.objectContaining({ cuentaContableId: `cuenta-${CODIGOS_CUENTA.CAJA_BANCOS}` })]),
+      );
+      expect(llamada.lineas).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ cuentaContableId: `cuenta-${CODIGOS_CUENTA.CUENTAS_POR_PAGAR}`, debito: 100 }),
+          expect.objectContaining({ cuentaContableId: `cuenta-${CODIGOS_CUENTA.ISR_RETENIDO_TERCEROS}`, credito: 70 }),
+          expect.objectContaining({ cuentaContableId: `cuenta-${CODIGOS_CUENTA.ITBIS_RETENIDO_TERCEROS}`, credito: 30 }),
+        ]),
+      );
+    });
   });
 
   describe('crearGasto', () => {

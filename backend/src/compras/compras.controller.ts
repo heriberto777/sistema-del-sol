@@ -4,7 +4,7 @@ import { ComprasService } from './compras.service';
 import { CrearOrdenCompraDto } from './dto/crear-orden-compra.dto';
 import { RecibirOrdenCompraDto } from './dto/recibir-orden-compra.dto';
 import { DevolverOrdenCompraDto } from './dto/devolver-orden-compra.dto';
-import { CrearPagoDto } from '../pagos/dto/crear-pago.dto';
+import { CrearPagoOrdenCompraDto } from './dto/crear-pago-orden-compra.dto';
 import { Permissions } from '../common/decorators/permissions.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtPayloadUser } from '../common/types/authenticated-request';
@@ -48,7 +48,7 @@ export class ComprasController {
 
   @Post(':id/pagos')
   @Permissions('compras.pagar')
-  registrarPago(@Param('id') id: string, @Body() dto: CrearPagoDto, @CurrentUser() user: JwtPayloadUser) {
+  registrarPago(@Param('id') id: string, @Body() dto: CrearPagoOrdenCompraDto, @CurrentUser() user: JwtPayloadUser) {
     return this.comprasService.registrarPago(id, dto, user.userId, user.tenantId);
   }
 

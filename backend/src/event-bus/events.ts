@@ -78,6 +78,8 @@ export interface PagoOrdenCompraRegistradoPayload {
   pagoId: string;
   ordenCompraId: string;
   monto: string;
+  retencionIsr: string;
+  retencionItbis: string;
 }
 
 export interface CotizacionEnviadaPayload {

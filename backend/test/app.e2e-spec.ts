@@ -2263,6 +2263,60 @@ describe('App (e2e)', () => {
       expect(historial.body.pagos).toHaveLength(2);
     });
 
+    it('pago a proveedor con retención de ISR/ITBIS: genera un asiento balanceado y aparece en el reporte de retenciones', async () => {
+      const token = await login('admin@e2e-a.com', SUBDOMINIO_A);
+      const esperarListener = () => new Promise((resolve) => setTimeout(resolve, 300));
+
+      const orden = await request(app.getHttpServer())
+        .post('/api/compras')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ proveedorId, numero: 'OC-RETENCION-E2E-001', lineas: [{ productoId, cantidad: 10, costoUnitario: 100 }] })
+        .expect(201);
+      // total = 1000
+
+      const pago = await request(app.getHttpServer())
+        .post(`/api/compras/${orden.body.id}/pagos`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ monto: 1000, metodoPago: 'TRANSFERENCIA', retencionIsr: 150, retencionItbis: 300 })
+        .expect(201);
+
+      // Retención que excede el monto del pago debe rechazarse.
+      const otraOrden = await request(app.getHttpServer())
+        .post('/api/compras')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ proveedorId, numero: 'OC-RETENCION-E2E-002', lineas: [{ productoId, cantidad: 1, costoUnitario: 100 }] })
+        .expect(201);
+      await request(app.getHttpServer())
+        .post(`/api/compras/${otraOrden.body.id}/pagos`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ monto: 100, metodoPago: 'EFECTIVO', retencionIsr: 80, retencionItbis: 50 })
+        .expect(400);
+
+      await esperarListener();
+
+      const asientos = await request(app.getHttpServer())
+        .get('/api/contabilidad/asientos')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+      const asiento = asientos.body.datos.find((a: { origenId: string }) => a.origenId === pago.body.id);
+      expect(asiento).toBeDefined();
+      const totalDebito = asiento.lineas.reduce((acc: number, l: { debito: string }) => acc + Number(l.debito), 0);
+      const totalCredito = asiento.lineas.reduce((acc: number, l: { credito: string }) => acc + Number(l.credito), 0);
+      expect(totalDebito).toBe(totalCredito);
+      expect(totalDebito).toBe(1000);
+      const creditoCaja = asiento.lineas.find((l: { cuentaContable: { codigo: string } }) => l.cuentaContable.codigo === '1010');
+      expect(Number(creditoCaja.credito)).toBe(550); // 1000 - 150 (ISR) - 300 (ITBIS)
+
+      const reporte = await request(app.getHttpServer())
+        .get('/api/reportes-fiscales/retenciones-proveedores')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+      const fila = reporte.body.filas.find((f: { netoPagado: number }) => f.netoPagado === 550);
+      expect(fila).toBeDefined();
+      expect(fila.retencionIsr).toBe(150);
+      expect(fila.retencionItbis).toBe(300);
+    });
+
     it('devolución a proveedor: reduce cantidadRecibida, saca stock, y vuelve a RECIBIDA_PARCIAL', async () => {
       const token = await login('admin@e2e-a.com', SUBDOMINIO_A);
 

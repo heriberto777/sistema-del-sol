@@ -212,21 +212,42 @@ export class AsientosContablesService {
     });
   }
 
-  /** Pago (parcial o total) hecho a un proveedor contra una orden de compra -> mueve de Caja/Bancos a Cuentas por Pagar. */
-  async generarDesdePagoOrdenCompra(params: { tenantId: string; pagoId: string; monto: number }) {
-    const [cuentaPorPagar, cuentaCaja] = await Promise.all([
+  /**
+   * Pago (parcial o total) hecho a un proveedor contra una orden de compra
+   * -> mueve de Caja/Bancos a Cuentas por Pagar. Si el pago retuvo ISR y/o
+   * ITBIS al proveedor (Art. 309/349 — ver PagosService.registrarPagoOrdenCompra),
+   * esa porción no sale de Caja: se acredita a las cuentas de retención en
+   * vez de a Caja, para declarar y remitir aparte a la DGII. El débito a
+   * Cuentas por Pagar es siempre el monto BRUTO (lo que salda la orden);
+   * Caja solo se mueve por el neto efectivamente desembolsado.
+   */
+  async generarDesdePagoOrdenCompra(params: { tenantId: string; pagoId: string; monto: number; retencionIsr?: number; retencionItbis?: number }) {
+    const retencionIsr = params.retencionIsr ?? 0;
+    const retencionItbis = params.retencionItbis ?? 0;
+    const netoCaja = params.monto - retencionIsr - retencionItbis;
+    const descripcion = `Pago a proveedor — ${params.pagoId}`;
+
+    const [cuentaPorPagar, cuentaCaja, cuentaIsrRetenido, cuentaItbisRetenido] = await Promise.all([
       this.cuentasRepository.buscarPorCodigoGlobal(params.tenantId, CODIGOS_CUENTA.CUENTAS_POR_PAGAR),
       this.cuentasRepository.buscarPorCodigoGlobal(params.tenantId, CODIGOS_CUENTA.CAJA_BANCOS),
+      retencionIsr > 0 ? this.cuentasRepository.buscarPorCodigoGlobal(params.tenantId, CODIGOS_CUENTA.ISR_RETENIDO_TERCEROS) : null,
+      retencionItbis > 0 ? this.cuentasRepository.buscarPorCodigoGlobal(params.tenantId, CODIGOS_CUENTA.ITBIS_RETENIDO_TERCEROS) : null,
     ]);
 
-    const lineas = [
-      this.lineaSegunSigno(cuentaPorPagar.id, params.monto, 'debito', `Pago a proveedor — ${params.pagoId}`),
-      this.lineaSegunSigno(cuentaCaja.id, params.monto, 'credito', `Pago a proveedor — ${params.pagoId}`),
-    ];
+    const lineas = [this.lineaSegunSigno(cuentaPorPagar.id, params.monto, 'debito', descripcion)];
+    if (netoCaja > EPSILON) {
+      lineas.push(this.lineaSegunSigno(cuentaCaja.id, netoCaja, 'credito', descripcion));
+    }
+    if (cuentaIsrRetenido) {
+      lineas.push(this.lineaSegunSigno(cuentaIsrRetenido.id, retencionIsr, 'credito', descripcion));
+    }
+    if (cuentaItbisRetenido) {
+      lineas.push(this.lineaSegunSigno(cuentaItbisRetenido.id, retencionItbis, 'credito', descripcion));
+    }
 
     return this.crearAsientoAutomatico({
       tenantId: params.tenantId,
-      concepto: `Pago a proveedor — ${params.pagoId}`,
+      concepto: descripcion,
       origen: 'PAGO',
       origenId: params.pagoId,
       lineas,
