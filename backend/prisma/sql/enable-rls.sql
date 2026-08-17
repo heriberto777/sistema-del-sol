@@ -16,7 +16,7 @@ DECLARE
 BEGIN
   FOR tabla IN
     SELECT unnest(ARRAY[
-      'tenant_settings', 'configuraciones', 'tenant_plugins',
+      'tenant_settings', 'configuraciones', 'tenant_modulo_overrides',
       'users', 'roles', 'audit_logs',
       'ncf_asignados', 'facturas',
       'productos', 'bodegas', 'movimiento_inventario',

@@ -5,11 +5,13 @@ import { AjustarStockDto } from './dto/ajustar-stock.dto';
 import { TransferirStockDto } from './dto/transferir-stock.dto';
 import { CrearBodegaDto } from './dto/crear-bodega.dto';
 import { Permissions } from '../common/decorators/permissions.decorator';
+import { RequiereModulo } from '../common/decorators/requiere-modulo.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtPayloadUser } from '../common/types/authenticated-request';
 
 @ApiBearerAuth()
 @ApiTags('inventario')
+@RequiereModulo('inventario')
 @Controller('inventario')
 export class InventarioController {
   constructor(private readonly inventarioService: InventarioService) {}

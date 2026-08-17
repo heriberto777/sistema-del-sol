@@ -33,11 +33,17 @@ No hay alta de super admins por HTTP — se crean con
 | POST | `/api/platform/auth/login` | público | `{ email, password }` → `{ accessToken, admin }` |
 | POST | `/api/platform/auth/password/olvide` | público (5/hora) | `{ email }` → mensaje genérico siempre |
 | POST | `/api/platform/auth/password/restablecer` | público | `{ token, password }` — token de un solo uso, vence en 1h |
-| POST | `/api/platform/tenants` | Bearer de plataforma | Crea el tenant + roles/permisos/configuración/usuario admin inicial, todo en una transacción |
-| GET | `/api/platform/tenants` | Bearer de plataforma | Lista todos los tenants |
+| POST | `/api/platform/tenants` | Bearer de plataforma | `{ planId, nombre, subdominio, rnc?, adminEmail, adminNombre, adminPassword }` — crea el tenant + roles/permisos/configuración/usuario admin inicial, todo en una transacción |
+| GET | `/api/platform/tenants` | Bearer de plataforma | Lista todos los tenants (con su `plan`) |
 | GET | `/api/platform/tenants/:id` | Bearer de plataforma | |
-| PATCH | `/api/platform/tenants/:id` | Bearer de plataforma | `{ nombre?, estado?, planBase? }` — `estado: SUSPENDIDO` bloquea el login de ese tenant |
+| PATCH | `/api/platform/tenants/:id` | Bearer de plataforma | `{ nombre?, estado?, planId? }` — `estado: SUSPENDIDO` bloquea el login de ese tenant |
 | GET | `/api/platform/audit-log?pagina&tamanoPagina&busqueda` | Bearer de plataforma | Bitácora de acciones de plataforma (crear/suspender tenants, etc.) |
+| GET | `/api/platform/planes` | Bearer de plataforma | Catálogo de Planes, cada uno con sus módulos incluidos |
+| GET | `/api/platform/planes/modulos` | Bearer de plataforma | Catálogo completo de `Modulo` (claves gateable, ver ARCHITECTURE.md) |
+| POST | `/api/platform/planes` | Bearer de plataforma | `{ nombre, descripcion?, modulos: string[] }` (claves) |
+| PATCH | `/api/platform/planes/:id` | Bearer de plataforma | `{ nombre?, descripcion?, modulos?: string[] }` |
+| GET | `/api/platform/tenants/:tenantId/modulos` | Bearer de plataforma | Set efectivo de módulos (plan + excepciones) con su origen (`plan`\|`override`) |
+| PATCH | `/api/platform/tenants/:tenantId/modulos/:clave` | Bearer de plataforma | `{ activo: boolean \| null }` — crea/actualiza la excepción; `null` la quita y vuelve a heredar del plan |
 
 ## NCF (por tenant)
 
@@ -154,10 +160,13 @@ la entrega como fallida en `webhook_deliveries` — ver ARCHITECTURE.md.
 ## Plugins
 
 Rutas bajo `/api/plugins/<clave>/...`, protegidas además por
-`@RequiresPlugin('<clave>')` (403 si el tenant no tiene el plugin activo).
+`@RequiereModulo('<clave>')` (403 si el tenant no tiene ese módulo activo
+— plan + excepciones, ver ARCHITECTURE.md). La activación ya no es
+self-service del tenant: la decide la plataforma vía
+`/api/platform/tenants/:tenantId/modulos/:clave` (ver arriba).
 Ver `plugins/inmobiliaria/src/inmobiliaria.controller.ts`.
 
-## Admin (usuarios, plugins, configuración)
+## Admin (usuarios, configuración)
 
 | Método | Ruta | Permiso |
 |---|---|---|
@@ -166,9 +175,6 @@ Ver `plugins/inmobiliaria/src/inmobiliaria.controller.ts`.
 | GET | `/api/admin/usuarios?pagina&tamanoPagina&busqueda` | `admin.usuarios` — `busqueda` filtra por nombre o email |
 | GET | `/api/admin/usuarios/:id` | `admin.usuarios` |
 | PATCH | `/api/admin/usuarios/:id` | `admin.usuarios` — `{ nombre?, activo?, rolIds? }` (rolIds reemplaza los roles asignados) |
-| GET | `/api/admin/plugins` | `admin.plugins` — manifiestos descubiertos + `activo` para el tenant actual |
-| POST | `/api/admin/plugins/:pluginKey/activar` | `admin.plugins` |
-| POST | `/api/admin/plugins/:pluginKey/desactivar` | `admin.plugins` |
 | GET | `/api/admin/configuraciones` | `admin.configuracion` |
 | PUT | `/api/admin/configuraciones/:clave` | `admin.configuracion` — `{ valor }`, upsert (crea la clave si no existe) |
 

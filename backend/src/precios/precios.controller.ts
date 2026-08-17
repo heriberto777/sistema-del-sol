@@ -3,9 +3,11 @@ import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { PreciosService } from './precios.service';
 import { CrearPrecioDto } from './dto/crear-precio.dto';
 import { Permissions } from '../common/decorators/permissions.decorator';
+import { RequiereModulo } from '../common/decorators/requiere-modulo.decorator';
 
 @ApiBearerAuth()
 @ApiTags('precios')
+@RequiereModulo('productos')
 @Controller('precios')
 export class PreciosController {
   constructor(private readonly preciosService: PreciosService) {}

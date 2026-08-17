@@ -8,6 +8,7 @@ import { OlvidePasswordDto } from './dto/olvide-password.dto';
 import { RestablecerPasswordDto } from './dto/restablecer-password.dto';
 import { generarTokenReset, hashearTokenReset, RESET_PASSWORD_TTL_MS } from '../common/utils/password-reset-token';
 import { EmailChannel } from '../notificaciones/canales/email.channel';
+import { resolverModulosActivos } from '../planes/resolver-modulos-activos';
 
 const RESPUESTA_GENERICA_OLVIDE = {
   mensaje: 'Si el correo existe, se envió un enlace para restablecer la contraseña.',
@@ -66,20 +67,24 @@ export class AuthService {
       permisos,
     };
 
+    const modulosActivos = await resolverModulosActivos(this.prisma, tenant.id);
+
     return {
       accessToken: this.jwtService.sign(payload),
-      // `permisos` viaja también acá (no solo dentro del JWT) para que el
-      // frontend pueda ocultar rutas/botones según permiso real sin tener
-      // que decodificar el token — la aplicación real del permiso sigue
-      // siendo 100% responsabilidad de PermissionsGuard en el backend,
-      // esto es solo para no mostrarle al usuario acciones que el servidor
-      // le va a rechazar con 403.
+      // `permisos`/`modulosActivos` viajan también acá (no solo dentro del
+      // JWT) para que el frontend pueda ocultar rutas/botones según permiso
+      // y plan real sin tener que decodificar el token — la aplicación real
+      // de ambos sigue siendo 100% responsabilidad de los guards del
+      // backend (PermissionsGuard/ModuloActivoGuard), esto es solo para no
+      // mostrarle al usuario acciones que el servidor le va a rechazar con
+      // 403.
       usuario: {
         id: user.id,
         nombre: user.nombre,
         email: user.email,
         roles,
         permisos,
+        modulosActivos,
         tenant: { subdominio: tenant.subdominio, nombre: tenant.nombre },
       },
     };

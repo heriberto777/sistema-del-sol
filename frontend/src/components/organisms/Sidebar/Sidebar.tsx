@@ -7,6 +7,8 @@ interface Enlace {
   ruta: string;
   etiqueta: string;
   permisos?: string[];
+  /** Clave de `MODULOS_BASE` — si está presente, además exige que el tenant lo tenga activo (plan + excepciones). */
+  modulo?: string;
 }
 
 interface Grupo {
@@ -24,21 +26,21 @@ const GRUPOS: Grupo[] = [
     id: 'ventas',
     etiqueta: 'Ventas',
     items: [
-      { ruta: '/facturacion', etiqueta: 'Facturación', permisos: ['facturacion.ver'] },
-      { ruta: '/cotizaciones', etiqueta: 'Cotizaciones', permisos: ['cotizaciones.ver'] },
-      { ruta: '/remisiones', etiqueta: 'Remisiones', permisos: ['remisiones.ver'] },
-      { ruta: '/pos', etiqueta: 'Punto de venta', permisos: ['pos.ver'] },
+      { ruta: '/facturacion', etiqueta: 'Facturación', permisos: ['facturacion.ver'], modulo: 'facturacion' },
+      { ruta: '/cotizaciones', etiqueta: 'Cotizaciones', permisos: ['cotizaciones.ver'], modulo: 'cotizaciones' },
+      { ruta: '/remisiones', etiqueta: 'Remisiones', permisos: ['remisiones.ver'], modulo: 'remisiones' },
+      { ruta: '/pos', etiqueta: 'Punto de venta', permisos: ['pos.ver'], modulo: 'pos' },
     ],
   },
   {
     id: 'inventario-compras',
     etiqueta: 'Inventario y Compras',
     items: [
-      { ruta: '/inventario', etiqueta: 'Inventario', permisos: ['inventario.ver'] },
-      { ruta: '/compras', etiqueta: 'Compras', permisos: ['compras.ver'] },
-      { ruta: '/productos', etiqueta: 'Productos', permisos: ['precios.ver'] },
-      { ruta: '/bancos', etiqueta: 'Bancos', permisos: ['bancos.ver'] },
-      { ruta: '/gastos-menores', etiqueta: 'Gastos menores', permisos: ['gastosmenores.ver'] },
+      { ruta: '/inventario', etiqueta: 'Inventario', permisos: ['inventario.ver'], modulo: 'inventario' },
+      { ruta: '/compras', etiqueta: 'Compras', permisos: ['compras.ver'], modulo: 'compras' },
+      { ruta: '/productos', etiqueta: 'Productos', permisos: ['precios.ver'], modulo: 'productos' },
+      { ruta: '/bancos', etiqueta: 'Bancos', permisos: ['bancos.ver'], modulo: 'bancos' },
+      { ruta: '/gastos-menores', etiqueta: 'Gastos menores', permisos: ['gastosmenores.ver'], modulo: 'gastosmenores' },
     ],
   },
   {
@@ -46,7 +48,7 @@ const GRUPOS: Grupo[] = [
     etiqueta: 'Finanzas',
     items: [
       { ruta: '/contabilidad', etiqueta: 'Contabilidad', permisos: ['contabilidad.ver'] },
-      { ruta: '/nomina', etiqueta: 'Nómina', permisos: ['nomina.ver'] },
+      { ruta: '/nomina', etiqueta: 'Nómina', permisos: ['nomina.ver'], modulo: 'nomina' },
       { ruta: '/reportes', etiqueta: 'Reportes', permisos: ['reportes.ver'] },
     ],
   },
@@ -54,9 +56,9 @@ const GRUPOS: Grupo[] = [
     id: 'sistema',
     etiqueta: 'Sistema',
     items: [
-      { ruta: '/ia', etiqueta: 'IA', permisos: ['ia.usar'] },
+      { ruta: '/ia', etiqueta: 'IA', permisos: ['ia.usar'], modulo: 'ia' },
       { ruta: '/notificaciones', etiqueta: 'Notificaciones', permisos: ['notificaciones.ver'] },
-      { ruta: '/admin', etiqueta: 'Admin', permisos: ['admin.usuarios', 'admin.plugins', 'admin.configuracion'] },
+      { ruta: '/admin', etiqueta: 'Admin', permisos: ['admin.usuarios', 'admin.configuracion'] },
     ],
   },
 ];
@@ -65,7 +67,12 @@ const GRUPOS: Grupo[] = [
 // limpio en ningún grupo, se deja suelto debajo de todos.
 const SUELTOS_ABAJO: Enlace[] = [{ ruta: '/contactos', etiqueta: 'Contactos', permisos: ['clientes.ver', 'compras.ver'] }];
 
-function esVisible(enlace: Enlace, tienePermiso: (permiso: string) => boolean) {
+function esVisible(
+  enlace: Enlace,
+  tienePermiso: (permiso: string) => boolean,
+  tieneModulo: (modulo: string) => boolean,
+) {
+  if (enlace.modulo && !tieneModulo(enlace.modulo)) return false;
   return !enlace.permisos || enlace.permisos.some(tienePermiso);
 }
 
@@ -75,7 +82,7 @@ function grupoDeRuta(pathname: string): string | null {
 }
 
 export function Sidebar() {
-  const { usuario, tienePermiso } = useAuth();
+  const { usuario, tienePermiso, tieneModulo } = useAuth();
   const location = useLocation();
   const [gruposAbiertos, setGruposAbiertos] = useState<Set<string>>(() => {
     const activo = grupoDeRuta(location.pathname);
@@ -106,9 +113,10 @@ export function Sidebar() {
         : 'text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-900',
     );
 
-  const gruposVisibles = GRUPOS.map((g) => ({ ...g, items: g.items.filter((item) => esVisible(item, tienePermiso)) })).filter(
-    (g) => g.items.length > 0,
-  );
+  const gruposVisibles = GRUPOS.map((g) => ({
+    ...g,
+    items: g.items.filter((item) => esVisible(item, tienePermiso, tieneModulo)),
+  })).filter((g) => g.items.length > 0);
 
   return (
     <nav className="flex h-full w-56 flex-col gap-1 overflow-y-auto border-r border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950">
@@ -117,7 +125,7 @@ export function Sidebar() {
         {usuario?.tenant?.nombre && <p className="truncate text-xs text-slate-500 dark:text-slate-400">{usuario.tenant.nombre}</p>}
       </div>
 
-      {SUELTOS_ARRIBA.filter((enlace) => esVisible(enlace, tienePermiso)).map((enlace) => (
+      {SUELTOS_ARRIBA.filter((enlace) => esVisible(enlace, tienePermiso, tieneModulo)).map((enlace) => (
         <NavLink key={enlace.ruta} to={enlace.ruta} end={enlace.ruta === '/'} className={enlaceClase}>
           {enlace.etiqueta}
         </NavLink>
@@ -148,7 +156,7 @@ export function Sidebar() {
         );
       })}
 
-      {SUELTOS_ABAJO.filter((enlace) => esVisible(enlace, tienePermiso)).map((enlace) => (
+      {SUELTOS_ABAJO.filter((enlace) => esVisible(enlace, tienePermiso, tieneModulo)).map((enlace) => (
         <NavLink key={enlace.ruta} to={enlace.ruta} className={enlaceClase}>
           {enlace.etiqueta}
         </NavLink>

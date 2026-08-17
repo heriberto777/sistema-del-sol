@@ -31,7 +31,8 @@ PostgreSQL 16 + Prisma. Schema completo en `backend/prisma/schema.prisma`.
 
 | Módulo | Tablas |
 |---|---|
-| Core / tenants | `tenants`, `tenant_settings`, `configuraciones`, `tenant_plugins` |
+| Core / tenants | `tenants`, `tenant_settings`, `configuraciones` |
+| Planes / módulos | `planes`, `modulos`, `plan_modulos` (catálogo global, sin `tenantId`), `tenant_modulo_overrides` (tenant-scoped) |
 | Usuarios / RBAC | `users`, `roles`, `permissions`, `role_permissions`, `user_roles` |
 | Auditoría | `audit_logs` (tenant), `platform_audit_logs` (plataforma, sin `tenantId`) |
 | Facturación | `ncf_asignados`, `facturas`, `linea_factura` |

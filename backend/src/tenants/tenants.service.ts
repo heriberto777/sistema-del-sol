@@ -14,6 +14,7 @@ export class TenantsService {
       nombre: dto.nombre,
       subdominio: dto.subdominio,
       rnc: dto.rnc,
+      planId: dto.planId,
       adminEmail: dto.adminEmail,
       adminNombre: dto.adminNombre,
       adminPasswordHash,

@@ -1,7 +1,11 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEmail, IsOptional, IsString, Matches, MinLength } from 'class-validator';
+import { IsEmail, IsOptional, IsString, IsUUID, Matches, MinLength } from 'class-validator';
 
 export class CrearTenantDto {
+  @ApiProperty({ description: 'Id del Plan a asignar — ver GET /platform/planes' })
+  @IsUUID()
+  planId: string;
+
   @ApiProperty({ example: 'Distribuidora Ejemplo SRL' })
   @IsString()
   nombre: string;

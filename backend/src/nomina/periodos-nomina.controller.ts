@@ -3,12 +3,14 @@ import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { PeriodosNominaService } from './periodos-nomina.service';
 import { GenerarPeriodoDto } from './dto/generar-periodo.dto';
 import { Permissions } from '../common/decorators/permissions.decorator';
+import { RequiereModulo } from '../common/decorators/requiere-modulo.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtPayloadUser } from '../common/types/authenticated-request';
 import { ListadoQueryDto } from '../common/dto/listado-query.dto';
 
 @ApiBearerAuth()
 @ApiTags('nomina')
+@RequiereModulo('nomina')
 @Controller('nomina/periodos')
 export class PeriodosNominaController {
   constructor(private readonly periodosNominaService: PeriodosNominaService) {}

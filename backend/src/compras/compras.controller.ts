@@ -6,12 +6,14 @@ import { RecibirOrdenCompraDto } from './dto/recibir-orden-compra.dto';
 import { DevolverOrdenCompraDto } from './dto/devolver-orden-compra.dto';
 import { CrearPagoOrdenCompraDto } from './dto/crear-pago-orden-compra.dto';
 import { Permissions } from '../common/decorators/permissions.decorator';
+import { RequiereModulo } from '../common/decorators/requiere-modulo.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtPayloadUser } from '../common/types/authenticated-request';
 import { ListadoQueryDto } from '../common/dto/listado-query.dto';
 
 @ApiBearerAuth()
 @ApiTags('compras')
+@RequiereModulo('compras')
 @Controller('compras')
 export class ComprasController {
   constructor(private readonly comprasService: ComprasService) {}

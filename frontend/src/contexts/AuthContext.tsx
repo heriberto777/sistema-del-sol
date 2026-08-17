@@ -7,6 +7,7 @@ export interface UsuarioAutenticado {
   email: string;
   roles: string[];
   permisos: string[];
+  modulosActivos: string[];
   tenant?: { subdominio: string; nombre: string };
 }
 
@@ -22,6 +23,12 @@ interface AuthContextValue {
    * seguridad por sí sola.
    */
   tienePermiso: (permiso: string) => boolean;
+  /**
+   * Igual que `tienePermiso`, pero para el plan/excepciones del tenant — solo
+   * UX (ocultar del menú), la aplicación real es 100% `ModuloActivoGuard` en
+   * el backend.
+   */
+  tieneModulo: (modulo: string) => boolean;
 }
 
 export const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -59,10 +66,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // localStorage sin `permisos` — sin el segundo `?.` esto reventaría con
   // un TypeError en vez de tratarlo como "sin permisos" hasta el próximo login.
   const tienePermiso = useCallback((permiso: string) => usuario?.permisos?.includes(permiso) ?? false, [usuario]);
+  const tieneModulo = useCallback((modulo: string) => usuario?.modulosActivos?.includes(modulo) ?? false, [usuario]);
 
   const value = useMemo(
-    () => ({ usuario, cargando, login, logout, tienePermiso }),
-    [usuario, cargando, login, logout, tienePermiso],
+    () => ({ usuario, cargando, login, logout, tienePermiso, tieneModulo }),
+    [usuario, cargando, login, logout, tienePermiso, tieneModulo],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

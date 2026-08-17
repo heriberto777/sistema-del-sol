@@ -18,17 +18,23 @@ La activación de plugins en esta plataforma es manual — no hay UI de
 3. Importa `InmobiliariaModule` en `backend/src/app.module.ts`.
 4. Implementa el/los `*.service.ts` y `*.repository.ts` reales (este stub
    solo trae el controller de ejemplo).
-5. Por cada tenant que compre el plugin, crea su fila en `tenant_plugins`
-   con `pluginKey: "inmobiliaria"` y `activo: true` — `PluginActiveGuard`
-   usa esa fila para permitir o denegar acceso a las rutas del plugin.
+5. Por cada tenant que compre el plugin, la plataforma lo agrega al Plan
+   del tenant o le crea una excepción puntual (`TenantModuloOverride`
+   con `activo: true` para la clave `inmobiliaria`) desde
+   `/plataforma/tenants` — `ModuloActivoGuard` (global) usa eso para
+   permitir o denegar acceso a las rutas del plugin. Ya no lo activa el
+   propio tenant desde su panel de Admin (así era antes, con
+   `tenant_plugins`/`PluginActiveGuard` — reemplazado por el mismo
+   mecanismo que controla el resto de los módulos, ver
+   docs/ARCHITECTURE.md).
 
 ## Por qué este patrón
 
 - El código del plugin se compila junto al backend (mismo proceso NestJS),
   no como microservicio aparte — más simple de operar a la escala actual
   (~50 tenants).
-- La activación por tenant es un dato (`tenant_plugins.activo`), no un
-  despliegue distinto — así un mismo release del backend sirve a tenants
-  con distintos plugins activos.
+- La activación por tenant es un dato (Plan + `TenantModuloOverride`), no
+  un despliegue distinto — así un mismo release del backend sirve a
+  tenants con distintos módulos/plugins activos.
 - `plugin.json` es lo que `PluginLoaderService` lee al boot para loguear
   qué plugins están disponibles en el código desplegado.

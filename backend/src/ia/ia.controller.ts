@@ -5,11 +5,13 @@ import { PreguntarAsistenteDto } from './dto/preguntar-asistente.dto';
 import { SugerirCuentaContableDto } from './dto/sugerir-cuenta-contable.dto';
 import { GenerarDescripcionProductoDto } from './dto/generar-descripcion-producto.dto';
 import { Permissions } from '../common/decorators/permissions.decorator';
+import { RequiereModulo } from '../common/decorators/requiere-modulo.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtPayloadUser } from '../common/types/authenticated-request';
 
 @ApiBearerAuth()
 @ApiTags('ia')
+@RequiereModulo('ia')
 @Controller('ia')
 export class IaController {
   constructor(private readonly iaService: IaService) {}

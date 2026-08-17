@@ -17,7 +17,7 @@ export const PERMISOS_BASE = [
   'compras.crear', 'compras.recibir', 'compras.pagar', 'compras.ver',
   'clientes.crear', 'clientes.editar', 'clientes.ver',
   'reportes.ver',
-  'admin.configuracion', 'admin.usuarios', 'admin.plugins',
+  'admin.configuracion', 'admin.usuarios',
   'auditoria.ver',
 ];
 

@@ -7,11 +7,13 @@ import { CrearMovimientoCajaDto } from './dto/crear-movimiento-caja.dto';
 import { RegistrarVentaPosDto } from './dto/registrar-venta.dto';
 import { ListarTurnosQueryDto } from './dto/listar-turnos-query.dto';
 import { Permissions } from '../common/decorators/permissions.decorator';
+import { RequiereModulo } from '../common/decorators/requiere-modulo.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtPayloadUser } from '../common/types/authenticated-request';
 
 @ApiBearerAuth()
 @ApiTags('pos')
+@RequiereModulo('pos')
 @Controller('pos')
 export class PosController {
   constructor(private readonly posService: PosService) {}

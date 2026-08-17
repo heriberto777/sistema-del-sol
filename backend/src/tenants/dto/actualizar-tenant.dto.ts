@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { EstadoTenant } from '@prisma/client';
-import { IsEnum, IsOptional, IsString } from 'class-validator';
+import { IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
 
 export class ActualizarTenantDto {
   @ApiProperty({ required: false })
@@ -13,8 +13,8 @@ export class ActualizarTenantDto {
   @IsEnum(EstadoTenant)
   estado?: EstadoTenant;
 
-  @ApiProperty({ required: false })
+  @ApiProperty({ required: false, description: 'Id del Plan a asignar — ver /platform/planes' })
   @IsOptional()
-  @IsString()
-  planBase?: string;
+  @IsUUID()
+  planId?: string;
 }

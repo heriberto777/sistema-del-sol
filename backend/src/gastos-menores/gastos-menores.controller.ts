@@ -3,12 +3,14 @@ import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { GastosMenoresService } from './gastos-menores.service';
 import { CrearGastoMenorDto } from './dto/crear-gasto-menor.dto';
 import { Permissions } from '../common/decorators/permissions.decorator';
+import { RequiereModulo } from '../common/decorators/requiere-modulo.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtPayloadUser } from '../common/types/authenticated-request';
 import { ListadoQueryDto } from '../common/dto/listado-query.dto';
 
 @ApiBearerAuth()
 @ApiTags('gastos-menores')
+@RequiereModulo('gastosmenores')
 @Controller('gastos-menores')
 export class GastosMenoresController {
   constructor(private readonly gastosMenoresService: GastosMenoresService) {}

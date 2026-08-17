@@ -6,12 +6,14 @@ import { CrearFacturaDto } from './dto/crear-factura.dto';
 import { AnularFacturaDto } from './dto/anular-factura.dto';
 import { CrearPagoDto } from '../pagos/dto/crear-pago.dto';
 import { Permissions } from '../common/decorators/permissions.decorator';
+import { RequiereModulo } from '../common/decorators/requiere-modulo.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtPayloadUser } from '../common/types/authenticated-request';
 import { ListadoQueryDto } from '../common/dto/listado-query.dto';
 
 @ApiBearerAuth()
 @ApiTags('facturacion')
+@RequiereModulo('facturacion')
 @Controller('facturas')
 export class FacturacionController {
   constructor(private readonly facturacionService: FacturacionService) {}

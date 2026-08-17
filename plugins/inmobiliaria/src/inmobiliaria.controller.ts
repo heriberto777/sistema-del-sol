@@ -1,18 +1,18 @@
 import { Controller, Get } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Permissions } from '../../../backend/src/common/decorators/permissions.decorator';
-import { RequiresPlugin } from '../../../backend/src/common/decorators/requires-plugin.decorator';
+import { RequiereModulo } from '../../../backend/src/common/decorators/requiere-modulo.decorator';
 
 /**
  * Controller de ejemplo del plugin Inmobiliaria. Sirve como plantilla para
  * los próximos plugins (Clínica, Casa de Cambio): las rutas quedan
- * protegidas tanto por permisos de rol (@Permissions) como por la
- * activación del plugin para el tenant actual (@RequiresPlugin), vía
- * PluginActiveGuard.
+ * protegidas tanto por permisos de rol (@Permissions) como por si la
+ * plataforma le activó el módulo "inmobiliaria" a este tenant (vía Plan
+ * o excepción puntual — @RequiereModulo, ModuloActivoGuard global).
  */
 @ApiBearerAuth()
 @ApiTags('plugin-inmobiliaria')
-@RequiresPlugin('inmobiliaria')
+@RequiereModulo('inmobiliaria')
 @Controller('plugins/inmobiliaria/propiedades')
 export class InmobiliariaController {
   @Get()

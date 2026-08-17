@@ -4,12 +4,14 @@ import { EmpleadosService } from './empleados.service';
 import { CrearEmpleadoDto } from './dto/crear-empleado.dto';
 import { ActualizarEmpleadoDto } from './dto/actualizar-empleado.dto';
 import { Permissions } from '../common/decorators/permissions.decorator';
+import { RequiereModulo } from '../common/decorators/requiere-modulo.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtPayloadUser } from '../common/types/authenticated-request';
 import { ListadoQueryDto } from '../common/dto/listado-query.dto';
 
 @ApiBearerAuth()
 @ApiTags('nomina')
+@RequiereModulo('nomina')
 @Controller('nomina/empleados')
 export class EmpleadosController {
   constructor(private readonly empleadosService: EmpleadosService) {}

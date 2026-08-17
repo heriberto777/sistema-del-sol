@@ -9,14 +9,14 @@ export class TenantsRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   listar() {
-    return this.prisma.tenant.findMany({ orderBy: { createdAt: 'desc' } });
+    return this.prisma.tenant.findMany({ orderBy: { createdAt: 'desc' }, include: { plan: true } });
   }
 
   buscarPorId(id: string) {
     return this.prisma.tenant.findUniqueOrThrow({ where: { id } });
   }
 
-  actualizar(id: string, data: { nombre?: string; estado?: EstadoTenant; planBase?: string }) {
+  actualizar(id: string, data: { nombre?: string; estado?: EstadoTenant; planId?: string }) {
     return this.prisma.tenant.update({ where: { id }, data });
   }
 
@@ -31,6 +31,7 @@ export class TenantsRepository {
     nombre: string;
     subdominio: string;
     rnc?: string;
+    planId: string;
     adminEmail: string;
     adminNombre: string;
     adminPasswordHash: string;
@@ -45,6 +46,7 @@ export class TenantsRepository {
           nombre: params.nombre,
           subdominio: params.subdominio,
           rnc: params.rnc,
+          planId: params.planId,
           settings: { create: {} },
           configuraciones: {
             create: Object.entries(CONFIGURACIONES_BASE).map(([clave, valor]) => ({ clave, valor })),

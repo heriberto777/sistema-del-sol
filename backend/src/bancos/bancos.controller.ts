@@ -3,12 +3,14 @@ import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { BancosService } from './bancos.service';
 import { CrearCuentaBancariaDto } from './dto/crear-cuenta-bancaria.dto';
 import { Permissions } from '../common/decorators/permissions.decorator';
+import { RequiereModulo } from '../common/decorators/requiere-modulo.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtPayloadUser } from '../common/types/authenticated-request';
 import { ListadoQueryDto } from '../common/dto/listado-query.dto';
 
 @ApiBearerAuth()
 @ApiTags('bancos')
+@RequiereModulo('bancos')
 @Controller('bancos')
 export class BancosController {
   constructor(private readonly bancosService: BancosService) {}

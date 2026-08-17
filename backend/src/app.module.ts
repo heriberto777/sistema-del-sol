@@ -20,7 +20,7 @@ import { ProveedoresModule } from './proveedores/proveedores.module';
 import { NotificacionesModule } from './notificaciones/notificaciones.module';
 import { WebhooksModule } from './webhooks/webhooks.module';
 import { UsuariosModule } from './usuarios/usuarios.module';
-import { TenantPluginsModule } from './tenant-plugins/tenant-plugins.module';
+import { PlanesModule } from './planes/planes.module';
 import { ConfiguracionesModule } from './configuraciones/configuraciones.module';
 import { PlatformAuthModule } from './platform-auth/platform-auth.module';
 import { TenantsModule } from './tenants/tenants.module';
@@ -39,6 +39,7 @@ import { BancosModule } from './bancos/bancos.module';
 import { GastosMenoresModule } from './gastos-menores/gastos-menores.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { PermissionsGuard } from './common/guards/permissions.guard';
+import { ModuloActivoGuard } from './common/guards/modulo-activo.guard';
 import { AuditLogInterceptor } from './common/interceptors/audit-log.interceptor';
 import { TenantMiddleware } from './common/middleware/tenant.middleware';
 
@@ -69,7 +70,7 @@ import { TenantMiddleware } from './common/middleware/tenant.middleware';
     NotificacionesModule,
     WebhooksModule,
     UsuariosModule,
-    TenantPluginsModule,
+    PlanesModule,
     ConfiguracionesModule,
     PlatformAuthModule,
     TenantsModule,
@@ -91,6 +92,7 @@ import { TenantMiddleware } from './common/middleware/tenant.middleware';
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: PermissionsGuard },
+    { provide: APP_GUARD, useClass: ModuloActivoGuard },
     { provide: APP_INTERCEPTOR, useClass: AuditLogInterceptor },
   ],
 })

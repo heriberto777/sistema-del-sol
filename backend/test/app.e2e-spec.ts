@@ -8,6 +8,7 @@ import { AppModule } from '../src/app.module';
 import { HttpExceptionFilter } from '../src/common/filters/http-exception.filter';
 import { EmailChannel } from '../src/notificaciones/canales/email.channel';
 import { CUENTAS_BASE } from '../src/contabilidad/cuentas-base';
+import { MODULOS_BASE } from '../src/tenants/modulos-base';
 
 function extraerTokenDeReset(cuerpoHtml: string): string {
   const href = cuerpoHtml.match(/href="([^"]+)"/)?.[1];
@@ -49,6 +50,30 @@ describe('App (e2e)', () => {
     }
   }
 
+  // Cacheado para que las dos veces que se llama a crearTenantConUsuario
+  // (tenant A y B) reutilicen el mismo Plan en vez de crear uno cada vez —
+  // ModuloActivoGuard (global) deniega TODO módulo gateable a un tenant sin
+  // plan asignado, así que los fixtures de este archivo (que ejercitan
+  // Facturación/Compras/POS/Nómina/etc. de punta a punta) necesitan un plan
+  // con el catálogo completo, no el flujo real de "elegir un plan chico".
+  let planTodoIncluidoId: string | undefined;
+  async function idPlanTodoIncluido(): Promise<string> {
+    if (planTodoIncluidoId) return planTodoIncluidoId;
+    for (const modulo of MODULOS_BASE) {
+      await prisma.modulo.upsert({ where: { clave: modulo.clave }, update: {}, create: { clave: modulo.clave, nombre: modulo.nombre } });
+    }
+    const modulos = await prisma.modulo.findMany();
+    const plan = await prisma.plan.upsert({
+      where: { nombre: 'E2E Todo Incluido' },
+      update: {},
+      create: { nombre: 'E2E Todo Incluido' },
+    });
+    await prisma.planModulo.deleteMany({ where: { planId: plan.id } });
+    await prisma.planModulo.createMany({ data: modulos.map((m) => ({ planId: plan.id, moduloId: m.id })) });
+    planTodoIncluidoId = plan.id;
+    return plan.id;
+  }
+
   async function crearTenantConUsuario(params: {
     subdominio: string;
     nombreRol: string;
@@ -56,7 +81,7 @@ describe('App (e2e)', () => {
     email: string;
   }) {
     const tenant = await prisma.tenant.create({
-      data: { nombre: `E2E ${params.subdominio}`, subdominio: params.subdominio },
+      data: { nombre: `E2E ${params.subdominio}`, subdominio: params.subdominio, planId: await idPlanTodoIncluido() },
     });
     const rol = await prisma.role.create({
       data: { tenantId: tenant.id, nombre: params.nombreRol },
@@ -2943,6 +2968,131 @@ describe('App (e2e)', () => {
         .post('/api/auth/password/restablecer')
         .send({ token, tenantSubdominio: SUBDOMINIO_B, password: 'Intento123!' })
         .expect(400);
+    });
+  });
+
+  describe('Módulos activos por plan (ModuloActivoGuard)', () => {
+    let moduloPosId: string;
+    let planSinPosId: string;
+    let planConPosId: string;
+    let tenantSinPosId: string;
+    let tenantConPosId: string;
+    let tokenSinPos: string;
+    let tokenConPos: string;
+
+    beforeAll(async () => {
+      const moduloPos = await prisma.modulo.upsert({
+        where: { clave: 'pos' },
+        update: {},
+        create: { clave: 'pos', nombre: 'Punto de venta' },
+      });
+      moduloPosId = moduloPos.id;
+      const moduloFacturacion = await prisma.modulo.upsert({
+        where: { clave: 'facturacion' },
+        update: {},
+        create: { clave: 'facturacion', nombre: 'Facturación' },
+      });
+
+      const planSinPos = await prisma.plan.upsert({
+        where: { nombre: 'E2E Básico Sin POS' },
+        update: {},
+        create: { nombre: 'E2E Básico Sin POS' },
+      });
+      planSinPosId = planSinPos.id;
+      await prisma.planModulo.deleteMany({ where: { planId: planSinPosId } });
+      await prisma.planModulo.create({ data: { planId: planSinPosId, moduloId: moduloFacturacion.id } });
+
+      const planConPos = await prisma.plan.upsert({
+        where: { nombre: 'E2E Premium Con POS' },
+        update: {},
+        create: { nombre: 'E2E Premium Con POS' },
+      });
+      planConPosId = planConPos.id;
+      await prisma.planModulo.deleteMany({ where: { planId: planConPosId } });
+      await prisma.planModulo.createMany({
+        data: [
+          { planId: planConPosId, moduloId: moduloFacturacion.id },
+          { planId: planConPosId, moduloId: moduloPosId },
+        ],
+      });
+
+      // 'pos.ver'/'contabilidad.ver' ya fueron sembrados por crearPermisos() más arriba.
+      const permisoPosVer = await prisma.permission.findUniqueOrThrow({ where: { clave: 'pos.ver' } });
+      const permisoContabilidadVer = await prisma.permission.findUniqueOrThrow({ where: { clave: 'contabilidad.ver' } });
+      const passwordHash = await bcrypt.hash(PASSWORD, 10);
+
+      const tenantSinPos = await prisma.tenant.create({
+        data: { nombre: 'E2E Tenant Sin POS', subdominio: 'e2e-tenant-sin-pos', planId: planSinPosId },
+      });
+      tenantSinPosId = tenantSinPos.id;
+      const rolSinPos = await prisma.role.create({ data: { tenantId: tenantSinPosId, nombre: 'RolSinPos' } });
+      await prisma.rolePermission.createMany({
+        data: [
+          { roleId: rolSinPos.id, permissionId: permisoPosVer.id },
+          { roleId: rolSinPos.id, permissionId: permisoContabilidadVer.id },
+        ],
+      });
+      const usuarioSinPos = await prisma.user.create({
+        data: { tenantId: tenantSinPosId, email: 'admin@e2e-sin-pos.com', nombre: 'Admin', passwordHash },
+      });
+      await prisma.userRole.create({ data: { userId: usuarioSinPos.id, roleId: rolSinPos.id } });
+
+      const tenantConPos = await prisma.tenant.create({
+        data: { nombre: 'E2E Tenant Con POS', subdominio: 'e2e-tenant-con-pos', planId: planConPosId },
+      });
+      tenantConPosId = tenantConPos.id;
+      const rolConPos = await prisma.role.create({ data: { tenantId: tenantConPosId, nombre: 'RolConPos' } });
+      await prisma.rolePermission.createMany({
+        data: [
+          { roleId: rolConPos.id, permissionId: permisoPosVer.id },
+          { roleId: rolConPos.id, permissionId: permisoContabilidadVer.id },
+        ],
+      });
+      const usuarioConPos = await prisma.user.create({
+        data: { tenantId: tenantConPosId, email: 'admin@e2e-con-pos.com', nombre: 'Admin', passwordHash },
+      });
+      await prisma.userRole.create({ data: { userId: usuarioConPos.id, roleId: rolConPos.id } });
+
+      tokenSinPos = await login('admin@e2e-sin-pos.com', 'e2e-tenant-sin-pos');
+      tokenConPos = await login('admin@e2e-con-pos.com', 'e2e-tenant-con-pos');
+    });
+
+    afterAll(async () => {
+      await prisma.tenant.deleteMany({ where: { id: { in: [tenantSinPosId, tenantConPosId] } } });
+    });
+
+    it('un tenant con un plan que no incluye POS recibe 403 al acceder a /pos/*', async () => {
+      await request(app.getHttpServer())
+        .get('/api/pos/turnos')
+        .set('Authorization', `Bearer ${tokenSinPos}`)
+        .expect(403);
+    });
+
+    it('Contabilidad sigue accesible aunque el plan del tenant no incluya POS (nunca gateable)', async () => {
+      await request(app.getHttpServer())
+        .get('/api/contabilidad/cuentas')
+        .set('Authorization', `Bearer ${tokenSinPos}`)
+        .expect(200);
+    });
+
+    it('una excepción pos:true habilita el módulo sin cambiar de plan', async () => {
+      await prisma.tenantModuloOverride.upsert({
+        where: { tenantId_moduloId: { tenantId: tenantSinPosId, moduloId: moduloPosId } },
+        update: { activo: true },
+        create: { tenantId: tenantSinPosId, moduloId: moduloPosId, activo: true },
+      });
+
+      await request(app.getHttpServer())
+        .get('/api/pos/turnos')
+        .set('Authorization', `Bearer ${tokenSinPos}`)
+        .expect(200);
+    });
+
+    it('un tenant con un plan que incluye POS puede acceder desde el inicio', async () => {
+      await request(app.getHttpServer())
+        .get('/api/pos/turnos')
+        .set('Authorization', `Bearer ${tokenConPos}`)
+        .expect(200);
     });
   });
 });

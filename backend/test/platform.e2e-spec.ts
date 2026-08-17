@@ -30,6 +30,7 @@ describe('Plataforma (e2e)', () => {
 
   let tenantCreadoId: string | undefined;
   let tenantExistenteId: string;
+  let planId: string;
 
   async function loginPlataforma() {
     const respuesta = await request(app.getHttpServer())
@@ -54,9 +55,19 @@ describe('Plataforma (e2e)', () => {
       create: { email: ADMIN_EMAIL, passwordHash, nombre: 'E2E Platform Admin' },
     });
 
+    // Plan global mínimo para poder crear tenants vía POST /platform/tenants
+    // (CrearTenantDto exige planId) — el catálogo de Planes/Modulo no es por
+    // tenant, ver comentario equivalente en app.e2e-spec.ts.
+    const plan = await prisma.plan.upsert({
+      where: { nombre: 'E2E Plataforma Default' },
+      update: {},
+      create: { nombre: 'E2E Plataforma Default' },
+    });
+    planId = plan.id;
+
     // Tenant + usuario normal, para probar que su token NO sirve en /platform.
     const tenantExistente = await prisma.tenant.create({
-      data: { nombre: 'E2E Tenant Existente', subdominio: 'e2e-tenant-existente' },
+      data: { nombre: 'E2E Tenant Existente', subdominio: 'e2e-tenant-existente', planId },
     });
     tenantExistenteId = tenantExistente.id;
     for (const clave of PERMISOS_BASE) {
@@ -149,6 +160,7 @@ describe('Plataforma (e2e)', () => {
         .send({
           nombre: 'E2E Tenant Provisionado',
           subdominio: SUBDOMINIO_NUEVO,
+          planId,
           adminEmail: 'admin@e2e-provisioned.com',
           adminNombre: 'Admin Provisionado',
           adminPassword: 'Provisionado123!',

@@ -19,6 +19,7 @@ describe('TenantsService', () => {
   const dto: CrearTenantDto = {
     nombre: 'Cliente X',
     subdominio: 'cliente-x',
+    planId: 'plan-1',
     adminEmail: 'admin@cliente-x.com',
     adminNombre: 'Admin X',
     adminPassword: 'ClienteX123!',
@@ -44,6 +45,7 @@ describe('TenantsService', () => {
         nombre: 'Cliente X',
         subdominio: 'cliente-x',
         rnc: '123456789',
+        planId: 'plan-1',
         adminEmail: 'admin@cliente-x.com',
         adminNombre: 'Admin X',
       }),

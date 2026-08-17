@@ -6,12 +6,14 @@ import { CrearRemisionDto } from './dto/crear-remision.dto';
 import { CambiarEstadoRemisionDto } from './dto/cambiar-estado-remision.dto';
 import { ConvertirRemisionDto } from './dto/convertir-remision.dto';
 import { Permissions } from '../common/decorators/permissions.decorator';
+import { RequiereModulo } from '../common/decorators/requiere-modulo.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtPayloadUser } from '../common/types/authenticated-request';
 import { ListadoQueryDto } from '../common/dto/listado-query.dto';
 
 @ApiBearerAuth()
 @ApiTags('remisiones')
+@RequiereModulo('remisiones')
 @Controller('remisiones')
 export class RemisionesController {
   constructor(private readonly remisionesService: RemisionesService) {}

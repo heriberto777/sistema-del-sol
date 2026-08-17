@@ -27,6 +27,7 @@ import { GastosMenores } from './pages/GastosMenores';
 import { Admin } from './pages/Admin';
 import { PlatformLogin } from './pages/PlatformLogin';
 import { PlatformTenants } from './pages/PlatformTenants';
+import { PlatformPlanes } from './pages/PlatformPlanes';
 
 export const router = createBrowserRouter([
   { path: '*', element: <NoEncontrado /> },
@@ -38,7 +39,10 @@ export const router = createBrowserRouter([
   { path: '/plataforma/restablecer-password', element: <PlatformRestablecerPassword /> },
   {
     element: <RutaProtegidaPlataforma />,
-    children: [{ path: '/plataforma/tenants', element: <PlatformTenants /> }],
+    children: [
+      { path: '/plataforma/tenants', element: <PlatformTenants /> },
+      { path: '/plataforma/planes', element: <PlatformPlanes /> },
+    ],
   },
   {
     element: <RutaProtegida />,

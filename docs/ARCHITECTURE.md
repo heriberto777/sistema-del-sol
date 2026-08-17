@@ -429,15 +429,60 @@ y se compila junto al resto del backend (un solo proceso, no
 microservicios). `PluginLoaderService` escanea `plugins/*/plugin.json` al
 boot solo para loguear qué hay disponible en el código desplegado.
 
-La **activación por tenant** es un dato, no un despliegue: la tabla
-`tenant_plugins` (`tenantId`, `pluginKey`, `activo`) se consulta en
-`PluginActiveGuard` vía el decorator `@RequiresPlugin('inmobiliaria')`.
-Así un mismo release del backend sirve a tenants con distintos plugins
-activos, sin recompilar ni redeployar por cliente.
+La **activación por tenant** usa el mismo mecanismo de Planes/módulos
+descrito abajo (ver "Planes y módulos activables por tenant") — un
+plugin como Inmobiliaria es, para efectos de activación, un módulo más
+del catálogo (`@RequiereModulo('inmobiliaria')`), no un sistema aparte.
+Así un mismo release del backend sirve a tenants con distintos
+plugins/módulos activos, sin recompilar ni redeployar por cliente.
 
 Roadmap: Inmobiliaria → Clínica → Casa de Cambio. Ver
 `plugins/inmobiliaria/README.md` para el patrón a seguir en cada plugin
 nuevo.
+
+## Planes y módulos activables por tenant
+
+Desde la plataforma (super admin), qué módulos ve/puede usar cada tenant
+se decide con dos capas:
+
+1. **`Plan`** (`planes`): catálogo global (no por tenant) de "paquetes" —
+   cada uno con un set de `Modulo` incluidos vía `PlanModulo`. Un tenant
+   tiene a lo sumo un plan (`Tenant.planId`). Los planes por defecto
+   (Básico/Profesional/Premium) viven como código en
+   `backend/src/tenants/modulos-base.ts` (`PLANES_BASE`) y se siembran
+   una sola vez por entorno con `pnpm --filter ./backend planes:seed`
+   (catálogo de planes, NO por tenant — a diferencia de `PERMISOS_BASE`/
+   `CUENTAS_BASE`, que se siembran en cada `crearConProvisioning`).
+2. **`TenantModuloOverride`** (`tenant_modulo_overrides`, sí tenant-scoped):
+   excepción puntual que gana sobre el plan en cualquier dirección —
+   `activo:true` fuerza encendido aunque el plan no lo incluya (upsell de
+   un módulo suelto sin cambiar de plan entero), `activo:false` fuerza
+   apagado aunque el plan sí lo incluya.
+
+La regla de resolución (override manda; si no hay, decide el plan; sin
+plan asignado, deniega) vive en un solo lugar,
+`backend/src/planes/resolver-modulos-activos.ts` (funciones puras, no un
+servicio inyectable, justo para que no puedan divergir entre quien la
+usa): `ModuloActivoGuard` (`backend/src/common/guards/modulo-activo.guard.ts`,
+decorator `@RequiereModulo('clave')`) la aplica por request, y
+`AuthService.login` la usa para mandar `usuario.modulosActivos` al
+frontend (mismo criterio que `usuario.permisos`: solo UX para ocultar
+sidebar, la aplicación real es 100% el guard).
+
+`ModuloActivoGuard` está registrado **globalmente** vía `APP_GUARD` en
+`app.module.ts` (a diferencia del `PluginActiveGuard` que reemplaza, que
+nunca llegó a conectarse a ningún controller ni a `APP_GUARD` — quedó
+código muerto cubierto solo por su propio test unitario). Un controller
+sin `@RequiereModulo` no se ve afectado (no-op); un request sin
+`request.user` (rutas públicas) tampoco.
+
+**Contabilidad, Contactos, Reportes, Notificaciones y Admin quedan
+siempre activos, sin `@RequiereModulo` y sin poder togglearse** — decisión
+explícita: Contabilidad genera asientos automáticos consumidos por
+Bancos/Gastos Menores (apagarla dejaría huecos en el libro si se
+reactiva después) y los otros cuatro son plomería compartida entre
+varios módulos de negocio (ej. Contactos lo usan Facturación y Compras
+por igual).
 
 ## Event Bus
 

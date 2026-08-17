@@ -164,11 +164,29 @@ listeners corren fuera de un request HTTP: usan `PrismaService` global +
 
 Instalación manual: cada plugin vive en `plugins/<nombre>/` con su propio
 módulo NestJS, importado a mano en `backend/src/app.module.ts` (un solo
-proceso compilado, no microservicios). La activación por tenant es un
-dato (`tenant_plugins`), consultado por `PluginActiveGuard` +
-`@RequiresPlugin('inmobiliaria')` — un mismo release sirve tenants con
-distinto plugin activo. Ver `plugins/inmobiliaria/README.md` como
+proceso compilado, no microservicios). La activación por tenant usa el
+mismo mecanismo de Planes/módulos que el resto del catálogo gateable
+(`@RequiereModulo('inmobiliaria')`) — un mismo release sirve tenants con
+distinto plugin/módulo activo. Ver `plugins/inmobiliaria/README.md` como
 referencia para plugins nuevos.
+
+### Planes y módulos activables por tenant
+
+Qué módulos ve/usa cada tenant lo decide la **plataforma** (super admin),
+no el propio tenant: un `Plan` (catálogo global,
+`backend/src/tenants/modulos-base.ts`) trae un set de `Modulo` incluidos,
+y un `TenantModuloOverride` (tenant-scoped) puede forzar un módulo suelto
+encendido o apagado para un tenant puntual sin cambiarle el plan entero
+— override siempre gana sobre el plan. Resolución centralizada en
+`backend/src/planes/resolver-modulos-activos.ts` (funciones puras, no
+servicio inyectable) para que `ModuloActivoGuard`
+(`@RequiereModulo('clave')`, registrado **globalmente** vía `APP_GUARD`)
+y `AuthService.login` (que manda `usuario.modulosActivos` al frontend,
+solo UX) nunca puedan divergir. **Contabilidad, Contactos, Reportes,
+Notificaciones y Admin quedan siempre activos, sin excepción posible** —
+Contabilidad porque genera asientos automáticos consumidos por
+Bancos/Gastos Menores (apagarla dejaría huecos en el libro), los demás
+por ser plomería compartida entre varios módulos.
 
 ### Módulos con lógica no obvia (ver ARCHITECTURE.md para el detalle)
 

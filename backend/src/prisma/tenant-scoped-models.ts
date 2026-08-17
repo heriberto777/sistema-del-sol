@@ -11,7 +11,7 @@
 export const TENANT_SCOPED_MODELS = new Set([
   'TenantSettings',
   'Configuracion',
-  'TenantPlugin',
+  'TenantModuloOverride',
   'User',
   'Role',
   'AuditLog',

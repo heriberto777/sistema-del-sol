@@ -6,12 +6,14 @@ import { CrearCotizacionDto } from './dto/crear-cotizacion.dto';
 import { CambiarEstadoCotizacionDto } from './dto/cambiar-estado-cotizacion.dto';
 import { ConvertirCotizacionDto } from './dto/convertir-cotizacion.dto';
 import { Permissions } from '../common/decorators/permissions.decorator';
+import { RequiereModulo } from '../common/decorators/requiere-modulo.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtPayloadUser } from '../common/types/authenticated-request';
 import { ListadoQueryDto } from '../common/dto/listado-query.dto';
 
 @ApiBearerAuth()
 @ApiTags('cotizaciones')
+@RequiereModulo('cotizaciones')
 @Controller('cotizaciones')
 export class CotizacionesController {
   constructor(private readonly cotizacionesService: CotizacionesService) {}

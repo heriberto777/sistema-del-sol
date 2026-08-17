@@ -2,7 +2,6 @@ import { useState } from 'react';
 import clsx from 'clsx';
 import { UsuariosPanel } from '../components/organisms/UsuariosPanel/UsuariosPanel';
 import { RolesPanel } from '../components/organisms/RolesPanel/RolesPanel';
-import { PluginsPanel } from '../components/organisms/PluginsPanel/PluginsPanel';
 import { WebhooksPanel } from '../components/organisms/WebhooksPanel/WebhooksPanel';
 import { ConfiguracionesPanel } from '../components/organisms/ConfiguracionesPanel/ConfiguracionesPanel';
 import { NcfPanel } from '../components/organisms/NcfPanel/NcfPanel';
@@ -47,11 +46,8 @@ const CATEGORIAS: Categoria[] = [
   {
     id: 'integraciones',
     etiqueta: 'Integraciones',
-    descripcion: 'Plugins y webhooks hacia sistemas externos.',
-    pestanas: [
-      { id: 'plugins', etiqueta: 'Plugins', permiso: 'admin.plugins', panel: PluginsPanel },
-      { id: 'webhooks', etiqueta: 'Webhooks', permiso: 'admin.configuracion', panel: WebhooksPanel },
-    ],
+    descripcion: 'Webhooks hacia sistemas externos.',
+    pestanas: [{ id: 'webhooks', etiqueta: 'Webhooks', permiso: 'admin.configuracion', panel: WebhooksPanel }],
   },
 ];
 

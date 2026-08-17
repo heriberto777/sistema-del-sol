@@ -8,7 +8,9 @@ import { PluginManifest } from './plugin-manifest.interface';
  * plugins/<nombre>/plugin.json en la raíz del monorepo. La activación
  * NestJS de las rutas de cada plugin se hace importando su módulo a mano
  * en AppModule; este loader solo informa qué manifiestos hay disponibles
- * y sirve de fuente de verdad para validar tenant_plugins.pluginKey.
+ * en el código desplegado — la activación por tenant es un dato aparte
+ * (`Modulo.clave` + `Plan`/`TenantModuloOverride`, ver
+ * resolver-modulos-activos.ts), no algo que este loader valide.
  */
 @Injectable()
 export class PluginLoaderService implements OnModuleInit {

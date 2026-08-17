@@ -23,7 +23,12 @@ model Tenant {
   rnc       String?
   subdominio String      @unique
   estado    EstadoTenant @default(ACTIVO)
-  planBase  String       @default("base")
+  // Qué módulos tiene disponibles este tenant — ver ModuloActivoGuard.
+  // Nullable a propósito: un tenant recién creado sin plan asignado cae
+  // al fallback "denegar" del guard hasta que plataforma le asigne uno
+  // (los tenants ya existentes se backfillean a un plan al migrar).
+  planId    String?
+  plan      Plan?        @relation(fields: [planId], references: [id])
   // Ver ModalidadFacturacion — vive acá (no en TenantSettings) porque a
   // diferencia de esa tabla, Tenant siempre tiene una fila garantizada
   // desde su creación (TenantSettings hoy no se crea en ningún flujo).
@@ -33,7 +38,7 @@ model Tenant {
 
   settings      TenantSettings?
   configuraciones Configuracion[]
-  plugins       TenantPlugin[]
+  modulosOverride TenantModuloOverride[]
   users         User[]
   roles         Role[]
   auditLogs     AuditLog[]
@@ -115,17 +120,61 @@ model Configuracion {
   @@map("configuraciones")
 }
 
-model TenantPlugin {
-  id           String   @id @default(uuid())
-  tenantId     String
-  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  pluginKey    String
-  activo       Boolean  @default(true)
-  config       Json     @default("{}")
-  instaladoEn  DateTime @default(now())
+// Catálogo de módulos activables (clave = código, ej. 'pos', 'nomina',
+// 'inmobiliaria') — el set de claves posibles es de código
+// (MODULOS_BASE en tenants/modulos-base.ts), sembrado acá igual que
+// Permission se siembra desde PERMISOS_BASE.
+model Modulo {
+  id     String @id @default(uuid())
+  clave  String @unique
+  nombre String
 
-  @@unique([tenantId, pluginKey])
-  @@map("tenant_plugins")
+  planes    PlanModulo[]
+  overrides TenantModuloOverride[]
+
+  @@map("modulos")
+}
+
+// Catálogo de planes comerciales (Básico/Profesional/Premium...) — cada
+// uno con un set fijo de módulos incluidos (PlanModulo). Ver
+// ModuloActivoGuard para cómo se combina con TenantModuloOverride.
+model Plan {
+  id          String   @id @default(uuid())
+  nombre      String   @unique
+  descripcion String?
+  createdAt   DateTime @default(now())
+
+  modulos PlanModulo[]
+  tenants Tenant[]
+
+  @@map("planes")
+}
+
+model PlanModulo {
+  planId   String
+  plan     Plan   @relation(fields: [planId], references: [id], onDelete: Cascade)
+  moduloId String
+  modulo   Modulo @relation(fields: [moduloId], references: [id], onDelete: Cascade)
+
+  @@id([planId, moduloId])
+  @@map("plan_modulos")
+}
+
+// Excepción puntual de plataforma sobre lo que dice el plan del tenant:
+// activo:true fuerza encendido aunque el plan no incluya ese módulo
+// (upsell de un módulo suelto sin cambiar de plan); activo:false fuerza
+// apagado aunque el plan sí lo incluya.
+model TenantModuloOverride {
+  id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  moduloId  String
+  modulo    Modulo   @relation(fields: [moduloId], references: [id], onDelete: Cascade)
+  activo    Boolean
+  createdAt DateTime @default(now())
+
+  @@unique([tenantId, moduloId])
+  @@map("tenant_modulo_overrides")
 }
 
 // ============================================================
