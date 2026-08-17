@@ -253,6 +253,33 @@ describe('App (e2e)', () => {
       // El rol "SoloLecturaA" (ver beforeAll) solo tiene clientes.ver.
       expect(respuesta.body.usuario.permisos).toEqual(['clientes.ver']);
     });
+
+    it('el login expone también el subdominio y nombre del tenant', async () => {
+      const respuesta = await request(app.getHttpServer())
+        .post('/api/auth/login')
+        .send({ email: 'admin@e2e-a.com', password: PASSWORD, tenantSubdominio: SUBDOMINIO_A })
+        .expect(201);
+
+      expect(respuesta.body.usuario.tenant).toEqual({ subdominio: SUBDOMINIO_A, nombre: `E2E ${SUBDOMINIO_A}` });
+    });
+
+    it('resolver-empresas devuelve la empresa de un email conocido', async () => {
+      const respuesta = await request(app.getHttpServer())
+        .post('/api/auth/resolver-empresas')
+        .send({ email: 'admin@e2e-a.com' })
+        .expect(201);
+
+      expect(respuesta.body.empresas).toEqual([{ subdominio: SUBDOMINIO_A, nombre: `E2E ${SUBDOMINIO_A}` }]);
+    });
+
+    it('resolver-empresas devuelve una lista vacía para un email desconocido, sin filtrar información', async () => {
+      const respuesta = await request(app.getHttpServer())
+        .post('/api/auth/resolver-empresas')
+        .send({ email: 'no-existe@e2e.com' })
+        .expect(201);
+
+      expect(respuesta.body.empresas).toEqual([]);
+    });
   });
 
   describe('Aislamiento de tenant', () => {

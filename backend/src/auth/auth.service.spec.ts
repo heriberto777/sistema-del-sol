@@ -12,7 +12,7 @@ describe('AuthService — recuperación de contraseña', () => {
   beforeEach(() => {
     prisma = {
       tenant: { findUnique: jest.fn() },
-      user: { findUnique: jest.fn(), findFirst: jest.fn(), update: jest.fn() },
+      user: { findUnique: jest.fn(), findFirst: jest.fn(), findMany: jest.fn(), update: jest.fn() },
     };
     emailChannel = { enviar: jest.fn().mockResolvedValue(true) } as unknown as jest.Mocked<EmailChannel>;
     service = new AuthService(prisma as unknown as PrismaService, {} as never, emailChannel);
@@ -115,6 +115,51 @@ describe('AuthService — recuperación de contraseña', () => {
         }),
       });
       expect(resultado.mensaje).toContain('actualizada');
+    });
+  });
+
+  describe('resolverEmpresas', () => {
+    it('devuelve una sola empresa si el email pertenece a un único tenant activo', async () => {
+      prisma.user.findMany.mockResolvedValue([
+        { tenant: { subdominio: 'demo', nombre: 'Empresa Demo' } },
+      ]);
+
+      const resultado = await service.resolverEmpresas('admin@demo.com');
+
+      expect(resultado.empresas).toEqual([{ subdominio: 'demo', nombre: 'Empresa Demo' }]);
+    });
+
+    it('devuelve varias empresas si el mismo email existe en más de un tenant', async () => {
+      prisma.user.findMany.mockResolvedValue([
+        { tenant: { subdominio: 'empresa-a', nombre: 'Empresa A' } },
+        { tenant: { subdominio: 'empresa-b', nombre: 'Empresa B' } },
+      ]);
+
+      const resultado = await service.resolverEmpresas('compartido@ejemplo.com');
+
+      expect(resultado.empresas).toEqual([
+        { subdominio: 'empresa-a', nombre: 'Empresa A' },
+        { subdominio: 'empresa-b', nombre: 'Empresa B' },
+      ]);
+    });
+
+    it('devuelve una lista vacía si el email no pertenece a ningún tenant activo', async () => {
+      prisma.user.findMany.mockResolvedValue([]);
+
+      const resultado = await service.resolverEmpresas('desconocido@ejemplo.com');
+
+      expect(resultado.empresas).toEqual([]);
+    });
+
+    it('filtra por usuario activo y tenant activo en la consulta', async () => {
+      prisma.user.findMany.mockResolvedValue([]);
+
+      await service.resolverEmpresas('admin@demo.com');
+
+      expect(prisma.user.findMany).toHaveBeenCalledWith({
+        where: { email: 'admin@demo.com', activo: true, tenant: { estado: 'ACTIVO' } },
+        include: { tenant: true },
+      });
     });
   });
 });

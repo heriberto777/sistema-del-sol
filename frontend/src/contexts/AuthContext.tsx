@@ -7,6 +7,7 @@ export interface UsuarioAutenticado {
   email: string;
   roles: string[];
   permisos: string[];
+  tenant?: { subdominio: string; nombre: string };
 }
 
 interface AuthContextValue {

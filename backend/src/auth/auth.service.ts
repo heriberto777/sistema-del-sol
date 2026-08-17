@@ -23,6 +23,18 @@ export class AuthService {
     private readonly emailChannel: EmailChannel,
   ) {}
 
+  /** Primer paso del login: a qué empresa(s) pertenece este email, para que el usuario no tenga que saber el subdominio de memoria. */
+  async resolverEmpresas(email: string) {
+    const usuarios = await this.prisma.user.findMany({
+      where: { email, activo: true, tenant: { estado: 'ACTIVO' } },
+      include: { tenant: true },
+    });
+
+    return {
+      empresas: usuarios.map((u) => ({ subdominio: u.tenant.subdominio, nombre: u.tenant.nombre })),
+    };
+  }
+
   async login({ email, password, tenantSubdominio }: LoginDto) {
     const tenant = await this.prisma.tenant.findUnique({ where: { subdominio: tenantSubdominio } });
     if (!tenant || tenant.estado !== 'ACTIVO') {
@@ -62,7 +74,14 @@ export class AuthService {
       // siendo 100% responsabilidad de PermissionsGuard en el backend,
       // esto es solo para no mostrarle al usuario acciones que el servidor
       // le va a rechazar con 403.
-      usuario: { id: user.id, nombre: user.nombre, email: user.email, roles, permisos },
+      usuario: {
+        id: user.id,
+        nombre: user.nombre,
+        email: user.email,
+        roles,
+        permisos,
+        tenant: { subdominio: tenant.subdominio, nombre: tenant.nombre },
+      },
     };
   }
 

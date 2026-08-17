@@ -835,6 +835,34 @@ No hay alta de super admins por HTTP a propósito: el primer (y cualquier)
 `backend/scripts/bootstrap-platform-admin.ts`), no vía endpoint — es una
 operación de confianza total, no algo que deba quedar expuesto en la API.
 
+## Login en dos pasos (identificar la empresa)
+
+`POST /auth/login` (`LoginDto`) sigue exigiendo `tenantSubdominio`
+explícito — eso no cambió, sigue siendo la única forma real de resolver
+qué tenant usar. Lo que cambió es que el usuario ya no tiene que saber
+ese subdominio de memoria: `POST /auth/resolver-empresas` (público,
+`AuthService.resolverEmpresas`) recibe solo un `email` y devuelve
+`{ empresas: [{ subdominio, nombre }] }` — todos los tenants ACTIVOS
+donde ese email tiene un `User` activo. El frontend (`Login.tsx`) llama
+primero a este endpoint: si hay una sola empresa, la resuelve
+automáticamente y solo pide la contraseña; si hay varias (mismo email en
+más de un tenant, posible porque `User` es único por `(tenantId, email)`
+y no globalmente), muestra un selector; si no hay ninguna, avisa sin
+pasar a pedir contraseña.
+
+A diferencia de `password/olvide` (que responde siempre el mismo mensaje
+genérico para no filtrar qué correos existen), acá **sí se revela a
+propósito** el nombre de la empresa para un email dado — es el objetivo
+mismo del endpoint. Por eso está limitado con `@Throttle` (10
+solicitudes/15 min) para no habilitar enumeración masiva, mismo mecanismo
+que ya usa `password/olvide`, con un límite más laxo porque es parte del
+flujo normal de login (tolera reintentos por typos).
+
+`AuthService.login()` también devuelve ahora `usuario.tenant.{subdominio,
+nombre}` (antes solo iba en el login inicial) — así el nombre de la
+empresa activa queda visible de forma persistente en el sidebar, no solo
+durante el login.
+
 ## Recuperación de contraseña
 
 Dos flujos idénticos en forma, completamente separados (tenant vs.
