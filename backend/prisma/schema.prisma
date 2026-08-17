@@ -153,6 +153,7 @@ model User {
   cotizaciones  Cotizacion[]
   remisiones    Remision[]
   turnosCaja    TurnoCaja[]
+  turnosCajaCerrados TurnoCaja[] @relation("TurnoCajaCerradoPor")
   pagos         Pago[]
 
   @@unique([tenantId, email])
@@ -799,6 +800,12 @@ model TurnoCaja {
   estado            EstadoTurnoCaja @default(ABIERTO)
   abiertoEn         DateTime        @default(now())
   cerradoEn         DateTime?
+  cerradoPorId      String?
+  // Cascade por la misma razón que cajeroId (rama hermana Tenant -> User).
+  // Nullable + relación nombrada porque ya existe otra relación User->TurnoCaja
+  // (cajeroId, sin nombre explícito) — Prisma exige distinguirlas.
+  cerradoPor        User?           @relation("TurnoCajaCerradoPor", fields: [cerradoPorId], references: [id], onDelete: Cascade)
+  justificacionDiferencia String?
 
   movimientos MovimientoCaja[]
   facturas    Factura[]

@@ -6,5 +6,6 @@ import { ConfiguracionesRepository } from './configuraciones.repository';
 @Module({
   controllers: [ConfiguracionesController],
   providers: [ConfiguracionesService, ConfiguracionesRepository],
+  exports: [ConfiguracionesService],
 })
 export class ConfiguracionesModule {}

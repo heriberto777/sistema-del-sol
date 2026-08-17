@@ -134,10 +134,13 @@ token, así que un token nunca puede reusarse.
   `lineas_asiento.cuentaContableId`, aquí el documento fiscal (`Factura`)
   debe sobrevivir siempre aunque el turno de caja que la originó
   desaparezca; solo se pierde el vínculo con la caja.
-- **`turnos_caja.bodegaId`/`turnos_caja.cajeroId`** sí son `ON DELETE
-  CASCADE` hacia `bodegas`/`users` — mismo patrón de ramas hermanas que
-  compiten al borrar un tenant completo (ver el punto anterior sobre
-  `recibos_nomina`/`lineas_asiento`).
+- **`turnos_caja.bodegaId`/`turnos_caja.cajeroId`/`turnos_caja.cerradoPorId`**
+  son `ON DELETE CASCADE` hacia `bodegas`/`users` — mismo patrón de ramas
+  hermanas que compiten al borrar un tenant completo (ver el punto
+  anterior sobre `recibos_nomina`/`lineas_asiento`). `cerradoPorId` es
+  nullable (solo se llena al cerrar) y usa la relación nombrada
+  `"TurnoCajaCerradoPor"` porque `User` ya tiene la relación por defecto
+  hacia `TurnoCaja` vía `cajeroId`.
 - **`cuentas_bancarias.cuentaContableId`, `gastos_menores.cuentaBancariaId`
   y `lineas_gasto_menor.cuentaContableId`** son `ON DELETE CASCADE` por el
   mismo patrón de ramas hermanas: `Tenant -> CuentaContable` y

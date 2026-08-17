@@ -13,6 +13,10 @@ export class ConfiguracionesRepository {
     return this.db.configuracion.findMany({ orderBy: { clave: 'asc' } });
   }
 
+  buscarPorClave(clave: string, tenantId: string) {
+    return this.db.configuracion.findUnique({ where: { tenantId_clave: { tenantId, clave } } });
+  }
+
   actualizar(clave: string, valor: string, tenantId: string) {
     return this.db.configuracion.upsert({
       where: { tenantId_clave: { tenantId, clave } },

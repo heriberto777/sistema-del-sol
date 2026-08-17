@@ -109,6 +109,7 @@ describe('App (e2e)', () => {
       'nomina.editar',
       'pos.ver',
       'pos.editar',
+      'pos.supervisar',
       'ia.usar',
       'notificaciones.ver',
       'inventario.ver',
@@ -137,7 +138,7 @@ describe('App (e2e)', () => {
         'bancos.ver', 'bancos.editar',
         'gastosmenores.ver', 'gastosmenores.crear',
         'nomina.ver', 'nomina.editar',
-        'pos.ver', 'pos.editar',
+        'pos.ver', 'pos.editar', 'pos.supervisar',
         'ia.usar',
         'notificaciones.ver',
         'compras.crear', 'compras.recibir', 'compras.pagar', 'compras.ver',
@@ -1979,6 +1980,122 @@ describe('App (e2e)', () => {
         .get(`/api/pos/turnos/${turnoId}`)
         .set('Authorization', `Bearer ${tokenB}`)
         .expect(404);
+    });
+  });
+
+  describe('POS — arqueo por cajero (quién cierra, restricción, tolerancia)', () => {
+    let bodegaArqueoId: string;
+    // Un login por usuario para todo el describe (no uno por test) — evitar
+    // sumarle presión innecesaria al rate-limiter global de /auth/login
+    // (120/min) que comparten TODOS los tests de este archivo.
+    let tokenAdminArqueo: string;
+    let tokenCajero2Arqueo: string;
+    let tokenCajero3Arqueo: string;
+
+    beforeAll(async () => {
+      const bodega = await prisma.bodega.create({ data: { tenantId: tenantAId, nombre: 'Bodega Arqueo E2E' } });
+      bodegaArqueoId = bodega.id;
+
+      const rolCajero = await prisma.role.create({ data: { tenantId: tenantAId, nombre: 'CajeroArqueoE2E' } });
+      for (const clave of ['pos.ver', 'pos.editar']) {
+        const permiso = await prisma.permission.findUniqueOrThrow({ where: { clave } });
+        await prisma.rolePermission.create({ data: { roleId: rolCajero.id, permissionId: permiso.id } });
+      }
+      const passwordHash = await bcrypt.hash(PASSWORD, 10);
+      for (const email of ['cajero2@e2e-a.com', 'cajero3@e2e-a.com']) {
+        const usuario = await prisma.user.create({ data: { tenantId: tenantAId, email, nombre: email, passwordHash } });
+        await prisma.userRole.create({ data: { userId: usuario.id, roleId: rolCajero.id } });
+      }
+
+      tokenAdminArqueo = await login('admin@e2e-a.com', SUBDOMINIO_A); // CompletoA tiene pos.supervisar
+      tokenCajero2Arqueo = await login('cajero2@e2e-a.com', SUBDOMINIO_A);
+      tokenCajero3Arqueo = await login('cajero3@e2e-a.com', SUBDOMINIO_A);
+    });
+
+    it('un cajero sin pos.supervisar no puede cerrar el turno abierto por otro cajero', async () => {
+      const turno = await request(app.getHttpServer())
+        .post('/api/pos/turnos')
+        .set('Authorization', `Bearer ${tokenCajero2Arqueo}`)
+        .send({ bodegaId: bodegaArqueoId, montoInicial: 500 })
+        .expect(201);
+
+      await request(app.getHttpServer())
+        .post(`/api/pos/turnos/${turno.body.id}/cerrar`)
+        .set('Authorization', `Bearer ${tokenCajero3Arqueo}`)
+        .send({ montoFinalContado: 500 })
+        .expect(403);
+
+      // El cajero que lo abrió sí puede cerrar el suyo propio.
+      const cierre = await request(app.getHttpServer())
+        .post(`/api/pos/turnos/${turno.body.id}/cerrar`)
+        .set('Authorization', `Bearer ${tokenCajero2Arqueo}`)
+        .send({ montoFinalContado: 500 })
+        .expect(201);
+      expect(cierre.body.cerradoPor.id).toEqual(expect.any(String));
+      expect(cierre.body.cajero.nombre).toEqual(expect.any(String));
+    });
+
+    it('un supervisor (pos.supervisar) sí puede cerrar el turno de otro cajero, y queda registrado como cerradoPor', async () => {
+      const turno = await request(app.getHttpServer())
+        .post('/api/pos/turnos')
+        .set('Authorization', `Bearer ${tokenCajero2Arqueo}`)
+        .send({ bodegaId: bodegaArqueoId, montoInicial: 500 })
+        .expect(201);
+
+      const cierre = await request(app.getHttpServer())
+        .post(`/api/pos/turnos/${turno.body.id}/cerrar`)
+        .set('Authorization', `Bearer ${tokenAdminArqueo}`)
+        .send({ montoFinalContado: 500 })
+        .expect(201);
+
+      expect(cierre.body.cajero.id).not.toBe(cierre.body.cerradoPor.id);
+    });
+
+    it('exige justificación si la diferencia supera la tolerancia (default RD$50), y la acepta con ella', async () => {
+      const turno = await request(app.getHttpServer())
+        .post('/api/pos/turnos')
+        .set('Authorization', `Bearer ${tokenCajero2Arqueo}`)
+        .send({ bodegaId: bodegaArqueoId, montoInicial: 500 })
+        .expect(201);
+
+      // esperado = 500 (sin ventas/movimientos); contado 300 -> diferencia -200, supera la tolerancia default de 50.
+      await request(app.getHttpServer())
+        .post(`/api/pos/turnos/${turno.body.id}/cerrar`)
+        .set('Authorization', `Bearer ${tokenCajero2Arqueo}`)
+        .send({ montoFinalContado: 300 })
+        .expect(400);
+
+      const cierre = await request(app.getHttpServer())
+        .post(`/api/pos/turnos/${turno.body.id}/cerrar`)
+        .set('Authorization', `Bearer ${tokenCajero2Arqueo}`)
+        .send({ montoFinalContado: 300, justificacionDiferencia: 'Faltante por verificar con el cajero' })
+        .expect(201);
+
+      expect(cierre.body.justificacionDiferencia).toBe('Faltante por verificar con el cajero');
+    });
+
+    it('GET /pos/turnos filtra por cajeroId y GET /pos/cajeros lista los cajeros distintos', async () => {
+      const bodegaFiltro = await prisma.bodega.create({ data: { tenantId: tenantAId, nombre: 'Bodega Filtro E2E' } });
+
+      const turnoCajero2 = await request(app.getHttpServer())
+        .post('/api/pos/turnos')
+        .set('Authorization', `Bearer ${tokenCajero2Arqueo}`)
+        .send({ bodegaId: bodegaFiltro.id, montoInicial: 100 })
+        .expect(201);
+      const cajeroId = turnoCajero2.body.cajero.id;
+
+      const filtrado = await request(app.getHttpServer())
+        .get('/api/pos/turnos')
+        .query({ cajeroId })
+        .set('Authorization', `Bearer ${tokenAdminArqueo}`)
+        .expect(200);
+      expect(filtrado.body.datos.every((t: { cajero: { id: string } }) => t.cajero.id === cajeroId)).toBe(true);
+
+      const cajeros = await request(app.getHttpServer())
+        .get('/api/pos/cajeros')
+        .set('Authorization', `Bearer ${tokenAdminArqueo}`)
+        .expect(200);
+      expect(cajeros.body.some((c: { id: string }) => c.id === cajeroId)).toBe(true);
     });
   });
 

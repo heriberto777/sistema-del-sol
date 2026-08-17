@@ -31,6 +31,7 @@ describe('roles-base', () => {
         STOCK_MINIMO_DEFAULT: '10',
         RETENCION_ISR_TASA: '15',
         RETENCION_ITBIS_TASA: '30',
+        POS_TOLERANCIA_ARQUEO: '50',
       }),
     );
   });

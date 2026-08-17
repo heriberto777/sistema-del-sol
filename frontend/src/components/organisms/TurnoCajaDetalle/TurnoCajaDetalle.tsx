@@ -36,6 +36,11 @@ interface FacturaTurno {
   estado: string;
 }
 
+interface Cajero {
+  id: string;
+  nombre: string;
+}
+
 interface TurnoCajaDetalleData {
   id: string;
   bodegaId: string;
@@ -43,7 +48,10 @@ interface TurnoCajaDetalleData {
   montoFinalContado: string | null;
   montoEsperado: string | null;
   diferencia: string | null;
+  justificacionDiferencia: string | null;
   estado: EstadoTurno;
+  cajero: Cajero;
+  cerradoPor: Cajero | null;
   movimientos: MovimientoCaja[];
   facturas: FacturaTurno[];
 }
@@ -63,6 +71,7 @@ export function TurnoCajaDetalle({ turnoId }: { turnoId: string }) {
   const [montoMovimiento, setMontoMovimiento] = useState('');
   const [conceptoMovimiento, setConceptoMovimiento] = useState('');
   const [montoFinalContado, setMontoFinalContado] = useState('');
+  const [justificacionDiferencia, setJustificacionDiferencia] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   const { data, isLoading } = useQuery({
@@ -114,10 +123,22 @@ export function TurnoCajaDetalle({ turnoId }: { turnoId: string }) {
   });
 
   const cerrarTurno = useMutation({
-    mutationFn: async () => apiClient.post(`/pos/turnos/${turnoId}/cerrar`, { montoFinalContado: Number(montoFinalContado) }),
+    mutationFn: async () =>
+      apiClient.post(`/pos/turnos/${turnoId}/cerrar`, {
+        montoFinalContado: Number(montoFinalContado),
+        justificacionDiferencia: justificacionDiferencia || undefined,
+      }),
     onSuccess: () => {
       invalidar();
       setError(null);
+      setJustificacionDiferencia('');
+    },
+    onError: (err: unknown) => {
+      const mensaje =
+        err && typeof err === 'object' && 'response' in err
+          ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
+          : undefined;
+      setError(mensaje ?? 'No se pudo cerrar el turno.');
     },
   });
 
@@ -129,6 +150,13 @@ export function TurnoCajaDetalle({ turnoId }: { turnoId: string }) {
         <h2 className="font-medium text-slate-900 dark:text-slate-100">Turno de caja</h2>
         <Badge tono={data.estado === 'ABIERTO' ? 'exito' : 'neutro'}>{data.estado}</Badge>
       </div>
+
+      <p className="text-sm text-slate-600 dark:text-slate-400">
+        Abierto por {data.cajero.nombre}
+        {data.estado === 'CERRADO' && data.cerradoPor && data.cerradoPor.id !== data.cajero.id && (
+          <> — cerrado por {data.cerradoPor.nombre}</>
+        )}
+      </p>
 
       {error && <p className="text-sm text-red-600">{error}</p>}
 
@@ -230,6 +258,18 @@ export function TurnoCajaDetalle({ turnoId }: { turnoId: string }) {
                 required
                 className="w-40"
               />
+              <div className="flex flex-col gap-1">
+                <label htmlFor="turno-justificacion" className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                  Justificación (si hay descuadre)
+                </label>
+                <textarea
+                  id="turno-justificacion"
+                  value={justificacionDiferencia}
+                  onChange={(e) => setJustificacionDiferencia(e.target.value)}
+                  rows={1}
+                  className="w-64 rounded-md border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                />
+              </div>
               <Button type="submit" variante="peligro" disabled={cerrarTurno.isPending}>
                 {cerrarTurno.isPending ? 'Cerrando…' : 'Cerrar turno'}
               </Button>
@@ -239,10 +279,15 @@ export function TurnoCajaDetalle({ turnoId }: { turnoId: string }) {
       )}
 
       {data.estado === 'CERRADO' && (
-        <div className="grid grid-cols-3 gap-3 border-t border-slate-200 pt-3 text-sm dark:border-slate-800">
-          <p>Esperado: {formatoRD(data.montoEsperado ?? 0)}</p>
-          <p>Contado: {formatoRD(data.montoFinalContado ?? 0)}</p>
-          <p>Diferencia: {formatoRD(data.diferencia ?? 0)}</p>
+        <div className="space-y-2 border-t border-slate-200 pt-3 text-sm dark:border-slate-800">
+          <div className="grid grid-cols-3 gap-3">
+            <p>Esperado: {formatoRD(data.montoEsperado ?? 0)}</p>
+            <p>Contado: {formatoRD(data.montoFinalContado ?? 0)}</p>
+            <p>Diferencia: {formatoRD(data.diferencia ?? 0)}</p>
+          </div>
+          {data.justificacionDiferencia && (
+            <p className="text-slate-600 dark:text-slate-400">Justificación: {data.justificacionDiferencia}</p>
+          )}
         </div>
       )}
 

@@ -676,6 +676,24 @@ para operar (ver "Fuera de alcance" abajo).
   Σ(salidas)`; `diferencia = montoFinalContado - montoEsperado`. Ventas
   con tarjeta/transferencia no se cuentan en el efectivo esperado (ese
   dinero nunca pasó por la caja física).
+- **Arqueo: quién abre, quién cierra, y la tolerancia.** `TurnoCaja`
+  guarda `cajeroId` (quien lo abrió) y `cerradoPorId` (quien lo cerró) —
+  dos relaciones distintas a `User` (`cerradoPor` usa el nombre de
+  relación explícito `"TurnoCajaCerradoPor"` porque Prisma ya tiene la
+  relación por defecto vía `cajeroId`). Por defecto **solo el cajero que
+  abrió puede cerrarlo**; alguien con el permiso `pos.supervisar` puede
+  cerrar el turno de cualquier cajero (`PosService.cerrarTurno` lo valida
+  en código, antes de calcular el arqueo). Si `|diferencia|` supera la
+  tolerancia configurada del tenant (`Configuracion.POS_TOLERANCIA_ARQUEO`,
+  default RD$50 — ver `CONFIGURACIONES_BASE`), el cierre exige
+  `justificacionDiferencia`; es la primera `Configuracion` que el backend
+  efectivamente lee para una regla de negocio (el resto, como
+  `ITBIS_GENERAL`/`RETENCION_ISR_TASA`, son solo de referencia, nunca
+  consumidas programáticamente — `ConfiguracionesService.buscarValor`
+  cae a un default si el tenant todavía no tiene la clave sembrada).
+  `GET /pos/turnos` admite filtrar por `cajeroId`/`estado`/`desde`/`hasta`,
+  y `GET /pos/cajeros` lista los cajeros distintos con turnos — sin
+  requerir el permiso `admin.usuarios` que protege `GET /admin/usuarios`.
 
 **Fuera de alcance deliberadamente**: modo offline/sincronización
 diferida (de ahí el nombre de esta sección — es la razón de ser del

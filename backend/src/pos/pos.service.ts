@@ -1,18 +1,23 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
 import { PosRepository } from './pos.repository';
 import { FacturacionService } from '../facturacion/facturacion.service';
+import { ConfiguracionesService } from '../configuraciones/configuraciones.service';
 import { AbrirTurnoDto } from './dto/abrir-turno.dto';
 import { CerrarTurnoDto } from './dto/cerrar-turno.dto';
 import { CrearMovimientoCajaDto } from './dto/crear-movimiento-caja.dto';
 import { RegistrarVentaPosDto } from './dto/registrar-venta.dto';
-import { ListadoQueryDto } from '../common/dto/listado-query.dto';
+import { ListarTurnosQueryDto } from './dto/listar-turnos-query.dto';
 import { paginar } from '../common/types/pagina-resultado';
+import { CONFIGURACIONES_BASE } from '../tenants/roles-base';
+
+const CLAVE_TOLERANCIA_ARQUEO = 'POS_TOLERANCIA_ARQUEO';
 
 @Injectable()
 export class PosService {
   constructor(
     private readonly posRepository: PosRepository,
     private readonly facturacionService: FacturacionService,
+    private readonly configuracionesService: ConfiguracionesService,
   ) {}
 
   async abrirTurno(dto: AbrirTurnoDto, tenantId: string, cajeroId: string) {
@@ -27,10 +32,21 @@ export class PosService {
     return this.posRepository.buscarPorId(id);
   }
 
-  async listar(query: ListadoQueryDto) {
+  async listar(query: ListarTurnosQueryDto) {
     const { pagina, tamanoPagina, skip, take } = paginar(query.pagina, query.tamanoPagina);
-    const [datos, total] = await this.posRepository.listar({ skip, take });
+    const [datos, total] = await this.posRepository.listar({
+      skip,
+      take,
+      cajeroId: query.cajeroId,
+      estado: query.estado,
+      desde: query.desde ? new Date(query.desde) : undefined,
+      hasta: query.hasta ? new Date(query.hasta) : undefined,
+    });
     return { datos, total, pagina, tamanoPagina };
+  }
+
+  listarCajeros() {
+    return this.posRepository.listarCajeros();
   }
 
   async registrarMovimiento(turnoId: string, dto: CrearMovimientoCajaDto) {
@@ -52,16 +68,41 @@ export class PosService {
     );
   }
 
-  /** montoEsperado = inicial + ventas en efectivo de este turno + entradas de caja - salidas de caja. */
-  async cerrarTurno(id: string, dto: CerrarTurnoDto) {
+  /**
+   * montoEsperado = inicial + ventas en efectivo de este turno + entradas de
+   * caja - salidas de caja. Solo el cajero que abrió el turno (o alguien con
+   * `pos.supervisar`) puede cerrarlo. Si |diferencia| supera la tolerancia
+   * configurada del tenant (`Configuracion.POS_TOLERANCIA_ARQUEO`), exige
+   * `justificacionDiferencia`.
+   */
+  async cerrarTurno(id: string, dto: CerrarTurnoDto, userId: string, tenantId: string, puedeCerrarDeOtros: boolean) {
     const turno = await this.posRepository.buscarPorId(id);
     this.validarAbierto(turno);
+
+    if (turno.cajeroId !== userId && !puedeCerrarDeOtros) {
+      throw new ForbiddenException('Solo el cajero que abrió el turno, o un supervisor, puede cerrarlo');
+    }
 
     const { ventasEfectivo, entradas, salidas } = await this.posRepository.calcularMovimientoEfectivo(id);
     const montoEsperado = Number(turno.montoInicial) + ventasEfectivo + entradas - salidas;
     const diferencia = dto.montoFinalContado - montoEsperado;
 
-    return this.posRepository.cerrarTurno(id, { montoFinalContado: dto.montoFinalContado, montoEsperado, diferencia });
+    const tolerancia = Number(
+      await this.configuracionesService.buscarValor(CLAVE_TOLERANCIA_ARQUEO, tenantId, CONFIGURACIONES_BASE.POS_TOLERANCIA_ARQUEO),
+    );
+    if (Math.abs(diferencia) > tolerancia && !dto.justificacionDiferencia?.trim()) {
+      throw new BadRequestException(
+        `La diferencia (RD$ ${diferencia.toFixed(2)}) supera la tolerancia configurada (RD$ ${tolerancia.toFixed(2)}) — agregá una justificación para poder cerrar el turno.`,
+      );
+    }
+
+    return this.posRepository.cerrarTurno(id, {
+      montoFinalContado: dto.montoFinalContado,
+      montoEsperado,
+      diferencia,
+      cerradoPorId: userId,
+      justificacionDiferencia: dto.justificacionDiferencia,
+    });
   }
 
   private validarAbierto(turno: { estado: string }) {

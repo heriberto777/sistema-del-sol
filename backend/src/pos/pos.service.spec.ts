@@ -1,12 +1,14 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { PosService } from './pos.service';
 import { PosRepository } from './pos.repository';
 import { FacturacionService } from '../facturacion/facturacion.service';
+import { ConfiguracionesService } from '../configuraciones/configuraciones.service';
 
 describe('PosService', () => {
   let service: PosService;
   let posRepository: jest.Mocked<PosRepository>;
   let facturacionService: jest.Mocked<FacturacionService>;
+  let configuracionesService: jest.Mocked<ConfiguracionesService>;
 
   beforeEach(() => {
     posRepository = {
@@ -14,12 +16,14 @@ describe('PosService', () => {
       crearTurno: jest.fn(),
       buscarPorId: jest.fn(),
       listar: jest.fn(),
+      listarCajeros: jest.fn(),
       crearMovimiento: jest.fn(),
       calcularMovimientoEfectivo: jest.fn(),
       cerrarTurno: jest.fn(),
     } as unknown as jest.Mocked<PosRepository>;
     facturacionService = { crear: jest.fn() } as unknown as jest.Mocked<FacturacionService>;
-    service = new PosService(posRepository, facturacionService);
+    configuracionesService = { buscarValor: jest.fn().mockResolvedValue('50') } as unknown as jest.Mocked<ConfiguracionesService>;
+    service = new PosService(posRepository, facturacionService, configuracionesService);
   });
 
   describe('abrirTurno', () => {
@@ -91,20 +95,90 @@ describe('PosService', () => {
 
   describe('cerrarTurno', () => {
     it('calcula montoEsperado = inicial + ventas efectivo + entradas - salidas, y la diferencia contra lo contado', async () => {
-      posRepository.buscarPorId.mockResolvedValue({ id: 't1', estado: 'ABIERTO', montoInicial: 1000 } as never);
+      posRepository.buscarPorId.mockResolvedValue({ id: 't1', estado: 'ABIERTO', montoInicial: 1000, cajeroId: 'cajero-1' } as never);
       posRepository.calcularMovimientoEfectivo.mockResolvedValue({ ventasEfectivo: 2000, entradas: 100, salidas: 300 });
       posRepository.cerrarTurno.mockResolvedValue({ id: 't1', estado: 'CERRADO' } as never);
 
-      await service.cerrarTurno('t1', { montoFinalContado: 2750 });
+      await service.cerrarTurno('t1', { montoFinalContado: 2750 }, 'cajero-1', 'tenant-1', false);
 
-      // esperado = 1000 + 2000 + 100 - 300 = 2800; contado 2750 -> diferencia -50 (faltante)
-      expect(posRepository.cerrarTurno).toHaveBeenCalledWith('t1', { montoFinalContado: 2750, montoEsperado: 2800, diferencia: -50 });
+      // esperado = 1000 + 2000 + 100 - 300 = 2800; contado 2750 -> diferencia -50 (faltante, en el límite de la tolerancia default 50, no exige justificación)
+      expect(posRepository.cerrarTurno).toHaveBeenCalledWith('t1', {
+        montoFinalContado: 2750,
+        montoEsperado: 2800,
+        diferencia: -50,
+        cerradoPorId: 'cajero-1',
+        justificacionDiferencia: undefined,
+      });
     });
 
     it('rechaza cerrar un turno que ya está cerrado', async () => {
-      posRepository.buscarPorId.mockResolvedValue({ id: 't1', estado: 'CERRADO' } as never);
+      posRepository.buscarPorId.mockResolvedValue({ id: 't1', estado: 'CERRADO', cajeroId: 'cajero-1' } as never);
 
-      await expect(service.cerrarTurno('t1', { montoFinalContado: 100 })).rejects.toThrow(BadRequestException);
+      await expect(service.cerrarTurno('t1', { montoFinalContado: 100 }, 'cajero-1', 'tenant-1', false)).rejects.toThrow(BadRequestException);
+    });
+
+    it('rechaza con 403 si otro cajero sin pos.supervisar intenta cerrarlo', async () => {
+      posRepository.buscarPorId.mockResolvedValue({ id: 't1', estado: 'ABIERTO', montoInicial: 1000, cajeroId: 'cajero-1' } as never);
+
+      await expect(service.cerrarTurno('t1', { montoFinalContado: 100 }, 'otro-usuario', 'tenant-1', false)).rejects.toThrow(
+        ForbiddenException,
+      );
+      expect(posRepository.cerrarTurno).not.toHaveBeenCalled();
+    });
+
+    it('permite cerrar el turno de otro cajero si tiene pos.supervisar', async () => {
+      posRepository.buscarPorId.mockResolvedValue({ id: 't1', estado: 'ABIERTO', montoInicial: 1000, cajeroId: 'cajero-1' } as never);
+      posRepository.calcularMovimientoEfectivo.mockResolvedValue({ ventasEfectivo: 0, entradas: 0, salidas: 0 });
+      posRepository.cerrarTurno.mockResolvedValue({ id: 't1', estado: 'CERRADO' } as never);
+
+      await service.cerrarTurno('t1', { montoFinalContado: 1000 }, 'supervisor-1', 'tenant-1', true);
+
+      expect(posRepository.cerrarTurno).toHaveBeenCalledWith(
+        't1',
+        expect.objectContaining({ cerradoPorId: 'supervisor-1' }),
+      );
+    });
+
+    it('exige justificación si la diferencia supera la tolerancia configurada, y la rechaza sin ella', async () => {
+      posRepository.buscarPorId.mockResolvedValue({ id: 't1', estado: 'ABIERTO', montoInicial: 1000, cajeroId: 'cajero-1' } as never);
+      posRepository.calcularMovimientoEfectivo.mockResolvedValue({ ventasEfectivo: 0, entradas: 0, salidas: 0 });
+
+      // esperado = 1000, contado 900 -> diferencia -100, supera la tolerancia default de 50.
+      await expect(service.cerrarTurno('t1', { montoFinalContado: 900 }, 'cajero-1', 'tenant-1', false)).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(posRepository.cerrarTurno).not.toHaveBeenCalled();
+    });
+
+    it('acepta una diferencia que supera la tolerancia si viene con justificación', async () => {
+      posRepository.buscarPorId.mockResolvedValue({ id: 't1', estado: 'ABIERTO', montoInicial: 1000, cajeroId: 'cajero-1' } as never);
+      posRepository.calcularMovimientoEfectivo.mockResolvedValue({ ventasEfectivo: 0, entradas: 0, salidas: 0 });
+      posRepository.cerrarTurno.mockResolvedValue({ id: 't1', estado: 'CERRADO' } as never);
+
+      await service.cerrarTurno(
+        't1',
+        { montoFinalContado: 900, justificacionDiferencia: 'Error al dar cambio en una venta' },
+        'cajero-1',
+        'tenant-1',
+        false,
+      );
+
+      expect(posRepository.cerrarTurno).toHaveBeenCalledWith(
+        't1',
+        expect.objectContaining({ justificacionDiferencia: 'Error al dar cambio en una venta' }),
+      );
+    });
+
+    it('usa una tolerancia configurada distinta del default si el tenant la cambió', async () => {
+      configuracionesService.buscarValor.mockResolvedValue('200');
+      posRepository.buscarPorId.mockResolvedValue({ id: 't1', estado: 'ABIERTO', montoInicial: 1000, cajeroId: 'cajero-1' } as never);
+      posRepository.calcularMovimientoEfectivo.mockResolvedValue({ ventasEfectivo: 0, entradas: 0, salidas: 0 });
+      posRepository.cerrarTurno.mockResolvedValue({ id: 't1', estado: 'CERRADO' } as never);
+
+      // diferencia -100, dentro de la tolerancia configurada de 200 -> no exige justificación.
+      await service.cerrarTurno('t1', { montoFinalContado: 900 }, 'cajero-1', 'tenant-1', false);
+
+      expect(posRepository.cerrarTurno).toHaveBeenCalledWith('t1', expect.objectContaining({ justificacionDiferencia: undefined }));
     });
   });
 });

@@ -2,7 +2,12 @@ import { Injectable } from '@nestjs/common';
 import { TenantPrismaService } from '../prisma/tenant-prisma.service';
 import { EstadoTurnoCaja, TipoMovimientoCaja } from '@prisma/client';
 
-const INCLUDE_TURNO = { movimientos: true, facturas: { select: { id: true, total: true, metodoPago: true, estado: true } } } as const;
+const INCLUDE_TURNO = {
+  movimientos: true,
+  facturas: { select: { id: true, total: true, metodoPago: true, estado: true } },
+  cajero: { select: { id: true, nombre: true } },
+  cerradoPor: { select: { id: true, nombre: true } },
+} as const;
 
 @Injectable()
 export class PosRepository {
@@ -24,11 +29,27 @@ export class PosRepository {
     return this.db.turnoCaja.findUniqueOrThrow({ where: { id }, include: INCLUDE_TURNO });
   }
 
-  listar(params: { skip: number; take: number }) {
+  listar(params: { skip: number; take: number; cajeroId?: string; estado?: EstadoTurnoCaja; desde?: Date; hasta?: Date }) {
+    const where = {
+      ...(params.cajeroId && { cajeroId: params.cajeroId }),
+      ...(params.estado && { estado: params.estado }),
+      ...((params.desde || params.hasta) && {
+        abiertoEn: { ...(params.desde && { gte: params.desde }), ...(params.hasta && { lte: params.hasta }) },
+      }),
+    };
     return Promise.all([
-      this.db.turnoCaja.findMany({ orderBy: { abiertoEn: 'desc' }, skip: params.skip, take: params.take }),
-      this.db.turnoCaja.count(),
+      this.db.turnoCaja.findMany({ where, orderBy: { abiertoEn: 'desc' }, skip: params.skip, take: params.take, include: INCLUDE_TURNO }),
+      this.db.turnoCaja.count({ where }),
     ]);
+  }
+
+  /** Cajeros distintos que han tenido al menos un turno — para poblar el filtro sin requerir el permiso admin.usuarios de GET /admin/usuarios. */
+  async listarCajeros() {
+    const turnos = await this.db.turnoCaja.findMany({
+      distinct: ['cajeroId'],
+      select: { cajero: { select: { id: true, nombre: true } } },
+    });
+    return turnos.map((t) => t.cajero);
   }
 
   crearMovimiento(params: { turnoId: string; tipo: TipoMovimientoCaja; monto: number; concepto: string }) {
@@ -49,7 +70,10 @@ export class PosRepository {
     };
   }
 
-  cerrarTurno(id: string, params: { montoFinalContado: number; montoEsperado: number; diferencia: number }) {
+  cerrarTurno(
+    id: string,
+    params: { montoFinalContado: number; montoEsperado: number; diferencia: number; cerradoPorId: string; justificacionDiferencia?: string },
+  ) {
     return this.db.turnoCaja.update({
       where: { id },
       data: { ...params, estado: 'CERRADO' as EstadoTurnoCaja, cerradoEn: new Date() },

@@ -9,7 +9,7 @@ export const PERMISOS_BASE = [
   'bancos.ver', 'bancos.editar',
   'gastosmenores.ver', 'gastosmenores.crear',
   'nomina.ver', 'nomina.editar',
-  'pos.ver', 'pos.editar',
+  'pos.ver', 'pos.editar', 'pos.supervisar',
   'ia.usar',
   'notificaciones.ver',
   'inventario.ver', 'inventario.ajustar', 'inventario.transferir',
@@ -50,4 +50,8 @@ export const CONFIGURACIONES_BASE: Record<string, string> = {
   // TSS/ISR de Nómina.
   RETENCION_ISR_TASA: '15',
   RETENCION_ITBIS_TASA: '30',
+  // A diferencia de las anteriores, esta SÍ se lee programáticamente (ver
+  // PosService.cerrarTurno): si |diferencia| del arqueo supera este monto
+  // (RD$), exige justificacionDiferencia para poder cerrar el turno.
+  POS_TOLERANCIA_ARQUEO: '50',
 };

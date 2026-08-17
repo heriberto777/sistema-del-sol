@@ -5,10 +5,10 @@ import { AbrirTurnoDto } from './dto/abrir-turno.dto';
 import { CerrarTurnoDto } from './dto/cerrar-turno.dto';
 import { CrearMovimientoCajaDto } from './dto/crear-movimiento-caja.dto';
 import { RegistrarVentaPosDto } from './dto/registrar-venta.dto';
+import { ListarTurnosQueryDto } from './dto/listar-turnos-query.dto';
 import { Permissions } from '../common/decorators/permissions.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtPayloadUser } from '../common/types/authenticated-request';
-import { ListadoQueryDto } from '../common/dto/listado-query.dto';
 
 @ApiBearerAuth()
 @ApiTags('pos')
@@ -24,8 +24,14 @@ export class PosController {
 
   @Get('turnos')
   @Permissions('pos.ver')
-  listarTurnos(@Query() query: ListadoQueryDto) {
+  listarTurnos(@Query() query: ListarTurnosQueryDto) {
     return this.posService.listar(query);
+  }
+
+  @Get('cajeros')
+  @Permissions('pos.ver')
+  listarCajeros() {
+    return this.posService.listarCajeros();
   }
 
   @Get('turnos/:id')
@@ -42,8 +48,8 @@ export class PosController {
 
   @Post('turnos/:id/cerrar')
   @Permissions('pos.editar')
-  cerrarTurno(@Param('id') id: string, @Body() dto: CerrarTurnoDto) {
-    return this.posService.cerrarTurno(id, dto);
+  cerrarTurno(@Param('id') id: string, @Body() dto: CerrarTurnoDto, @CurrentUser() user: JwtPayloadUser) {
+    return this.posService.cerrarTurno(id, dto, user.userId, user.tenantId, user.permisos.includes('pos.supervisar'));
   }
 
   @Post('ventas')
