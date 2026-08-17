@@ -3,11 +3,13 @@ import { PagosService } from './pagos.service';
 import { PagosRepository } from './pagos.repository';
 import { EventBusService } from '../event-bus/event-bus.service';
 import { EVENTOS } from '../event-bus/events';
+import { CierrePeriodoService } from '../contabilidad/cierre-periodo.service';
 
 describe('PagosService', () => {
   let service: PagosService;
   let repository: jest.Mocked<PagosRepository>;
   let eventBus: jest.Mocked<EventBusService>;
+  let cierrePeriodoService: jest.Mocked<CierrePeriodoService>;
 
   beforeEach(() => {
     repository = {
@@ -20,7 +22,8 @@ describe('PagosService', () => {
       marcarOrdenCompraPagada: jest.fn(),
     } as unknown as jest.Mocked<PagosRepository>;
     eventBus = { emit: jest.fn(), on: jest.fn() } as unknown as jest.Mocked<EventBusService>;
-    service = new PagosService(repository, eventBus);
+    cierrePeriodoService = { validarFechaAbierta: jest.fn().mockResolvedValue(undefined) } as unknown as jest.Mocked<CierrePeriodoService>;
+    service = new PagosService(repository, eventBus, cierrePeriodoService);
   });
 
   describe('registrarPagoFactura', () => {
@@ -111,6 +114,15 @@ describe('PagosService', () => {
       const dtoConRetencionExcesiva = { monto: 1000, metodoPago: 'TRANSFERENCIA', retencionIsr: 600, retencionItbis: 500 } as never;
 
       await expect(service.registrarPagoOrdenCompra(orden, dtoConRetencionExcesiva, 'user-1', 'tenant-1')).rejects.toThrow(BadRequestException);
+      expect(repository.crear).not.toHaveBeenCalled();
+    });
+
+    it('rechaza un pago fechado en un período contable ya cerrado', async () => {
+      repository.sumaPagosOrdenCompra.mockResolvedValue(0);
+      cierrePeriodoService.validarFechaAbierta.mockRejectedValue(new BadRequestException('cerrado'));
+      const dtoConFecha = { monto: 1000, metodoPago: 'TRANSFERENCIA', fecha: '2026-01-01' } as never;
+
+      await expect(service.registrarPagoOrdenCompra(orden, dtoConFecha, 'user-1', 'tenant-1')).rejects.toThrow(BadRequestException);
       expect(repository.crear).not.toHaveBeenCalled();
     });
   });

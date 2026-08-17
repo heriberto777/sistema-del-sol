@@ -4,6 +4,7 @@ import { EventBusService } from '../event-bus/event-bus.service';
 import { EVENTOS } from '../event-bus/events';
 import { CrearPagoDto } from './dto/crear-pago.dto';
 import type { CrearPagoOrdenCompraDto } from '../compras/dto/crear-pago-orden-compra.dto';
+import { CierrePeriodoService } from '../contabilidad/cierre-periodo.service';
 
 const EPSILON = 0.005; // tolerancia de redondeo en centavos, igual que AsientosContablesService
 
@@ -12,6 +13,7 @@ export class PagosService {
   constructor(
     private readonly pagosRepository: PagosRepository,
     private readonly eventBus: EventBusService,
+    private readonly cierrePeriodoService: CierrePeriodoService,
   ) {}
 
   /**
@@ -29,6 +31,7 @@ export class PagosService {
     }
 
     const fecha = dto.fecha ? new Date(dto.fecha) : new Date();
+    await this.cierrePeriodoService.validarFechaAbierta(fecha);
     const pago = await this.pagosRepository.crear({
       tenantId,
       facturaId: factura.id,
@@ -67,6 +70,7 @@ export class PagosService {
     }
 
     const fecha = dto.fecha ? new Date(dto.fecha) : new Date();
+    await this.cierrePeriodoService.validarFechaAbierta(fecha);
     const pago = await this.pagosRepository.crear({
       tenantId,
       ordenCompraId: orden.id,

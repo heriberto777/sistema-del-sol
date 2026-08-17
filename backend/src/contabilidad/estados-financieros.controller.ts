@@ -1,8 +1,9 @@
-import { Controller, Get, Param, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { EstadosFinancierosService } from './estados-financieros.service';
 import { Permissions } from '../common/decorators/permissions.decorator';
 import { ReporteFiscalQueryDto } from '../reportes-fiscales/dto/reporte-fiscal-query.dto';
+import { MarcarLineaConciliadaDto } from './dto/marcar-linea-conciliada.dto';
 
 @ApiBearerAuth()
 @ApiTags('contabilidad')
@@ -22,9 +23,27 @@ export class EstadosFinancierosController {
     return this.estadosFinancierosService.estadoResultados(query.desde, query.hasta);
   }
 
+  @Get('balance-comprobacion')
+  @Permissions('contabilidad.ver')
+  balanceComprobacion(@Query() query: ReporteFiscalQueryDto) {
+    return this.estadosFinancierosService.balanceComprobacion(query.desde, query.hasta);
+  }
+
   @Get('libro-mayor/:cuentaId')
   @Permissions('contabilidad.ver')
   libroMayor(@Param('cuentaId') cuentaId: string, @Query() query: ReporteFiscalQueryDto) {
     return this.estadosFinancierosService.libroMayor(cuentaId, query.desde, query.hasta);
+  }
+
+  @Get('conciliacion/:cuentaBancariaId')
+  @Permissions('contabilidad.ver')
+  conciliacionBancaria(@Param('cuentaBancariaId') cuentaBancariaId: string, @Query() query: ReporteFiscalQueryDto) {
+    return this.estadosFinancierosService.conciliacionBancaria(cuentaBancariaId, query.desde, query.hasta);
+  }
+
+  @Patch('conciliacion/lineas/:lineaId')
+  @Permissions('contabilidad.conciliar')
+  marcarLineaConciliada(@Param('lineaId') lineaId: string, @Body() dto: MarcarLineaConciliadaDto) {
+    return this.estadosFinancierosService.marcarLineaConciliada(lineaId, dto.conciliado);
   }
 }

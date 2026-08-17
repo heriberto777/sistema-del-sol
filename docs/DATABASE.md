@@ -158,6 +158,18 @@ token, así que un token nunca puede reusarse.
   `orden_compra.total`; la retención solo cambia cuánto sale de Caja y a
   qué cuentas se acredita (ver ARCHITECTURE.md, "Retenciones a
   proveedores").
+- **`asientos_contables.anulado`** no filtra ningún cálculo financiero
+  (`lineasHasta`/`lineasEnRango`/`lineasEnRangoTodas`/`lineasPorCuenta`
+  no excluyen asientos anulados) — es puramente informativo. El asiento
+  reverso que genera `AsientosContablesService.anular` (origen
+  `ANULACION`) cancela al original matemáticamente porque AMBOS siguen
+  contando; filtrarlo excluiría la mitad de la cancelación y el reverso
+  terminaría restando dos veces (bug real encontrado escribiendo el e2e
+  de esta feature).
+- **`lineas_asiento.conciliado`/`conciliadoEn`** (default false/null):
+  conciliación bancaria manual (ver ARCHITECTURE.md) — cualquier línea
+  puede marcarse, en la práctica solo se usa para las que tocan la
+  cuenta contable vinculada a una `CuentaBancaria`.
 
 ## Migraciones
 

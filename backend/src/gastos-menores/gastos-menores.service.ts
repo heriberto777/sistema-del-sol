@@ -7,6 +7,7 @@ import { EVENTOS } from '../event-bus/events';
 import { CrearGastoMenorDto } from './dto/crear-gasto-menor.dto';
 import { ListadoQueryDto } from '../common/dto/listado-query.dto';
 import { paginar } from '../common/types/pagina-resultado';
+import { CierrePeriodoService } from '../contabilidad/cierre-periodo.service';
 
 @Injectable()
 export class GastosMenoresService {
@@ -14,6 +15,7 @@ export class GastosMenoresService {
     private readonly gastosMenoresRepository: GastosMenoresRepository,
     private readonly tenantPrisma: TenantPrismaService,
     private readonly eventBus: EventBusService,
+    private readonly cierrePeriodoService: CierrePeriodoService,
   ) {}
 
   /**
@@ -45,6 +47,7 @@ export class GastosMenoresService {
     const modalidad = await this.gastosMenoresRepository.obtenerModalidadFacturacion(tenantId);
     const tipoNcf: TipoNcf = modalidad === 'ECF' ? 'E43' : 'B11';
     const fecha = dto.fecha ? new Date(dto.fecha) : new Date();
+    await this.cierrePeriodoService.validarFechaAbierta(fecha);
 
     const gastoMenor = await this.tenantPrisma.client.$transaction(async (tx) => {
       const ncf = await this.gastosMenoresRepository.siguienteNumeroEnTx(tx, tipoNcf);

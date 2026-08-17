@@ -5,8 +5,10 @@ import { AsientosContablesTable } from '../components/organisms/AsientosContable
 import { GastoRapidoForm } from '../components/organisms/GastoRapidoForm/GastoRapidoForm';
 import { BalanceGeneralView } from '../components/organisms/BalanceGeneralView/BalanceGeneralView';
 import { EstadoResultadosView } from '../components/organisms/EstadoResultadosView/EstadoResultadosView';
+import { BalanceComprobacionView } from '../components/organisms/BalanceComprobacionView/BalanceComprobacionView';
 import { LibroMayorView } from '../components/organisms/LibroMayorView/LibroMayorView';
 import { CierrePeriodoView } from '../components/organisms/CierrePeriodoView/CierrePeriodoView';
+import { ConciliacionBancariaView } from '../components/organisms/ConciliacionBancariaView/ConciliacionBancariaView';
 import { RequierePermiso } from '../components/organisms/RequierePermiso/RequierePermiso';
 import { useAuth } from '../hooks/useAuth';
 
@@ -16,7 +18,9 @@ const PESTANAS = [
   { id: 'gastos', etiqueta: 'Nuevo gasto', permiso: 'contabilidad.editar' },
   { id: 'balance', etiqueta: 'Balance general' },
   { id: 'resultados', etiqueta: 'Estado de resultados' },
+  { id: 'comprobacion', etiqueta: 'Balance de comprobación' },
   { id: 'libro-mayor', etiqueta: 'Libro mayor' },
+  { id: 'conciliacion', etiqueta: 'Conciliación bancaria' },
   { id: 'cierre', etiqueta: 'Cierre de período' },
 ] as const;
 
@@ -54,7 +58,9 @@ export function Contabilidad() {
         {pestana === 'gastos' && <GastoRapidoForm />}
         {pestana === 'balance' && <BalanceGeneralView />}
         {pestana === 'resultados' && <EstadoResultadosView />}
+        {pestana === 'comprobacion' && <BalanceComprobacionView />}
         {pestana === 'libro-mayor' && <LibroMayorView />}
+        {pestana === 'conciliacion' && <ConciliacionBancariaView />}
         {pestana === 'cierre' && <CierrePeriodoView />}
       </RequierePermiso>
     </div>

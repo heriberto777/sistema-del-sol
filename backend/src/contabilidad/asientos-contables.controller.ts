@@ -37,4 +37,10 @@ export class AsientosContablesController {
   crearGasto(@Body() dto: CrearGastoDto, @CurrentUser() user: JwtPayloadUser) {
     return this.asientosContablesService.crearGasto(dto, user.tenantId);
   }
+
+  @Post(':id/anular')
+  @Permissions('contabilidad.anular')
+  anular(@Param('id') id: string, @CurrentUser() user: JwtPayloadUser) {
+    return this.asientosContablesService.anular(id, user.tenantId);
+  }
 }

@@ -36,16 +36,33 @@ export class CierrePeriodoService {
   }
 
   /**
+   * Único punto donde se valida una fecha contra el último cierre —
+   * usado por AsientosContablesService (crear/crearGasto/anular) y por
+   * PagosService/GastosMenoresService, las dos únicas rutas de negocio
+   * que aceptan una fecha manual retroactiva (facturación/compras/nómina
+   * siempre se fechan a "ahora", nunca caen en un período cerrado).
+   */
+  async validarFechaAbierta(fecha: Date) {
+    const ultimo = await this.cierreRepository.buscarUltimo();
+    if (ultimo && fecha <= ultimo.fecha) {
+      throw new BadRequestException(
+        `No se puede registrar con fecha ${fecha.toISOString().slice(0, 10)} — el período hasta ${ultimo.fecha.toISOString().slice(0, 10)} ya está cerrado`,
+      );
+    }
+  }
+
+  /**
    * Traspasa el saldo neto de las cuentas de INGRESO/GASTO acumulado desde
    * el último cierre (o desde el inicio, si es el primero) hasta `fecha`,
-   * a Utilidades Retenidas — el "cierre de período" que estados-financieros.service.ts
-   * señala como no implementado. Alcance deliberado (ver ARCHITECTURE.md):
-   * solo cierra INGRESO/GASTO contra patrimonio; no bloquea retroactivamente
-   * los asientos AUTOMÁTICOS (factura/compra/nómina/pago), que siempre se
-   * fechan a "ahora" y por lo tanto nunca caen dentro de un período ya
-   * cerrado en la práctica — solo los asientos MANUALES y los "gastos
-   * rápidos" (fecha elegida a mano) se validan contra el último cierre, en
-   * AsientosContablesService.
+   * a Utilidades Retenidas — el "cierre de período" que
+   * estados-financieros.service.ts señala como no implementado. Alcance
+   * deliberado (ver ARCHITECTURE.md): solo cierra INGRESO/GASTO contra
+   * patrimonio; no bloquea retroactivamente los asientos AUTOMÁTICOS
+   * (factura/compra/nómina), que siempre se fechan a "ahora" y por lo
+   * tanto nunca caen dentro de un período ya cerrado en la práctica.
+   * `validarFechaAbierta` (arriba) sí valida asientos manuales/gastos
+   * rápidos, anulaciones, y Pago/GastoMenor — las únicas rutas de
+   * negocio con fecha manual retroactiva.
    */
   async cerrarPeriodo(dto: CerrarPeriodoDto, tenantId: string) {
     const fecha = new Date(dto.fecha);

@@ -34,4 +34,15 @@ export class CuentasContablesRepository {
   buscarPorCodigoGlobal(tenantId: string, codigo: string) {
     return this.prisma.cuentaContable.findFirstOrThrow({ where: { tenantId, codigo } });
   }
+
+  /**
+   * Lectura cruzada a CuentaBancaria (dueña del módulo Bancos) para la
+   * conciliación bancaria — mismo criterio pragmático que ya usa
+   * GastosMenoresService para tocar CuentaBancaria sin importar el
+   * módulo de Bancos completo. `this.db` ya inyecta tenantId (ambos
+   * modelos están en TENANT_SCOPED_MODELS).
+   */
+  buscarCuentaBancariaConContable(id: string) {
+    return this.db.cuentaBancaria.findUniqueOrThrow({ where: { id }, include: { cuentaContable: true } });
+  }
 }

@@ -105,6 +105,9 @@ describe('App (e2e)', () => {
       'remisiones.ver',
       'contabilidad.ver',
       'contabilidad.editar',
+      'contabilidad.anular',
+      'contabilidad.cerrarperiodo',
+      'contabilidad.conciliar',
       'nomina.ver',
       'nomina.editar',
       'pos.ver',
@@ -134,7 +137,7 @@ describe('App (e2e)', () => {
         'clientes.crear', 'clientes.ver', 'facturacion.crear', 'facturacion.ver', 'facturacion.anular', 'facturacion.cobrar',
         'cotizaciones.crear', 'cotizaciones.editar', 'cotizaciones.ver',
         'remisiones.crear', 'remisiones.editar', 'remisiones.ver',
-        'contabilidad.ver', 'contabilidad.editar',
+        'contabilidad.ver', 'contabilidad.editar', 'contabilidad.anular', 'contabilidad.cerrarperiodo', 'contabilidad.conciliar',
         'bancos.ver', 'bancos.editar',
         'gastosmenores.ver', 'gastosmenores.crear',
         'nomina.ver', 'nomina.editar',
@@ -159,7 +162,7 @@ describe('App (e2e)', () => {
       permisos: [
         'clientes.crear', 'clientes.ver', 'facturacion.crear', 'facturacion.ver', 'nomina.ver', 'pos.ver',
         'inventario.ver', 'inventario.ajustar', 'inventario.transferir', 'precios.ver', 'precios.editar',
-        'admin.configuracion',
+        'admin.configuracion', 'contabilidad.ver', 'contabilidad.conciliar',
       ],
       email: 'admin@e2e-b.com',
     });
@@ -1588,9 +1591,17 @@ describe('App (e2e)', () => {
     let cajaId: string;
     let ingresosId: string;
     let gastosOperativosId: string;
+    // Reutilizados en los tests nuevos de anular/conciliación/balance de
+    // comprobación (en vez de loguear de nuevo en cada uno) para no sumarle
+    // presión innecesaria al rate-limiter global de /auth/login (120/min)
+    // que comparten TODOS los tests de este archivo.
+    let tokenAdmin: string;
+    let tokenB: string;
 
     beforeAll(async () => {
       const token = await login('admin@e2e-a.com', SUBDOMINIO_A);
+      tokenAdmin = token;
+      tokenB = await login('admin@e2e-b.com', SUBDOMINIO_B);
       const cuentas = await request(app.getHttpServer())
         .get('/api/contabilidad/cuentas')
         .set('Authorization', `Bearer ${token}`)
@@ -1710,7 +1721,7 @@ describe('App (e2e)', () => {
       expect(respuesta.body.some((c: { utilidadNeta: string }) => Number(c.utilidadNeta) === 600)).toBe(true);
     });
 
-    it('contabilidad.editar es obligatorio para cerrar un período', async () => {
+    it('contabilidad.cerrarperiodo es obligatorio para cerrar un período', async () => {
       const token = await login('lectura@e2e-a.com', SUBDOMINIO_A);
 
       await request(app.getHttpServer())
@@ -1718,6 +1729,177 @@ describe('App (e2e)', () => {
         .set('Authorization', `Bearer ${token}`)
         .send({ fecha: '2019-01-31' })
         .expect(403);
+    });
+
+    it('anular un asiento manual genera un reverso y ya no aporta al balance general', async () => {
+      const token = tokenAdmin;
+
+      // Cuentas dedicadas y nuevas (sin ningún movimiento previo) para que el
+      // saldo de esta prueba sea 100% autocontenido, sin depender de qué otro
+      // test haya tocado Caja/Ingresos antes — el reverso siempre se fecha a
+      // "ahora" (momento real de la anulación, igual que la reversa de
+      // Factura/Compra), no a la fecha del asiento original.
+      const cuentas = await request(app.getHttpServer())
+        .post('/api/contabilidad/cuentas')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ codigo: '1099', nombre: 'Caja Test Anular', tipo: 'ACTIVO', naturaleza: 'DEUDORA' })
+        .expect(201);
+      const cajaAnularId = cuentas.body.id;
+      const ingresosAnular = await request(app.getHttpServer())
+        .post('/api/contabilidad/cuentas')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ codigo: '4099', nombre: 'Ingresos Test Anular', tipo: 'INGRESO', naturaleza: 'ACREEDORA' })
+        .expect(201);
+      const ingresosAnularId = ingresosAnular.body.id;
+
+      const asiento = await request(app.getHttpServer())
+        .post('/api/contabilidad/asientos')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          concepto: 'Aporte a anular',
+          lineas: [{ cuentaContableId: cajaAnularId, debito: 777 }, { cuentaContableId: ingresosAnularId, credito: 777 }],
+        })
+        .expect(201);
+
+      const balanceConAsiento = await request(app.getHttpServer())
+        .get('/api/contabilidad/balance-general')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+      const cajaConAsiento = balanceConAsiento.body.activo.cuentas.find((c: { codigo: string }) => c.codigo === '1099').saldo;
+      expect(cajaConAsiento).toBeCloseTo(777, 2);
+
+      const reverso = await request(app.getHttpServer())
+        .post(`/api/contabilidad/asientos/${asiento.body.id}/anular`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(201);
+      expect(reverso.body.origen).toBe('ANULACION');
+      const totalDebito = reverso.body.lineas.reduce((acc: number, l: { debito: string }) => acc + Number(l.debito), 0);
+      const totalCredito = reverso.body.lineas.reduce((acc: number, l: { credito: string }) => acc + Number(l.credito), 0);
+      expect(totalDebito).toBeCloseTo(totalCredito, 2);
+      expect(totalDebito).toBeCloseTo(777, 2);
+
+      const original = await request(app.getHttpServer())
+        .get(`/api/contabilidad/asientos/${asiento.body.id}`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+      expect(original.body.anulado).toBe(true);
+
+      const balanceDespues = await request(app.getHttpServer())
+        .get('/api/contabilidad/balance-general')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+      const cajaDespues = balanceDespues.body.activo.cuentas.find((c: { codigo: string }) => c.codigo === '1099');
+      // El original sigue contando (no se filtra por anulado), pero el
+      // reverso lo cancela matemáticamente -> el saldo neto vuelve a 0.
+      expect(cajaDespues?.saldo ?? 0).toBeCloseTo(0, 2);
+    });
+
+    it('rechaza anular un asiento (o registrar un pago/gasto menor) con fecha dentro de un período ya cerrado', async () => {
+      const token = tokenAdmin;
+
+      const asientoViejo = await request(app.getHttpServer())
+        .get('/api/contabilidad/asientos')
+        .query({ busqueda: 'Venta de prueba 2020' })
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+      const idAsientoViejo = asientoViejo.body.datos[0].id;
+
+      await request(app.getHttpServer())
+        .post(`/api/contabilidad/asientos/${idAsientoViejo}/anular`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(400);
+    });
+
+    it('rechaza anular un asiento de origen automático', async () => {
+      const token = tokenAdmin;
+
+      const asientos = await request(app.getHttpServer())
+        .get('/api/contabilidad/asientos')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+      const asientoFactura = asientos.body.datos.find((a: { origen: string }) => a.origen === 'FACTURA');
+      expect(asientoFactura).toBeDefined();
+
+      await request(app.getHttpServer())
+        .post(`/api/contabilidad/asientos/${asientoFactura.id}/anular`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(400);
+    });
+
+    it('balance de comprobación: los totales de débito y crédito cuadran', async () => {
+      const token = tokenAdmin;
+
+      const respuesta = await request(app.getHttpServer())
+        .get('/api/contabilidad/balance-comprobacion')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(Math.abs(respuesta.body.totales.debito - respuesta.body.totales.credito)).toBeLessThan(0.01);
+      expect(respuesta.body.cuentas.some((c: { codigo: string }) => c.codigo === '1010')).toBe(true);
+    });
+
+    it('conciliación bancaria: marcar una línea conciliada actualiza el saldo conciliado/pendiente', async () => {
+      const token = tokenAdmin;
+
+      // Cuenta contable dedicada y nueva (sin ningún movimiento previo) para
+      // que el saldo según libros sea 100% predecible, sin arrastrar el
+      // historial acumulado de la cuenta "1010" compartida por media suite.
+      const cuentaNueva = await request(app.getHttpServer())
+        .post('/api/contabilidad/cuentas')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ codigo: '1098', nombre: 'Banco Test Conciliación', tipo: 'ACTIVO', naturaleza: 'DEUDORA' })
+        .expect(201);
+      const cajaIdConciliacion = cuentaNueva.body.id;
+
+      const banco = await request(app.getHttpServer())
+        .post('/api/bancos')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ banco: 'Banco Conciliación E2E', numeroCuenta: 'CONC-001', tipoCuenta: 'CORRIENTE', cuentaContableId: cajaIdConciliacion })
+        .expect(201);
+
+      const asiento = await request(app.getHttpServer())
+        .post('/api/contabilidad/asientos')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          concepto: 'Depósito a conciliar',
+          lineas: [{ cuentaContableId: cajaIdConciliacion, debito: 500 }, { cuentaContableId: ingresosId, credito: 500 }],
+        })
+        .expect(201);
+      const lineaCaja = asiento.body.lineas.find((l: { cuentaContableId: string }) => l.cuentaContableId === cajaIdConciliacion);
+
+      const antes = await request(app.getHttpServer())
+        .get(`/api/contabilidad/conciliacion/${banco.body.id}`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+      expect(antes.body.saldoConciliado).toBe(0);
+      expect(antes.body.saldoPendiente).toBeCloseTo(500, 2);
+
+      await request(app.getHttpServer())
+        .patch(`/api/contabilidad/conciliacion/lineas/${lineaCaja.id}`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ conciliado: true })
+        .expect(200);
+
+      const despues = await request(app.getHttpServer())
+        .get(`/api/contabilidad/conciliacion/${banco.body.id}`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+      expect(despues.body.saldoConciliado).toBeCloseTo(500, 2);
+      expect(despues.body.saldoPendiente).toBeCloseTo(0, 2);
+    });
+
+    it('el tenant B no puede conciliar una línea de asiento del tenant A (regresión de IDOR en tabla hija)', async () => {
+      const asientos = await request(app.getHttpServer())
+        .get('/api/contabilidad/asientos')
+        .set('Authorization', `Bearer ${tokenAdmin}`)
+        .expect(200);
+      const lineaDeA = asientos.body.datos[0].lineas[0].id;
+
+      await request(app.getHttpServer())
+        .patch(`/api/contabilidad/conciliacion/lineas/${lineaDeA}`)
+        .set('Authorization', `Bearer ${tokenB}`)
+        .send({ conciliado: true })
+        .expect(404);
     });
   });
 

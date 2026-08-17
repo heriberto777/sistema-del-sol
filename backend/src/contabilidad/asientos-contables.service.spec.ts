@@ -2,23 +2,29 @@ import { BadRequestException } from '@nestjs/common';
 import { AsientosContablesService } from './asientos-contables.service';
 import { AsientosContablesRepository } from './asientos-contables.repository';
 import { CuentasContablesRepository } from './cuentas-contables.repository';
-import { CierrePeriodoRepository } from './cierre-periodo.repository';
+import { CierrePeriodoService } from './cierre-periodo.service';
 import { CODIGOS_CUENTA } from './cuentas-base';
 
 describe('AsientosContablesService', () => {
   let service: AsientosContablesService;
   let asientosRepository: jest.Mocked<AsientosContablesRepository>;
   let cuentasRepository: jest.Mocked<CuentasContablesRepository>;
-  let cierrePeriodoRepository: jest.Mocked<CierrePeriodoRepository>;
+  let cierrePeriodoService: jest.Mocked<CierrePeriodoService>;
 
   const cuenta = (codigo: string) => ({ id: `cuenta-${codigo}`, codigo });
 
   beforeEach(() => {
-    asientosRepository = { crear: jest.fn(), crearGlobal: jest.fn(), buscarPorId: jest.fn(), listar: jest.fn() } as unknown as jest.Mocked<AsientosContablesRepository>;
+    asientosRepository = {
+      crear: jest.fn(),
+      crearGlobal: jest.fn(),
+      buscarPorId: jest.fn(),
+      listar: jest.fn(),
+      marcarAnulado: jest.fn(),
+    } as unknown as jest.Mocked<AsientosContablesRepository>;
     cuentasRepository = { buscarPorCodigo: jest.fn(), buscarPorCodigoGlobal: jest.fn(), listar: jest.fn(), crear: jest.fn() } as unknown as jest.Mocked<CuentasContablesRepository>;
     cuentasRepository.buscarPorCodigoGlobal.mockImplementation(((_tenantId: string, codigo: string) => Promise.resolve(cuenta(codigo))) as never);
-    cierrePeriodoRepository = { buscarUltimo: jest.fn().mockResolvedValue(null) } as unknown as jest.Mocked<CierrePeriodoRepository>;
-    service = new AsientosContablesService(asientosRepository, cuentasRepository, cierrePeriodoRepository);
+    cierrePeriodoService = { validarFechaAbierta: jest.fn().mockResolvedValue(undefined) } as unknown as jest.Mocked<CierrePeriodoService>;
+    service = new AsientosContablesService(asientosRepository, cuentasRepository, cierrePeriodoService);
   });
 
   describe('crear (manual)', () => {
@@ -57,7 +63,7 @@ describe('AsientosContablesService', () => {
     });
 
     it('rechaza un asiento fechado en o antes del último cierre de período', async () => {
-      cierrePeriodoRepository.buscarUltimo.mockResolvedValue({ fecha: new Date('2026-06-30') } as never);
+      cierrePeriodoService.validarFechaAbierta.mockRejectedValue(new BadRequestException('cerrado'));
 
       await expect(
         service.crear(
@@ -69,7 +75,6 @@ describe('AsientosContablesService', () => {
     });
 
     it('permite un asiento fechado después del último cierre', async () => {
-      cierrePeriodoRepository.buscarUltimo.mockResolvedValue({ fecha: new Date('2026-06-30') } as never);
       asientosRepository.crear.mockResolvedValue({ id: 'a1' } as never);
 
       await expect(
@@ -78,6 +83,7 @@ describe('AsientosContablesService', () => {
           'tenant-1',
         ),
       ).resolves.toBeDefined();
+      expect(cierrePeriodoService.validarFechaAbierta).toHaveBeenCalledWith(new Date('2026-07-15'));
     });
   });
 
@@ -370,6 +376,65 @@ describe('AsientosContablesService', () => {
           ],
         }),
       );
+    });
+  });
+
+  describe('anular', () => {
+    const asientoManual = {
+      id: 'a1',
+      numero: 5,
+      concepto: 'Ajuste',
+      origen: 'MANUAL',
+      anulado: false,
+      fecha: new Date('2026-07-15'),
+      lineas: [
+        { cuentaContableId: 'c1', debito: 100, credito: 0 },
+        { cuentaContableId: 'c2', debito: 0, credito: 100 },
+      ],
+    };
+
+    it('genera un reverso con débito/crédito invertidos y marca el original anulado', async () => {
+      asientosRepository.buscarPorId.mockResolvedValue(asientoManual as never);
+      asientosRepository.crear.mockResolvedValue({ id: 'reverso-1' } as never);
+
+      await service.anular('a1', 'tenant-1');
+
+      expect(asientosRepository.crear).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tenantId: 'tenant-1',
+          origen: 'ANULACION',
+          origenId: 'a1',
+          lineas: [
+            { cuentaContableId: 'c1', debito: 0, credito: 100, descripcion: 'Anulación — asiento 5' },
+            { cuentaContableId: 'c2', debito: 100, credito: 0, descripcion: 'Anulación — asiento 5' },
+          ],
+        }),
+      );
+      expect(asientosRepository.marcarAnulado).toHaveBeenCalledWith('a1');
+    });
+
+    it('rechaza anular un asiento de origen automático (ej. FACTURA)', async () => {
+      asientosRepository.buscarPorId.mockResolvedValue({ ...asientoManual, origen: 'FACTURA' } as never);
+
+      await expect(service.anular('a1', 'tenant-1')).rejects.toThrow(BadRequestException);
+      expect(asientosRepository.crear).not.toHaveBeenCalled();
+      expect(asientosRepository.marcarAnulado).not.toHaveBeenCalled();
+    });
+
+    it('rechaza anular un asiento ya anulado', async () => {
+      asientosRepository.buscarPorId.mockResolvedValue({ ...asientoManual, anulado: true } as never);
+
+      await expect(service.anular('a1', 'tenant-1')).rejects.toThrow(BadRequestException);
+      expect(asientosRepository.crear).not.toHaveBeenCalled();
+    });
+
+    it('rechaza anular un asiento fechado en un período ya cerrado', async () => {
+      asientosRepository.buscarPorId.mockResolvedValue(asientoManual as never);
+      cierrePeriodoService.validarFechaAbierta.mockRejectedValue(new BadRequestException('cerrado'));
+
+      await expect(service.anular('a1', 'tenant-1')).rejects.toThrow(BadRequestException);
+      expect(asientosRepository.crear).not.toHaveBeenCalled();
+      expect(asientosRepository.marcarAnulado).not.toHaveBeenCalled();
     });
   });
 });

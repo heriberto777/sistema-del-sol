@@ -1,14 +1,17 @@
+import { BadRequestException } from '@nestjs/common';
 import { GastosMenoresService } from './gastos-menores.service';
 import { GastosMenoresRepository } from './gastos-menores.repository';
 import { TenantPrismaService } from '../prisma/tenant-prisma.service';
 import { EventBusService } from '../event-bus/event-bus.service';
 import { EVENTOS } from '../event-bus/events';
+import { CierrePeriodoService } from '../contabilidad/cierre-periodo.service';
 
 describe('GastosMenoresService', () => {
   let service: GastosMenoresService;
   let repository: jest.Mocked<GastosMenoresRepository>;
   let tenantPrisma: { client: { $transaction: jest.Mock } };
   let eventBus: jest.Mocked<EventBusService>;
+  let cierrePeriodoService: jest.Mocked<CierrePeriodoService>;
 
   const TX = { esTransaccion: true };
 
@@ -22,7 +25,8 @@ describe('GastosMenoresService', () => {
     } as unknown as jest.Mocked<GastosMenoresRepository>;
     tenantPrisma = { client: { $transaction: jest.fn((callback: (tx: unknown) => unknown) => callback(TX)) } };
     eventBus = { emit: jest.fn(), on: jest.fn() } as unknown as jest.Mocked<EventBusService>;
-    service = new GastosMenoresService(repository, tenantPrisma as unknown as TenantPrismaService, eventBus);
+    cierrePeriodoService = { validarFechaAbierta: jest.fn().mockResolvedValue(undefined) } as unknown as jest.Mocked<CierrePeriodoService>;
+    service = new GastosMenoresService(repository, tenantPrisma as unknown as TenantPrismaService, eventBus, cierrePeriodoService);
   });
 
   function dto(overrides: Partial<Parameters<GastosMenoresService['crear']>[0]> = {}) {
@@ -112,6 +116,13 @@ describe('GastosMenoresService', () => {
     expect(tenantPrisma.client.$transaction).toHaveBeenCalledTimes(1);
     expect(repository.siguienteNumeroEnTx).toHaveBeenCalledWith(TX, expect.anything());
     expect(repository.crearEnTx).toHaveBeenCalledWith(TX, expect.anything());
+  });
+
+  it('rechaza un gasto menor fechado en un período contable ya cerrado', async () => {
+    cierrePeriodoService.validarFechaAbierta.mockRejectedValue(new BadRequestException('cerrado'));
+
+    await expect(service.crear(dto({ fecha: '2026-01-01' }), 'tenant-1')).rejects.toThrow(BadRequestException);
+    expect(repository.crearEnTx).not.toHaveBeenCalled();
   });
 
   it('listar delega en el repositorio con paginación', async () => {

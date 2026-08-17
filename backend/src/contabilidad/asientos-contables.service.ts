@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { AsientosContablesRepository } from './asientos-contables.repository';
 import { CuentasContablesRepository } from './cuentas-contables.repository';
-import { CierrePeriodoRepository } from './cierre-periodo.repository';
+import { CierrePeriodoService } from './cierre-periodo.service';
 import { CODIGOS_CUENTA } from './cuentas-base';
 import { CrearAsientoDto } from './dto/crear-asiento.dto';
 import { CrearGastoDto } from './dto/crear-gasto.dto';
@@ -9,6 +9,7 @@ import { ListadoQueryDto } from '../common/dto/listado-query.dto';
 import { paginar } from '../common/types/pagina-resultado';
 
 const EPSILON = 0.005; // tolerancia de redondeo en centavos
+const ORIGENES_ANULABLES = ['MANUAL', 'GASTO'] as const;
 
 interface LineaCalculada {
   cuentaContableId: string;
@@ -24,14 +25,14 @@ export class AsientosContablesService {
   constructor(
     private readonly asientosRepository: AsientosContablesRepository,
     private readonly cuentasRepository: CuentasContablesRepository,
-    private readonly cierrePeriodoRepository: CierrePeriodoRepository,
+    private readonly cierrePeriodoService: CierrePeriodoService,
   ) {}
 
   async crear(dto: CrearAsientoDto, tenantId: string) {
     const lineas = dto.lineas.map((l) => ({ cuentaContableId: l.cuentaContableId, debito: l.debito ?? 0, credito: l.credito ?? 0, descripcion: l.descripcion }));
     this.validarBalance(lineas);
     const fecha = dto.fecha ? new Date(dto.fecha) : new Date();
-    await this.validarPeriodoAbierto(fecha);
+    await this.cierrePeriodoService.validarFechaAbierta(fecha);
 
     return this.asientosRepository.crear({
       tenantId,
@@ -40,6 +41,46 @@ export class AsientosContablesService {
       fecha,
       lineas,
     });
+  }
+
+  /**
+   * Anula un asiento MANUAL o GASTO (los que crea directamente el
+   * usuario) generando un reverso auditable — nunca edita/borra el
+   * original, así se preserva el historial. Los orígenes automáticos
+   * (FACTURA/COMPRA/NOMINA/PAGO/GASTO_MENOR) tienen su propio mecanismo
+   * de reversa atado al documento que los originó (anular factura,
+   * devolver compra) y CIERRE nunca se debe tocar directamente.
+   */
+  async anular(id: string, tenantId: string) {
+    const asiento = await this.asientosRepository.buscarPorId(id);
+    if (!ORIGENES_ANULABLES.includes(asiento.origen as (typeof ORIGENES_ANULABLES)[number])) {
+      throw new BadRequestException(
+        'Solo se pueden anular asientos manuales o de gasto rápido — los generados automáticamente se reversan anulando el documento que los originó (factura, compra, etc.)',
+      );
+    }
+    if (asiento.anulado) {
+      throw new BadRequestException('Este asiento ya está anulado');
+    }
+    await this.cierrePeriodoService.validarFechaAbierta(asiento.fecha);
+
+    const lineasReversas = asiento.lineas.map((l) => ({
+      cuentaContableId: l.cuentaContableId,
+      debito: Number(l.credito),
+      credito: Number(l.debito),
+      descripcion: `Anulación — asiento ${asiento.numero}`,
+    }));
+
+    const reverso = await this.asientosRepository.crear({
+      tenantId,
+      concepto: `Anulación — asiento ${asiento.numero} (${asiento.concepto})`,
+      origen: 'ANULACION',
+      origenId: asiento.id,
+      lineas: lineasReversas,
+    });
+
+    await this.asientosRepository.marcarAnulado(id);
+
+    return reverso;
   }
 
   buscarPorId(id: string) {
@@ -302,7 +343,7 @@ export class AsientosContablesService {
     ];
     this.validarBalance(lineas);
     const fecha = dto.fecha ? new Date(dto.fecha) : new Date();
-    await this.validarPeriodoAbierto(fecha);
+    await this.cierrePeriodoService.validarFechaAbierta(fecha);
 
     return this.asientosRepository.crear({
       tenantId,
@@ -323,15 +364,6 @@ export class AsientosContablesService {
     const cuandoNegativo = cuandoPositivo === 'debito' ? 'credito' : 'debito';
     const columna = monto >= 0 ? cuandoPositivo : cuandoNegativo;
     return { cuentaContableId, debito: 0, credito: 0, [columna]: Math.abs(monto), descripcion } as LineaCalculada;
-  }
-
-  private async validarPeriodoAbierto(fecha: Date) {
-    const ultimoCierre = await this.cierrePeriodoRepository.buscarUltimo();
-    if (ultimoCierre && fecha <= ultimoCierre.fecha) {
-      throw new BadRequestException(
-        `No se puede registrar un asiento con fecha ${fecha.toISOString().slice(0, 10)} — el período hasta ${ultimoCierre.fecha.toISOString().slice(0, 10)} ya está cerrado`,
-      );
-    }
   }
 
   private validarBalance(lineas: { debito: number; credito: number }[]) {

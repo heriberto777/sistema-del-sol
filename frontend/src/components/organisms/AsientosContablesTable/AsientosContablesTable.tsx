@@ -1,6 +1,7 @@
 import { FormEvent, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../../lib/api-client';
+import { Badge } from '../../atoms/Badge/Badge';
 import { Button } from '../../atoms/Button/Button';
 import { Input } from '../../atoms/Input/Input';
 import { FormField } from '../../molecules/FormField/FormField';
@@ -24,12 +25,17 @@ interface LineaAsiento {
   cuentaContable: CuentaContable;
 }
 
+type OrigenAsiento = 'FACTURA' | 'COMPRA' | 'MANUAL' | 'NOMINA' | 'PAGO' | 'GASTO' | 'GASTO_MENOR' | 'CIERRE' | 'ANULACION';
+
+const ORIGENES_ANULABLES: OrigenAsiento[] = ['MANUAL', 'GASTO'];
+
 interface AsientoContable {
   id: string;
   numero: number;
   fecha: string;
   concepto: string;
-  origen: 'FACTURA' | 'COMPRA' | 'MANUAL' | 'NOMINA';
+  origen: OrigenAsiento;
+  anulado: boolean;
   lineas: LineaAsiento[];
 }
 
@@ -88,6 +94,15 @@ export function AsientosContablesTable() {
       setError(null);
     },
     onError: () => setError('No se pudo crear el asiento — confirmá que débito y crédito totalicen lo mismo.'),
+  });
+
+  const anular = useMutation({
+    mutationFn: async (asientoId: string) => apiClient.post(`/contabilidad/asientos/${asientoId}/anular`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['contabilidad-asientos'] });
+      setError(null);
+    },
+    onError: () => setError('No se pudo anular el asiento.'),
   });
 
   function onSubmit(e: FormEvent) {
@@ -191,11 +206,26 @@ export function AsientosContablesTable() {
             {data.datos.map((asiento) => (
               <div key={asiento.id} className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
                 <div className="flex items-center justify-between text-sm">
-                  <span className="font-medium text-slate-900 dark:text-slate-100">
+                  <span className="flex items-center gap-2 font-medium text-slate-900 dark:text-slate-100">
                     #{asiento.numero} — {asiento.concepto}
+                    {asiento.anulado && <Badge tono="peligro">Anulado</Badge>}
                   </span>
-                  <span className="text-slate-500 dark:text-slate-400">
+                  <span className="flex items-center gap-2 text-slate-500 dark:text-slate-400">
                     {asiento.origen} · {new Date(asiento.fecha).toLocaleDateString('es-DO')}
+                    {!asiento.anulado && ORIGENES_ANULABLES.includes(asiento.origen) && tienePermiso('contabilidad.anular') && (
+                      <Button
+                        type="button"
+                        variante="peligro"
+                        disabled={anular.isPending}
+                        onClick={() => {
+                          if (window.confirm(`¿Anular el asiento #${asiento.numero}? Se generará un reverso.`)) {
+                            anular.mutate(asiento.id);
+                          }
+                        }}
+                      >
+                        Anular
+                      </Button>
+                    )}
                   </span>
                 </div>
                 <table className="mt-2 w-full text-left text-xs">

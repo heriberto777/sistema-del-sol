@@ -103,4 +103,25 @@ describe('CierrePeriodoService', () => {
     expect(hasta.getHours()).toBe(23);
     expect(hasta.getMinutes()).toBe(59);
   });
+
+  describe('validarFechaAbierta', () => {
+    it('no rechaza nada si todavía no hay ningún cierre', async () => {
+      cierreRepository.buscarUltimo.mockResolvedValue(null);
+
+      await expect(service.validarFechaAbierta(new Date('2020-01-01'))).resolves.toBeUndefined();
+    });
+
+    it('rechaza una fecha en o antes del último cierre', async () => {
+      cierreRepository.buscarUltimo.mockResolvedValue({ fecha: new Date('2026-06-30') } as never);
+
+      await expect(service.validarFechaAbierta(new Date('2026-06-15'))).rejects.toThrow(BadRequestException);
+      await expect(service.validarFechaAbierta(new Date('2026-06-30'))).rejects.toThrow(BadRequestException);
+    });
+
+    it('permite una fecha después del último cierre', async () => {
+      cierreRepository.buscarUltimo.mockResolvedValue({ fecha: new Date('2026-06-30') } as never);
+
+      await expect(service.validarFechaAbierta(new Date('2026-07-01'))).resolves.toBeUndefined();
+    });
+  });
 });

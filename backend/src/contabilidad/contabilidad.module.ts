@@ -24,6 +24,6 @@ import { CierrePeriodoRepository } from './cierre-periodo.repository';
     CierrePeriodoService,
     CierrePeriodoRepository,
   ],
-  exports: [CuentasContablesService],
+  exports: [CuentasContablesService, CierrePeriodoService],
 })
 export class ContabilidadModule {}

@@ -8,8 +8,16 @@ describe('EstadosFinancierosService', () => {
   let cuentasRepository: jest.Mocked<CuentasContablesRepository>;
 
   beforeEach(() => {
-    repository = { lineasHasta: jest.fn(), lineasEnRango: jest.fn(), lineasPorCuenta: jest.fn() } as unknown as jest.Mocked<AsientosContablesRepository>;
-    cuentasRepository = { buscarPorId: jest.fn() } as unknown as jest.Mocked<CuentasContablesRepository>;
+    repository = {
+      lineasHasta: jest.fn(),
+      lineasEnRango: jest.fn(),
+      lineasEnRangoTodas: jest.fn(),
+      lineasPorCuenta: jest.fn(),
+      buscarLineaSola: jest.fn(),
+      buscarPorId: jest.fn(),
+      marcarLineaConciliada: jest.fn(),
+    } as unknown as jest.Mocked<AsientosContablesRepository>;
+    cuentasRepository = { buscarPorId: jest.fn(), buscarCuentaBancariaConContable: jest.fn() } as unknown as jest.Mocked<CuentasContablesRepository>;
     service = new EstadosFinancierosService(repository, cuentasRepository);
   });
 
@@ -139,6 +147,78 @@ describe('EstadosFinancierosService', () => {
       expect(resultado.movimientos).toEqual([]);
       expect(resultado.saldoInicial).toBe(200);
       expect(resultado.saldoFinal).toBe(200);
+    });
+  });
+
+  describe('conciliacionBancaria', () => {
+    const caja = { id: 'c1', codigo: '1010', nombre: 'Caja y Bancos', naturaleza: 'DEUDORA' };
+    const cuentaBancaria = { id: 'banco-1', banco: 'Banco Popular', numeroCuenta: '123', cuentaContableId: 'c1', cuentaContable: caja };
+
+    function lineaAsiento(debito: number, credito: number, fecha: string, numero: number, conciliado = false) {
+      return { id: `l-${numero}`, debito, credito, conciliado, asiento: { id: `a-${numero}`, numero, fecha: new Date(fecha), concepto: 'Movimiento' } };
+    }
+
+    it('separa el saldo conciliado del pendiente según la naturaleza de la cuenta', async () => {
+      cuentasRepository.buscarCuentaBancariaConContable.mockResolvedValue(cuentaBancaria as never);
+      cuentasRepository.buscarPorId.mockResolvedValue(caja as never);
+      repository.lineasPorCuenta.mockResolvedValue([
+        lineaAsiento(1000, 0, '2026-08-05', 1, true), // conciliado: +1000
+        lineaAsiento(0, 300, '2026-08-10', 2, false), // pendiente: -300
+      ] as never);
+
+      const resultado = await service.conciliacionBancaria('banco-1', '2026-08-01', '2026-08-31');
+
+      expect(resultado.saldoSegunLibros).toBe(700);
+      expect(resultado.saldoConciliado).toBe(1000);
+      expect(resultado.saldoPendiente).toBe(-300);
+      expect(resultado.cuentaBancaria).toEqual({ id: 'banco-1', banco: 'Banco Popular', numeroCuenta: '123' });
+    });
+  });
+
+  describe('marcarLineaConciliada', () => {
+    it('rechaza (propaga el error) si el asiento padre no pertenece al tenant actual', async () => {
+      repository.buscarLineaSola.mockResolvedValue({ id: 'l1', asientoId: 'a1' } as never);
+      repository.buscarPorId.mockRejectedValue(new Error('P2025'));
+
+      await expect(service.marcarLineaConciliada('l1', true)).rejects.toThrow();
+      expect(repository.marcarLineaConciliada).not.toHaveBeenCalled();
+    });
+
+    it('marca la línea conciliada si el asiento padre se resuelve (pertenece al tenant)', async () => {
+      repository.buscarLineaSola.mockResolvedValue({ id: 'l1', asientoId: 'a1' } as never);
+      repository.buscarPorId.mockResolvedValue({ id: 'a1' } as never);
+      repository.marcarLineaConciliada.mockResolvedValue({ id: 'l1', conciliado: true } as never);
+
+      await service.marcarLineaConciliada('l1', true);
+
+      expect(repository.buscarPorId).toHaveBeenCalledWith('a1');
+      expect(repository.marcarLineaConciliada).toHaveBeenCalledWith('l1', true);
+    });
+  });
+
+  describe('balanceComprobacion', () => {
+    it('acumula débito/crédito por cuenta y calcula el saldo según naturaleza', async () => {
+      const caja = { id: 'c1', codigo: '1010', nombre: 'Caja', tipo: 'ACTIVO', naturaleza: 'DEUDORA' };
+      const itbis = { id: 'c2', codigo: '2020', nombre: 'ITBIS por Pagar', tipo: 'PASIVO', naturaleza: 'ACREEDORA' };
+      repository.lineasEnRangoTodas.mockResolvedValue([linea(caja, 354, 0), linea(caja, 0, 100), linea(itbis, 0, 54)] as never);
+
+      const resultado = await service.balanceComprobacion();
+
+      expect(resultado.cuentas).toEqual([
+        { codigo: '1010', nombre: 'Caja', totalDebito: 354, totalCredito: 100, saldo: 254 },
+        { codigo: '2020', nombre: 'ITBIS por Pagar', totalDebito: 0, totalCredito: 54, saldo: 54 },
+      ]);
+      expect(resultado.totales).toEqual({ debito: 354, credito: 154 });
+    });
+
+    it('los totales de débito y crédito cuadran cuando todos los asientos balancearon', async () => {
+      const caja = { id: 'c1', codigo: '1010', nombre: 'Caja', tipo: 'ACTIVO', naturaleza: 'DEUDORA' };
+      const ingresos = { id: 'c2', codigo: '4010', nombre: 'Ingresos', tipo: 'INGRESO', naturaleza: 'ACREEDORA' };
+      repository.lineasEnRangoTodas.mockResolvedValue([linea(caja, 118, 0), linea(ingresos, 0, 118)] as never);
+
+      const resultado = await service.balanceComprobacion();
+
+      expect(resultado.totales.debito).toBe(resultado.totales.credito);
     });
   });
 });

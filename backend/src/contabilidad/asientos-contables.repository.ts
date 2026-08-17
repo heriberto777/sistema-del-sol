@@ -118,6 +118,29 @@ export class AsientosContablesRepository {
     return this.db.asientoContable.findUniqueOrThrow({ where: { id }, include: INCLUDE_ASIENTO });
   }
 
+  marcarAnulado(id: string) {
+    return this.db.asientoContable.update({ where: { id }, data: { anulado: true } });
+  }
+
+  /**
+   * Solo la línea, SIN include del asiento a propósito: `asiento` es una
+   * relación requerida, y si esta línea perteneciera a otro tenant, el
+   * JOIN implícito hacia `AsientoContable` (con RLS forzado) volvería
+   * null — Prisma detecta esa inconsistencia (relación requerida vacía)
+   * y lanza `PrismaClientUnknownRequestError` en vez de un 404 limpio.
+   * El service resuelve la pertenencia llamando a `buscarPorId(asientoId)`
+   * por separado (ese sí está en TENANT_SCOPED_MODELS: si es de otro
+   * tenant, el `where` con tenantId auto-inyectado simplemente no
+   * matchea nada → P2025 → 404 vía HttpExceptionFilter).
+   */
+  buscarLineaSola(lineaId: string) {
+    return this.db.lineaAsiento.findUniqueOrThrow({ where: { id: lineaId } });
+  }
+
+  marcarLineaConciliada(lineaId: string, conciliado: boolean) {
+    return this.db.lineaAsiento.update({ where: { id: lineaId }, data: { conciliado, conciliadoEn: conciliado ? new Date() : null } });
+  }
+
   listar(params: { skip: number; take: number; busqueda?: string }) {
     const where = params.busqueda ? { concepto: { contains: params.busqueda, mode: 'insensitive' as const } } : {};
     return Promise.all([
@@ -132,7 +155,16 @@ export class AsientosContablesRepository {
     ]);
   }
 
-  /** Todas las líneas de todos los asientos hasta una fecha, agrupadas por cuenta — para el balance general. */
+  /**
+   * Todas las líneas de todos los asientos hasta una fecha, agrupadas por
+   * cuenta — para el balance general. NO se filtra por `anulado`: un
+   * asiento anulado sigue contando, pero su reverso (débito/crédito
+   * invertidos, ver AsientosContablesService.anular) ya lo cancela
+   * matemáticamente — filtrar el original excluiría su mitad de la
+   * cancelación y el reverso terminaría restando dos veces. Mismo
+   * principio que ya usan las reversas de Factura/Compra (que tampoco
+   * marcan el original ni se excluyen de estas consultas).
+   */
   lineasHasta(hasta: Date) {
     return this.db.lineaAsiento.findMany({
       where: { asiento: { fecha: { lte: hasta } } },
@@ -147,6 +179,14 @@ export class AsientosContablesRepository {
         asiento: { fecha: { gte: desde, lte: hasta } },
         cuentaContable: { tipo: { in: ['INGRESO', 'GASTO'] } },
       },
+      include: { cuentaContable: true },
+    });
+  }
+
+  /** Líneas de TODAS las cuentas dentro de un rango — para el balance de comprobación. */
+  lineasEnRangoTodas(desde: Date, hasta: Date) {
+    return this.db.lineaAsiento.findMany({
+      where: { asiento: { fecha: { gte: desde, lte: hasta } } },
       include: { cuentaContable: true },
     });
   }

@@ -526,6 +526,7 @@ enum OrigenAsiento {
   GASTO
   GASTO_MENOR
   CIERRE
+  ANULACION
 }
 
 enum TipoCuentaBancaria {
@@ -668,6 +669,11 @@ model LineaAsiento {
   debito           Decimal         @default(0) @db.Decimal(14, 2)
   credito          Decimal         @default(0) @db.Decimal(14, 2)
   descripcion      String?
+  // Conciliación bancaria manual (ver EstadosFinancierosService.conciliacionBancaria) —
+  // sin importar extractos ni auto-match: el contador marca a mano cada línea
+  // que ya confirmó contra el estado de cuenta del banco.
+  conciliado       Boolean         @default(false)
+  conciliadoEn     DateTime?
 
   @@map("lineas_asiento")
 }

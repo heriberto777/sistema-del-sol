@@ -546,6 +546,58 @@ la respuesta HTTP ya se envió.
 - **Compra recibida**: débito Inventario + ITBIS Adelantado, crédito
   Cuentas por Pagar por el total.
 
+**Anular un asiento MANUAL o GASTO** (`AsientosContablesService.anular`,
+`POST /contabilidad/asientos/:id/anular`, permiso `contabilidad.anular`):
+mismo principio que anular una factura — genera un asiento reverso
+(origen `ANULACION`, débito/crédito invertidos) y marca `anulado: true`
+en el original, **nunca lo edita ni lo excluye de los cálculos
+financieros**. Esto es deliberado: el original sigue contando en
+`lineasHasta`/`lineasEnRango`/etc., pero el reverso lo cancela
+matemáticamente (mismo mecanismo, sin filtro especial, que ya usan las
+reversas de Factura/Compra) — filtrar por `anulado` ahí sería un bug:
+excluiría la mitad de la cancelación y el reverso terminaría restando
+dos veces. `anulado` es puramente informativo (badge en el listado).
+Solo se puede anular un asiento de origen `MANUAL`/`GASTO` (los que crea
+directamente el usuario) — los automáticos ya tienen su propio mecanismo
+de reversa atado al documento que los originó, y `CIERRE` nunca se toca
+directamente. Respeta el cierre de período: no se puede anular un
+asiento fechado en o antes del último cierre.
+
+**Cierre de período** (`CierrePeriodoService.cerrarPeriodo`,
+`POST /contabilidad/cierre-periodo`, permiso `contabilidad.cerrarperiodo`):
+traspasa el saldo neto de INGRESO/GASTO acumulado hasta la fecha de
+corte a Utilidades Retenidas. `validarFechaAbierta` (método público,
+único punto donde se valida una fecha contra el último cierre) la usan
+`AsientosContablesService` (`crear`/`crearGasto`/`anular`) y
+`PagosService`/`GastosMenoresService` — estas dos últimas son las
+**únicas rutas de negocio con fecha manual retroactiva** (`Pago.fecha`,
+`GastoMenor.fecha`); Facturación/Compras/Nómina siempre generan su
+asiento con la fecha de "ahora", así que nunca caen dentro de un período
+ya cerrado en la práctica y no necesitan esta validación.
+
+**Conciliación bancaria manual** (`EstadosFinancierosService.conciliacionBancaria`/
+`marcarLineaConciliada`, `GET/PATCH /contabilidad/conciliacion/...`,
+permiso `contabilidad.conciliar` para marcar): sin importar extractos ni
+auto-match — cada `LineaAsiento` que toca la cuenta contable vinculada a
+una `CuentaBancaria` se marca conciliada a mano (`conciliado`/
+`conciliadoEn`), comparando visualmente contra el estado de cuenta del
+banco. El saldo se separa en conciliado/pendiente reusando `libroMayor`
+internamente. `marcarLineaConciliada` valida pertenencia al tenant
+resolviendo el `asiento` padre por separado con `buscarPorId` (que sí
+está en `TENANT_SCOPED_MODELS`) en vez de un `include: { asiento: true }`
+sobre la línea: `LineaAsiento` no tiene RLS propio, y si el `include`
+tocara un asiento de otro tenant, la relación requerida volvería `null`
+por RLS y Prisma lanzaría `PrismaClientUnknownRequestError` (500) en vez
+de un 404 limpio — el mismo tipo de trampa ya documentado para tablas
+hijas sin `tenantId` propio.
+
+**Balance de comprobación** (`EstadosFinancierosService.balanceComprobacion`,
+`GET /contabilidad/balance-comprobacion`): a diferencia de
+`balanceGeneral()`/`estadoResultados()` (que separan por grupo de
+cuentas), agrega TODAS las cuentas a la vez con su total débito/crédito
+y saldo — el formato clásico de balanza de comprobación, útil para
+verificar que todo balancea antes de cerrar un período.
+
 **Patrón de doble repositorio** (igual al ya usado en Webhooks):
 `CuentasContablesRepository`/`AsientosContablesRepository` tienen
 métodos `TenantPrismaService`-based (`crear`, `listar`,
@@ -573,12 +625,13 @@ PATRIMONIO — el tratamiento contable estándar para un balance *antes*
 del cierre anual. Es la razón por la que el balance general siempre
 debe cuadrar (`diferencia ≈ 0`) sin necesitar ese cierre.
 
-**Fuera de alcance deliberadamente** (no implementado en esta pasada):
-conciliación bancaria, cierre de período (traspaso real de
-INGRESO/GASTO a Utilidades Retenidas), reportes contables adicionales
-(libro mayor detallado por cuenta, balance de comprobación), y edición/
-anulación de asientos manuales ya creados (`crear()` es el único método
-de escritura manual — no hay `PATCH`/`DELETE` de asientos).
+**Fuera de alcance deliberadamente**: edición in-place de un asiento ya
+creado (solo anulación vía reverso, nunca `PATCH`); importar extractos
+bancarios o hacer auto-match en la conciliación (100% manual); bloquear
+retroactivamente los asientos automáticos de Factura/Compra/Nómina
+contra un cierre de período (no lo necesitan — ver arriba); y granularidad
+de permisos más allá de `contabilidad.ver/editar/anular/cerrarperiodo/conciliar`
+(por ejemplo, un permiso de auditoría separado de `contabilidad.ver`).
 
 ## Nómina
 
