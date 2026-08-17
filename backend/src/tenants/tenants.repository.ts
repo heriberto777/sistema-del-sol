@@ -16,8 +16,17 @@ export class TenantsRepository {
     return this.prisma.tenant.findUniqueOrThrow({ where: { id } });
   }
 
-  actualizar(id: string, data: { nombre?: string; estado?: EstadoTenant; planId?: string }) {
-    return this.prisma.tenant.update({ where: { id }, data });
+  async actualizar(id: string, data: { nombre?: string; estado?: EstadoTenant; planId?: string }) {
+    return this.prisma.$transaction(async (tx) => {
+      const tenant = await tx.tenant.update({ where: { id }, data });
+      // Si cambia de plan, la suscripción debe cobrar el precio del plan
+      // nuevo desde la próxima factura — no tocar fechaProximoCorte, solo
+      // qué plan factura.
+      if (data.planId) {
+        await tx.suscripcion.updateMany({ where: { tenantId: id }, data: { planId: data.planId } });
+      }
+      return tenant;
+    });
   }
 
   /**
@@ -52,6 +61,12 @@ export class TenantsRepository {
             create: Object.entries(CONFIGURACIONES_BASE).map(([clave, valor]) => ({ clave, valor })),
           },
         },
+      });
+
+      // fechaProximoCorte: hoy — la primera factura sale en el próximo
+      // tick del cron de facturación de plataforma, sin período de gracia.
+      await tx.suscripcion.create({
+        data: { tenantId: tenant.id, planId: params.planId, fechaProximoCorte: new Date() },
       });
 
       await tx.cuentaContable.createMany({

@@ -214,7 +214,33 @@ por ser plomería compartida entre varios módulos.
 Cada `Plan` tiene además `precio` (Decimal) y `cicloFacturacion`
 (`MENSUAL`/`ANUAL`) — precio de lista editable desde
 `/plataforma/planes`. Un descuento puntual (si aplica) se registra en la
-factura de plataforma de una fase futura, nunca en el Plan.
+factura de plataforma (ver abajo), nunca en el Plan.
+
+### Suscripción y facturación de plataforma (lo que le cobra la plataforma a cada tenant)
+
+No confundir con `Factura` (lo que un tenant le cobra a SUS clientes).
+Cada tenant tiene una `Suscripcion` (1:1, creada automáticamente al
+provisionarlo — ver `TenantsRepository.crearConProvisioning`) con
+`fechaProximoCorte` y `feeMoraPct`. `FacturasPlataformaCronService`
+(`backend/src/facturacion-plataforma/`, patrón `@Cron` igual que
+`RecordatoriosService`) corre diario: genera una `FacturaPlataforma` por
+cada suscripción `ACTIVA` vencida (monto = precio del Plan en ese
+momento, vence el mismo día que se emite) y avanza `fechaProximoCorte`
+según `Plan.cicloFacturacion`; y marca `VENCIDA` + aplica `feeMoraPct`
+(una sola vez, no compone) a las que pasaron su fecha de vencimiento sin
+pago — ambos casos notifican por email al usuario `Admin Total` más
+antiguo del tenant (`EmailChannel` directo, HTML inline, sin plantillas
+por-tenant). Cambiar el `planId` de un tenant también actualiza el
+`planId` de su `Suscripcion` (la próxima factura cobra el precio nuevo).
+
+Pagos (`PagoPlataforma`) siguen el mismo patrón de pagos parciales que
+`PagosService` de tenant (`EPSILON = 0.005`, marca `PAGADA` cuando se
+cubre el saldo) — ver `PagosPlataformaService`. Una factura
+`PENDIENTE`/`VENCIDA` se puede editar (descuento/mora/concepto/fecha de
+vencimiento); no se puede anular si ya tiene pagos o si ya está
+`PAGADA`. Tenants creados antes de esta feature no tienen `Suscripcion`
+automática — correr `pnpm --filter ./backend suscripciones:backfill`
+una vez.
 
 ### Módulos con lógica no obvia (ver ARCHITECTURE.md para el detalle)
 

@@ -56,6 +56,15 @@ pasa ninguna de ellas.
 | GET | `/api/platform/admins` | `platform.admins.ver` | Lista de `PlatformAdmin` (sin `passwordHash`), con su rol |
 | POST | `/api/platform/admins` | `platform.admins.gestionar` | `{ email, password, nombre, roleId? }` |
 | PATCH | `/api/platform/admins/:id` | `platform.admins.gestionar` | `{ nombre?, activo?, roleId? }` — 400 si el admin autenticado intenta desactivarse a sí mismo |
+| GET | `/api/platform/tenants/:tenantId/suscripcion` | `platform.facturacion.ver` | Plan/precio/próximo corte/fee de mora/estado de la suscripción del tenant |
+| PATCH | `/api/platform/tenants/:tenantId/suscripcion` | `platform.facturacion.gestionar` | `{ feeMoraPct?, estado?: 'ACTIVA'\|'CANCELADA' }` |
+| POST | `/api/platform/tenants/:tenantId/suscripcion/generar-factura` | `platform.facturacion.gestionar` | Genera una factura fuera de ciclo (misma lógica que el cron diario) |
+| GET | `/api/platform/facturas?pagina&tamanoPagina&tenantId&estado` | `platform.facturacion.ver` | Listado paginado de `FacturaPlataforma` de todos los tenants |
+| GET | `/api/platform/facturas/:id` | `platform.facturacion.ver` | |
+| PATCH | `/api/platform/facturas/:id` | `platform.facturacion.gestionar` | `{ concepto?, descuento?, montoMora?, fechaVencimiento? }` — 400 si la factura ya está `PAGADA`/`ANULADA` |
+| POST | `/api/platform/facturas/:id/anular` | `platform.facturacion.gestionar` | 400 si ya está `PAGADA` o tiene pagos registrados |
+| GET | `/api/platform/facturas/:id/pagos` | `platform.facturacion.ver` | `{ pagos, totalPagado }` |
+| POST | `/api/platform/facturas/:id/pagos` | `platform.pagos.registrar` | `{ monto, metodoPago, referencia?, fecha? }` — pagos parciales soportados, marca `PAGADA` al cubrir el total |
 
 ## NCF (por tenant)
 

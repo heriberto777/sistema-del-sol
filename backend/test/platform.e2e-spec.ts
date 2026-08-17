@@ -112,11 +112,13 @@ describe('Plataforma (e2e)', () => {
 
     // Plan global mínimo para poder crear tenants vía POST /platform/tenants
     // (CrearTenantDto exige planId) — el catálogo de Planes/Modulo no es por
-    // tenant, ver comentario equivalente en app.e2e-spec.ts.
+    // tenant, ver comentario equivalente en app.e2e-spec.ts. precio > 0
+    // para que los tests de facturación de plataforma generen montos reales
+    // (CrearPagoPlataformaDto exige un monto positivo).
     const plan = await prisma.plan.upsert({
       where: { nombre: 'E2E Plataforma Default' },
-      update: {},
-      create: { nombre: 'E2E Plataforma Default' },
+      update: { precio: 1000 },
+      create: { nombre: 'E2E Plataforma Default', precio: 1000 },
     });
     planId = plan.id;
 
@@ -401,6 +403,133 @@ describe('Plataforma (e2e)', () => {
 
       expect(respuesta.body.email).toBe('e2e-nuevo-admin@sistemadelsol.com');
       await prisma.platformAdmin.delete({ where: { id: respuesta.body.id } });
+    });
+  });
+
+  describe('Suscripción y facturación de plataforma', () => {
+    let facturaId: string;
+
+    it('provisionar un tenant crea su Suscripcion con el plan correspondiente', async () => {
+      const tokenPlataforma = await loginPlataforma();
+
+      const respuesta = await request(app.getHttpServer())
+        .get(`/api/platform/tenants/${tenantCreadoId}/suscripcion`)
+        .set('Authorization', `Bearer ${tokenPlataforma}`)
+        .expect(200);
+
+      expect(respuesta.body.planId).toBe(planId);
+      expect(respuesta.body.estado).toBe('ACTIVA');
+    });
+
+    it('cambiar el plan del tenant actualiza también su Suscripcion', async () => {
+      const tokenPlataforma = await loginPlataforma();
+      const otroPlan = await prisma.plan.upsert({
+        where: { nombre: 'E2E Plan Alterno' },
+        update: {},
+        create: { nombre: 'E2E Plan Alterno' },
+      });
+
+      await request(app.getHttpServer())
+        .patch(`/api/platform/tenants/${tenantCreadoId}`)
+        .set('Authorization', `Bearer ${tokenPlataforma}`)
+        .send({ planId: otroPlan.id })
+        .expect(200);
+
+      const respuesta = await request(app.getHttpServer())
+        .get(`/api/platform/tenants/${tenantCreadoId}/suscripcion`)
+        .set('Authorization', `Bearer ${tokenPlataforma}`)
+        .expect(200);
+      expect(respuesta.body.planId).toBe(otroPlan.id);
+
+      // revertir, para no afectar otros tests que asumen el plan original
+      await request(app.getHttpServer())
+        .patch(`/api/platform/tenants/${tenantCreadoId}`)
+        .set('Authorization', `Bearer ${tokenPlataforma}`)
+        .send({ planId })
+        .expect(200);
+    });
+
+    it('genera una factura manual y la marca PAGADA tras un pago parcial y luego el resto', async () => {
+      const tokenPlataforma = await loginPlataforma();
+
+      const generada = await request(app.getHttpServer())
+        .post(`/api/platform/tenants/${tenantCreadoId}/suscripcion/generar-factura`)
+        .set('Authorization', `Bearer ${tokenPlataforma}`)
+        .expect(201);
+      facturaId = generada.body.id;
+      expect(generada.body.estado).toBe('PENDIENTE');
+
+      const total = Number(generada.body.total);
+      const mitad = Math.round((total / 2) * 100) / 100;
+
+      await request(app.getHttpServer())
+        .post(`/api/platform/facturas/${facturaId}/pagos`)
+        .set('Authorization', `Bearer ${tokenPlataforma}`)
+        .send({ monto: mitad, metodoPago: 'TRANSFERENCIA' })
+        .expect(201);
+
+      let detalle = await request(app.getHttpServer())
+        .get(`/api/platform/facturas/${facturaId}`)
+        .set('Authorization', `Bearer ${tokenPlataforma}`)
+        .expect(200);
+      expect(detalle.body.estado).toBe('PENDIENTE');
+
+      await request(app.getHttpServer())
+        .post(`/api/platform/facturas/${facturaId}/pagos`)
+        .set('Authorization', `Bearer ${tokenPlataforma}`)
+        .send({ monto: total - mitad, metodoPago: 'TRANSFERENCIA' })
+        .expect(201);
+
+      detalle = await request(app.getHttpServer())
+        .get(`/api/platform/facturas/${facturaId}`)
+        .set('Authorization', `Bearer ${tokenPlataforma}`)
+        .expect(200);
+      expect(detalle.body.estado).toBe('PAGADA');
+    });
+
+    it('editar una factura ya PAGADA es rechazado', async () => {
+      const tokenPlataforma = await loginPlataforma();
+
+      await request(app.getHttpServer())
+        .patch(`/api/platform/facturas/${facturaId}`)
+        .set('Authorization', `Bearer ${tokenPlataforma}`)
+        .send({ descuento: 10 })
+        .expect(400);
+    });
+
+    it('un admin con solo platform.pagos.registrar puede pagar pero no editar una factura', async () => {
+      const EMAIL_SOLO_PAGOS = 'e2e-solo-pagos@sistemadelsol.com';
+      await crearAdminConRol({
+        email: EMAIL_SOLO_PAGOS,
+        nombreRol: 'E2E Solo Pagos',
+        permisos: ['platform.facturacion.ver', 'platform.pagos.registrar'],
+      });
+      const loginSoloPagos = await request(app.getHttpServer())
+        .post('/api/platform/auth/login')
+        .send({ email: EMAIL_SOLO_PAGOS, password: ADMIN_PASSWORD });
+      const tokenSoloPagos = loginSoloPagos.body.accessToken as string;
+
+      const tokenPlataforma = await loginPlataforma();
+      const generada = await request(app.getHttpServer())
+        .post(`/api/platform/tenants/${tenantCreadoId}/suscripcion/generar-factura`)
+        .set('Authorization', `Bearer ${tokenPlataforma}`)
+        .expect(201);
+      const nuevaFacturaId = generada.body.id;
+
+      await request(app.getHttpServer())
+        .patch(`/api/platform/facturas/${nuevaFacturaId}`)
+        .set('Authorization', `Bearer ${tokenSoloPagos}`)
+        .send({ descuento: 5 })
+        .expect(403);
+
+      await request(app.getHttpServer())
+        .post(`/api/platform/facturas/${nuevaFacturaId}/pagos`)
+        .set('Authorization', `Bearer ${tokenSoloPagos}`)
+        .send({ monto: Number(generada.body.total), metodoPago: 'EFECTIVO' })
+        .expect(201);
+
+      await prisma.platformAdmin.deleteMany({ where: { email: EMAIL_SOLO_PAGOS } });
+      await prisma.platformRole.deleteMany({ where: { nombre: 'E2E Solo Pagos' } });
     });
   });
 

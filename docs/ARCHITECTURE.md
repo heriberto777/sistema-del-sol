@@ -487,10 +487,75 @@ por igual).
 Cada `Plan` tiene también `precio` (`Decimal(12,2)`, default `0`) y
 `cicloFacturacion` (enum `MENSUAL`/`ANUAL`, default `MENSUAL`) — precio
 de lista editable desde `/plataforma/planes`
-(`PATCH /platform/planes/:id`). Es la base para la futura Fase 2
-(suscripción + factura de plataforma + pago); un descuento puntual, si
-aplica, se registrará ahí, nunca en el `Plan` (que es siempre el precio
-de lista).
+(`PATCH /platform/planes/:id`). El precio de lista es la base de la
+suscripción/facturación de plataforma (ver más abajo); un descuento
+puntual se registra en la factura, nunca en el `Plan`.
+
+## Suscripción y facturación de plataforma
+
+Lo que la plataforma le cobra a cada tenant por el servicio — no
+confundir con `Factura` (lo que un tenant le cobra a SUS clientes).
+Tres modelos nuevos en `backend/prisma/schema.prisma`, deliberadamente
+**fuera de `TENANT_SCOPED_MODELS`/RLS** (misma categoría que
+`Modulo`/`Plan`/`PlanModulo`): solo se acceden desde controllers de
+plataforma vía `PrismaService` raw.
+
+- **`Suscripcion`** (`tenantId` único — una por tenant): `planId`,
+  `estado` (`ACTIVA`/`CANCELADA`, cancelar pausa la generación
+  automática sin tocar `Tenant.estado` — son ejes independientes),
+  `fechaProximoCorte`, `feeMoraPct` (default 5, editable por tenant).
+  Creada automáticamente en `TenantsRepository.crearConProvisioning`
+  (`fechaProximoCorte: new Date()` — la primera factura sale en el
+  próximo tick del cron, sin período de gracia). Tenants creados antes
+  de esta feature (ej. "demo") no la tienen — se backfillean con
+  `pnpm --filter ./backend suscripciones:backfill`. Si `TenantsService.
+  actualizar` cambia el `planId` del tenant, también actualiza el de su
+  `Suscripcion` (la próxima factura cobra el precio del plan nuevo).
+- **`FacturaPlataforma`**: `monto`/`descuento`/`montoMora`/`total`
+  (`Decimal(14,2)`), `estado` (`PENDIENTE`/`PAGADA`/`VENCIDA`/
+  `ANULADA`), `fechaEmision`/`fechaVencimiento` (iguales al generarse —
+  sin período de gracia; el admin puede moverla con `PATCH` si hace
+  falta). Editable (`FacturasPlataformaService.actualizar`, recalcula
+  `total`) mientras esté `PENDIENTE`/`VENCIDA`; `anular` rechaza si ya
+  está `PAGADA` o si tiene algún `PagoPlataforma` registrado (evita
+  reversar cobros parciales ya hechos).
+- **`PagoPlataforma`**: mismo patrón de pagos parciales que `Pago` de
+  tenant (`PagosPlataformaService`, `EPSILON = 0.005` de tolerancia de
+  redondeo, marca `PAGADA` + `fechaPago` cuando el acumulado cubre el
+  `total`) pero simplificado — sin `EventBusService` (tenant-scoped, no
+  aplica) ni `CierrePeriodoService` (no hay contabilidad de plataforma).
+  Reutiliza el enum `MetodoPago` ya existente. `registradoPorId` es
+  nullable con `onDelete: SetNull` (mismo criterio que
+  `PlatformAuditLog.adminId`): borrar un admin no debe bloquear ni hacer
+  desaparecer los pagos que registró.
+
+`FacturasPlataformaCronService` (`@Cron(EVERY_DAY_AT_8AM)`, mismo patrón
+que `RecordatoriosService` — `PrismaService` global, sin contexto de
+tenant) hace dos pasadas diarias:
+
+1. `generarFacturasDelDia()`: por cada `Suscripcion` `ACTIVA` con
+   `fechaProximoCorte` vencida, genera la factura
+   (`FacturasPlataformaService.generarDesdeSuscripcion`, reutilizado
+   también por "generar factura ahora" manual desde
+   `/plataforma/tenants`) y avanza `fechaProximoCorte` sumando 1 mes o 1
+   año según `Plan.cicloFacturacion` (`sumarCiclo()`, `setMonth`/
+   `setFullYear` nativos — no hay librería de fechas en el proyecto).
+2. `marcarVencidasYAplicarMora()`: por cada factura `PENDIENTE` ya
+   vencida, aplica `feeMoraPct` sobre el total **una sola vez** (no
+   compone día a día) y la pasa a `VENCIDA`.
+
+Ambos pasos notifican por email al usuario `Admin Total` más antiguo del
+tenant (`EmailChannel.enviar()` directo, HTML inline — mismo criterio
+que `PlatformAuthService.olvidePassword`, sin pasar por el sistema de
+plantillas por-tenant de `NotificacionesService`, que no aplica acá). Es
+un email simple por evento, no el sistema completo de "N avisos
+configurables con offsets de días + canal activable" de una fase futura
+— esa richness se construye después, sobre este mismo cron.
+
+Permisos nuevos en el catálogo de plataforma:
+`platform.facturacion.ver`/`.gestionar`, `platform.pagos.registrar`
+(separado de `.gestionar` a propósito — un rol puede poder cobrar sin
+poder editar descuentos/mora).
 
 ## Event Bus
 

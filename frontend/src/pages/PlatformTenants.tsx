@@ -1,4 +1,4 @@
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { platformApiClient } from '../lib/platform-api-client';
 import { FormField } from '../components/molecules/FormField/FormField';
@@ -56,6 +56,115 @@ function tonoPorAccion(accion: string): 'exito' | 'advertencia' | 'peligro' | 'n
   if (clave.includes('crea') || clave.includes('activ')) return 'exito';
   if (clave.includes('actualiz') || clave.includes('edit') || clave.includes('cambi')) return 'advertencia';
   return 'neutro';
+}
+
+interface Suscripcion {
+  id: string;
+  estado: 'ACTIVA' | 'CANCELADA';
+  fechaProximoCorte: string;
+  feeMoraPct: string;
+  plan: { nombre: string; precio: string; cicloFacturacion: 'MENSUAL' | 'ANUAL' };
+}
+
+const ETIQUETA_CICLO: Record<'MENSUAL' | 'ANUAL', string> = { MENSUAL: 'mes', ANUAL: 'año' };
+
+function PanelSuscripcionTenant({ tenant, onClose }: { tenant: Tenant; onClose: () => void }) {
+  const queryClient = useQueryClient();
+  const [feeMoraPct, setFeeMoraPct] = useState('');
+  const [mensaje, setMensaje] = useState<string | null>(null);
+
+  const { data: suscripcion } = useQuery({
+    queryKey: ['platform-tenant-suscripcion', tenant.id],
+    queryFn: async () => (await platformApiClient.get<Suscripcion>(`/platform/tenants/${tenant.id}/suscripcion`)).data,
+  });
+
+  useEffect(() => {
+    if (suscripcion) setFeeMoraPct(suscripcion.feeMoraPct);
+  }, [suscripcion]);
+
+  const actualizar = useMutation({
+    mutationFn: async (data: { feeMoraPct?: number; estado?: 'ACTIVA' | 'CANCELADA' }) =>
+      platformApiClient.patch(`/platform/tenants/${tenant.id}/suscripcion`, data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['platform-tenant-suscripcion', tenant.id] }),
+  });
+
+  const generarFactura = useMutation({
+    mutationFn: async () => platformApiClient.post(`/platform/tenants/${tenant.id}/suscripcion/generar-factura`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['platform-facturas'] });
+      setMensaje('Factura generada correctamente.');
+    },
+    onError: () => setMensaje('No se pudo generar la factura.'),
+  });
+
+  if (!suscripcion) {
+    return (
+      <Modal titulo={`Suscripción — ${tenant.nombre}`} onClose={onClose}>
+        <p className="text-sm text-slate-400">Cargando…</p>
+      </Modal>
+    );
+  }
+
+  return (
+    <Modal titulo={`Suscripción — ${tenant.nombre}`} onClose={onClose}>
+      <div className="space-y-4">
+        <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm dark:bg-slate-800/60">
+          <p>
+            Plan: <span className="font-medium">{suscripcion.plan.nombre}</span> — RD${' '}
+            {Number(suscripcion.plan.precio).toLocaleString('es-DO')} / {ETIQUETA_CICLO[suscripcion.plan.cicloFacturacion]}
+          </p>
+          <p className="text-slate-500 dark:text-slate-400">
+            Próximo corte: {new Date(suscripcion.fechaProximoCorte).toLocaleDateString('es-DO')}
+          </p>
+        </div>
+
+        <div className="flex items-center justify-between">
+          <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Estado de la suscripción</span>
+          <Switch
+            activo={suscripcion.estado === 'ACTIVA'}
+            disabled={actualizar.isPending}
+            onChange={(valor) => actualizar.mutate({ estado: valor ? 'ACTIVA' : 'CANCELADA' })}
+          />
+        </div>
+
+        <div>
+          <label htmlFor="fee-mora" className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+            % de mora (aplicado una vez al vencerse sin pago)
+          </label>
+          <div className="flex gap-2">
+            <input
+              id="fee-mora"
+              type="number"
+              min="0"
+              max="100"
+              step="0.1"
+              value={feeMoraPct}
+              onChange={(e) => setFeeMoraPct(e.target.value)}
+              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+            />
+            <Button
+              variante="secundario"
+              disabled={actualizar.isPending}
+              onClick={() => actualizar.mutate({ feeMoraPct: Number(feeMoraPct) })}
+            >
+              Guardar
+            </Button>
+          </div>
+        </div>
+
+        <hr className="border-slate-200 dark:border-slate-800" />
+
+        <Button
+          className="w-full"
+          disabled={generarFactura.isPending}
+          onClick={() => generarFactura.mutate()}
+        >
+          {generarFactura.isPending ? 'Generando…' : 'Generar factura ahora'}
+        </Button>
+        {mensaje && <p className="text-sm text-slate-500 dark:text-slate-400">{mensaje}</p>}
+      </div>
+    </Modal>
+  );
 }
 
 function PanelModulosTenant({ tenant, onClose }: { tenant: Tenant; onClose: () => void }) {
@@ -129,6 +238,7 @@ export function PlatformTenants() {
   const [adminPassword, setAdminPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [tenantModulos, setTenantModulos] = useState<Tenant | null>(null);
+  const [tenantSuscripcion, setTenantSuscripcion] = useState<Tenant | null>(null);
 
   const [paginaAuditoria, setPaginaAuditoria] = useState(1);
 
@@ -275,6 +385,9 @@ export function PlatformTenants() {
                     </td>
                     <td className="px-5 py-3">
                       <div className="flex items-center gap-2">
+                        <Button variante="secundario" onClick={() => setTenantSuscripcion(tenant)}>
+                          Suscripción
+                        </Button>
                         <Button variante="secundario" onClick={() => setTenantModulos(tenant)}>
                           Ver módulos
                         </Button>
@@ -350,6 +463,7 @@ export function PlatformTenants() {
       </Card>
 
       {tenantModulos && <PanelModulosTenant tenant={tenantModulos} onClose={() => setTenantModulos(null)} />}
+      {tenantSuscripcion && <PanelSuscripcionTenant tenant={tenantSuscripcion} onClose={() => setTenantSuscripcion(null)} />}
     </div>
   );
 }

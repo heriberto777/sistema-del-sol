@@ -64,6 +64,8 @@ model Tenant {
   pagos         Pago[]
   cuentasBancarias CuentaBancaria[]
   gastosMenores GastoMenor[]
+  suscripcion   Suscripcion?
+  facturasPlataforma FacturaPlataforma[]
 
   @@map("tenants")
 }
@@ -85,6 +87,7 @@ model PlatformAdmin {
   role                    PlatformRole? @relation(fields: [roleId], references: [id])
 
   auditLogs PlatformAuditLog[]
+  pagosPlataformaRegistrados PagoPlataforma[]
 
   @@map("platform_admins")
 }
@@ -184,12 +187,14 @@ model Plan {
 
   modulos PlanModulo[]
   tenants Tenant[]
+  suscripciones Suscripcion[]
 
   @@map("planes")
 }
 
 // El descuento (si aplica) se registra en la Factura de plataforma
-// (Fase 2), nunca acá — el precio del Plan es el precio de lista.
+// (ver Suscripcion/FacturaPlataforma abajo), nunca acá — el precio del
+// Plan es el precio de lista.
 enum CicloFacturacion {
   MENSUAL
   ANUAL
@@ -220,6 +225,95 @@ model TenantModuloOverride {
 
   @@unique([tenantId, moduloId])
   @@map("tenant_modulo_overrides")
+}
+
+// ============================================================
+// SUSCRIPCIÓN Y FACTURACIÓN DE PLATAFORMA (lo que le cobra la
+// plataforma a cada tenant por el servicio — no confundir con Factura,
+// que es lo que un tenant le cobra a SUS clientes). Deliberadamente
+// fuera de TENANT_SCOPED_MODELS/RLS, igual que Modulo/Plan/PlanModulo:
+// solo se accede desde controllers de plataforma vía PrismaService raw.
+// ============================================================
+
+enum EstadoSuscripcion {
+  ACTIVA
+  CANCELADA
+}
+
+// Una por tenant (tenantId único) — el "contrato" de facturación
+// recurrente. Cancelarla (estado: CANCELADA) pausa la generación
+// automática de facturas sin tocar Tenant.estado (son ejes
+// independientes: un tenant puede seguir ACTIVO para sus usuarios
+// mientras se resuelve algo de facturación a mano).
+model Suscripcion {
+  id                String            @id @default(uuid())
+  tenantId          String            @unique
+  tenant            Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  planId            String
+  plan              Plan              @relation(fields: [planId], references: [id])
+  estado            EstadoSuscripcion @default(ACTIVA)
+  fechaInicio       DateTime          @default(now())
+  fechaProximoCorte DateTime
+  // % de mora aplicado una sola vez cuando una factura pasa a VENCIDA.
+  feeMoraPct        Decimal           @default(5) @db.Decimal(5, 2)
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  facturas FacturaPlataforma[]
+
+  @@map("suscripciones")
+}
+
+enum EstadoFacturaPlataforma {
+  PENDIENTE
+  PAGADA
+  VENCIDA
+  ANULADA
+}
+
+model FacturaPlataforma {
+  id               String                  @id @default(uuid())
+  tenantId         String
+  tenant           Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  suscripcionId    String
+  suscripcion      Suscripcion             @relation(fields: [suscripcionId], references: [id], onDelete: Cascade)
+  concepto         String
+  monto            Decimal                 @db.Decimal(14, 2)
+  descuento        Decimal                 @default(0) @db.Decimal(14, 2)
+  montoMora        Decimal                 @default(0) @db.Decimal(14, 2)
+  total            Decimal                 @db.Decimal(14, 2)
+  moneda           String                  @default("DOP")
+  estado           EstadoFacturaPlataforma @default(PENDIENTE)
+  fechaEmision     DateTime                @default(now())
+  fechaVencimiento DateTime
+  fechaPago        DateTime?
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
+
+  pagos PagoPlataforma[]
+
+  @@map("facturas_plataforma")
+}
+
+// Reutiliza el enum MetodoPago (ver más abajo, ya usado por Pago de
+// tenant) — mismo concepto, no vale la pena duplicarlo.
+model PagoPlataforma {
+  id              String            @id @default(uuid())
+  facturaId       String
+  factura         FacturaPlataforma @relation(fields: [facturaId], references: [id], onDelete: Cascade)
+  monto           Decimal           @db.Decimal(14, 2)
+  metodoPago      MetodoPago
+  referencia      String?
+  fecha           DateTime          @default(now())
+  // Nullable + SetNull, mismo criterio que PlatformAuditLog.adminId: si se
+  // borra el admin que lo registró, el pago (comprobante real) no debe
+  // desaparecer ni bloquear el borrado del admin.
+  registradoPorId String?
+  registradoPor   PlatformAdmin?    @relation(fields: [registradoPorId], references: [id], onDelete: SetNull)
+  createdAt       DateTime          @default(now())
+
+  @@index([facturaId])
+  @@map("pagos_plataforma")
 }
 
 // ============================================================

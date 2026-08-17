@@ -30,6 +30,7 @@ import { PlatformTenants } from './pages/PlatformTenants';
 import { PlatformPlanes } from './pages/PlatformPlanes';
 import { PlatformRoles } from './pages/PlatformRoles';
 import { PlatformAdmins } from './pages/PlatformAdmins';
+import { PlatformFacturas } from './pages/PlatformFacturas';
 
 export const router = createBrowserRouter([
   { path: '*', element: <NoEncontrado /> },
@@ -46,6 +47,7 @@ export const router = createBrowserRouter([
       { path: '/plataforma/planes', element: <PlatformPlanes /> },
       { path: '/plataforma/roles', element: <PlatformRoles /> },
       { path: '/plataforma/admins', element: <PlatformAdmins /> },
+      { path: '/plataforma/facturas', element: <PlatformFacturas /> },
     ],
   },
   {

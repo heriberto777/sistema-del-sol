@@ -13,6 +13,7 @@ interface EnlacePlataforma {
 const ENLACES: EnlacePlataforma[] = [
   { ruta: '/plataforma/tenants', etiqueta: 'Tenants', permiso: 'platform.tenants.ver' },
   { ruta: '/plataforma/planes', etiqueta: 'Planes', permiso: 'platform.planes.ver' },
+  { ruta: '/plataforma/facturas', etiqueta: 'Facturas', permiso: 'platform.facturacion.ver' },
   { ruta: '/plataforma/admins', etiqueta: 'Admins', permiso: 'platform.admins.ver' },
   { ruta: '/plataforma/roles', etiqueta: 'Roles', permiso: 'platform.roles.ver' },
 ];

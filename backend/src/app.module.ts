@@ -22,6 +22,7 @@ import { WebhooksModule } from './webhooks/webhooks.module';
 import { UsuariosModule } from './usuarios/usuarios.module';
 import { PlanesModule } from './planes/planes.module';
 import { PlatformAdminsModule } from './platform-admins/platform-admins.module';
+import { FacturacionPlataformaModule } from './facturacion-plataforma/facturacion-plataforma.module';
 import { ConfiguracionesModule } from './configuraciones/configuraciones.module';
 import { PlatformAuthModule } from './platform-auth/platform-auth.module';
 import { TenantsModule } from './tenants/tenants.module';
@@ -73,6 +74,7 @@ import { TenantMiddleware } from './common/middleware/tenant.middleware';
     UsuariosModule,
     PlanesModule,
     PlatformAdminsModule,
+    FacturacionPlataformaModule,
     ConfiguracionesModule,
     PlatformAuthModule,
     TenantsModule,
