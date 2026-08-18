@@ -3,7 +3,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../../lib/api-client';
 import { Badge } from '../../atoms/Badge/Badge';
 import { Button } from '../../atoms/Button/Button';
+import { Select } from '../../atoms/Select/Select';
 import { FormField } from '../../molecules/FormField/FormField';
+import { Modal } from '../../molecules/Modal/Modal';
 import { Paginacion } from '../../molecules/Paginacion/Paginacion';
 import { useAuth } from '../../../hooks/useAuth';
 import { PaginaResultado } from '../../../types/pagina-resultado';
@@ -21,7 +23,14 @@ interface PeriodoNomina {
 interface ReciboNomina {
   id: string;
   salarioBruto: string;
+  sfsEmpleado: string;
+  afpEmpleado: string;
+  isr: string;
+  otrasDeducciones: string;
   salarioNeto: string;
+  sfsEmpleador: string;
+  afpEmpleador: string;
+  infotep: string;
   empleado: { nombre: string };
 }
 
@@ -53,7 +62,7 @@ function ReporteAportesView({ id }: { id: string }) {
   if (isLoading || !data) return <p className="py-2 text-sm text-slate-500">Calculando reporte de aportes…</p>;
 
   return (
-    <div className="space-y-2">
+    <div className="overflow-x-auto">
       <table className="w-full text-left text-sm">
         <thead className="text-slate-500 dark:text-slate-400">
           <tr>
@@ -93,10 +102,34 @@ function ReporteAportesView({ id }: { id: string }) {
   );
 }
 
+function ModalDetalleRecibo({ recibo, onClose }: { recibo: ReciboNomina; onClose: () => void }) {
+  return (
+    <Modal titulo={`Recibo — ${recibo.empleado.nombre}`} onClose={onClose}>
+      <div className="space-y-1 text-sm text-slate-700 dark:text-slate-300">
+        <div className="flex justify-between"><span>Salario bruto</span><span>{formatoRD(recibo.salarioBruto)}</span></div>
+        <div className="flex justify-between"><span>SFS (empleado)</span><span>{formatoRD(recibo.sfsEmpleado)}</span></div>
+        <div className="flex justify-between"><span>AFP (empleado)</span><span>{formatoRD(recibo.afpEmpleado)}</span></div>
+        <div className="flex justify-between"><span>ISR</span><span>{formatoRD(recibo.isr)}</span></div>
+        <div className="flex justify-between"><span>Otras deducciones</span><span>{formatoRD(recibo.otrasDeducciones)}</span></div>
+        <hr className="border-slate-200 dark:border-slate-800" />
+        <div className="flex justify-between font-medium text-slate-900 dark:text-slate-100">
+          <span>Salario neto</span><span>{formatoRD(recibo.salarioNeto)}</span>
+        </div>
+        <hr className="border-slate-200 dark:border-slate-800" />
+        <p className="pt-1 text-xs text-slate-500 dark:text-slate-400">Aportes patronales (no descontados del recibo)</p>
+        <div className="flex justify-between"><span>SFS (patronal)</span><span>{formatoRD(recibo.sfsEmpleador)}</span></div>
+        <div className="flex justify-between"><span>AFP (patronal)</span><span>{formatoRD(recibo.afpEmpleador)}</span></div>
+        <div className="flex justify-between"><span>INFOTEP</span><span>{formatoRD(recibo.infotep)}</span></div>
+      </div>
+    </Modal>
+  );
+}
+
 function PeriodoDetalle({ id }: { id: string }) {
   const queryClient = useQueryClient();
   const { tienePermiso } = useAuth();
   const [verAportes, setVerAportes] = useState(false);
+  const [reciboAbierto, setReciboAbierto] = useState<ReciboNomina | null>(null);
   const { data, isLoading } = useQuery({
     queryKey: ['nomina-periodo', id],
     queryFn: async () => (await apiClient.get<PeriodoNominaDetalle>(`/nomina/periodos/${id}`)).data,
@@ -136,29 +169,42 @@ function PeriodoDetalle({ id }: { id: string }) {
         )}
       </div>
       )}
-      <table className="w-full text-left text-sm">
-        <thead className="text-slate-500 dark:text-slate-400">
-          <tr>
-            <th className="py-1">Empleado</th>
-            <th className="py-1">Salario bruto</th>
-            <th className="py-1">Salario neto</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
-          {data.recibos.map((recibo) => (
-            <tr key={recibo.id}>
-              <td className="py-1">{recibo.empleado.nombre}</td>
-              <td className="py-1">{formatoRD(recibo.salarioBruto)}</td>
-              <td className="py-1">{formatoRD(recibo.salarioNeto)}</td>
+      <div className="overflow-x-auto">
+        <table className="w-full text-left text-sm">
+          <thead className="text-slate-500 dark:text-slate-400">
+            <tr>
+              <th className="py-1">Empleado</th>
+              <th className="py-1">Salario bruto</th>
+              <th className="py-1">Salario neto</th>
+              <th className="py-1" />
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+            {data.recibos.map((recibo) => (
+              <tr key={recibo.id}>
+                <td className="py-1">{recibo.empleado.nombre}</td>
+                <td className="py-1">{formatoRD(recibo.salarioBruto)}</td>
+                <td className="py-1">{formatoRD(recibo.salarioNeto)}</td>
+                <td className="py-1 text-right">
+                  <button
+                    type="button"
+                    className="text-xs text-sol-600 hover:underline dark:text-sol-400"
+                    onClick={() => setReciboAbierto(recibo)}
+                  >
+                    Ver detalle
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
 
       <Button variante="secundario" onClick={() => setVerAportes((v) => !v)}>
         {verAportes ? 'Ocultar reporte de aportes (TSS/ISR)' : 'Ver reporte de aportes (TSS/ISR)'}
       </Button>
       {verAportes && <ReporteAportesView id={id} />}
+      {reciboAbierto && <ModalDetalleRecibo recibo={reciboAbierto} onClose={() => setReciboAbierto(null)} />}
     </div>
   );
 }
@@ -168,6 +214,7 @@ export function PeriodosNominaTable() {
   const { tienePermiso } = useAuth();
   const [pagina, setPagina] = useState(1);
   const [expandidoId, setExpandidoId] = useState<string | null>(null);
+  const [filtroEstado, setFiltroEstado] = useState('');
 
   const [tipo, setTipo] = useState<'QUINCENAL' | 'MENSUAL'>('MENSUAL');
   const [fechaInicio, setFechaInicio] = useState('');
@@ -175,8 +222,13 @@ export function PeriodosNominaTable() {
   const [error, setError] = useState<string | null>(null);
 
   const { data, isLoading, error: errorCarga } = useQuery({
-    queryKey: ['nomina-periodos', pagina],
-    queryFn: async () => (await apiClient.get<PaginaResultado<PeriodoNomina>>('/nomina/periodos', { params: { pagina } })).data,
+    queryKey: ['nomina-periodos', pagina, filtroEstado],
+    queryFn: async () =>
+      (
+        await apiClient.get<PaginaResultado<PeriodoNomina>>('/nomina/periodos', {
+          params: { pagina, estado: filtroEstado || undefined },
+        })
+      ).data,
   });
 
   const generar = useMutation({
@@ -221,6 +273,23 @@ export function PeriodosNominaTable() {
         </Button>
       </form>
       )}
+
+      <div className="flex items-center gap-2">
+        <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Estado</label>
+        <Select
+          value={filtroEstado}
+          onChange={(e) => {
+            setFiltroEstado(e.target.value);
+            setPagina(1);
+          }}
+          className="!w-auto py-1"
+        >
+          <option value="">Todos</option>
+          <option value="BORRADOR">Borrador</option>
+          <option value="PROCESADO">Procesado</option>
+          <option value="PAGADO">Pagado</option>
+        </Select>
+      </div>
 
       {error && <p className="text-sm text-red-600">{error}</p>}
       {isLoading && <p className="text-sm text-slate-500">Cargando períodos…</p>}

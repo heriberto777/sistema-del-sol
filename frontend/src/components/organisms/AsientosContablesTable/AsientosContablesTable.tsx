@@ -228,19 +228,21 @@ export function AsientosContablesTable() {
                     )}
                   </span>
                 </div>
-                <table className="mt-2 w-full text-left text-xs">
-                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                    {asiento.lineas.map((linea) => (
-                      <tr key={linea.id}>
-                        <td className="py-1 text-slate-600 dark:text-slate-400">
-                          {linea.cuentaContable.codigo} — {linea.cuentaContable.nombre}
-                        </td>
-                        <td className="py-1 text-right">{Number(linea.debito) > 0 ? `RD$ ${Number(linea.debito).toLocaleString('es-DO')}` : ''}</td>
-                        <td className="py-1 text-right">{Number(linea.credito) > 0 ? `RD$ ${Number(linea.credito).toLocaleString('es-DO')}` : ''}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <div className="overflow-x-auto">
+                  <table className="mt-2 w-full text-left text-xs">
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                      {asiento.lineas.map((linea) => (
+                        <tr key={linea.id}>
+                          <td className="py-1 text-slate-600 dark:text-slate-400">
+                            {linea.cuentaContable.codigo} — {linea.cuentaContable.nombre}
+                          </td>
+                          <td className="py-1 text-right">{Number(linea.debito) > 0 ? `RD$ ${Number(linea.debito).toLocaleString('es-DO')}` : ''}</td>
+                          <td className="py-1 text-right">{Number(linea.credito) > 0 ? `RD$ ${Number(linea.credito).toLocaleString('es-DO')}` : ''}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             ))}
           </div>

@@ -6,6 +6,8 @@ import { WebhooksRepository } from './webhooks.repository';
 import { validarUrlWebhook } from './ssrf-guard';
 import { CrearWebhookDto } from './dto/crear-webhook.dto';
 import { EVENTOS } from '../event-bus/events';
+import { ListadoQueryDto } from '../common/dto/listado-query.dto';
+import { paginar } from '../common/types/pagina-resultado';
 
 const MAX_INTENTOS = 3;
 // Sin espera en el primer intento; backoff creciente en los reintentos.
@@ -44,9 +46,11 @@ export class WebhooksService {
   }
 
   /** `buscarPorId` valida que el webhook pertenezca al tenant (404 si no) antes de listar sus entregas. */
-  async listarEntregas(id: string) {
+  async listarEntregas(id: string, query: ListadoQueryDto) {
     await this.webhooksRepository.buscarPorId(id);
-    return this.webhooksRepository.listarEntregas(id);
+    const { pagina, tamanoPagina, skip, take } = paginar(query.pagina, query.tamanoPagina);
+    const [datos, total] = await this.webhooksRepository.listarEntregas(id, { skip, take });
+    return { datos, total, pagina, tamanoPagina };
   }
 
   private async despachar(evento: string, payload: { tenantId: string } & Record<string, unknown>) {

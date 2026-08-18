@@ -530,7 +530,7 @@ describe('App (e2e)', () => {
         .get(`/api/webhooks/${webhook.body.id}/deliveries`)
         .set('Authorization', `Bearer ${token}`)
         .expect(200);
-      expect(entregas.body).toEqual([]);
+      expect(entregas.body).toEqual({ datos: [], total: 0, pagina: 1, tamanoPagina: 20 });
 
       await request(app.getHttpServer())
         .delete(`/api/webhooks/${webhook.body.id}`)

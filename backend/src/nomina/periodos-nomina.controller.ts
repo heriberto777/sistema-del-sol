@@ -6,7 +6,7 @@ import { Permissions } from '../common/decorators/permissions.decorator';
 import { RequiereModulo } from '../common/decorators/requiere-modulo.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtPayloadUser } from '../common/types/authenticated-request';
-import { ListadoQueryDto } from '../common/dto/listado-query.dto';
+import { ListarPeriodosNominaQueryDto } from './dto/listar-periodos-nomina-query.dto';
 
 @ApiBearerAuth()
 @ApiTags('nomina')
@@ -23,7 +23,7 @@ export class PeriodosNominaController {
 
   @Get()
   @Permissions('nomina.ver')
-  listar(@Query() query: ListadoQueryDto) {
+  listar(@Query() query: ListarPeriodosNominaQueryDto) {
     return this.periodosNominaService.listar(query);
   }
 

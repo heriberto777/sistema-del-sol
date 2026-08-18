@@ -53,13 +53,24 @@ interface LineaOcDetalle {
   cantidad: string;
   cantidadRecibida: string;
   costoUnitario: string;
+  producto: Producto;
+}
+
+interface RecepcionDetalle {
+  id: string;
+  fecha: string;
+  facturaProveedorNumero: string | null;
+  montoFacturaProveedor: string | null;
 }
 
 interface OrdenCompraDetalle {
   id: string;
   numero: string;
   estado: string;
+  fecha: string;
+  total: string;
   lineas: LineaOcDetalle[];
+  recepciones: RecepcionDetalle[];
 }
 
 const ESTADOS_RECIBIBLES = ['PENDIENTE', 'RECIBIDA_PARCIAL'];
@@ -75,6 +86,7 @@ export function Compras() {
   const [ordenRecibiendo, setOrdenRecibiendo] = useState<OrdenCompra | null>(null);
   const [ordenPagando, setOrdenPagando] = useState<OrdenCompra | null>(null);
   const [ordenDevolviendo, setOrdenDevolviendo] = useState<OrdenCompra | null>(null);
+  const [ordenViendo, setOrdenViendo] = useState<OrdenCompra | null>(null);
 
   useEffect(() => {
     if (searchParams.get('crear') === '1') {
@@ -133,6 +145,7 @@ export function Compras() {
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {data?.datos.map((oc) => {
                   const acciones = [
+                    { etiqueta: 'Ver detalle', onClick: () => setOrdenViendo(oc) },
                     ...(ESTADOS_RECIBIBLES.includes(oc.estado) && tienePermiso('compras.recibir')
                       ? [{ etiqueta: 'Recibir', onClick: () => setOrdenRecibiendo(oc) }]
                       : []),
@@ -172,7 +185,78 @@ export function Compras() {
       )}
       {ordenPagando && <ModalRegistrarPago orden={ordenPagando} onClose={() => setOrdenPagando(null)} />}
       {ordenDevolviendo && <ModalDevolverOrden orden={ordenDevolviendo} onClose={() => setOrdenDevolviendo(null)} />}
+      {ordenViendo && <ModalVerOrden orden={ordenViendo} onClose={() => setOrdenViendo(null)} />}
     </div>
+  );
+}
+
+function ModalVerOrden({ orden, onClose }: { orden: OrdenCompra; onClose: () => void }) {
+  const { data } = useQuery({
+    queryKey: ['orden-compra', orden.id],
+    queryFn: async () => (await apiClient.get<OrdenCompraDetalle>(`/compras/${orden.id}`)).data,
+  });
+
+  return (
+    <Modal titulo={`Orden de compra — ${orden.numero}`} onClose={onClose}>
+      {!data ? (
+        <p className="text-sm text-slate-400">Cargando…</p>
+      ) : (
+        <div className="space-y-4">
+          <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm dark:bg-slate-800/60">
+            <p>
+              Proveedor: <span className="font-medium">{orden.proveedor?.nombre}</span>
+            </p>
+            <p className="text-slate-500 dark:text-slate-400">
+              Fecha: {new Date(data.fecha).toLocaleDateString('es-DO')} — Estado: <Badge>{data.estado}</Badge>
+            </p>
+            <p className="font-medium">Total: RD$ {Number(data.total).toLocaleString('es-DO')}</p>
+          </div>
+
+          <div>
+            <p className="mb-2 text-sm font-medium text-slate-700 dark:text-slate-300">Líneas</p>
+            <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800">
+              <table className="w-full text-left text-sm">
+                <thead className="bg-slate-50 text-slate-500 dark:bg-slate-900/60 dark:text-slate-400">
+                  <tr>
+                    <th className="px-3 py-2">Producto</th>
+                    <th className="px-3 py-2">Pedido</th>
+                    <th className="px-3 py-2">Recibido</th>
+                    <th className="px-3 py-2">Costo unit.</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {data.lineas.map((linea) => (
+                    <tr key={linea.productoId}>
+                      <td className="px-3 py-2">
+                        {linea.producto.codigo} — {linea.producto.nombre}
+                      </td>
+                      <td className="px-3 py-2">{Number(linea.cantidad)}</td>
+                      <td className="px-3 py-2">{Number(linea.cantidadRecibida)}</td>
+                      <td className="px-3 py-2">RD$ {Number(linea.costoUnitario).toLocaleString('es-DO')}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {data.recepciones.length > 0 && (
+            <div>
+              <p className="mb-2 text-sm font-medium text-slate-700 dark:text-slate-300">Recepciones</p>
+              <div className="space-y-1">
+                {data.recepciones.map((r) => (
+                  <p key={r.id} className="text-sm text-slate-600 dark:text-slate-400">
+                    {new Date(r.fecha).toLocaleDateString('es-DO')}
+                    {r.facturaProveedorNumero && ` — Factura del proveedor: ${r.facturaProveedorNumero}`}
+                    {r.montoFacturaProveedor && ` (RD$ ${Number(r.montoFacturaProveedor).toLocaleString('es-DO')})`}
+                  </p>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </Modal>
   );
 }
 

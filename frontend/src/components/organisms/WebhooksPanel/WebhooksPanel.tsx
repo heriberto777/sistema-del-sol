@@ -7,6 +7,8 @@ import { FormField } from '../../molecules/FormField/FormField';
 import { Modal } from '../../molecules/Modal/Modal';
 import { RowActionsMenu } from '../../molecules/RowActionsMenu/RowActionsMenu';
 import { EstadoVacio } from '../../molecules/EstadoVacio/EstadoVacio';
+import { Paginacion } from '../../molecules/Paginacion/Paginacion';
+import { PaginaResultado } from '../../../types/pagina-resultado';
 
 interface Webhook {
   id: string;
@@ -199,16 +201,18 @@ function ModalNuevoWebhook({ onClose }: { onClose: () => void }) {
 }
 
 function ModalEntregas({ webhook, onClose }: { webhook: Webhook; onClose: () => void }) {
+  const [pagina, setPagina] = useState(1);
   const { data: entregas } = useQuery({
-    queryKey: ['webhook-entregas', webhook.id],
-    queryFn: async () => (await apiClient.get<WebhookDelivery[]>(`/webhooks/${webhook.id}/deliveries`)).data,
+    queryKey: ['webhook-entregas', webhook.id, pagina],
+    queryFn: async () =>
+      (await apiClient.get<PaginaResultado<WebhookDelivery>>(`/webhooks/${webhook.id}/deliveries`, { params: { pagina } })).data,
   });
 
   return (
     <Modal titulo={`Entregas — ${webhook.url}`} onClose={onClose}>
       <div className="space-y-2">
-        {entregas?.length === 0 && <p className="text-sm text-slate-400">Todavía no se disparó ninguna entrega para este webhook.</p>}
-        {entregas?.map((entrega) => (
+        {entregas?.datos.length === 0 && <p className="text-sm text-slate-400">Todavía no se disparó ninguna entrega para este webhook.</p>}
+        {entregas?.datos.map((entrega) => (
           <div key={entrega.id} className="flex items-center justify-between rounded-md border border-slate-200 p-2 text-sm dark:border-slate-800">
             <div>
               <p className="text-slate-900 dark:text-slate-100">{entrega.evento}</p>
@@ -220,6 +224,9 @@ function ModalEntregas({ webhook, onClose }: { webhook: Webhook; onClose: () => 
             <Badge tono={entrega.exitoso ? 'exito' : 'peligro'}>{entrega.exitoso ? 'Exitosa' : 'Fallida'}</Badge>
           </div>
         ))}
+        {entregas && (
+          <Paginacion pagina={entregas.pagina} tamanoPagina={entregas.tamanoPagina} total={entregas.total} onCambiarPagina={setPagina} />
+        )}
       </div>
     </Modal>
   );

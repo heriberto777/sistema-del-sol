@@ -18,6 +18,17 @@ describe('PeriodosNominaService', () => {
     service = new PeriodosNominaService(periodosRepository, empleadosRepository, eventBus);
   });
 
+  describe('listar', () => {
+    it('pagina y pasa el filtro de estado al repositorio', async () => {
+      periodosRepository.listar.mockResolvedValue([[{ id: 'p1' }], 1] as never);
+
+      const resultado = await service.listar({ pagina: 2, tamanoPagina: 10, estado: 'PAGADO' });
+
+      expect(periodosRepository.listar).toHaveBeenCalledWith({ skip: 10, take: 10, estado: 'PAGADO' });
+      expect(resultado).toEqual({ datos: [{ id: 'p1' }], total: 1, pagina: 2, tamanoPagina: 10 });
+    });
+  });
+
   describe('generarPeriodo', () => {
     it('rechaza generar si no hay empleados activos', async () => {
       empleadosRepository.listarActivos.mockResolvedValue([]);

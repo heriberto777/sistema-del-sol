@@ -1,8 +1,9 @@
-import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { PlatformAdminsService } from './platform-admins.service';
 import { CrearPlatformAdminDto } from './dto/crear-platform-admin.dto';
 import { ActualizarPlatformAdminDto } from './dto/actualizar-platform-admin.dto';
+import { ListadoQueryDto } from '../common/dto/listado-query.dto';
 import { Public } from '../common/decorators/public.decorator';
 import { PlatformPermissions } from '../common/decorators/platform-permissions.decorator';
 import { PlatformAuthGuard } from '../platform-auth/guards/platform-auth.guard';
@@ -20,8 +21,8 @@ export class PlatformAdminsController {
 
   @Get()
   @PlatformPermissions('platform.admins.ver')
-  listar() {
-    return this.platformAdminsService.listar();
+  listar(@Query() query: ListadoQueryDto) {
+    return this.platformAdminsService.listar(query);
   }
 
   @Post()

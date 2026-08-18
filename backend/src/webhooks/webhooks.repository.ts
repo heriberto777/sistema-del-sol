@@ -30,8 +30,12 @@ export class WebhooksRepository {
   }
 
   /** El tenantId ya se validó en `buscarPorId` (el modelo Webhook sí está tenant-scoped) — ver WebhooksService.listarEntregas. */
-  listarEntregas(webhookId: string) {
-    return this.db.webhookDelivery.findMany({ where: { webhookId }, orderBy: { createdAt: 'desc' } });
+  listarEntregas(webhookId: string, params: { skip: number; take: number }) {
+    const where = { webhookId };
+    return Promise.all([
+      this.db.webhookDelivery.findMany({ where, orderBy: { createdAt: 'desc' }, skip: params.skip, take: params.take }),
+      this.db.webhookDelivery.count({ where }),
+    ]);
   }
 
   /** Usado por el dispatcher, fuera del contexto de un request HTTP. */

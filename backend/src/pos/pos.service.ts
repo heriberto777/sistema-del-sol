@@ -41,6 +41,7 @@ export class PosService {
       estado: query.estado,
       desde: query.desde ? new Date(query.desde) : undefined,
       hasta: query.hasta ? new Date(query.hasta) : undefined,
+      busqueda: query.busqueda,
     });
     return { datos, total, pagina, tamanoPagina };
   }

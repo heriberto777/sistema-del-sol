@@ -6,9 +6,11 @@ import { Select } from '../components/atoms/Select/Select';
 import { FormField } from '../components/molecules/FormField/FormField';
 import { Modal } from '../components/molecules/Modal/Modal';
 import { Paginacion } from '../components/molecules/Paginacion/Paginacion';
+import { SearchInput } from '../components/molecules/SearchInput/SearchInput';
 import { EstadoVacio } from '../components/molecules/EstadoVacio/EstadoVacio';
 import { RequierePermiso } from '../components/organisms/RequierePermiso/RequierePermiso';
 import { useAuth } from '../hooks/useAuth';
+import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { PaginaResultado } from '../types/pagina-resultado';
 
 interface CuentaContable {
@@ -35,16 +37,39 @@ interface GastoMenor {
   cuentaBancaria: CuentaBancaria;
 }
 
+interface LineaGastoMenorDetalle {
+  id: string;
+  concepto: string | null;
+  valor: string;
+  porcentajeItbis: string;
+  montoItbis: string;
+  cantidad: string;
+  montoTotal: string;
+  cuentaContable: CuentaContable;
+}
+
+interface GastoMenorDetalle extends GastoMenor {
+  lineas: LineaGastoMenorDetalle[];
+}
+
 const LINEA_VACIA = { cuentaContableId: '', concepto: '', valor: '', porcentajeItbis: '0', cantidad: '1' };
 
 export function GastosMenores() {
   const { tienePermiso } = useAuth();
   const [pagina, setPagina] = useState(1);
+  const [busqueda, setBusqueda] = useState('');
   const [modalAbierto, setModalAbierto] = useState(false);
+  const [gastoViendo, setGastoViendo] = useState<GastoMenor | null>(null);
+  const busquedaDebounced = useDebouncedValue(busqueda);
 
   const { data } = useQuery({
-    queryKey: ['gastos-menores', pagina],
-    queryFn: async () => (await apiClient.get<PaginaResultado<GastoMenor>>('/gastos-menores', { params: { pagina } })).data,
+    queryKey: ['gastos-menores', pagina, busquedaDebounced],
+    queryFn: async () =>
+      (
+        await apiClient.get<PaginaResultado<GastoMenor>>('/gastos-menores', {
+          params: { pagina, busqueda: busquedaDebounced || undefined },
+        })
+      ).data,
   });
 
   return (
@@ -60,6 +85,14 @@ export function GastosMenores() {
       </div>
 
       <RequierePermiso permiso="gastosmenores.ver">
+        <SearchInput
+          value={busqueda}
+          onChange={(v) => {
+            setBusqueda(v);
+            setPagina(1);
+          }}
+          placeholder="Buscar por NCF o notas…"
+        />
         {data?.datos.length === 0 ? (
           <EstadoVacio
             titulo="Todavía no has registrado gastos menores"
@@ -77,6 +110,7 @@ export function GastosMenores() {
                   <th className="px-4 py-2">Fecha</th>
                   <th className="px-4 py-2">Cuenta</th>
                   <th className="px-4 py-2">Monto</th>
+                  <th className="px-4 py-2" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -89,6 +123,11 @@ export function GastosMenores() {
                       {g.cuentaBancaria.banco} — {g.cuentaBancaria.numeroCuenta}
                     </td>
                     <td className="px-4 py-2">RD$ {Number(g.total).toLocaleString('es-DO')}</td>
+                    <td className="px-4 py-2 text-right">
+                      <Button variante="secundario" onClick={() => setGastoViendo(g)}>
+                        Ver detalle
+                      </Button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -101,7 +140,66 @@ export function GastosMenores() {
       </RequierePermiso>
 
       {modalAbierto && <ModalNuevoGastoMenor onClose={() => setModalAbierto(false)} />}
+      {gastoViendo && <ModalVerGastoMenor gasto={gastoViendo} onClose={() => setGastoViendo(null)} />}
     </div>
+  );
+}
+
+function ModalVerGastoMenor({ gasto, onClose }: { gasto: GastoMenor; onClose: () => void }) {
+  const { data } = useQuery({
+    queryKey: ['gasto-menor', gasto.id],
+    queryFn: async () => (await apiClient.get<GastoMenorDetalle>(`/gastos-menores/${gasto.id}`)).data,
+  });
+
+  return (
+    <Modal titulo={`Gasto menor — ${gasto.ncf ?? new Date(gasto.fecha).toLocaleDateString('es-DO')}`} onClose={onClose}>
+      {!data ? (
+        <p className="text-sm text-slate-400">Cargando…</p>
+      ) : (
+        <div className="space-y-4">
+          <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm dark:bg-slate-800/60">
+            <p>
+              Cuenta bancaria: <span className="font-medium">{data.cuentaBancaria.banco} — {data.cuentaBancaria.numeroCuenta}</span>
+            </p>
+            <p className="text-slate-500 dark:text-slate-400">Fecha: {new Date(data.fecha).toLocaleDateString('es-DO')}</p>
+            {data.notas && <p className="text-slate-500 dark:text-slate-400">Notas: {data.notas}</p>}
+          </div>
+
+          <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-slate-50 text-slate-500 dark:bg-slate-900/60 dark:text-slate-400">
+                <tr>
+                  <th className="px-3 py-2">Cuenta contable</th>
+                  <th className="px-3 py-2">Concepto</th>
+                  <th className="px-3 py-2">Cant.</th>
+                  <th className="px-3 py-2">Valor</th>
+                  <th className="px-3 py-2">ITBIS</th>
+                  <th className="px-3 py-2">Total</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                {data.lineas.map((linea) => (
+                  <tr key={linea.id}>
+                    <td className="px-3 py-2">
+                      {linea.cuentaContable.codigo} — {linea.cuentaContable.nombre}
+                    </td>
+                    <td className="px-3 py-2">{linea.concepto ?? '—'}</td>
+                    <td className="px-3 py-2">{Number(linea.cantidad)}</td>
+                    <td className="px-3 py-2">RD$ {Number(linea.valor).toLocaleString('es-DO')}</td>
+                    <td className="px-3 py-2">RD$ {Number(linea.montoItbis).toLocaleString('es-DO')}</td>
+                    <td className="px-3 py-2">RD$ {Number(linea.montoTotal).toLocaleString('es-DO')}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="flex justify-end text-sm font-medium text-slate-900 dark:text-slate-100">
+            Total: RD$ {Number(data.total).toLocaleString('es-DO')}
+          </div>
+        </div>
+      )}
+    </Modal>
   );
 }
 

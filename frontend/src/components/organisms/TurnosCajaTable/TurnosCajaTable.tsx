@@ -5,7 +5,9 @@ import { Badge } from '../../atoms/Badge/Badge';
 import { Button } from '../../atoms/Button/Button';
 import { FormField } from '../../molecules/FormField/FormField';
 import { Paginacion } from '../../molecules/Paginacion/Paginacion';
+import { SearchInput } from '../../molecules/SearchInput/SearchInput';
 import { useAuth } from '../../../hooks/useAuth';
+import { useDebouncedValue } from '../../../hooks/useDebouncedValue';
 import { PaginaResultado } from '../../../types/pagina-resultado';
 
 interface Bodega {
@@ -46,6 +48,8 @@ export function TurnosCajaTable({ seleccionadoId, onSeleccionar }: TurnosCajaTab
   const [filtroEstado, setFiltroEstado] = useState('');
   const [filtroDesde, setFiltroDesde] = useState('');
   const [filtroHasta, setFiltroHasta] = useState('');
+  const [busqueda, setBusqueda] = useState('');
+  const busquedaDebounced = useDebouncedValue(busqueda);
 
   const { data: bodegas } = useQuery({
     queryKey: ['inventario-bodegas'],
@@ -58,7 +62,7 @@ export function TurnosCajaTable({ seleccionadoId, onSeleccionar }: TurnosCajaTab
   });
 
   const { data, isLoading, error: errorCarga } = useQuery({
-    queryKey: ['pos-turnos', pagina, filtroCajeroId, filtroEstado, filtroDesde, filtroHasta],
+    queryKey: ['pos-turnos', pagina, filtroCajeroId, filtroEstado, filtroDesde, filtroHasta, busquedaDebounced],
     queryFn: async () =>
       (
         await apiClient.get<PaginaResultado<TurnoCaja>>('/pos/turnos', {
@@ -68,6 +72,7 @@ export function TurnosCajaTable({ seleccionadoId, onSeleccionar }: TurnosCajaTab
             estado: filtroEstado || undefined,
             desde: filtroDesde || undefined,
             hasta: filtroHasta || undefined,
+            busqueda: busquedaDebounced || undefined,
           },
         })
       ).data,
@@ -167,6 +172,17 @@ export function TurnosCajaTable({ seleccionadoId, onSeleccionar }: TurnosCajaTab
         </div>
         <FormField id="turnos-filtro-desde" label="Desde" type="date" value={filtroDesde} onChange={(e) => { setFiltroDesde(e.target.value); setPagina(1); }} className="w-36" />
         <FormField id="turnos-filtro-hasta" label="Hasta" type="date" value={filtroHasta} onChange={(e) => { setFiltroHasta(e.target.value); setPagina(1); }} className="w-36" />
+        <div>
+          <label className="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">Buscar cajero</label>
+          <SearchInput
+            value={busqueda}
+            onChange={(v) => {
+              setBusqueda(v);
+              setPagina(1);
+            }}
+            placeholder="Nombre del cajero…"
+          />
+        </div>
       </div>
 
       {isLoading && <p className="text-sm text-slate-500">Cargando turnos…</p>}

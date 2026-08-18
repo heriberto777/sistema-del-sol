@@ -16,8 +16,25 @@ const SELECT_ADMIN = {
 export class PlatformAdminsRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  listar() {
-    return this.prisma.platformAdmin.findMany({ select: SELECT_ADMIN, orderBy: { createdAt: 'desc' } });
+  listar(params: { skip: number; take: number; busqueda?: string }) {
+    const where = params.busqueda
+      ? {
+          OR: [
+            { nombre: { contains: params.busqueda, mode: 'insensitive' as const } },
+            { email: { contains: params.busqueda, mode: 'insensitive' as const } },
+          ],
+        }
+      : {};
+    return Promise.all([
+      this.prisma.platformAdmin.findMany({
+        where,
+        select: SELECT_ADMIN,
+        orderBy: { createdAt: 'desc' },
+        skip: params.skip,
+        take: params.take,
+      }),
+      this.prisma.platformAdmin.count({ where }),
+    ]);
   }
 
   crear(params: { email: string; passwordHash: string; nombre: string; roleId?: string }) {

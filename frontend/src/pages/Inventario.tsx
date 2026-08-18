@@ -9,6 +9,9 @@ import { FormField } from '../components/molecules/FormField/FormField';
 import { Modal } from '../components/molecules/Modal/Modal';
 import { EstadoVacio } from '../components/molecules/EstadoVacio/EstadoVacio';
 import { RequierePermiso } from '../components/organisms/RequierePermiso/RequierePermiso';
+import { SearchInput } from '../components/molecules/SearchInput/SearchInput';
+import { Paginacion } from '../components/molecules/Paginacion/Paginacion';
+import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { PaginaResultado } from '../types/pagina-resultado';
 import { FORMATOS_IMPRESION, FormatoImpresion } from '../constants/formato-impresion';
 
@@ -40,6 +43,9 @@ export function Inventario() {
   const [modalAjustar, setModalAjustar] = useState(false);
   const [modalTransferir, setModalTransferir] = useState(false);
   const [bodegaEditandoFormato, setBodegaEditandoFormato] = useState<Bodega | null>(null);
+  const [busquedaStock, setBusquedaStock] = useState('');
+  const [paginaStock, setPaginaStock] = useState(1);
+  const busquedaStockDebounced = useDebouncedValue(busquedaStock);
 
   useEffect(() => {
     if (searchParams.get('crear') === '1') {
@@ -55,12 +61,23 @@ export function Inventario() {
   });
 
   const { data: stock } = useQuery({
-    queryKey: ['stock', bodegaSeleccionadaId],
+    queryKey: ['stock', bodegaSeleccionadaId, paginaStock, busquedaStockDebounced],
     enabled: !!bodegaSeleccionadaId,
-    queryFn: async () => (await apiClient.get<Stock[]>(`/inventario/stock/${bodegaSeleccionadaId}`)).data,
+    queryFn: async () =>
+      (
+        await apiClient.get<PaginaResultado<Stock>>(`/inventario/stock/${bodegaSeleccionadaId}`, {
+          params: { pagina: paginaStock, busqueda: busquedaStockDebounced || undefined },
+        })
+      ).data,
   });
 
   const bodegaSeleccionada = bodegas?.find((b) => b.id === bodegaSeleccionadaId) ?? null;
+
+  function seleccionarBodega(id: string) {
+    setBodegaSeleccionadaId(id);
+    setPaginaStock(1);
+    setBusquedaStock('');
+  }
 
   return (
     <div className="space-y-4">
@@ -86,8 +103,8 @@ export function Inventario() {
                 key={bodega.id}
                 role="button"
                 tabIndex={0}
-                onClick={() => setBodegaSeleccionadaId(bodega.id)}
-                onKeyDown={(e) => e.key === 'Enter' && setBodegaSeleccionadaId(bodega.id)}
+                onClick={() => seleccionarBodega(bodega.id)}
+                onKeyDown={(e) => e.key === 'Enter' && seleccionarBodega(bodega.id)}
                 className={clsx(
                   'rounded-lg border p-4 text-left transition-colors',
                   bodega.id === bodegaSeleccionadaId
@@ -136,6 +153,14 @@ export function Inventario() {
                 </RequierePermiso>
               </div>
             </div>
+            <SearchInput
+              value={busquedaStock}
+              onChange={(v) => {
+                setBusquedaStock(v);
+                setPaginaStock(1);
+              }}
+              placeholder="Buscar por código o nombre de producto…"
+            />
             <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800">
               <table className="w-full text-left text-sm">
                 <thead className="bg-slate-50 text-slate-500 dark:bg-slate-900 dark:text-slate-400">
@@ -148,7 +173,7 @@ export function Inventario() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {stock?.map((linea) => (
+                  {stock?.datos.map((linea) => (
                     <tr key={linea.productoId}>
                       <td className="px-4 py-2">
                         {linea.producto.codigo} — {linea.producto.nombre}
@@ -159,7 +184,7 @@ export function Inventario() {
                       <td className="px-4 py-2">{Number(linea.stockMinimo)}</td>
                     </tr>
                   ))}
-                  {stock?.length === 0 && (
+                  {stock?.datos.length === 0 && (
                     <tr>
                       <td colSpan={5} className="px-4 py-6 text-center text-slate-400">
                         Esta bodega no tiene stock registrado todavía.
@@ -169,6 +194,9 @@ export function Inventario() {
                 </tbody>
               </table>
             </div>
+            {stock && (
+              <Paginacion pagina={stock.pagina} tamanoPagina={stock.tamanoPagina} total={stock.total} onCambiarPagina={setPaginaStock} />
+            )}
           </div>
         )}
       </RequierePermiso>

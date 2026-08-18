@@ -42,10 +42,11 @@ export class PeriodosNominaRepository {
     return this.db.periodoNomina.findUniqueOrThrow({ where: { id }, include: INCLUDE_PERIODO });
   }
 
-  listar(params: { skip: number; take: number }) {
+  listar(params: { skip: number; take: number; estado?: EstadoPeriodoNomina }) {
+    const where = params.estado ? { estado: params.estado } : {};
     return Promise.all([
-      this.db.periodoNomina.findMany({ orderBy: { fechaInicio: 'desc' }, skip: params.skip, take: params.take }),
-      this.db.periodoNomina.count(),
+      this.db.periodoNomina.findMany({ where, orderBy: { fechaInicio: 'desc' }, skip: params.skip, take: params.take }),
+      this.db.periodoNomina.count({ where }),
     ]);
   }
 

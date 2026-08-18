@@ -6,7 +6,7 @@ import { calcularRecibo } from './calculo-nomina';
 import { EventBusService } from '../event-bus/event-bus.service';
 import { EVENTOS } from '../event-bus/events';
 import { paginar } from '../common/types/pagina-resultado';
-import { ListadoQueryDto } from '../common/dto/listado-query.dto';
+import { ListarPeriodosNominaQueryDto } from './dto/listar-periodos-nomina-query.dto';
 
 @Injectable()
 export class PeriodosNominaService {
@@ -42,9 +42,9 @@ export class PeriodosNominaService {
     return this.periodosRepository.buscarPorId(id);
   }
 
-  async listar(query: ListadoQueryDto) {
+  async listar(query: ListarPeriodosNominaQueryDto) {
     const { pagina, tamanoPagina, skip, take } = paginar(query.pagina, query.tamanoPagina);
-    const [datos, total] = await this.periodosRepository.listar({ skip, take });
+    const [datos, total] = await this.periodosRepository.listar({ skip, take, estado: query.estado });
     return { datos, total, pagina, tamanoPagina };
   }
 

@@ -7,7 +7,11 @@ import { Badge } from '../components/atoms/Badge/Badge';
 import { Card } from '../components/atoms/Card/Card';
 import { Select } from '../components/atoms/Select/Select';
 import { PlatformHeader } from '../components/organisms/PlatformHeader/PlatformHeader';
+import { SearchInput } from '../components/molecules/SearchInput/SearchInput';
+import { Paginacion } from '../components/molecules/Paginacion/Paginacion';
+import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { usePlatformAuth } from '../hooks/usePlatformAuth';
+import { PaginaResultado } from '../types/pagina-resultado';
 
 interface PlatformRole {
   id: string;
@@ -33,10 +37,18 @@ export function PlatformAdmins() {
   const [nombre, setNombre] = useState('');
   const [roleId, setRoleId] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [busqueda, setBusqueda] = useState('');
+  const [pagina, setPagina] = useState(1);
+  const busquedaDebounced = useDebouncedValue(busqueda);
 
   const { data: admins } = useQuery({
-    queryKey: ['platform-admins'],
-    queryFn: async () => (await platformApiClient.get<PlatformAdminRow[]>('/platform/admins')).data,
+    queryKey: ['platform-admins', pagina, busquedaDebounced],
+    queryFn: async () =>
+      (
+        await platformApiClient.get<PaginaResultado<PlatformAdminRow>>('/platform/admins', {
+          params: { pagina, busqueda: busquedaDebounced || undefined },
+        })
+      ).data,
   });
 
   const { data: roles } = useQuery({
@@ -131,7 +143,17 @@ export function PlatformAdmins() {
           className={puedeGestionar ? 'lg:col-span-2' : 'lg:col-span-3'}
           sinPadding
           titulo="Admins de plataforma"
-          descripcion={admins ? `${admins.length} admin(s) registrados` : undefined}
+          descripcion={admins ? `${admins.total} admin(s) registrados` : undefined}
+          acciones={
+            <SearchInput
+              value={busqueda}
+              onChange={(v) => {
+                setBusqueda(v);
+                setPagina(1);
+              }}
+              placeholder="Buscar por nombre o email…"
+            />
+          }
         >
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
@@ -145,7 +167,7 @@ export function PlatformAdmins() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {admins?.map((fila) => {
+                {admins?.datos.map((fila) => {
                   const esUnoMismo = fila.id === admin?.id;
                   return (
                     <tr key={fila.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
@@ -199,6 +221,11 @@ export function PlatformAdmins() {
               </tbody>
             </table>
           </div>
+          {admins && (
+            <div className="px-5 py-3">
+              <Paginacion pagina={admins.pagina} tamanoPagina={admins.tamanoPagina} total={admins.total} onCambiarPagina={setPagina} />
+            </div>
+          )}
         </Card>
       </div>
     </div>

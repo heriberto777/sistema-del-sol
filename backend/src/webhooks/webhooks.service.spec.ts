@@ -137,21 +137,21 @@ describe('WebhooksService — listarEntregas', () => {
     service = new WebhooksService(repository);
   });
 
-  it('valida que el webhook pertenezca al tenant antes de listar sus entregas', async () => {
+  it('valida que el webhook pertenezca al tenant antes de listar sus entregas, y pagina', async () => {
     repository.buscarPorId.mockResolvedValue({ id: 'w1' } as never);
-    repository.listarEntregas.mockResolvedValue([{ id: 'd1' }] as never);
+    repository.listarEntregas.mockResolvedValue([[{ id: 'd1' }], 1] as never);
 
-    const resultado = await service.listarEntregas('w1');
+    const resultado = await service.listarEntregas('w1', { pagina: 2, tamanoPagina: 10 });
 
     expect(repository.buscarPorId).toHaveBeenCalledWith('w1');
-    expect(repository.listarEntregas).toHaveBeenCalledWith('w1');
-    expect(resultado).toEqual([{ id: 'd1' }]);
+    expect(repository.listarEntregas).toHaveBeenCalledWith('w1', { skip: 10, take: 10 });
+    expect(resultado).toEqual({ datos: [{ id: 'd1' }], total: 1, pagina: 2, tamanoPagina: 10 });
   });
 
   it('propaga el error si el webhook no existe/no pertenece al tenant (404 vía findUniqueOrThrow)', async () => {
     repository.buscarPorId.mockRejectedValue(new Error('no encontrado'));
 
-    await expect(service.listarEntregas('w1')).rejects.toThrow('no encontrado');
+    await expect(service.listarEntregas('w1', {})).rejects.toThrow('no encontrado');
     expect(repository.listarEntregas).not.toHaveBeenCalled();
   });
 });

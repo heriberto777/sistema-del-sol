@@ -29,13 +29,22 @@ export class PosRepository {
     return this.db.turnoCaja.findUniqueOrThrow({ where: { id }, include: INCLUDE_TURNO });
   }
 
-  listar(params: { skip: number; take: number; cajeroId?: string; estado?: EstadoTurnoCaja; desde?: Date; hasta?: Date }) {
+  listar(params: {
+    skip: number;
+    take: number;
+    cajeroId?: string;
+    estado?: EstadoTurnoCaja;
+    desde?: Date;
+    hasta?: Date;
+    busqueda?: string;
+  }) {
     const where = {
       ...(params.cajeroId && { cajeroId: params.cajeroId }),
       ...(params.estado && { estado: params.estado }),
       ...((params.desde || params.hasta) && {
         abiertoEn: { ...(params.desde && { gte: params.desde }), ...(params.hasta && { lte: params.hasta }) },
       }),
+      ...(params.busqueda && { cajero: { nombre: { contains: params.busqueda, mode: 'insensitive' as const } } }),
     };
     return Promise.all([
       this.db.turnoCaja.findMany({ where, orderBy: { abiertoEn: 'desc' }, skip: params.skip, take: params.take, include: INCLUDE_TURNO }),

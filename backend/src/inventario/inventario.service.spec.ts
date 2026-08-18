@@ -118,8 +118,17 @@ describe('InventarioService', () => {
     it('listarStockPorBodega rechaza si la bodega no pertenece al tenant actual', async () => {
       repository.buscarBodegaPorId.mockRejectedValue(new Error('No encontrado'));
 
-      await expect(service.listarStockPorBodega('ajena')).rejects.toThrow('No encontrado');
+      await expect(service.listarStockPorBodega('ajena', {})).rejects.toThrow('No encontrado');
       expect(repository.listarStockPorBodega).not.toHaveBeenCalled();
+    });
+
+    it('listarStockPorBodega pagina y pasa la búsqueda al repositorio', async () => {
+      repository.listarStockPorBodega.mockResolvedValue([[{ id: 's1' }], 1] as never);
+
+      const resultado = await service.listarStockPorBodega('b1', { pagina: 2, tamanoPagina: 10, busqueda: 'martillo' });
+
+      expect(repository.listarStockPorBodega).toHaveBeenCalledWith('b1', { skip: 10, take: 10, busqueda: 'martillo' });
+      expect(resultado).toEqual({ datos: [{ id: 's1' }], total: 1, pagina: 2, tamanoPagina: 10 });
     });
 
     it('transferirStock valida las dos bodegas (origen y destino) y el producto', async () => {

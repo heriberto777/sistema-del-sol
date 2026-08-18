@@ -4,6 +4,8 @@ import { InventarioRepository } from './inventario.repository';
 import { ProductosService } from '../productos/productos.service';
 import { EventBusService } from '../event-bus/event-bus.service';
 import { EVENTOS } from '../event-bus/events';
+import { ListadoQueryDto } from '../common/dto/listado-query.dto';
+import { paginar } from '../common/types/pagina-resultado';
 
 @Injectable()
 export class InventarioService {
@@ -223,9 +225,11 @@ export class InventarioService {
     return this.inventarioRepository.transferir(params);
   }
 
-  async listarStockPorBodega(bodegaId: string) {
+  async listarStockPorBodega(bodegaId: string, query: ListadoQueryDto) {
     await this.validarPertenencia({ bodegaId });
-    return this.inventarioRepository.listarStockPorBodega(bodegaId);
+    const { pagina, tamanoPagina, skip, take } = paginar(query.pagina, query.tamanoPagina);
+    const [datos, total] = await this.inventarioRepository.listarStockPorBodega(bodegaId, { skip, take, busqueda: query.busqueda });
+    return { datos, total, pagina, tamanoPagina };
   }
 
   listarBodegas() {

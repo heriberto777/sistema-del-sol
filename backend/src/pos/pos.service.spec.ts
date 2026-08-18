@@ -26,6 +26,19 @@ describe('PosService', () => {
     service = new PosService(posRepository, facturacionService, configuracionesService);
   });
 
+  describe('listar', () => {
+    it('pasa la búsqueda al repositorio junto al resto de filtros', async () => {
+      posRepository.listar.mockResolvedValue([[{ id: 't1' }], 1] as never);
+
+      const resultado = await service.listar({ pagina: 1, tamanoPagina: 20, busqueda: 'María' });
+
+      expect(posRepository.listar).toHaveBeenCalledWith(
+        expect.objectContaining({ skip: 0, take: 20, busqueda: 'María' }),
+      );
+      expect(resultado).toEqual({ datos: [{ id: 't1' }], total: 1, pagina: 1, tamanoPagina: 20 });
+    });
+  });
+
   describe('abrirTurno', () => {
     it('rechaza abrir un turno si la bodega ya tiene uno abierto', async () => {
       posRepository.buscarTurnoAbierto.mockResolvedValue({ id: 't1' } as never);

@@ -54,8 +54,30 @@ export class InventarioRepository {
     return this.db.stock.findUnique({ where: { productoId_bodegaId: { productoId, bodegaId } } });
   }
 
-  listarStockPorBodega(bodegaId: string) {
-    return this.db.stock.findMany({ where: { bodegaId }, include: { producto: true } });
+  listarStockPorBodega(bodegaId: string, params: { skip: number; take: number; busqueda?: string }) {
+    const where = {
+      bodegaId,
+      ...(params.busqueda
+        ? {
+            producto: {
+              OR: [
+                { nombre: { contains: params.busqueda, mode: 'insensitive' as const } },
+                { codigo: { contains: params.busqueda, mode: 'insensitive' as const } },
+              ],
+            },
+          }
+        : {}),
+    };
+    return Promise.all([
+      this.db.stock.findMany({
+        where,
+        include: { producto: true },
+        orderBy: { producto: { nombre: 'asc' } },
+        skip: params.skip,
+        take: params.take,
+      }),
+      this.db.stock.count({ where }),
+    ]);
   }
 
   /**
