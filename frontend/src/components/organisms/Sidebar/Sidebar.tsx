@@ -30,6 +30,9 @@ const GRUPOS: Grupo[] = [
       { ruta: '/cotizaciones', etiqueta: 'Cotizaciones', permisos: ['cotizaciones.ver'], modulo: 'cotizaciones' },
       { ruta: '/remisiones', etiqueta: 'Remisiones', permisos: ['remisiones.ver'], modulo: 'remisiones' },
       { ruta: '/pos', etiqueta: 'Punto de venta', permisos: ['pos.ver'], modulo: 'pos' },
+      // Sirve tanto a Ventas (clientes) como a Compras (proveedores) —
+      // se prioriza acá por ser el uso más frecuente.
+      { ruta: '/contactos', etiqueta: 'Contactos', permisos: ['clientes.ver', 'compras.ver'] },
     ],
   },
   {
@@ -39,7 +42,6 @@ const GRUPOS: Grupo[] = [
       { ruta: '/inventario', etiqueta: 'Inventario', permisos: ['inventario.ver'], modulo: 'inventario' },
       { ruta: '/compras', etiqueta: 'Compras', permisos: ['compras.ver'], modulo: 'compras' },
       { ruta: '/productos', etiqueta: 'Productos', permisos: ['precios.ver'], modulo: 'productos' },
-      { ruta: '/bancos', etiqueta: 'Bancos', permisos: ['bancos.ver'], modulo: 'bancos' },
       { ruta: '/gastos-menores', etiqueta: 'Gastos menores', permisos: ['gastosmenores.ver'], modulo: 'gastosmenores' },
     ],
   },
@@ -48,9 +50,14 @@ const GRUPOS: Grupo[] = [
     etiqueta: 'Finanzas',
     items: [
       { ruta: '/contabilidad', etiqueta: 'Contabilidad', permisos: ['contabilidad.ver'] },
-      { ruta: '/nomina', etiqueta: 'Nómina', permisos: ['nomina.ver'], modulo: 'nomina' },
+      { ruta: '/bancos', etiqueta: 'Bancos', permisos: ['bancos.ver'], modulo: 'bancos' },
       { ruta: '/reportes', etiqueta: 'Reportes', permisos: ['reportes.ver'] },
     ],
+  },
+  {
+    id: 'gestion-humana',
+    etiqueta: 'Gestión Humana',
+    items: [{ ruta: '/nomina', etiqueta: 'Nómina', permisos: ['nomina.ver'], modulo: 'nomina' }],
   },
   {
     id: 'sistema',
@@ -62,10 +69,6 @@ const GRUPOS: Grupo[] = [
     ],
   },
 ];
-
-// Sirve tanto a Ventas (clientes) como a Compras (proveedores) — no encaja
-// limpio en ningún grupo, se deja suelto debajo de todos.
-const SUELTOS_ABAJO: Enlace[] = [{ ruta: '/contactos', etiqueta: 'Contactos', permisos: ['clientes.ver', 'compras.ver'] }];
 
 function esVisible(
   enlace: Enlace,
@@ -155,12 +158,6 @@ export function Sidebar() {
           </div>
         );
       })}
-
-      {SUELTOS_ABAJO.filter((enlace) => esVisible(enlace, tienePermiso, tieneModulo)).map((enlace) => (
-        <NavLink key={enlace.ruta} to={enlace.ruta} className={enlaceClase}>
-          {enlace.etiqueta}
-        </NavLink>
-      ))}
     </nav>
   );
 }
