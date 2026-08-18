@@ -242,6 +242,15 @@ vencimiento); no se puede anular si ya tiene pagos o si ya está
 automática — correr `pnpm --filter ./backend suscripciones:backfill`
 una vez.
 
+`POST /platform/facturas` (`platform.facturacion.gestionar`) crea un
+cargo puntual fuera del ciclo, con **líneas múltiples**
+(`FacturaPlataformaLinea`, hijo con `onDelete: Cascade`) —
+retrocompatible: `concepto`/`monto`/`total` siguen siendo el agregado
+para toda factura, `generarDesdeSuscripcion()` (cron + "generar factura
+ahora") sigue creando con `lineas: []` sin ningún cambio. Editar líneas
+de una factura ya creada queda fuera de alcance — se anula y se
+recrea, igual criterio que notas de crédito/débito.
+
 **Pasarela de pago** (`backend/src/facturacion-plataforma/pasarela/`):
 el admin del tenant paga en línea desde un link público (sin
 autenticación) que llega en el email de la factura —
@@ -296,6 +305,15 @@ ahora solo guarda el dato de conexión — no dispara nada todavía.
   BORRADOR → PROCESADO → PAGADO, el paso a PAGADO dispara el asiento.
 - **POS**: capa delgada sobre Facturación (turno de caja + llamada a
   `FacturacionService.crear()`), sin modo offline.
+- **Impresión multi-formato** (`GET /:id/imprimir` en Facturación/
+  Cotizaciones/Remisiones — sibling de los `/pdf` existentes, que
+  quedan intactos): resuelve `FormatoImpresion` (`CARTA`/`A4`/
+  `TERMICA_80MM`/`TERMICA_58MM` — override de `Bodega` > default de
+  tenant en `Configuracion.FORMATO_IMPRESION_DEFAULT` > `'CARTA'`) y
+  devuelve PDF o un HTML angosto con `window.print()` para el térmico
+  (diálogo de impresión del navegador — sin ESC/POS crudo ni agente
+  local). El POS no tiene endpoint propio: una venta de POS ya es una
+  `Factura`, se imprime contra el mismo endpoint de Facturación.
 - **Reportes fiscales DGII (606/607/608)**: layout exacto no verificado
   byte a byte contra la herramienta oficial — validar antes de producción.
 - **IA** (`backend/src/ia/`): degrada a heurística sin

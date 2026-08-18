@@ -7,7 +7,11 @@ import { ListadoQueryDto } from '../common/dto/listado-query.dto';
 import { paginar } from '../common/types/pagina-resultado';
 import { EventBusService } from '../event-bus/event-bus.service';
 import { EVENTOS } from '../event-bus/events';
-import { generarDocumentoPdf } from '../common/pdf/documento-pdf';
+import { DocumentoPdfParams, generarDocumentoPdf } from '../common/pdf/documento-pdf';
+import { generarDocumentoTicketHtml } from '../common/pdf/documento-ticket';
+import { resolverFormatoImpresion } from '../common/impresion/resolver-formato-impresion';
+import { PrismaService } from '../prisma/prisma.service';
+import { FormatoImpresion } from '@prisma/client';
 
 /** Una cotización vigente cuya fecha de validez ya pasó se muestra como vencida sin necesidad de un job que la actualice. */
 function marcarVencidaSiAplica<T extends { estado: string; fechaVigenciaHasta: Date }>(cotizacion: T): T {
@@ -23,6 +27,7 @@ export class CotizacionesService {
     private readonly cotizacionesRepository: CotizacionesRepository,
     private readonly facturacionService: FacturacionService,
     private readonly eventBus: EventBusService,
+    private readonly prisma: PrismaService,
   ) {}
 
   private async calcularLineas(lineas: CrearCotizacionDto['lineas']) {
@@ -122,9 +127,8 @@ export class CotizacionesService {
     return actualizada;
   }
 
-  async generarPdf(id: string) {
-    const cotizacion = await this.cotizacionesRepository.buscarPorId(id);
-    return generarDocumentoPdf({
+  private mapearCotizacionAParams(cotizacion: Awaited<ReturnType<CotizacionesRepository['buscarPorId']>>): DocumentoPdfParams {
+    return {
       tipoDocumento: 'Cotización',
       numero: cotizacion.numero,
       fecha: cotizacion.createdAt,
@@ -139,7 +143,26 @@ export class CotizacionesService {
       descuento: Number(cotizacion.descuento),
       itbis: Number(cotizacion.itbis),
       total: Number(cotizacion.total),
-    });
+    };
+  }
+
+  /** @deprecated usar generarImpreso — se mantiene por compatibilidad de la ruta /pdf ya existente. */
+  async generarPdf(id: string) {
+    const cotizacion = await this.cotizacionesRepository.buscarPorId(id);
+    return generarDocumentoPdf(this.mapearCotizacionAParams(cotizacion));
+  }
+
+  /** Cotización no tiene bodegaId (no toca stock hasta convertirse en factura) — solo aplica el default de tenant. */
+  async generarImpreso(id: string, formatoSolicitado: FormatoImpresion | undefined, tenantId: string) {
+    const cotizacion = await this.cotizacionesRepository.buscarPorId(id);
+    const formato = formatoSolicitado ?? (await resolverFormatoImpresion(this.prisma, tenantId, null));
+    const params = this.mapearCotizacionAParams(cotizacion);
+
+    if (formato === 'TERMICA_80MM' || formato === 'TERMICA_58MM') {
+      return { buffer: Buffer.from(generarDocumentoTicketHtml(params, formato), 'utf-8'), contentType: 'text/html; charset=utf-8' };
+    }
+    const buffer = await generarDocumentoPdf(params, { tamanoPagina: formato === 'A4' ? 'a4' : 'letter' });
+    return { buffer, contentType: 'application/pdf' };
   }
 
   async convertirEnFactura(id: string, dto: ConvertirCotizacionDto, tenantId: string, vendedorId: string) {

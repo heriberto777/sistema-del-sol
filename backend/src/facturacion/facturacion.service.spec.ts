@@ -7,6 +7,7 @@ import { EventBusService } from '../event-bus/event-bus.service';
 import { EVENTOS } from '../event-bus/events';
 import { CrearFacturaDto } from './dto/crear-factura.dto';
 import { PagosService } from '../pagos/pagos.service';
+import { PrismaService } from '../prisma/prisma.service';
 
 describe('FacturacionService', () => {
   let service: FacturacionService;
@@ -15,6 +16,7 @@ describe('FacturacionService', () => {
   let tenantPrisma: { client: { $transaction: jest.Mock } };
   let eventBus: jest.Mocked<EventBusService>;
   let pagosService: jest.Mocked<PagosService>;
+  let prisma: jest.Mocked<PrismaService>;
 
   // Un tx opaco: crear()/anular() abren la transacción con tenantPrisma.client.$transaction
   // y pasan este objeto a los métodos *EnTx — para las pruebas basta con que sea el mismo
@@ -62,7 +64,18 @@ describe('FacturacionService', () => {
       listarPorFactura: jest.fn(),
       listarPorOrdenCompra: jest.fn(),
     } as unknown as jest.Mocked<PagosService>;
-    service = new FacturacionService(repository, inventarioService, tenantPrisma as unknown as TenantPrismaService, eventBus, pagosService);
+    prisma = {
+      bodega: { findFirst: jest.fn().mockResolvedValue(null) },
+      configuracion: { findUnique: jest.fn().mockResolvedValue(null) },
+    } as unknown as jest.Mocked<PrismaService>;
+    service = new FacturacionService(
+      repository,
+      inventarioService,
+      tenantPrisma as unknown as TenantPrismaService,
+      eventBus,
+      pagosService,
+      prisma,
+    );
   });
 
   function dto(overrides: Partial<CrearFacturaDto> = {}): CrearFacturaDto {

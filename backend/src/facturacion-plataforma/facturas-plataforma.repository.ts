@@ -41,7 +41,7 @@ export class FacturasPlataformaRepository {
   buscarPorId(id: string) {
     return this.prisma.facturaPlataforma.findUniqueOrThrow({
       where: { id },
-      include: { ...INCLUDE_FACTURA, suscripcion: { include: { plan: true } } },
+      include: { ...INCLUDE_FACTURA, suscripcion: { include: { plan: true } }, lineas: { orderBy: { orden: 'asc' } } },
     });
   }
 
@@ -53,8 +53,16 @@ export class FacturasPlataformaRepository {
     total: number;
     fechaEmision: Date;
     fechaVencimiento: Date;
+    lineas?: { concepto: string; monto: number }[];
   }) {
-    return this.prisma.facturaPlataforma.create({ data, include: INCLUDE_FACTURA });
+    const { lineas, ...resto } = data;
+    return this.prisma.facturaPlataforma.create({
+      data: {
+        ...resto,
+        ...(lineas ? { lineas: { create: lineas.map((l, i) => ({ concepto: l.concepto, monto: l.monto, orden: i })) } } : {}),
+      },
+      include: { ...INCLUDE_FACTURA, lineas: { orderBy: { orden: 'asc' } } },
+    });
   }
 
   actualizar(id: string, data: { concepto?: string; descuento?: number; montoMora?: number; total?: number; fechaVencimiento?: Date }) {

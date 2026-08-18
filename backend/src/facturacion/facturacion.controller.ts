@@ -10,6 +10,7 @@ import { RequiereModulo } from '../common/decorators/requiere-modulo.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtPayloadUser } from '../common/types/authenticated-request';
 import { ListadoQueryDto } from '../common/dto/listado-query.dto';
+import { ImprimirDocumentoQueryDto } from '../common/impresion/dto/imprimir-documento-query.dto';
 
 @ApiBearerAuth()
 @ApiTags('facturacion')
@@ -41,6 +42,19 @@ export class FacturacionController {
   async pdf(@Param('id') id: string, @Res() res: Response) {
     const buffer = await this.facturacionService.generarPdf(id);
     res.set({ 'Content-Type': 'application/pdf', 'Content-Disposition': 'inline; filename="factura.pdf"' });
+    res.send(buffer);
+  }
+
+  @Get(':id/imprimir')
+  @Permissions('facturacion.ver')
+  async imprimir(
+    @Param('id') id: string,
+    @Query() query: ImprimirDocumentoQueryDto,
+    @CurrentUser() user: JwtPayloadUser,
+    @Res() res: Response,
+  ) {
+    const { buffer, contentType } = await this.facturacionService.generarImpreso(id, query.formato, user.tenantId);
+    res.set({ 'Content-Type': contentType, 'Content-Disposition': 'inline; filename="factura"' });
     res.send(buffer);
   }
 

@@ -60,6 +60,7 @@ pasa ninguna de ellas.
 | PATCH | `/api/platform/tenants/:tenantId/suscripcion` | `platform.facturacion.gestionar` | `{ feeMoraPct?, estado?: 'ACTIVA'\|'CANCELADA' }` |
 | POST | `/api/platform/tenants/:tenantId/suscripcion/generar-factura` | `platform.facturacion.gestionar` | Genera una factura fuera de ciclo (misma lógica que el cron diario) |
 | GET | `/api/platform/facturas?pagina&tamanoPagina&tenantId&estado` | `platform.facturacion.ver` | Listado paginado de `FacturaPlataforma` de todos los tenants |
+| POST | `/api/platform/facturas` | `platform.facturacion.gestionar` | `{ tenantId, lineas: [{concepto, monto}], fechaVencimiento? }` — cargo puntual fuera del ciclo de suscripción, con líneas múltiples; 400 si el tenant no tiene `Suscripcion` |
 | GET | `/api/platform/facturas/:id` | `platform.facturacion.ver` | |
 | PATCH | `/api/platform/facturas/:id` | `platform.facturacion.gestionar` | `{ concepto?, descuento?, montoMora?, fechaVencimiento? }` — 400 si la factura ya está `PAGADA`/`ANULADA` |
 | POST | `/api/platform/facturas/:id/anular` | `platform.facturacion.gestionar` | 400 si ya está `PAGADA` o tiene pagos registrados |
@@ -93,6 +94,7 @@ pasa ninguna de ellas.
 | GET | `/api/facturas/:id` | `facturacion.ver` |
 | POST | `/api/facturas/:id/anular` | `facturacion.anular` — reversa el efecto de inventario (ver ARCHITECTURE.md); 400 si ya estaba anulada |
 | POST | `/api/facturas/:id/registrar-pago` | `facturacion.cobrar` — `{ fechaPago? }` (default: ahora); 400 si no está EMITIDA o ya estaba pagada |
+| GET | `/api/facturas/:id/imprimir?formato=CARTA\|A4\|TERMICA_80MM\|TERMICA_58MM` | `facturacion.ver` — sin `formato`, resuelve el default (override de bodega > default de tenant > CARTA, ver ARCHITECTURE.md); devuelve PDF o HTML según formato |
 
 ## Cotizaciones
 
@@ -103,6 +105,7 @@ pasa ninguna de ellas.
 | GET | `/api/cotizaciones/:id` | `cotizaciones.ver` |
 | PATCH | `/api/cotizaciones/:id/estado` | `cotizaciones.editar` — `{ estado: ENVIADA\|ACEPTADA\|RECHAZADA }` |
 | POST | `/api/cotizaciones/:id/convertir` | `cotizaciones.editar` — `{ bodegaId, tipoFactura: CONTADO\|CREDITO }`, crea la factura y marca la cotización convertida |
+| GET | `/api/cotizaciones/:id/imprimir?formato=...` | `cotizaciones.ver` — igual que en Facturación; sin bodega propia, solo aplica el default de tenant |
 
 ## Remisiones
 
@@ -113,6 +116,7 @@ pasa ninguna de ellas.
 | GET | `/api/remisiones/:id` | `remisiones.ver` |
 | PATCH | `/api/remisiones/:id/estado` | `remisiones.editar` — `{ estado: ENTREGADA\|ANULADA }` |
 | POST | `/api/remisiones/:id/convertir` | `remisiones.editar` — `{ tipoFactura: CONTADO\|CREDITO }`, recién aquí descuenta inventario |
+| GET | `/api/remisiones/:id/imprimir?formato=...` | `remisiones.ver` — igual que en Facturación |
 
 ## Productos
 
@@ -128,6 +132,7 @@ pasa ninguna de ellas.
 |---|---|---|
 | GET | `/api/inventario/bodegas` | `inventario.ver` |
 | POST | `/api/inventario/bodegas` | `admin.configuracion` |
+| PATCH | `/api/inventario/bodegas/:id` | `admin.configuracion` — solo `{ formatoImpresion? }` (`null` quita el override, hereda el default del tenant) |
 | GET | `/api/inventario/stock/:bodegaId` | `inventario.ver` |
 | POST | `/api/inventario/ajustar` | `inventario.ajustar` |
 | POST | `/api/inventario/transferir` | `inventario.transferir` |

@@ -291,8 +291,27 @@ model FacturaPlataforma {
   updatedAt        DateTime                @updatedAt
 
   pagos PagoPlataforma[]
+  lineas FacturaPlataformaLinea[]
 
   @@map("facturas_plataforma")
+}
+
+// Desglose opcional de una FacturaPlataforma: vacío en las generadas
+// automáticamente por el ciclo de suscripción (que siguen usando solo
+// concepto/monto/total como agregado); solo lo llenan las facturas
+// manuales creadas con líneas múltiples (ver FacturasPlataformaService.crearManual).
+model FacturaPlataformaLinea {
+  id                  String            @id @default(uuid())
+  facturaPlataformaId String
+  facturaPlataforma   FacturaPlataforma @relation(fields: [facturaPlataformaId], references: [id], onDelete: Cascade)
+  concepto            String
+  monto               Decimal           @db.Decimal(14, 2)
+  // Sin esto el orden no está garantizado: los inserts corren en la
+  // misma transacción del nested-create y comparten el mismo now().
+  orden               Int               @default(0)
+  createdAt           DateTime          @default(now())
+
+  @@map("facturas_plataforma_lineas")
 }
 
 // Reutiliza el enum MetodoPago (ver más abajo, ya usado por Pago de
@@ -1004,6 +1023,13 @@ enum MetodoPago {
   TRANSFERENCIA
 }
 
+enum FormatoImpresion {
+  CARTA
+  A4
+  TERMICA_80MM
+  TERMICA_58MM
+}
+
 enum EstadoTurnoCaja {
   ABIERTO
   CERRADO
@@ -1148,6 +1174,9 @@ model Bodega {
   nombre    String
   direccion String?
   activa    Boolean  @default(true)
+  // null = hereda el default de Configuracion[FORMATO_IMPRESION_DEFAULT]
+  // del tenant (ver resolver-formato-impresion.ts).
+  formatoImpresion FormatoImpresion?
 
   stock        Stock[]
   movimientos  MovimientoInventario[]

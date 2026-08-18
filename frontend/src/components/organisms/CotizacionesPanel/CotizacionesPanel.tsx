@@ -1,7 +1,7 @@
 import { FormEvent, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../../lib/api-client';
-import { abrirBlob } from '../../../lib/descargar-archivo';
+import { ModalImprimir } from '../../molecules/ModalImprimir/ModalImprimir';
 import { FormField } from '../../molecules/FormField/FormField';
 import { Modal } from '../../molecules/Modal/Modal';
 import { RowActionsMenu } from '../../molecules/RowActionsMenu/RowActionsMenu';
@@ -75,11 +75,7 @@ export function CotizacionesPanel() {
 
   const [cotizacionEditando, setCotizacionEditando] = useState<Cotizacion | null>(null);
   const [cotizacionConvirtiendo, setCotizacionConvirtiendo] = useState<Cotizacion | null>(null);
-
-  async function verPdf(id: string) {
-    const respuesta = await apiClient.get(`/cotizaciones/${id}/pdf`, { responseType: 'blob' });
-    abrirBlob(respuesta.data);
-  }
+  const [cotizacionImprimiendo, setCotizacionImprimiendo] = useState<Cotizacion | null>(null);
 
   const { data: clientes } = useQuery({
     queryKey: ['clientes-select'],
@@ -243,7 +239,7 @@ export function CotizacionesPanel() {
           <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
             {data?.datos.map((cotizacion) => {
               const acciones = [
-                { etiqueta: 'Ver PDF', onClick: () => verPdf(cotizacion.id) },
+                { etiqueta: 'Imprimir', onClick: () => setCotizacionImprimiendo(cotizacion) },
                 ...(tienePermiso('cotizaciones.editar') && cotizacion.estado === 'BORRADOR'
                   ? [{ etiqueta: 'Editar', onClick: () => setCotizacionEditando(cotizacion) }]
                   : []),
@@ -292,6 +288,13 @@ export function CotizacionesPanel() {
       )}
       {cotizacionConvirtiendo && (
         <ModalConvertirCotizacion cotizacion={cotizacionConvirtiendo} onClose={() => setCotizacionConvirtiendo(null)} />
+      )}
+      {cotizacionImprimiendo && (
+        <ModalImprimir
+          urlBase={`/cotizaciones/${cotizacionImprimiendo.id}`}
+          titulo={`Imprimir — ${cotizacionImprimiendo.numero}`}
+          onClose={() => setCotizacionImprimiendo(null)}
+        />
       )}
     </div>
   );

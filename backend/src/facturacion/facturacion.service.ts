@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { MetodoPago, Prisma, TipoFactura, TipoNcf, TipoProducto } from '@prisma/client';
+import { FormatoImpresion, MetodoPago, Prisma, TipoFactura, TipoNcf, TipoProducto } from '@prisma/client';
 import { FacturacionRepository } from './facturacion.repository';
 import { InventarioService } from '../inventario/inventario.service';
 import { TenantPrismaService } from '../prisma/tenant-prisma.service';
@@ -10,7 +10,10 @@ import { CrearPagoDto } from '../pagos/dto/crear-pago.dto';
 import { PagosService } from '../pagos/pagos.service';
 import { ListadoQueryDto } from '../common/dto/listado-query.dto';
 import { paginar } from '../common/types/pagina-resultado';
-import { generarDocumentoPdf } from '../common/pdf/documento-pdf';
+import { DocumentoPdfParams, generarDocumentoPdf } from '../common/pdf/documento-pdf';
+import { generarDocumentoTicketHtml } from '../common/pdf/documento-ticket';
+import { resolverFormatoImpresion } from '../common/impresion/resolver-formato-impresion';
+import { PrismaService } from '../prisma/prisma.service';
 
 const NOMBRE_TIPO_FACTURA: Record<TipoFactura, string> = {
   CONTADO: 'Factura de venta',
@@ -68,6 +71,7 @@ export class FacturacionService {
     private readonly tenantPrisma: TenantPrismaService,
     private readonly eventBus: EventBusService,
     private readonly pagosService: PagosService,
+    private readonly prisma: PrismaService,
   ) {}
 
   /**
@@ -192,9 +196,8 @@ export class FacturacionService {
     return this.facturacionRepository.buscarPorId(id);
   }
 
-  async generarPdf(id: string) {
-    const factura = await this.facturacionRepository.buscarPorId(id);
-    return generarDocumentoPdf({
+  private mapearFacturaAParams(factura: Awaited<ReturnType<FacturacionRepository['buscarPorId']>>): DocumentoPdfParams {
+    return {
       tipoDocumento: NOMBRE_TIPO_FACTURA[factura.tipoFactura],
       numero: factura.ncf ?? factura.id,
       fecha: factura.fecha,
@@ -209,7 +212,25 @@ export class FacturacionService {
       descuento: Number(factura.descuento),
       itbis: Number(factura.itbis),
       total: Number(factura.total),
-    });
+    };
+  }
+
+  /** @deprecated usar generarImpreso — se mantiene por compatibilidad de la ruta /pdf ya existente. */
+  async generarPdf(id: string) {
+    const factura = await this.facturacionRepository.buscarPorId(id);
+    return generarDocumentoPdf(this.mapearFacturaAParams(factura));
+  }
+
+  async generarImpreso(id: string, formatoSolicitado: FormatoImpresion | undefined, tenantId: string) {
+    const factura = await this.facturacionRepository.buscarPorId(id);
+    const formato = formatoSolicitado ?? (await resolverFormatoImpresion(this.prisma, tenantId, factura.bodegaId));
+    const params = this.mapearFacturaAParams(factura);
+
+    if (formato === 'TERMICA_80MM' || formato === 'TERMICA_58MM') {
+      return { buffer: Buffer.from(generarDocumentoTicketHtml(params, formato), 'utf-8'), contentType: 'text/html; charset=utf-8' };
+    }
+    const buffer = await generarDocumentoPdf(params, { tamanoPagina: formato === 'A4' ? 'a4' : 'letter' });
+    return { buffer, contentType: 'application/pdf' };
   }
 
   async listar(query: ListadoQueryDto) {

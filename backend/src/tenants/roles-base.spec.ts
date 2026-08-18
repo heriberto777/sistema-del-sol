@@ -32,6 +32,7 @@ describe('roles-base', () => {
         RETENCION_ISR_TASA: '15',
         RETENCION_ITBIS_TASA: '30',
         POS_TOLERANCIA_ARQUEO: '50',
+        FORMATO_IMPRESION_DEFAULT: 'CARTA',
       }),
     );
   });

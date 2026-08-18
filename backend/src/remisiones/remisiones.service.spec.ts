@@ -2,11 +2,13 @@ import { BadRequestException } from '@nestjs/common';
 import { RemisionesService } from './remisiones.service';
 import { RemisionesRepository } from './remisiones.repository';
 import { FacturacionService } from '../facturacion/facturacion.service';
+import { PrismaService } from '../prisma/prisma.service';
 
 describe('RemisionesService', () => {
   let service: RemisionesService;
   let repository: jest.Mocked<RemisionesRepository>;
   let facturacionService: jest.Mocked<FacturacionService>;
+  let prisma: jest.Mocked<PrismaService>;
 
   beforeEach(() => {
     repository = {
@@ -20,7 +22,11 @@ describe('RemisionesService', () => {
     facturacionService = {
       crear: jest.fn(),
     } as unknown as jest.Mocked<FacturacionService>;
-    service = new RemisionesService(repository, facturacionService);
+    prisma = {
+      bodega: { findFirst: jest.fn().mockResolvedValue(null) },
+      configuracion: { findUnique: jest.fn().mockResolvedValue(null) },
+    } as unknown as jest.Mocked<PrismaService>;
+    service = new RemisionesService(repository, facturacionService, prisma);
   });
 
   describe('crear', () => {

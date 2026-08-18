@@ -531,6 +531,54 @@ describe('Plataforma (e2e)', () => {
       await prisma.platformAdmin.deleteMany({ where: { email: EMAIL_SOLO_PAGOS } });
       await prisma.platformRole.deleteMany({ where: { nombre: 'E2E Solo Pagos' } });
     });
+
+    it('crea una factura manual con líneas múltiples — el total es la suma y las líneas quedan guardadas en orden', async () => {
+      const tokenPlataforma = await loginPlataforma();
+
+      const respuesta = await request(app.getHttpServer())
+        .post('/api/platform/facturas')
+        .set('Authorization', `Bearer ${tokenPlataforma}`)
+        .send({
+          tenantId: tenantCreadoId,
+          lineas: [
+            { concepto: 'Configuración inicial', monto: 200 },
+            { concepto: 'Capacitación', monto: 150 },
+          ],
+        })
+        .expect(201);
+
+      expect(Number(respuesta.body.monto)).toBe(350);
+      expect(Number(respuesta.body.total)).toBe(350);
+      expect(respuesta.body.concepto).toContain('Configuración inicial');
+
+      const detalle = await request(app.getHttpServer())
+        .get(`/api/platform/facturas/${respuesta.body.id}`)
+        .set('Authorization', `Bearer ${tokenPlataforma}`)
+        .expect(200);
+      expect(detalle.body.lineas.map((l: { concepto: string }) => l.concepto)).toEqual(['Configuración inicial', 'Capacitación']);
+    });
+
+    it('un admin con solo platform.pagos.registrar NO puede crear una factura manual', async () => {
+      const EMAIL_SOLO_PAGOS_2 = 'e2e-solo-pagos-crear@sistemadelsol.com';
+      await crearAdminConRol({
+        email: EMAIL_SOLO_PAGOS_2,
+        nombreRol: 'E2E Solo Pagos Crear',
+        permisos: ['platform.facturacion.ver', 'platform.pagos.registrar'],
+      });
+      const loginSoloPagos = await request(app.getHttpServer())
+        .post('/api/platform/auth/login')
+        .send({ email: EMAIL_SOLO_PAGOS_2, password: ADMIN_PASSWORD });
+      const tokenSoloPagos = loginSoloPagos.body.accessToken as string;
+
+      await request(app.getHttpServer())
+        .post('/api/platform/facturas')
+        .set('Authorization', `Bearer ${tokenSoloPagos}`)
+        .send({ tenantId: tenantCreadoId, lineas: [{ concepto: 'x', monto: 10 }] })
+        .expect(403);
+
+      await prisma.platformAdmin.deleteMany({ where: { email: EMAIL_SOLO_PAGOS_2 } });
+      await prisma.platformRole.deleteMany({ where: { nombre: 'E2E Solo Pagos Crear' } });
+    });
   });
 
   describe('Gestión de tenants desde plataforma', () => {

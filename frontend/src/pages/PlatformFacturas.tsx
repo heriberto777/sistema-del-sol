@@ -185,10 +185,12 @@ function PanelFactura({ factura, onClose }: { factura: FacturaPlataforma; onClos
 }
 
 export function PlatformFacturas() {
+  const { tienePermiso } = usePlatformAuth();
   const [pagina, setPagina] = useState(1);
   const [estado, setEstado] = useState('');
   const [tenantId, setTenantId] = useState('');
   const [facturaAbierta, setFacturaAbierta] = useState<FacturaPlataforma | null>(null);
+  const [modalNuevaFactura, setModalNuevaFactura] = useState(false);
 
   const { data: tenants } = useQuery({
     queryKey: ['platform-tenants-lite'],
@@ -219,23 +221,28 @@ export function PlatformFacturas() {
         titulo="Facturación de plataforma"
         descripcion="Facturas generadas por la suscripción de cada tenant."
         acciones={
-          <form onSubmit={onSubmitFiltro} className="flex items-center gap-2">
-            <Select value={estado} onChange={(e) => { setEstado(e.target.value); setPagina(1); }} className="!w-auto py-1">
-              <option value="">Todos los estados</option>
-              <option value="PENDIENTE">Pendiente</option>
-              <option value="PAGADA">Pagada</option>
-              <option value="VENCIDA">Vencida</option>
-              <option value="ANULADA">Anulada</option>
-            </Select>
-            <Select value={tenantId} onChange={(e) => { setTenantId(e.target.value); setPagina(1); }} className="!w-auto py-1">
-              <option value="">Todos los tenants</option>
-              {tenants?.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.nombre}
-                </option>
-              ))}
-            </Select>
-          </form>
+          <div className="flex items-center gap-2">
+            <form onSubmit={onSubmitFiltro} className="flex items-center gap-2">
+              <Select value={estado} onChange={(e) => { setEstado(e.target.value); setPagina(1); }} className="!w-auto py-1">
+                <option value="">Todos los estados</option>
+                <option value="PENDIENTE">Pendiente</option>
+                <option value="PAGADA">Pagada</option>
+                <option value="VENCIDA">Vencida</option>
+                <option value="ANULADA">Anulada</option>
+              </Select>
+              <Select value={tenantId} onChange={(e) => { setTenantId(e.target.value); setPagina(1); }} className="!w-auto py-1">
+                <option value="">Todos los tenants</option>
+                {tenants?.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.nombre}
+                  </option>
+                ))}
+              </Select>
+            </form>
+            {tienePermiso('platform.facturacion.gestionar') && (
+              <Button onClick={() => setModalNuevaFactura(true)}>Nueva factura</Button>
+            )}
+          </div>
         }
       >
         <div className="overflow-x-auto">
@@ -287,6 +294,121 @@ export function PlatformFacturas() {
       </Card>
 
       {facturaAbierta && <PanelFactura factura={facturaAbierta} onClose={() => setFacturaAbierta(null)} />}
+      {modalNuevaFactura && (
+        <ModalNuevaFacturaManual tenants={tenants ?? []} onClose={() => setModalNuevaFactura(false)} />
+      )}
     </div>
+  );
+}
+
+function ModalNuevaFacturaManual({ tenants, onClose }: { tenants: Tenant[]; onClose: () => void }) {
+  const queryClient = useQueryClient();
+  const [tenantId, setTenantId] = useState('');
+  const [lineas, setLineas] = useState<{ concepto: string; monto: string }[]>([{ concepto: '', monto: '' }]);
+  const [fechaVencimiento, setFechaVencimiento] = useState('');
+  const [error, setError] = useState<string | null>(null);
+
+  function actualizarLinea(i: number, cambios: Partial<{ concepto: string; monto: string }>) {
+    setLineas((prev) => prev.map((l, idx) => (idx === i ? { ...l, ...cambios } : l)));
+  }
+
+  function agregarLinea() {
+    setLineas((prev) => [...prev, { concepto: '', monto: '' }]);
+  }
+
+  function quitarLinea(i: number) {
+    setLineas((prev) => prev.filter((_, idx) => idx !== i));
+  }
+
+  const crear = useMutation({
+    mutationFn: async () =>
+      platformApiClient.post('/platform/facturas', {
+        tenantId,
+        lineas: lineas.map((l) => ({ concepto: l.concepto, monto: Number(l.monto) })),
+        fechaVencimiento: fechaVencimiento || undefined,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['platform-facturas'] });
+      onClose();
+    },
+    onError: () => setError('No se pudo crear la factura — revisa el tenant y los montos.'),
+  });
+
+  function onSubmit(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    crear.mutate();
+  }
+
+  return (
+    <Modal titulo="Nueva factura manual" onClose={onClose}>
+      <form onSubmit={onSubmit} className="space-y-3">
+        <div>
+          <label htmlFor="nueva-factura-tenant" className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+            Tenant
+          </label>
+          <Select id="nueva-factura-tenant" value={tenantId} onChange={(e) => setTenantId(e.target.value)} required>
+            <option value="" disabled>
+              Selecciona un tenant
+            </option>
+            {tenants.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.nombre}
+              </option>
+            ))}
+          </Select>
+        </div>
+
+        <div className="space-y-2">
+          <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Líneas</p>
+          {lineas.map((linea, i) => (
+            <div key={i} className="flex items-end gap-2">
+              <div className="flex-1">
+                <FormField
+                  id={`linea-concepto-${i}`}
+                  label="Concepto"
+                  value={linea.concepto}
+                  onChange={(e) => actualizarLinea(i, { concepto: e.target.value })}
+                  required
+                />
+              </div>
+              <div className="w-32">
+                <FormField
+                  id={`linea-monto-${i}`}
+                  label="Monto"
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  value={linea.monto}
+                  onChange={(e) => actualizarLinea(i, { monto: e.target.value })}
+                  required
+                />
+              </div>
+              {lineas.length > 1 && (
+                <Button type="button" variante="peligro" onClick={() => quitarLinea(i)}>
+                  ×
+                </Button>
+              )}
+            </div>
+          ))}
+          <Button type="button" variante="secundario" onClick={agregarLinea}>
+            Agregar línea
+          </Button>
+        </div>
+
+        <FormField
+          id="nueva-factura-vencimiento"
+          label="Fecha de vencimiento (opcional)"
+          type="date"
+          value={fechaVencimiento}
+          onChange={(e) => setFechaVencimiento(e.target.value)}
+        />
+
+        {error && <p className="text-sm text-red-600">{error}</p>}
+        <Button type="submit" disabled={crear.isPending || !tenantId} className="w-full">
+          {crear.isPending ? 'Creando…' : 'Crear factura'}
+        </Button>
+      </form>
+    </Modal>
   );
 }

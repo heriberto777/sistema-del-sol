@@ -1,6 +1,7 @@
 import { FormEvent, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../../lib/api-client';
+import { ModalImprimir } from '../../molecules/ModalImprimir/ModalImprimir';
 import { Badge } from '../../atoms/Badge/Badge';
 import { Button } from '../../atoms/Button/Button';
 import { Input } from '../../atoms/Input/Input';
@@ -73,6 +74,7 @@ export function TurnoCajaDetalle({ turnoId }: { turnoId: string }) {
   const [montoFinalContado, setMontoFinalContado] = useState('');
   const [justificacionDiferencia, setJustificacionDiferencia] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [facturaImprimiendo, setFacturaImprimiendo] = useState<string | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ['pos-turno', turnoId],
@@ -295,8 +297,17 @@ export function TurnoCajaDetalle({ turnoId }: { turnoId: string }) {
         <h3 className="mb-1 text-sm font-medium text-slate-700 dark:text-slate-300">Ventas del turno</h3>
         <ul className="space-y-1 text-sm text-slate-600 dark:text-slate-400">
           {data.facturas.map((f) => (
-            <li key={f.id}>
-              {formatoRD(f.total)} — {f.metodoPago ?? '—'} ({f.estado})
+            <li key={f.id} className="flex items-center justify-between gap-2">
+              <span>
+                {formatoRD(f.total)} — {f.metodoPago ?? '—'} ({f.estado})
+              </span>
+              <button
+                type="button"
+                className="text-xs text-sol-600 hover:underline dark:text-sol-400"
+                onClick={() => setFacturaImprimiendo(f.id)}
+              >
+                Imprimir
+              </button>
             </li>
           ))}
           {data.facturas.length === 0 && <li className="text-slate-400">Sin ventas todavía</li>}
@@ -314,6 +325,14 @@ export function TurnoCajaDetalle({ turnoId }: { turnoId: string }) {
           {data.movimientos.length === 0 && <li className="text-slate-400">Sin movimientos todavía</li>}
         </ul>
       </div>
+
+      {facturaImprimiendo && (
+        <ModalImprimir
+          urlBase={`/facturas/${facturaImprimiendo}`}
+          titulo="Imprimir recibo"
+          onClose={() => setFacturaImprimiendo(null)}
+        />
+      )}
     </div>
   );
 }

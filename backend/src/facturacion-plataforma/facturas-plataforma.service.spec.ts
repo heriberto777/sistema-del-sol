@@ -8,7 +8,7 @@ describe('FacturasPlataformaService', () => {
   let service: FacturasPlataformaService;
   let repo: jest.Mocked<FacturasPlataformaRepository>;
   let emailChannel: jest.Mocked<EmailChannel>;
-  let prisma: { user: { findFirst: jest.Mock } };
+  let prisma: { user: { findFirst: jest.Mock }; suscripcion: { findUnique: jest.Mock } };
 
   beforeEach(() => {
     repo = {
@@ -21,7 +21,10 @@ describe('FacturasPlataformaService', () => {
       listarVencidasPendientes: jest.fn(),
     } as unknown as jest.Mocked<FacturasPlataformaRepository>;
     emailChannel = { enviar: jest.fn().mockResolvedValue(true) } as unknown as jest.Mocked<EmailChannel>;
-    prisma = { user: { findFirst: jest.fn().mockResolvedValue({ email: 'admin@tenant.com' }) } };
+    prisma = {
+      user: { findFirst: jest.fn().mockResolvedValue({ email: 'admin@tenant.com' }) },
+      suscripcion: { findUnique: jest.fn().mockResolvedValue({ id: 's1', tenantId: 't1' }) },
+    };
     service = new FacturasPlataformaService(repo, emailChannel, prisma as unknown as PrismaService);
   });
 
@@ -51,6 +54,52 @@ describe('FacturasPlataformaService', () => {
 
       await expect(service.generarDesdeSuscripcion(suscripcion)).resolves.toBeDefined();
       expect(emailChannel.enviar).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('crearManual', () => {
+    it('suma el monto de las líneas, arma un concepto resumido, y guarda las líneas en el repositorio', async () => {
+      repo.crear.mockResolvedValue({ id: 'f1' } as never);
+      repo.buscarPorId.mockResolvedValue({ id: 'f1', concepto: 'x', total: 350, fechaVencimiento: new Date() } as never);
+
+      await service.crearManual({
+        tenantId: 't1',
+        lineas: [
+          { concepto: 'Configuración inicial', monto: 200 },
+          { concepto: 'Capacitación', monto: 150 },
+        ],
+      });
+
+      const [args] = repo.crear.mock.calls[0];
+      expect(args.tenantId).toBe('t1');
+      expect(args.suscripcionId).toBe('s1');
+      expect(args.monto).toBe(350);
+      expect(args.total).toBe(350);
+      expect(args.concepto).toBe('Configuración inicial (+1 más)');
+      expect(args.lineas).toEqual([
+        { concepto: 'Configuración inicial', monto: 200 },
+        { concepto: 'Capacitación', monto: 150 },
+      ]);
+      expect(emailChannel.enviar).toHaveBeenCalled();
+    });
+
+    it('con una sola línea, usa su concepto tal cual (sin el sufijo "+N más")', async () => {
+      repo.crear.mockResolvedValue({ id: 'f1' } as never);
+      repo.buscarPorId.mockResolvedValue({ id: 'f1', concepto: 'x', total: 100, fechaVencimiento: new Date() } as never);
+
+      await service.crearManual({ tenantId: 't1', lineas: [{ concepto: 'Cargo único', monto: 100 }] });
+
+      const [args] = repo.crear.mock.calls[0];
+      expect(args.concepto).toBe('Cargo único');
+    });
+
+    it('rechaza con 400 si el tenant no tiene Suscripcion', async () => {
+      prisma.suscripcion.findUnique.mockResolvedValue(null);
+
+      await expect(service.crearManual({ tenantId: 't1', lineas: [{ concepto: 'x', monto: 10 }] })).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(repo.crear).not.toHaveBeenCalled();
     });
   });
 

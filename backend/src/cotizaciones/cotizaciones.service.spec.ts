@@ -5,12 +5,14 @@ import { FacturacionService } from '../facturacion/facturacion.service';
 import { EventBusService } from '../event-bus/event-bus.service';
 import { EVENTOS } from '../event-bus/events';
 import { CrearCotizacionDto } from './dto/crear-cotizacion.dto';
+import { PrismaService } from '../prisma/prisma.service';
 
 describe('CotizacionesService', () => {
   let service: CotizacionesService;
   let repository: jest.Mocked<CotizacionesRepository>;
   let facturacionService: jest.Mocked<FacturacionService>;
   let eventBus: jest.Mocked<EventBusService>;
+  let prisma: jest.Mocked<PrismaService>;
 
   const producto = (porcentajeItbis: number, precioVenta: number) => ({
     precios: [{ precioVenta }],
@@ -31,7 +33,11 @@ describe('CotizacionesService', () => {
       crear: jest.fn(),
     } as unknown as jest.Mocked<FacturacionService>;
     eventBus = { emit: jest.fn(), on: jest.fn() } as unknown as jest.Mocked<EventBusService>;
-    service = new CotizacionesService(repository, facturacionService, eventBus);
+    prisma = {
+      bodega: { findFirst: jest.fn().mockResolvedValue(null) },
+      configuracion: { findUnique: jest.fn().mockResolvedValue(null) },
+    } as unknown as jest.Mocked<PrismaService>;
+    service = new CotizacionesService(repository, facturacionService, eventBus, prisma);
   });
 
   function dto(overrides: Partial<CrearCotizacionDto> = {}): CrearCotizacionDto {

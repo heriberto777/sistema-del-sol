@@ -10,6 +10,7 @@ import { RequiereModulo } from '../common/decorators/requiere-modulo.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtPayloadUser } from '../common/types/authenticated-request';
 import { ListadoQueryDto } from '../common/dto/listado-query.dto';
+import { ImprimirDocumentoQueryDto } from '../common/impresion/dto/imprimir-documento-query.dto';
 
 @ApiBearerAuth()
 @ApiTags('cotizaciones')
@@ -53,6 +54,19 @@ export class CotizacionesController {
   async pdf(@Param('id') id: string, @Res() res: Response) {
     const buffer = await this.cotizacionesService.generarPdf(id);
     res.set({ 'Content-Type': 'application/pdf', 'Content-Disposition': 'inline; filename="cotizacion.pdf"' });
+    res.send(buffer);
+  }
+
+  @Get(':id/imprimir')
+  @Permissions('cotizaciones.ver')
+  async imprimir(
+    @Param('id') id: string,
+    @Query() query: ImprimirDocumentoQueryDto,
+    @CurrentUser() user: JwtPayloadUser,
+    @Res() res: Response,
+  ) {
+    const { buffer, contentType } = await this.cotizacionesService.generarImpreso(id, query.formato, user.tenantId);
+    res.set({ 'Content-Type': contentType, 'Content-Disposition': 'inline; filename="cotizacion"' });
     res.send(buffer);
   }
 

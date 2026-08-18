@@ -4,6 +4,7 @@ import { FacturasPlataformaService } from './facturas-plataforma.service';
 import { PagosPlataformaService } from './pagos-plataforma.service';
 import { ListarFacturasPlataformaQueryDto } from './dto/listar-facturas-plataforma-query.dto';
 import { ActualizarFacturaPlataformaDto } from './dto/actualizar-factura-plataforma.dto';
+import { CrearFacturaPlataformaManualDto } from './dto/crear-factura-plataforma-manual.dto';
 import { CrearPagoPlataformaDto } from './dto/crear-pago-plataforma.dto';
 import { Public } from '../common/decorators/public.decorator';
 import { PlatformPermissions } from '../common/decorators/platform-permissions.decorator';
@@ -27,6 +28,12 @@ export class FacturasPlataformaController {
   @PlatformPermissions('platform.facturacion.ver')
   listar(@Query() query: ListarFacturasPlataformaQueryDto) {
     return this.facturasPlataformaService.listar(query);
+  }
+
+  @Post()
+  @PlatformPermissions('platform.facturacion.gestionar')
+  crearManual(@Body() dto: CrearFacturaPlataformaManualDto) {
+    return this.facturasPlataformaService.crearManual(dto);
   }
 
   @Get(':id')

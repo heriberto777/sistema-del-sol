@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { Suscripcion, Plan } from '@prisma/client';
 import { FacturasPlataformaRepository } from './facturas-plataforma.repository';
 import { ActualizarFacturaPlataformaDto } from './dto/actualizar-factura-plataforma.dto';
+import { CrearFacturaPlataformaManualDto } from './dto/crear-factura-plataforma-manual.dto';
 import { EmailChannel } from '../notificaciones/canales/email.channel';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -48,6 +49,32 @@ export class FacturasPlataformaService {
     });
 
     await this.notificarFactura(suscripcion.tenantId, factura.id, 'generada');
+    return factura;
+  }
+
+  /** Cargo puntual fuera del ciclo de suscripción, con líneas múltiples — ver PlatformFacturas.tsx "Nueva factura". */
+  async crearManual(dto: CrearFacturaPlataformaManualDto) {
+    const suscripcion = await this.prisma.suscripcion.findUnique({ where: { tenantId: dto.tenantId } });
+    if (!suscripcion) {
+      throw new BadRequestException('Este tenant no tiene una suscripción — no se puede facturar manualmente');
+    }
+
+    const monto = dto.lineas.reduce((acc, l) => acc + l.monto, 0);
+    const ahora = new Date();
+    const concepto = dto.lineas.length === 1 ? dto.lineas[0].concepto : `${dto.lineas[0].concepto} (+${dto.lineas.length - 1} más)`;
+
+    const factura = await this.facturasPlataformaRepository.crear({
+      tenantId: dto.tenantId,
+      suscripcionId: suscripcion.id,
+      concepto,
+      monto,
+      total: monto,
+      fechaEmision: ahora,
+      fechaVencimiento: dto.fechaVencimiento ? new Date(dto.fechaVencimiento) : ahora,
+      lineas: dto.lineas,
+    });
+
+    await this.notificarFactura(dto.tenantId, factura.id, 'manual');
     return factura;
   }
 
@@ -103,7 +130,7 @@ export class FacturasPlataformaService {
   }
 
   /** Igual criterio que PlatformAuthService.olvidePassword: HTML inline, sin plantillas por-tenant (eso es NotificacionesService, tenant-scoped). */
-  private async notificarFactura(tenantId: string, facturaId: string, motivo: 'generada' | 'vencida') {
+  private async notificarFactura(tenantId: string, facturaId: string, motivo: 'generada' | 'vencida' | 'manual') {
     const admin = await this.prisma.user.findFirst({
       where: { tenantId, roles: { some: { role: { nombre: 'Admin Total' } } } },
       orderBy: { createdAt: 'asc' },
@@ -115,12 +142,18 @@ export class FacturasPlataformaService {
 
     const factura = await this.facturasPlataformaRepository.buscarPorId(facturaId);
     const enlacePago = `${process.env.FRONTEND_URL ?? 'http://localhost:5173'}/pagar/${factura.id}`;
-    const asunto =
-      motivo === 'generada' ? 'Nueva factura de tu suscripción — El Sistema del Sol' : 'Factura vencida — El Sistema del Sol';
-    const cuerpo =
-      motivo === 'generada'
-        ? `<p>Se generó una nueva factura por tu suscripción: <strong>${factura.concepto}</strong>.</p><p>Total: RD$ ${Number(factura.total).toLocaleString('es-DO')}, vence el ${factura.fechaVencimiento.toLocaleDateString('es-DO')}.</p><p><a href="${enlacePago}">Pagar en línea</a></p>`
-        : `<p>Tu factura <strong>${factura.concepto}</strong> venció sin pago registrado y se le aplicó un cargo por mora.</p><p>Nuevo total: RD$ ${Number(factura.total).toLocaleString('es-DO')}.</p><p><a href="${enlacePago}">Pagar en línea</a></p>`;
+    const ASUNTOS: Record<typeof motivo, string> = {
+      generada: 'Nueva factura de tu suscripción — El Sistema del Sol',
+      vencida: 'Factura vencida — El Sistema del Sol',
+      manual: 'Nuevo cargo — El Sistema del Sol',
+    };
+    const CUERPOS: Record<typeof motivo, string> = {
+      generada: `<p>Se generó una nueva factura por tu suscripción: <strong>${factura.concepto}</strong>.</p><p>Total: RD$ ${Number(factura.total).toLocaleString('es-DO')}, vence el ${factura.fechaVencimiento.toLocaleDateString('es-DO')}.</p><p><a href="${enlacePago}">Pagar en línea</a></p>`,
+      vencida: `<p>Tu factura <strong>${factura.concepto}</strong> venció sin pago registrado y se le aplicó un cargo por mora.</p><p>Nuevo total: RD$ ${Number(factura.total).toLocaleString('es-DO')}.</p><p><a href="${enlacePago}">Pagar en línea</a></p>`,
+      manual: `<p>Se generó un cargo puntual: <strong>${factura.concepto}</strong>.</p><p>Total: RD$ ${Number(factura.total).toLocaleString('es-DO')}, vence el ${factura.fechaVencimiento.toLocaleDateString('es-DO')}.</p><p><a href="${enlacePago}">Pagar en línea</a></p>`,
+    };
+    const asunto = ASUNTOS[motivo];
+    const cuerpo = CUERPOS[motivo];
 
     this.logger.debug(`Notificación de factura ${motivo} para ${admin.email}: ${factura.id}`);
     await this.emailChannel.enviar(admin.email, asunto, cuerpo);

@@ -1,4 +1,5 @@
 import PDFDocument from 'pdfkit';
+import { formatearMontoDop } from './formato-monto';
 
 const MARGEN = 40;
 const ALTO_FILA = 20;
@@ -25,18 +26,19 @@ export interface DocumentoPdfParams {
   notas?: string;
 }
 
-const formatearMonto = (monto: number) => `RD$ ${monto.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-
 /**
  * Documento imprimible tipo factura/cotización/remisión — a diferencia de
  * `generarPdf` (tabla genérica de reportes), este incluye encabezado con
  * número/fecha/cliente y un resumen de totales al final.
  */
-export function generarDocumentoPdf(params: DocumentoPdfParams): Promise<Buffer> {
+export function generarDocumentoPdf(
+  params: DocumentoPdfParams,
+  opciones?: { tamanoPagina?: 'letter' | 'a4' },
+): Promise<Buffer> {
   const mostrarPrecios = params.mostrarPrecios ?? true;
 
   return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ margin: MARGEN, size: 'letter' });
+    const doc = new PDFDocument({ margin: MARGEN, size: opciones?.tamanoPagina === 'a4' ? 'A4' : 'letter' });
     const chunks: Buffer[] = [];
     doc.on('data', (chunk) => chunks.push(chunk));
     doc.on('end', () => resolve(Buffer.concat(chunks)));
@@ -97,10 +99,10 @@ export function generarDocumentoPdf(params: DocumentoPdfParams): Promise<Buffer>
     if (mostrarPrecios) {
       doc.moveDown();
       doc.font('Helvetica').fontSize(10);
-      if (params.subtotal !== undefined) doc.text(`Subtotal: ${formatearMonto(params.subtotal)}`, { align: 'right' });
-      if (params.descuento) doc.text(`Descuento: ${formatearMonto(params.descuento)}`, { align: 'right' });
-      if (params.itbis !== undefined) doc.text(`ITBIS: ${formatearMonto(params.itbis)}`, { align: 'right' });
-      if (params.total !== undefined) doc.font('Helvetica-Bold').text(`Total: ${formatearMonto(params.total)}`, { align: 'right' });
+      if (params.subtotal !== undefined) doc.text(`Subtotal: ${formatearMontoDop(params.subtotal)}`, { align: 'right' });
+      if (params.descuento) doc.text(`Descuento: ${formatearMontoDop(params.descuento)}`, { align: 'right' });
+      if (params.itbis !== undefined) doc.text(`ITBIS: ${formatearMontoDop(params.itbis)}`, { align: 'right' });
+      if (params.total !== undefined) doc.font('Helvetica-Bold').text(`Total: ${formatearMontoDop(params.total)}`, { align: 'right' });
     }
 
     if (params.notas) {

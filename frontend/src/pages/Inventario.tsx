@@ -10,11 +10,13 @@ import { Modal } from '../components/molecules/Modal/Modal';
 import { EstadoVacio } from '../components/molecules/EstadoVacio/EstadoVacio';
 import { RequierePermiso } from '../components/organisms/RequierePermiso/RequierePermiso';
 import { PaginaResultado } from '../types/pagina-resultado';
+import { FORMATOS_IMPRESION, FormatoImpresion } from '../constants/formato-impresion';
 
 interface Bodega {
   id: string;
   nombre: string;
   direccion: string | null;
+  formatoImpresion: FormatoImpresion | null;
 }
 
 interface Producto {
@@ -37,6 +39,7 @@ export function Inventario() {
   const [modalNuevaBodega, setModalNuevaBodega] = useState(false);
   const [modalAjustar, setModalAjustar] = useState(false);
   const [modalTransferir, setModalTransferir] = useState(false);
+  const [bodegaEditandoFormato, setBodegaEditandoFormato] = useState<Bodega | null>(null);
 
   useEffect(() => {
     if (searchParams.get('crear') === '1') {
@@ -79,9 +82,12 @@ export function Inventario() {
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {bodegas?.map((bodega) => (
-              <button
+              <div
                 key={bodega.id}
+                role="button"
+                tabIndex={0}
                 onClick={() => setBodegaSeleccionadaId(bodega.id)}
+                onKeyDown={(e) => e.key === 'Enter' && setBodegaSeleccionadaId(bodega.id)}
                 className={clsx(
                   'rounded-lg border p-4 text-left transition-colors',
                   bodega.id === bodegaSeleccionadaId
@@ -91,7 +97,24 @@ export function Inventario() {
               >
                 <p className="font-medium text-slate-900 dark:text-slate-100">{bodega.nombre}</p>
                 {bodega.direccion && <p className="text-sm text-slate-500 dark:text-slate-400">{bodega.direccion}</p>}
-              </button>
+                <div className="mt-2 flex items-center justify-between">
+                  <p className="text-xs text-slate-400">
+                    {FORMATOS_IMPRESION.find((f) => f.value === bodega.formatoImpresion)?.label ?? 'Formato de la empresa'}
+                  </p>
+                  <RequierePermiso permiso="admin.configuracion">
+                    <button
+                      type="button"
+                      className="text-xs text-sol-600 hover:underline dark:text-sol-400"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setBodegaEditandoFormato(bodega);
+                      }}
+                    >
+                      Editar formato
+                    </button>
+                  </RequierePermiso>
+                </div>
+              </div>
             ))}
           </div>
         )}
@@ -151,6 +174,9 @@ export function Inventario() {
       </RequierePermiso>
 
       {modalNuevaBodega && <ModalNuevaBodega onClose={() => setModalNuevaBodega(false)} />}
+      {bodegaEditandoFormato && (
+        <ModalEditarFormatoBodega bodega={bodegaEditandoFormato} onClose={() => setBodegaEditandoFormato(null)} />
+      )}
       {modalAjustar && bodegaSeleccionadaId && (
         <ModalAjustarStock bodegaId={bodegaSeleccionadaId} onClose={() => setModalAjustar(false)} />
       )}
@@ -196,6 +222,38 @@ function ModalNuevaBodega({ onClose }: { onClose: () => void }) {
           {crear.isPending ? 'Creando…' : 'Crear bodega'}
         </Button>
       </form>
+    </Modal>
+  );
+}
+
+function ModalEditarFormatoBodega({ bodega, onClose }: { bodega: Bodega; onClose: () => void }) {
+  const queryClient = useQueryClient();
+  const [formatoImpresion, setFormatoImpresion] = useState(bodega.formatoImpresion ?? '');
+
+  const guardar = useMutation({
+    mutationFn: async () =>
+      apiClient.patch(`/inventario/bodegas/${bodega.id}`, { formatoImpresion: formatoImpresion || null }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['bodegas'] });
+      onClose();
+    },
+  });
+
+  return (
+    <Modal titulo={`Formato de impresión — ${bodega.nombre}`} onClose={onClose}>
+      <div className="space-y-3">
+        <Select value={formatoImpresion} onChange={(e) => setFormatoImpresion(e.target.value)}>
+          <option value="">Usar el default de la empresa</option>
+          {FORMATOS_IMPRESION.map((f) => (
+            <option key={f.value} value={f.value}>
+              {f.label}
+            </option>
+          ))}
+        </Select>
+        <Button onClick={() => guardar.mutate()} disabled={guardar.isPending} className="w-full">
+          {guardar.isPending ? 'Guardando…' : 'Guardar'}
+        </Button>
+      </div>
     </Modal>
   );
 }

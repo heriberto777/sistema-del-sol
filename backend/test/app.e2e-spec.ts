@@ -676,6 +676,109 @@ describe('App (e2e)', () => {
     });
   });
 
+  describe('Impresión multi-formato', () => {
+    // Un solo login reusado en todo el bloque, Y un flushdb extra acá mismo:
+    // /auth/login no tiene @Throttle propio (hereda el default global,
+    // 120/60s) y este archivo ya hace ~114 llamadas a login() en total —
+    // ese conteo acumulado deja a los describe blocks de MÁS ADELANTE sin
+    // margen (un login de cualquier bloque anterior alcanza a tumbar un
+    // token de un bloque posterior con 401, ya que comparten el mismo
+    // bucket por IP). Mismo criterio que el flushdb del beforeAll de todo
+    // el archivo, solo que repetido acá para darle presupuesto fresco al
+    // resto del archivo que corre después de este bloque.
+    let token: string;
+    let facturaImpresionId: string;
+
+    beforeAll(async () => {
+      const redis = new Redis(process.env.REDIS_URL ?? 'redis://127.0.0.1:6379');
+      await redis.flushdb();
+      await redis.quit();
+
+      token = await login('admin@e2e-a.com', SUBDOMINIO_A);
+      const respuesta = await request(app.getHttpServer())
+        .post('/api/facturas')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ clienteId: clienteAId, bodegaId: bodegaAId, tipoFactura: 'CONTADO', lineas: [{ productoId: productoAId, cantidad: 1 }] })
+        .expect(201);
+      facturaImpresionId = respuesta.body.id;
+    });
+
+    afterAll(async () => {
+      // Revertir el default de tenant y el override de bodega para no
+      // afectar otros describe blocks de este mismo archivo.
+      await prisma.configuracion.deleteMany({ where: { tenantId: tenantAId, clave: 'FORMATO_IMPRESION_DEFAULT' } });
+      await prisma.bodega.update({ where: { id: bodegaAId }, data: { formatoImpresion: null } });
+    });
+
+    it('sin ninguna configuración, /imprimir devuelve un PDF (fallback CARTA)', async () => {
+      const respuesta = await request(app.getHttpServer())
+        .get(`/api/facturas/${facturaImpresionId}/imprimir`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(respuesta.headers['content-type']).toBe('application/pdf');
+    });
+
+    it('con el default de tenant en térmica, /imprimir sin formato devuelve HTML', async () => {
+      await request(app.getHttpServer())
+        .put('/api/admin/configuraciones/FORMATO_IMPRESION_DEFAULT')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ valor: 'TERMICA_80MM' })
+        .expect(200);
+
+      const respuesta = await request(app.getHttpServer())
+        .get(`/api/facturas/${facturaImpresionId}/imprimir`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(respuesta.headers['content-type']).toContain('text/html');
+      expect(respuesta.text).toContain('80mm auto');
+    });
+
+    it('un ?formato= explícito manda sobre el default guardado', async () => {
+      const respuesta = await request(app.getHttpServer())
+        .get(`/api/facturas/${facturaImpresionId}/imprimir`)
+        .query({ formato: 'CARTA' })
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(respuesta.headers['content-type']).toBe('application/pdf');
+    });
+
+    it('el override de bodega manda sobre el default de tenant', async () => {
+      await request(app.getHttpServer())
+        .patch(`/api/inventario/bodegas/${bodegaAId}`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ formatoImpresion: 'TERMICA_58MM' })
+        .expect(200);
+
+      const respuesta = await request(app.getHttpServer())
+        .get(`/api/facturas/${facturaImpresionId}/imprimir`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(respuesta.headers['content-type']).toContain('text/html');
+      expect(respuesta.text).toContain('58mm auto');
+    });
+
+    it('un tenant no puede anular el override de formato de una bodega de otro tenant', async () => {
+      const bodegaTenantB = await prisma.bodega.create({ data: { tenantId: tenantBId, nombre: 'Bodega B — impresión' } });
+
+      // El PATCH "funciona" (200) porque TenantPrismaService inyecta el
+      // tenantId de quien llama en el `where` — el resultado real es que
+      // no encuentra la fila (pertenece a otro tenant) y Prisma lanza
+      // "Record not found", que el filtro de excepciones traduce a 404/400.
+      await request(app.getHttpServer())
+        .patch(`/api/inventario/bodegas/${bodegaTenantB.id}`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ formatoImpresion: 'TERMICA_58MM' })
+        .expect((res) => expect(res.status).toBeGreaterThanOrEqual(400));
+
+      const bodegaSinTocar = await prisma.bodega.findUniqueOrThrow({ where: { id: bodegaTenantB.id } });
+      expect(bodegaSinTocar.formatoImpresion).toBeNull();
+    });
+  });
+
   describe('Producto tipo Servicio/Combo', () => {
     let componenteXId: string;
     let componenteYId: string;

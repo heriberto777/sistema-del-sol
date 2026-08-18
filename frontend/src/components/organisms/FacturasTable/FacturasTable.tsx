@@ -1,7 +1,7 @@
 import { FormEvent, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../../lib/api-client';
-import { abrirBlob } from '../../../lib/descargar-archivo';
+import { ModalImprimir } from '../../molecules/ModalImprimir/ModalImprimir';
 import { Badge } from '../../atoms/Badge/Badge';
 import { Button } from '../../atoms/Button/Button';
 import { Select } from '../../atoms/Select/Select';
@@ -45,11 +45,7 @@ export function FacturasTable() {
   const busquedaDebounced = useDebouncedValue(busqueda);
   const [facturaCobrando, setFacturaCobrando] = useState<Factura | null>(null);
   const [facturaAnulando, setFacturaAnulando] = useState<Factura | null>(null);
-
-  async function verPdf(id: string) {
-    const respuesta = await apiClient.get(`/facturas/${id}/pdf`, { responseType: 'blob' });
-    abrirBlob(respuesta.data);
-  }
+  const [facturaImprimiendo, setFacturaImprimiendo] = useState<Factura | null>(null);
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['facturas', pagina, busquedaDebounced],
@@ -93,7 +89,7 @@ export function FacturasTable() {
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {data.datos.map((factura) => {
                   const acciones = [
-                    { etiqueta: 'Ver PDF', onClick: () => verPdf(factura.id) },
+                    { etiqueta: 'Imprimir', onClick: () => setFacturaImprimiendo(factura) },
                     ...(factura.tipoFactura === 'CREDITO' &&
                     factura.estado === 'EMITIDA' &&
                     !factura.pagada &&
@@ -136,6 +132,13 @@ export function FacturasTable() {
 
       {facturaCobrando && <ModalRegistrarCobro factura={facturaCobrando} onClose={() => setFacturaCobrando(null)} />}
       {facturaAnulando && <ModalAnularFactura factura={facturaAnulando} onClose={() => setFacturaAnulando(null)} />}
+      {facturaImprimiendo && (
+        <ModalImprimir
+          urlBase={`/facturas/${facturaImprimiendo.id}`}
+          titulo={`Imprimir — ${facturaImprimiendo.ncf ?? facturaImprimiendo.id}`}
+          onClose={() => setFacturaImprimiendo(null)}
+        />
+      )}
     </div>
   );
 }

@@ -557,6 +557,23 @@ Permisos nuevos en el catálogo de plataforma:
 (separado de `.gestionar` a propósito — un rol puede poder cobrar sin
 poder editar descuentos/mora).
 
+**Facturas manuales con líneas múltiples** (`POST /platform/facturas`,
+permiso `platform.facturacion.gestionar`): además del ciclo automático,
+el super admin puede facturarle a un tenant un cargo puntual (ej.
+configuración inicial, capacitación) con varios conceptos/montos.
+`FacturaPlataformaLinea` es un modelo hijo nuevo (`onDelete: Cascade`)
+— retrocompatible a propósito: `FacturaPlataforma.concepto`/`monto`/
+`total` siguen siendo el agregado para TODA factura (auto-generada o
+manual), `generarDesdeSuscripcion()` (cron + "generar factura ahora")
+queda intacto y sigue creando con `lineas: []`. Solo la creación manual
+llena `lineas` — `monto`/`total` = suma de las líneas, `concepto` =
+el de la primera línea (+"(+N más)" si hay varias). Requiere que el
+tenant ya tenga `Suscripcion` (siempre la tiene desde el provisioning);
+si no, 400 explícito en vez de una FK violation cruda. Editar líneas de
+una factura ya creada queda fuera de alcance a propósito — el camino
+para corregir una factura manual mal hecha es anularla y recrearla,
+igual criterio que notas de crédito/débito en vez de edición in-place.
+
 ## Pasarela de pago (`backend/src/facturacion-plataforma/pasarela/`)
 
 Quién paga: **el admin del tenant**, no la plataforma — llega desde un
@@ -981,11 +998,54 @@ para operar (ver "Fuera de alcance" abajo).
 
 **Fuera de alcance deliberadamente**: modo offline/sincronización
 diferida (de ahí el nombre de esta sección — es la razón de ser del
-"sin offline en v1"), impresión a impresora térmica/fiscal (responsabilidad
-del frontend/hardware, no de esta API), pagos con tarjeta procesados de
-verdad (`metodoPago: TARJETA` solo registra la intención, no integra una
+"sin offline en v1"), pagos con tarjeta procesados de verdad
+(`metodoPago: TARJETA` solo registra la intención, no integra una
 pasarela), y pagos divididos (una venta usa un solo `metodoPago`, no
-un mix efectivo+tarjeta en la misma factura).
+un mix efectivo+tarjeta en la misma factura). La impresión de tickets sí
+está cubierta — ver la sección siguiente.
+
+## Impresión multi-formato (Facturación/Cotizaciones/Remisiones/POS)
+
+Antes, Facturación/Cotizaciones/Remisiones solo generaban PDF a tamaño
+carta fijo (`pdfkit`) y el POS no imprimía nada. `GET /:id/imprimir`
+(sibling de los `/pdf` existentes, que se dejan intactos por
+compatibilidad) resuelve un `FormatoImpresion` (`CARTA`/`A4`/
+`TERMICA_80MM`/`TERMICA_58MM`, enum Prisma) y devuelve **PDF** para los
+dos primeros o **HTML angosto** (`text/html`) para los térmicos — el
+backend decide el `Content-Type` según el formato, el frontend siempre
+llama al mismo endpoint, lee el `Content-Type` de la respuesta, y abre
+el blob (mismo patrón `abrirBlob` de siempre). El HTML térmico
+(`backend/src/common/pdf/documento-ticket.ts`) trae
+`window.print()` en un `<script>` — se abre en una pestaña y el
+navegador dispara el diálogo de impresión del sistema operativo solo:
+**sin ESC/POS crudo, sin WebUSB, sin agente local** — la impresora
+térmica solo necesita estar instalada como impresora normal de Windows
+(USB o red).
+
+`documento-ticket.ts` y `documento-pdf.ts` consumen la MISMA forma de
+datos (`DocumentoPdfParams`) que ya arma cada servicio — cero
+duplicación de lógica de negocio entre el PDF y el ticket. Como el
+ticket se arma por concatenación de strings HTML (no PDFKit, que nunca
+interpreta su texto como markup) y se abre en una pestaña real,
+**escapa todo campo interpolado que pueda venir influenciado por el
+usuario final** (nombre de producto, nombre de cliente) — sin esto,
+sería un XSS almacenado real que no existe en el PDF.
+
+**Resolución del formato** (`backend/src/common/impresion/
+resolver-formato-impresion.ts`, función pura — mismo espíritu que
+`resolver-modulos-activos.ts`): un `?formato=` explícito en la query
+manda siempre (elegido al momento de imprimir, nunca se persiste); si
+se omite, gana el override de la `Bodega` de ese documento
+(`Bodega.formatoImpresion`, nullable) sobre el default del tenant
+(`Configuracion.FORMATO_IMPRESION_DEFAULT`, reutiliza la tabla
+clave-valor genérica en vez de una columna nueva); si nada está
+configurado, cae al fallback duro `'CARTA'`. `Cotizacion` no tiene
+`bodegaId` (no toca stock hasta convertirse en factura) — solo aplica
+el default de tenant, sin override posible. El POS no necesita ningún
+endpoint propio: una venta de POS ya es una `Factura` real
+(`PosService.registrarVenta` delega en `FacturacionService.crear()`),
+así que un recibo de POS se imprime contra el mismo
+`GET /facturas/:id/imprimir`.
 
 ## IA (asistente de negocio, transversal a varios módulos)
 

@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../../lib/api-client';
-import { abrirBlob } from '../../../lib/descargar-archivo';
+import { ModalImprimir } from '../../molecules/ModalImprimir/ModalImprimir';
 import { FormField } from '../../molecules/FormField/FormField';
 import { Modal } from '../../molecules/Modal/Modal';
 import { RowActionsMenu } from '../../molecules/RowActionsMenu/RowActionsMenu';
@@ -67,11 +67,7 @@ export function RemisionesPanel() {
 
   const [remisionEditando, setRemisionEditando] = useState<Remision | null>(null);
   const [remisionConvirtiendo, setRemisionConvirtiendo] = useState<Remision | null>(null);
-
-  async function verPdf(id: string) {
-    const respuesta = await apiClient.get(`/remisiones/${id}/pdf`, { responseType: 'blob' });
-    abrirBlob(respuesta.data);
-  }
+  const [remisionImprimiendo, setRemisionImprimiendo] = useState<Remision | null>(null);
 
   const { data: clientes } = useQuery({
     queryKey: ['clientes-select'],
@@ -243,7 +239,7 @@ export function RemisionesPanel() {
           <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
             {data?.datos.map((remision) => {
               const acciones = [
-                { etiqueta: 'Ver PDF', onClick: () => verPdf(remision.id) },
+                { etiqueta: 'Imprimir', onClick: () => setRemisionImprimiendo(remision) },
                 ...(tienePermiso('remisiones.editar') && remision.estado === 'BORRADOR'
                   ? [{ etiqueta: 'Editar', onClick: () => setRemisionEditando(remision) }]
                   : []),
@@ -289,6 +285,13 @@ export function RemisionesPanel() {
       )}
       {remisionConvirtiendo && (
         <ModalConvertirRemision remision={remisionConvirtiendo} onClose={() => setRemisionConvirtiendo(null)} />
+      )}
+      {remisionImprimiendo && (
+        <ModalImprimir
+          urlBase={`/remisiones/${remisionImprimiendo.id}`}
+          titulo={`Imprimir — ${remisionImprimiendo.numero}`}
+          onClose={() => setRemisionImprimiendo(null)}
+        />
       )}
     </div>
   );

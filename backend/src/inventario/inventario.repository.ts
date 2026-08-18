@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { TenantPrismaService } from '../prisma/tenant-prisma.service';
-import { Prisma, TipoMovimientoInventario } from '@prisma/client';
+import { FormatoImpresion, Prisma, TipoMovimientoInventario } from '@prisma/client';
 
 interface ParamsAjuste {
   tenantId: string;
@@ -175,5 +175,9 @@ export class InventarioRepository {
 
   crearBodega(tenantId: string, nombre: string, direccion?: string) {
     return this.db.bodega.create({ data: { tenantId, nombre, direccion } });
+  }
+
+  actualizarBodega(id: string, data: { formatoImpresion?: FormatoImpresion | null }) {
+    return this.db.bodega.update({ where: { id }, data });
   }
 }

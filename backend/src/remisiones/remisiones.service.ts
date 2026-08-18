@@ -5,13 +5,18 @@ import { CrearRemisionDto } from './dto/crear-remision.dto';
 import { ConvertirRemisionDto } from './dto/convertir-remision.dto';
 import { ListadoQueryDto } from '../common/dto/listado-query.dto';
 import { paginar } from '../common/types/pagina-resultado';
-import { generarDocumentoPdf } from '../common/pdf/documento-pdf';
+import { DocumentoPdfParams, generarDocumentoPdf } from '../common/pdf/documento-pdf';
+import { generarDocumentoTicketHtml } from '../common/pdf/documento-ticket';
+import { resolverFormatoImpresion } from '../common/impresion/resolver-formato-impresion';
+import { PrismaService } from '../prisma/prisma.service';
+import { FormatoImpresion } from '@prisma/client';
 
 @Injectable()
 export class RemisionesService {
   constructor(
     private readonly remisionesRepository: RemisionesRepository,
     private readonly facturacionService: FacturacionService,
+    private readonly prisma: PrismaService,
   ) {}
 
   crear(dto: CrearRemisionDto, tenantId: string, vendedorId: string) {
@@ -76,9 +81,8 @@ export class RemisionesService {
     return factura;
   }
 
-  async generarPdf(id: string) {
-    const remision = await this.remisionesRepository.buscarPorId(id);
-    return generarDocumentoPdf({
+  private mapearRemisionAParams(remision: Awaited<ReturnType<RemisionesRepository['buscarPorId']>>): DocumentoPdfParams {
+    return {
       tipoDocumento: 'Remisión',
       numero: remision.numero,
       fecha: remision.fecha,
@@ -88,7 +92,25 @@ export class RemisionesService {
         concepto: linea.producto.nombre,
         cantidad: linea.cantidad.toString(),
       })),
-    });
+    };
+  }
+
+  /** @deprecated usar generarImpreso — se mantiene por compatibilidad de la ruta /pdf ya existente. */
+  async generarPdf(id: string) {
+    const remision = await this.remisionesRepository.buscarPorId(id);
+    return generarDocumentoPdf(this.mapearRemisionAParams(remision));
+  }
+
+  async generarImpreso(id: string, formatoSolicitado: FormatoImpresion | undefined, tenantId: string) {
+    const remision = await this.remisionesRepository.buscarPorId(id);
+    const formato = formatoSolicitado ?? (await resolverFormatoImpresion(this.prisma, tenantId, remision.bodegaId));
+    const params = this.mapearRemisionAParams(remision);
+
+    if (formato === 'TERMICA_80MM' || formato === 'TERMICA_58MM') {
+      return { buffer: Buffer.from(generarDocumentoTicketHtml(params, formato), 'utf-8'), contentType: 'text/html; charset=utf-8' };
+    }
+    const buffer = await generarDocumentoPdf(params, { tamanoPagina: formato === 'A4' ? 'a4' : 'letter' });
+    return { buffer, contentType: 'application/pdf' };
   }
 
   private validarQueSigaAbierta(remision: { estado: string; facturaId: string | null }) {

@@ -1,9 +1,10 @@
-import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { InventarioService } from './inventario.service';
 import { AjustarStockDto } from './dto/ajustar-stock.dto';
 import { TransferirStockDto } from './dto/transferir-stock.dto';
 import { CrearBodegaDto } from './dto/crear-bodega.dto';
+import { ActualizarBodegaDto } from './dto/actualizar-bodega.dto';
 import { Permissions } from '../common/decorators/permissions.decorator';
 import { RequiereModulo } from '../common/decorators/requiere-modulo.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -26,6 +27,12 @@ export class InventarioController {
   @Permissions('admin.configuracion')
   crearBodega(@Body() dto: CrearBodegaDto, @CurrentUser() user: JwtPayloadUser) {
     return this.inventarioService.crearBodega(user.tenantId, dto.nombre, dto.direccion);
+  }
+
+  @Patch('bodegas/:id')
+  @Permissions('admin.configuracion')
+  actualizarBodega(@Param('id') id: string, @Body() dto: ActualizarBodegaDto) {
+    return this.inventarioService.actualizarBodega(id, dto);
   }
 
   @Get('stock/:bodegaId')

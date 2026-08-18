@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { FormatoImpresion, Prisma } from '@prisma/client';
 import { InventarioRepository } from './inventario.repository';
 import { ProductosService } from '../productos/productos.service';
 import { EventBusService } from '../event-bus/event-bus.service';
@@ -234,5 +234,9 @@ export class InventarioService {
 
   crearBodega(tenantId: string, nombre: string, direccion?: string) {
     return this.inventarioRepository.crearBodega(tenantId, nombre, direccion);
+  }
+
+  actualizarBodega(id: string, data: { formatoImpresion?: FormatoImpresion | null }) {
+    return this.inventarioRepository.actualizarBodega(id, data);
   }
 }

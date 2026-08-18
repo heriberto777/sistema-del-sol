@@ -2,16 +2,21 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../../lib/api-client';
 import { Input } from '../../atoms/Input/Input';
+import { Select } from '../../atoms/Select/Select';
 import { Button } from '../../atoms/Button/Button';
+import { FORMATOS_IMPRESION } from '../../../constants/formato-impresion';
 
 interface Configuracion {
   clave: string;
   valor: string;
 }
 
+const CLAVE_FORMATO_IMPRESION_DEFAULT = 'FORMATO_IMPRESION_DEFAULT';
+
 function FilaConfiguracion({ configuracion }: { configuracion: Configuracion }) {
   const queryClient = useQueryClient();
   const [valor, setValor] = useState(configuracion.valor);
+  const esFormatoImpresion = configuracion.clave === CLAVE_FORMATO_IMPRESION_DEFAULT;
 
   const guardar = useMutation({
     mutationFn: async () => apiClient.put(`/admin/configuraciones/${configuracion.clave}`, { valor }),
@@ -22,7 +27,17 @@ function FilaConfiguracion({ configuracion }: { configuracion: Configuracion }) 
     <tr>
       <td className="px-4 py-2 font-mono text-xs">{configuracion.clave}</td>
       <td className="px-4 py-2">
-        <Input value={valor} onChange={(e) => setValor(e.target.value)} />
+        {esFormatoImpresion ? (
+          <Select value={valor} onChange={(e) => setValor(e.target.value)}>
+            {FORMATOS_IMPRESION.map((f) => (
+              <option key={f.value} value={f.value}>
+                {f.label}
+              </option>
+            ))}
+          </Select>
+        ) : (
+          <Input value={valor} onChange={(e) => setValor(e.target.value)} />
+        )}
       </td>
       <td className="px-4 py-2">
         <Button

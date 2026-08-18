@@ -54,4 +54,8 @@ export const CONFIGURACIONES_BASE: Record<string, string> = {
   // PosService.cerrarTurno): si |diferencia| del arqueo supera este monto
   // (RD$), exige justificacionDiferencia para poder cerrar el turno.
   POS_TOLERANCIA_ARQUEO: '50',
+  // Formato de impresión por defecto para Facturación/Cotizaciones/
+  // Remisiones/POS (ver resolver-formato-impresion.ts) — un valor del
+  // enum FormatoImpresion. Una Bodega puede anularlo puntualmente.
+  FORMATO_IMPRESION_DEFAULT: 'CARTA',
 };
