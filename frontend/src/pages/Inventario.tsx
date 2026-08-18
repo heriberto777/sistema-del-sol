@@ -9,7 +9,9 @@ import { FormField } from '../components/molecules/FormField/FormField';
 import { Modal } from '../components/molecules/Modal/Modal';
 import { EstadoVacio } from '../components/molecules/EstadoVacio/EstadoVacio';
 import { RequierePermiso } from '../components/organisms/RequierePermiso/RequierePermiso';
+import { RowActionsMenu } from '../components/molecules/RowActionsMenu/RowActionsMenu';
 import { SearchInput } from '../components/molecules/SearchInput/SearchInput';
+import { useAuth } from '../hooks/useAuth';
 import { Paginacion } from '../components/molecules/Paginacion/Paginacion';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { PaginaResultado } from '../types/pagina-resultado';
@@ -37,11 +39,14 @@ interface Stock {
 }
 
 export function Inventario() {
+  const { tienePermiso } = useAuth();
+  const tienePermisoAjustar = tienePermiso('inventario.ajustar');
+  const tienePermisoTransferir = tienePermiso('inventario.transferir');
   const [searchParams, setSearchParams] = useSearchParams();
   const [bodegaSeleccionadaId, setBodegaSeleccionadaId] = useState<string | null>(null);
   const [modalNuevaBodega, setModalNuevaBodega] = useState(false);
-  const [modalAjustar, setModalAjustar] = useState(false);
-  const [modalTransferir, setModalTransferir] = useState(false);
+  const [productoAjustando, setProductoAjustando] = useState<Producto | null>(null);
+  const [productoTransfiriendo, setProductoTransfiriendo] = useState<Producto | null>(null);
   const [bodegaEditandoFormato, setBodegaEditandoFormato] = useState<Bodega | null>(null);
   const [busquedaStock, setBusquedaStock] = useState('');
   const [paginaStock, setPaginaStock] = useState(1);
@@ -138,21 +143,7 @@ export function Inventario() {
 
         {bodegaSeleccionada && (
           <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h2 className="font-medium text-slate-900 dark:text-slate-100">Stock — {bodegaSeleccionada.nombre}</h2>
-              <div className="flex gap-2">
-                <RequierePermiso permiso="inventario.ajustar">
-                  <Button variante="secundario" onClick={() => setModalAjustar(true)}>
-                    Ajustar stock
-                  </Button>
-                </RequierePermiso>
-                <RequierePermiso permiso="inventario.transferir">
-                  <Button variante="secundario" onClick={() => setModalTransferir(true)}>
-                    Transferir stock
-                  </Button>
-                </RequierePermiso>
-              </div>
-            </div>
+            <h2 className="font-medium text-slate-900 dark:text-slate-100">Stock — {bodegaSeleccionada.nombre}</h2>
             <SearchInput
               value={busquedaStock}
               onChange={(v) => {
@@ -170,6 +161,7 @@ export function Inventario() {
                     <th className="px-4 py-2">Reservada</th>
                     <th className="px-4 py-2">Disponible</th>
                     <th className="px-4 py-2">Mínimo</th>
+                    <th className="px-4 py-2" />
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -182,11 +174,23 @@ export function Inventario() {
                       <td className="px-4 py-2">{Number(linea.cantidadReservada)}</td>
                       <td className="px-4 py-2">{Number(linea.cantidadActual) - Number(linea.cantidadReservada)}</td>
                       <td className="px-4 py-2">{Number(linea.stockMinimo)}</td>
+                      <td className="px-4 py-2 text-right">
+                        <RowActionsMenu
+                          acciones={[
+                            ...(tienePermisoAjustar
+                              ? [{ etiqueta: 'Ajustar stock', onClick: () => setProductoAjustando(linea.producto) }]
+                              : []),
+                            ...(tienePermisoTransferir
+                              ? [{ etiqueta: 'Transferir stock', onClick: () => setProductoTransfiriendo(linea.producto) }]
+                              : []),
+                          ]}
+                        />
+                      </td>
                     </tr>
                   ))}
                   {stock?.datos.length === 0 && (
                     <tr>
-                      <td colSpan={5} className="px-4 py-6 text-center text-slate-400">
+                      <td colSpan={6} className="px-4 py-6 text-center text-slate-400">
                         Esta bodega no tiene stock registrado todavía.
                       </td>
                     </tr>
@@ -205,14 +209,19 @@ export function Inventario() {
       {bodegaEditandoFormato && (
         <ModalEditarFormatoBodega bodega={bodegaEditandoFormato} onClose={() => setBodegaEditandoFormato(null)} />
       )}
-      {modalAjustar && bodegaSeleccionadaId && (
-        <ModalAjustarStock bodegaId={bodegaSeleccionadaId} onClose={() => setModalAjustar(false)} />
+      {productoAjustando && bodegaSeleccionadaId && (
+        <ModalAjustarStock
+          bodegaId={bodegaSeleccionadaId}
+          productoInicial={productoAjustando}
+          onClose={() => setProductoAjustando(null)}
+        />
       )}
-      {modalTransferir && bodegaSeleccionadaId && (
+      {productoTransfiriendo && bodegaSeleccionadaId && (
         <ModalTransferirStock
           bodegaOrigenId={bodegaSeleccionadaId}
           bodegas={bodegas ?? []}
-          onClose={() => setModalTransferir(false)}
+          productoInicial={productoTransfiriendo}
+          onClose={() => setProductoTransfiriendo(null)}
         />
       )}
     </div>
@@ -286,21 +295,23 @@ function ModalEditarFormatoBodega({ bodega, onClose }: { bodega: Bodega; onClose
   );
 }
 
-function ModalAjustarStock({ bodegaId, onClose }: { bodegaId: string; onClose: () => void }) {
+function ModalAjustarStock({
+  bodegaId,
+  productoInicial,
+  onClose,
+}: {
+  bodegaId: string;
+  productoInicial: Producto;
+  onClose: () => void;
+}) {
   const queryClient = useQueryClient();
-  const [productoId, setProductoId] = useState('');
   const [cantidad, setCantidad] = useState('');
   const [motivo, setMotivo] = useState('');
   const [error, setError] = useState<string | null>(null);
 
-  const { data: productos } = useQuery({
-    queryKey: ['productos-select'],
-    queryFn: async () => (await apiClient.get<PaginaResultado<Producto>>('/productos', { params: { tamanoPagina: 100 } })).data.datos,
-  });
-
   const ajustar = useMutation({
     mutationFn: async () =>
-      apiClient.post('/inventario/ajustar', { productoId, bodegaId, cantidad: Number(cantidad), motivo }),
+      apiClient.post('/inventario/ajustar', { productoId: productoInicial.id, bodegaId, cantidad: Number(cantidad), motivo }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['stock', bodegaId] });
       onClose();
@@ -319,14 +330,9 @@ function ModalAjustarStock({ bodegaId, onClose }: { bodegaId: string; onClose: (
       <form onSubmit={onSubmit} className="space-y-3">
         <div className="flex flex-col gap-1">
           <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Producto</label>
-          <Select value={productoId} onChange={(e) => setProductoId(e.target.value)} required>
-            <option value="">Seleccionar…</option>
-            {productos?.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.codigo} — {p.nombre}
-              </option>
-            ))}
-          </Select>
+          <p className="rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-700 dark:bg-slate-800/60 dark:text-slate-300">
+            {productoInicial.codigo} — {productoInicial.nombre}
+          </p>
         </div>
         <FormField
           id="ajuste-cantidad"
@@ -349,27 +355,23 @@ function ModalAjustarStock({ bodegaId, onClose }: { bodegaId: string; onClose: (
 function ModalTransferirStock({
   bodegaOrigenId,
   bodegas,
+  productoInicial,
   onClose,
 }: {
   bodegaOrigenId: string;
   bodegas: Bodega[];
+  productoInicial: Producto;
   onClose: () => void;
 }) {
   const queryClient = useQueryClient();
-  const [productoId, setProductoId] = useState('');
   const [bodegaDestinoId, setBodegaDestinoId] = useState('');
   const [cantidad, setCantidad] = useState('');
   const [error, setError] = useState<string | null>(null);
 
-  const { data: productos } = useQuery({
-    queryKey: ['productos-select'],
-    queryFn: async () => (await apiClient.get<PaginaResultado<Producto>>('/productos', { params: { tamanoPagina: 100 } })).data.datos,
-  });
-
   const transferir = useMutation({
     mutationFn: async () =>
       apiClient.post('/inventario/transferir', {
-        productoId,
+        productoId: productoInicial.id,
         bodegaOrigenId,
         bodegaDestinoId,
         cantidad: Number(cantidad),
@@ -393,14 +395,9 @@ function ModalTransferirStock({
       <form onSubmit={onSubmit} className="space-y-3">
         <div className="flex flex-col gap-1">
           <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Producto</label>
-          <Select value={productoId} onChange={(e) => setProductoId(e.target.value)} required>
-            <option value="">Seleccionar…</option>
-            {productos?.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.codigo} — {p.nombre}
-              </option>
-            ))}
-          </Select>
+          <p className="rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-700 dark:bg-slate-800/60 dark:text-slate-300">
+            {productoInicial.codigo} — {productoInicial.nombre}
+          </p>
         </div>
         <div className="flex flex-col gap-1">
           <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Bodega destino</label>

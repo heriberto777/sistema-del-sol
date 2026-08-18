@@ -1,61 +1,143 @@
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import clsx from 'clsx';
+import {
+  Ban,
+  Banknote,
+  Check,
+  CheckCircle2,
+  Eye,
+  FileText,
+  type LucideIcon,
+  MoreVertical,
+  PackageCheck,
+  Pencil,
+  Printer,
+  Send,
+  Tag,
+  Trash2,
+  Undo2,
+  X,
+} from 'lucide-react';
 
 interface Accion {
   etiqueta: string;
   onClick: () => void;
   tono?: 'peligro';
+  /** Si se omite, se infiere de la etiqueta (ver INFERENCIA_ICONO) — no hace falta tocar cada llamado para tener íconos consistentes. */
+  icono?: LucideIcon;
+}
+
+/** Orden de evaluación importa: la primera coincidencia gana (ej. "Ver detalle" no debe caer en "detalle" si hubiera dos reglas ambiguas). */
+const INFERENCIA_ICONO: [RegExp, LucideIcon][] = [
+  [/imprimir/i, Printer],
+  [/^ver\b|ver detalle|ver entregas/i, Eye],
+  [/eliminar/i, Trash2],
+  [/anular|rechazar/i, Ban],
+  [/editar/i, Pencil],
+  [/aceptar|marcar entregada|marcar pagado/i, CheckCircle2],
+  [/enviar/i, Send],
+  [/cobro|pago/i, Banknote],
+  [/recibir/i, PackageCheck],
+  [/devolver/i, Undo2],
+  [/convertir/i, FileText],
+  [/precio/i, Tag],
+  [/confirmar/i, Check],
+  [/cancelar|cerrar/i, X],
+];
+
+function inferirIcono(etiqueta: string): LucideIcon | undefined {
+  return INFERENCIA_ICONO.find(([patron]) => patron.test(etiqueta))?.[1];
 }
 
 /**
- * Menú de "más acciones" por fila (⋮) — sin librería externa, cierra al
- * hacer click fuera. Reemplaza los botones de texto sueltos por fila
- * cuando una fila tiene más de una acción posible.
+ * Menú de "más acciones" por fila — trigger con ícono real (no el
+ * carácter "⋮" plano de antes, muy poco descubrible) y el panel
+ * desplegable se renderiza vía portal a `document.body` con posición
+ * `fixed` calculada del botón: así nunca se corta contra el
+ * `overflow-x-auto` de la tabla contenedora (antes sí podía pasar, ver
+ * ARCHITECTURE.md/notas de la fase de UI).
  */
 export function RowActionsMenu({ acciones }: { acciones: Accion[] }) {
   const [abierto, setAbierto] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const [posicion, setPosicion] = useState<{ top: number; left: number } | null>(null);
+  const botonRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (!abierto) return;
+
     function onClickFuera(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setAbierto(false);
+      const objetivo = e.target as Node;
+      if (menuRef.current?.contains(objetivo) || botonRef.current?.contains(objetivo)) return;
+      setAbierto(false);
+    }
+    function cerrar() {
+      setAbierto(false);
     }
     document.addEventListener('mousedown', onClickFuera);
-    return () => document.removeEventListener('mousedown', onClickFuera);
-  }, []);
+    window.addEventListener('scroll', cerrar, true);
+    window.addEventListener('resize', cerrar);
+    return () => {
+      document.removeEventListener('mousedown', onClickFuera);
+      window.removeEventListener('scroll', cerrar, true);
+      window.removeEventListener('resize', cerrar);
+    };
+  }, [abierto]);
+
+  function alternar() {
+    if (!abierto && botonRef.current) {
+      const rect = botonRef.current.getBoundingClientRect();
+      const ANCHO_MENU = 176; // w-44
+      setPosicion({ top: rect.bottom + 4, left: Math.min(rect.right - ANCHO_MENU, window.innerWidth - ANCHO_MENU - 8) });
+    }
+    setAbierto((v) => !v);
+  }
 
   return (
-    <div className="relative inline-block text-left" ref={ref}>
+    <>
       <button
+        ref={botonRef}
         type="button"
-        onClick={() => setAbierto((v) => !v)}
-        className="rounded px-2 py-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+        onClick={alternar}
+        className="rounded-md border border-slate-200 p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
         aria-label="Más acciones"
       >
-        ⋮
+        <MoreVertical size={16} />
       </button>
-      {abierto && (
-        <div className="absolute right-0 z-10 mt-1 w-44 rounded-md border border-slate-200 bg-white py-1 shadow-lg dark:border-slate-800 dark:bg-slate-900">
-          {acciones.map((accion) => (
-            <button
-              key={accion.etiqueta}
-              type="button"
-              onClick={() => {
-                setAbierto(false);
-                accion.onClick();
-              }}
-              className={clsx(
-                'block w-full px-3 py-2 text-left text-sm',
-                accion.tono === 'peligro'
-                  ? 'text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20'
-                  : 'text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800',
-              )}
-            >
-              {accion.etiqueta}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
+      {abierto &&
+        posicion &&
+        createPortal(
+          <div
+            ref={menuRef}
+            style={{ position: 'fixed', top: posicion.top, left: posicion.left }}
+            className="z-50 w-44 rounded-md border border-slate-200 bg-white py-1 shadow-lg dark:border-slate-800 dark:bg-slate-900"
+          >
+            {acciones.map((accion) => {
+              const Icono = accion.icono ?? inferirIcono(accion.etiqueta);
+              return (
+                <button
+                  key={accion.etiqueta}
+                  type="button"
+                  onClick={() => {
+                    setAbierto(false);
+                    accion.onClick();
+                  }}
+                  className={clsx(
+                    'flex w-full items-center gap-2 px-3 py-2 text-left text-sm',
+                    accion.tono === 'peligro'
+                      ? 'text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20'
+                      : 'text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800',
+                  )}
+                >
+                  {Icono && <Icono size={15} className="shrink-0" />}
+                  {accion.etiqueta}
+                </button>
+              );
+            })}
+          </div>,
+          document.body,
+        )}
+    </>
   );
 }

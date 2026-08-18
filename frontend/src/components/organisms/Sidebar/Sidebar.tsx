@@ -42,7 +42,6 @@ const GRUPOS: Grupo[] = [
       { ruta: '/inventario', etiqueta: 'Inventario', permisos: ['inventario.ver'], modulo: 'inventario' },
       { ruta: '/compras', etiqueta: 'Compras', permisos: ['compras.ver'], modulo: 'compras' },
       { ruta: '/productos', etiqueta: 'Productos', permisos: ['precios.ver'], modulo: 'productos' },
-      { ruta: '/gastos-menores', etiqueta: 'Gastos menores', permisos: ['gastosmenores.ver'], modulo: 'gastosmenores' },
     ],
   },
   {
@@ -51,6 +50,12 @@ const GRUPOS: Grupo[] = [
     items: [
       { ruta: '/contabilidad', etiqueta: 'Contabilidad', permisos: ['contabilidad.ver'] },
       { ruta: '/bancos', etiqueta: 'Bancos', permisos: ['bancos.ver'], modulo: 'bancos' },
+      // Aunque el nombre sugiere "compras", lo que hace en el código es
+      // 100% financiero: exige NCF fiscal, descuenta de una cuenta
+      // bancaria puntual, valida que el período contable esté abierto, y
+      // genera un asiento contable automático — no toca inventario ni
+      // proveedores en ningún momento.
+      { ruta: '/gastos-menores', etiqueta: 'Gastos menores', permisos: ['gastosmenores.ver'], modulo: 'gastosmenores' },
       { ruta: '/reportes', etiqueta: 'Reportes', permisos: ['reportes.ver'] },
     ],
   },

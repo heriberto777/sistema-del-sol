@@ -8,6 +8,7 @@ import { Modal } from '../components/molecules/Modal/Modal';
 import { SearchInput } from '../components/molecules/SearchInput/SearchInput';
 import { Paginacion } from '../components/molecules/Paginacion/Paginacion';
 import { EstadoVacio } from '../components/molecules/EstadoVacio/EstadoVacio';
+import { RowActionsMenu } from '../components/molecules/RowActionsMenu/RowActionsMenu';
 import { RequierePermiso } from '../components/organisms/RequierePermiso/RequierePermiso';
 import { useAuth } from '../hooks/useAuth';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
@@ -34,6 +35,8 @@ export function Bancos() {
   const [pagina, setPagina] = useState(1);
   const busquedaDebounced = useDebouncedValue(busqueda);
   const [modalAbierto, setModalAbierto] = useState(false);
+  const [cuentaEditando, setCuentaEditando] = useState<CuentaBancaria | null>(null);
+  const queryClient = useQueryClient();
 
   const { data } = useQuery({
     queryKey: ['bancos', pagina, busquedaDebounced],
@@ -43,6 +46,11 @@ export function Bancos() {
           params: { pagina, busqueda: busquedaDebounced || undefined },
         })
       ).data,
+  });
+
+  const desactivar = useMutation({
+    mutationFn: async (id: string) => apiClient.patch(`/bancos/${id}`, { activa: false }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['bancos'] }),
   });
 
   return (
@@ -77,6 +85,7 @@ export function Bancos() {
                   <th className="px-4 py-2">Número de cuenta</th>
                   <th className="px-4 py-2">Tipo</th>
                   <th className="px-4 py-2">Cuenta contable</th>
+                  <th className="px-4 py-2" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -87,6 +96,24 @@ export function Bancos() {
                     <td className="px-4 py-2">{c.tipoCuenta === 'CORRIENTE' ? 'Corriente' : 'Ahorros'}</td>
                     <td className="px-4 py-2">
                       {c.cuentaContable.codigo} — {c.cuentaContable.nombre}
+                    </td>
+                    <td className="px-4 py-2 text-right">
+                      {tienePermiso('bancos.editar') && (
+                        <RowActionsMenu
+                          acciones={[
+                            { etiqueta: 'Editar', onClick: () => setCuentaEditando(c) },
+                            {
+                              etiqueta: 'Desactivar',
+                              tono: 'peligro',
+                              onClick: () => {
+                                if (window.confirm(`¿Desactivar la cuenta ${c.banco} — ${c.numeroCuenta}?`)) {
+                                  desactivar.mutate(c.id);
+                                }
+                              },
+                            },
+                          ]}
+                        />
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -104,16 +131,21 @@ export function Bancos() {
           <FormularioCuentaBancaria onGuardado={() => setModalAbierto(false)} />
         </Modal>
       )}
+      {cuentaEditando && (
+        <Modal titulo={`Editar cuenta — ${cuentaEditando.banco}`} onClose={() => setCuentaEditando(null)}>
+          <FormularioCuentaBancaria cuenta={cuentaEditando} onGuardado={() => setCuentaEditando(null)} />
+        </Modal>
+      )}
     </div>
   );
 }
 
-function FormularioCuentaBancaria({ onGuardado }: { onGuardado: () => void }) {
+function FormularioCuentaBancaria({ cuenta, onGuardado }: { cuenta?: CuentaBancaria; onGuardado: () => void }) {
   const queryClient = useQueryClient();
-  const [banco, setBanco] = useState('');
-  const [numeroCuenta, setNumeroCuenta] = useState('');
-  const [tipoCuenta, setTipoCuenta] = useState<'CORRIENTE' | 'AHORROS'>('CORRIENTE');
-  const [cuentaContableId, setCuentaContableId] = useState('');
+  const [banco, setBanco] = useState(cuenta?.banco ?? '');
+  const [numeroCuenta, setNumeroCuenta] = useState(cuenta?.numeroCuenta ?? '');
+  const [tipoCuenta, setTipoCuenta] = useState<'CORRIENTE' | 'AHORROS'>(cuenta?.tipoCuenta ?? 'CORRIENTE');
+  const [cuentaContableId, setCuentaContableId] = useState(cuenta?.cuentaContable.id ?? '');
   const [error, setError] = useState<string | null>(null);
 
   const { data: cuentas } = useQuery({
@@ -123,7 +155,10 @@ function FormularioCuentaBancaria({ onGuardado }: { onGuardado: () => void }) {
   const cuentasActivo = (cuentas ?? []).filter((c) => c.tipo === 'ACTIVO');
 
   const guardar = useMutation({
-    mutationFn: async () => apiClient.post('/bancos', { banco, numeroCuenta, tipoCuenta, cuentaContableId }),
+    mutationFn: async () => {
+      const datos = { banco, numeroCuenta, tipoCuenta, cuentaContableId };
+      return cuenta ? apiClient.patch(`/bancos/${cuenta.id}`, datos) : apiClient.post('/bancos', datos);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['bancos'] });
       onGuardado();
@@ -167,7 +202,7 @@ function FormularioCuentaBancaria({ onGuardado }: { onGuardado: () => void }) {
       </div>
       {error && <p className="text-sm text-red-600">{error}</p>}
       <Button type="submit" disabled={guardar.isPending} className="w-full">
-        {guardar.isPending ? 'Guardando…' : 'Guardar'}
+        {guardar.isPending ? 'Guardando…' : cuenta ? 'Guardar cambios' : 'Guardar'}
       </Button>
     </form>
   );
