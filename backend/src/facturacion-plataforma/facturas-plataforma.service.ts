@@ -114,12 +114,13 @@ export class FacturasPlataformaService {
     }
 
     const factura = await this.facturasPlataformaRepository.buscarPorId(facturaId);
+    const enlacePago = `${process.env.FRONTEND_URL ?? 'http://localhost:5173'}/pagar/${factura.id}`;
     const asunto =
       motivo === 'generada' ? 'Nueva factura de tu suscripción — El Sistema del Sol' : 'Factura vencida — El Sistema del Sol';
     const cuerpo =
       motivo === 'generada'
-        ? `<p>Se generó una nueva factura por tu suscripción: <strong>${factura.concepto}</strong>.</p><p>Total: RD$ ${Number(factura.total).toLocaleString('es-DO')}, vence el ${factura.fechaVencimiento.toLocaleDateString('es-DO')}.</p>`
-        : `<p>Tu factura <strong>${factura.concepto}</strong> venció sin pago registrado y se le aplicó un cargo por mora.</p><p>Nuevo total: RD$ ${Number(factura.total).toLocaleString('es-DO')}.</p>`;
+        ? `<p>Se generó una nueva factura por tu suscripción: <strong>${factura.concepto}</strong>.</p><p>Total: RD$ ${Number(factura.total).toLocaleString('es-DO')}, vence el ${factura.fechaVencimiento.toLocaleDateString('es-DO')}.</p><p><a href="${enlacePago}">Pagar en línea</a></p>`
+        : `<p>Tu factura <strong>${factura.concepto}</strong> venció sin pago registrado y se le aplicó un cargo por mora.</p><p>Nuevo total: RD$ ${Number(factura.total).toLocaleString('es-DO')}.</p><p><a href="${enlacePago}">Pagar en línea</a></p>`;
 
     this.logger.debug(`Notificación de factura ${motivo} para ${admin.email}: ${factura.id}`);
     await this.emailChannel.enviar(admin.email, asunto, cuerpo);

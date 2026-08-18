@@ -9,10 +9,15 @@ import { FacturasPlataformaRepository } from './facturas-plataforma.repository';
 import { PagosPlataformaService } from './pagos-plataforma.service';
 import { PagosPlataformaRepository } from './pagos-plataforma.repository';
 import { FacturasPlataformaCronService } from './facturas-plataforma-cron.service';
+import { PagoPublicoController } from './pago-publico.controller';
+import { PasarelaPagoService } from './pasarela/pasarela-pago.service';
+import { StripeAdapter } from './pasarela/stripe.adapter';
+import { AzulAdapter } from './pasarela/azul.adapter';
+import { CardNetAdapter } from './pasarela/cardnet.adapter';
 
 @Module({
   imports: [NotificacionesModule],
-  controllers: [SuscripcionController, FacturasPlataformaController],
+  controllers: [SuscripcionController, FacturasPlataformaController, PagoPublicoController],
   providers: [
     SuscripcionesService,
     SuscripcionesRepository,
@@ -21,6 +26,10 @@ import { FacturasPlataformaCronService } from './facturas-plataforma-cron.servic
     PagosPlataformaService,
     PagosPlataformaRepository,
     FacturasPlataformaCronService,
+    PasarelaPagoService,
+    StripeAdapter,
+    AzulAdapter,
+    CardNetAdapter,
   ],
 })
 export class FacturacionPlataformaModule {}

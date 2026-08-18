@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { PagosPlataformaRepository } from './pagos-plataforma.repository';
 import { FacturasPlataformaRepository } from './facturas-plataforma.repository';
 import { FacturasPlataformaService } from './facturas-plataforma.service';
@@ -8,6 +8,8 @@ const EPSILON = 0.005; // tolerancia de redondeo en centavos, igual que PagosSer
 
 @Injectable()
 export class PagosPlataformaService {
+  private readonly logger = new Logger(PagosPlataformaService.name);
+
   constructor(
     private readonly pagosPlataformaRepository: PagosPlataformaRepository,
     private readonly facturasPlataformaRepository: FacturasPlataformaRepository,
@@ -38,6 +40,39 @@ export class PagosPlataformaService {
     });
 
     if (pendiente - dto.monto <= EPSILON) {
+      await this.facturasPlataformaService.marcarPagada(facturaId, fecha);
+    }
+
+    return pago;
+  }
+
+  /**
+   * Registrado por el webhook de la pasarela de pago, nunca por un
+   * admin de plataforma (registradoPorId: null). Idempotente a
+   * propósito: Stripe reintenta el webhook si no recibe 200, así que
+   * debe poder llamarse de nuevo sin duplicar el pago ni tirar una
+   * excepción que dispare más reintentos.
+   */
+  async registrarPagoGateway(facturaId: string, params: { monto: number; referenciaExterna: string }) {
+    const factura = await this.facturasPlataformaRepository.buscarPorId(facturaId);
+    if (factura.estado === 'PAGADA' || factura.estado === 'ANULADA') {
+      this.logger.warn(`Webhook de pago recibido para una factura ya ${factura.estado} — ignorado (${facturaId})`);
+      return null;
+    }
+
+    const fecha = new Date();
+    const pago = await this.pagosPlataformaRepository.crear({
+      facturaId,
+      monto: params.monto,
+      metodoPago: 'TARJETA',
+      referencia: params.referenciaExterna,
+      fecha,
+      registradoPorId: null,
+    });
+
+    const totalPagado = await this.pagosPlataformaRepository.sumaPagosFactura(facturaId);
+    const total = Number(factura.total);
+    if (total - totalPagado <= EPSILON) {
       await this.facturasPlataformaService.marcarPagada(facturaId, fecha);
     }
 

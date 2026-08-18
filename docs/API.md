@@ -66,6 +66,14 @@ pasa ninguna de ellas.
 | GET | `/api/platform/facturas/:id/pagos` | `platform.facturacion.ver` | `{ pagos, totalPagado }` |
 | POST | `/api/platform/facturas/:id/pagos` | `platform.pagos.registrar` | `{ monto, metodoPago, referencia?, fecha? }` — pagos parciales soportados, marca `PAGADA` al cubrir el total |
 
+## Pagos públicos (pago en línea de una factura — sin autenticación, ver ARCHITECTURE.md)
+
+| Método | Ruta | Auth | Descripción |
+|---|---|---|---|
+| GET | `/api/pagos-publicos/facturas/:facturaId` | público | Datos seguros para la pantalla de pago (tenant, concepto, total, pendiente, estado); 404 si no existe |
+| POST | `/api/pagos-publicos/facturas/:facturaId/checkout` | público | `{ url }` para redirigir a la pasarela activa; 400 si ya está `PAGADA`/`ANULADA` o sin saldo; 503 si la pasarela no está configurada (`STRIPE_SECRET_KEY`) |
+| POST | `/api/pagos-publicos/webhook/stripe` | público (firma verificada) | Header `Stripe-Signature` requerido; 400 si la firma no verifica; en `checkout.session.completed` registra el pago automáticamente (idempotente) |
+
 ## NCF (por tenant)
 
 | Método | Ruta | Permiso |

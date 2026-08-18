@@ -31,6 +31,9 @@ import { PlatformPlanes } from './pages/PlatformPlanes';
 import { PlatformRoles } from './pages/PlatformRoles';
 import { PlatformAdmins } from './pages/PlatformAdmins';
 import { PlatformFacturas } from './pages/PlatformFacturas';
+import { PagarFactura } from './pages/PagarFactura';
+import { PagoExitoso } from './pages/PagoExitoso';
+import { PagoCancelado } from './pages/PagoCancelado';
 
 export const router = createBrowserRouter([
   { path: '*', element: <NoEncontrado /> },
@@ -40,6 +43,9 @@ export const router = createBrowserRouter([
   { path: '/plataforma/login', element: <PlatformLogin /> },
   { path: '/plataforma/olvide-password', element: <PlatformOlvidePassword /> },
   { path: '/plataforma/restablecer-password', element: <PlatformRestablecerPassword /> },
+  { path: '/pagar/:facturaId', element: <PagarFactura /> },
+  { path: '/pagar/:facturaId/exito', element: <PagoExitoso /> },
+  { path: '/pagar/:facturaId/cancelado', element: <PagoCancelado /> },
   {
     element: <RutaProtegidaPlataforma />,
     children: [

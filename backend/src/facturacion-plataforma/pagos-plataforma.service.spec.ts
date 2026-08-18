@@ -69,4 +69,45 @@ describe('PagosPlataformaService', () => {
 
     expect(facturasService.marcarPagada).toHaveBeenCalled();
   });
+
+  describe('registrarPagoGateway', () => {
+    it('es no-op si la factura ya está PAGADA (idempotente ante reintentos del webhook)', async () => {
+      facturasRepo.buscarPorId.mockResolvedValue({ id: 'f1', tenantId: 't1', estado: 'PAGADA', total: 1000 } as never);
+
+      const resultado = await service.registrarPagoGateway('f1', { monto: 1000, referenciaExterna: 'cs_1' });
+
+      expect(resultado).toBeNull();
+      expect(pagosRepo.crear).not.toHaveBeenCalled();
+    });
+
+    it('es no-op si la factura ya está ANULADA', async () => {
+      facturasRepo.buscarPorId.mockResolvedValue({ id: 'f1', tenantId: 't1', estado: 'ANULADA', total: 1000 } as never);
+
+      const resultado = await service.registrarPagoGateway('f1', { monto: 1000, referenciaExterna: 'cs_1' });
+
+      expect(resultado).toBeNull();
+      expect(pagosRepo.crear).not.toHaveBeenCalled();
+    });
+
+    it('registra el pago con metodoPago TARJETA y registradoPorId null', async () => {
+      facturasRepo.buscarPorId.mockResolvedValue({ id: 'f1', tenantId: 't1', estado: 'PENDIENTE', total: 1000 } as never);
+      pagosRepo.sumaPagosFactura.mockResolvedValue(1000);
+
+      await service.registrarPagoGateway('f1', { monto: 1000, referenciaExterna: 'cs_1' });
+
+      expect(pagosRepo.crear).toHaveBeenCalledWith(
+        expect.objectContaining({ facturaId: 'f1', monto: 1000, metodoPago: 'TARJETA', referencia: 'cs_1', registradoPorId: null }),
+      );
+      expect(facturasService.marcarPagada).toHaveBeenCalledWith('f1', expect.any(Date));
+    });
+
+    it('no marca PAGADA si el monto pagado no cubre el total (pago parcial vía pasarela)', async () => {
+      facturasRepo.buscarPorId.mockResolvedValue({ id: 'f1', tenantId: 't1', estado: 'PENDIENTE', total: 1000 } as never);
+      pagosRepo.sumaPagosFactura.mockResolvedValue(400);
+
+      await service.registrarPagoGateway('f1', { monto: 400, referenciaExterna: 'cs_1' });
+
+      expect(facturasService.marcarPagada).not.toHaveBeenCalled();
+    });
+  });
 });

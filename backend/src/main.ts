@@ -5,7 +5,11 @@ import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  // rawBody: true deja request.rawBody (Buffer) disponible en TODAS las
+  // rutas sin desactivar el parseo JSON normal del resto de la app — lo
+  // único que necesita el webhook de Stripe para verificar la firma
+  // (exige el body crudo, no el ya parseado a objeto).
+  const app = await NestFactory.create(AppModule, { rawBody: true });
 
   app.enableCors({
     origin: process.env.CORS_ORIGIN?.split(',') ?? 'http://localhost:5173',

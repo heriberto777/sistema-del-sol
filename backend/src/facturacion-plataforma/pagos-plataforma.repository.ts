@@ -6,7 +6,15 @@ import { PrismaService } from '../prisma/prisma.service';
 export class PagosPlataformaRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  crear(params: { facturaId: string; monto: number; metodoPago: MetodoPago; referencia?: string; fecha: Date; registradoPorId: string }) {
+  crear(params: {
+    facturaId: string;
+    monto: number;
+    metodoPago: MetodoPago;
+    referencia?: string;
+    fecha: Date;
+    // null = lo registró la pasarela de pago vía webhook, ningún admin de plataforma.
+    registradoPorId: string | null;
+  }) {
     return this.prisma.pagoPlataforma.create({ data: params });
   }
 

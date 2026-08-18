@@ -242,6 +242,25 @@ vencimiento); no se puede anular si ya tiene pagos o si ya está
 automática — correr `pnpm --filter ./backend suscripciones:backfill`
 una vez.
 
+**Pasarela de pago** (`backend/src/facturacion-plataforma/pasarela/`):
+el admin del tenant paga en línea desde un link público (sin
+autenticación) que llega en el email de la factura —
+`/pagar/:facturaId` en el frontend, endpoints `/api/pagos-publicos/**`
+en el backend. `PasarelaPagoAdapter` es la interfaz común
+(`crearSesionPago`); `PasarelaPagoService.activa` resuelve cuál usar
+según `PASARELA_PAGO_ACTIVA` (default `stripe`). Solo `StripeAdapter`
+está realmente conectado (REST API vía `fetch` nativo, mismo criterio
+que `IaClientService` con Anthropic — sin SDK oficial, degrada con
+`ServiceUnavailableException` sin `STRIPE_SECRET_KEY`); `AzulAdapter`/
+`CardNetAdapter` son stubs que demuestran que el patrón admite sumarlos
+después. El webhook (`POST /api/pagos-publicos/webhook/stripe`) verifica
+la firma a mano (`stripe-webhook.util.ts`, HMAC-SHA256, sin SDK) y llama
+`PagosPlataformaService.registrarPagoGateway` (idempotente — Stripe
+reintenta si no recibe 200). **Limitación conocida**: Stripe no liquida
+en DOP directo — el cobro de prueba se hace en `STRIPE_CURRENCY`
+(default `usd`) con el mismo monto numérico de la factura, sin
+conversión de tasa de cambio.
+
 ### Módulos con lógica no obvia (ver ARCHITECTURE.md para el detalle)
 
 - **Cotizaciones/Remisiones**: reutilizan `FacturacionService.crear()`

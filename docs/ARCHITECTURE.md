@@ -557,6 +557,65 @@ Permisos nuevos en el catálogo de plataforma:
 (separado de `.gestionar` a propósito — un rol puede poder cobrar sin
 poder editar descuentos/mora).
 
+## Pasarela de pago (`backend/src/facturacion-plataforma/pasarela/`)
+
+Quién paga: **el admin del tenant**, no la plataforma — llega desde un
+link público en el email que ya envía `notificarFactura()`
+(`/pagar/:facturaId`, sin autenticación, prefijo backend
+`/api/pagos-publicos/**` para no chocar con `/api/facturas` de tenant ni
+`/api/platform/facturas`). Diseñada como **adaptador intercambiable**:
+
+```ts
+interface PasarelaPagoAdapter {
+  readonly clave: string;
+  readonly habilitado: boolean;
+  crearSesionPago(params: CrearSesionPagoParams): Promise<SesionPagoResultado>;
+}
+```
+
+`PasarelaPagoService.activa` resuelve cuál usar según
+`PASARELA_PAGO_ACTIVA` (default `'stripe'`) — ni el controller público
+ni `PagosPlataformaService` conocen la pasarela concreta.
+
+- **`StripeAdapter`**: la única realmente conectada. `fetch` nativo
+  directo contra `POST https://api.stripe.com/v1/checkout/sessions`
+  (form-urlencoded) — mismo criterio que `IaClientService` con
+  Anthropic: es un solo POST, no justifica agregar el SDK oficial
+  `stripe` como dependencia. Sin `STRIPE_SECRET_KEY`, `crearSesionPago`
+  lanza `ServiceUnavailableException` sin llegar a llamar `fetch` (nunca
+  crashea la app). `client_reference_id`/`metadata[facturaId]` llevan el
+  id de la factura para que el webhook sepa qué marcar.
+- **`AzulAdapter`/`CardNetAdapter`**: stubs (`habilitado: false`,
+  lanzan `ServiceUnavailableException`) — demuestran que el patrón
+  admite sumar la pasarela real después sin tocar
+  `PasarelaPagoService`, el controller ni `PagosPlataformaService`.
+
+**Verificación de firma del webhook** (`stripe-webhook.util.ts`,
+`verificarFirmaStripe`): hand-rolled con `crypto` nativo (HMAC-SHA256
+sobre `${timestamp}.${body}`, comparación con `timingSafeEqual`, ventana
+de tolerancia anti-replay de 300s) — mismo criterio de `crypto` nativo
+que ya usa `password-reset-token.ts`, tampoco justifica el SDK. Requiere
+el body **crudo** (no el ya parseado a JSON), por eso
+`NestFactory.create(AppModule, { rawBody: true })` en `main.ts` — deja
+`request.rawBody: Buffer` disponible en toda la app sin desactivar el
+parseo JSON normal del resto de las rutas.
+
+`POST /api/pagos-publicos/webhook/stripe` → firma inválida = 400 sin
+tocar nada; en `checkout.session.completed`, llama
+`PagosPlataformaService.registrarPagoGateway(metadata.facturaId, {
+monto, referenciaExterna: session.id })` — **idempotente a propósito**
+(no-op si la factura ya está `PAGADA`/`ANULADA`, nunca lanza): Stripe
+reintenta el webhook si no recibe 200, así que debe poder llamarse de
+nuevo sin duplicar el pago. El pago queda con `metodoPago: 'TARJETA'` y
+`registradoPorId: null` (nadie de plataforma lo registró).
+
+**Limitación conocida de esta fase**: Stripe no liquida en DOP
+directo — el cobro se hace en `STRIPE_CURRENCY` (default `usd`) con el
+mismo monto numérico de la factura, **sin conversión de tasa de
+cambio**. Facturar en DOP real requeriría configurar la cuenta de
+Stripe para liquidar en DOP o aplicar una tasa de conversión — fuera de
+alcance de esta fase.
+
 ## Event Bus
 
 `EventBusService` (`backend/src/event-bus/`) envuelve `EventEmitter2` de
