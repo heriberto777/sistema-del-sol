@@ -29,6 +29,10 @@ export class ClientesService {
     return this.clientesRepository.buscarPorId(id);
   }
 
+  buscarConsumidorFinal() {
+    return this.clientesRepository.buscarConsumidorFinal();
+  }
+
   actualizar(id: string, dto: Partial<CrearClienteDto>) {
     return this.clientesRepository.actualizar(id, dto);
   }

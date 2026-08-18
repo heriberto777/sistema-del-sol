@@ -4,7 +4,7 @@ import { EstadoTurnoCaja, TipoMovimientoCaja } from '@prisma/client';
 
 const INCLUDE_TURNO = {
   movimientos: true,
-  facturas: { select: { id: true, total: true, metodoPago: true, estado: true } },
+  facturas: { select: { id: true, ncf: true, total: true, metodoPago: true, estado: true } },
   cajero: { select: { id: true, nombre: true } },
   cerradoPor: { select: { id: true, nombre: true } },
 } as const;

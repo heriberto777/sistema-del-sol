@@ -1004,6 +1004,46 @@ pasarela), y pagos divididos (una venta usa un solo `metodoPago`, no
 un mix efectivo+tarjeta en la misma factura). La impresión de tickets sí
 está cubierta — ver la sección siguiente.
 
+### UX del cajero: carrito, cliente por defecto, y anulación en el mismo flujo
+
+`TurnoCajaDetalle.tsx` arma la venta como un carrito local (múltiples
+líneas antes de cobrar, cada una pidiendo su precio vigente a
+`GET /precios/:productoId`) y llama `POST /pos/ventas` una sola vez con
+todo el arreglo — el backend ya soportaba `lineas[]`, así que esto es
+puramente frontend. Cliente/Producto usan el nuevo
+`ComboboxBusqueda` (`frontend/src/components/molecules/ComboboxBusqueda/`)
+en vez del `<select>` nativo truncado a 100 registros, contra los
+mismos endpoints paginados que ya existían (`/clientes?busqueda=`,
+`/productos?busqueda=`).
+
+**Cliente "Consumidor Final"**: cada tenant tiene un `Cliente` singleton
+marcado `esConsumidorFinal: true` (sembrado en
+`TenantsRepository.crearConProvisioning`, backfill en
+`backend/scripts/backfill-consumidor-final.ts` para tenants previos),
+resuelto vía `GET /clientes/consumidor-final` y precargado por defecto
+al abrir el carrito de POS — el cajero puede cambiarlo a un cliente
+real buscándolo. Se eligió esto en vez de volver `Factura.clienteId`
+nullable para no tocar reportes/facturación que asumen un cliente
+siempre presente.
+
+**Anulación/devolución desde POS**: reutiliza `POST /facturas/:id/anular`
+tal cual (mismo flujo que Facturación) — no hay endpoint ni lógica
+nueva. El rol `Vendedor` ahora incluye `facturacion.anular` en
+`ROLES_BASE` (antes solo lo tenían roles de supervisión), propagado a
+tenants existentes con el `permisos:backfill` genérico. Una venta
+anulada dentro de un turno abierto deja de contar en el efectivo
+esperado del cierre porque `PosService.cerrarTurno` ya filtraba por
+`estado: 'EMITIDA'`.
+
+**Apertura/cierre de turno en modal**: el cierre muestra el
+`montoEsperado` calculado en el propio frontend (misma fórmula que
+`PosService.cerrarTurno`) ANTES de que el cajero escriba el efectivo
+contado, y la diferencia en vivo contra la tolerancia de referencia
+(RD$50, el default de `POS_TOLERANCIA_ARQUEO`) — es solo una vista
+previa; el backend sigue siendo quien valida y exige
+`justificacionDiferencia` si corresponde, porque el tenant pudo haber
+cambiado esa configuración.
+
 ## Impresión multi-formato (Facturación/Cotizaciones/Remisiones/POS)
 
 Antes, Facturación/Cotizaciones/Remisiones solo generaban PDF a tamaño

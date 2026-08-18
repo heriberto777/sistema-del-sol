@@ -25,6 +25,15 @@ export class ClientesController {
     return this.clientesService.listar(query);
   }
 
+  // Antes de ':id' a propósito — si no, Nest matchea "consumidor-final"
+  // como si fuera un :id (ambas son rutas GET /clientes/*, el orden de
+  // declaración decide).
+  @Get('consumidor-final')
+  @Permissions('clientes.ver')
+  consumidorFinal() {
+    return this.clientesService.buscarConsumidorFinal();
+  }
+
   @Get(':id')
   @Permissions('clientes.ver')
   buscarPorId(@Param('id') id: string) {

@@ -25,7 +25,11 @@ export const ROLES_BASE: Record<string, string[]> = {
   'Admin Total': PERMISOS_BASE,
   Gerente: PERMISOS_BASE.filter((p) => !p.startsWith('admin.')),
   Vendedor: [
-    'facturacion.crear', 'facturacion.ver', 'facturacion.cobrar',
+    // facturacion.anular: para poder anular/devolver una venta de POS
+    // desde el mismo turno (ver TurnoCajaDetalle.tsx) — reusa el mismo
+    // endpoint que Facturación normal, no hay una ruta separada solo
+    // para POS.
+    'facturacion.crear', 'facturacion.ver', 'facturacion.cobrar', 'facturacion.anular',
     'cotizaciones.crear', 'cotizaciones.editar', 'cotizaciones.ver',
     'remisiones.crear', 'remisiones.editar', 'remisiones.ver',
     'clientes.crear', 'clientes.ver', 'precios.ver',

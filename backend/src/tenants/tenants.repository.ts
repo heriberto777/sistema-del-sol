@@ -79,6 +79,11 @@ export class TenantsRepository {
         })),
       });
 
+      // Cliente genérico para POS — ver ClientesController.consumidorFinal.
+      await tx.cliente.create({
+        data: { tenantId: tenant.id, nombre: 'Consumidor Final', esConsumidorFinal: true },
+      });
+
       let adminRoleId: string | undefined;
       for (const [nombreRol, permisos] of Object.entries(ROLES_BASE)) {
         const rol = await tx.role.create({

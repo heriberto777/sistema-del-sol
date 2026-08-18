@@ -4,6 +4,7 @@ import { apiClient } from '../../../lib/api-client';
 import { Badge } from '../../atoms/Badge/Badge';
 import { Button } from '../../atoms/Button/Button';
 import { FormField } from '../../molecules/FormField/FormField';
+import { Modal } from '../../molecules/Modal/Modal';
 import { Paginacion } from '../../molecules/Paginacion/Paginacion';
 import { SearchInput } from '../../molecules/SearchInput/SearchInput';
 import { useAuth } from '../../../hooks/useAuth';
@@ -38,12 +39,9 @@ interface TurnosCajaTableProps {
 }
 
 export function TurnosCajaTable({ seleccionadoId, onSeleccionar }: TurnosCajaTableProps) {
-  const queryClient = useQueryClient();
   const { tienePermiso } = useAuth();
   const [pagina, setPagina] = useState(1);
-  const [bodegaId, setBodegaId] = useState('');
-  const [montoInicial, setMontoInicial] = useState('');
-  const [error, setError] = useState<string | null>(null);
+  const [modalAbrirTurno, setModalAbrirTurno] = useState(false);
   const [filtroCajeroId, setFiltroCajeroId] = useState('');
   const [filtroEstado, setFiltroEstado] = useState('');
   const [filtroDesde, setFiltroDesde] = useState('');
@@ -78,63 +76,12 @@ export function TurnosCajaTable({ seleccionadoId, onSeleccionar }: TurnosCajaTab
       ).data,
   });
 
-  const abrir = useMutation({
-    mutationFn: async () => apiClient.post('/pos/turnos', { bodegaId, montoInicial: Number(montoInicial) }),
-    onSuccess: (respuesta) => {
-      queryClient.invalidateQueries({ queryKey: ['pos-turnos'] });
-      onSeleccionar(respuesta.data.id);
-      setMontoInicial('');
-      setError(null);
-    },
-    onError: () => setError('No se pudo abrir el turno — esa bodega ya podría tener uno abierto.'),
-  });
-
-  function onSubmit(e: FormEvent) {
-    e.preventDefault();
-    abrir.mutate();
-  }
-
   return (
     <div className="space-y-4">
-      {tienePermiso('pos.editar') && (
-      <form
-        onSubmit={onSubmit}
-        className="flex flex-wrap items-end gap-3 rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
-      >
-        <div>
-          <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Bodega</label>
-          <select
-            value={bodegaId}
-            onChange={(e) => setBodegaId(e.target.value)}
-            required
-            className="rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-          >
-            <option value="">Seleccionar…</option>
-            {bodegas?.map((b) => (
-              <option key={b.id} value={b.id}>
-                {b.nombre}
-              </option>
-            ))}
-          </select>
-        </div>
-        <FormField
-          id="turno-monto-inicial"
-          label="Efectivo inicial"
-          type="number"
-          min={0}
-          step="any"
-          value={montoInicial}
-          onChange={(e) => setMontoInicial(e.target.value)}
-          required
-          className="w-40"
-        />
-        <Button type="submit" disabled={abrir.isPending}>
-          {abrir.isPending ? 'Abriendo…' : 'Abrir turno'}
-        </Button>
-      </form>
-      )}
-
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Turnos de caja</h2>
+        {tienePermiso('pos.editar') && <Button onClick={() => setModalAbrirTurno(true)}>Abrir turno</Button>}
+      </div>
 
       <div className="flex flex-wrap items-end gap-3 rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
         <div>
@@ -230,6 +177,84 @@ export function TurnosCajaTable({ seleccionadoId, onSeleccionar }: TurnosCajaTab
           <Paginacion pagina={data.pagina} tamanoPagina={data.tamanoPagina} total={data.total} onCambiarPagina={setPagina} />
         </>
       )}
+
+      {modalAbrirTurno && (
+        <ModalAbrirTurno
+          bodegas={bodegas ?? []}
+          onClose={() => setModalAbrirTurno(false)}
+          onAbierto={(turnoId) => {
+            setModalAbrirTurno(false);
+            onSeleccionar(turnoId);
+          }}
+        />
+      )}
     </div>
+  );
+}
+
+function ModalAbrirTurno({
+  bodegas,
+  onClose,
+  onAbierto,
+}: {
+  bodegas: Bodega[];
+  onClose: () => void;
+  onAbierto: (turnoId: string) => void;
+}) {
+  const queryClient = useQueryClient();
+  const [bodegaId, setBodegaId] = useState('');
+  const [montoInicial, setMontoInicial] = useState('');
+  const [error, setError] = useState<string | null>(null);
+
+  const abrir = useMutation({
+    mutationFn: async () => apiClient.post('/pos/turnos', { bodegaId, montoInicial: Number(montoInicial) }),
+    onSuccess: (respuesta) => {
+      queryClient.invalidateQueries({ queryKey: ['pos-turnos'] });
+      onAbierto(respuesta.data.id);
+    },
+    onError: () => setError('No se pudo abrir el turno — esa bodega ya podría tener uno abierto.'),
+  });
+
+  function onSubmit(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    abrir.mutate();
+  }
+
+  return (
+    <Modal titulo="Abrir turno" onClose={onClose}>
+      <form onSubmit={onSubmit} className="space-y-3">
+        <div>
+          <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Bodega</label>
+          <select
+            value={bodegaId}
+            onChange={(e) => setBodegaId(e.target.value)}
+            required
+            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+          >
+            <option value="">Seleccionar…</option>
+            {bodegas.map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.nombre}
+              </option>
+            ))}
+          </select>
+        </div>
+        <FormField
+          id="turno-monto-inicial"
+          label="Efectivo inicial"
+          type="number"
+          min={0}
+          step="any"
+          value={montoInicial}
+          onChange={(e) => setMontoInicial(e.target.value)}
+          required
+        />
+        {error && <p className="text-sm text-red-600">{error}</p>}
+        <Button type="submit" disabled={abrir.isPending} className="w-full">
+          {abrir.isPending ? 'Abriendo…' : 'Abrir turno'}
+        </Button>
+      </form>
+    </Modal>
   );
 }

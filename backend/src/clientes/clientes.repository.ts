@@ -37,6 +37,11 @@ export class ClientesRepository {
     return this.db.cliente.findUniqueOrThrow({ where: { id }, include: { direcciones: true } });
   }
 
+  /** Sembrado al provisionar el tenant (ver TenantsRepository.crearConProvisioning) — nunca debería faltar, pero null en vez de throw por si un tenant viejo no fue backfilleado todavía. */
+  buscarConsumidorFinal() {
+    return this.db.cliente.findFirst({ where: { esConsumidorFinal: true } });
+  }
+
   actualizar(id: string, dto: Partial<CrearClienteDto>) {
     return this.db.cliente.update({ where: { id }, data: dto });
   }

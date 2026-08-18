@@ -1424,6 +1424,11 @@ model Cliente {
   telefono      String?
   limiteCredito Decimal     @default(0) @db.Decimal(14, 2)
   activo        Boolean     @default(true)
+  // Contacto genérico sembrado al provisionar el tenant (ver
+  // TenantsRepository.crearConProvisioning) — lo usa POS como cliente
+  // por defecto en la venta rápida, para no exigir elegir un cliente
+  // real en cada venta de mostrador.
+  esConsumidorFinal Boolean @default(false)
   createdAt     DateTime    @default(now())
 
   direcciones DireccionCliente[]

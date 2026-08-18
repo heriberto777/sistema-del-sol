@@ -233,6 +233,11 @@ describe('Plataforma (e2e)', () => {
 
       const configuraciones = await prisma.configuracion.findMany({ where: { tenantId: tenantCreadoId } });
       expect(configuraciones.find((c) => c.clave === 'ITBIS_GENERAL')?.valor).toBe('18');
+
+      const consumidorFinal = await prisma.cliente.findFirst({
+        where: { tenantId: tenantCreadoId, esConsumidorFinal: true },
+      });
+      expect(consumidorFinal?.nombre).toBe('Consumidor Final');
     });
 
     it('el usuario admin del tenant recién creado puede hacer login normal', async () => {
@@ -265,6 +270,25 @@ describe('Plataforma (e2e)', () => {
       expect(listado.body).toEqual(
         expect.arrayContaining([expect.objectContaining({ tipoNcf: 'B02', secuenciaFinal: 5000 })]),
       );
+    });
+
+    it('GET /clientes/consumidor-final devuelve el contacto sembrado al provisionar, y el rol Vendedor puede anular facturas', async () => {
+      const loginTenant = await request(app.getHttpServer())
+        .post('/api/auth/login')
+        .send({ email: 'admin@e2e-provisioned.com', password: 'Provisionado123!', tenantSubdominio: SUBDOMINIO_NUEVO });
+      const tokenTenant = loginTenant.body.accessToken;
+
+      const respuesta = await request(app.getHttpServer())
+        .get('/api/clientes/consumidor-final')
+        .set('Authorization', `Bearer ${tokenTenant}`)
+        .expect(200);
+      expect(respuesta.body.nombre).toBe('Consumidor Final');
+
+      const rolVendedor = await prisma.role.findUniqueOrThrow({
+        where: { tenantId_nombre: { tenantId: tenantCreadoId!, nombre: 'Vendedor' } },
+        include: { rolePermissions: { include: { permission: true } } },
+      });
+      expect(rolVendedor.rolePermissions.map((rp) => rp.permission.clave)).toContain('facturacion.anular');
     });
   });
 
