@@ -1035,6 +1035,31 @@ anulada dentro de un turno abierto deja de contar en el efectivo
 esperado del cierre porque `PosService.cerrarTurno` ya filtraba por
 `estado: 'EMITIDA'`.
 
+**Vendedor solo vende por POS — nunca por Facturación directa.** Antes
+`Vendedor` también tenía `facturacion.crear/ver/cobrar`, así que veía
+"Facturación" en el menú y podía cobrar una venta en efectivo ahí
+mismo — una venta que **no queda amarrada a ningún turno** y por lo
+tanto nunca entra al arqueo de caja (un hueco real de control de
+efectivo, no solo de UX). Es el mismo patrón que separan Odoo/Lightspeed:
+el cajero solo opera dentro de una sesión de caja, la app de
+facturación/contabilidad de oficina es otra pantalla para otro rol.
+Arreglado quitándole a `Vendedor` `facturacion.crear/ver/cobrar` — sin
+`facturacion.ver` el ítem "Facturación" del sidebar (gateado en ese
+mismo permiso) deja de aparecer solo, sin tocar `Sidebar.tsx`. Como
+`GET /facturas/:id/pdf`/`/imprimir` (el botón "Imprimir recibo" dentro
+del turno) también estaban gateados en `facturacion.ver`, se separó un
+permiso nuevo **`facturacion.imprimir`** solo para esos dos endpoints —
+`Vendedor` lo tiene sin `facturacion.ver`, y los roles que ya
+imprimían/veían facturas (Admin Total, Gerente, Contador, Auditor)
+lo suman para no perder esa capacidad. Migrar tenants ya provisionados
+necesitó dos scripts: `permisos:backfill` (genérico, solo agrega lo que
+falta) para sumar `facturacion.imprimir` donde corresponde, y un
+one-off `ajustar-permisos-vendedor:migrar`
+(`backend/scripts/ajustar-permisos-vendedor-pos.ts`) para quitarle a
+`Vendedor` los tres permisos que ya no debe tener — el backfill genérico
+es deliberadamente aditivo (nunca borra), así que remover un permiso de
+`ROLES_BASE` siempre va a necesitar un script puntual como este.
+
 **Apertura/cierre de turno en modal**: el cierre muestra el
 `montoEsperado` calculado en el propio frontend (misma fórmula que
 `PosService.cerrarTurno`) ANTES de que el cajero escriba el efectivo

@@ -288,7 +288,14 @@ describe('Plataforma (e2e)', () => {
         where: { tenantId_nombre: { tenantId: tenantCreadoId!, nombre: 'Vendedor' } },
         include: { rolePermissions: { include: { permission: true } } },
       });
-      expect(rolVendedor.rolePermissions.map((rp) => rp.permission.clave)).toContain('facturacion.anular');
+      const clavesVendedor = rolVendedor.rolePermissions.map((rp) => rp.permission.clave);
+      expect(clavesVendedor).toContain('facturacion.anular');
+      expect(clavesVendedor).toContain('facturacion.imprimir');
+      // Vendedor solo vende por POS — nunca por la pantalla de Facturación
+      // directa (ver docs/ARCHITECTURE.md, "Vendedor solo vende por POS").
+      expect(clavesVendedor).not.toContain('facturacion.crear');
+      expect(clavesVendedor).not.toContain('facturacion.ver');
+      expect(clavesVendedor).not.toContain('facturacion.cobrar');
     });
   });
 

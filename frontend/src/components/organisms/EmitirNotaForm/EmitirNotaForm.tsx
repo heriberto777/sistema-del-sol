@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../../lib/api-client';
 import { FormField } from '../../molecules/FormField/FormField';
 import { Button } from '../../atoms/Button/Button';
+import { Modal } from '../../molecules/Modal/Modal';
 import { PaginaResultado } from '../../../types/pagina-resultado';
 
 interface LineaFactura {
@@ -21,7 +22,7 @@ interface Factura {
   lineas: LineaFactura[];
 }
 
-export function EmitirNotaForm() {
+export function EmitirNotaForm({ onClose }: { onClose: () => void }) {
   const queryClient = useQueryClient();
   const [ncfBuscado, setNcfBuscado] = useState('');
   const [facturaOrigen, setFacturaOrigen] = useState<Factura | null>(null);
@@ -78,9 +79,7 @@ export function EmitirNotaForm() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['facturas'] });
-      setFacturaOrigen(null);
-      setNcfBuscado('');
-      setError(null);
+      onClose();
     },
     onError: () => setError('No se pudo emitir la nota. Revisa las cantidades.'),
   });
@@ -91,9 +90,7 @@ export function EmitirNotaForm() {
   }
 
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-      <h2 className="mb-3 font-medium text-slate-900 dark:text-slate-100">Emitir nota de crédito/débito</h2>
-
+    <Modal titulo="Emitir nota de crédito/débito" onClose={onClose}>
       <form onSubmit={buscarFactura} className="flex items-end gap-2">
         <FormField
           id="ncf-buscar"
@@ -101,6 +98,7 @@ export function EmitirNotaForm() {
           value={ncfBuscado}
           onChange={(e) => setNcfBuscado(e.target.value)}
           required
+          className="flex-1"
         />
         <Button type="submit" variante="secundario" disabled={buscando}>
           {buscando ? 'Buscando…' : 'Buscar'}
@@ -116,7 +114,7 @@ export function EmitirNotaForm() {
             <select
               value={tipoNota}
               onChange={(e) => setTipoNota(e.target.value as 'NOTA_CREDITO' | 'NOTA_DEBITO')}
-              className="rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
             >
               <option value="NOTA_CREDITO">Nota de crédito (devuelve mercancía/dinero)</option>
               <option value="NOTA_DEBITO">Nota de débito (cargo adicional)</option>
@@ -147,6 +145,6 @@ export function EmitirNotaForm() {
           </Button>
         </form>
       )}
-    </div>
+    </Modal>
   );
 }

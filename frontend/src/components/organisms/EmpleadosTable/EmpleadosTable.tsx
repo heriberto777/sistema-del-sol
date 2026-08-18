@@ -4,6 +4,7 @@ import { apiClient } from '../../../lib/api-client';
 import { Badge } from '../../atoms/Badge/Badge';
 import { Button } from '../../atoms/Button/Button';
 import { FormField } from '../../molecules/FormField/FormField';
+import { Modal } from '../../molecules/Modal/Modal';
 import { SearchInput } from '../../molecules/SearchInput/SearchInput';
 import { Paginacion } from '../../molecules/Paginacion/Paginacion';
 import { useDebouncedValue } from '../../../hooks/useDebouncedValue';
@@ -26,13 +27,7 @@ export function EmpleadosTable() {
   const [busqueda, setBusqueda] = useState('');
   const [pagina, setPagina] = useState(1);
   const busquedaDebounced = useDebouncedValue(busqueda);
-
-  const [nombre, setNombre] = useState('');
-  const [cedula, setCedula] = useState('');
-  const [cargo, setCargo] = useState('');
-  const [fechaIngreso, setFechaIngreso] = useState('');
-  const [salarioBrutoMensual, setSalarioBrutoMensual] = useState('');
-  const [error, setError] = useState<string | null>(null);
+  const [modalNuevoEmpleado, setModalNuevoEmpleado] = useState(false);
 
   const { data, isLoading, error: errorCarga } = useQuery({
     queryKey: ['nomina-empleados', pagina, busquedaDebounced],
@@ -44,73 +39,17 @@ export function EmpleadosTable() {
       ).data,
   });
 
-  const crear = useMutation({
-    mutationFn: async () =>
-      apiClient.post('/nomina/empleados', {
-        nombre,
-        cedula,
-        cargo,
-        fechaIngreso,
-        salarioBrutoMensual: Number(salarioBrutoMensual),
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['nomina-empleados'] });
-      setNombre('');
-      setCedula('');
-      setCargo('');
-      setFechaIngreso('');
-      setSalarioBrutoMensual('');
-      setError(null);
-    },
-    onError: () => setError('No se pudo crear el empleado — revisá que la cédula no esté repetida.'),
-  });
-
   const desactivar = useMutation({
     mutationFn: async (id: string) => apiClient.patch(`/nomina/empleados/${id}`, { fechaSalida: new Date().toISOString().slice(0, 10) }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['nomina-empleados'] }),
   });
 
-  function onSubmit(e: FormEvent) {
-    e.preventDefault();
-    crear.mutate();
-  }
-
   return (
     <div className="space-y-4">
-      {tienePermiso('nomina.editar') && (
-      <form
-        onSubmit={onSubmit}
-        className="flex flex-wrap items-end gap-3 rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
-      >
-        <FormField id="empleado-nombre" label="Nombre" value={nombre} onChange={(e) => setNombre(e.target.value)} required />
-        <FormField id="empleado-cedula" label="Cédula" value={cedula} onChange={(e) => setCedula(e.target.value)} required className="w-40" />
-        <FormField id="empleado-cargo" label="Cargo" value={cargo} onChange={(e) => setCargo(e.target.value)} required />
-        <FormField
-          id="empleado-fecha-ingreso"
-          label="Fecha de ingreso"
-          type="date"
-          value={fechaIngreso}
-          onChange={(e) => setFechaIngreso(e.target.value)}
-          required
-        />
-        <FormField
-          id="empleado-salario"
-          label="Salario bruto mensual"
-          type="number"
-          min={0}
-          step="any"
-          value={salarioBrutoMensual}
-          onChange={(e) => setSalarioBrutoMensual(e.target.value)}
-          required
-          className="w-40"
-        />
-        <Button type="submit" disabled={crear.isPending}>
-          {crear.isPending ? 'Creando…' : 'Agregar empleado'}
-        </Button>
-      </form>
-      )}
-
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      <div className="flex items-center justify-between">
+        <h2 className="font-medium text-slate-900 dark:text-slate-100">Empleados</h2>
+        {tienePermiso('nomina.editar') && <Button onClick={() => setModalNuevoEmpleado(true)}>Nuevo empleado</Button>}
+      </div>
 
       <SearchInput
         value={busqueda}
@@ -163,6 +102,72 @@ export function EmpleadosTable() {
           <Paginacion pagina={data.pagina} tamanoPagina={data.tamanoPagina} total={data.total} onCambiarPagina={setPagina} />
         </>
       )}
+
+      {modalNuevoEmpleado && <ModalNuevoEmpleado onClose={() => setModalNuevoEmpleado(false)} />}
     </div>
+  );
+}
+
+function ModalNuevoEmpleado({ onClose }: { onClose: () => void }) {
+  const queryClient = useQueryClient();
+  const [nombre, setNombre] = useState('');
+  const [cedula, setCedula] = useState('');
+  const [cargo, setCargo] = useState('');
+  const [fechaIngreso, setFechaIngreso] = useState('');
+  const [salarioBrutoMensual, setSalarioBrutoMensual] = useState('');
+  const [error, setError] = useState<string | null>(null);
+
+  const crear = useMutation({
+    mutationFn: async () =>
+      apiClient.post('/nomina/empleados', {
+        nombre,
+        cedula,
+        cargo,
+        fechaIngreso,
+        salarioBrutoMensual: Number(salarioBrutoMensual),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['nomina-empleados'] });
+      onClose();
+    },
+    onError: () => setError('No se pudo crear el empleado — revisá que la cédula no esté repetida.'),
+  });
+
+  function onSubmit(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    crear.mutate();
+  }
+
+  return (
+    <Modal titulo="Nuevo empleado" onClose={onClose}>
+      <form onSubmit={onSubmit} className="space-y-3">
+        <FormField id="empleado-nombre" label="Nombre" value={nombre} onChange={(e) => setNombre(e.target.value)} required />
+        <FormField id="empleado-cedula" label="Cédula" value={cedula} onChange={(e) => setCedula(e.target.value)} required />
+        <FormField id="empleado-cargo" label="Cargo" value={cargo} onChange={(e) => setCargo(e.target.value)} required />
+        <FormField
+          id="empleado-fecha-ingreso"
+          label="Fecha de ingreso"
+          type="date"
+          value={fechaIngreso}
+          onChange={(e) => setFechaIngreso(e.target.value)}
+          required
+        />
+        <FormField
+          id="empleado-salario"
+          label="Salario bruto mensual"
+          type="number"
+          min={0}
+          step="any"
+          value={salarioBrutoMensual}
+          onChange={(e) => setSalarioBrutoMensual(e.target.value)}
+          required
+        />
+        {error && <p className="text-sm text-red-600">{error}</p>}
+        <Button type="submit" disabled={crear.isPending} className="w-full">
+          {crear.isPending ? 'Creando…' : 'Agregar empleado'}
+        </Button>
+      </form>
+    </Modal>
   );
 }

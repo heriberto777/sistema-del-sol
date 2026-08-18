@@ -32,6 +32,7 @@ export function Facturacion() {
   const { tienePermiso } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const [modalNuevaFactura, setModalNuevaFactura] = useState(false);
+  const [modalNota, setModalNota] = useState(false);
 
   useEffect(() => {
     if (searchParams.get('crear') === '1') {
@@ -45,14 +46,21 @@ export function Facturacion() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Facturación</h1>
-        {tienePermiso('facturacion.crear') && <Button onClick={() => setModalNuevaFactura(true)}>Nueva factura</Button>}
+        <div className="flex gap-2">
+          {tienePermiso('facturacion.crear') && (
+            <Button variante="secundario" onClick={() => setModalNota(true)}>
+              Emitir nota
+            </Button>
+          )}
+          {tienePermiso('facturacion.crear') && <Button onClick={() => setModalNuevaFactura(true)}>Nueva factura</Button>}
+        </div>
       </div>
       <RequierePermiso permiso="facturacion.ver">
-        {tienePermiso('facturacion.crear') && <EmitirNotaForm />}
         <FacturasTable />
       </RequierePermiso>
 
       {modalNuevaFactura && <ModalNuevaFactura onClose={() => setModalNuevaFactura(false)} />}
+      {modalNota && <EmitirNotaForm onClose={() => setModalNota(false)} />}
     </div>
   );
 }

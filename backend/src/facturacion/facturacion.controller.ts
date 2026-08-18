@@ -38,15 +38,18 @@ export class FacturacionController {
   }
 
   @Get(':id/pdf')
-  @Permissions('facturacion.ver')
+  @Permissions('facturacion.imprimir')
   async pdf(@Param('id') id: string, @Res() res: Response) {
     const buffer = await this.facturacionService.generarPdf(id);
     res.set({ 'Content-Type': 'application/pdf', 'Content-Disposition': 'inline; filename="factura.pdf"' });
     res.send(buffer);
   }
 
+  // facturacion.imprimir, no facturacion.ver: separado a propósito para que
+  // Vendedor pueda imprimir el recibo de una venta de POS sin necesitar
+  // acceso a la pantalla general de Facturación (ver roles-base.ts).
   @Get(':id/imprimir')
-  @Permissions('facturacion.ver')
+  @Permissions('facturacion.imprimir')
   async imprimir(
     @Param('id') id: string,
     @Query() query: ImprimirDocumentoQueryDto,

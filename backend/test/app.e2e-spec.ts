@@ -122,6 +122,7 @@ describe('App (e2e)', () => {
       'facturacion.ver',
       'facturacion.anular',
       'facturacion.cobrar',
+      'facturacion.imprimir',
       'cotizaciones.crear',
       'cotizaciones.editar',
       'cotizaciones.ver',
@@ -159,7 +160,7 @@ describe('App (e2e)', () => {
       subdominio: SUBDOMINIO_A,
       nombreRol: 'CompletoA',
       permisos: [
-        'clientes.crear', 'clientes.ver', 'facturacion.crear', 'facturacion.ver', 'facturacion.anular', 'facturacion.cobrar',
+        'clientes.crear', 'clientes.ver', 'facturacion.crear', 'facturacion.ver', 'facturacion.anular', 'facturacion.cobrar', 'facturacion.imprimir',
         'cotizaciones.crear', 'cotizaciones.editar', 'cotizaciones.ver',
         'remisiones.crear', 'remisiones.editar', 'remisiones.ver',
         'contabilidad.ver', 'contabilidad.editar', 'contabilidad.anular', 'contabilidad.cerrarperiodo', 'contabilidad.conciliar',

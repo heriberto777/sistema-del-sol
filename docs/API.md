@@ -94,7 +94,7 @@ pasa ninguna de ellas.
 | GET | `/api/facturas/:id` | `facturacion.ver` |
 | POST | `/api/facturas/:id/anular` | `facturacion.anular` — reversa el efecto de inventario (ver ARCHITECTURE.md); 400 si ya estaba anulada |
 | POST | `/api/facturas/:id/registrar-pago` | `facturacion.cobrar` — `{ fechaPago? }` (default: ahora); 400 si no está EMITIDA o ya estaba pagada |
-| GET | `/api/facturas/:id/imprimir?formato=CARTA\|A4\|TERMICA_80MM\|TERMICA_58MM` | `facturacion.ver` — sin `formato`, resuelve el default (override de bodega > default de tenant > CARTA, ver ARCHITECTURE.md); devuelve PDF o HTML según formato |
+| GET | `/api/facturas/:id/imprimir?formato=CARTA\|A4\|TERMICA_80MM\|TERMICA_58MM` | `facturacion.imprimir` — sin `formato`, resuelve el default (override de bodega > default de tenant > CARTA, ver ARCHITECTURE.md); devuelve PDF o HTML según formato. Separado de `facturacion.ver` para que Vendedor pueda imprimir un recibo de POS sin ver la pantalla general de Facturación |
 
 ## Cotizaciones
 
