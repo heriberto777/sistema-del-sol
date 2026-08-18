@@ -567,7 +567,17 @@ describe('Plataforma (e2e)', () => {
       const acciones = respuesta.body.datos.map((r: { accion: string }) => r.accion);
       expect(acciones.some((a: string) => a.startsWith('POST') && a.includes('tenants'))).toBe(true);
       expect(acciones.some((a: string) => a.startsWith('PATCH') && a.includes('tenants'))).toBe(true);
-      expect(respuesta.body.datos[0].admin?.email).toBe(ADMIN_EMAIL);
+
+      // Se busca la fila de ESTA suspensión puntual (por entidadId + estado)
+      // en vez de asumir que es datos[0]: el audit log se escribe de forma
+      // fire-and-forget (AuditLogInterceptor no espera el INSERT antes de
+      // responder al request), así que el orden real de llegada a Postgres
+      // de dos escrituras async no está garantizado igual al orden lógico
+      // de los tests — asumir "la más reciente" es frágil.
+      const registroSuspension = (
+        respuesta.body.datos as Array<{ entidadId?: string; despues?: { estado?: string }; admin?: { email: string } }>
+      ).find((r) => r.entidadId === tenantExistenteId && r.despues?.estado === 'SUSPENDIDO');
+      expect(registroSuspension?.admin?.email).toBe(ADMIN_EMAIL);
     });
 
     it('un token de tenant normal no puede leer el audit log de plataforma', async () => {
@@ -584,6 +594,94 @@ describe('Plataforma (e2e)', () => {
 
     it('sin token, /platform/audit-log responde 401', async () => {
       await request(app.getHttpServer()).get('/api/platform/audit-log').expect(401);
+    });
+  });
+
+  describe('Configuración de plataforma', () => {
+    const ENCRYPTION_KEY_ORIGINAL = process.env.ENCRYPTION_KEY;
+
+    afterAll(async () => {
+      if (ENCRYPTION_KEY_ORIGINAL === undefined) delete process.env.ENCRYPTION_KEY;
+      else process.env.ENCRYPTION_KEY = ENCRYPTION_KEY_ORIGINAL;
+
+      // No dejar credenciales de prueba pisando el único registro de
+      // configuración (fila singleton, compartida por toda la app).
+      await prisma.plataformaConfiguracion.updateMany({
+        data: {
+          stripeSecretKeyCifrado: null,
+          stripeCurrency: null,
+          webhookUrl: null,
+          webhookSecretCifrado: null,
+        },
+      });
+    });
+
+    it('sin permiso platform.configuracion.ver, GET responde 403', async () => {
+      const EMAIL_SIN_CONFIG = 'e2e-sin-config@sistemadelsol.com';
+      await crearAdminConRol({ email: EMAIL_SIN_CONFIG, nombreRol: 'E2E Sin Config', permisos: ['platform.tenants.ver'] });
+      const login = await request(app.getHttpServer())
+        .post('/api/platform/auth/login')
+        .send({ email: EMAIL_SIN_CONFIG, password: ADMIN_PASSWORD });
+      const token = login.body.accessToken as string;
+
+      await request(app.getHttpServer())
+        .get('/api/platform/configuracion')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(403);
+      await request(app.getHttpServer())
+        .patch('/api/platform/configuracion')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ stripeCurrency: 'usd' })
+        .expect(403);
+
+      await prisma.platformAdmin.deleteMany({ where: { email: EMAIL_SIN_CONFIG } });
+      await prisma.platformRole.deleteMany({ where: { nombre: 'E2E Sin Config' } });
+    });
+
+    it('sin ENCRYPTION_KEY en el entorno, guardar un secreto responde 400 y no lo persiste', async () => {
+      delete process.env.ENCRYPTION_KEY;
+      const tokenPlataforma = await loginPlataforma();
+
+      await request(app.getHttpServer())
+        .patch('/api/platform/configuracion')
+        .set('Authorization', `Bearer ${tokenPlataforma}`)
+        .send({ stripeSecretKey: 'sk_test_sin_clave' })
+        .expect(400);
+
+      process.env.ENCRYPTION_KEY = 'clave-de-prueba-e2e-64-caracteres-para-scrypt-1234567890abcdef';
+      const obtenido = await request(app.getHttpServer())
+        .get('/api/platform/configuracion')
+        .set('Authorization', `Bearer ${tokenPlataforma}`)
+        .expect(200);
+      expect(obtenido.body.pasarela.stripeSecretKeyConfigurado).toBe(false);
+    });
+
+    it('guarda un secreto cifrado, nunca lo devuelve en claro, y "" lo borra', async () => {
+      process.env.ENCRYPTION_KEY = 'clave-de-prueba-e2e-64-caracteres-para-scrypt-1234567890abcdef';
+      const tokenPlataforma = await loginPlataforma();
+
+      const guardado = await request(app.getHttpServer())
+        .patch('/api/platform/configuracion')
+        .set('Authorization', `Bearer ${tokenPlataforma}`)
+        .send({ stripeSecretKey: 'sk_test_e2e_real', stripeCurrency: 'usd' })
+        .expect(200);
+      expect(guardado.body.pasarela.stripeSecretKeyConfigurado).toBe(true);
+      expect(guardado.body.pasarela.currency).toBe('usd');
+      expect(JSON.stringify(guardado.body)).not.toContain('sk_test_e2e_real');
+
+      const obtenido = await request(app.getHttpServer())
+        .get('/api/platform/configuracion')
+        .set('Authorization', `Bearer ${tokenPlataforma}`)
+        .expect(200);
+      expect(obtenido.body.pasarela.stripeSecretKeyConfigurado).toBe(true);
+      expect(JSON.stringify(obtenido.body)).not.toContain('sk_test_e2e_real');
+
+      const borrado = await request(app.getHttpServer())
+        .patch('/api/platform/configuracion')
+        .set('Authorization', `Bearer ${tokenPlataforma}`)
+        .send({ stripeSecretKey: '' })
+        .expect(200);
+      expect(borrado.body.pasarela.stripeSecretKeyConfigurado).toBe(false);
     });
   });
 

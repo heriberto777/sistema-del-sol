@@ -616,6 +616,60 @@ cambio**. Facturar en DOP real requeriría configurar la cuenta de
 Stripe para liquidar en DOP o aplicar una tasa de conversión — fuera de
 alcance de esta fase.
 
+## Configuración de plataforma (`backend/src/plataforma-config/`)
+
+Antes de esta fase, la pasarela de pago, SMTP y Twilio solo se
+configuraban editando `.env` a mano y reiniciando el backend — no había
+ninguna pantalla para el super admin. `PlataformaConfiguracion` es un
+modelo Prisma **fila única** (primer precedente de este patrón en el
+schema: `findFirst({ orderBy: { createdAt: 'asc' } })` + crea con
+defaults si no existe ninguna — determinístico incluso si una carrera
+rarísima llegara a crear dos filas, algo que de hecho ocurrió una vez en
+desarrollo). Todos sus campos son `null`-ables a propósito: `null`
+significa "sin override, seguir usando `.env`".
+
+**Cifrado**: los campos de secreto (`smtpPasswordCifrado`,
+`twilioAuthTokenCifrado`, `stripeSecretKeyCifrado`,
+`stripeWebhookSecretCifrado`, `webhookSecretCifrado`) se guardan con
+AES-256-GCM vía `crypto` nativo (`backend/src/common/utils/encriptado.util.ts`,
+`cifrar`/`descifrar`) — mismo criterio que el resto del proyecto para
+todo lo relacionado a un solo secreto (sin SDK/dependencia nueva).
+Requiere la env var `ENCRYPTION_KEY` (`openssl rand -hex 32`) **solo al
+momento de guardar** un campo cifrado — si falta, `actualizar()`
+responde 400 en vez de guardar en texto plano. `GET
+/platform/configuracion` **nunca** devuelve un secreto en claro: expone
+`{campo}Configurado: boolean` en su lugar. `PATCH` interpreta el valor
+recibido con la convención: string no vacío = nuevo valor (se cifra
+server-side), `""` = borra el override (vuelve a `.env`), campo
+omitido = sin cambios.
+
+**Decisión de diseño clave** (para no tocar código ya estable): en vez
+de inyectar este servicio en `EmailChannel`/`WhatsAppChannel`/
+`StripeAdapter`/`PasarelaPagoService`, `sincronizarEnv()` escribe los
+valores guardados **directo en `process.env`** — una vez en
+`onModuleInit()` (arranque) y de nuevo después de cada `actualizar()`
+exitoso. Solo pisa `process.env.CLAVE` cuando el campo correspondiente
+no es `null` en la fila, así una instalación sin nada guardado en la UI
+sigue funcionando 100% igual que antes, solo por `.env`. Tres de los
+cuatro canales (`WhatsAppChannel`, `StripeAdapter`,
+`PasarelaPagoService.activa`) ya leían `process.env` fresco en cada
+llamada — recogen el cambio sin reiniciar el backend sin que se les
+toque una sola línea. `EmailChannel` sí se ajustó: el transporter de
+Nodemailer pasó de construirse una sola vez (inicializador de campo) a
+construirse dentro de `enviar()`, leyendo `process.env` en ese momento.
+
+**Permisos** `platform.configuracion.ver`/`.gestionar`: solo el rol
+"Super Admin" los tiene por defecto (igual criterio de sensibilidad que
+`platform.admins.gestionar`) — nunca se agregan a Ventas/Soporte,
+porque exponen si hay credenciales de SMTP/Twilio/Stripe configuradas.
+
+**Alcance recortado a propósito**: el bloque "webhook de plataforma"
+(pensado para n8n u otro sistema externo) solo guarda el dato de
+conexión (URL + secreto + activo/inactivo) — todavía no dispara nada.
+Conectarlo a eventos reales (factura generada/vencida) queda para una
+fase posterior, cuando exista un Event Bus de plataforma equivalente al
+de tenants.
+
 ## Event Bus
 
 `EventBusService` (`backend/src/event-bus/`) envuelve `EventEmitter2` de

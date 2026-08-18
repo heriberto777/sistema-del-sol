@@ -31,6 +31,8 @@ import { PlatformPlanes } from './pages/PlatformPlanes';
 import { PlatformRoles } from './pages/PlatformRoles';
 import { PlatformAdmins } from './pages/PlatformAdmins';
 import { PlatformFacturas } from './pages/PlatformFacturas';
+import { PlatformActividad } from './pages/PlatformActividad';
+import { PlatformConfiguracion } from './pages/PlatformConfiguracion';
 import { PagarFactura } from './pages/PagarFactura';
 import { PagoExitoso } from './pages/PagoExitoso';
 import { PagoCancelado } from './pages/PagoCancelado';
@@ -54,6 +56,8 @@ export const router = createBrowserRouter([
       { path: '/plataforma/roles', element: <PlatformRoles /> },
       { path: '/plataforma/admins', element: <PlatformAdmins /> },
       { path: '/plataforma/facturas', element: <PlatformFacturas /> },
+      { path: '/plataforma/actividad', element: <PlatformActividad /> },
+      { path: '/plataforma/configuracion', element: <PlatformConfiguracion /> },
     ],
   },
   {

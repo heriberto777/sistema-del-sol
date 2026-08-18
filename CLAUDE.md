@@ -261,6 +261,21 @@ en DOP directo — el cobro de prueba se hace en `STRIPE_CURRENCY`
 (default `usd`) con el mismo monto numérico de la factura, sin
 conversión de tasa de cambio.
 
+**Configuración de plataforma** (`backend/src/plataforma-config/`,
+`/plataforma/configuracion` en el frontend): pantalla para que el super
+admin configure SMTP/Twilio/pasarela de pago/webhook sin editar `.env`
+a mano. Fila única en Postgres (`PlataformaConfiguracion`); los
+secretos se cifran con AES-256-GCM (`crypto` nativo, requiere
+`ENCRYPTION_KEY` — sin ella, guardar un secreto responde 400) y nunca
+se devuelven en claro (`GET` expone `{campo}Configurado: boolean`). En
+vez de inyectar este servicio en los canales existentes,
+`sincronizarEnv()` escribe los valores guardados directo en
+`process.env` (al arrancar y tras cada `PATCH`) — los canales ya leen
+`process.env` fresco por llamada, así que el cambio aplica sin
+reiniciar el backend. Permisos `platform.configuracion.ver`/
+`.gestionar`: solo Super Admin. El bloque de webhook (para n8n) por
+ahora solo guarda el dato de conexión — no dispara nada todavía.
+
 ### Módulos con lógica no obvia (ver ARCHITECTURE.md para el detalle)
 
 - **Cotizaciones/Remisiones**: reutilizan `FacturacionService.crear()`

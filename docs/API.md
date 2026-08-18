@@ -65,6 +65,8 @@ pasa ninguna de ellas.
 | POST | `/api/platform/facturas/:id/anular` | `platform.facturacion.gestionar` | 400 si ya está `PAGADA` o tiene pagos registrados |
 | GET | `/api/platform/facturas/:id/pagos` | `platform.facturacion.ver` | `{ pagos, totalPagado }` |
 | POST | `/api/platform/facturas/:id/pagos` | `platform.pagos.registrar` | `{ monto, metodoPago, referencia?, fecha? }` — pagos parciales soportados, marca `PAGADA` al cubrir el total |
+| GET | `/api/platform/configuracion` | `platform.configuracion.ver` | Config. general/notificaciones/pasarela/webhook — secretos nunca en claro, solo `{campo}Configurado: boolean` (ver ARCHITECTURE.md) |
+| PATCH | `/api/platform/configuracion` | `platform.configuracion.gestionar` | Campos por sección (`nombreNegocio`, `smtpHost`/`smtpPassword`/…, `twilioAccountSid`/`twilioAuthToken`/…, `pasarelaActiva`/`stripeSecretKey`/…, `webhookUrl`/`webhookSecret`/`webhookActivo`) — en los de secreto: string = nuevo valor, `""` = borra el override, omitido = sin cambios. Aplica en caliente (sin reiniciar) |
 
 ## Pagos públicos (pago en línea de una factura — sin autenticación, ver ARCHITECTURE.md)
 

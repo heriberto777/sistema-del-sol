@@ -16,6 +16,8 @@ const ENLACES: EnlacePlataforma[] = [
   { ruta: '/plataforma/facturas', etiqueta: 'Facturas', permiso: 'platform.facturacion.ver' },
   { ruta: '/plataforma/admins', etiqueta: 'Admins', permiso: 'platform.admins.ver' },
   { ruta: '/plataforma/roles', etiqueta: 'Roles', permiso: 'platform.roles.ver' },
+  { ruta: '/plataforma/actividad', etiqueta: 'Actividad', permiso: 'platform.auditoria.ver' },
+  { ruta: '/plataforma/configuracion', etiqueta: 'Configuración', permiso: 'platform.configuracion.ver' },
 ];
 
 /** Header compartido por las páginas de plataforma — evita repetir título/nav/logout en cada una. */

@@ -316,6 +316,47 @@ model PagoPlataforma {
   @@map("pagos_plataforma")
 }
 
+// Fila única (sin tenantId, catálogo/config global de plataforma — misma
+// categoría que Modulo/Plan). Todo nullable a propósito: null = "sin
+// override, seguir usando la variable de entorno correspondiente" — ver
+// PlataformaConfiguracionService.sincronizarEnv(). Los campos *Cifrado
+// se guardan con encriptado.util.ts (AES-256-GCM), nunca en texto plano.
+model PlataformaConfiguracion {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // General
+  nombreNegocio String?
+
+  // Notificaciones — email (SMTP)
+  emailHabilitado     Boolean?
+  smtpHost            String?
+  smtpPort            Int?
+  smtpUser            String?
+  smtpPasswordCifrado String?
+  smtpFrom            String?
+
+  // Notificaciones — WhatsApp (Twilio)
+  twilioAccountSid       String?
+  twilioAuthTokenCifrado String?
+  twilioWhatsappFrom     String?
+
+  // Pasarela de pago
+  pasarelaActiva             String?
+  stripeSecretKeyCifrado     String?
+  stripeWebhookSecretCifrado String?
+  stripeCurrency             String?
+
+  // Webhook de plataforma (n8n u otro receptor) — solo dato configurable
+  // todavía, sin disparador de eventos conectado (ver Fase 4 del roadmap).
+  webhookUrl           String?
+  webhookSecretCifrado String?
+  webhookActivo        Boolean @default(false)
+
+  @@map("plataforma_configuracion")
+}
+
 // ============================================================
 // CORE: USUARIOS, ROLES, PERMISOS, AUDITORÍA
 // ============================================================

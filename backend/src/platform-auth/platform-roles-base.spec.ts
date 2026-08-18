@@ -26,4 +26,12 @@ describe('platform-roles-base', () => {
       expect(permisos).not.toContain('platform.roles.gestionar');
     }
   });
+
+  it('ningún rol salvo Super Admin puede ver/gestionar la configuración de plataforma (credenciales sensibles)', () => {
+    for (const [rol, permisos] of Object.entries(ROLES_PLATAFORMA_BASE)) {
+      if (rol === 'Super Admin') continue;
+      expect(permisos).not.toContain('platform.configuracion.ver');
+      expect(permisos).not.toContain('platform.configuracion.gestionar');
+    }
+  });
 });

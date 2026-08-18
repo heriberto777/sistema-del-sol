@@ -16,6 +16,8 @@ export const PERMISOS_PLATAFORMA_BASE = [
   'platform.facturacion.ver',
   'platform.facturacion.gestionar',
   'platform.pagos.registrar',
+  'platform.configuracion.ver',
+  'platform.configuracion.gestionar',
 ];
 
 export const ROLES_PLATAFORMA_BASE: Record<string, string[]> = {
