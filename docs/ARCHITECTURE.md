@@ -247,6 +247,63 @@ prop `tiposFactura?` para filtrar el listado (`['NOTA_CREDITO',
 `{ tipoFactura: { in: [...] } }`) — el listado normal de Facturación
 sigue sin mandar el parámetro, así que no cambia en nada.
 
+## Ofertas — motor de descuentos automáticos (Fase 4b de adopción de Cuadre)
+
+`backend/src/ofertas/` (`Oferta`, tenant-scoped) es un catálogo de
+descuentos automáticos que se resuelven al facturar/cotizar — tres
+alcances: `PRODUCTO` (un producto puntual), `CATEGORIA` (todos los
+productos de una categoría) y `CARRITO` (sobre el subtotal completo de
+la venta, con `montoMinimoCarrito` opcional). `productoId`/
+`categoriaId`/`montoMinimoCarrito` son mutuamente exclusivos según
+`alcance` — validado en `OfertasService.validarAlcance` (el schema no
+lo puede exigir, son todas columnas nullable), mismo criterio que
+`ProductosService.validarComponentes` para las reglas de COMBO.
+
+**No acumulable — decisión explícita del usuario**: si una línea
+matchea más de una oferta (ej. una de su producto y otra de su
+categoría), se aplica la de MAYOR descuento resultante, nunca la suma
+de ambas (`OfertasService.resolverDescuentoLinea`, `Math.max` sobre
+los descuentos de todas las ofertas vigentes que matchean). Mismo
+criterio para ofertas de `CARRITO`: si varias aplican a la vez, gana
+la de mayor descuento, no se suman.
+
+**Solo aplica a ventas nuevas** (`CONTADO`/`CREDITO`) — nunca a
+`NOTA_CREDITO`/`NOTA_DEBITO`, que ajustan un monto YA facturado, no
+calculan una venta fresca (`FacturacionService.crear`, guardia
+`esVentaNormal`). Un descuento manual explícito en la línea (`linea.
+descuento`, aunque sea `0`) siempre gana sobre el automático — nunca
+se resuelve `OfertasService.resolverDescuentoLinea` si el caller ya
+mandó un valor.
+
+**Dos puntos de conexión** (decisión explícita del usuario — las
+ofertas deben verse reflejadas antes de facturar, no solo al momento
+de vender): `FacturacionService.crear()` (con lo cual `PosService` y
+la conversión de Cotización→Factura lo heredan gratis, sin tocarlos)
+y `CotizacionesService.calcularLineas()` — una cotización ya muestra
+el precio con descuento. Remisiones NO lo necesita: `LineaRemision` no
+tiene `precioUnitario` ni `descuento` en su modelo (documento sin
+efecto fiscal, solo cantidades — ver "Cotizaciones y Remisiones" más
+abajo).
+
+**Descuento de carrito y prorrateo de ITBIS**: un descuento de
+`CARRITO` no puede aplicarse como un número suelto al total — para que
+el ITBIS de cada línea siga siendo correcto, `OfertasService.
+resolverDescuentoCarritoTotal()` devuelve el monto total a descontar
+(ya evaluado contra `montoMinimoCarrito`), y `prorratearDescuentoCarrito()`
+(`backend/src/ofertas/prorratear-descuento-carrito.ts`, función pura
+sin acceso a DB, testeada sin mocks) lo reparte proporcionalmente al
+monto de cada línea (después de su propio descuento automático de
+línea, si tuviera uno) — cada `FacturacionService.crear()`/
+`CotizacionesService.calcularLineas()` suma ese extra al `descuento` de
+la línea y recalcula `montoItbis`/`montoTotal` antes de sumar los
+totales finales.
+
+`ofertas.ver`/`ofertas.editar` son permisos nuevos en `PERMISOS_BASE`
+— como con cualquier permiso agregado después de que un tenant ya fue
+provisionado, no llega solo a tenants existentes (ver nota en
+`backfill-permisos.ts`); correr `pnpm --filter ./backend
+permisos:backfill` una vez.
+
 ## Cotizaciones y Remisiones
 
 Documentos sin efecto fiscal que preceden a una factura, cada uno en su

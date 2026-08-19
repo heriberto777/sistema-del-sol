@@ -14,6 +14,7 @@ export const PERMISOS_BASE = [
   'notificaciones.ver',
   'inventario.ver', 'inventario.ajustar', 'inventario.transferir',
   'precios.ver', 'precios.editar',
+  'ofertas.ver', 'ofertas.editar',
   'compras.crear', 'compras.recibir', 'compras.pagar', 'compras.ver',
   'clientes.crear', 'clientes.editar', 'clientes.ver',
   'reportes.ver',

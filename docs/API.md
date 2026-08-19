@@ -105,6 +105,19 @@ pasa ninguna de ellas.
 | GET | `/api/facturas/:id/pagos` | `facturacion.ver` — `{ pagos, totalPagado }` |
 | GET | `/api/facturas/:id/imprimir?formato=CARTA\|A4\|TERMICA_80MM\|TERMICA_58MM` | `facturacion.imprimir` — sin `formato`, resuelve el default (override de bodega > default de tenant > CARTA, ver ARCHITECTURE.md); devuelve PDF o HTML según formato. Separado de `facturacion.ver` para que Vendedor pueda imprimir un recibo de POS sin ver la pantalla general de Facturación |
 
+## Ofertas (Fase 4b de adopción de Cuadre)
+
+Descuentos automáticos, resueltos al facturar/cotizar (ver
+ARCHITECTURE.md) — este CRUD solo administra el catálogo, la resolución
+en sí no es un endpoint propio.
+
+| Método | Ruta | Permiso |
+|---|---|---|
+| POST | `/api/ofertas` | `ofertas.editar` — `{ nombre, tipoDescuento: PORCENTAJE\|MONTO_FIJO, valor, alcance: PRODUCTO\|CATEGORIA\|CARRITO, productoId?, categoriaId?, montoMinimoCarrito?, fechaInicio, fechaFin }`; `productoId`/`categoriaId`/`montoMinimoCarrito` son mutuamente exclusivos según `alcance` (400 si no corresponden) |
+| GET | `/api/ofertas` | `ofertas.ver` |
+| PATCH | `/api/ofertas/:id` | `ofertas.editar` — mismas reglas de exclusividad que crear |
+| DELETE | `/api/ofertas/:id` | `ofertas.editar` |
+
 ## Cotizaciones
 
 | Método | Ruta | Permiso |

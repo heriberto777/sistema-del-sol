@@ -3,6 +3,8 @@ import { CotizacionesRepository } from './cotizaciones.repository';
 import { FacturacionService } from '../facturacion/facturacion.service';
 import { ClientesService } from '../clientes/clientes.service';
 import { VariantesService } from '../variantes/variantes.service';
+import { OfertasService } from '../ofertas/ofertas.service';
+import { prorratearDescuentoCarrito } from '../ofertas/prorratear-descuento-carrito';
 import { CrearCotizacionDto } from './dto/crear-cotizacion.dto';
 import { ConvertirCotizacionDto } from './dto/convertir-cotizacion.dto';
 import { ListadoQueryDto } from '../common/dto/listado-query.dto';
@@ -30,10 +32,19 @@ export class CotizacionesService {
     private readonly facturacionService: FacturacionService,
     private readonly clientesService: ClientesService,
     private readonly variantesService: VariantesService,
+    private readonly ofertasService: OfertasService,
     private readonly eventBus: EventBusService,
     private readonly prisma: PrismaService,
   ) {}
 
+  /**
+   * Resuelve ofertas automáticas (Fase 4b) igual que
+   * `FacturacionService.crear()` — el usuario decidió que una cotización
+   * ya debe mostrar el precio con descuento (no solo al facturarla), así
+   * que este es el segundo (de dos) puntos de conexión al motor de
+   * ofertas. Remisiones no lo necesita: no tiene precio ni descuento en
+   * su modelo (documento sin efecto fiscal, solo cantidades).
+   */
   private async calcularLineas(lineas: CrearCotizacionDto['lineas'], listaPrecio: string) {
     const lineasCalculadas = await Promise.all(
       lineas.map(async (linea) => {
@@ -41,7 +52,8 @@ export class CotizacionesService {
         const producto = await this.cotizacionesRepository.obtenerProductoConPrecioVigente(linea.productoId, varianteId, listaPrecio);
         const precioUnitario = linea.precioUnitario ?? Number(producto.precios[0]?.precioVenta ?? 0);
         const porcentajeItbis = Number(producto.porcentajeItbis);
-        const descuento = linea.descuento ?? 0;
+        const descuento =
+          linea.descuento ?? (await this.ofertasService.resolverDescuentoLinea(linea.productoId, producto.categoriaId, linea.cantidad, precioUnitario));
 
         const totalLinea = linea.cantidad * precioUnitario - descuento;
         const montoItbis = totalLinea * (porcentajeItbis / 100);
@@ -58,6 +70,22 @@ export class CotizacionesService {
         };
       }),
     );
+
+    const subtotalPreCarrito = lineasCalculadas.reduce((acc, l) => acc + (l.cantidad * l.precioUnitario - l.descuento), 0);
+    const descuentoCarritoTotal = await this.ofertasService.resolverDescuentoCarritoTotal(subtotalPreCarrito);
+    if (descuentoCarritoTotal > 0) {
+      const extras = prorratearDescuentoCarrito(
+        subtotalPreCarrito,
+        lineasCalculadas.map((l) => l.cantidad * l.precioUnitario - l.descuento),
+        descuentoCarritoTotal,
+      );
+      lineasCalculadas.forEach((l, i) => {
+        l.descuento += extras[i];
+        const totalLinea = l.cantidad * l.precioUnitario - l.descuento;
+        l.montoItbis = totalLinea * (l.porcentajeItbis / 100);
+        l.montoTotal = totalLinea + l.montoItbis;
+      });
+    }
 
     const subtotal = lineasCalculadas.reduce((acc, l) => acc + (l.cantidad * l.precioUnitario - l.descuento), 0);
     const itbis = lineasCalculadas.reduce((acc, l) => acc + l.montoItbis, 0);

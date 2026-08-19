@@ -6,9 +6,10 @@ import { InventarioModule } from '../inventario/inventario.module';
 import { PagosModule } from '../pagos/pagos.module';
 import { ClientesModule } from '../clientes/clientes.module';
 import { VariantesModule } from '../variantes/variantes.module';
+import { OfertasModule } from '../ofertas/ofertas.module';
 
 @Module({
-  imports: [InventarioModule, PagosModule, ClientesModule, VariantesModule],
+  imports: [InventarioModule, PagosModule, ClientesModule, VariantesModule, OfertasModule],
   controllers: [FacturacionController],
   providers: [FacturacionService, FacturacionRepository],
   exports: [FacturacionService],

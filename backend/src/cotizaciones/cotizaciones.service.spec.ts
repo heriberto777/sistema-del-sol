@@ -4,6 +4,7 @@ import { CotizacionesRepository } from './cotizaciones.repository';
 import { FacturacionService } from '../facturacion/facturacion.service';
 import { ClientesService } from '../clientes/clientes.service';
 import { VariantesService } from '../variantes/variantes.service';
+import { OfertasService } from '../ofertas/ofertas.service';
 import { EventBusService } from '../event-bus/event-bus.service';
 import { EVENTOS } from '../event-bus/events';
 import { CrearCotizacionDto } from './dto/crear-cotizacion.dto';
@@ -15,6 +16,7 @@ describe('CotizacionesService', () => {
   let facturacionService: jest.Mocked<FacturacionService>;
   let clientesService: jest.Mocked<ClientesService>;
   let variantesService: jest.Mocked<VariantesService>;
+  let ofertasService: jest.Mocked<OfertasService>;
   let eventBus: jest.Mocked<EventBusService>;
   let prisma: jest.Mocked<PrismaService>;
 
@@ -42,12 +44,16 @@ describe('CotizacionesService', () => {
     variantesService = {
       resolverObligatoria: jest.fn().mockResolvedValue('variante-1'),
     } as unknown as jest.Mocked<VariantesService>;
+    ofertasService = {
+      resolverDescuentoLinea: jest.fn().mockResolvedValue(0),
+      resolverDescuentoCarritoTotal: jest.fn().mockResolvedValue(0),
+    } as unknown as jest.Mocked<OfertasService>;
     eventBus = { emit: jest.fn(), on: jest.fn() } as unknown as jest.Mocked<EventBusService>;
     prisma = {
       bodega: { findFirst: jest.fn().mockResolvedValue(null) },
       configuracion: { findUnique: jest.fn().mockResolvedValue(null) },
     } as unknown as jest.Mocked<PrismaService>;
-    service = new CotizacionesService(repository, facturacionService, clientesService, variantesService, eventBus, prisma);
+    service = new CotizacionesService(repository, facturacionService, clientesService, variantesService, ofertasService, eventBus, prisma);
   });
 
   function dto(overrides: Partial<CrearCotizacionDto> = {}): CrearCotizacionDto {
@@ -112,6 +118,43 @@ describe('CotizacionesService', () => {
       await service.crear(dto(), 'tenant-1', 'vendedor-1');
 
       expect(facturacionService.crear).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('ofertas automáticas (Fase 4b)', () => {
+    it('una cotización ya muestra el descuento automático de línea (no solo al facturarla)', async () => {
+      repository.obtenerProductoConPrecioVigente.mockResolvedValue(producto(18, 100) as never);
+      ofertasService.resolverDescuentoLinea.mockResolvedValue(20);
+      repository.crear.mockResolvedValue({ id: 'c1' } as never);
+
+      await service.crear(dto({ lineas: [{ productoId: 'prod-1', cantidad: 2 }] }), 'tenant-1', 'vendedor-1');
+
+      // 2*100=200 - 20 descuento = 180 subtotal; itbis 18% de 180 = 32.4
+      expect(repository.crear).toHaveBeenCalledWith(expect.objectContaining({ subtotal: 180, itbis: 32.4, descuento: 20 }));
+    });
+
+    it('reparte un descuento de carrito proporcionalmente entre las líneas', async () => {
+      repository.obtenerProductoConPrecioVigente
+        .mockResolvedValueOnce(producto(18, 150) as never)
+        .mockResolvedValueOnce(producto(18, 100) as never);
+      ofertasService.resolverDescuentoCarritoTotal.mockResolvedValue(40);
+      repository.crear.mockResolvedValue({ id: 'c1' } as never);
+
+      await service.crear(
+        dto({
+          lineas: [
+            { productoId: 'prod-1', cantidad: 2 },
+            { productoId: 'prod-2', cantidad: 1 },
+          ],
+        }),
+        'tenant-1',
+        'vendedor-1',
+      );
+
+      expect(ofertasService.resolverDescuentoCarritoTotal).toHaveBeenCalledWith(400);
+      const llamada = repository.crear.mock.calls[0][0] as { lineas: { descuento: number }[] };
+      expect(llamada.lineas[0].descuento).toBeCloseTo(30);
+      expect(llamada.lineas[1].descuento).toBeCloseTo(10);
     });
   });
 

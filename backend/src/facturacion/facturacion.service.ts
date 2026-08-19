@@ -10,6 +10,8 @@ import { CrearPagoDto } from '../pagos/dto/crear-pago.dto';
 import { PagosService } from '../pagos/pagos.service';
 import { ClientesService } from '../clientes/clientes.service';
 import { VariantesService } from '../variantes/variantes.service';
+import { OfertasService } from '../ofertas/ofertas.service';
+import { prorratearDescuentoCarrito } from '../ofertas/prorratear-descuento-carrito';
 import { ListarFacturasQueryDto } from './dto/listar-facturas-query.dto';
 import { paginar } from '../common/types/pagina-resultado';
 import { DocumentoPdfParams, generarDocumentoPdf } from '../common/pdf/documento-pdf';
@@ -85,6 +87,7 @@ export class FacturacionService {
     private readonly prisma: PrismaService,
     private readonly clientesService: ClientesService,
     private readonly variantesService: VariantesService,
+    private readonly ofertasService: OfertasService,
   ) {}
 
   /**
@@ -114,6 +117,10 @@ export class FacturacionService {
     // cliente para las líneas que no traen precioUnitario explícito.
     const cliente = await this.clientesService.buscarPorId(dto.clienteId);
     const listaPrecio = dto.listaPrecio ?? cliente.listaPrecio?.nombre ?? 'GENERAL';
+    // Ofertas (Fase 4b) solo aplican a una venta nueva — una nota de
+    // crédito/débito ajusta un monto YA facturado, nunca recalcula un
+    // descuento fresco sobre lo que se está devolviendo/cargando.
+    const esVentaNormal = dto.tipoFactura === 'CONTADO' || dto.tipoFactura === 'CREDITO';
 
     const lineasCalculadas = await Promise.all(
       dto.lineas.map(async (linea) => {
@@ -125,7 +132,11 @@ export class FacturacionService {
         const producto = await this.facturacionRepository.obtenerProductoConPrecioVigente(linea.productoId, varianteId, listaPrecio);
         const precioUnitario = linea.precioUnitario ?? Number(producto.precios[0]?.precioVenta ?? 0);
         const porcentajeItbis = Number(producto.porcentajeItbis);
-        const descuento = linea.descuento ?? 0;
+        // Un descuento manual explícito (aunque sea 0) siempre gana sobre
+        // el automático — ver OfertasService, "no acumulable".
+        const descuento =
+          linea.descuento ??
+          (esVentaNormal ? await this.ofertasService.resolverDescuentoLinea(linea.productoId, producto.categoriaId, linea.cantidad, precioUnitario) : 0);
 
         const totalLinea = linea.cantidad * precioUnitario - descuento;
         const montoItbis = totalLinea * (porcentajeItbis / 100);
@@ -147,6 +158,24 @@ export class FacturacionService {
         };
       }),
     );
+
+    if (esVentaNormal) {
+      const subtotalPreCarrito = lineasCalculadas.reduce((acc, l) => acc + (l.cantidad * l.precioUnitario - l.descuento), 0);
+      const descuentoCarritoTotal = await this.ofertasService.resolverDescuentoCarritoTotal(subtotalPreCarrito);
+      if (descuentoCarritoTotal > 0) {
+        const extras = prorratearDescuentoCarrito(
+          subtotalPreCarrito,
+          lineasCalculadas.map((l) => l.cantidad * l.precioUnitario - l.descuento),
+          descuentoCarritoTotal,
+        );
+        lineasCalculadas.forEach((l, i) => {
+          l.descuento += extras[i];
+          const totalLinea = l.cantidad * l.precioUnitario - l.descuento;
+          l.montoItbis = totalLinea * (l.porcentajeItbis / 100);
+          l.montoTotal = totalLinea + l.montoItbis;
+        });
+      }
+    }
 
     const subtotalLineas = lineasCalculadas.reduce((acc, l) => acc + (l.cantidad * l.precioUnitario - l.descuento), 0);
     const itbisLineas = lineasCalculadas.reduce((acc, l) => acc + l.montoItbis, 0);

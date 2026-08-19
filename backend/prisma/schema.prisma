@@ -56,6 +56,7 @@ model Tenant {
   webhooks      Webhook[]
   notificaciones Notificacion[]
   plantillasNotificacion NotificacionPlantilla[]
+  ofertas       Oferta[]
   cotizaciones  Cotizacion[]
   remisiones    Remision[]
   cuentasContables  CuentaContable[]
@@ -1263,6 +1264,7 @@ model Categoria {
   createdAt        DateTime    @default(now())
 
   productos Producto[]
+  ofertas   Oferta[]
 
   @@unique([tenantId, nombre])
   @@map("categorias")
@@ -1309,6 +1311,7 @@ model Producto {
   componentes    ComponenteCombo[] @relation("ComboComponentes")
   // Combos de los que este producto forma parte (como componente).
   partesDeCombos ComponenteCombo[] @relation("ComponenteDeCombos")
+  ofertas        Oferta[]
 
   @@unique([tenantId, codigo])
   @@map("productos")
@@ -1809,4 +1812,46 @@ model Notificacion {
   enviadaEn     DateTime?
 
   @@map("notificaciones")
+}
+
+enum TipoDescuentoOferta {
+  PORCENTAJE
+  MONTO_FIJO
+}
+
+enum AlcanceOferta {
+  PRODUCTO
+  CATEGORIA
+  CARRITO
+}
+
+/// Motor de descuentos automáticos (Fase 4b de adopción de Cuadre) — se
+/// resuelve al facturar/vender (OfertasService), nunca se apila con otra
+/// oferta que matchee la misma línea (se aplica la de mayor descuento
+/// resultante, ver ARCHITECTURE.md). Solo aplica a ventas normales
+/// (CONTADO/CREDITO) — nunca a NOTA_CREDITO/NOTA_DEBITO, que ajustan un
+/// monto ya facturado, no una venta nueva. `productoId`/`categoriaId`/
+/// `montoMinimoCarrito` son mutuamente exclusivos según `alcance`,
+/// validado en OfertasService, no en el schema.
+model Oferta {
+  id                 String              @id @default(uuid())
+  tenantId           String
+  tenant             Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  nombre             String
+  tipoDescuento      TipoDescuentoOferta
+  // % (0-100) si PORCENTAJE, monto RD$ si MONTO_FIJO.
+  valor              Decimal             @db.Decimal(14, 4)
+  alcance            AlcanceOferta
+  productoId         String?
+  producto           Producto?           @relation(fields: [productoId], references: [id], onDelete: Cascade)
+  categoriaId        String?
+  categoria          Categoria?          @relation(fields: [categoriaId], references: [id], onDelete: Cascade)
+  // Solo alcance=CARRITO — null significa "sin mínimo, siempre aplica".
+  montoMinimoCarrito Decimal?            @db.Decimal(14, 2)
+  fechaInicio        DateTime
+  fechaFin           DateTime
+  activa             Boolean             @default(true)
+  createdAt          DateTime            @default(now())
+
+  @@map("ofertas")
 }

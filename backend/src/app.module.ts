@@ -45,6 +45,7 @@ import { CategoriasModule } from './categorias/categorias.module';
 import { ListasPrecioModule } from './listas-precio/listas-precio.module';
 import { AtributosModule } from './atributos/atributos.module';
 import { VariantesModule } from './variantes/variantes.module';
+import { OfertasModule } from './ofertas/ofertas.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { PermissionsGuard } from './common/guards/permissions.guard';
 import { ModuloActivoGuard } from './common/guards/modulo-activo.guard';
@@ -103,6 +104,7 @@ import { TenantMiddleware } from './common/middleware/tenant.middleware';
     AtributosModule,
     VariantesModule,
     GastosMenoresModule,
+    OfertasModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

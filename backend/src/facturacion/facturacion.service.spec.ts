@@ -10,6 +10,7 @@ import { PagosService } from '../pagos/pagos.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ClientesService } from '../clientes/clientes.service';
 import { VariantesService } from '../variantes/variantes.service';
+import { OfertasService } from '../ofertas/ofertas.service';
 
 describe('FacturacionService', () => {
   let service: FacturacionService;
@@ -21,6 +22,7 @@ describe('FacturacionService', () => {
   let prisma: jest.Mocked<PrismaService>;
   let clientesService: jest.Mocked<ClientesService>;
   let variantesService: jest.Mocked<VariantesService>;
+  let ofertasService: jest.Mocked<OfertasService>;
 
   // Un tx opaco: crear()/anular() abren la transacción con tenantPrisma.client.$transaction
   // y pasan este objeto a los métodos *EnTx — para las pruebas basta con que sea el mismo
@@ -78,6 +80,10 @@ describe('FacturacionService', () => {
     variantesService = {
       resolverObligatoria: jest.fn().mockResolvedValue('variante-1'),
     } as unknown as jest.Mocked<VariantesService>;
+    ofertasService = {
+      resolverDescuentoLinea: jest.fn().mockResolvedValue(0),
+      resolverDescuentoCarritoTotal: jest.fn().mockResolvedValue(0),
+    } as unknown as jest.Mocked<OfertasService>;
     service = new FacturacionService(
       repository,
       inventarioService,
@@ -87,6 +93,7 @@ describe('FacturacionService', () => {
       prisma,
       clientesService,
       variantesService,
+      ofertasService,
     );
   });
 
@@ -143,6 +150,71 @@ describe('FacturacionService', () => {
       TX,
       expect.objectContaining({ subtotal: 300, itbis: 54, total: 354, descuento: 0 }),
     );
+  });
+
+  describe('ofertas automáticas (Fase 4b)', () => {
+    it('aplica el descuento automático de línea que resuelve OfertasService cuando la línea no trae descuento manual', async () => {
+      repository.obtenerProductoConPrecioVigente.mockResolvedValue(producto(18, 100) as never);
+      ofertasService.resolverDescuentoLinea.mockResolvedValue(20);
+      repository.crearFacturaEnTx.mockResolvedValue(facturaCreada() as never);
+
+      await service.crear(dto({ lineas: [{ productoId: 'prod-1', cantidad: 2 }] }), 'tenant-1', 'vendedor-1');
+
+      // 2*100=200 - 20 descuento = 180 subtotal; itbis 18% de 180 = 32.4
+      expect(repository.crearFacturaEnTx).toHaveBeenCalledWith(
+        TX,
+        expect.objectContaining({ subtotal: 180, itbis: 32.4, descuento: 20 }),
+      );
+    });
+
+    it('un descuento manual explícito en la línea evita que se resuelva el automático', async () => {
+      repository.obtenerProductoConPrecioVigente.mockResolvedValue(producto(18, 100) as never);
+      repository.crearFacturaEnTx.mockResolvedValue(facturaCreada() as never);
+
+      await service.crear(dto({ lineas: [{ productoId: 'prod-1', cantidad: 2, descuento: 5 }] }), 'tenant-1', 'vendedor-1');
+
+      expect(ofertasService.resolverDescuentoLinea).not.toHaveBeenCalled();
+      expect(repository.crearFacturaEnTx).toHaveBeenCalledWith(TX, expect.objectContaining({ descuento: 5 }));
+    });
+
+    it('un descuento de carrito se reparte proporcionalmente entre las líneas (ITBIS recalculado por línea)', async () => {
+      repository.obtenerProductoConPrecioVigente
+        .mockResolvedValueOnce(producto(18, 150) as never) // línea 1: 2*150=300
+        .mockResolvedValueOnce(producto(18, 100) as never); // línea 2: 1*100=100
+      ofertasService.resolverDescuentoCarritoTotal.mockResolvedValue(40); // 10% de 400
+      repository.crearFacturaEnTx.mockResolvedValue(facturaCreada() as never);
+
+      await service.crear(
+        dto({
+          lineas: [
+            { productoId: 'prod-1', cantidad: 2 },
+            { productoId: 'prod-2', cantidad: 1 },
+          ],
+        }),
+        'tenant-1',
+        'vendedor-1',
+      );
+
+      expect(ofertasService.resolverDescuentoCarritoTotal).toHaveBeenCalledWith(400);
+      const llamada = repository.crearFacturaEnTx.mock.calls[0][1] as { lineas: { descuento: number }[]; subtotal: number };
+      expect(llamada.lineas[0].descuento).toBeCloseTo(30); // 300/400 * 40
+      expect(llamada.lineas[1].descuento).toBeCloseTo(10); // 100/400 * 40
+      expect(llamada.subtotal).toBeCloseTo(360); // 400 - 40
+    });
+
+    it('una NOTA_CREDITO/NOTA_DEBITO nunca resuelve ofertas automáticas (ajustan un monto ya facturado, no una venta nueva)', async () => {
+      repository.obtenerProductoConPrecioVigente.mockResolvedValue(producto(18, 100) as never);
+      repository.crearFacturaEnTx.mockResolvedValue(facturaCreada({ tipoFactura: 'NOTA_CREDITO' }) as never);
+
+      await service.crear(
+        dto({ tipoFactura: 'NOTA_CREDITO', facturaOrigenId: 'f-origen', lineas: [{ productoId: 'prod-1', cantidad: 1 }] }),
+        'tenant-1',
+        'vendedor-1',
+      );
+
+      expect(ofertasService.resolverDescuentoLinea).not.toHaveBeenCalled();
+      expect(ofertasService.resolverDescuentoCarritoTotal).not.toHaveBeenCalled();
+    });
   });
 
   it('usa el precioUnitario explícito de la línea en vez del precio vigente', async () => {
