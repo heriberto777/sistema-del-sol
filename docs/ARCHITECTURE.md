@@ -1112,7 +1112,48 @@ busca directo si YA tiene un turno `ABIERTO` propio (`GET /pos/turnos?
 cajeroId=<yo>&estado=ABIERTO`) y si no, muestra solo el formulario de
 apertura (`AbrirTurnoForm`, compartido con el modal de
 `TurnosCajaTable` para no duplicar la lógica) — nunca una pantalla
-vacía sin acción clara.
+vacía sin acción clara. Apenas hay un turno (recién abierto o ya
+existente), tanto `PosCajero` como un supervisor que elige "Entrar a la
+caja" navegan a `/pos/caja/:turnoId` (ver subsección siguiente) — ya no
+se renderiza `TurnoCajaDetalle` embebido dentro de `AppLayout`.
+
+### Pantalla completa + atajos de teclado (Fase 2a de adopción de Cuadre)
+
+`/pos/caja/:turnoId` (`frontend/src/pages/PosCaja.tsx`) es una ruta
+**hermana de `AppLayout`**, no una hija — mismo criterio que
+`/pagar/:facturaId` (dentro de `RutaProtegida` para exigir sesión, pero
+fuera del árbol que monta `Sidebar`/header general). Es la réplica del
+modo dedicado de `pos.cuadre.do`: sin sidebar, header propio (cajero,
+badge de estado, atajos visibles), y toda la lógica de carrito/turno
+sigue viviendo en el mismo `TurnoCajaDetalle` de siempre — le agregamos
+una prop `pantallaCompleta` que le quita su propio `<Card>` (para no
+quedar en una caja dentro de otra caja) y activa los atajos de teclado.
+
+**`useAtajosTeclado`** (`frontend/src/hooks/useAtajosTeclado.ts`): hook
+genérico, un solo `addEventListener('keydown', ...)` a nivel de
+`document` por instancia. Las teclas `F1-F12`/`Escape` no escriben
+caracteres, así que se disparan aunque el foco esté en un `<input>` (el
+cajero puede estar tipeando una búsqueda); cualquier otra tecla mapeada
+se ignora con el foco en un campo de texto libre, para no interferir
+con la escritura normal. Esta fase cablea F3 (foco al combobox de
+cliente), F5 (refrescar), F6 (vaciar carrito), F7 (abrir Mov. Caja) y F9
+(abrir Cerrar Caja) — F2/F4/F8/F10/F11/F12/⇧F12 se suman en las
+sub-fases siguientes de esta misma Fase 2, reutilizando el mismo hook.
+
+**Catálogo con categorías y cantidad rápida**: `categoria` de
+`Producto` sigue siendo texto libre (no hay tabla `Categoria`) —
+`GET /productos/categorias` (`ProductosController`, mismo permiso
+`precios.ver` que `/productos/catalogo`) devuelve los valores distintos
+no nulos del tenant, pintados como chips en `CatalogoProductosPos.tsx`.
+Un input de cantidad junto al buscador permite fijar cuántas unidades
+agrega el próximo clic (se resetea a 1 después de cada clic) — evita
+tener que editar la cantidad línea por línea en el carrito para
+compras de más de una unidad.
+
+**`ComboboxBusqueda` con navegación por teclado**: se agregó
+`ArrowUp`/`ArrowDown` para mover el resaltado, `Enter` para confirmar la
+opción resaltada y `Escape` para cerrar — antes solo aceptaba clic de
+mouse en cada resultado.
 
 ### Roles de POS: Cajero, Vendedor, Supervisor de Caja
 

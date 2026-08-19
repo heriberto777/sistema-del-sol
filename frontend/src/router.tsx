@@ -20,6 +20,7 @@ import { Reportes } from './pages/Reportes';
 import { Contabilidad } from './pages/Contabilidad';
 import { Nomina } from './pages/Nomina';
 import { Pos } from './pages/Pos';
+import { PosCaja } from './pages/PosCaja';
 import { Ia } from './pages/Ia';
 import { Notificaciones } from './pages/Notificaciones';
 import { Bancos } from './pages/Bancos';
@@ -63,6 +64,9 @@ export const router = createBrowserRouter([
   {
     element: <RutaProtegida />,
     children: [
+      // Fuera de AppLayout a propósito — pantalla completa dedicada del
+      // POS (sin sidebar/header), mismo criterio que /pagar/:facturaId.
+      { path: '/pos/caja/:turnoId', element: <PosCaja /> },
       {
         element: <AppLayout />,
         children: [

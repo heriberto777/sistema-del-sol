@@ -3,6 +3,7 @@ import { Prisma, TipoProducto } from '@prisma/client';
 import { ProductosRepository } from './productos.repository';
 import { CrearProductoDto, ComponenteComboDto } from './dto/crear-producto.dto';
 import { ListadoQueryDto } from '../common/dto/listado-query.dto';
+import { CatalogoQueryDto } from './dto/catalogo-query.dto';
 import { paginar } from '../common/types/pagina-resultado';
 
 @Injectable()
@@ -21,11 +22,20 @@ export class ProductosService {
     return { datos, total, pagina, tamanoPagina };
   }
 
-  async catalogo(query: ListadoQueryDto) {
+  async catalogo(query: CatalogoQueryDto) {
     const { pagina, tamanoPagina, skip, take } = paginar(query.pagina, query.tamanoPagina);
-    const [filas, total] = await this.productosRepository.catalogo({ skip, take, busqueda: query.busqueda });
+    const [filas, total] = await this.productosRepository.catalogo({
+      skip,
+      take,
+      busqueda: query.busqueda,
+      categoria: query.categoria,
+    });
     const datos = filas.map(({ precios, ...producto }) => ({ ...producto, precioVenta: precios[0]?.precioVenta ?? null }));
     return { datos, total, pagina, tamanoPagina };
+  }
+
+  categorias() {
+    return this.productosRepository.categoriasDistintas();
   }
 
   buscarPorId(id: string) {

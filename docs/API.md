@@ -133,7 +133,8 @@ pasa ninguna de ellas.
 |---|---|---|
 | POST | `/api/productos` | `precios.editar` — acepta `imagen` (data URI, opcional) |
 | GET | `/api/productos?pagina&tamanoPagina&busqueda` | `precios.ver` — `busqueda` filtra por nombre o código; NUNCA incluye `imagen` (ver ARCHITECTURE.md) |
-| GET | `/api/productos/catalogo?pagina&tamanoPagina&busqueda` | `precios.ver` — para el catálogo de POS: incluye `imagen` y `precioVenta` (lista GENERAL vigente) en cada fila |
+| GET | `/api/productos/catalogo?pagina&tamanoPagina&busqueda&categoria` | `precios.ver` — para el catálogo de POS: incluye `imagen` y `precioVenta` (lista GENERAL vigente) en cada fila; `categoria` filtra exacto |
+| GET | `/api/productos/categorias` | `precios.ver` — valores distintos no nulos de `Producto.categoria` (texto libre, sin tabla propia), para los chips del catálogo de POS |
 | GET | `/api/productos/:id` | `precios.ver` — sí incluye `imagen` |
 | PATCH | `/api/productos/:id` | `precios.editar` — `imagen: null` explícito quita la foto existente |
 
@@ -141,7 +142,7 @@ pasa ninguna de ellas.
 
 | Método | Ruta | Permiso |
 |---|---|---|
-| GET | `/api/inventario/bodegas` | `inventario.ver` |
+| GET | `/api/inventario/bodegas` | sin permiso — cualquier usuario autenticado (un Cajero puro necesita esta lista para abrir su turno de POS y no tiene `inventario.ver`) |
 | POST | `/api/inventario/bodegas` | `admin.configuracion` |
 | PATCH | `/api/inventario/bodegas/:id` | `admin.configuracion` — solo `{ formatoImpresion? }` (`null` quita el override, hereda el default del tenant) |
 | GET | `/api/inventario/stock/:bodegaId` | `inventario.ver` |

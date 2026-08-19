@@ -25,7 +25,7 @@ export class ProductosRepository {
     });
   }
 
-  private whereBusqueda(busqueda?: string) {
+  private whereBusqueda(busqueda?: string, categoria?: string) {
     return {
       activo: true,
       ...(busqueda
@@ -36,6 +36,7 @@ export class ProductosRepository {
             ],
           }
         : {}),
+      ...(categoria ? { categoria } : {}),
     };
   }
 
@@ -65,8 +66,8 @@ export class ProductosRepository {
   }
 
   /** Para el catálogo de POS (Modelo C) — sí trae `imagen` y el precio vigente, para pintar la grilla sin un round-trip por producto. */
-  catalogo(params: { skip: number; take: number; busqueda?: string }) {
-    const where = this.whereBusqueda(params.busqueda);
+  catalogo(params: { skip: number; take: number; busqueda?: string; categoria?: string }) {
+    const where = this.whereBusqueda(params.busqueda, params.categoria);
     const select = {
       id: true,
       codigo: true,
@@ -80,6 +81,17 @@ export class ProductosRepository {
       this.db.producto.findMany({ where, orderBy: { nombre: 'asc' }, skip: params.skip, take: params.take, select }),
       this.db.producto.count({ where }),
     ]);
+  }
+
+  /** Chips de categoría del catálogo de POS — valores distintos no vacíos, texto libre (no hay tabla `Categoria`). */
+  async categoriasDistintas(): Promise<string[]> {
+    const filas = await this.db.producto.findMany({
+      where: { activo: true, categoria: { not: null } },
+      distinct: ['categoria'],
+      select: { categoria: true },
+      orderBy: { categoria: 'asc' },
+    });
+    return filas.map((f) => f.categoria).filter((c): c is string => !!c);
   }
 
   buscarPorId(id: string) {

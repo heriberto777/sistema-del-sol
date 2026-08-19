@@ -11,7 +11,10 @@ import { FormField } from '../../molecules/FormField/FormField';
 import { Modal } from '../../molecules/Modal/Modal';
 import { SelectFormaPago } from '../../molecules/SelectFormaPago/SelectFormaPago';
 import { useAuth } from '../../../hooks/useAuth';
+import { useAtajosTeclado } from '../../../hooks/useAtajosTeclado';
 import { PaginaResultado } from '../../../types/pagina-resultado';
+
+const ID_COMBOBOX_CLIENTE = 'turno-cliente-combobox';
 
 type EstadoTurno = 'ABIERTO' | 'CERRADO';
 
@@ -78,7 +81,14 @@ function calcularMontoEsperado(data: TurnoCajaDetalleData): number {
   return Number(data.montoInicial) + ventasEfectivo + entradas - salidas;
 }
 
-export function TurnoCajaDetalle({ turnoId, onCerrado }: { turnoId: string; onCerrado?: () => void }) {
+interface TurnoCajaDetalleProps {
+  turnoId: string;
+  onCerrado?: () => void;
+  /** Vive dentro de PosCaja.tsx (pantalla completa, F2-F12) en vez de un Card embebido en AppLayout — omite el wrapper de Card y activa los atajos de teclado. */
+  pantallaCompleta?: boolean;
+}
+
+export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: TurnoCajaDetalleProps) {
   const queryClient = useQueryClient();
   const { tienePermiso } = useAuth();
   const [carrito, setCarrito] = useState<LineaCarrito[]>([]);
@@ -137,13 +147,13 @@ export function TurnoCajaDetalle({ turnoId, onCerrado }: { turnoId: string; onCe
     });
   }
 
-  function agregarProductoCatalogo(producto: ProductoCatalogo) {
+  function agregarProductoCatalogo(producto: ProductoCatalogo, cantidad: number) {
     if (!producto.precioVenta) return;
     agregarAlCarrito({
       productoId: producto.id,
       codigo: producto.codigo,
       nombre: producto.nombre,
-      cantidad: 1,
+      cantidad,
       precioUnitario: Number(producto.precioVenta),
       porcentajeItbis: Number(producto.porcentajeItbis),
     });
@@ -178,6 +188,19 @@ export function TurnoCajaDetalle({ turnoId, onCerrado }: { turnoId: string; onCe
     registrarVenta.mutate();
   }
 
+  const puedeVender = !!data && data.estado === 'ABIERTO';
+
+  useAtajosTeclado(
+    {
+      F3: () => document.getElementById(ID_COMBOBOX_CLIENTE)?.focus(),
+      F5: () => invalidar(),
+      F6: () => setCarrito([]),
+      F7: () => setModalMovimiento(true),
+      F9: () => setModalCerrarTurno(true),
+    },
+    pantallaCompleta && puedeVender,
+  );
+
   if (isLoading || !data) return <p className="text-sm text-slate-500">Cargando turno…</p>;
 
   const descripcion =
@@ -186,9 +209,11 @@ export function TurnoCajaDetalle({ turnoId, onCerrado }: { turnoId: string; onCe
 
   return (
     <Card
-      titulo="Turno de caja"
-      descripcion={descripcion}
-      acciones={<Badge tono={data.estado === 'ABIERTO' ? 'exito' : 'neutro'}>{data.estado}</Badge>}
+      titulo={pantallaCompleta ? undefined : 'Turno de caja'}
+      descripcion={pantallaCompleta ? undefined : descripcion}
+      acciones={pantallaCompleta ? undefined : <Badge tono={data.estado === 'ABIERTO' ? 'exito' : 'neutro'}>{data.estado}</Badge>}
+      className={pantallaCompleta ? 'border-0 bg-transparent shadow-none dark:bg-transparent' : undefined}
+      sinPadding={pantallaCompleta}
     >
       <div className="space-y-4">
       {error && <p className="text-sm text-red-600">{error}</p>}
@@ -204,6 +229,7 @@ export function TurnoCajaDetalle({ turnoId, onCerrado }: { turnoId: string; onCe
               <div className="flex flex-col gap-1">
                 <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Cliente</label>
                 <ComboboxBusqueda<Cliente>
+                  id={ID_COMBOBOX_CLIENTE}
                   valor={cliente}
                   onSeleccionar={setCliente}
                   obtenerId={(c) => c.id}

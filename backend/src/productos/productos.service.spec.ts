@@ -11,6 +11,7 @@ describe('ProductosService', () => {
       crear: jest.fn(),
       listar: jest.fn(),
       catalogo: jest.fn(),
+      categoriasDistintas: jest.fn(),
       buscarPorId: jest.fn(),
       buscarPorIdEnTx: jest.fn(),
       actualizar: jest.fn(),
@@ -121,6 +122,26 @@ describe('ProductosService', () => {
         { id: 'p2', codigo: 'B', nombre: 'Sin precio', imagen: null, precioVenta: null },
       ]);
       expect(resultado.total).toBe(2);
+    });
+
+    it('pasa la categoría al repositorio como filtro del catálogo', async () => {
+      repository.catalogo.mockResolvedValue([[], 0] as never);
+
+      await service.catalogo({ categoria: 'Bebidas' });
+
+      expect(repository.catalogo).toHaveBeenCalledWith(
+        expect.objectContaining({ categoria: 'Bebidas' }),
+      );
+    });
+  });
+
+  describe('categorias', () => {
+    it('delega en el repositorio', async () => {
+      repository.categoriasDistintas.mockResolvedValue(['Bebidas', 'Snacks']);
+
+      const resultado = await service.categorias();
+
+      expect(resultado).toEqual(['Bebidas', 'Snacks']);
     });
   });
 });

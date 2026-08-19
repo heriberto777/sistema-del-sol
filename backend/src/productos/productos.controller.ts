@@ -2,6 +2,7 @@ import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { ProductosService } from './productos.service';
 import { CrearProductoDto } from './dto/crear-producto.dto';
+import { CatalogoQueryDto } from './dto/catalogo-query.dto';
 import { Permissions } from '../common/decorators/permissions.decorator';
 import { RequiereModulo } from '../common/decorators/requiere-modulo.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -28,11 +29,17 @@ export class ProductosController {
   }
 
   // Antes de ':id' a propósito — mismo motivo que /clientes/consumidor-final:
-  // si no, Nest matchea "catalogo" como si fuera un :id.
+  // si no, Nest matchea "catalogo"/"categorias" como si fueran un :id.
   @Get('catalogo')
   @Permissions('precios.ver')
-  catalogo(@Query() query: ListadoQueryDto) {
+  catalogo(@Query() query: CatalogoQueryDto) {
     return this.productosService.catalogo(query);
+  }
+
+  @Get('categorias')
+  @Permissions('precios.ver')
+  categorias() {
+    return this.productosService.categorias();
   }
 
   @Get(':id')

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { useDebouncedValue } from '../../../hooks/useDebouncedValue';
 
 interface ComboboxBusquedaProps<T> {
@@ -30,6 +30,7 @@ export function ComboboxBusqueda<T>({
   const [abierto, setAbierto] = useState(false);
   const [opciones, setOpciones] = useState<T[]>([]);
   const [cargando, setCargando] = useState(false);
+  const [resaltado, setResaltado] = useState(0);
   const contenedorRef = useRef<HTMLDivElement>(null);
   const textoDebounced = useDebouncedValue(texto, 300);
 
@@ -52,6 +53,32 @@ export function ComboboxBusqueda<T>({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [textoDebounced, abierto]);
+
+  useEffect(() => {
+    setResaltado(0);
+  }, [opciones]);
+
+  function seleccionar(op: T) {
+    onSeleccionar(op);
+    setTexto('');
+    setAbierto(false);
+  }
+
+  function onKeyDownInput(e: KeyboardEvent<HTMLInputElement>) {
+    if (opciones.length === 0) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setResaltado((r) => (r + 1) % opciones.length);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setResaltado((r) => (r - 1 + opciones.length) % opciones.length);
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      seleccionar(opciones[resaltado]);
+    } else if (e.key === 'Escape') {
+      setAbierto(false);
+    }
+  }
 
   useEffect(() => {
     if (!abierto) return;
@@ -89,6 +116,7 @@ export function ComboboxBusqueda<T>({
           setAbierto(true);
         }}
         onFocus={() => setAbierto(true)}
+        onKeyDown={onKeyDownInput}
         placeholder={placeholder ?? 'Buscar…'}
         autoComplete="off"
         className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
@@ -98,16 +126,17 @@ export function ComboboxBusqueda<T>({
           {cargando && <p className="px-3 py-2 text-sm text-slate-400">Buscando…</p>}
           {!cargando && opciones.length === 0 && <p className="px-3 py-2 text-sm text-slate-400">Sin resultados</p>}
           {!cargando &&
-            opciones.map((op) => (
+            opciones.map((op, i) => (
               <button
                 key={obtenerId(op)}
                 type="button"
-                onClick={() => {
-                  onSeleccionar(op);
-                  setTexto('');
-                  setAbierto(false);
-                }}
-                className="block w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+                onMouseEnter={() => setResaltado(i)}
+                onClick={() => seleccionar(op)}
+                className={`block w-full px-3 py-2 text-left text-sm ${
+                  i === resaltado
+                    ? 'bg-sol-50 text-sol-700 dark:bg-sol-900/30 dark:text-sol-300'
+                    : 'text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
+                }`}
               >
                 {obtenerEtiqueta(op)}
               </button>
