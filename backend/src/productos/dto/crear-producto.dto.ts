@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { ArrayMinSize, IsArray, IsEnum, IsNumber, IsOptional, IsPositive, IsString, IsUUID, Max, Min, ValidateNested } from 'class-validator';
+import { ArrayMinSize, IsArray, IsEnum, IsNumber, IsOptional, IsPositive, IsString, IsUUID, Matches, MaxLength, Max, Min, ValidateNested } from 'class-validator';
 import { TipoProducto } from '@prisma/client';
 
 export class ComponenteComboDto {
@@ -56,4 +56,16 @@ export class CrearProductoDto {
   @ValidateNested({ each: true })
   @Type(() => ComponenteComboDto)
   componentes?: ComponenteComboDto[];
+
+  @ApiProperty({
+    required: false,
+    nullable: true,
+    description:
+      'Data URI completa (data:image/...;base64,...) — el cliente la comprime/redimensiona antes de enviarla. `null` explícito quita la foto existente.',
+  })
+  @IsOptional()
+  @IsString()
+  @Matches(/^data:image\/(jpeg|jpg|png|webp);base64,/, { message: 'imagen debe ser una data URI de imagen (jpeg/png/webp)' })
+  @MaxLength(2_000_000, { message: 'La imagen es demasiado pesada — comprimila antes de subirla' })
+  imagen?: string | null;
 }

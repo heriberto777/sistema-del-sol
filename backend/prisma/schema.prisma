@@ -1114,6 +1114,12 @@ model Producto {
   tipo             TipoProducto @default(PRODUCTO)
   activo           Boolean  @default(true)
   origenMssql      Boolean  @default(false)
+  // Data URI completa (data:image/jpeg;base64,...), comprimida en el
+  // cliente antes de subir. `listar()` (el listado general de
+  // Productos.tsx) NO la selecciona a propósito — solo `catalogo()`
+  // (pensado para el catálogo del POS) y `buscarPorId()` la incluyen,
+  // para no inflar la página normal con blobs — ver ProductosRepository.
+  imagen           String?  @db.Text
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 

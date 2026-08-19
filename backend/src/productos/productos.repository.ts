@@ -25,20 +25,59 @@ export class ProductosRepository {
     });
   }
 
-  listar(params: { skip: number; take: number; busqueda?: string }) {
-    const where = {
+  private whereBusqueda(busqueda?: string) {
+    return {
       activo: true,
-      ...(params.busqueda
+      ...(busqueda
         ? {
             OR: [
-              { nombre: { contains: params.busqueda, mode: 'insensitive' as const } },
-              { codigo: { contains: params.busqueda, mode: 'insensitive' as const } },
+              { nombre: { contains: busqueda, mode: 'insensitive' as const } },
+              { codigo: { contains: busqueda, mode: 'insensitive' as const } },
             ],
           }
         : {}),
     };
+  }
+
+  // Select explícito que EXCLUYE `imagen` a propósito — es el listado que
+  // alimenta Productos.tsx y ComboboxBusqueda, no debe cargar blobs de
+  // imagen en cada tecla de búsqueda. Ver `catalogo()` para el uso que sí
+  // la necesita. Mismos campos que ya devolvía este endpoint antes de
+  // agregar la columna `imagen`, para no romper a ningún consumidor.
+  listar(params: { skip: number; take: number; busqueda?: string }) {
+    const where = this.whereBusqueda(params.busqueda);
+    const select = {
+      id: true,
+      codigo: true,
+      nombre: true,
+      categoria: true,
+      unidadMedida: true,
+      porcentajeItbis: true,
+      tipo: true,
+      activo: true,
+      createdAt: true,
+      updatedAt: true,
+    } as const;
     return Promise.all([
-      this.db.producto.findMany({ where, orderBy: { nombre: 'asc' }, skip: params.skip, take: params.take }),
+      this.db.producto.findMany({ where, orderBy: { nombre: 'asc' }, skip: params.skip, take: params.take, select }),
+      this.db.producto.count({ where }),
+    ]);
+  }
+
+  /** Para el catálogo de POS (Modelo C) — sí trae `imagen` y el precio vigente, para pintar la grilla sin un round-trip por producto. */
+  catalogo(params: { skip: number; take: number; busqueda?: string }) {
+    const where = this.whereBusqueda(params.busqueda);
+    const select = {
+      id: true,
+      codigo: true,
+      nombre: true,
+      imagen: true,
+      porcentajeItbis: true,
+      tipo: true,
+      precios: { where: { listaPrecio: 'GENERAL', vigenteHasta: null }, select: { precioVenta: true }, take: 1 },
+    } as const;
+    return Promise.all([
+      this.db.producto.findMany({ where, orderBy: { nombre: 'asc' }, skip: params.skip, take: params.take, select }),
       this.db.producto.count({ where }),
     ]);
   }

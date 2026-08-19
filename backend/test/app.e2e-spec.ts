@@ -2689,6 +2689,46 @@ describe('App (e2e)', () => {
           expect(res.body.categoria).toBe('General');
         });
     });
+
+    it('la imagen se guarda y se ve en el detalle/catálogo, pero nunca en el listado general — y se puede quitar con null', async () => {
+      const token = await login('admin@e2e-a.com', SUBDOMINIO_A);
+      const dataUri = 'data:image/jpeg;base64,AAAA';
+
+      await request(app.getHttpServer())
+        .patch(`/api/productos/${productoId}`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ imagen: dataUri })
+        .expect(200)
+        .expect((res) => expect(res.body.imagen).toBe(dataUri));
+
+      const detalle = await request(app.getHttpServer())
+        .get(`/api/productos/${productoId}`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+      expect(detalle.body.imagen).toBe(dataUri);
+
+      const listado = await request(app.getHttpServer())
+        .get('/api/productos')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+      expect(listado.body.datos.every((p: Record<string, unknown>) => !('imagen' in p))).toBe(true);
+
+      const catalogo = await request(app.getHttpServer())
+        .get('/api/productos/catalogo')
+        .query({ busqueda: 'Compras E2E Actualizado' })
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+      const fila = catalogo.body.datos.find((p: { id: string }) => p.id === productoId);
+      expect(fila.imagen).toBe(dataUri);
+      expect(fila).toHaveProperty('precioVenta');
+
+      await request(app.getHttpServer())
+        .patch(`/api/productos/${productoId}`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ imagen: null })
+        .expect(200)
+        .expect((res) => expect(res.body.imagen).toBeNull());
+    });
   });
 
   describe('Pagos de facturas y órdenes de compra', () => {

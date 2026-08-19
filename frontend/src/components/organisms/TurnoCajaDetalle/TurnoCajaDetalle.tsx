@@ -5,7 +5,7 @@ import { ModalImprimir } from '../../molecules/ModalImprimir/ModalImprimir';
 import { Badge } from '../../atoms/Badge/Badge';
 import { Button } from '../../atoms/Button/Button';
 import { Card } from '../../atoms/Card/Card';
-import { Input } from '../../atoms/Input/Input';
+import { CatalogoProductosPos, type ProductoCatalogo } from '../CatalogoProductosPos/CatalogoProductosPos';
 import { ComboboxBusqueda } from '../../molecules/ComboboxBusqueda/ComboboxBusqueda';
 import { FormField } from '../../molecules/FormField/FormField';
 import { Modal } from '../../molecules/Modal/Modal';
@@ -18,17 +18,6 @@ type MetodoPago = 'EFECTIVO' | 'TARJETA' | 'TRANSFERENCIA';
 interface Cliente {
   id: string;
   nombre: string;
-}
-
-interface Producto {
-  id: string;
-  codigo: string;
-  nombre: string;
-  porcentajeItbis: string;
-}
-
-interface Precio {
-  precioVenta: string;
 }
 
 interface LineaCarrito {
@@ -148,6 +137,18 @@ export function TurnoCajaDetalle({ turnoId, onCerrado }: { turnoId: string; onCe
     });
   }
 
+  function agregarProductoCatalogo(producto: ProductoCatalogo) {
+    if (!producto.precioVenta) return;
+    agregarAlCarrito({
+      productoId: producto.id,
+      codigo: producto.codigo,
+      nombre: producto.nombre,
+      cantidad: 1,
+      precioUnitario: Number(producto.precioVenta),
+      porcentajeItbis: Number(producto.porcentajeItbis),
+    });
+  }
+
   function quitarDelCarrito(productoId: string) {
     setCarrito((prev) => prev.filter((l) => l.productoId !== productoId));
   }
@@ -190,101 +191,90 @@ export function TurnoCajaDetalle({ turnoId, onCerrado }: { turnoId: string; onCe
 
       {data.estado === 'ABIERTO' && tienePermiso('pos.editar') && (
         <>
-          <div className="space-y-3 border-t border-slate-200 pt-3 dark:border-slate-800">
-            <h3 className="text-sm font-medium text-slate-700 dark:text-slate-300">Venta</h3>
-
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Cliente</label>
-              <ComboboxBusqueda<Cliente>
-                valor={cliente}
-                onSeleccionar={setCliente}
-                obtenerId={(c) => c.id}
-                obtenerEtiqueta={(c) => c.nombre}
-                placeholder="Buscar cliente…"
-                buscar={async (texto) =>
-                  (await apiClient.get<PaginaResultado<Cliente>>('/clientes', { params: { busqueda: texto, tamanoPagina: 10 } })).data.datos
-                }
-              />
+          <div className="grid grid-cols-1 gap-4 border-t border-slate-200 pt-3 dark:border-slate-800 lg:grid-cols-5">
+            <div className="lg:col-span-3">
+              <CatalogoProductosPos onAgregar={agregarProductoCatalogo} />
             </div>
 
-            <AgregarProducto onAgregar={agregarAlCarrito} />
-
-            <div className="rounded-md border border-slate-200 dark:border-slate-800">
-              <table className="w-full text-left text-sm">
-                <thead className="bg-slate-50 text-xs text-slate-500 dark:bg-slate-950 dark:text-slate-400">
-                  <tr>
-                    <th className="px-3 py-1.5">Producto</th>
-                    <th className="px-3 py-1.5">Cant.</th>
-                    <th className="px-3 py-1.5">Precio</th>
-                    <th className="px-3 py-1.5">Subtotal</th>
-                    <th className="px-3 py-1.5"></th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {carrito.map((l) => (
-                    <tr key={l.productoId}>
-                      <td className="px-3 py-1.5">
-                        {l.codigo} — {l.nombre}
-                      </td>
-                      <td className="px-3 py-1.5">
-                        <input
-                          type="number"
-                          min={0.01}
-                          step="any"
-                          value={l.cantidad}
-                          onChange={(e) => cambiarCantidad(l.productoId, Number(e.target.value))}
-                          className="w-20 rounded-md border border-slate-300 px-2 py-1 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-                        />
-                      </td>
-                      <td className="px-3 py-1.5">{formatoRD(l.precioUnitario)}</td>
-                      <td className="px-3 py-1.5">{formatoRD(l.cantidad * l.precioUnitario)}</td>
-                      <td className="px-3 py-1.5">
-                        <button
-                          type="button"
-                          onClick={() => quitarDelCarrito(l.productoId)}
-                          className="text-red-600 hover:text-red-700"
-                          aria-label="Quitar del carrito"
-                        >
-                          ×
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                  {carrito.length === 0 && (
-                    <tr>
-                      <td colSpan={5} className="px-3 py-3 text-center text-slate-400">
-                        Carrito vacío — agregá un producto arriba.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-
-            {carrito.length > 0 && (
-              <div className="flex flex-col items-end gap-0.5 text-sm text-slate-600 dark:text-slate-400">
-                <p>Subtotal: {formatoRD(subtotal)}</p>
-                <p>ITBIS: {formatoRD(itbis)}</p>
-                <p className="text-base font-semibold text-slate-900 dark:text-slate-100">Total: {formatoRD(total)}</p>
-              </div>
-            )}
-
-            <div className="flex flex-wrap items-end justify-between gap-2">
+            <div className="space-y-3 lg:col-span-2">
               <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Método de pago</label>
-                <select
-                  value={metodoPago}
-                  onChange={(e) => setMetodoPago(e.target.value as MetodoPago)}
-                  className="rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-                >
-                  <option value="EFECTIVO">Efectivo</option>
-                  <option value="TARJETA">Tarjeta</option>
-                  <option value="TRANSFERENCIA">Transferencia</option>
-                </select>
+                <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Cliente</label>
+                <ComboboxBusqueda<Cliente>
+                  valor={cliente}
+                  onSeleccionar={setCliente}
+                  obtenerId={(c) => c.id}
+                  obtenerEtiqueta={(c) => c.nombre}
+                  placeholder="Buscar cliente…"
+                  buscar={async (texto) =>
+                    (await apiClient.get<PaginaResultado<Cliente>>('/clientes', { params: { busqueda: texto, tamanoPagina: 10 } })).data.datos
+                  }
+                />
               </div>
-              <Button onClick={onCobrar} disabled={registrarVenta.isPending || carrito.length === 0}>
-                {registrarVenta.isPending ? 'Cobrando…' : `Cobrar ${carrito.length > 0 ? formatoRD(total) : ''}`}
-              </Button>
+
+              <Card sinPadding>
+                <ul className="max-h-64 divide-y divide-slate-100 overflow-y-auto dark:divide-slate-800">
+                  {carrito.map((l) => (
+                    <li key={l.productoId} className="flex items-center gap-2 px-3 py-2 text-sm">
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-medium text-slate-800 dark:text-slate-200">{l.nombre}</p>
+                        <p className="text-xs text-slate-400">{formatoRD(l.precioUnitario)} c/u</p>
+                      </div>
+                      <input
+                        type="number"
+                        min={0.01}
+                        step="any"
+                        value={l.cantidad}
+                        onChange={(e) => cambiarCantidad(l.productoId, Number(e.target.value))}
+                        className="w-16 rounded-md border border-slate-300 px-2 py-1 text-right text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                      />
+                      <span className="w-20 shrink-0 text-right font-medium text-slate-700 dark:text-slate-300">
+                        {formatoRD(l.cantidad * l.precioUnitario)}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => quitarDelCarrito(l.productoId)}
+                        className="text-red-600 hover:text-red-700"
+                        aria-label="Quitar del carrito"
+                      >
+                        ×
+                      </button>
+                    </li>
+                  ))}
+                  {carrito.length === 0 && <li className="px-3 py-6 text-center text-sm text-slate-400">Carrito vacío — elegí un producto del catálogo.</li>}
+                </ul>
+
+                {carrito.length > 0 && (
+                  <div className="space-y-0.5 border-t border-slate-100 px-3 py-2 text-sm text-slate-600 dark:border-slate-800 dark:text-slate-400">
+                    <div className="flex justify-between">
+                      <span>Subtotal</span>
+                      <span>{formatoRD(subtotal)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>ITBIS</span>
+                      <span>{formatoRD(itbis)}</span>
+                    </div>
+                    <div className="flex justify-between text-base font-semibold text-slate-900 dark:text-slate-100">
+                      <span>Total</span>
+                      <span>{formatoRD(total)}</span>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex items-center gap-2 border-t border-slate-100 p-3 dark:border-slate-800">
+                  <select
+                    value={metodoPago}
+                    onChange={(e) => setMetodoPago(e.target.value as MetodoPago)}
+                    className="rounded-lg border border-slate-300 px-2 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                  >
+                    <option value="EFECTIVO">Efectivo</option>
+                    <option value="TARJETA">Tarjeta</option>
+                    <option value="TRANSFERENCIA">Transferencia</option>
+                  </select>
+                  <Button onClick={onCobrar} disabled={registrarVenta.isPending || carrito.length === 0} className="flex-1">
+                    {registrarVenta.isPending ? 'Cobrando…' : `Cobrar ${carrito.length > 0 ? formatoRD(total) : ''}`}
+                  </Button>
+                </div>
+              </Card>
             </div>
           </div>
 
@@ -405,63 +395,6 @@ export function TurnoCajaDetalle({ turnoId, onCerrado }: { turnoId: string; onCe
       )}
       </div>
     </Card>
-  );
-}
-
-function AgregarProducto({ onAgregar }: { onAgregar: (linea: LineaCarrito) => void }) {
-  const [producto, setProducto] = useState<Producto | null>(null);
-  const [cantidad, setCantidad] = useState('1');
-  const [cargando, setCargando] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  async function agregar() {
-    if (!producto) return;
-    setError(null);
-    setCargando(true);
-    try {
-      const precio = (await apiClient.get<Precio | null>(`/precios/${producto.id}`)).data;
-      if (!precio) {
-        setError('Este producto no tiene precio configurado.');
-        return;
-      }
-      onAgregar({
-        productoId: producto.id,
-        codigo: producto.codigo,
-        nombre: producto.nombre,
-        cantidad: Number(cantidad) || 1,
-        precioUnitario: Number(precio.precioVenta),
-        porcentajeItbis: Number(producto.porcentajeItbis),
-      });
-      setProducto(null);
-      setCantidad('1');
-    } catch {
-      setError('No se pudo obtener el precio del producto.');
-    } finally {
-      setCargando(false);
-    }
-  }
-
-  return (
-    <div className="flex flex-wrap items-end gap-2">
-      <div className="min-w-[240px] flex-1">
-        <label className="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">Producto</label>
-        <ComboboxBusqueda<Producto>
-          valor={producto}
-          onSeleccionar={setProducto}
-          obtenerId={(p) => p.id}
-          obtenerEtiqueta={(p) => `${p.codigo} — ${p.nombre}`}
-          placeholder="Buscar producto…"
-          buscar={async (texto) =>
-            (await apiClient.get<PaginaResultado<Producto>>('/productos', { params: { busqueda: texto, tamanoPagina: 10 } })).data.datos
-          }
-        />
-      </div>
-      <Input type="number" min={0.01} step="any" value={cantidad} onChange={(e) => setCantidad(e.target.value)} className="w-24" />
-      <Button type="button" variante="secundario" onClick={agregar} disabled={!producto || cargando}>
-        {cargando ? 'Agregando…' : 'Agregar'}
-      </Button>
-      {error && <p className="w-full text-xs text-red-600">{error}</p>}
-    </div>
   );
 }
 

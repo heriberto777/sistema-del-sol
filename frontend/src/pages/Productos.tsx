@@ -6,6 +6,7 @@ import { Badge } from '../components/atoms/Badge/Badge';
 import { Button } from '../components/atoms/Button/Button';
 import { Card } from '../components/atoms/Card/Card';
 import { Select } from '../components/atoms/Select/Select';
+import { CampoImagen } from '../components/molecules/CampoImagen/CampoImagen';
 import { FormField } from '../components/molecules/FormField/FormField';
 import { Modal } from '../components/molecules/Modal/Modal';
 import { SearchInput } from '../components/molecules/SearchInput/SearchInput';
@@ -35,6 +36,7 @@ interface ComponenteComboDetalle {
 
 interface ProductoDetalle extends Producto {
   componentes: ComponenteComboDetalle[];
+  imagen: string | null;
 }
 
 interface Precio {
@@ -52,6 +54,7 @@ interface ProductoFormValues {
   unidadMedida: string;
   porcentajeItbis: string;
   tipo: TipoProducto;
+  imagen: string | null;
 }
 
 interface ComponenteComboForm {
@@ -59,7 +62,15 @@ interface ComponenteComboForm {
   cantidad: string;
 }
 
-const PRODUCTO_VACIO: ProductoFormValues = { codigo: '', nombre: '', categoria: '', unidadMedida: 'UND', porcentajeItbis: '18', tipo: 'PRODUCTO' };
+const PRODUCTO_VACIO: ProductoFormValues = {
+  codigo: '',
+  nombre: '',
+  categoria: '',
+  unidadMedida: 'UND',
+  porcentajeItbis: '18',
+  tipo: 'PRODUCTO',
+  imagen: null,
+};
 
 const ETIQUETA_TIPO: Record<TipoProducto, string> = { PRODUCTO: 'Producto', SERVICIO: 'Servicio', COMBO: 'Combo' };
 const TONO_TIPO: Record<TipoProducto, 'neutro' | 'exito'> = { PRODUCTO: 'neutro', SERVICIO: 'exito', COMBO: 'exito' };
@@ -228,18 +239,23 @@ function FormularioProducto({ producto, onGuardado }: { producto: Producto | nul
           unidadMedida: producto.unidadMedida,
           porcentajeItbis: producto.porcentajeItbis,
           tipo: producto.tipo,
+          imagen: null,
         }
       : PRODUCTO_VACIO,
   );
   const [componentes, setComponentes] = useState<ComponenteComboForm[]>([]);
   const [error, setError] = useState<string | null>(null);
 
-  // Editar un combo existente: la lista de productos (GET /productos) no trae
-  // los componentes — hay que pedir el detalle completo para precargarlos.
+  // Editar un producto existente: la lista (GET /productos) no trae ni la
+  // imagen ni (si es combo) los componentes — hay que pedir el detalle
+  // completo para precargarlos.
   useEffect(() => {
-    if (!producto || producto.tipo !== 'COMBO') return;
+    if (!producto) return;
     apiClient.get<ProductoDetalle>(`/productos/${producto.id}`).then(({ data }) => {
-      setComponentes(data.componentes.map((c) => ({ productoId: c.componente.id, cantidad: c.cantidad })));
+      setValores((v) => ({ ...v, imagen: data.imagen }));
+      if (data.tipo === 'COMBO') {
+        setComponentes(data.componentes.map((c) => ({ productoId: c.componente.id, cantidad: c.cantidad })));
+      }
     });
   }, [producto]);
 
@@ -263,6 +279,7 @@ function FormularioProducto({ producto, onGuardado }: { producto: Producto | nul
       unidadMedida: valores.unidadMedida || undefined,
       porcentajeItbis: valores.porcentajeItbis ? Number(valores.porcentajeItbis) : undefined,
       tipo: valores.tipo,
+      imagen: valores.imagen,
       componentes:
         valores.tipo === 'COMBO'
           ? componentes.filter((c) => c.productoId).map((c) => ({ productoId: c.productoId, cantidad: Number(c.cantidad) || 1 }))
@@ -292,6 +309,7 @@ function FormularioProducto({ producto, onGuardado }: { producto: Producto | nul
 
   return (
     <form onSubmit={onSubmit} className="space-y-3">
+      <CampoImagen valor={valores.imagen} onChange={(imagen) => setValores((v) => ({ ...v, imagen }))} />
       <div className="flex flex-col gap-1">
         <label htmlFor="producto-tipo" className="text-sm font-medium text-slate-700 dark:text-slate-300">
           Tipo

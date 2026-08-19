@@ -122,9 +122,11 @@ pasa ninguna de ellas.
 
 | Método | Ruta | Permiso |
 |---|---|---|
-| POST | `/api/productos` | `precios.editar` |
-| GET | `/api/productos?pagina&tamanoPagina&busqueda` | `precios.ver` — `busqueda` filtra por nombre o código |
-| GET | `/api/productos/:id` | `precios.ver` |
+| POST | `/api/productos` | `precios.editar` — acepta `imagen` (data URI, opcional) |
+| GET | `/api/productos?pagina&tamanoPagina&busqueda` | `precios.ver` — `busqueda` filtra por nombre o código; NUNCA incluye `imagen` (ver ARCHITECTURE.md) |
+| GET | `/api/productos/catalogo?pagina&tamanoPagina&busqueda` | `precios.ver` — para el catálogo de POS: incluye `imagen` y `precioVenta` (lista GENERAL vigente) en cada fila |
+| GET | `/api/productos/:id` | `precios.ver` — sí incluye `imagen` |
+| PATCH | `/api/productos/:id` | `precios.editar` — `imagen: null` explícito quita la foto existente |
 
 ## Inventario
 

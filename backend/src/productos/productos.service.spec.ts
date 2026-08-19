@@ -10,6 +10,7 @@ describe('ProductosService', () => {
     repository = {
       crear: jest.fn(),
       listar: jest.fn(),
+      catalogo: jest.fn(),
       buscarPorId: jest.fn(),
       buscarPorIdEnTx: jest.fn(),
       actualizar: jest.fn(),
@@ -100,6 +101,26 @@ describe('ProductosService', () => {
       expect(repository.actualizar).toHaveBeenCalledWith('combo-1', {
         componentes: [{ productoId: 'p2', cantidad: 5 }],
       });
+    });
+  });
+
+  describe('catalogo', () => {
+    it('aplana precios[0].precioVenta a precioVenta, y null si el producto no tiene precio vigente', async () => {
+      repository.catalogo.mockResolvedValue([
+        [
+          { id: 'p1', codigo: 'A', nombre: 'Con precio', imagen: null, precios: [{ precioVenta: '150' }] },
+          { id: 'p2', codigo: 'B', nombre: 'Sin precio', imagen: null, precios: [] },
+        ],
+        2,
+      ] as never);
+
+      const resultado = await service.catalogo({});
+
+      expect(resultado.datos).toEqual([
+        { id: 'p1', codigo: 'A', nombre: 'Con precio', imagen: null, precioVenta: '150' },
+        { id: 'p2', codigo: 'B', nombre: 'Sin precio', imagen: null, precioVenta: null },
+      ]);
+      expect(resultado.total).toBe(2);
     });
   });
 });

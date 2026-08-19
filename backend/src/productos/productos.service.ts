@@ -21,6 +21,13 @@ export class ProductosService {
     return { datos, total, pagina, tamanoPagina };
   }
 
+  async catalogo(query: ListadoQueryDto) {
+    const { pagina, tamanoPagina, skip, take } = paginar(query.pagina, query.tamanoPagina);
+    const [filas, total] = await this.productosRepository.catalogo({ skip, take, busqueda: query.busqueda });
+    const datos = filas.map(({ precios, ...producto }) => ({ ...producto, precioVenta: precios[0]?.precioVenta ?? null }));
+    return { datos, total, pagina, tamanoPagina };
+  }
+
   buscarPorId(id: string) {
     return this.productosRepository.buscarPorId(id);
   }

@@ -1127,6 +1127,31 @@ previa; el backend sigue siendo quien valida y exige
 `justificacionDiferencia` si corresponde, porque el tenant pudo haber
 cambiado esa configuración.
 
+### Modelo C: catálogo con foto + carrito persistente
+
+`TurnoCajaDetalle.tsx` reemplazó el combobox+botón "Agregar" (un
+producto a la vez, con un `GET /precios/:id` aparte por cada uno) por
+un panel dividido: `CatalogoProductosPos` a la izquierda (grilla de
+productos con foto, clic en una tarjeta agrega 1 unidad directo al
+carrito) y el carrito persistente a la derecha (cliente, líneas,
+totales, método de pago, "Cobrar"). El catálogo llama a
+`GET /productos/catalogo`, no a `GET /productos` — ya trae `imagen` y
+`precioVenta` (lista `GENERAL` vigente) en la misma fila, así que agregar
+un producto ya no dispara una llamada aparte por precio.
+
+**`Producto.imagen`** es una data URI completa, comprimida en el
+navegador antes de subir (`lib/comprimir-imagen.ts`, redimensiona a 640px
+y comprime a JPEG calidad 0.72 vía `<canvas>`) — mismo criterio que se
+pensó para el logo del tenant. Por el tamaño que puede tomar un catálogo
+entero de imágenes, `ProductosRepository.listar()` (el que alimenta
+`Productos.tsx` y cualquier `ComboboxBusqueda`) tiene un **`select`
+explícito que excluye `imagen` a propósito** — no debe cargarse un blob
+por fila en cada tecla de búsqueda. Solo `catalogo()` (pensado para esta
+grilla del POS) y `buscarPorId()` (detalle de un producto) la incluyen.
+`PATCH /productos/:id` con `imagen: null` explícito la quita — un
+`imagen` simplemente ausente en el body deja la existente intacta
+(comportamiento normal de un `PATCH` parcial).
+
 ## Impresión multi-formato (Facturación/Cotizaciones/Remisiones/POS)
 
 Antes, Facturación/Cotizaciones/Remisiones solo generaban PDF a tamaño

@@ -27,6 +27,14 @@ export class ProductosController {
     return this.productosService.listar(query);
   }
 
+  // Antes de ':id' a propósito — mismo motivo que /clientes/consumidor-final:
+  // si no, Nest matchea "catalogo" como si fuera un :id.
+  @Get('catalogo')
+  @Permissions('precios.ver')
+  catalogo(@Query() query: ListadoQueryDto) {
+    return this.productosService.catalogo(query);
+  }
+
   @Get(':id')
   @Permissions('precios.ver')
   buscarPorId(@Param('id') id: string) {
