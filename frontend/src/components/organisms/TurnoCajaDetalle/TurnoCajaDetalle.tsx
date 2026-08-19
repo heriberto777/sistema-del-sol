@@ -9,7 +9,7 @@ import { CatalogoProductosPos, type ProductoCatalogo } from '../CatalogoProducto
 import { ComboboxBusqueda } from '../../molecules/ComboboxBusqueda/ComboboxBusqueda';
 import { FormField } from '../../molecules/FormField/FormField';
 import { Modal } from '../../molecules/Modal/Modal';
-import { SelectFormaPago } from '../../molecules/SelectFormaPago/SelectFormaPago';
+import { SelectFormaPago, type FormaPago } from '../../molecules/SelectFormaPago/SelectFormaPago';
 import { useAuth } from '../../../hooks/useAuth';
 import { useAtajosTeclado } from '../../../hooks/useAtajosTeclado';
 import { PaginaResultado } from '../../../types/pagina-resultado';
@@ -65,12 +65,18 @@ interface VentaAparcada {
   lineas: VentaAparcadaLinea[];
 }
 
+interface PagoVentaResumen {
+  monto: string;
+  formaPago: { esEfectivo: boolean };
+}
+
 interface FacturaTurno {
   id: string;
   ncf: string | null;
   total: string;
   formaPago: { nombre: string; esEfectivo: boolean } | null;
   vendedorEmpleado: { nombre: string } | null;
+  pagosVenta: PagoVentaResumen[];
   estado: string;
 }
 
@@ -98,11 +104,13 @@ function formatoRD(valor: string | number) {
   return `RD$ ${Number(valor).toLocaleString('es-DO', { minimumFractionDigits: 2 })}`;
 }
 
-/** Réplica del cálculo de pos.service.ts:88 — solo para mostrar el esperado ANTES de cerrar; el backend sigue siendo la fuente de verdad final. */
+/** Réplica del cálculo de pos.service.ts (calcularMovimientoEfectivo) — solo para mostrar el esperado ANTES de cerrar; el backend sigue siendo la fuente de verdad final. */
 function calcularMontoEsperado(data: TurnoCajaDetalleData): number {
   const ventasEfectivo = data.facturas
-    .filter((f) => f.formaPago?.esEfectivo && f.estado === 'EMITIDA')
-    .reduce((acc, f) => acc + Number(f.total), 0);
+    .filter((f) => f.estado === 'EMITIDA')
+    .flatMap((f) => f.pagosVenta)
+    .filter((p) => p.formaPago.esEfectivo)
+    .reduce((acc, p) => acc + Number(p.monto), 0);
   const entradas = data.movimientos.filter((m) => m.tipo === 'ENTRADA').reduce((acc, m) => acc + Number(m.monto), 0);
   const salidas = data.movimientos.filter((m) => m.tipo === 'SALIDA').reduce((acc, m) => acc + Number(m.monto), 0);
   return Number(data.montoInicial) + ventasEfectivo + entradas - salidas;
@@ -121,13 +129,13 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
   const [carrito, setCarrito] = useState<LineaCarrito[]>([]);
   const [cliente, setCliente] = useState<Cliente | null>(null);
   const [vendedor, setVendedor] = useState<Vendedor | null>(null);
-  const [formaPagoId, setFormaPagoId] = useState('');
   const [modalMovimiento, setModalMovimiento] = useState(false);
   const [modalCerrarTurno, setModalCerrarTurno] = useState(false);
   const [modalDescuento, setModalDescuento] = useState(false);
   const [modalGuardar, setModalGuardar] = useState(false);
   const [modalGuardadas, setModalGuardadas] = useState(false);
   const [modalDevolucion, setModalDevolucion] = useState(false);
+  const [modalCheckout, setModalCheckout] = useState(false);
   const [ventaConfirmada, setVentaConfirmada] = useState<{ id: string; total: string } | null>(null);
   const [facturaAnulando, setFacturaAnulando] = useState<FacturaTurno | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -153,12 +161,12 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
   }
 
   const registrarVenta = useMutation({
-    mutationFn: async () =>
+    mutationFn: async (pagos: { formaPagoId: string; monto: number; referencia?: string }[]) =>
       apiClient.post('/pos/ventas', {
         turnoCajaId: turnoId,
         clienteId: cliente?.id,
-        formaPagoId,
         vendedorEmpleadoId: vendedor?.id,
+        pagos,
         lineas: carrito.map((l) => ({ productoId: l.productoId, cantidad: l.cantidad, descuento: l.descuento })),
       }),
     onSuccess: (respuesta) => {
@@ -166,6 +174,7 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
       setCarrito([]);
       setVendedor(null);
       setError(null);
+      setModalCheckout(false);
       setVentaConfirmada({ id: respuesta.data.id, total: respuesta.data.total });
     },
     onError: () => setError('No se pudo registrar la venta — revisá el stock disponible.'),
@@ -271,7 +280,7 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
   const itbis = carrito.reduce((acc, l) => acc + (l.cantidad * l.precioUnitario - l.descuento) * (l.porcentajeItbis / 100), 0);
   const total = subtotalBruto - totalDescuentos + itbis;
 
-  function onCobrar() {
+  function onAbrirCheckout() {
     setError(null);
     if (carrito.length === 0) {
       setError('Agregá al menos un producto al carrito.');
@@ -281,11 +290,7 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
       setError('Seleccioná un cliente (o dejá el Consumidor Final por defecto).');
       return;
     }
-    if (!formaPagoId) {
-      setError('Seleccioná una forma de pago.');
-      return;
-    }
-    registrarVenta.mutate();
+    setModalCheckout(true);
   }
 
   const puedeVender = !!data && data.estado === 'ABIERTO';
@@ -300,6 +305,7 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
       F7: () => setModalMovimiento(true),
       F8: () => carrito.length > 0 && setModalDescuento(true),
       F9: () => setModalCerrarTurno(true),
+      F10: () => onAbrirCheckout(),
       F12: () => carrito.length > 0 && setModalGuardar(true),
       'Shift+F12': () => setModalGuardadas(true),
     },
@@ -428,12 +434,9 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
                   </div>
                 )}
 
-                <div className="flex items-center gap-2 border-t border-slate-100 p-3 dark:border-slate-800">
-                  <div className="flex-1">
-                    <SelectFormaPago value={formaPagoId} onChange={setFormaPagoId} />
-                  </div>
-                  <Button onClick={onCobrar} disabled={registrarVenta.isPending || carrito.length === 0} className="flex-1">
-                    {registrarVenta.isPending ? 'Cobrando…' : `Cobrar ${carrito.length > 0 ? formatoRD(total) : ''}`}
+                <div className="border-t border-slate-100 p-3 dark:border-slate-800">
+                  <Button onClick={onAbrirCheckout} disabled={carrito.length === 0} className="w-full">
+                    {`Cobrar (F10) ${carrito.length > 0 ? formatoRD(total) : ''}`}
                   </Button>
                 </div>
               </Card>
@@ -482,6 +485,7 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
             <li key={f.id} className="flex items-center justify-between gap-2">
               <span>
                 {formatoRD(f.total)} — {f.formaPago?.nombre ?? '—'}
+                {f.pagosVenta.length > 1 && ` (+${f.pagosVenta.length - 1} forma${f.pagosVenta.length > 2 ? 's' : ''} más)`}
                 {f.vendedorEmpleado && ` — vendedor: ${f.vendedorEmpleado.nombre}`}{' '}
                 <Badge tono={f.estado === 'EMITIDA' ? 'exito' : 'neutro'}>{f.estado}</Badge>
               </span>
@@ -527,6 +531,15 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
 
       {modalDescuento && (
         <ModalDescuento carrito={carrito} onAplicar={aplicarDescuento} onClose={() => setModalDescuento(false)} />
+      )}
+
+      {modalCheckout && (
+        <ModalCheckout
+          total={total}
+          registrando={registrarVenta.isPending}
+          onConfirmar={(pagos) => registrarVenta.mutate(pagos)}
+          onClose={() => setModalCheckout(false)}
+        />
       )}
 
       {modalGuardar && (
@@ -856,6 +869,172 @@ function ModalDevolucion({
   );
 }
 
+const MONTOS_RAPIDOS = [100, 200, 500, 1000];
+const EPSILON_PAGOS = 0.005;
+
+interface PagoAgregado {
+  formaPagoId: string;
+  nombreFormaPago: string;
+  monto: number;
+  referencia?: string;
+}
+
+/**
+ * Checkout (F10) — reemplaza el flujo de una sola forma de pago. Soporta
+ * pago dividido: se van agregando pagos (cada uno con su forma) hasta
+ * cubrir el total; el sobrante (si el cajero registra de más, ej. "pagó
+ * con 1000" en una venta de 700) se muestra como cambio pero NUNCA se
+ * envía al backend — al confirmar, `pagosParaEnviar` recorta el último
+ * pago para que la suma enviada sea exacta al total (ver ARCHITECTURE.md).
+ */
+function ModalCheckout({
+  total,
+  registrando,
+  onConfirmar,
+  onClose,
+}: {
+  total: number;
+  registrando: boolean;
+  onConfirmar: (pagos: { formaPagoId: string; monto: number; referencia?: string }[]) => void;
+  onClose: () => void;
+}) {
+  const [pagos, setPagos] = useState<PagoAgregado[]>([]);
+  const [formaSeleccionada, setFormaSeleccionada] = useState<FormaPago | undefined>(undefined);
+  const [formaPagoId, setFormaPagoId] = useState('');
+  const [monto, setMonto] = useState('');
+  const [referencia, setReferencia] = useState('');
+
+  const sumaPagos = pagos.reduce((acc, p) => acc + p.monto, 0);
+  const pendiente = Math.max(0, total - sumaPagos);
+  const cambio = Math.max(0, sumaPagos - total);
+  const puedeConfirmar = pagos.length > 0 && sumaPagos + EPSILON_PAGOS >= total;
+
+  function agregarPago() {
+    if (!formaPagoId || !monto || Number(monto) <= 0) return;
+    setPagos((prev) => [
+      ...prev,
+      { formaPagoId, nombreFormaPago: formaSeleccionada?.nombre ?? '', monto: Number(monto), referencia: referencia || undefined },
+    ]);
+    setMonto('');
+    setReferencia('');
+  }
+
+  function quitarPago(indice: number) {
+    setPagos((prev) => prev.filter((_, i) => i !== indice));
+  }
+
+  function confirmar() {
+    // Recorta el sobrante (cambio) para que la suma enviada al backend sea
+    // exacta al total — el backend valida esto con la misma tolerancia.
+    let acumulado = 0;
+    const pagosParaEnviar: { formaPagoId: string; monto: number; referencia?: string }[] = [];
+    for (const p of pagos) {
+      const restante = total - acumulado;
+      if (restante <= EPSILON_PAGOS) break;
+      const montoAplicado = Math.min(p.monto, restante);
+      pagosParaEnviar.push({ formaPagoId: p.formaPagoId, monto: montoAplicado, referencia: p.referencia });
+      acumulado += montoAplicado;
+    }
+    onConfirmar(pagosParaEnviar);
+  }
+
+  return (
+    <Modal titulo="Cobrar" onClose={onClose}>
+      <div className="space-y-3">
+        <div className="flex justify-between text-sm text-slate-600 dark:text-slate-400">
+          <span>Total a cobrar</span>
+          <span className="text-base font-semibold text-slate-900 dark:text-slate-100">{formatoRD(total)}</span>
+        </div>
+
+        {pagos.length > 0 && (
+          <ul className="space-y-1 rounded-md border border-slate-200 p-2 text-sm dark:border-slate-800">
+            {pagos.map((p, i) => (
+              <li key={i} className="flex items-center justify-between gap-2">
+                <span className="text-slate-700 dark:text-slate-300">
+                  {p.nombreFormaPago} {p.referencia && `(${p.referencia})`}
+                </span>
+                <span className="flex items-center gap-2">
+                  <span className="font-medium text-slate-800 dark:text-slate-200">{formatoRD(p.monto)}</span>
+                  <button type="button" onClick={() => quitarPago(i)} className="text-red-600 hover:text-red-700" aria-label="Quitar pago">
+                    ×
+                  </button>
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        <div className="flex justify-between text-sm">
+          <span className="text-slate-600 dark:text-slate-400">Pendiente</span>
+          <span className={pendiente > 0 ? 'font-medium text-amber-600' : 'font-medium text-emerald-600'}>{formatoRD(pendiente)}</span>
+        </div>
+        {cambio > 0 && (
+          <div className="flex justify-between text-sm">
+            <span className="text-slate-600 dark:text-slate-400">Cambio</span>
+            <span className="font-medium text-slate-900 dark:text-slate-100">{formatoRD(cambio)}</span>
+          </div>
+        )}
+
+        <div className="space-y-2 border-t border-slate-200 pt-3 dark:border-slate-800">
+          <SelectFormaPago
+            value={formaPagoId}
+            onChange={(id, forma) => {
+              setFormaPagoId(id);
+              setFormaSeleccionada(forma);
+            }}
+          />
+          <div className="flex flex-wrap gap-1.5">
+            <button
+              type="button"
+              onClick={() => setMonto(pendiente > 0 ? pendiente.toFixed(2) : '')}
+              className="rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-600 hover:border-sol-300 dark:border-slate-700 dark:text-slate-300"
+            >
+              Exacto
+            </button>
+            {MONTOS_RAPIDOS.map((m) => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => setMonto(String(m))}
+                className="rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-600 hover:border-sol-300 dark:border-slate-700 dark:text-slate-300"
+              >
+                {formatoRD(m)}
+              </button>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            <input
+              type="number"
+              min={0.01}
+              step="any"
+              value={monto}
+              onChange={(e) => setMonto(e.target.value)}
+              placeholder="Monto"
+              className="w-28 rounded-md border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+            />
+            {formaSeleccionada?.requiereReferencia && (
+              <input
+                type="text"
+                value={referencia}
+                onChange={(e) => setReferencia(e.target.value)}
+                placeholder="Referencia"
+                className="flex-1 rounded-md border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+              />
+            )}
+            <Button type="button" variante="secundario" onClick={agregarPago} disabled={!formaPagoId || !monto}>
+              Agregar pago
+            </Button>
+          </div>
+        </div>
+
+        <Button onClick={confirmar} disabled={!puedeConfirmar || registrando} className="w-full">
+          {registrando ? 'Cobrando…' : 'Confirmar venta'}
+        </Button>
+      </div>
+    </Modal>
+  );
+}
+
 function ModalMovimiento({ turnoId, onClose, onRegistrado }: { turnoId: string; onClose: () => void; onRegistrado: () => void }) {
   const [tipoMovimiento, setTipoMovimiento] = useState<'ENTRADA' | 'SALIDA'>('SALIDA');
   const [monto, setMonto] = useState('');
@@ -901,6 +1080,10 @@ function ModalMovimiento({ turnoId, onClose, onRegistrado }: { turnoId: string; 
   );
 }
 
+// Billetes/monedas en circulación en RD$ — cierre por denominación en vez
+// de un solo campo "monto contado" (más preciso para el arqueo real).
+const DENOMINACIONES = [2000, 1000, 500, 200, 100, 50, 25, 10, 5, 1];
+
 function ModalCerrarTurno({
   data,
   onClose,
@@ -910,19 +1093,22 @@ function ModalCerrarTurno({
   onClose: () => void;
   onCerrado: () => void;
 }) {
-  const [montoFinalContado, setMontoFinalContado] = useState('');
+  const [conteo, setConteo] = useState<Record<number, string>>({});
   const [justificacionDiferencia, setJustificacionDiferencia] = useState('');
   const [error, setError] = useState<string | null>(null);
 
+  const algoContado = Object.values(conteo).some((v) => v.trim() !== '');
+  const montoFinalContado = DENOMINACIONES.reduce((acc, d) => acc + d * (Number(conteo[d]) || 0), 0);
+
   const montoEsperado = calcularMontoEsperado(data);
   const TOLERANCIA_REFERENCIA = 50; // RD$ — default documentado de Configuracion.POS_TOLERANCIA_ARQUEO; el backend valida el real
-  const diferencia = montoFinalContado.trim() === '' ? null : Number(montoFinalContado) - montoEsperado;
+  const diferencia = algoContado ? montoFinalContado - montoEsperado : null;
   const dentroDeTolerancia = diferencia === null || Math.abs(diferencia) <= TOLERANCIA_REFERENCIA;
 
   const cerrarTurno = useMutation({
     mutationFn: async () =>
       apiClient.post(`/pos/turnos/${data.id}/cerrar`, {
-        montoFinalContado: Number(montoFinalContado),
+        montoFinalContado,
         justificacionDiferencia: justificacionDiferencia || undefined,
       }),
     onSuccess: () => onCerrado(),
@@ -938,6 +1124,10 @@ function ModalCerrarTurno({
   function onSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
+    if (!algoContado) {
+      setError('Contá al menos una denominación.');
+      return;
+    }
     cerrarTurno.mutate();
   }
 
@@ -947,16 +1137,37 @@ function ModalCerrarTurno({
         <p className="text-sm text-slate-600 dark:text-slate-400">
           Efectivo esperado según ventas y movimientos: <span className="font-semibold text-slate-900 dark:text-slate-100">{formatoRD(montoEsperado)}</span>
         </p>
-        <FormField
-          id="turno-monto-final"
-          label="Efectivo contado"
-          type="number"
-          min={0}
-          step="any"
-          value={montoFinalContado}
-          onChange={(e) => setMontoFinalContado(e.target.value)}
-          required
-        />
+
+        <div className="space-y-1">
+          <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Efectivo contado (por denominación)</p>
+          <div className="grid max-h-56 grid-cols-2 gap-x-4 gap-y-1 overflow-y-auto rounded-md border border-slate-200 p-2 dark:border-slate-800">
+            {DENOMINACIONES.map((d) => (
+              <div key={d} className="flex items-center justify-between gap-2 text-sm">
+                <label htmlFor={`denominacion-${d}`} className="text-slate-600 dark:text-slate-400">
+                  {formatoRD(d)}
+                </label>
+                <div className="flex items-center gap-1.5">
+                  <input
+                    id={`denominacion-${d}`}
+                    type="number"
+                    min={0}
+                    step={1}
+                    value={conteo[d] ?? ''}
+                    onChange={(e) => setConteo((prev) => ({ ...prev, [d]: e.target.value }))}
+                    className="w-16 rounded-md border border-slate-300 px-2 py-1 text-right text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                  />
+                  <span className="w-20 shrink-0 text-right text-xs text-slate-400">
+                    {formatoRD(d * (Number(conteo[d]) || 0))}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+          <p className="text-right text-sm font-semibold text-slate-900 dark:text-slate-100">
+            Total contado: {formatoRD(montoFinalContado)}
+          </p>
+        </div>
+
         {diferencia !== null && (
           <p className={dentroDeTolerancia ? 'text-sm text-emerald-600' : 'text-sm font-medium text-amber-600'}>
             Diferencia: {formatoRD(diferencia)}

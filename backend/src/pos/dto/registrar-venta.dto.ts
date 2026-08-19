@@ -1,7 +1,23 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { ArrayMinSize, IsArray, IsOptional, IsString, IsUUID, ValidateNested } from 'class-validator';
+import { ArrayMinSize, IsArray, IsNumber, IsOptional, IsPositive, IsString, IsUUID, ValidateNested } from 'class-validator';
 import { LineaFacturaDto } from '../../facturacion/dto/crear-factura.dto';
+
+export class PagoVentaPosDto {
+  @ApiProperty()
+  @IsUUID()
+  formaPagoId: string;
+
+  @ApiProperty({ description: 'Monto aplicado a la venta con esta forma de pago (no el efectivo bruto entregado — el cambio nunca se envía)' })
+  @IsNumber()
+  @IsPositive()
+  monto: number;
+
+  @ApiProperty({ required: false, description: 'Solo aplica si la forma de pago elegida requiere referencia (transferencia, cheque, etc.)' })
+  @IsOptional()
+  @IsString()
+  referencia?: string;
+}
 
 export class RegistrarVentaPosDto {
   @ApiProperty()
@@ -12,19 +28,20 @@ export class RegistrarVentaPosDto {
   @IsUUID()
   clienteId: string;
 
-  @ApiProperty()
-  @IsUUID()
-  formaPagoId: string;
-
-  @ApiProperty({ required: false, description: 'Solo aplica si la forma de pago elegida requiere referencia (transferencia, cheque, etc.)' })
-  @IsOptional()
-  @IsString()
-  referenciaPago?: string;
-
   @ApiProperty({ required: false, description: 'Empleado (cargo "Vendedor") acreditado por comisión en esta venta — distinto del cajero que la registra' })
   @IsOptional()
   @IsUUID()
   vendedorEmpleadoId?: string;
+
+  @ApiProperty({
+    type: [PagoVentaPosDto],
+    description: 'Uno o más pagos que en conjunto cubren el total de la venta — soporta pago dividido (ej. parte efectivo + parte tarjeta)',
+  })
+  @IsArray()
+  @ArrayMinSize(1)
+  @ValidateNested({ each: true })
+  @Type(() => PagoVentaPosDto)
+  pagos: PagoVentaPosDto[];
 
   @ApiProperty({ type: [LineaFacturaDto] })
   @IsArray()

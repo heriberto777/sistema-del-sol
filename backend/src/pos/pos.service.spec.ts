@@ -95,7 +95,7 @@ describe('PosService', () => {
       facturacionService.crear.mockResolvedValue({ id: 'f1' } as never);
 
       await service.registrarVenta(
-        { turnoCajaId: 't1', clienteId: 'c1', formaPagoId: 'fp1', lineas: [{ productoId: 'p1', cantidad: 1 }] },
+        { turnoCajaId: 't1', clienteId: 'c1', pagos: [{ formaPagoId: 'fp1', monto: 177 }], lineas: [{ productoId: 'p1', cantidad: 1 }] },
         'tenant-1',
         'cajero-1',
       );
@@ -104,7 +104,7 @@ describe('PosService', () => {
         { clienteId: 'c1', bodegaId: 'b1', tipoFactura: 'CONTADO', lineas: [{ productoId: 'p1', cantidad: 1 }] },
         'tenant-1',
         'cajero-1',
-        { formaPagoId: 'fp1', referenciaPago: undefined, turnoCajaId: 't1', vendedorEmpleadoId: undefined },
+        { turnoCajaId: 't1', vendedorEmpleadoId: undefined, pagos: [{ formaPagoId: 'fp1', monto: 177 }] },
       );
     });
 
@@ -116,7 +116,7 @@ describe('PosService', () => {
         {
           turnoCajaId: 't1',
           clienteId: 'c1',
-          formaPagoId: 'fp1',
+          pagos: [{ formaPagoId: 'fp1', monto: 177 }],
           vendedorEmpleadoId: 'emp1',
           lineas: [{ productoId: 'p1', cantidad: 1 }],
         } as never,
@@ -138,7 +138,7 @@ describe('PosService', () => {
       facturacionService.crear.mockResolvedValue({ id: 'f1' } as never);
 
       await service.registrarVenta(
-        { turnoCajaId: 't1', clienteId: 'c1', formaPagoId: 'fp1', lineas: [{ productoId: 'p1', cantidad: 1 }] },
+        { turnoCajaId: 't1', clienteId: 'c1', pagos: [{ formaPagoId: 'fp1', monto: 177 }], lineas: [{ productoId: 'p1', cantidad: 1 }] },
         'tenant-1',
         'cajero-1',
       );
@@ -146,24 +146,34 @@ describe('PosService', () => {
       expect(empleadosRepository.buscarPorId).not.toHaveBeenCalled();
     });
 
-    it('valida que formaPagoId pertenezca al tenant antes de vender (404 si no, vía findUniqueOrThrow tenant-scoped)', async () => {
+    it('valida que cada formaPagoId de `pagos` pertenezca al tenant antes de vender (404 si no, vía findUniqueOrThrow tenant-scoped)', async () => {
       posRepository.buscarPorId.mockResolvedValue({ id: 't1', estado: 'ABIERTO', bodegaId: 'b1' } as never);
       facturacionService.crear.mockResolvedValue({ id: 'f1' } as never);
 
       await service.registrarVenta(
-        { turnoCajaId: 't1', clienteId: 'c1', formaPagoId: 'fp1', lineas: [{ productoId: 'p1', cantidad: 1 }] },
+        {
+          turnoCajaId: 't1',
+          clienteId: 'c1',
+          pagos: [{ formaPagoId: 'fp1', monto: 100 }, { formaPagoId: 'fp2', monto: 77 }],
+          lineas: [{ productoId: 'p1', cantidad: 1 }],
+        },
         'tenant-1',
         'cajero-1',
       );
 
       expect(formasPagoRepository.buscarPorId).toHaveBeenCalledWith('fp1');
+      expect(formasPagoRepository.buscarPorId).toHaveBeenCalledWith('fp2');
     });
 
     it('rechaza vender contra un turno que no está abierto', async () => {
       posRepository.buscarPorId.mockResolvedValue({ id: 't1', estado: 'CERRADO', bodegaId: 'b1' } as never);
 
       await expect(
-        service.registrarVenta({ turnoCajaId: 't1', clienteId: 'c1', formaPagoId: 'fp1', lineas: [{ productoId: 'p1', cantidad: 1 }] }, 'tenant-1', 'cajero-1'),
+        service.registrarVenta(
+          { turnoCajaId: 't1', clienteId: 'c1', pagos: [{ formaPagoId: 'fp1', monto: 177 }], lineas: [{ productoId: 'p1', cantidad: 1 }] },
+          'tenant-1',
+          'cajero-1',
+        ),
       ).rejects.toThrow(BadRequestException);
       expect(facturacionService.crear).not.toHaveBeenCalled();
     });

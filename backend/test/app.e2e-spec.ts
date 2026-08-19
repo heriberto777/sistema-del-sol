@@ -2245,7 +2245,12 @@ describe('App (e2e)', () => {
       const respuesta = await request(app.getHttpServer())
         .post('/api/pos/ventas')
         .set('Authorization', `Bearer ${token}`)
-        .send({ turnoCajaId: turnoId, clienteId: clienteAId, formaPagoId: formaPagoEfectivoAId, lineas: [{ productoId, cantidad: 2 }] })
+        .send({
+          turnoCajaId: turnoId,
+          clienteId: clienteAId,
+          pagos: [{ formaPagoId: formaPagoEfectivoAId, monto: 236 }],
+          lineas: [{ productoId, cantidad: 2 }],
+        })
         .expect(201);
 
       expect(respuesta.body.tipoFactura).toBe('CONTADO');
@@ -2436,7 +2441,7 @@ describe('App (e2e)', () => {
         .send({
           turnoCajaId: turno.body.id,
           clienteId: clienteAId,
-          formaPagoId: formaPagoEfectivoAId,
+          pagos: [{ formaPagoId: formaPagoEfectivoAId, monto: 118 }],
           lineas: [{ productoId: productoAId, cantidad: 1 }],
         })
         .expect(201);
@@ -2475,7 +2480,7 @@ describe('App (e2e)', () => {
         .send({
           turnoCajaId: turno.body.id,
           clienteId: clienteAId,
-          formaPagoId: formaPagoTarjetaAId,
+          pagos: [{ formaPagoId: formaPagoTarjetaAId, monto: 118 }],
           lineas: [{ productoId: productoAId, cantidad: 1 }],
         })
         .expect(201);

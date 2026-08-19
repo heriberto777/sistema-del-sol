@@ -87,7 +87,13 @@ export class FacturacionService {
     dto: CrearFacturaDto,
     tenantId: string,
     vendedorId: string,
-    opciones?: { formaPagoId?: string; referenciaPago?: string; turnoCajaId?: string; vendedorEmpleadoId?: string },
+    opciones?: {
+      formaPagoId?: string;
+      referenciaPago?: string;
+      turnoCajaId?: string;
+      vendedorEmpleadoId?: string;
+      pagos?: { formaPagoId: string; monto: number; referencia?: string }[];
+    },
   ) {
     const lineasCalculadas = await Promise.all(
       dto.lineas.map(async (linea) => {
@@ -126,6 +132,27 @@ export class FacturacionService {
     const subtotal = subtotalLineas * signo;
     const itbis = itbisLineas * signo;
     const total = (subtotalLineas + itbisLineas) * signo;
+
+    // Pago dividido (POS, ver PosService.registrarVenta): si vienen `pagos`
+    // explícitos, deben sumar exacto el total (EPSILON, mismo criterio que
+    // PagosService); si no, se sintetiza un único pago desde formaPagoId
+    // (caso de un solo método — resto de POS, Devolución) para que todo
+    // termine en el mismo ledger PagoVenta sin dos caminos de código.
+    const EPSILON_PAGOS = 0.005;
+    if (opciones?.pagos?.length) {
+      const sumaPagos = opciones.pagos.reduce((acc, p) => acc + p.monto, 0);
+      if (Math.abs(sumaPagos - total) > EPSILON_PAGOS) {
+        throw new BadRequestException(
+          `La suma de los pagos (RD$ ${sumaPagos.toFixed(2)}) no coincide con el total de la venta (RD$ ${total.toFixed(2)})`,
+        );
+      }
+    }
+    const pagosResueltos =
+      opciones?.pagos ?? (opciones?.formaPagoId ? [{ formaPagoId: opciones.formaPagoId, monto: total, referencia: opciones.referenciaPago }] : []);
+    const formaPagoPrincipal = pagosResueltos.length
+      ? pagosResueltos.reduce((max, p) => (Math.abs(p.monto) > Math.abs(max.monto) ? p : max))
+      : undefined;
+
     const modalidad = await this.facturacionRepository.obtenerModalidadFacturacion(tenantId);
     const tipoNcf = (modalidad === 'ECF' ? ECF_POR_TIPO : NCF_POR_TIPO)[dto.tipoFactura];
 
@@ -174,10 +201,11 @@ export class FacturacionService {
         ncf,
         tipoNcf,
         facturaOrigenId: dto.facturaOrigenId,
-        formaPagoId: opciones?.formaPagoId,
-        referenciaPago: opciones?.referenciaPago,
+        formaPagoId: formaPagoPrincipal?.formaPagoId,
+        referenciaPago: formaPagoPrincipal?.referencia,
         turnoCajaId: opciones?.turnoCajaId,
         vendedorEmpleadoId: opciones?.vendedorEmpleadoId,
+        pagos: pagosResueltos,
         subtotal,
         descuento: descuentoTotal,
         itbis,

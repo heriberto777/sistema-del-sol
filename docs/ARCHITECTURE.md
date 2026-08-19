@@ -1281,6 +1281,55 @@ duplicar lógica.
   (exigiría `facturacion.ver`). Devolver una venta de un turno anterior
   queda fuera de alcance de esta fase.
 
+### Pagos divididos y cierre por denominación (Fase 2f — la más grande de la adopción de Cuadre)
+
+**Cierre por denominación** (100% frontend): `ModalCerrarTurno` reemplaza
+el input único "Efectivo contado" por una fila por denominación (RD$
+2000/1000/500/200/100/50/25/10/5/1) con un contador cada una; la suma
+calculada se manda igual que siempre como `montoFinalContado` a
+`POST /pos/turnos/:id/cerrar` — el backend no se entera del cambio.
+
+**Pagos divididos**: nuevo modelo tenant-scoped-por-relación `PagoVenta`
+(sin `tenantId` propio — hija de `Factura`, mismo patrón que
+`LineaFactura`) — el ledger real de "con qué se pagó" una venta,
+permitiendo varias formas de pago en la misma factura (ej. parte
+efectivo + parte tarjeta). `RegistrarVentaPosDto.formaPagoId`/
+`referenciaPago` (un solo método) pasaron a ser `pagos:
+{formaPagoId, monto, referencia?}[]` (uno o más).
+
+- **`FacturacionService.crear()`** valida `Σ pagos.monto === total`
+  (EPSILON 0.005, mismo criterio que `PagosService`) **antes** de abrir
+  la transacción — si no cuadra, `BadRequestException`, no se toca la
+  base. Si el caller no manda `pagos` (Devolución, Fase 2e — un solo
+  reintegro) pero sí `formaPagoId`/`referenciaPago` sueltos, se
+  sintetiza un único pago con `monto: total` — **todo termina en el
+  mismo ledger `PagoVenta`**, un solo camino de código en vez de dos.
+  `Factura.formaPagoId`/`referenciaPago` (de Fase 1) se conservan como
+  "forma de pago principal" (la de mayor `|monto|`) para lectura
+  rápida/reportes — la fuente de verdad del arqueo es `PagoVenta`.
+- **`PosRepository.calcularMovimientoEfectivo`** ya no suma
+  `Factura.total` por `formaPago.esEfectivo` — suma `PagoVenta.monto`
+  agrupado por `formaPago.esEfectivo`, vía `factura: { turnoCajaId,
+  estado: 'EMITIDA' }`. Una venta con pago mixto solo cuenta su
+  porción efectivo real; una devolución (Nota de Crédito, con su propio
+  `PagoVenta` de monto negativo) resta sola, sin lógica especial.
+- **El cambio (vuelto) nunca se persiste**: `ModalCheckout` (F10,
+  frontend) deja agregar pagos con montos rápidos (Exacto/100/200/500/
+  1000) hasta cubrir el total — si el cajero registra de más (ej. "pagó
+  con 1000" en una venta de 700), el sobrante se muestra como cambio
+  pero se recorta ANTES de enviar: el último pago se cap­ea a
+  `total - Σ(pagos previos)` para que la suma enviada sea exacta,
+  nunca el efectivo bruto entregado por el cliente.
+- **Migración con backfill**: `20260819070000_pago_venta` crea
+  `PagoVenta` y sembró un registro por cada `Factura` de POS ya
+  existente (`formaPagoId`+`turnoCajaId` no nulos) con `monto: total` —
+  para que el arqueo de turnos que ya estaban abiertos al migrar no
+  perdiera el efectivo de ventas anteriores a este cambio.
+- **`GET /pos/turnos/:id`** ahora incluye `facturas[].pagosVenta` (monto
+  + `formaPago.esEfectivo`) para que el preview del frontend
+  (`calcularMontoEsperado`) calcule exactamente lo mismo que el backend
+  en vez de asumir 1 factura = 1 forma de pago.
+
 ### Roles de POS: Cajero, Vendedor, Supervisor de Caja
 
 Investigando el patrón de sesión de caja más a fondo (Odoo multi-cajero,

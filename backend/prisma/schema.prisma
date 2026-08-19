@@ -602,6 +602,7 @@ model Factura {
   cotizacionOrigen Cotizacion?
   remisionOrigen   Remision?
   pagos            Pago[]
+  pagosVenta       PagoVenta[]
 
   @@unique([tenantId, ncf])
   @@index([tenantId, clienteId])
@@ -1058,11 +1059,34 @@ model FormaPago {
   activa             Boolean  @default(true)
   createdAt          DateTime @default(now())
 
-  facturas Factura[]
-  pagos    Pago[]
+  facturas  Factura[]
+  pagos     Pago[]
+  pagosVenta PagoVenta[]
 
   @@unique([tenantId, nombre])
   @@map("formas_pago")
+}
+
+/// Ledger de "con qué se pagó" una venta de POS — permite pagos divididos
+/// (parte efectivo + parte tarjeta en la misma factura). Distinto de `Pago`
+/// (abonos POSTERIORES de AR/AP, ej. una factura a crédito) — acá el pago
+/// es simultáneo a la creación de la factura. `Factura.formaPagoId`/
+/// `referenciaPago` se conservan como "forma de pago principal" (la de
+/// mayor monto) para lectura rápida/reportes, pero la fuente de verdad
+/// para el arqueo de caja es esta tabla — ver PosRepository.
+/// Tabla "hija" sin tenantId propio (mismo patrón que LineaFactura): su
+/// aislamiento depende de llegar siempre vía Factura, ya tenant-scoped.
+model PagoVenta {
+  id          String    @id @default(uuid())
+  facturaId   String
+  factura     Factura   @relation(fields: [facturaId], references: [id], onDelete: Cascade)
+  formaPagoId String
+  formaPago   FormaPago @relation(fields: [formaPagoId], references: [id])
+  monto       Decimal   @db.Decimal(14, 2)
+  referencia  String?
+  createdAt   DateTime  @default(now())
+
+  @@map("pagos_venta")
 }
 
 enum FormatoImpresion {

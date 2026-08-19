@@ -242,6 +242,82 @@ describe('FacturacionService', () => {
     expect(repository.crearFacturaEnTx).toHaveBeenCalledWith(TX, expect.anything());
   });
 
+  describe('pago dividido (opciones.pagos)', () => {
+    it('sin formaPagoId ni pagos, no crea ningún PagoVenta', async () => {
+      repository.obtenerProductoConPrecioVigente.mockResolvedValue(producto(18, 100) as never);
+      repository.crearFacturaEnTx.mockResolvedValue(facturaCreada({ total: 236 }) as never);
+
+      await service.crear(dto(), 'tenant-1', 'vendedor-1');
+
+      expect(repository.crearFacturaEnTx).toHaveBeenCalledWith(
+        TX,
+        expect.objectContaining({ formaPagoId: undefined, referenciaPago: undefined, pagos: [] }),
+      );
+    });
+
+    it('con un solo formaPagoId (sin pagos explícitos), sintetiza un único PagoVenta por el total', async () => {
+      repository.obtenerProductoConPrecioVigente.mockResolvedValue(producto(18, 100) as never);
+      repository.crearFacturaEnTx.mockResolvedValue(facturaCreada({ total: 236 }) as never);
+
+      await service.crear(dto(), 'tenant-1', 'vendedor-1', { formaPagoId: 'fp1', referenciaPago: 'ref-1' });
+
+      expect(repository.crearFacturaEnTx).toHaveBeenCalledWith(
+        TX,
+        expect.objectContaining({
+          formaPagoId: 'fp1',
+          referenciaPago: 'ref-1',
+          pagos: [{ formaPagoId: 'fp1', monto: 236, referencia: 'ref-1' }],
+        }),
+      );
+    });
+
+    it('con pagos explícitos que suman exacto el total, los pasa tal cual y la forma de pago principal es la de mayor monto', async () => {
+      repository.obtenerProductoConPrecioVigente.mockResolvedValue(producto(18, 100) as never);
+      repository.crearFacturaEnTx.mockResolvedValue(facturaCreada({ total: 236 }) as never);
+
+      await service.crear(dto(), 'tenant-1', 'vendedor-1', {
+        pagos: [
+          { formaPagoId: 'fp-efectivo', monto: 200 },
+          { formaPagoId: 'fp-tarjeta', monto: 36 },
+        ],
+      });
+
+      expect(repository.crearFacturaEnTx).toHaveBeenCalledWith(
+        TX,
+        expect.objectContaining({
+          formaPagoId: 'fp-efectivo',
+          referenciaPago: undefined,
+          pagos: [
+            { formaPagoId: 'fp-efectivo', monto: 200 },
+            { formaPagoId: 'fp-tarjeta', monto: 36 },
+          ],
+        }),
+      );
+    });
+
+    it('rechaza si la suma de los pagos no coincide con el total (fuera de EPSILON)', async () => {
+      repository.obtenerProductoConPrecioVigente.mockResolvedValue(producto(18, 100) as never);
+
+      await expect(
+        service.crear(dto(), 'tenant-1', 'vendedor-1', {
+          pagos: [{ formaPagoId: 'fp1', monto: 100 }],
+        }),
+      ).rejects.toThrow(BadRequestException);
+      expect(repository.crearFacturaEnTx).not.toHaveBeenCalled();
+    });
+
+    it('acepta una diferencia de centavos dentro del EPSILON', async () => {
+      repository.obtenerProductoConPrecioVigente.mockResolvedValue(producto(18, 100) as never);
+      repository.crearFacturaEnTx.mockResolvedValue(facturaCreada({ total: 236 }) as never);
+
+      await service.crear(dto(), 'tenant-1', 'vendedor-1', {
+        pagos: [{ formaPagoId: 'fp1', monto: 236.003 }],
+      });
+
+      expect(repository.crearFacturaEnTx).toHaveBeenCalled();
+    });
+  });
+
   describe('notas de crédito y débito', () => {
     it('NOTA_CREDITO devuelve stock (entradaStockEnTx) en vez de descontarlo', async () => {
       repository.obtenerProductoConPrecioVigente.mockResolvedValue(producto(18, 100) as never);

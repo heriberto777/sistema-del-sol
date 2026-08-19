@@ -70,9 +70,9 @@ export class PosService {
   async registrarVenta(dto: RegistrarVentaPosDto, tenantId: string, cajeroId: string) {
     const turno = await this.posRepository.buscarPorId(dto.turnoCajaId);
     this.validarAbierto(turno);
-    // findUniqueOrThrow tenant-scoped: si formaPagoId/vendedorEmpleadoId son
-    // de otro tenant, 404 — mismo patrón que InventarioService.validarPertenencia.
-    await this.formasPagoRepository.buscarPorId(dto.formaPagoId);
+    // findUniqueOrThrow tenant-scoped: si alguna formaPagoId/vendedorEmpleadoId
+    // es de otro tenant, 404 — mismo patrón que InventarioService.validarPertenencia.
+    await Promise.all(dto.pagos.map((p) => this.formasPagoRepository.buscarPorId(p.formaPagoId)));
     if (dto.vendedorEmpleadoId) {
       await this.empleadosRepository.buscarPorId(dto.vendedorEmpleadoId);
     }
@@ -82,10 +82,9 @@ export class PosService {
       tenantId,
       cajeroId,
       {
-        formaPagoId: dto.formaPagoId,
-        referenciaPago: dto.referenciaPago,
         turnoCajaId: dto.turnoCajaId,
         vendedorEmpleadoId: dto.vendedorEmpleadoId,
+        pagos: dto.pagos,
       },
     );
   }

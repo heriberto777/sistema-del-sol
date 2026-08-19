@@ -103,10 +103,17 @@ export class FacturacionRepository {
       tipoNcf?: TipoNcf;
       facturaOrigenId?: string;
       // Solo lo llenan las ventas de POS — ver PosService.registrarVenta.
+      // formaPagoId/referenciaPago acá son ya la "forma de pago principal"
+      // (mayor monto) resuelta por FacturacionService.crear — para lectura
+      // rápida/reportes. La fuente de verdad del arqueo es `pagos` (abajo).
       formaPagoId?: string;
       referenciaPago?: string;
       turnoCajaId?: string;
       vendedorEmpleadoId?: string;
+      // Ledger de PagoVenta a crear junto a la factura — soporta pago
+      // dividido (varias formas de pago en una misma venta). Vacío/omitido
+      // para facturación que no es de POS (crédito sin pago inmediato).
+      pagos?: { formaPagoId: string; monto: number; referencia?: string }[];
       subtotal: number;
       descuento: number;
       itbis: number;
@@ -144,6 +151,13 @@ export class FacturacionRepository {
             montoTotal: linea.montoTotal,
           })),
         },
+        ...(params.pagos?.length
+          ? {
+              pagosVenta: {
+                create: params.pagos.map((p) => ({ formaPagoId: p.formaPagoId, monto: p.monto, referencia: p.referencia })),
+              },
+            }
+          : {}),
       },
       include: { lineas: true },
     });
