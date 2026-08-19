@@ -132,11 +132,21 @@ pasa ninguna de ellas.
 | Método | Ruta | Permiso |
 |---|---|---|
 | POST | `/api/productos` | `precios.editar` — acepta `imagen` (data URI, opcional) |
-| GET | `/api/productos?pagina&tamanoPagina&busqueda` | `precios.ver` — `busqueda` filtra por nombre o código; NUNCA incluye `imagen` (ver ARCHITECTURE.md) |
-| GET | `/api/productos/catalogo?pagina&tamanoPagina&busqueda&categoria` | `precios.ver` — para el catálogo de POS: incluye `imagen` y `precioVenta` (lista GENERAL vigente) en cada fila; `categoria` filtra exacto |
-| GET | `/api/productos/categorias` | `precios.ver` — valores distintos no nulos de `Producto.categoria` (texto libre, sin tabla propia), para los chips del catálogo de POS |
+| GET | `/api/productos?pagina&tamanoPagina&busqueda&categoriaId` | `precios.ver` — `busqueda` filtra por nombre o código, `categoriaId` filtra exacto (no incluye descendientes); NUNCA incluye `imagen` (ver ARCHITECTURE.md) |
+| GET | `/api/productos/catalogo?pagina&tamanoPagina&busqueda&categoriaId` | `precios.ver` — para el catálogo de POS: incluye `imagen` y `precioVenta` (lista GENERAL vigente) en cada fila; `categoriaId` filtra exacto |
 | GET | `/api/productos/:id` | `precios.ver` — sí incluye `imagen` |
-| PATCH | `/api/productos/:id` | `precios.editar` — `imagen: null` explícito quita la foto existente |
+| PATCH | `/api/productos/:id` | `precios.editar` — `imagen: null` explícito quita la foto existente; `categoriaId: null` explícito quita la categoría asignada |
+
+## Categorías
+
+Catálogo tenant-scoped con jerarquía real (mismo patrón de auto-relación que `CuentaContable.cuentaPadreId`, ver ARCHITECTURE.md). Reemplaza el antiguo `GET /api/productos/categorias` (texto libre sin tabla propia).
+
+| Método | Ruta | Permiso |
+|---|---|---|
+| POST | `/api/categorias` | `precios.editar` — `{ nombre, categoriaPadreId? }` |
+| GET | `/api/categorias` | `precios.ver` — listado plano con `categoriaPadreId`; el cliente arma el árbol (ver `frontend/src/lib/categorias-arbol.ts`) |
+| PATCH | `/api/categorias/:id` | `precios.editar` — rechaza auto-referencia y ciclos (`categoriaPadreId` no puede ser un descendiente propio) |
+| DELETE | `/api/categorias/:id` | `precios.editar` — rechaza (400) si tiene productos o subcategorías asignadas |
 
 ## Inventario
 

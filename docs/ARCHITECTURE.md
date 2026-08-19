@@ -420,6 +420,45 @@ backend pero **no tienen página propia en el frontend todavía** (nunca la
 tuvieron en este scaffold) — no es una regresión, es trabajo pendiente
 si se decide construir esas pantallas de administración.
 
+## Categorías de productos (jerarquía real, Fase 3a de adopción de Cuadre)
+
+`Categoria` (`backend/src/categorias/`) reemplaza el antiguo
+`Producto.categoria` de texto libre por un catálogo tenant-scoped con
+jerarquía real: `categoriaPadreId` es una self-relation
+(`@relation("JerarquiaCategoria")`) — mismo patrón ya presente pero sin
+explotar en `CuentaContable.cuentaPadreId`/`subcuentas`
+(`@relation("JerarquiaCuenta")`), no un esquema de prefijos de código.
+`Producto.categoriaId` (`onDelete: SetNull`) apunta a ella.
+
+`GET /categorias` sirve el listado plano (con `categoriaPadreId`); el
+árbol se arma en el cliente (`frontend/src/lib/categorias-arbol.ts`,
+`aplanarArbolCategorias()`, depth-first con `profundidad` calculada) para
+pintar `<select>`/chips indentados sin construir un árbol de verdad en
+el DOM — reusado por `SelectCategoria` (formularios de Productos/
+Categorías), `CategoriasPanel` (admin) y `CatalogoProductosPos` (chips
+del POS).
+
+`categoriaPadreId` es una FK cliente-suministrable a una tabla
+tenant-scoped: `CategoriasService.crear()`/`actualizar()` la validan vía
+`CategoriasRepository.buscarPorId()` (auto-scoped por
+`TenantPrismaService`, 404 cross-tenant) antes de usarla, mismo patrón
+que cualquier otra FK de este tipo en el proyecto (ver
+`ProductosService` para `categoriaId`). `actualizar()` además rechaza
+auto-referencia directa y ciclos: `validarNoEsDescendiente` recorre
+hacia arriba la cadena de padres del candidato hasta encontrar la
+categoría que se está editando (rechazo) o la raíz (válido) — es la
+única lógica de prevención de ciclos en un árbol auto-referenciado que
+existe hoy en el proyecto (el equivalente en `CuentaContable` nunca se
+llegó a necesitar porque nada arma su jerarquía en código todavía).
+Eliminar una categoría con productos o subcategorías asignadas se
+rechaza (400), sin cascada silenciosa.
+
+El filtro por categoría (`GET /productos?categoriaId=`, `GET
+/productos/catalogo?categoriaId=`, chips del POS) es siempre exacto —
+no incluye descendientes. Decisión deliberada para no over-engineering
+esta sub-fase: filtrar por "Bebidas" no trae los productos de su hija
+"Gaseosas" a menos que se seleccione "Gaseosas" directamente.
+
 ## Plugin system
 
 Instalación **manual** (git/deploy): un plugin es un paquete del

@@ -14,6 +14,7 @@ import { Paginacion } from '../components/molecules/Paginacion/Paginacion';
 import { EstadoVacio } from '../components/molecules/EstadoVacio/EstadoVacio';
 import { RowActionsMenu } from '../components/molecules/RowActionsMenu/RowActionsMenu';
 import { RequierePermiso } from '../components/organisms/RequierePermiso/RequierePermiso';
+import { SelectCategoria } from '../components/molecules/SelectCategoria/SelectCategoria';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { PaginaResultado } from '../types/pagina-resultado';
 
@@ -23,7 +24,8 @@ interface Producto {
   id: string;
   codigo: string;
   nombre: string;
-  categoria: string | null;
+  categoriaId: string | null;
+  categoria: { id: string; nombre: string } | null;
   unidadMedida: string;
   porcentajeItbis: string;
   tipo: TipoProducto;
@@ -50,7 +52,7 @@ interface Precio {
 interface ProductoFormValues {
   codigo: string;
   nombre: string;
-  categoria: string;
+  categoriaId: string;
   unidadMedida: string;
   porcentajeItbis: string;
   tipo: TipoProducto;
@@ -65,7 +67,7 @@ interface ComponenteComboForm {
 const PRODUCTO_VACIO: ProductoFormValues = {
   codigo: '',
   nombre: '',
-  categoria: '',
+  categoriaId: '',
   unidadMedida: 'UND',
   porcentajeItbis: '18',
   tipo: 'PRODUCTO',
@@ -78,6 +80,7 @@ const TONO_TIPO: Record<TipoProducto, 'neutro' | 'exito'> = { PRODUCTO: 'neutro'
 export function Productos() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [busqueda, setBusqueda] = useState('');
+  const [categoriaId, setCategoriaId] = useState('');
   const [pagina, setPagina] = useState(1);
   const busquedaDebounced = useDebouncedValue(busqueda);
   const [productoEditando, setProductoEditando] = useState<Producto | null>(null);
@@ -94,11 +97,11 @@ export function Productos() {
   }, []);
 
   const { data } = useQuery({
-    queryKey: ['productos', pagina, busquedaDebounced],
+    queryKey: ['productos', pagina, busquedaDebounced, categoriaId],
     queryFn: async () =>
       (
         await apiClient.get<PaginaResultado<Producto>>('/productos', {
-          params: { pagina, busqueda: busquedaDebounced || undefined },
+          params: { pagina, busqueda: busquedaDebounced || undefined, categoriaId: categoriaId || undefined },
         })
       ).data,
   });
@@ -134,14 +137,25 @@ export function Productos() {
           titulo="Productos"
           descripcion={data ? `${data.total} producto(s)` : undefined}
           acciones={
-            <SearchInput
-              value={busqueda}
-              onChange={(v) => {
-                setBusqueda(v);
-                setPagina(1);
-              }}
-              placeholder="Buscar por código o nombre…"
-            />
+            <div className="flex items-center gap-2">
+              <div className="w-48">
+                <SelectCategoria
+                  value={categoriaId}
+                  onChange={(v) => {
+                    setCategoriaId(v);
+                    setPagina(1);
+                  }}
+                />
+              </div>
+              <SearchInput
+                value={busqueda}
+                onChange={(v) => {
+                  setBusqueda(v);
+                  setPagina(1);
+                }}
+                placeholder="Buscar por código o nombre…"
+              />
+            </div>
           }
         >
           {data?.datos.length === 0 ? (
@@ -176,7 +190,7 @@ export function Productos() {
                       <td className="px-5 py-3">
                         <Badge tono={TONO_TIPO[producto.tipo]}>{ETIQUETA_TIPO[producto.tipo]}</Badge>
                       </td>
-                      <td className="px-5 py-3">{producto.categoria ?? '—'}</td>
+                      <td className="px-5 py-3">{producto.categoria?.nombre ?? '—'}</td>
                       <td className="px-5 py-3">{producto.unidadMedida}</td>
                       <td className="px-5 py-3">{Number(producto.porcentajeItbis)}%</td>
                       <td className="px-5 py-3">
@@ -235,7 +249,7 @@ function FormularioProducto({ producto, onGuardado }: { producto: Producto | nul
       ? {
           codigo: producto.codigo,
           nombre: producto.nombre,
-          categoria: producto.categoria ?? '',
+          categoriaId: producto.categoriaId ?? '',
           unidadMedida: producto.unidadMedida,
           porcentajeItbis: producto.porcentajeItbis,
           tipo: producto.tipo,
@@ -275,7 +289,7 @@ function FormularioProducto({ producto, onGuardado }: { producto: Producto | nul
     return {
       codigo: valores.codigo,
       nombre: valores.nombre,
-      categoria: valores.categoria || undefined,
+      categoriaId: valores.categoriaId || null,
       unidadMedida: valores.unidadMedida || undefined,
       porcentajeItbis: valores.porcentajeItbis ? Number(valores.porcentajeItbis) : undefined,
       tipo: valores.tipo,
@@ -338,12 +352,16 @@ function FormularioProducto({ producto, onGuardado }: { producto: Producto | nul
         onChange={(e) => setValores((v) => ({ ...v, nombre: e.target.value }))}
         required
       />
-      <FormField
-        id="producto-categoria"
-        label="Categoría"
-        value={valores.categoria}
-        onChange={(e) => setValores((v) => ({ ...v, categoria: e.target.value }))}
-      />
+      <div className="flex flex-col gap-1">
+        <label htmlFor="producto-categoria" className="text-sm font-medium text-slate-700 dark:text-slate-300">
+          Categoría
+        </label>
+        <SelectCategoria
+          id="producto-categoria"
+          value={valores.categoriaId}
+          onChange={(id) => setValores((v) => ({ ...v, categoriaId: id }))}
+        />
+      </div>
       <FormField
         id="producto-unidad"
         label="Unidad de medida"

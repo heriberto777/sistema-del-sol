@@ -2694,14 +2694,20 @@ describe('App (e2e)', () => {
     it('actualiza un producto existente', async () => {
       const token = await login('admin@e2e-a.com', SUBDOMINIO_A);
 
+      const categoria = await request(app.getHttpServer())
+        .post('/api/categorias')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ nombre: 'General E2E' })
+        .expect(201);
+
       await request(app.getHttpServer())
         .patch(`/api/productos/${productoId}`)
         .set('Authorization', `Bearer ${token}`)
-        .send({ nombre: 'Producto Compras E2E Actualizado', categoria: 'General' })
+        .send({ nombre: 'Producto Compras E2E Actualizado', categoriaId: categoria.body.id })
         .expect(200)
         .expect((res) => {
           expect(res.body.nombre).toBe('Producto Compras E2E Actualizado');
-          expect(res.body.categoria).toBe('General');
+          expect(res.body.categoriaId).toBe(categoria.body.id);
         });
     });
 

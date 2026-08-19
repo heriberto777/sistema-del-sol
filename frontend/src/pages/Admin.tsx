@@ -6,6 +6,7 @@ import { WebhooksPanel } from '../components/organisms/WebhooksPanel/WebhooksPan
 import { ConfiguracionesPanel } from '../components/organisms/ConfiguracionesPanel/ConfiguracionesPanel';
 import { NcfPanel } from '../components/organisms/NcfPanel/NcfPanel';
 import { FormasPagoPanel } from '../components/organisms/FormasPagoPanel/FormasPagoPanel';
+import { CategoriasPanel } from '../components/organisms/CategoriasPanel/CategoriasPanel';
 import { useAuth } from '../hooks/useAuth';
 
 interface Pestana {
@@ -40,6 +41,12 @@ const CATEGORIAS: Categoria[] = [
       { id: 'ncf', etiqueta: 'NCF', permiso: 'admin.configuracion', panel: NcfPanel },
       { id: 'formas-pago', etiqueta: 'Formas de pago', permiso: 'admin.configuracion', panel: FormasPagoPanel },
     ],
+  },
+  {
+    id: 'catalogo',
+    etiqueta: 'Catálogo',
+    descripcion: 'Categorías de productos.',
+    pestanas: [{ id: 'categorias', etiqueta: 'Categorías', permiso: 'admin.configuracion', panel: CategoriasPanel }],
   },
   {
     id: 'general',

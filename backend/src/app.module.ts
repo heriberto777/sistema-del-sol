@@ -41,6 +41,7 @@ import { IaModule } from './ia/ia.module';
 import { BancosModule } from './bancos/bancos.module';
 import { GastosMenoresModule } from './gastos-menores/gastos-menores.module';
 import { FormasPagoModule } from './formas-pago/formas-pago.module';
+import { CategoriasModule } from './categorias/categorias.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { PermissionsGuard } from './common/guards/permissions.guard';
 import { ModuloActivoGuard } from './common/guards/modulo-activo.guard';
@@ -94,6 +95,7 @@ import { TenantMiddleware } from './common/middleware/tenant.middleware';
     IaModule,
     BancosModule,
     FormasPagoModule,
+    CategoriasModule,
     GastosMenoresModule,
   ],
   providers: [

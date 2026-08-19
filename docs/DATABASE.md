@@ -37,7 +37,7 @@ PostgreSQL 16 + Prisma. Schema completo en `backend/prisma/schema.prisma`.
 | Auditoría | `audit_logs` (tenant), `platform_audit_logs` (plataforma, sin `tenantId`) |
 | Facturación | `ncf_asignados`, `facturas`, `linea_factura` |
 | Cotizaciones / Remisiones | `cotizaciones`, `linea_cotizacion`, `remisiones`, `linea_remision` |
-| Productos / precios | `productos`, `precios`, `componentes_combo` |
+| Productos / precios | `productos`, `precios`, `componentes_combo`, `categorias` (jerarquía real vía `categoriaPadreId`, self-relation — mismo patrón que `cuentas_contables.cuentaPadreId`) |
 | Inventario | `bodegas`, `stock`, `movimiento_inventario` |
 | Compras | `proveedores`, `orden_compra`, `linea_oc`, `recepcion_compra`, `linea_recepcion` |
 | Clientes | `clientes`, `direccion_cliente` |
@@ -87,6 +87,19 @@ token, así que un token nunca puede reusarse.
   Remisiones/POS lo heredan al convertir vía `FacturacionService.crear()`).
   `ComprasService` rechaza comprar un `COMBO` directamente y no mueve
   stock al recibir/devolver una línea `SERVICIO`.
+- **Categorías**: `categorias.categoriaPadreId` es una self-relation real
+  (`@relation("JerarquiaCategoria")`, mismo patrón que
+  `cuentas_contables.cuentaPadreId`, hasta ahora sembrado pero sin
+  explotar) — el listado se sirve plano (`GET /categorias`) y el cliente
+  arma el árbol (`frontend/src/lib/categorias-arbol.ts`). Reasignar el
+  padre de una categoría (`CategoriasService.actualizar`) valida que no
+  se cree un ciclo, recorriendo hacia arriba la cadena de padres del
+  candidato hasta encontrar la propia categoría (caso de rechazo) o la
+  raíz (caso válido). Eliminar una categoría con productos o
+  subcategorías asignadas se rechaza (400) — no hay cascada silenciosa.
+  `productos.categoriaId` (`onDelete: SetNull`) reemplazó el antiguo
+  `productos.categoria` (texto libre); el filtro de listado/catálogo por
+  categoría es exacto, no incluye descendientes.
 - **Compras**: `linea_oc.cantidadRecibida` se incrementa con cada
   `recepcion_compra`; la orden pasa a `RECIBIDA_TOTAL` cuando toda línea
   recibió >= lo pedido, o `RECIBIDA_PARCIAL` en caso contrario.

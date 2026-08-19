@@ -23,10 +23,10 @@ export class CrearProductoDto {
   @IsString()
   nombre: string;
 
-  @ApiProperty({ required: false })
+  @ApiProperty({ required: false, nullable: true, description: 'null explícito quita la categoría asignada' })
   @IsOptional()
-  @IsString()
-  categoria?: string;
+  @IsUUID()
+  categoriaId?: string | null;
 
   @ApiProperty({ required: false, default: 'UND' })
   @IsOptional()

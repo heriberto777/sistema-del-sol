@@ -45,6 +45,7 @@ model Tenant {
   facturas      Factura[]
   ncfAsignados  NcfAsignado[]
   productos     Producto[]
+  categorias    Categoria[]
   bodegas       Bodega[]
   movimientosInventario MovimientoInventario[]
   clientes      Cliente[]
@@ -1205,13 +1206,35 @@ enum TipoProducto {
   COMBO
 }
 
+/// Catálogo de categorías con jerarquía real (mismo patrón de auto-relación
+/// que `CuentaContable.cuentaPadreId` — no un prefijo de código, que en la
+/// práctica nadie parsea en tiempo de ejecución). El frontend arma el árbol
+/// a partir del listado plano con `categoriaPadreId`.
+model Categoria {
+  id               String      @id @default(uuid())
+  tenantId         String
+  tenant           Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  nombre           String
+  categoriaPadreId String?
+  categoriaPadre   Categoria?  @relation("JerarquiaCategoria", fields: [categoriaPadreId], references: [id])
+  subcategorias    Categoria[] @relation("JerarquiaCategoria")
+  activa           Boolean     @default(true)
+  createdAt        DateTime    @default(now())
+
+  productos Producto[]
+
+  @@unique([tenantId, nombre])
+  @@map("categorias")
+}
+
 model Producto {
   id               String   @id @default(uuid())
   tenantId         String
   tenant           Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   codigo           String
   nombre           String
-  categoria        String?
+  categoriaId      String?
+  categoria        Categoria? @relation(fields: [categoriaId], references: [id], onDelete: SetNull)
   unidadMedida     String   @default("UND")
   porcentajeItbis  Decimal  @default(18) @db.Decimal(5, 2)
   // PRODUCTO mueve inventario normal; SERVICIO nunca toca Stock; COMBO

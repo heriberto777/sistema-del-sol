@@ -5,6 +5,7 @@ import { apiClient } from '../../../lib/api-client';
 import { Card } from '../../atoms/Card/Card';
 import { SearchInput } from '../../molecules/SearchInput/SearchInput';
 import { useDebouncedValue } from '../../../hooks/useDebouncedValue';
+import { aplanarArbolCategorias, type CategoriaPlana } from '../../../lib/categorias-arbol';
 import { PaginaResultado } from '../../../types/pagina-resultado';
 
 export interface ProductoCatalogo {
@@ -26,27 +27,29 @@ function formatoRD(valor: string) {
  * tarjeta agrega al carrito, sin combobox+botón separados. Usa
  * `/productos/catalogo` (no `/productos`): ya trae la imagen y el precio
  * vigente en la misma respuesta, para no pedir el precio aparte por cada
- * producto como hacía la versión anterior. Chips de categoría (texto
- * libre, sin tabla propia — ver `/productos/categorias`) y un campo de
- * cantidad rápida permiten armar el carrito sin volver a tocar el mouse.
+ * producto como hacía la versión anterior. Chips de categoría (árbol real
+ * de `Categoria`, aplanado en orden jerárquico — ver `/categorias`) y un
+ * campo de cantidad rápida permiten armar el carrito sin volver a tocar
+ * el mouse.
  */
 export function CatalogoProductosPos({ onAgregar }: { onAgregar: (producto: ProductoCatalogo, cantidad: number) => void }) {
   const [busqueda, setBusqueda] = useState('');
-  const [categoria, setCategoria] = useState<string | null>(null);
+  const [categoriaId, setCategoriaId] = useState<string | null>(null);
   const [cantidad, setCantidad] = useState('1');
   const busquedaDebounced = useDebouncedValue(busqueda);
 
   const { data: categorias } = useQuery({
-    queryKey: ['pos-categorias'],
-    queryFn: async () => (await apiClient.get<string[]>('/productos/categorias')).data,
+    queryKey: ['categorias'],
+    queryFn: async () => (await apiClient.get<CategoriaPlana[]>('/categorias')).data,
   });
+  const categoriasPlanas = aplanarArbolCategorias(categorias ?? []);
 
   const { data, isLoading } = useQuery({
-    queryKey: ['pos-catalogo', busquedaDebounced, categoria],
+    queryKey: ['pos-catalogo', busquedaDebounced, categoriaId],
     queryFn: async () =>
       (
         await apiClient.get<PaginaResultado<ProductoCatalogo>>('/productos/catalogo', {
-          params: { busqueda: busquedaDebounced || undefined, categoria: categoria ?? undefined, tamanoPagina: 24 },
+          params: { busqueda: busquedaDebounced || undefined, categoriaId: categoriaId ?? undefined, tamanoPagina: 24 },
         })
       ).data,
   });
@@ -74,31 +77,32 @@ export function CatalogoProductosPos({ onAgregar }: { onAgregar: (producto: Prod
             className="w-16 rounded-md border border-slate-300 px-2 py-1.5 text-center text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
           />
         </div>
-        {!!categorias?.length && (
+        {!!categoriasPlanas.length && (
           <div className="flex gap-1.5 overflow-x-auto pb-0.5">
             <button
               type="button"
-              onClick={() => setCategoria(null)}
+              onClick={() => setCategoriaId(null)}
               className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-medium ${
-                categoria === null
+                categoriaId === null
                   ? 'border-sol-400 bg-sol-50 text-sol-700 dark:border-sol-700 dark:bg-sol-900/30 dark:text-sol-300'
                   : 'border-slate-200 text-slate-500 hover:border-slate-300 dark:border-slate-800 dark:text-slate-400'
               }`}
             >
               Todas
             </button>
-            {categorias.map((c) => (
+            {categoriasPlanas.map((c) => (
               <button
-                key={c}
+                key={c.id}
                 type="button"
-                onClick={() => setCategoria(c)}
+                onClick={() => setCategoriaId(c.id)}
                 className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-medium ${
-                  categoria === c
+                  categoriaId === c.id
                     ? 'border-sol-400 bg-sol-50 text-sol-700 dark:border-sol-700 dark:bg-sol-900/30 dark:text-sol-300'
                     : 'border-slate-200 text-slate-500 hover:border-slate-300 dark:border-slate-800 dark:text-slate-400'
                 }`}
               >
-                {c}
+                {'— '.repeat(c.profundidad)}
+                {c.nombre}
               </button>
             ))}
           </div>

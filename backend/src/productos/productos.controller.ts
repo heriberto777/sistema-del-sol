@@ -7,7 +7,6 @@ import { Permissions } from '../common/decorators/permissions.decorator';
 import { RequiereModulo } from '../common/decorators/requiere-modulo.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtPayloadUser } from '../common/types/authenticated-request';
-import { ListadoQueryDto } from '../common/dto/listado-query.dto';
 
 @ApiBearerAuth()
 @ApiTags('productos')
@@ -24,22 +23,17 @@ export class ProductosController {
 
   @Get()
   @Permissions('precios.ver')
-  listar(@Query() query: ListadoQueryDto) {
+  listar(@Query() query: CatalogoQueryDto) {
     return this.productosService.listar(query);
   }
 
   // Antes de ':id' a propósito — mismo motivo que /clientes/consumidor-final:
-  // si no, Nest matchea "catalogo"/"categorias" como si fueran un :id.
+  // si no, Nest matchea "catalogo" como si fuera un :id. El árbol de
+  // categorías vive en /categorias (CategoriasModule), no acá.
   @Get('catalogo')
   @Permissions('precios.ver')
   catalogo(@Query() query: CatalogoQueryDto) {
     return this.productosService.catalogo(query);
-  }
-
-  @Get('categorias')
-  @Permissions('precios.ver')
-  categorias() {
-    return this.productosService.categorias();
   }
 
   @Get(':id')

@@ -2,23 +2,35 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { Prisma, TipoProducto } from '@prisma/client';
 import { ProductosRepository } from './productos.repository';
 import { CrearProductoDto, ComponenteComboDto } from './dto/crear-producto.dto';
-import { ListadoQueryDto } from '../common/dto/listado-query.dto';
 import { CatalogoQueryDto } from './dto/catalogo-query.dto';
 import { paginar } from '../common/types/pagina-resultado';
+import { CategoriasRepository } from '../categorias/categorias.repository';
 
 @Injectable()
 export class ProductosService {
-  constructor(private readonly productosRepository: ProductosRepository) {}
+  constructor(
+    private readonly productosRepository: ProductosRepository,
+    private readonly categoriasRepository: CategoriasRepository,
+  ) {}
 
   async crear(dto: CrearProductoDto, tenantId: string) {
     const tipoEfectivo = dto.tipo ?? 'PRODUCTO';
     await this.validarComponentes(dto.componentes, tipoEfectivo);
+    if (dto.categoriaId) {
+      // findUniqueOrThrow tenant-scoped: si categoriaId es de otro tenant, 404.
+      await this.categoriasRepository.buscarPorId(dto.categoriaId);
+    }
     return this.productosRepository.crear(dto, tenantId);
   }
 
-  async listar(query: ListadoQueryDto) {
+  async listar(query: CatalogoQueryDto) {
     const { pagina, tamanoPagina, skip, take } = paginar(query.pagina, query.tamanoPagina);
-    const [datos, total] = await this.productosRepository.listar({ skip, take, busqueda: query.busqueda });
+    const [datos, total] = await this.productosRepository.listar({
+      skip,
+      take,
+      busqueda: query.busqueda,
+      categoriaId: query.categoriaId,
+    });
     return { datos, total, pagina, tamanoPagina };
   }
 
@@ -28,14 +40,10 @@ export class ProductosService {
       skip,
       take,
       busqueda: query.busqueda,
-      categoria: query.categoria,
+      categoriaId: query.categoriaId,
     });
     const datos = filas.map(({ precios, ...producto }) => ({ ...producto, precioVenta: precios[0]?.precioVenta ?? null }));
     return { datos, total, pagina, tamanoPagina };
-  }
-
-  categorias() {
-    return this.productosRepository.categoriasDistintas();
   }
 
   buscarPorId(id: string) {
@@ -47,6 +55,10 @@ export class ProductosService {
   }
 
   async actualizar(id: string, dto: Partial<CrearProductoDto>) {
+    if (dto.categoriaId) {
+      await this.categoriasRepository.buscarPorId(dto.categoriaId);
+    }
+
     if (dto.tipo === undefined && dto.componentes === undefined) {
       return this.productosRepository.actualizar(id, dto);
     }

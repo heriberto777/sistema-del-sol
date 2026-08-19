@@ -1,22 +1,26 @@
 import { BadRequestException } from '@nestjs/common';
 import { ProductosService } from './productos.service';
 import { ProductosRepository } from './productos.repository';
+import { CategoriasRepository } from '../categorias/categorias.repository';
 
 describe('ProductosService', () => {
   let service: ProductosService;
   let repository: jest.Mocked<ProductosRepository>;
+  let categoriasRepository: jest.Mocked<CategoriasRepository>;
 
   beforeEach(() => {
     repository = {
       crear: jest.fn(),
       listar: jest.fn(),
       catalogo: jest.fn(),
-      categoriasDistintas: jest.fn(),
       buscarPorId: jest.fn(),
       buscarPorIdEnTx: jest.fn(),
       actualizar: jest.fn(),
     } as unknown as jest.Mocked<ProductosRepository>;
-    service = new ProductosService(repository);
+    categoriasRepository = {
+      buscarPorId: jest.fn().mockResolvedValue({ id: 'cat-1' }),
+    } as unknown as jest.Mocked<CategoriasRepository>;
+    service = new ProductosService(repository, categoriasRepository);
   });
 
   describe('crear', () => {
@@ -127,21 +131,33 @@ describe('ProductosService', () => {
     it('pasa la categoría al repositorio como filtro del catálogo', async () => {
       repository.catalogo.mockResolvedValue([[], 0] as never);
 
-      await service.catalogo({ categoria: 'Bebidas' });
+      await service.catalogo({ categoriaId: 'cat-1' });
 
       expect(repository.catalogo).toHaveBeenCalledWith(
-        expect.objectContaining({ categoria: 'Bebidas' }),
+        expect.objectContaining({ categoriaId: 'cat-1' }),
       );
     });
   });
 
-  describe('categorias', () => {
-    it('delega en el repositorio', async () => {
-      repository.categoriasDistintas.mockResolvedValue(['Bebidas', 'Snacks']);
+  describe('categoriaId (FK cliente-suministrada)', () => {
+    it('valida que categoriaId pertenezca al tenant antes de crear (404 si no, vía findUniqueOrThrow tenant-scoped)', async () => {
+      await service.crear({ codigo: 'P1', nombre: 'Producto 1', categoriaId: 'cat-1' }, 'tenant-1');
 
-      const resultado = await service.categorias();
+      expect(categoriasRepository.buscarPorId).toHaveBeenCalledWith('cat-1');
+      expect(repository.crear).toHaveBeenCalled();
+    });
 
-      expect(resultado).toEqual(['Bebidas', 'Snacks']);
+    it('no valida categoriaId si no viene en el DTO al crear', async () => {
+      await service.crear({ codigo: 'P1', nombre: 'Producto 1' }, 'tenant-1');
+
+      expect(categoriasRepository.buscarPorId).not.toHaveBeenCalled();
+    });
+
+    it('valida categoriaId al actualizar', async () => {
+      await service.actualizar('p1', { categoriaId: 'cat-1' });
+
+      expect(categoriasRepository.buscarPorId).toHaveBeenCalledWith('cat-1');
+      expect(repository.actualizar).toHaveBeenCalledWith('p1', { categoriaId: 'cat-1' });
     });
   });
 });
