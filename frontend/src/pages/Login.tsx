@@ -4,6 +4,7 @@ import { FormField } from '../components/molecules/FormField/FormField';
 import { Button } from '../components/atoms/Button/Button';
 import { ThemeToggle } from '../components/molecules/ThemeToggle/ThemeToggle';
 import { useAuth } from '../hooks/useAuth';
+import { esCajeroPuro } from '../contexts/AuthContext';
 import { apiClient } from '../lib/api-client';
 
 interface Empresa {
@@ -64,8 +65,10 @@ export function Login() {
     if (!empresaElegida) return;
     setError(null);
     try {
-      await login(email, password, empresaElegida.subdominio);
-      navigate('/');
+      const usuarioLogueado = await login(email, password, empresaElegida.subdominio);
+      // Un cajero puro (Vendedor) va directo al POS, no al Dashboard —
+      // ver docs/ARCHITECTURE.md, "Vendedor solo vende por POS".
+      navigate(esCajeroPuro(usuarioLogueado) ? '/pos' : '/');
     } catch {
       setError('Credenciales inválidas');
     }

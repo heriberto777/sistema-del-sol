@@ -1060,6 +1060,25 @@ one-off `ajustar-permisos-vendedor:migrar`
 es deliberadamente aditivo (nunca borra), así que remover un permiso de
 `ROLES_BASE` siempre va a necesitar un script puntual como este.
 
+**Aterrizaje directo en POS para un cajero puro.** En Lightspeed/Square/
+Odoo el patrón no es "recomendable" abrir turno, es un bloqueo duro —
+"sales can be recorded only when a session is active" — y el login del
+cajero termina directo en esa apertura, no en un dashboard genérico.
+`AuthContext.esCajeroPuro(usuario)` (`pos.editar` sin `facturacion.ver`
+— hoy exactamente la firma de `Vendedor`, sin hardcodear el nombre del
+rol) decide dos cosas: `Login.tsx` lo manda a `/pos` en vez de `/` al
+autenticarse, y `Pos.tsx` le muestra una vista distinta a la de quien
+supervisa varios cajeros (`PosCajero` vs. la `TurnosCajaTable`
+completa) — sin la tabla de turnos de otros cajeros (no le sirve, no
+tiene `pos.supervisar`), busca directo si YA tiene un turno `ABIERTO`
+propio (`GET /pos/turnos?cajeroId=<yo>&estado=ABIERTO`) y si no, muestra
+solo el formulario de apertura (`AbrirTurnoForm`, compartido con el
+modal de `TurnosCajaTable` para no duplicar la lógica) — nunca una
+pantalla vacía sin acción clara. Cotizaciones/Remisiones/Contactos
+siguen accesibles igual que antes para este rol — no mueven caja, y
+ninguna fuente consultada (tampoco Odoo) respalda bloquear módulos que
+no tocan efectivo solo porque el turno esté cerrado.
+
 **Apertura/cierre de turno en modal**: el cierre muestra el
 `montoEsperado` calculado en el propio frontend (misma fórmula que
 `PosService.cerrarTurno`) ANTES de que el cajero escriba el efectivo

@@ -88,7 +88,7 @@ function calcularMontoEsperado(data: TurnoCajaDetalleData): number {
   return Number(data.montoInicial) + ventasEfectivo + entradas - salidas;
 }
 
-export function TurnoCajaDetalle({ turnoId }: { turnoId: string }) {
+export function TurnoCajaDetalle({ turnoId, onCerrado }: { turnoId: string; onCerrado?: () => void }) {
   const queryClient = useQueryClient();
   const { tienePermiso } = useAuth();
   const [carrito, setCarrito] = useState<LineaCarrito[]>([]);
@@ -367,6 +367,7 @@ export function TurnoCajaDetalle({ turnoId }: { turnoId: string }) {
           onCerrado={() => {
             setModalCerrarTurno(false);
             invalidar();
+            onCerrado?.();
           }}
         />
       )}

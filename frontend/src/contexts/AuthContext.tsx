@@ -14,7 +14,7 @@ export interface UsuarioAutenticado {
 interface AuthContextValue {
   usuario: UsuarioAutenticado | null;
   cargando: boolean;
-  login: (email: string, password: string, tenantSubdominio: string) => Promise<void>;
+  login: (email: string, password: string, tenantSubdominio: string) => Promise<UsuarioAutenticado>;
   logout: () => void;
   /**
    * Solo para UX (ocultar botones/rutas que el usuario no puede usar) — la
@@ -33,6 +33,17 @@ interface AuthContextValue {
 
 export const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
+/**
+ * "Cajero puro": tiene acceso al POS pero ninguna visibilidad de la
+ * pantalla general de Facturación — hoy es exactamente el rol Vendedor
+ * (ver docs/ARCHITECTURE.md, "Vendedor solo vende por POS"). Se usa
+ * para decidir a dónde aterriza el login y cómo se comporta `Pos.tsx`,
+ * sin hardcodear el nombre del rol.
+ */
+export function esCajeroPuro(usuario: Pick<UsuarioAutenticado, 'permisos'> | null): boolean {
+  return !!usuario?.permisos?.includes('pos.editar') && !usuario.permisos.includes('facturacion.ver');
+}
+
 const STORAGE_KEY = 'sol_access_token';
 const STORAGE_USER_KEY = 'sol_usuario';
 
@@ -50,6 +61,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       localStorage.setItem(STORAGE_KEY, data.accessToken);
       localStorage.setItem(STORAGE_USER_KEY, JSON.stringify(data.usuario));
       setUsuario(data.usuario);
+      return data.usuario as UsuarioAutenticado;
     } finally {
       setCargando(false);
     }

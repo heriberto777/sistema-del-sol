@@ -1,0 +1,80 @@
+import { FormEvent, useState } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { apiClient } from '../../../lib/api-client';
+import { Button } from '../../atoms/Button/Button';
+import { FormField } from '../../molecules/FormField/FormField';
+
+interface Bodega {
+  id: string;
+  nombre: string;
+}
+
+interface AbrirTurnoFormProps {
+  bodegas: Bodega[];
+  onAbierto: (turnoId: string) => void;
+}
+
+/**
+ * Formulario puro (sin Modal alrededor) para reusar tanto en
+ * `ModalAbrirTurno` (TurnosCajaTable, para quien supervisa varios
+ * cajeros) como en la apertura forzada de `Pos.tsx` para un cajero puro
+ * (Vendedor) — ahí no hay nada detrás que "cerrar", es la pantalla
+ * entera.
+ */
+export function AbrirTurnoForm({ bodegas, onAbierto }: AbrirTurnoFormProps) {
+  const queryClient = useQueryClient();
+  const [bodegaId, setBodegaId] = useState('');
+  const [montoInicial, setMontoInicial] = useState('');
+  const [error, setError] = useState<string | null>(null);
+
+  const abrir = useMutation({
+    mutationFn: async () => apiClient.post('/pos/turnos', { bodegaId, montoInicial: Number(montoInicial) }),
+    onSuccess: (respuesta) => {
+      queryClient.invalidateQueries({ queryKey: ['pos-turnos'] });
+      queryClient.invalidateQueries({ queryKey: ['pos-mi-turno-abierto'] });
+      onAbierto(respuesta.data.id);
+    },
+    onError: () => setError('No se pudo abrir el turno — esa bodega ya podría tener uno abierto.'),
+  });
+
+  function onSubmit(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    abrir.mutate();
+  }
+
+  return (
+    <form onSubmit={onSubmit} className="space-y-3">
+      <div>
+        <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Bodega</label>
+        <select
+          value={bodegaId}
+          onChange={(e) => setBodegaId(e.target.value)}
+          required
+          className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+        >
+          <option value="">Seleccionar…</option>
+          {bodegas.map((b) => (
+            <option key={b.id} value={b.id}>
+              {b.nombre}
+            </option>
+          ))}
+        </select>
+      </div>
+      <FormField
+        id="turno-monto-inicial"
+        label="Efectivo inicial"
+        type="number"
+        min={0}
+        step="any"
+        value={montoInicial}
+        onChange={(e) => setMontoInicial(e.target.value)}
+        required
+      />
+      {error && <p className="text-sm text-red-600">{error}</p>}
+      <Button type="submit" disabled={abrir.isPending} className="w-full">
+        {abrir.isPending ? 'Abriendo…' : 'Abrir turno'}
+      </Button>
+    </form>
+  );
+}
