@@ -113,19 +113,25 @@ async function main() {
     },
   });
 
+  // Todo producto tiene siempre al menos una variante "por defecto" (Fase
+  // 3c) — Stock/Precio cuelgan de ella, nunca directo del producto.
+  const varianteDefault =
+    (await prisma.varianteProducto.findFirst({ where: { productoId: producto.id } })) ??
+    (await prisma.varianteProducto.create({ data: { tenantId: tenant.id, productoId: producto.id } }));
+
   const precioVigente = await prisma.precio.findFirst({
-    where: { productoId: producto.id, listaPrecio: 'GENERAL', vigenteHasta: null },
+    where: { varianteId: varianteDefault.id, listaPrecio: 'GENERAL', vigenteHasta: null },
   });
   if (!precioVigente) {
     await prisma.precio.create({
-      data: { productoId: producto.id, listaPrecio: 'GENERAL', costo: 100, margenPct: 50, precioVenta: 150 },
+      data: { varianteId: varianteDefault.id, listaPrecio: 'GENERAL', costo: 100, margenPct: 50, precioVenta: 150 },
     });
   }
 
   await prisma.stock.upsert({
-    where: { productoId_bodegaId: { productoId: producto.id, bodegaId: bodega.id } },
+    where: { varianteId_bodegaId: { varianteId: varianteDefault.id, bodegaId: bodega.id } },
     update: {},
-    create: { productoId: producto.id, bodegaId: bodega.id, cantidadActual: 100, stockMinimo: 10 },
+    create: { varianteId: varianteDefault.id, bodegaId: bodega.id, cantidadActual: 100, stockMinimo: 10 },
   });
 
   await prisma.empleado.upsert({

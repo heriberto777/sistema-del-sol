@@ -9,29 +9,47 @@ export class PreciosRepository {
     return this.tenantPrisma.client;
   }
 
-  vigente(productoId: string, listaPrecio = 'GENERAL') {
+  /**
+   * Precio cuelga de VarianteProducto desde la Fase 3c — mientras un
+   * producto no tenga atributos reales (ver ARCHITECTURE.md), tiene
+   * exactamente una variante "por defecto", que es la que resuelve este
+   * helper. Los métodos públicos de este repositorio siguen recibiendo
+   * `productoId` sin cambios para no tocar `PreciosService`/controller.
+   */
+  private resolverVarianteDefault(productoId: string) {
+    return this.db.varianteProducto.findFirstOrThrow({ where: { productoId }, orderBy: { createdAt: 'asc' } });
+  }
+
+  async vigente(productoId: string, listaPrecio = 'GENERAL') {
+    const variante = await this.resolverVarianteDefault(productoId);
     return this.db.precio.findFirst({
-      where: { productoId, listaPrecio, vigenteHasta: null },
+      where: { varianteId: variante.id, listaPrecio, vigenteHasta: null },
     });
   }
 
-  historial(productoId: string, listaPrecio = 'GENERAL') {
+  async historial(productoId: string, listaPrecio = 'GENERAL') {
+    const variante = await this.resolverVarianteDefault(productoId);
     return this.db.precio.findMany({
-      where: { productoId, listaPrecio },
+      where: { varianteId: variante.id, listaPrecio },
       orderBy: { vigenteDesde: 'desc' },
     });
   }
 
   async crear(params: { productoId: string; listaPrecio: string; costo: number; margenPct: number; precioVenta: number }) {
     return this.db.$transaction(async (tx) => {
+      const variante = await tx.varianteProducto.findFirstOrThrow({
+        where: { productoId: params.productoId },
+        orderBy: { createdAt: 'asc' },
+      });
+
       await tx.precio.updateMany({
-        where: { productoId: params.productoId, listaPrecio: params.listaPrecio, vigenteHasta: null },
+        where: { varianteId: variante.id, listaPrecio: params.listaPrecio, vigenteHasta: null },
         data: { vigenteHasta: new Date() },
       });
 
       return tx.precio.create({
         data: {
-          productoId: params.productoId,
+          varianteId: variante.id,
           listaPrecio: params.listaPrecio,
           costo: params.costo,
           margenPct: params.margenPct,

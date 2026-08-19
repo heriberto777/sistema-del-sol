@@ -508,6 +508,63 @@ significado re-resolver precio por cliente en cada tecla de búsqueda,
 para una grilla que es solo apoyo visual (el precio real correcto se
 resuelve recién al facturar, con el mecanismo de arriba).
 
+## Atributos y variantes de producto (Fase 3c de adopción de Cuadre — incremento 1: schema)
+
+`Stock`/`Precio` ya no cuelgan directo de `Producto` — cuelgan de
+`VarianteProducto` (nuevo modelo tenant-scoped, `variantes_producto`).
+`MovimientoInventario` conserva su `productoId` (denormalizado, de solo
+lectura, para no romper reportes que ya filtran por él) y gana
+`varianteId` como FK real. Todo producto tiene siempre **al menos una
+variante** — la "por defecto", sin `ValorAtributoVariante` asociados —
+para que un producto que nunca usó atributos reales (Talla/Color) siga
+teniendo exactamente una fila de stock/precio, igual que antes de esta
+fase. `VarianteProducto` tiene `tenantId` propio (a diferencia de
+`LineaFactura`/`PagoVenta`, hijas sin tenantId): se va a consultar
+directo muy seguido (Stock, catálogo del POS, código de barras — Fase
+3d) y necesita `@@unique([tenantId, codigoBarras])` sin depender de un
+join a `Producto`.
+
+Migración (`20260819100000_variantes_producto`): crea las 4 tablas
+nuevas (`variantes_producto`, `atributos`, `valores_atributo`,
+`valores_atributo_variante`), siembra una variante "por defecto" por
+cada `Producto` existente, agrega `varianteId` NULLABLE a
+`precios`/`stock`/`movimiento_inventario`, migra los datos usando el
+`productoId` todavía presente en esas tres tablas, y solo entonces
+borra `precios.productoId`/`stock.productoId` (con sus constraints
+viejas) y endurece `varianteId` a `NOT NULL` en las tres.
+
+**Este incremento es solo schema + la plomería mínima de repositorio
+para que nada se rompa — cero cambios en la capa de servicio.** Como
+todo producto tiene exactamente una variante hasta el incremento 2 (que
+recién habilita atributos/variantes reales), cada repositorio que tocaba
+`Stock`/`Precio` gana un paso de resolución `productoId → variante
+"por defecto"` (`VarianteProducto.findFirst({where:{productoId},
+orderBy:{createdAt:'asc'}})`, o su variante `EnTx` cuando el caller ya
+abrió una transacción) y sigue exponiendo el mismo parámetro
+`productoId`/la misma forma de retorno que antes — así
+`FacturacionService`, `CotizacionesService`, `PosService`,
+`ComprasService` y `ProductosService` no cambian ni una línea:
+- `InventarioRepository` (obtenerStock, listarStockPorBodega,
+  ajustarCantidadEnTx, descontarStockCondicionalEnTx — incluida la
+  única query SQL cruda del proyecto que tocaba `stock` directo).
+- `PreciosRepository` (vigente, historial, crear).
+- `FacturacionRepository`/`CotizacionesRepository.
+  obtenerProductoConPrecioVigente` y `ProductosRepository.catalogo()`:
+  la nested-select de `precios` ahora va vía `variantes` y se
+  **reaplana** al shape viejo (`{...producto, precios: variantes[0]?.
+  precios ?? []}`) antes de devolver, para que el caller siga leyendo
+  `producto.precios[0]?.precioVenta` sin saber que por debajo hay una
+  variante de por medio.
+- `ReportesRepository` (stockBajoConteo, stockActual): mismo criterio,
+  reaplana `variante.producto` a `producto` en cada fila.
+
+Los incrementos que siguen (ya planeados, no implementados todavía):
+atributos/variantes reales con CRUD y generación de combinaciones
+(incremento 2); las líneas de venta/compra ganan `varianteId` explícito
+y dejan de asumir "la variante por defecto" cuando el producto tiene
+más de una (incremento 3); frontend — selector de variante, armado de
+combinaciones desde Talla/Color (incremento 4).
+
 ## Plugin system
 
 Instalación **manual** (git/deploy): un plugin es un paquete del

@@ -66,8 +66,15 @@ export class ProductosRepository {
     ]);
   }
 
-  /** Para el catálogo de POS (Modelo C) — sí trae `imagen` y el precio vigente, para pintar la grilla sin un round-trip por producto. */
-  catalogo(params: { skip: number; take: number; busqueda?: string; categoriaId?: string }) {
+  /**
+   * Para el catálogo de POS (Modelo C) — sí trae `imagen` y el precio
+   * vigente, para pintar la grilla sin un round-trip por producto. Precio
+   * ya no cuelga directo de Producto (Fase 3c — ver VarianteProducto): se
+   * busca a través de la variante "por defecto" y se reaplana el
+   * resultado a `precios` para que `ProductosService.catalogo()` no tenga
+   * que cambiar ni una línea.
+   */
+  async catalogo(params: { skip: number; take: number; busqueda?: string; categoriaId?: string }) {
     const where = this.whereBusqueda(params.busqueda, params.categoriaId);
     const select = {
       id: true,
@@ -76,12 +83,18 @@ export class ProductosRepository {
       imagen: true,
       porcentajeItbis: true,
       tipo: true,
-      precios: { where: { listaPrecio: 'GENERAL', vigenteHasta: null }, select: { precioVenta: true }, take: 1 },
+      variantes: {
+        take: 1,
+        orderBy: { createdAt: 'asc' as const },
+        select: { precios: { where: { listaPrecio: 'GENERAL', vigenteHasta: null }, select: { precioVenta: true }, take: 1 } },
+      },
     } as const;
-    return Promise.all([
+    const [filas, total] = await Promise.all([
       this.db.producto.findMany({ where, orderBy: { nombre: 'asc' }, skip: params.skip, take: params.take, select }),
       this.db.producto.count({ where }),
     ]);
+    const datos = filas.map(({ variantes, ...producto }) => ({ ...producto, precios: variantes[0]?.precios ?? [] }));
+    return [datos, total] as const;
   }
 
   buscarPorId(id: string) {

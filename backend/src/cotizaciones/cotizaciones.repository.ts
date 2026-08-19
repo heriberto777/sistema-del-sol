@@ -22,16 +22,20 @@ export class CotizacionesRepository {
     return this.tenantPrisma.client;
   }
 
-  obtenerProductoConPrecioVigente(productoId: string, listaPrecio = 'GENERAL') {
-    return this.db.producto.findUniqueOrThrow({
+  /** Ver el comentario equivalente en FacturacionRepository — Precio cuelga de VarianteProducto desde la Fase 3c, reaplanado acá a `producto.precios`. */
+  async obtenerProductoConPrecioVigente(productoId: string, listaPrecio = 'GENERAL') {
+    const producto = await this.db.producto.findUniqueOrThrow({
       where: { id: productoId },
       include: {
-        precios: {
-          where: { listaPrecio, vigenteHasta: null },
+        variantes: {
           take: 1,
+          orderBy: { createdAt: 'asc' },
+          include: { precios: { where: { listaPrecio, vigenteHasta: null }, take: 1 } },
         },
       },
     });
+    const { variantes, ...resto } = producto;
+    return { ...resto, precios: variantes[0]?.precios ?? [] };
   }
 
   crear(params: {

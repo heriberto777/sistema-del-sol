@@ -37,8 +37,8 @@ PostgreSQL 16 + Prisma. Schema completo en `backend/prisma/schema.prisma`.
 | Auditoría | `audit_logs` (tenant), `platform_audit_logs` (plataforma, sin `tenantId`) |
 | Facturación | `ncf_asignados`, `facturas`, `linea_factura` |
 | Cotizaciones / Remisiones | `cotizaciones`, `linea_cotizacion`, `remisiones`, `linea_remision` |
-| Productos / precios | `productos`, `precios`, `componentes_combo`, `categorias` (jerarquía real vía `categoriaPadreId`, self-relation — mismo patrón que `cuentas_contables.cuentaPadreId`), `listas_precio` (catálogo de niveles de precio, sin FK desde `precios.listaPrecio`) |
-| Inventario | `bodegas`, `stock`, `movimiento_inventario` |
+| Productos / precios | `productos`, `precios` (cuelga de `variantes_producto`, no de `productos`), `componentes_combo`, `categorias` (jerarquía real vía `categoriaPadreId`, self-relation — mismo patrón que `cuentas_contables.cuentaPadreId`), `listas_precio` (catálogo de niveles de precio, sin FK desde `precios.listaPrecio`), `variantes_producto`/`atributos`/`valores_atributo`/`valores_atributo_variante` (SKU real, Fase 3c — ver ARCHITECTURE.md) |
+| Inventario | `bodegas`, `stock` (cuelga de `variantes_producto`), `movimiento_inventario` (conserva `productoId` denormalizado + `varianteId` como FK real) |
 | Compras | `proveedores`, `orden_compra`, `linea_oc`, `recepcion_compra`, `linea_recepcion` |
 | Clientes | `clientes`, `direccion_cliente` |
 | Webhooks | `webhooks`, `webhook_deliveries` |
@@ -88,6 +88,12 @@ token, así que un token nunca puede reusarse.
   disponible; nunca se permite que una venta lo deje negativo
   (`InventarioService.verificarYDescontarStock`). Cada movimiento queda
   también en `movimiento_inventario` (ENTRADA/SALIDA/TRANSFERENCIA/AJUSTE).
+- **Variantes de producto (Fase 3c)**: `stock`/`precios` cuelgan de
+  `variantes_producto`, no de `productos` directo — todo producto tiene
+  siempre al menos una variante "por defecto" (sin valores de atributo),
+  para que un producto sin atributos reales siga teniendo exactamente
+  una fila de stock/precio. `movimiento_inventario.productoId` se
+  conserva (denormalizado, de solo lectura); `varianteId` es la FK real.
 - **`productos.tipo`** (`PRODUCTO`/`SERVICIO`/`COMBO`): un `SERVICIO`
   nunca tiene fila en `stock` (no mueve inventario al facturarse); un
   `COMBO` tampoco tiene fila propia — al facturarse expande a sus

@@ -29,19 +29,29 @@ export class FacturacionRepository {
     return tenant.modalidadFacturacion;
   }
 
-  obtenerProductoConPrecioVigente(productoId: string, listaPrecio = 'GENERAL') {
-    return this.db.producto.findUniqueOrThrow({
+  /**
+   * Precio ya no cuelga directo de Producto (Fase 3c — ver
+   * VarianteProducto): se busca a través de la variante "por defecto" del
+   * producto (la única que existe mientras no tenga atributos reales, ver
+   * ARCHITECTURE.md) y se reaplana el resultado a `producto.precios` para
+   * que `FacturacionService.crear()` no tenga que cambiar ni una línea.
+   */
+  async obtenerProductoConPrecioVigente(productoId: string, listaPrecio = 'GENERAL') {
+    const producto = await this.db.producto.findUniqueOrThrow({
       where: { id: productoId },
       include: {
-        precios: {
-          where: { listaPrecio, vigenteHasta: null },
+        variantes: {
           take: 1,
+          orderBy: { createdAt: 'asc' },
+          include: { precios: { where: { listaPrecio, vigenteHasta: null }, take: 1 } },
         },
         // Solo tiene filas si el producto es COMBO — ver
         // FacturacionService.expandirParaInventario.
         componentes: { include: { componente: true } },
       },
     });
+    const { variantes, ...resto } = producto;
+    return { ...resto, precios: variantes[0]?.precios ?? [] };
   }
 
   /**

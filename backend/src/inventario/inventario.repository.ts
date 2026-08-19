@@ -24,7 +24,7 @@ interface ParamsDescuento {
 
 interface StockRow {
   id: string;
-  productoId: string;
+  varianteId: string;
   bodegaId: string;
   cantidadActual: Prisma.Decimal;
   cantidadReservada: Prisma.Decimal;
@@ -50,34 +50,56 @@ export class InventarioRepository {
     return tx.bodega.findUniqueOrThrow({ where: { id } });
   }
 
-  obtenerStock(productoId: string, bodegaId: string) {
-    return this.db.stock.findUnique({ where: { productoId_bodegaId: { productoId, bodegaId } } });
+  /**
+   * Stock cuelga de VarianteProducto desde la Fase 3c — mientras un
+   * producto no tenga atributos reales, tiene exactamente una variante
+   * "por defecto", que es la que resuelven estos dos helpers. Los métodos
+   * públicos de este repositorio siguen recibiendo `productoId` sin
+   * cambios, para no tocar `InventarioService`/`FacturacionService`/
+   * `ComprasService`.
+   */
+  private resolverVarianteDefault(productoId: string) {
+    return this.db.varianteProducto.findFirstOrThrow({ where: { productoId }, orderBy: { createdAt: 'asc' } });
   }
 
-  listarStockPorBodega(bodegaId: string, params: { skip: number; take: number; busqueda?: string }) {
+  private resolverVarianteDefaultEnTx(tx: Prisma.TransactionClient, productoId: string) {
+    return tx.varianteProducto.findFirstOrThrow({ where: { productoId }, orderBy: { createdAt: 'asc' } });
+  }
+
+  async obtenerStock(productoId: string, bodegaId: string) {
+    const variante = await this.resolverVarianteDefault(productoId);
+    return this.db.stock.findUnique({ where: { varianteId_bodegaId: { varianteId: variante.id, bodegaId } } });
+  }
+
+  /** Reaplana `variante.producto` a `producto` en cada fila, para que el consumidor (pantalla de Stock) no tenga que cambiar. */
+  async listarStockPorBodega(bodegaId: string, params: { skip: number; take: number; busqueda?: string }) {
     const where = {
       bodegaId,
       ...(params.busqueda
         ? {
-            producto: {
-              OR: [
-                { nombre: { contains: params.busqueda, mode: 'insensitive' as const } },
-                { codigo: { contains: params.busqueda, mode: 'insensitive' as const } },
-              ],
+            variante: {
+              producto: {
+                OR: [
+                  { nombre: { contains: params.busqueda, mode: 'insensitive' as const } },
+                  { codigo: { contains: params.busqueda, mode: 'insensitive' as const } },
+                ],
+              },
             },
           }
         : {}),
     };
-    return Promise.all([
+    const [filas, total] = await Promise.all([
       this.db.stock.findMany({
         where,
-        include: { producto: true },
-        orderBy: { producto: { nombre: 'asc' } },
+        include: { variante: { include: { producto: true } } },
+        orderBy: { variante: { producto: { nombre: 'asc' } } },
         skip: params.skip,
         take: params.take,
       }),
       this.db.stock.count({ where }),
     ]);
+    const datos = filas.map(({ variante, ...stock }) => ({ ...stock, producto: variante.producto }));
+    return [datos, total] as const;
   }
 
   /**
@@ -90,15 +112,16 @@ export class InventarioRepository {
    */
   async ajustarCantidadEnTx(tx: Prisma.TransactionClient, params: ParamsAjuste) {
     const { tenantId, productoId, bodegaId, delta, tipo, userId, motivo } = params;
+    const variante = await this.resolverVarianteDefaultEnTx(tx, productoId);
 
     const stock = await tx.stock.upsert({
-      where: { productoId_bodegaId: { productoId, bodegaId } },
-      create: { productoId, bodegaId, cantidadActual: Math.max(delta, 0) },
+      where: { varianteId_bodegaId: { varianteId: variante.id, bodegaId } },
+      create: { varianteId: variante.id, bodegaId, cantidadActual: Math.max(delta, 0) },
       update: { cantidadActual: { increment: delta } },
     });
 
     await tx.movimientoInventario.create({
-      data: { tenantId, productoId, bodegaId, tipo, cantidad: Math.abs(delta), motivo, userId },
+      data: { tenantId, productoId, varianteId: variante.id, bodegaId, tipo, cantidad: Math.abs(delta), motivo, userId },
     });
 
     return stock;
@@ -126,11 +149,12 @@ export class InventarioRepository {
    */
   async descontarStockCondicionalEnTx(tx: Prisma.TransactionClient, params: ParamsDescuento) {
     const { tenantId, productoId, bodegaId, cantidad, tipo, userId, motivo } = params;
+    const variante = await this.resolverVarianteDefaultEnTx(tx, productoId);
 
     const filas = await tx.$queryRaw<StockRow[]>`
       UPDATE stock
       SET "cantidadActual" = "cantidadActual" - ${cantidad}, "updatedAt" = now()
-      WHERE "productoId" = ${productoId} AND "bodegaId" = ${bodegaId}
+      WHERE "varianteId" = ${variante.id} AND "bodegaId" = ${bodegaId}
         AND ("cantidadActual" - "cantidadReservada") >= ${cantidad}
       RETURNING *
     `;
@@ -140,7 +164,7 @@ export class InventarioRepository {
     }
 
     await tx.movimientoInventario.create({
-      data: { tenantId, productoId, bodegaId, tipo, cantidad, motivo, userId },
+      data: { tenantId, productoId, varianteId: variante.id, bodegaId, tipo, cantidad, motivo, userId },
     });
 
     return stock;

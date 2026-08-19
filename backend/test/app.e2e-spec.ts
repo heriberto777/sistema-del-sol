@@ -102,6 +102,13 @@ describe('App (e2e)', () => {
     return tenant;
   }
 
+  async function idVarianteDefault(productoId: string): Promise<string> {
+    const existente = await prisma.varianteProducto.findFirst({ where: { productoId } });
+    if (existente) return existente.id;
+    const producto = await prisma.producto.findUniqueOrThrow({ where: { id: productoId } });
+    return (await prisma.varianteProducto.create({ data: { tenantId: producto.tenantId, productoId } })).id;
+  }
+
   async function login(email: string, tenantSubdominio: string) {
     const respuesta = await request(app.getHttpServer())
       .post('/api/auth/login')
@@ -230,10 +237,10 @@ describe('App (e2e)', () => {
     });
     productoAId = producto.id;
     await prisma.precio.create({
-      data: { productoId: producto.id, listaPrecio: 'GENERAL', costo: 50, margenPct: 100, precioVenta: 100 },
+      data: { varianteId: await idVarianteDefault(producto.id), listaPrecio: 'GENERAL', costo: 50, margenPct: 100, precioVenta: 100 },
     });
     await prisma.stock.create({
-      data: { productoId: producto.id, bodegaId: bodega.id, cantidadActual: 20, stockMinimo: 5 },
+      data: { varianteId: await idVarianteDefault(producto.id), bodegaId: bodega.id, cantidadActual: 20, stockMinimo: 5 },
     });
     const unAnio = new Date();
     unAnio.setFullYear(unAnio.getFullYear() + 1);
@@ -666,7 +673,7 @@ describe('App (e2e)', () => {
       expect(Number(respuesta.body.total)).toBe(354);
 
       const stock = await prisma.stock.findUniqueOrThrow({
-        where: { productoId_bodegaId: { productoId: productoAId, bodegaId: bodegaAId } },
+        where: { varianteId_bodegaId: { varianteId: await idVarianteDefault(productoAId), bodegaId: bodegaAId } },
       });
       expect(Number(stock.cantidadActual)).toBe(17); // 20 - 3
     });
@@ -801,20 +808,20 @@ describe('App (e2e)', () => {
         data: { tenantId: tenantAId, codigo: 'E2E-COMP-X', nombre: 'Componente X', porcentajeItbis: 18 },
       });
       componenteXId = componenteX.id;
-      await prisma.stock.create({ data: { productoId: componenteXId, bodegaId: bodegaAId, cantidadActual: 100, stockMinimo: 5 } });
+      await prisma.stock.create({ data: { varianteId: await idVarianteDefault(componenteXId), bodegaId: bodegaAId, cantidadActual: 100, stockMinimo: 5 } });
 
       const componenteY = await prisma.producto.create({
         data: { tenantId: tenantAId, codigo: 'E2E-COMP-Y', nombre: 'Componente Y', porcentajeItbis: 18 },
       });
       componenteYId = componenteY.id;
-      await prisma.stock.create({ data: { productoId: componenteYId, bodegaId: bodegaAId, cantidadActual: 100, stockMinimo: 5 } });
+      await prisma.stock.create({ data: { varianteId: await idVarianteDefault(componenteYId), bodegaId: bodegaAId, cantidadActual: 100, stockMinimo: 5 } });
 
       const combo = await prisma.producto.create({
         data: { tenantId: tenantAId, codigo: 'E2E-COMBO', nombre: 'Combo E2E', porcentajeItbis: 18, tipo: 'COMBO' },
       });
       comboId = combo.id;
       await prisma.precio.create({
-        data: { productoId: comboId, listaPrecio: 'GENERAL', costo: 100, margenPct: 100, precioVenta: 200 },
+        data: { varianteId: await idVarianteDefault(comboId), listaPrecio: 'GENERAL', costo: 100, margenPct: 100, precioVenta: 200 },
       });
       await prisma.componenteCombo.createMany({
         data: [
@@ -828,7 +835,7 @@ describe('App (e2e)', () => {
       });
       servicioId = servicio.id;
       await prisma.precio.create({
-        data: { productoId: servicioId, listaPrecio: 'GENERAL', costo: 0, margenPct: 100, precioVenta: 500 },
+        data: { varianteId: await idVarianteDefault(servicioId), listaPrecio: 'GENERAL', costo: 0, margenPct: 100, precioVenta: 500 },
       });
     });
 
@@ -841,7 +848,7 @@ describe('App (e2e)', () => {
         .send({ clienteId: clienteAId, bodegaId: bodegaAId, tipoFactura: 'CONTADO', lineas: [{ productoId: servicioId, cantidad: 1 }] })
         .expect(201);
 
-      const stock = await prisma.stock.findUnique({ where: { productoId_bodegaId: { productoId: servicioId, bodegaId: bodegaAId } } });
+      const stock = await prisma.stock.findUnique({ where: { varianteId_bodegaId: { varianteId: await idVarianteDefault(servicioId), bodegaId: bodegaAId } } });
       expect(stock).toBeNull();
     });
 
@@ -854,11 +861,11 @@ describe('App (e2e)', () => {
         .send({ clienteId: clienteAId, bodegaId: bodegaAId, tipoFactura: 'CONTADO', lineas: [{ productoId: comboId, cantidad: 3 }] })
         .expect(201);
 
-      const stockX = await prisma.stock.findUniqueOrThrow({ where: { productoId_bodegaId: { productoId: componenteXId, bodegaId: bodegaAId } } });
-      const stockY = await prisma.stock.findUniqueOrThrow({ where: { productoId_bodegaId: { productoId: componenteYId, bodegaId: bodegaAId } } });
+      const stockX = await prisma.stock.findUniqueOrThrow({ where: { varianteId_bodegaId: { varianteId: await idVarianteDefault(componenteXId), bodegaId: bodegaAId } } });
+      const stockY = await prisma.stock.findUniqueOrThrow({ where: { varianteId_bodegaId: { varianteId: await idVarianteDefault(componenteYId), bodegaId: bodegaAId } } });
       expect(Number(stockX.cantidadActual)).toBe(94); // 100 - 3*2
       expect(Number(stockY.cantidadActual)).toBe(97); // 100 - 3*1
-      const stockCombo = await prisma.stock.findUnique({ where: { productoId_bodegaId: { productoId: comboId, bodegaId: bodegaAId } } });
+      const stockCombo = await prisma.stock.findUnique({ where: { varianteId_bodegaId: { varianteId: await idVarianteDefault(comboId), bodegaId: bodegaAId } } });
       expect(stockCombo).toBeNull();
 
       // Anular la factura reintegra el stock de cada componente.
@@ -868,8 +875,8 @@ describe('App (e2e)', () => {
         .send({ motivo: 'Reversa de prueba e2e' })
         .expect(201);
 
-      const stockXTrasAnular = await prisma.stock.findUniqueOrThrow({ where: { productoId_bodegaId: { productoId: componenteXId, bodegaId: bodegaAId } } });
-      const stockYTrasAnular = await prisma.stock.findUniqueOrThrow({ where: { productoId_bodegaId: { productoId: componenteYId, bodegaId: bodegaAId } } });
+      const stockXTrasAnular = await prisma.stock.findUniqueOrThrow({ where: { varianteId_bodegaId: { varianteId: await idVarianteDefault(componenteXId), bodegaId: bodegaAId } } });
+      const stockYTrasAnular = await prisma.stock.findUniqueOrThrow({ where: { varianteId_bodegaId: { varianteId: await idVarianteDefault(componenteYId), bodegaId: bodegaAId } } });
       expect(Number(stockXTrasAnular.cantidadActual)).toBe(100);
       expect(Number(stockYTrasAnular.cantidadActual)).toBe(100);
     });
@@ -1028,10 +1035,10 @@ describe('App (e2e)', () => {
       });
       productoNotasId = producto.id;
       await prisma.precio.create({
-        data: { productoId: producto.id, listaPrecio: 'GENERAL', costo: 50, margenPct: 100, precioVenta: 100 },
+        data: { varianteId: await idVarianteDefault(producto.id), listaPrecio: 'GENERAL', costo: 50, margenPct: 100, precioVenta: 100 },
       });
       await prisma.stock.create({
-        data: { productoId: producto.id, bodegaId: bodega.id, cantidadActual: 20, stockMinimo: 5 },
+        data: { varianteId: await idVarianteDefault(producto.id), bodegaId: bodega.id, cantidadActual: 20, stockMinimo: 5 },
       });
       const unAnio = new Date();
       unAnio.setFullYear(unAnio.getFullYear() + 1);
@@ -1061,7 +1068,7 @@ describe('App (e2e)', () => {
       expect(Number(respuesta.body.total)).toBe(354);
 
       const stock = await prisma.stock.findUniqueOrThrow({
-        where: { productoId_bodegaId: { productoId: productoNotasId, bodegaId: bodegaNotasId } },
+        where: { varianteId_bodegaId: { varianteId: await idVarianteDefault(productoNotasId), bodegaId: bodegaNotasId } },
       });
       expect(Number(stock.cantidadActual)).toBe(17); // 20 - 3
     });
@@ -1088,7 +1095,7 @@ describe('App (e2e)', () => {
       expect(Number(respuesta.body.total)).toBe(-118);
 
       const stock = await prisma.stock.findUniqueOrThrow({
-        where: { productoId_bodegaId: { productoId: productoNotasId, bodegaId: bodegaNotasId } },
+        where: { varianteId_bodegaId: { varianteId: await idVarianteDefault(productoNotasId), bodegaId: bodegaNotasId } },
       });
       expect(Number(stock.cantidadActual)).toBe(18); // 17 + 1 devuelto
     });
@@ -1113,7 +1120,7 @@ describe('App (e2e)', () => {
         .expect(201);
 
       const stock = await prisma.stock.findUniqueOrThrow({
-        where: { productoId_bodegaId: { productoId: productoNotasId, bodegaId: bodegaNotasId } },
+        where: { varianteId_bodegaId: { varianteId: await idVarianteDefault(productoNotasId), bodegaId: bodegaNotasId } },
       });
       // 18 (tras la nota de crédito) + (3 originales - 1 ya devuelto por la nota) = 20
       expect(Number(stock.cantidadActual)).toBe(20);
@@ -1177,10 +1184,10 @@ describe('App (e2e)', () => {
       });
       productoId = producto.id;
       await prisma.precio.create({
-        data: { productoId: producto.id, listaPrecio: 'GENERAL', costo: 50, margenPct: 100, precioVenta: 100 },
+        data: { varianteId: await idVarianteDefault(producto.id), listaPrecio: 'GENERAL', costo: 50, margenPct: 100, precioVenta: 100 },
       });
       await prisma.stock.create({
-        data: { productoId: producto.id, bodegaId: bodega.id, cantidadActual: 50, stockMinimo: 5 },
+        data: { varianteId: await idVarianteDefault(producto.id), bodegaId: bodega.id, cantidadActual: 50, stockMinimo: 5 },
       });
       // La secuencia B02 de tenantA ya existe (creada en el beforeAll principal)
       // y se comparte entre describes — solo sigue incrementando.
@@ -1218,7 +1225,7 @@ describe('App (e2e)', () => {
       expect(Number(factura.body.total)).toBe(472);
 
       const stock = await prisma.stock.findUniqueOrThrow({
-        where: { productoId_bodegaId: { productoId, bodegaId } },
+        where: { varianteId_bodegaId: { varianteId: await idVarianteDefault(productoId), bodegaId } },
       });
       expect(Number(stock.cantidadActual)).toBe(46); // 50 - 4
 
@@ -1255,7 +1262,7 @@ describe('App (e2e)', () => {
     it('crea una remisión (sin mover stock) y al convertirla en factura recién ahí descuenta inventario', async () => {
       const token = await login('admin@e2e-a.com', SUBDOMINIO_A);
 
-      const stockAntes = await prisma.stock.findUniqueOrThrow({ where: { productoId_bodegaId: { productoId, bodegaId } } });
+      const stockAntes = await prisma.stock.findUniqueOrThrow({ where: { varianteId_bodegaId: { varianteId: await idVarianteDefault(productoId), bodegaId } } });
 
       const remision = await request(app.getHttpServer())
         .post('/api/remisiones')
@@ -1265,7 +1272,7 @@ describe('App (e2e)', () => {
 
       expect(remision.body.estado).toBe('BORRADOR');
 
-      const stockTrasRemision = await prisma.stock.findUniqueOrThrow({ where: { productoId_bodegaId: { productoId, bodegaId } } });
+      const stockTrasRemision = await prisma.stock.findUniqueOrThrow({ where: { varianteId_bodegaId: { varianteId: await idVarianteDefault(productoId), bodegaId } } });
       expect(Number(stockTrasRemision.cantidadActual)).toBe(Number(stockAntes.cantidadActual)); // sin cambios
 
       await request(app.getHttpServer())
@@ -1283,7 +1290,7 @@ describe('App (e2e)', () => {
       // precio se resuelve al vigente (100) ya que la remisión no guarda precio
       expect(Number(factura.body.total)).toBe(236); // 2*100=200 + 18% = 236
 
-      const stockTrasFactura = await prisma.stock.findUniqueOrThrow({ where: { productoId_bodegaId: { productoId, bodegaId } } });
+      const stockTrasFactura = await prisma.stock.findUniqueOrThrow({ where: { varianteId_bodegaId: { varianteId: await idVarianteDefault(productoId), bodegaId } } });
       expect(Number(stockTrasFactura.cantidadActual)).toBe(Number(stockAntes.cantidadActual) - 2);
 
       await request(app.getHttpServer())
@@ -1413,7 +1420,7 @@ describe('App (e2e)', () => {
         data: { tenantId: tenantAId, codigo: 'E2E-PDF', nombre: 'Producto PDF E2E', porcentajeItbis: 18 },
       });
       productoId = producto.id;
-      await prisma.stock.create({ data: { productoId: producto.id, bodegaId: bodega.id, cantidadActual: 50, stockMinimo: 5 } });
+      await prisma.stock.create({ data: { varianteId: await idVarianteDefault(producto.id), bodegaId: bodega.id, cantidadActual: 50, stockMinimo: 5 } });
     });
 
     it('descarga el PDF de una factura', async () => {
@@ -1490,10 +1497,10 @@ describe('App (e2e)', () => {
       });
       productoId = producto.id;
       await prisma.precio.create({
-        data: { productoId: producto.id, listaPrecio: 'GENERAL', costo: 50, margenPct: 100, precioVenta: 100 },
+        data: { varianteId: await idVarianteDefault(producto.id), listaPrecio: 'GENERAL', costo: 50, margenPct: 100, precioVenta: 100 },
       });
       await prisma.stock.create({
-        data: { productoId: producto.id, bodegaId: bodega.id, cantidadActual: 20, stockMinimo: 5 },
+        data: { varianteId: await idVarianteDefault(producto.id), bodegaId: bodega.id, cantidadActual: 20, stockMinimo: 5 },
       });
     });
 
@@ -2209,10 +2216,10 @@ describe('App (e2e)', () => {
       });
       productoId = producto.id;
       await prisma.precio.create({
-        data: { productoId: producto.id, listaPrecio: 'GENERAL', costo: 50, margenPct: 100, precioVenta: 100 },
+        data: { varianteId: await idVarianteDefault(producto.id), listaPrecio: 'GENERAL', costo: 50, margenPct: 100, precioVenta: 100 },
       });
       await prisma.stock.create({
-        data: { productoId: producto.id, bodegaId: bodega.id, cantidadActual: 20, stockMinimo: 5 },
+        data: { varianteId: await idVarianteDefault(producto.id), bodegaId: bodega.id, cantidadActual: 20, stockMinimo: 5 },
       });
     });
 
@@ -2335,7 +2342,7 @@ describe('App (e2e)', () => {
 
       // Stock del producto E2E compartido, ahora también en esta bodega —
       // necesario para registrar ventas de POS en los tests de anulación.
-      await prisma.stock.create({ data: { productoId: productoAId, bodegaId: bodegaArqueoId, cantidadActual: 50, stockMinimo: 5 } });
+      await prisma.stock.create({ data: { varianteId: await idVarianteDefault(productoAId), bodegaId: bodegaArqueoId, cantidadActual: 50, stockMinimo: 5 } });
 
       tokenAdminArqueo = await login('admin@e2e-a.com', SUBDOMINIO_A); // CompletoA tiene pos.supervisar
       tokenCajero2Arqueo = await login('cajero2@e2e-a.com', SUBDOMINIO_A);
@@ -2568,7 +2575,7 @@ describe('App (e2e)', () => {
         data: { tenantId: tenantAId, codigo: 'E2E-COMPRA', nombre: 'Producto Compras E2E', porcentajeItbis: 18 },
       });
       productoId = producto.id;
-      await prisma.stock.create({ data: { productoId: producto.id, bodegaId: bodega.id, cantidadActual: 0, stockMinimo: 1 } });
+      await prisma.stock.create({ data: { varianteId: await idVarianteDefault(producto.id), bodegaId: bodega.id, cantidadActual: 0, stockMinimo: 1 } });
       const proveedor = await prisma.proveedor.create({ data: { tenantId: tenantAId, nombre: 'Proveedor E2E' } });
       proveedorId = proveedor.id;
     });
@@ -2597,7 +2604,7 @@ describe('App (e2e)', () => {
         .expect(200);
       expect(ordenActualizada.body.estado).toBe('RECIBIDA_TOTAL');
 
-      const stock = await prisma.stock.findUnique({ where: { productoId_bodegaId: { productoId, bodegaId } } });
+      const stock = await prisma.stock.findUnique({ where: { varianteId_bodegaId: { varianteId: await idVarianteDefault(productoId), bodegaId } } });
       expect(Number(stock?.cantidadActual)).toBe(10);
     });
 
@@ -2657,7 +2664,7 @@ describe('App (e2e)', () => {
           .send({ proveedorId, numero: 'OC-E2E-002', lineas: [{ productoId, cantidad: 5, costoUnitario: 20 }] })
           .expect(201);
 
-        const stockAntes = await prisma.stock.findUnique({ where: { productoId_bodegaId: { productoId, bodegaId } } });
+        const stockAntes = await prisma.stock.findUnique({ where: { varianteId_bodegaId: { varianteId: await idVarianteDefault(productoId), bodegaId } } });
 
         await request(app.getHttpServer())
           .post(`/api/compras/${orden.body.id}/recibir`)
@@ -2671,7 +2678,7 @@ describe('App (e2e)', () => {
           })
           .expect(409); // el producto inexistente viola la FK de linea_recepcion.productoId al crear la recepción, dentro de la transacción
 
-        const stockDespues = await prisma.stock.findUnique({ where: { productoId_bodegaId: { productoId, bodegaId } } });
+        const stockDespues = await prisma.stock.findUnique({ where: { varianteId_bodegaId: { varianteId: await idVarianteDefault(productoId), bodegaId } } });
         expect(Number(stockDespues?.cantidadActual)).toBe(Number(stockAntes?.cantidadActual));
       },
       15_000,
@@ -2764,7 +2771,7 @@ describe('App (e2e)', () => {
         data: { tenantId: tenantAId, codigo: 'E2E-PAGOS', nombre: 'Producto Pagos E2E', porcentajeItbis: 18 },
       });
       productoId = producto.id;
-      await prisma.stock.create({ data: { productoId: producto.id, bodegaId: bodega.id, cantidadActual: 100, stockMinimo: 1 } });
+      await prisma.stock.create({ data: { varianteId: await idVarianteDefault(producto.id), bodegaId: bodega.id, cantidadActual: 100, stockMinimo: 1 } });
       const proveedor = await prisma.proveedor.create({ data: { tenantId: tenantAId, nombre: 'Proveedor Pagos E2E' } });
       proveedorId = proveedor.id;
     });
@@ -2929,7 +2936,7 @@ describe('App (e2e)', () => {
         .send({ bodegaId, lineas: [{ productoId, cantidadRecibida: 10, costoUnitario: 20 }] })
         .expect(201);
 
-      const stockTrasRecibir = await prisma.stock.findUniqueOrThrow({ where: { productoId_bodegaId: { productoId, bodegaId } } });
+      const stockTrasRecibir = await prisma.stock.findUniqueOrThrow({ where: { varianteId_bodegaId: { varianteId: await idVarianteDefault(productoId), bodegaId } } });
 
       // No se puede devolver más de lo recibido.
       await request(app.getHttpServer())
@@ -2944,7 +2951,7 @@ describe('App (e2e)', () => {
         .send({ bodegaId, motivo: 'Mercancía defectuosa', lineas: [{ productoId, cantidad: 4 }] })
         .expect(201);
 
-      const stockTrasDevolucion = await prisma.stock.findUniqueOrThrow({ where: { productoId_bodegaId: { productoId, bodegaId } } });
+      const stockTrasDevolucion = await prisma.stock.findUniqueOrThrow({ where: { varianteId_bodegaId: { varianteId: await idVarianteDefault(productoId), bodegaId } } });
       expect(Number(stockTrasDevolucion.cantidadActual)).toBe(Number(stockTrasRecibir.cantidadActual) - 4);
 
       const ordenActualizada = await request(app.getHttpServer())
@@ -2970,15 +2977,15 @@ describe('App (e2e)', () => {
         data: { tenantId: tenantAId, codigo: 'E2E-ATOM-1', nombre: 'Producto Con Stock E2E', porcentajeItbis: 18 },
       });
       productoConStockId = productoConStock.id;
-      await prisma.precio.create({ data: { productoId: productoConStock.id, listaPrecio: 'GENERAL', costo: 50, margenPct: 100, precioVenta: 100 } });
-      await prisma.stock.create({ data: { productoId: productoConStock.id, bodegaId: bodega.id, cantidadActual: 10, stockMinimo: 1 } });
+      await prisma.precio.create({ data: { varianteId: await idVarianteDefault(productoConStock.id), listaPrecio: 'GENERAL', costo: 50, margenPct: 100, precioVenta: 100 } });
+      await prisma.stock.create({ data: { varianteId: await idVarianteDefault(productoConStock.id), bodegaId: bodega.id, cantidadActual: 10, stockMinimo: 1 } });
 
       const productoSinStock = await prisma.producto.create({
         data: { tenantId: tenantAId, codigo: 'E2E-ATOM-2', nombre: 'Producto Sin Stock E2E', porcentajeItbis: 18 },
       });
       productoSinStockId = productoSinStock.id;
-      await prisma.precio.create({ data: { productoId: productoSinStock.id, listaPrecio: 'GENERAL', costo: 50, margenPct: 100, precioVenta: 100 } });
-      await prisma.stock.create({ data: { productoId: productoSinStock.id, bodegaId: bodega.id, cantidadActual: 0, stockMinimo: 1 } });
+      await prisma.precio.create({ data: { varianteId: await idVarianteDefault(productoSinStock.id), listaPrecio: 'GENERAL', costo: 50, margenPct: 100, precioVenta: 100 } });
+      await prisma.stock.create({ data: { varianteId: await idVarianteDefault(productoSinStock.id), bodegaId: bodega.id, cantidadActual: 0, stockMinimo: 1 } });
     });
 
     it(
@@ -3005,7 +3012,7 @@ describe('App (e2e)', () => {
         // nunca se creó — la línea 1 ya se había descontado en su propia
         // transacción antes de llegar a la línea 2 y fallar.
         const stock = await prisma.stock.findUnique({
-          where: { productoId_bodegaId: { productoId: productoConStockId, bodegaId } },
+          where: { varianteId_bodegaId: { varianteId: await idVarianteDefault(productoConStockId), bodegaId } },
         });
         expect(Number(stock?.cantidadActual)).toBe(10);
       },
@@ -3026,10 +3033,10 @@ describe('App (e2e)', () => {
       });
       productoId = producto.id;
       await prisma.precio.create({
-        data: { productoId: producto.id, listaPrecio: 'GENERAL', costo: 50, margenPct: 100, precioVenta: 100 },
+        data: { varianteId: await idVarianteDefault(producto.id), listaPrecio: 'GENERAL', costo: 50, margenPct: 100, precioVenta: 100 },
       });
       await prisma.stock.create({
-        data: { productoId: producto.id, bodegaId: bodega.id, cantidadActual: CANTIDAD_CONCURRENTE, stockMinimo: 1 },
+        data: { varianteId: await idVarianteDefault(producto.id), bodegaId: bodega.id, cantidadActual: CANTIDAD_CONCURRENTE, stockMinimo: 1 },
       });
     });
 
@@ -3054,7 +3061,7 @@ describe('App (e2e)', () => {
         // El stock (10 unidades) solo alcanza para las 10 ventas de este
         // test si ninguna pisó el NCF/stock de otra — confirma también que
         // verificarYDescontarStock no dejó pasar más ventas de las que había.
-        const stock = await prisma.stock.findUnique({ where: { productoId_bodegaId: { productoId, bodegaId } } });
+        const stock = await prisma.stock.findUnique({ where: { varianteId_bodegaId: { varianteId: await idVarianteDefault(productoId), bodegaId } } });
         expect(Number(stock?.cantidadActual)).toBe(0);
 
         // Los asientos contables automáticos (listener fire-and-forget, un

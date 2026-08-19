@@ -31,13 +31,14 @@ export class ReportesRepository {
   }
 
   /**
-   * Stock no lleva tenantId propio (se aísla por su producto/bodega, que sí
-   * son tenant-scoped), así que TenantPrismaService no lo auto-filtra —
-   * hay que filtrar explícitamente por producto.tenantId.
+   * Stock no lleva tenantId propio (se aísla por su variante→producto, que
+   * sí son tenant-scoped), así que TenantPrismaService no lo auto-filtra —
+   * hay que filtrar explícitamente por producto.tenantId (Fase 3c: Stock
+   * cuelga de VarianteProducto, no directo de Producto).
    */
   async stockBajoConteo(tenantId: string) {
     const stock = await this.db.stock.findMany({
-      where: { producto: { tenantId } },
+      where: { variante: { producto: { tenantId } } },
       select: { cantidadActual: true, stockMinimo: true },
     });
     return stock.filter((s) => Number(s.cantidadActual) < Number(s.stockMinimo)).length;
@@ -57,12 +58,14 @@ export class ReportesRepository {
     });
   }
 
+  /** Reaplana `variante.producto` a `producto` en cada fila, para que ReportesService no tenga que cambiar. */
   async stockActual(tenantId: string) {
-    return this.db.stock.findMany({
-      where: { producto: { tenantId } },
-      include: { producto: true, bodega: true },
-      orderBy: [{ bodega: { nombre: 'asc' } }, { producto: { nombre: 'asc' } }],
+    const filas = await this.db.stock.findMany({
+      where: { variante: { producto: { tenantId } } },
+      include: { variante: { include: { producto: true } }, bodega: true },
+      orderBy: [{ bodega: { nombre: 'asc' } }, { variante: { producto: { nombre: 'asc' } } }],
     });
+    return filas.map(({ variante, ...stock }) => ({ ...stock, producto: variante.producto }));
   }
 
   ordenesCompraEnRango(desde: Date, hasta: Date) {

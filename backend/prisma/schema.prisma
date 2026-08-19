@@ -46,6 +46,8 @@ model Tenant {
   ncfAsignados  NcfAsignado[]
   productos     Producto[]
   categorias    Categoria[]
+  variantesProducto VarianteProducto[]
+  atributos     Atributo[]
   bodegas       Bodega[]
   movimientosInventario MovimientoInventario[]
   clientes      Cliente[]
@@ -1275,8 +1277,10 @@ model Producto {
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
-  precios     Precio[]
-  stock       Stock[]
+  // Precio/Stock ya no cuelgan directo de Producto (Fase 3c — ver
+  // VarianteProducto): todo producto tiene siempre al menos una variante
+  // "por defecto", incluso sin atributos reales.
+  variantes   VarianteProducto[]
   movimientos MovimientoInventario[]
   lineasFactura LineaFactura[]
   lineasOc    LineaOc[]
@@ -1311,10 +1315,83 @@ model ComponenteCombo {
   @@map("componentes_combo")
 }
 
+/// SKU real de un producto (Fase 3c de adopción de Cuadre): un producto
+/// tiene siempre al menos una variante — la "por defecto", sin valores de
+/// atributo asociados — para que un producto que nunca usó atributos
+/// reales (Talla/Color) siga teniendo exactamente una fila de stock/precio,
+/// igual que antes de esta fase. `tenantId` propio (a diferencia de
+/// `LineaFactura`/`PagoVenta`, hijas sin tenantId): se consulta directo muy
+/// seguido (Stock, catálogo del POS, búsqueda por código de barras) y
+/// necesita `@@unique([tenantId, codigoBarras])` sin depender de un join a
+/// `Producto`.
+model VarianteProducto {
+  id           String   @id @default(uuid())
+  tenantId     String
+  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  productoId   String
+  producto     Producto @relation(fields: [productoId], references: [id], onDelete: Cascade)
+  sku          String?
+  codigoBarras String?
+  activa       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  valoresAtributo ValorAtributoVariante[]
+  precios         Precio[]
+  stock           Stock[]
+  movimientos     MovimientoInventario[]
+
+  @@unique([tenantId, codigoBarras])
+  @@map("variantes_producto")
+}
+
+/// Catálogo de atributos definibles por tenant ("Talla", "Color") — Fase 3c.
+model Atributo {
+  id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  nombre    String
+  createdAt DateTime @default(now())
+
+  valores ValorAtributo[]
+
+  @@unique([tenantId, nombre])
+  @@map("atributos")
+}
+
+/// Valores concretos de un atributo ("M", "Azul"). Hija sin tenantId propio
+/// (mismo patrón que ComponenteCombo) — su aislamiento depende de llegar
+/// siempre vía Atributo, ya tenant-scoped.
+model ValorAtributo {
+  id         String   @id @default(uuid())
+  atributoId String
+  atributo   Atributo @relation(fields: [atributoId], references: [id], onDelete: Cascade)
+  valor      String
+
+  variantes ValorAtributoVariante[]
+
+  @@unique([atributoId, valor])
+  @@map("valores_atributo")
+}
+
+/// Puente variante<->valor de atributo. Una variante tiene a lo sumo un
+/// valor por atributo — se valida en el service al generar las
+/// combinaciones (Fase 3c, incremento 2), no a nivel de constraint de base
+/// (el `@@id` de acá solo evita asignar el mismo valor dos veces a la
+/// misma variante).
+model ValorAtributoVariante {
+  varianteId      String
+  variante        VarianteProducto @relation(fields: [varianteId], references: [id], onDelete: Cascade)
+  valorAtributoId String
+  valorAtributo   ValorAtributo    @relation(fields: [valorAtributoId], references: [id], onDelete: Cascade)
+
+  @@id([varianteId, valorAtributoId])
+  @@map("valores_atributo_variante")
+}
+
 model Precio {
   id             String    @id @default(uuid())
-  productoId     String
-  producto       Producto  @relation(fields: [productoId], references: [id], onDelete: Cascade)
+  varianteId     String
+  variante       VarianteProducto @relation(fields: [varianteId], references: [id], onDelete: Cascade)
   listaPrecio    String    @default("GENERAL")
   costo          Decimal   @db.Decimal(14, 4)
   margenPct      Decimal   @db.Decimal(6, 2)
@@ -1322,7 +1399,7 @@ model Precio {
   vigenteDesde   DateTime  @default(now())
   vigenteHasta   DateTime?
 
-  @@index([productoId, listaPrecio, vigenteDesde])
+  @@index([varianteId, listaPrecio, vigenteDesde])
   @@map("precios")
 }
 
@@ -1350,8 +1427,8 @@ model Bodega {
 
 model Stock {
   id                 String   @id @default(uuid())
-  productoId         String
-  producto           Producto @relation(fields: [productoId], references: [id], onDelete: Cascade)
+  varianteId         String
+  variante           VarianteProducto @relation(fields: [varianteId], references: [id], onDelete: Cascade)
   bodegaId           String
   bodega             Bodega   @relation(fields: [bodegaId], references: [id], onDelete: Cascade)
   cantidadActual     Decimal  @default(0) @db.Decimal(14, 4)
@@ -1359,7 +1436,7 @@ model Stock {
   stockMinimo        Decimal  @default(10) @db.Decimal(14, 4)
   updatedAt          DateTime @updatedAt
 
-  @@unique([productoId, bodegaId])
+  @@unique([varianteId, bodegaId])
   @@map("stock")
 }
 
@@ -1374,8 +1451,13 @@ model MovimientoInventario {
   id             String                   @id @default(uuid())
   tenantId       String
   tenant         Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  // Se conserva como columna denormalizada de solo lectura (para no romper
+  // reportes que ya filtran por él) — la FK real para nuevo código es
+  // `varianteId`, ver Fase 3c.
   productoId     String
   producto       Producto                 @relation(fields: [productoId], references: [id])
+  varianteId     String
+  variante       VarianteProducto         @relation(fields: [varianteId], references: [id])
   bodegaId       String
   bodega         Bodega                   @relation(fields: [bodegaId], references: [id])
   tipo           TipoMovimientoInventario
@@ -1388,6 +1470,7 @@ model MovimientoInventario {
   createdAt      DateTime                 @default(now())
 
   @@index([tenantId, productoId, bodegaId])
+  @@index([varianteId])
   @@map("movimiento_inventario")
 }
 

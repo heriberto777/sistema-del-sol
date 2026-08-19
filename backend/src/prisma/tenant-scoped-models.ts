@@ -43,4 +43,6 @@ export const TENANT_SCOPED_MODELS = new Set([
   'VentaAparcada',
   'Categoria',
   'ListaPrecio',
+  'VarianteProducto',
+  'Atributo',
 ]);
