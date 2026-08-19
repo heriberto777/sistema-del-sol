@@ -37,6 +37,10 @@ export class ProductosRepository {
     });
   }
 
+  // Matchear codigoBarras acá (no solo nombre/código) es lo que hace que
+  // un lector de código de barras USB (emula teclado + Enter, sin
+  // integración especial) ya funcione tal cual contra este buscador —
+  // Fase 3d de adopción de Cuadre.
   private whereBusqueda(busqueda?: string, categoriaId?: string) {
     return {
       activo: true,
@@ -45,6 +49,7 @@ export class ProductosRepository {
             OR: [
               { nombre: { contains: busqueda, mode: 'insensitive' as const } },
               { codigo: { contains: busqueda, mode: 'insensitive' as const } },
+              { variantes: { some: { codigoBarras: { contains: busqueda, mode: 'insensitive' as const } } } },
             ],
           }
         : {}),

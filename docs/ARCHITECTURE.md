@@ -726,6 +726,39 @@ un `reduce` multiplicativo con acumulador inicial `0` en vez de `1` en
 selección), y el precio-de-tarjeta-sin-re-resolver del POS descrito
 arriba.
 
+### Código de barras (Fase 3d)
+
+`VarianteProducto.codigoBarras`/`sku` ya existían en el schema desde el
+incremento 1 (`@@unique([tenantId, codigoBarras])`), sin usarse en
+ningún lado hasta esta sub-fase. `VariantesService.actualizarCodigoBarras`
+(`PATCH /productos/:productoId/variantes/:varianteId`) los completa:
+valida que la variante realmente pertenezca a `productoId` (mismo
+patrón de IDOR que `resolverObligatoria`) antes de escribir; `null`
+explícito quita el código asignado.
+
+`ProductosRepository.whereBusqueda()` extiende su `OR` para matchear
+también `variantes.some.codigoBarras` — un lector de código de barras
+USB (emula teclado + Enter, sin integración especial) ya funciona tal
+cual contra el buscador existente de catálogo/POS, sin ningún endpoint
+ni modo especial nuevo.
+
+**Impresión de etiquetas es 100% client-side** (`frontend/src/lib/
+etiquetas-codigo-barras.ts`, dependencia `jsbarcode`) — mismo criterio
+que el ticket térmico del backend (`documento-ticket.ts`): arma un
+documento HTML standalone con `window.onload = () => window.print()` y
+lo abre con `abrirBlob()`, sin pasar por el servidor. La única
+diferencia real es que acá el renderizado del barcode en sí (SVG) tiene
+que ocurrir en el navegador — `JsBarcode()` puede dibujar sobre un
+`<svg>` creado con `document.createElementNS` sin insertarlo en el DOM
+real; se serializa con `.outerHTML` y se concatena directo en el HTML
+de salida, junto al nombre del producto y la etiqueta de la variante
+(escapados a mano, mismo `escaparHtml` que ya usa el ticket térmico —
+nombre de producto es texto influenciable por el usuario final). Solo
+se ofrecen para imprimir las variantes que ya tienen `codigoBarras`
+asignado. `jsbarcode` no trae sus propios tipos en el paquete (no
+declara `types`/`typings` en su `package.json`) — se instaló
+`@types/jsbarcode` aparte como devDependency.
+
 ## Plugin system
 
 Instalación **manual** (git/deploy): un plugin es un paquete del

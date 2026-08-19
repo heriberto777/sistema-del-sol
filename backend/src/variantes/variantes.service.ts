@@ -22,6 +22,22 @@ export class VariantesService {
   }
 
   /**
+   * Fase 3d — código de barras por variante, para que un lector USB
+   * (o tipear el código a mano) matchee el buscador de catálogo/POS
+   * (ver ProductosRepository.whereBusqueda). `productoId` viene de la
+   * URL (`/productos/:productoId/variantes/:varianteId`) — se valida
+   * que la variante realmente le pertenezca antes de tocarla, mismo
+   * patrón de IDOR que el resto de FKs cliente-suministradas.
+   */
+  async actualizarCodigoBarras(productoId: string, varianteId: string, codigoBarras: string | null) {
+    const variantes = await this.variantesRepository.listarIdsPorProducto(productoId);
+    if (!variantes.some((v) => v.id === varianteId)) {
+      throw new BadRequestException(`La variante indicada no pertenece al producto ${productoId}`);
+    }
+    return this.variantesRepository.actualizarCodigoBarras(varianteId, codigoBarras);
+  }
+
+  /**
    * Resolución obligatoria de variante para líneas de venta/compra (Fase
    * 3c, incremento 3): si el producto tiene una sola variante (el caso
    * normal — nunca usó atributos reales), se resuelve sola sin que el

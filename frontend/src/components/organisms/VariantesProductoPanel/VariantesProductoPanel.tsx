@@ -3,7 +3,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../../lib/api-client';
 import { Button } from '../../atoms/Button/Button';
 import { Badge } from '../../atoms/Badge/Badge';
-import { useVariantesProducto, etiquetaVariante } from '../../../hooks/useVariantesProducto';
+import { useVariantesProducto, etiquetaVariante, type VarianteProducto } from '../../../hooks/useVariantesProducto';
+import { imprimirEtiquetas } from '../../../lib/etiquetas-codigo-barras';
 
 interface ValorAtributo {
   id: string;
@@ -32,7 +33,7 @@ function mensajeError(err: unknown, fallback: string): string {
  * es el único que dispara la regeneración) y para tipo PRODUCTO (un
  * COMBO nunca tiene stock propio, no tiene sentido armarle variantes).
  */
-export function VariantesProductoPanel({ productoId }: { productoId: string }) {
+export function VariantesProductoPanel({ productoId, nombreProducto }: { productoId: string; nombreProducto: string }) {
   const queryClient = useQueryClient();
   const [seleccion, setSeleccion] = useState<Record<string, Set<string>>>({});
   const [inicializado, setInicializado] = useState(false);
@@ -82,6 +83,13 @@ export function VariantesProductoPanel({ productoId }: { productoId: string }) {
       setError(null);
     },
     onError: (err: unknown) => setError(mensajeError(err, 'No se pudieron generar las variantes.')),
+  });
+
+  const guardarCodigoBarras = useMutation({
+    mutationFn: async ({ varianteId, codigoBarras }: { varianteId: string; codigoBarras: string | null }) =>
+      apiClient.patch(`/productos/${productoId}/variantes/${varianteId}`, { codigoBarras }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['variantes-producto', productoId] }),
+    onError: (err: unknown) => setError(mensajeError(err, 'No se pudo guardar el código de barras.')),
   });
 
   const combinacionesPrevistas = Object.values(seleccion).filter((v) => v.size > 0);
@@ -137,11 +145,39 @@ export function VariantesProductoPanel({ productoId }: { productoId: string }) {
       </Button>
 
       {variantes && variantes.length > 0 && (
-        <div className="space-y-1 border-t border-slate-200 pt-2 dark:border-slate-800">
-          <p className="text-xs font-medium text-slate-600 dark:text-slate-400">Variantes actuales ({variantes.length})</p>
+        <div className="space-y-2 border-t border-slate-200 pt-2 dark:border-slate-800">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-medium text-slate-600 dark:text-slate-400">Variantes actuales ({variantes.length})</p>
+            <Button
+              type="button"
+              variante="secundario"
+              disabled={!variantes.some((v) => v.codigoBarras)}
+              onClick={() =>
+                imprimirEtiquetas(
+                  variantes
+                    .filter((v): v is VarianteProducto & { codigoBarras: string } => !!v.codigoBarras)
+                    .map((v) => ({ codigoBarras: v.codigoBarras, nombreProducto, variante: etiquetaVariante(v) || undefined })),
+                )
+              }
+            >
+              Imprimir etiquetas
+            </Button>
+          </div>
           {variantes.map((v) => (
-            <div key={v.id} className="flex items-center justify-between text-xs">
-              <span className="text-slate-700 dark:text-slate-300">{etiquetaVariante(v) || '(sin atributos — por defecto)'}</span>
+            <div key={v.id} className="flex items-center gap-2 text-xs">
+              <span className="flex-1 text-slate-700 dark:text-slate-300">{etiquetaVariante(v) || '(sin atributos — por defecto)'}</span>
+              <input
+                type="text"
+                placeholder="Código de barras"
+                defaultValue={v.codigoBarras ?? ''}
+                key={v.id + (v.codigoBarras ?? '')}
+                onBlur={(e) => {
+                  const valor = e.target.value.trim();
+                  if (valor === (v.codigoBarras ?? '')) return;
+                  guardarCodigoBarras.mutate({ varianteId: v.id, codigoBarras: valor || null });
+                }}
+                className="w-36 rounded-md border border-slate-300 px-2 py-1 text-xs dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+              />
               <Badge tono={v.activa ? 'exito' : 'neutro'}>{v.activa ? 'Activa' : 'Inactiva'}</Badge>
             </div>
           ))}

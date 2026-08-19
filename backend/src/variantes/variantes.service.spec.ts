@@ -15,6 +15,7 @@ describe('VariantesService', () => {
       contarMovimientos: jest.fn().mockResolvedValue(0),
       contarUsoEnLineas: jest.fn().mockResolvedValue(0),
       regenerar: jest.fn().mockResolvedValue([{ id: 'v1' }]),
+      actualizarCodigoBarras: jest.fn(),
     } as unknown as jest.Mocked<VariantesRepository>;
     atributosRepository = {
       buscarPorId: jest.fn(),
@@ -135,6 +136,25 @@ describe('VariantesService', () => {
       variantesRepository.listarIdsPorProducto.mockResolvedValue([]);
 
       await expect(service.resolverObligatoria('producto-inexistente')).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('actualizarCodigoBarras', () => {
+    it('actualiza el código cuando la variante pertenece al producto', async () => {
+      variantesRepository.listarIdsPorProducto.mockResolvedValue([{ id: 'v1' }, { id: 'v2' }] as never);
+
+      await service.actualizarCodigoBarras('p1', 'v2', '7501234567890');
+
+      expect(variantesRepository.actualizarCodigoBarras).toHaveBeenCalledWith('v2', '7501234567890');
+    });
+
+    it('rechaza (400) si la variante indicada no pertenece al producto', async () => {
+      variantesRepository.listarIdsPorProducto.mockResolvedValue([{ id: 'v1' }] as never);
+
+      await expect(service.actualizarCodigoBarras('p1', 'v-ajena', '7501234567890')).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(variantesRepository.actualizarCodigoBarras).not.toHaveBeenCalled();
     });
   });
 });

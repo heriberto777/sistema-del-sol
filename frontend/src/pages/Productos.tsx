@@ -436,7 +436,9 @@ function FormularioProducto({ producto, onGuardado }: { producto: Producto | nul
         </div>
       )}
 
-      {valores.tipo === 'PRODUCTO' && producto && <VariantesProductoPanel productoId={producto.id} />}
+      {valores.tipo === 'PRODUCTO' && producto && (
+        <VariantesProductoPanel productoId={producto.id} nombreProducto={producto.nombre} />
+      )}
       {valores.tipo === 'PRODUCTO' && !producto && (
         <p className="text-xs text-slate-400">Guardá el producto primero para poder armarle variantes (Talla, Color, etc.).</p>
       )}

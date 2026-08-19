@@ -22,6 +22,11 @@ export class VariantesRepository {
     return this.db.varianteProducto.findMany({ where: { productoId }, select: { id: true }, orderBy: { createdAt: 'asc' } });
   }
 
+  /** `codigoBarras: null` explícito quita el código asignado — ver ProductosRepository.whereBusqueda (Fase 3d). */
+  actualizarCodigoBarras(id: string, codigoBarras: string | null) {
+    return this.db.varianteProducto.update({ where: { id }, data: { codigoBarras } });
+  }
+
   contarMovimientos(varianteIds: string[]) {
     if (!varianteIds.length) return Promise.resolve(0);
     return this.db.movimientoInventario.count({ where: { varianteId: { in: varianteIds } } });

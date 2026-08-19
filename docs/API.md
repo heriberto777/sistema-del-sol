@@ -149,6 +149,7 @@ pasa ninguna de ellas.
 | DELETE | `/api/atributos/:id/valores/:valorId` | `precios.editar` — 400 si el valor está en uso por alguna variante |
 | DELETE | `/api/atributos/:id` | `precios.editar` — 400 si alguno de sus valores está en uso |
 | GET | `/api/productos/:productoId/variantes` | `precios.ver` — variantes del producto con sus valores de atributo |
+| PATCH | `/api/productos/:productoId/variantes/:varianteId` | `precios.editar` — `{ codigoBarras: string \| null }` (Fase 3d); `null` explícito quita el código asignado; 400 si la variante no pertenece a `productoId` |
 
 Toda línea de venta/compra (`/api/facturas`, `/api/cotizaciones`,
 `/api/remisiones`, `/api/compras`, `/api/pos/ventas`) acepta
@@ -158,6 +159,14 @@ y `varianteId` puede omitirse. Si tiene más de una, es **obligatorio**
 — 400 con un mensaje claro si falta, y 400 si la variante indicada no
 pertenece a ese producto. Ver `VariantesService.resolverObligatoria` en
 ARCHITECTURE.md.
+
+`busqueda` en `GET /api/productos` y `GET /api/productos/catalogo`
+(Fase 3d) también matchea `VarianteProducto.codigoBarras` — un lector
+de código de barras USB (emula teclado + Enter) ya funciona tal cual
+contra el buscador de catálogo y del POS, sin integración especial. La
+impresión de etiquetas (hoja con nombre + variante + barcode) es
+100% client-side (`frontend/src/lib/etiquetas-codigo-barras.ts`, vía
+`jsbarcode`) — no hay endpoint de backend involucrado.
 
 ## Categorías
 

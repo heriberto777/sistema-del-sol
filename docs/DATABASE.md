@@ -113,7 +113,10 @@ token, así que un token nunca puede reusarse.
   ninguna (no existe, o es de otro tenant). `PreciosService` usa el
   mismo `resolverObligatoria` — un producto con variantes reales puede
   tener un `precios` distinto por variante (Talla/Color con precio
-  propio), no solo por `listaPrecio`.
+  propio), no solo por `listaPrecio`. `variantes_producto.codigoBarras`
+  (Fase 3d, `@@unique([tenantId, codigoBarras])`) se edita vía `PATCH
+  /productos/:productoId/variantes/:varianteId` y participa en la
+  búsqueda de catálogo/POS (`ProductosRepository.whereBusqueda`).
 - **`productos.tipo`** (`PRODUCTO`/`SERVICIO`/`COMBO`): un `SERVICIO`
   nunca tiene fila en `stock` (no mueve inventario al facturarse); un
   `COMBO` tampoco tiene fila propia — al facturarse expande a sus
