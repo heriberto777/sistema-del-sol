@@ -3,9 +3,10 @@ import { ProductosService } from './productos.service';
 import { ProductosController } from './productos.controller';
 import { ProductosRepository } from './productos.repository';
 import { CategoriasModule } from '../categorias/categorias.module';
+import { VariantesModule } from '../variantes/variantes.module';
 
 @Module({
-  imports: [CategoriasModule],
+  imports: [CategoriasModule, VariantesModule],
   controllers: [ProductosController],
   providers: [ProductosService, ProductosRepository],
   exports: [ProductosService],

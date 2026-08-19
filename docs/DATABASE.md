@@ -94,6 +94,14 @@ token, así que un token nunca puede reusarse.
   para que un producto sin atributos reales siga teniendo exactamente
   una fila de stock/precio. `movimiento_inventario.productoId` se
   conserva (denormalizado, de solo lectura); `varianteId` es la FK real.
+  `VariantesService.generarCombinaciones` arma el producto cartesiano de
+  `atributos`/`valores_atributo` elegidos y reemplaza TODAS las
+  variantes del producto (borrar y recrear) — rechaza hacerlo si alguna
+  variante actual ya tiene filas en `movimiento_inventario`
+  (`onDelete: Restrict`, a propósito, a diferencia de `precios`/`stock`
+  que cuelgan con `Cascade`). `valores_atributo` es una tabla "hija" sin
+  tenantId propio (como `componentes_combo`) — su aislamiento depende de
+  validar primero el `atributo` padre.
 - **`productos.tipo`** (`PRODUCTO`/`SERVICIO`/`COMBO`): un `SERVICIO`
   nunca tiene fila en `stock` (no mueve inventario al facturarse); un
   `COMBO` tampoco tiene fila propia — al facturarse expande a sus

@@ -11,11 +11,23 @@ export class ProductosRepository {
     return this.tenantPrisma.client;
   }
 
-  /** `componentes` no es una columna de Producto — se crea aparte, en la misma transacción, como filas de ComponenteCombo. */
+  /**
+   * `componentes` no es una columna de Producto — se crea aparte, en la
+   * misma transacción, como filas de ComponenteCombo. Todo producto tiene
+   * siempre al menos una `VarianteProducto` (Fase 3c) — acá se crea la
+   * "por defecto" (sin valores de atributo); `VariantesService.
+   * generarCombinaciones` la reemplaza por variantes reales si el
+   * producto define atributos.
+   */
   crear(dto: CrearProductoDto, tenantId: string) {
-    const { componentes, ...datosProducto } = dto;
+    // `atributos` no es una columna de Producto — se ignora al crear (ver
+    // el comentario equivalente en `actualizar()`); un producto nuevo
+    // siempre arranca con su variante "por defecto" sin atributos.
+    const { componentes, atributos, ...datosProducto } = dto;
+    void atributos;
     return this.db.$transaction(async (tx) => {
       const producto = await tx.producto.create({ data: { ...datosProducto, tenantId } });
+      await tx.varianteProducto.create({ data: { productoId: producto.id, tenantId } });
       if (componentes?.length) {
         await tx.componenteCombo.createMany({
           data: componentes.map((c) => ({ comboId: producto.id, componenteId: c.productoId, cantidad: c.cantidad })),
@@ -123,7 +135,11 @@ export class ProductosRepository {
    * nuevas, dentro de una sola transacción.
    */
   actualizar(id: string, dto: Partial<CrearProductoDto>) {
-    const { componentes, ...datosProducto } = dto;
+    // `atributos` no es una columna de Producto — ya se procesó aparte en
+    // ProductosService.actualizar() (ver VariantesService.generarCombinaciones)
+    // antes de llegar acá.
+    const { componentes, atributos, ...datosProducto } = dto;
+    void atributos;
     return this.db.$transaction(async (tx) => {
       const producto = await tx.producto.update({ where: { id }, data: datosProducto });
       if (componentes !== undefined) {

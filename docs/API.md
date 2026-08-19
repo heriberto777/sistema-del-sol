@@ -135,7 +135,20 @@ pasa ninguna de ellas.
 | GET | `/api/productos?pagina&tamanoPagina&busqueda&categoriaId` | `precios.ver` — `busqueda` filtra por nombre o código, `categoriaId` filtra exacto (no incluye descendientes); NUNCA incluye `imagen` (ver ARCHITECTURE.md) |
 | GET | `/api/productos/catalogo?pagina&tamanoPagina&busqueda&categoriaId` | `precios.ver` — para el catálogo de POS: incluye `imagen` y `precioVenta` (lista GENERAL vigente) en cada fila; `categoriaId` filtra exacto |
 | GET | `/api/productos/:id` | `precios.ver` — sí incluye `imagen` |
-| PATCH | `/api/productos/:id` | `precios.editar` — `imagen: null` explícito quita la foto existente; `categoriaId: null` explícito quita la categoría asignada |
+| PATCH | `/api/productos/:id` | `precios.editar` — `imagen: null` explícito quita la foto existente; `categoriaId: null` explícito quita la categoría asignada; `atributos` (ver abajo) regenera las variantes del producto |
+
+`PATCH /api/productos/:id` con `atributos: [{ atributoId, valoresIds: string[] }]` genera el producto cartesiano de los valores elegidos — una `VarianteProducto` por combinación — y **reemplaza por completo** las variantes actuales del producto (Fase 3c, ver ARCHITECTURE.md). `atributos: []` revierte a una única variante "por defecto" sin atributos; omitir el campo no toca las variantes. 400 si algún valor no pertenece al atributo indicado, si la combinatoria supera 400 variantes, o si las variantes actuales ya tienen movimientos de inventario registrados (no se puede regenerar variantes de un producto que ya tuvo actividad de stock).
+
+## Atributos y variantes
+
+| Método | Ruta | Permiso |
+|---|---|---|
+| POST | `/api/atributos` | `precios.editar` — `{ nombre }` (ej. "Talla", "Color") |
+| GET | `/api/atributos` | `precios.ver` — con sus valores incluidos |
+| POST | `/api/atributos/:id/valores` | `precios.editar` — `{ valor }` (ej. "M", "Azul") |
+| DELETE | `/api/atributos/:id/valores/:valorId` | `precios.editar` — 400 si el valor está en uso por alguna variante |
+| DELETE | `/api/atributos/:id` | `precios.editar` — 400 si alguno de sus valores está en uso |
+| GET | `/api/productos/:productoId/variantes` | `precios.ver` — variantes del producto con sus valores de atributo |
 
 ## Categorías
 

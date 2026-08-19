@@ -5,12 +5,14 @@ import { CrearProductoDto, ComponenteComboDto } from './dto/crear-producto.dto';
 import { CatalogoQueryDto } from './dto/catalogo-query.dto';
 import { paginar } from '../common/types/pagina-resultado';
 import { CategoriasRepository } from '../categorias/categorias.repository';
+import { VariantesService } from '../variantes/variantes.service';
 
 @Injectable()
 export class ProductosService {
   constructor(
     private readonly productosRepository: ProductosRepository,
     private readonly categoriasRepository: CategoriasRepository,
+    private readonly variantesService: VariantesService,
   ) {}
 
   async crear(dto: CrearProductoDto, tenantId: string) {
@@ -54,9 +56,13 @@ export class ProductosService {
     return this.productosRepository.buscarPorIdEnTx(tx, id);
   }
 
-  async actualizar(id: string, dto: Partial<CrearProductoDto>) {
+  async actualizar(id: string, dto: Partial<CrearProductoDto>, tenantId: string) {
     if (dto.categoriaId) {
       await this.categoriasRepository.buscarPorId(dto.categoriaId);
+    }
+
+    if (dto.atributos !== undefined) {
+      await this.variantesService.generarCombinaciones(id, tenantId, dto.atributos);
     }
 
     if (dto.tipo === undefined && dto.componentes === undefined) {

@@ -43,6 +43,8 @@ import { GastosMenoresModule } from './gastos-menores/gastos-menores.module';
 import { FormasPagoModule } from './formas-pago/formas-pago.module';
 import { CategoriasModule } from './categorias/categorias.module';
 import { ListasPrecioModule } from './listas-precio/listas-precio.module';
+import { AtributosModule } from './atributos/atributos.module';
+import { VariantesModule } from './variantes/variantes.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { PermissionsGuard } from './common/guards/permissions.guard';
 import { ModuloActivoGuard } from './common/guards/modulo-activo.guard';
@@ -98,6 +100,8 @@ import { TenantMiddleware } from './common/middleware/tenant.middleware';
     FormasPagoModule,
     CategoriasModule,
     ListasPrecioModule,
+    AtributosModule,
+    VariantesModule,
     GastosMenoresModule,
   ],
   providers: [

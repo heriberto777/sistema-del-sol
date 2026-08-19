@@ -508,7 +508,7 @@ significado re-resolver precio por cliente en cada tecla de búsqueda,
 para una grilla que es solo apoyo visual (el precio real correcto se
 resuelve recién al facturar, con el mecanismo de arriba).
 
-## Atributos y variantes de producto (Fase 3c de adopción de Cuadre — incremento 1: schema)
+## Atributos y variantes de producto (Fase 3c de adopción de Cuadre)
 
 `Stock`/`Precio` ya no cuelgan directo de `Producto` — cuelgan de
 `VarianteProducto` (nuevo modelo tenant-scoped, `variantes_producto`).
@@ -523,6 +523,8 @@ fase. `VarianteProducto` tiene `tenantId` propio (a diferencia de
 directo muy seguido (Stock, catálogo del POS, código de barras — Fase
 3d) y necesita `@@unique([tenantId, codigoBarras])` sin depender de un
 join a `Producto`.
+
+### Incremento 1: schema
 
 Migración (`20260819100000_variantes_producto`): crea las 4 tablas
 nuevas (`variantes_producto`, `atributos`, `valores_atributo`,
@@ -558,11 +560,63 @@ abrió una transacción) y sigue exponiendo el mismo parámetro
 - `ReportesRepository` (stockBajoConteo, stockActual): mismo criterio,
   reaplana `variante.producto` a `producto` en cada fila.
 
+### Incremento 2: CRUD de atributos/variantes + generación de combinaciones
+
+`AtributosModule` (`backend/src/atributos/`) es el catálogo tenant-scoped
+de atributos (`POST/GET /atributos`) y sus valores (`POST /atributos/
+:id/valores`, `DELETE /atributos/:id/valores/:valorId`, `DELETE
+/atributos/:id`). `ValorAtributo` es una tabla "hija" sin tenantId
+propio (mismo patrón que `ComponenteCombo`) — su aislamiento depende de
+validar primero el `Atributo` padre (tenant-scoped) y recién ahí
+confirmar que el valor realmente pertenece a ESE atributo, antes de
+tocarlo (`AtributosService.eliminarValor`). Eliminar un valor o un
+atributo con algún valor en uso por una variante real se rechaza (400)
+— igual criterio que `Categoria`/`ListaPrecio`.
+
+`VariantesModule` (`backend/src/variantes/`) genera el producto
+cartesiano de los valores elegidos por atributo — una
+`VarianteProducto` por combinación — vía `VariantesService.
+generarCombinaciones(productoId, tenantId, seleccion)`, invocado desde
+`ProductosService.actualizar()` cuando el `PATCH` trae el campo
+`atributos` (ausente = no tocar variantes; `[]` = revertir a una única
+variante "por defecto" sin atributos). Mismo patrón "borrar todo y
+recrear" que `ComponenteCombo` ya usa para combos: se borran TODAS las
+variantes actuales del producto y se crean las nuevas dentro de una
+transacción. Antes de borrar, valida dos cosas:
+- Cada `valorId` elegido realmente pertenece al `atributoId` indicado
+  (400 si no) — mismo espíritu que el resto de FKs cliente-suministradas.
+- **Ninguna de las variantes actuales tiene movimientos de inventario
+  registrados** (`MovimientoInventario.varianteId` es `RESTRICT`, no
+  `Cascade`, a propósito — ver el modelo) — si los tiene, rechaza (400)
+  en vez de dejar que el `DELETE` explote con una violación de FK cruda.
+  Esto significa que **regenerar variantes reales solo es posible antes
+  de la primera venta/movimiento de stock del producto** — una
+  limitación real y deliberada: Precio/Stock si cuelgan con `Cascade` y
+  se pierden silenciosamente al regenerar (aceptable, porque en ese
+  punto no hay historial de movimientos que perder), pero el
+  movimiento de inventario si existiera se perdería de verdad, y eso sí
+  se bloquea. Un tope de 400 combinaciones (`MAX_COMBINACIONES` en
+  `variantes.service.ts`) es solo un salvavidas contra una combinatoria
+  descontrolada (varios atributos con muchos valores cada uno), no un
+  límite de negocio.
+
+`ProductosRepository.crear()` ahora también crea la variante "por
+defecto" del producto nuevo en la misma transacción — un gap real que
+el incremento 1 había dejado abierto (todo producto creado *antes* de
+esa migración tenía su variante por el backfill, pero nada creaba una
+para los productos *nuevos* hasta este incremento; se detectó y corrigió
+acá, verificado manualmente contra la base real: crear un producto,
+asignarle un precio, y confirmar que resuelve sin 404).
+
+`GET /productos/:productoId/variantes` (`VariantesController`) expone
+el listado de variantes de un producto con sus valores de atributo —
+para el consumo de incrementos posteriores (selector de variante en
+Facturación/POS, tabla de variantes en Productos.tsx).
+
 Los incrementos que siguen (ya planeados, no implementados todavía):
-atributos/variantes reales con CRUD y generación de combinaciones
-(incremento 2); las líneas de venta/compra ganan `varianteId` explícito
-y dejan de asumir "la variante por defecto" cuando el producto tiene
-más de una (incremento 3); frontend — selector de variante, armado de
+las líneas de venta/compra ganan `varianteId` explícito y dejan de
+asumir "la variante por defecto" cuando el producto tiene más de una
+(incremento 3); frontend — selector de variante, armado de
 combinaciones desde Talla/Color (incremento 4).
 
 ## Plugin system

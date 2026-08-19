@@ -14,6 +14,18 @@ export class ComponenteComboDto {
   cantidad: number;
 }
 
+export class SeleccionAtributoDto {
+  @ApiProperty()
+  @IsUUID()
+  atributoId: string;
+
+  @ApiProperty({ type: [String] })
+  @IsArray()
+  @ArrayMinSize(1)
+  @IsUUID('4', { each: true })
+  valoresIds: string[];
+}
+
 export class CrearProductoDto {
   @ApiProperty()
   @IsString()
@@ -68,4 +80,16 @@ export class CrearProductoDto {
   @Matches(/^data:image\/(jpeg|jpg|png|webp);base64,/, { message: 'imagen debe ser una data URI de imagen (jpeg/png/webp)' })
   @MaxLength(2_000_000, { message: 'La imagen es demasiado pesada — comprimila antes de subirla' })
   imagen?: string | null;
+
+  @ApiProperty({
+    type: [SeleccionAtributoDto],
+    required: false,
+    description:
+      'Solo tiene efecto al editar (PATCH) — genera el producto cartesiano de los valores elegidos por atributo (una VarianteProducto por combinación) y reemplaza por completo las variantes actuales. `[]` revierte a una única variante "por defecto" sin atributos.',
+  })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => SeleccionAtributoDto)
+  atributos?: SeleccionAtributoDto[];
 }

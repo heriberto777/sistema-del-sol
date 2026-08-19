@@ -44,7 +44,7 @@ export class ProductosController {
 
   @Patch(':id')
   @Permissions('precios.editar')
-  actualizar(@Param('id') id: string, @Body() dto: Partial<CrearProductoDto>) {
-    return this.productosService.actualizar(id, dto);
+  actualizar(@Param('id') id: string, @Body() dto: Partial<CrearProductoDto>, @CurrentUser() user: JwtPayloadUser) {
+    return this.productosService.actualizar(id, dto, user.tenantId);
   }
 }

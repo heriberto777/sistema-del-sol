@@ -2,11 +2,13 @@ import { BadRequestException } from '@nestjs/common';
 import { ProductosService } from './productos.service';
 import { ProductosRepository } from './productos.repository';
 import { CategoriasRepository } from '../categorias/categorias.repository';
+import { VariantesService } from '../variantes/variantes.service';
 
 describe('ProductosService', () => {
   let service: ProductosService;
   let repository: jest.Mocked<ProductosRepository>;
   let categoriasRepository: jest.Mocked<CategoriasRepository>;
+  let variantesService: jest.Mocked<VariantesService>;
 
   beforeEach(() => {
     repository = {
@@ -20,7 +22,11 @@ describe('ProductosService', () => {
     categoriasRepository = {
       buscarPorId: jest.fn().mockResolvedValue({ id: 'cat-1' }),
     } as unknown as jest.Mocked<CategoriasRepository>;
-    service = new ProductosService(repository, categoriasRepository);
+    variantesService = {
+      generarCombinaciones: jest.fn(),
+      listarPorProducto: jest.fn(),
+    } as unknown as jest.Mocked<VariantesService>;
+    service = new ProductosService(repository, categoriasRepository, variantesService);
   });
 
   describe('crear', () => {
@@ -73,7 +79,7 @@ describe('ProductosService', () => {
 
   describe('actualizar', () => {
     it('no valida nada ni consulta el producto actual si no se envía tipo ni componentes', async () => {
-      await service.actualizar('p1', { nombre: 'Nuevo nombre' });
+      await service.actualizar('p1', { nombre: 'Nuevo nombre' }, 'tenant-1');
 
       expect(repository.buscarPorId).not.toHaveBeenCalled();
       expect(repository.actualizar).toHaveBeenCalledWith('p1', { nombre: 'Nuevo nombre' });
@@ -83,7 +89,7 @@ describe('ProductosService', () => {
       repository.buscarPorId.mockResolvedValue({ id: 'combo-1', tipo: 'COMBO' } as never);
 
       await expect(
-        service.actualizar('combo-1', { componentes: [{ productoId: 'combo-1', cantidad: 1 }] }),
+        service.actualizar('combo-1', { componentes: [{ productoId: 'combo-1', cantidad: 1 }] }, 'tenant-1'),
       ).rejects.toThrow(BadRequestException);
       expect(repository.actualizar).not.toHaveBeenCalled();
     });
@@ -91,7 +97,7 @@ describe('ProductosService', () => {
     it('al cambiar el tipo de COMBO a PRODUCTO, limpia los componentes aunque no se hayan enviado', async () => {
       repository.buscarPorId.mockResolvedValue({ id: 'combo-1', tipo: 'COMBO' } as never);
 
-      await service.actualizar('combo-1', { tipo: 'PRODUCTO' });
+      await service.actualizar('combo-1', { tipo: 'PRODUCTO' }, 'tenant-1');
 
       expect(repository.actualizar).toHaveBeenCalledWith('combo-1', { tipo: 'PRODUCTO', componentes: [] });
     });
@@ -101,7 +107,7 @@ describe('ProductosService', () => {
         .mockResolvedValueOnce({ id: 'combo-1', tipo: 'COMBO' } as never) // tipo actual
         .mockResolvedValueOnce({ id: 'p2', nombre: 'Componente', tipo: 'PRODUCTO' } as never); // validación del componente
 
-      await service.actualizar('combo-1', { componentes: [{ productoId: 'p2', cantidad: 5 }] });
+      await service.actualizar('combo-1', { componentes: [{ productoId: 'p2', cantidad: 5 }] }, 'tenant-1');
 
       expect(repository.actualizar).toHaveBeenCalledWith('combo-1', {
         componentes: [{ productoId: 'p2', cantidad: 5 }],
@@ -154,10 +160,32 @@ describe('ProductosService', () => {
     });
 
     it('valida categoriaId al actualizar', async () => {
-      await service.actualizar('p1', { categoriaId: 'cat-1' });
+      await service.actualizar('p1', { categoriaId: 'cat-1' }, 'tenant-1');
 
       expect(categoriasRepository.buscarPorId).toHaveBeenCalledWith('cat-1');
       expect(repository.actualizar).toHaveBeenCalledWith('p1', { categoriaId: 'cat-1' });
+    });
+  });
+
+  describe('atributos (generación de variantes)', () => {
+    it('genera combinaciones al actualizar cuando el dto trae atributos', async () => {
+      const atributos = [{ atributoId: 'a1', valoresIds: ['v1', 'v2'] }];
+
+      await service.actualizar('p1', { atributos }, 'tenant-1');
+
+      expect(variantesService.generarCombinaciones).toHaveBeenCalledWith('p1', 'tenant-1', atributos);
+    });
+
+    it('no toca variantes si el dto no trae el campo atributos', async () => {
+      await service.actualizar('p1', { nombre: 'Nuevo nombre' }, 'tenant-1');
+
+      expect(variantesService.generarCombinaciones).not.toHaveBeenCalled();
+    });
+
+    it('revierte a la variante por defecto cuando se envía atributos: []', async () => {
+      await service.actualizar('p1', { atributos: [] }, 'tenant-1');
+
+      expect(variantesService.generarCombinaciones).toHaveBeenCalledWith('p1', 'tenant-1', []);
     });
   });
 });
