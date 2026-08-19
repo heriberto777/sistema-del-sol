@@ -190,15 +190,18 @@ export class FacturacionRepository {
     });
   }
 
-  listar(params: { skip?: number; take?: number; busqueda?: string }) {
-    const where = params.busqueda
-      ? {
-          OR: [
-            { ncf: { contains: params.busqueda, mode: 'insensitive' as const } },
-            { cliente: { nombre: { contains: params.busqueda, mode: 'insensitive' as const } } },
-          ],
-        }
-      : {};
+  listar(params: { skip?: number; take?: number; busqueda?: string; tiposFactura?: TipoFactura[] }) {
+    const where = {
+      ...(params.busqueda
+        ? {
+            OR: [
+              { ncf: { contains: params.busqueda, mode: 'insensitive' as const } },
+              { cliente: { nombre: { contains: params.busqueda, mode: 'insensitive' as const } } },
+            ],
+          }
+        : {}),
+      ...(params.tiposFactura?.length ? { tipoFactura: { in: params.tiposFactura } } : {}),
+    };
     return Promise.all([
       this.db.factura.findMany({
         where,

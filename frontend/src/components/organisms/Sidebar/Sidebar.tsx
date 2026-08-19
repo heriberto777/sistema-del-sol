@@ -12,6 +12,7 @@ import {
   Landmark,
   type LucideIcon,
   Receipt,
+  RotateCcw,
   Settings,
   ShoppingBag,
   Sparkles,
@@ -50,6 +51,7 @@ const GRUPOS: Grupo[] = [
       { ruta: '/facturacion', etiqueta: 'Facturación', icono: Receipt, permisos: ['facturacion.ver'], modulo: 'facturacion' },
       { ruta: '/cotizaciones', etiqueta: 'Cotizaciones', icono: FileText, permisos: ['cotizaciones.ver'], modulo: 'cotizaciones' },
       { ruta: '/remisiones', etiqueta: 'Remisiones', icono: Truck, permisos: ['remisiones.ver'], modulo: 'remisiones' },
+      { ruta: '/notas-credito', etiqueta: 'Notas de crédito/débito', icono: RotateCcw, permisos: ['facturacion.ver'], modulo: 'facturacion' },
       { ruta: '/pos', etiqueta: 'Punto de venta', icono: Store, permisos: ['pos.ver'], modulo: 'pos' },
       // Sirve tanto a Ventas (clientes) como a Compras (proveedores) —
       // se prioriza acá por ser el uso más frecuente.

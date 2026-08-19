@@ -39,7 +39,14 @@ const TONO_POR_ESTADO: Record<Factura['estado'], 'exito' | 'neutro' | 'peligro'>
   ANULADA: 'peligro',
 };
 
-export function FacturasTable() {
+interface FacturasTableProps {
+  /** Filtra por tipo (ej. ['NOTA_CREDITO', 'NOTA_DEBITO']) — usado por la pantalla de Notas (Fase 4a). Sin esto, trae todos los tipos. */
+  tiposFactura?: Factura['tipoFactura'][];
+  titulo?: string;
+  busquedaPlaceholder?: string;
+}
+
+export function FacturasTable({ tiposFactura, titulo = 'Facturas', busquedaPlaceholder = 'Buscar por NCF o cliente…' }: FacturasTableProps = {}) {
   const { tienePermiso } = useAuth();
   const [busqueda, setBusqueda] = useState('');
   const [pagina, setPagina] = useState(1);
@@ -49,11 +56,11 @@ export function FacturasTable() {
   const [facturaImprimiendo, setFacturaImprimiendo] = useState<Factura | null>(null);
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ['facturas', pagina, busquedaDebounced],
+    queryKey: ['facturas', pagina, busquedaDebounced, tiposFactura],
     queryFn: async () =>
       (
         await apiClient.get<PaginaResultado<Factura>>('/facturas', {
-          params: { pagina, busqueda: busquedaDebounced || undefined },
+          params: { pagina, busqueda: busquedaDebounced || undefined, tipoFactura: tiposFactura },
         })
       ).data,
   });
@@ -64,7 +71,7 @@ export function FacturasTable() {
 
       <Card
         sinPadding
-        titulo="Facturas"
+        titulo={titulo}
         descripcion={data ? `${data.total} factura(s)` : undefined}
         acciones={
           <SearchInput
@@ -73,7 +80,7 @@ export function FacturasTable() {
               setBusqueda(v);
               setPagina(1);
             }}
-            placeholder="Buscar por NCF o cliente…"
+            placeholder={busquedaPlaceholder}
           />
         }
       >

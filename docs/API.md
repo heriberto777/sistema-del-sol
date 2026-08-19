@@ -98,7 +98,7 @@ pasa ninguna de ellas.
 | Método | Ruta | Permiso |
 |---|---|---|
 | POST | `/api/facturas` | `facturacion.crear` — `{ clienteId, bodegaId, tipoFactura, lineas[], facturaOrigenId?, listaPrecio? }`; `facturaOrigenId` requerido para `NOTA_CREDITO`/`NOTA_DEBITO`; `listaPrecio` (nombre de `ListaPrecio`, no id) sobreescribe el nivel de precio resuelto del cliente para esta venta puntual — ver ARCHITECTURE.md, "Precios multinivel" |
-| GET | `/api/facturas?pagina&tamanoPagina&busqueda` | `facturacion.ver` — `busqueda` filtra por NCF o nombre de cliente |
+| GET | `/api/facturas?pagina&tamanoPagina&busqueda&tipoFactura` | `facturacion.ver` — `busqueda` filtra por NCF o nombre de cliente; `tipoFactura` (repetible: `?tipoFactura=NOTA_CREDITO&tipoFactura=NOTA_DEBITO`) filtra por tipo — usado por la pantalla de Notas de Crédito/Débito (Fase 4a de adopción de Cuadre) |
 | GET | `/api/facturas/:id` | `facturacion.ver` |
 | POST | `/api/facturas/:id/anular` | `facturacion.anular` — reversa el efecto de inventario (ver ARCHITECTURE.md); 400 si ya estaba anulada; si la factura es de POS y quien pide la anulación no tiene `pos.supervisar`, 403 salvo que sea el mismo cajero del turno Y siga `ABIERTO` (ver "Roles de POS" en ARCHITECTURE.md) |
 | POST | `/api/facturas/:id/pagos` | `facturacion.cobrar` — `{ monto, formaPagoId, referencia?, fecha? }`; pagos parciales soportados, marca `pagada: true` al cubrir el total; 400 si el monto excede el saldo pendiente |

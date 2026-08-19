@@ -12,6 +12,7 @@ import { Dashboard } from './pages/Dashboard';
 import { Facturacion } from './pages/Facturacion';
 import { Cotizaciones } from './pages/Cotizaciones';
 import { Remisiones } from './pages/Remisiones';
+import { NotasCredito } from './pages/NotasCredito';
 import { Inventario } from './pages/Inventario';
 import { Compras } from './pages/Compras';
 import { Contactos } from './pages/Contactos';
@@ -74,6 +75,7 @@ export const router = createBrowserRouter([
           { path: '/facturacion', element: <Facturacion /> },
           { path: '/cotizaciones', element: <Cotizaciones /> },
           { path: '/remisiones', element: <Remisiones /> },
+          { path: '/notas-credito', element: <NotasCredito /> },
           { path: '/inventario', element: <Inventario /> },
           { path: '/compras', element: <Compras /> },
           { path: '/contactos', element: <Contactos /> },

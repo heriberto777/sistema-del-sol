@@ -629,4 +629,24 @@ describe('FacturacionService', () => {
       expect(buffer.subarray(0, 5).toString('latin1')).toBe('%PDF-');
     });
   });
+
+  describe('listar', () => {
+    it('pasa tipoFactura al repositorio como tiposFactura — usado por la pantalla de Notas de Crédito/Débito (Fase 4a)', async () => {
+      repository.listar.mockResolvedValue([[], 0]);
+
+      await service.listar({ tipoFactura: ['NOTA_CREDITO', 'NOTA_DEBITO'] } as never);
+
+      expect(repository.listar).toHaveBeenCalledWith(
+        expect.objectContaining({ tiposFactura: ['NOTA_CREDITO', 'NOTA_DEBITO'] }),
+      );
+    });
+
+    it('no manda tiposFactura si el query no lo trae (listado normal de facturas)', async () => {
+      repository.listar.mockResolvedValue([[], 0]);
+
+      await service.listar({} as never);
+
+      expect(repository.listar).toHaveBeenCalledWith(expect.objectContaining({ tiposFactura: undefined }));
+    });
+  });
 });

@@ -235,6 +235,18 @@ contra Docker, no solo con mocks: unit tests con repos falsos no lo
 detectaron porque el mock no modelaba la relación entre notas y su
 factura origen).
 
+**Módulo propio de Notas** (Fase 4a de adopción de Cuadre,
+`frontend/src/pages/NotasCredito.tsx`, ruta `/notas-credito`): antes
+`EmitirNotaForm` solo existía como modal colgado de la pantalla de
+Facturación, sin listado dedicado. Nada nuevo del lado de negocio —
+reusa el mismo `EmitirNotaForm` y el mismo `FacturasTable`, que ganó un
+prop `tiposFactura?` para filtrar el listado (`['NOTA_CREDITO',
+'NOTA_DEBITO']` acá). El filtro real vive en
+`GET /facturas?tipoFactura=...` (repetible en el query string,
+`ListarFacturasQueryDto`, `FacturacionRepository.listar` arma
+`{ tipoFactura: { in: [...] } }`) — el listado normal de Facturación
+sigue sin mandar el parámetro, así que no cambia en nada.
+
 ## Cotizaciones y Remisiones
 
 Documentos sin efecto fiscal que preceden a una factura, cada uno en su

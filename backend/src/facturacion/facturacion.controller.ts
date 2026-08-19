@@ -9,7 +9,7 @@ import { Permissions } from '../common/decorators/permissions.decorator';
 import { RequiereModulo } from '../common/decorators/requiere-modulo.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtPayloadUser } from '../common/types/authenticated-request';
-import { ListadoQueryDto } from '../common/dto/listado-query.dto';
+import { ListarFacturasQueryDto } from './dto/listar-facturas-query.dto';
 import { ImprimirDocumentoQueryDto } from '../common/impresion/dto/imprimir-documento-query.dto';
 
 @ApiBearerAuth()
@@ -27,7 +27,7 @@ export class FacturacionController {
 
   @Get()
   @Permissions('facturacion.ver')
-  listar(@Query() query: ListadoQueryDto) {
+  listar(@Query() query: ListarFacturasQueryDto) {
     return this.facturacionService.listar(query);
   }
 

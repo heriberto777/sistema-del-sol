@@ -10,7 +10,7 @@ import { CrearPagoDto } from '../pagos/dto/crear-pago.dto';
 import { PagosService } from '../pagos/pagos.service';
 import { ClientesService } from '../clientes/clientes.service';
 import { VariantesService } from '../variantes/variantes.service';
-import { ListadoQueryDto } from '../common/dto/listado-query.dto';
+import { ListarFacturasQueryDto } from './dto/listar-facturas-query.dto';
 import { paginar } from '../common/types/pagina-resultado';
 import { DocumentoPdfParams, generarDocumentoPdf } from '../common/pdf/documento-pdf';
 import { generarDocumentoTicketHtml } from '../common/pdf/documento-ticket';
@@ -296,9 +296,14 @@ export class FacturacionService {
     return { buffer, contentType: 'application/pdf' };
   }
 
-  async listar(query: ListadoQueryDto) {
+  async listar(query: ListarFacturasQueryDto) {
     const { pagina, tamanoPagina, skip, take } = paginar(query.pagina, query.tamanoPagina);
-    const [datos, total] = await this.facturacionRepository.listar({ skip, take, busqueda: query.busqueda });
+    const [datos, total] = await this.facturacionRepository.listar({
+      skip,
+      take,
+      busqueda: query.busqueda,
+      tiposFactura: query.tipoFactura,
+    });
     return { datos, total, pagina, tamanoPagina };
   }
 
