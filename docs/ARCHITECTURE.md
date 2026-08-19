@@ -1184,6 +1184,25 @@ Ventas, Costo de Ventas, Gastos Operativos) se siembra igual que
 `ROLES_BASE`: en `TenantsRepository.crearConProvisioning()` para
 tenants nuevos y en `prisma/seed.ts` para el tenant demo.
 
+**Plan de cuentas como árbol expandible** (Fase 6 de adopción de
+Cuadre, `frontend/src/components/organisms/CuentasContablesTable/`):
+100% frontend — `CuentaContable.cuentaPadreId`/`subcuentas`
+(`@relation("JerarquiaCuenta")`) ya existía en el schema sin explotar
+(mismo precedente que ya usó `Categoria`, ver arriba), y `GET
+/contabilidad/cuentas` ya devolvía el campo (ningún `select` explícito
+en el repositorio). `frontend/src/lib/cuentas-arbol.ts` arma el árbol
+real (`construirArbolCuentas`, hijos anidados y ordenados por
+`codigo` — no por nombre, convención contable) para el expand/collapse
+por fila, y una versión aplanada con profundidad
+(`aplanarArbolCuentas`) para el `<select>` de "Cuenta padre" del
+formulario de alta — sin este selector, no había forma de construir la
+jerarquía desde la UI. Todo expandido por defecto (nada queda oculto
+sin que el usuario lo pida); `colapsadas` en el componente solo guarda
+qué ids el usuario decidió plegar. Deliberadamente sin `PATCH` para
+reasignar `cuentaPadreId` de una cuenta ya creada — cuentas nuevas
+pueden anidarse desde el alta, pero reorganizar el catálogo base ya
+sembrado queda fuera de esta fase.
+
 **Generación automática vía Event Bus**: `ContabilidadEventosService`
 se suscribe a `factura.creada`, `factura.anulada` y
 `compras.orden_recibida` (los mismos eventos que ya consumen
