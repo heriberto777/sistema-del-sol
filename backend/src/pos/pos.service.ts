@@ -9,6 +9,7 @@ import { CerrarTurnoDto } from './dto/cerrar-turno.dto';
 import { CrearMovimientoCajaDto } from './dto/crear-movimiento-caja.dto';
 import { RegistrarVentaPosDto } from './dto/registrar-venta.dto';
 import { GuardarVentaDto } from './dto/guardar-venta.dto';
+import { RegistrarDevolucionDto } from './dto/registrar-devolucion.dto';
 import { ListarTurnosQueryDto } from './dto/listar-turnos-query.dto';
 import { paginar } from '../common/types/pagina-resultado';
 import { CONFIGURACIONES_BASE } from '../tenants/roles-base';
@@ -124,6 +125,118 @@ export class PosService {
       cerradoPorId: userId,
       justificacionDiferencia: dto.justificacionDiferencia,
     });
+  }
+
+  /**
+   * Devolución parcial (F4) — reusa el mecanismo de Nota de Crédito que ya
+   * soporta líneas/cantidades parciales (ver docs/ARCHITECTURE.md), en vez
+   * de inventar una tabla de "devolución" propia. La bodega de reintegro es
+   * siempre la del turno actual (igual criterio que registrarVenta), no la
+   * de la factura original — el reintegro físico ocurre donde está el cajero.
+   */
+  async registrarDevolucion(dto: RegistrarDevolucionDto, tenantId: string, cajeroId: string) {
+    const turno = await this.posRepository.buscarPorId(dto.turnoCajaId);
+    this.validarAbierto(turno);
+    await this.formasPagoRepository.buscarPorId(dto.formaPagoId);
+
+    const facturaOrigen = await this.facturacionService.buscarPorId(dto.facturaOrigenId);
+    this.validarFacturaDevolvible(facturaOrigen);
+    const disponiblePorProducto = this.calcularDisponibleParaDevolucion(facturaOrigen);
+
+    const lineas = dto.lineas.map((linea) => {
+      const lineaOrigen = facturaOrigen.lineas.find((lo) => lo.productoId === linea.productoId);
+      if (!lineaOrigen) {
+        throw new BadRequestException(`El producto ${linea.productoId} no pertenece a la factura original`);
+      }
+      const cantidadOrigen = Number(lineaOrigen.cantidad);
+      const disponible = disponiblePorProducto.get(linea.productoId) ?? 0;
+      if (linea.cantidad > disponible) {
+        throw new BadRequestException(
+          `Solo quedan ${disponible} unidad(es) disponibles para devolver de este producto (de ${cantidadOrigen} originales)`,
+        );
+      }
+      // Descuento proporcional a la cantidad devuelta, para que el monto de
+      // la nota sea consistente con el descuento que tuvo la línea original.
+      const descuentoOriginal = Number(lineaOrigen.descuento);
+      const descuento = cantidadOrigen > 0 ? (descuentoOriginal * linea.cantidad) / cantidadOrigen : 0;
+
+      return {
+        productoId: linea.productoId,
+        cantidad: linea.cantidad,
+        precioUnitario: Number(lineaOrigen.precioUnitario),
+        descuento,
+      };
+    });
+
+    return this.facturacionService.crear(
+      {
+        clienteId: facturaOrigen.clienteId,
+        bodegaId: turno.bodegaId,
+        tipoFactura: 'NOTA_CREDITO',
+        facturaOrigenId: dto.facturaOrigenId,
+        lineas,
+      },
+      tenantId,
+      cajeroId,
+      { formaPagoId: dto.formaPagoId, referenciaPago: dto.referenciaPago, turnoCajaId: dto.turnoCajaId },
+    );
+  }
+
+  /** Detalle de una factura para armar la Devolución (F4) — cuánto queda disponible por producto, sin exigir `facturacion.ver` (Cajero no lo tiene). */
+  async obtenerFacturaParaDevolucion(id: string) {
+    const factura = await this.facturacionService.buscarPorId(id);
+    this.validarFacturaDevolvible(factura);
+    const disponiblePorProducto = this.calcularDisponibleParaDevolucion(factura);
+
+    return {
+      id: factura.id,
+      ncf: factura.ncf,
+      clienteId: factura.clienteId,
+      lineas: factura.lineas.map((l) => ({
+        productoId: l.productoId,
+        nombre: l.producto.nombre,
+        codigo: l.producto.codigo,
+        cantidadOriginal: Number(l.cantidad),
+        disponible: disponiblePorProducto.get(l.productoId) ?? 0,
+      })),
+    };
+  }
+
+  private validarFacturaDevolvible(factura: { estado: string; tipoFactura: string }) {
+    if (factura.estado !== 'EMITIDA') {
+      throw new BadRequestException('Solo se puede devolver una venta EMITIDA');
+    }
+    if (factura.tipoFactura === 'NOTA_CREDITO' || factura.tipoFactura === 'NOTA_DEBITO') {
+      throw new BadRequestException('No se puede devolver una nota de crédito/débito');
+    }
+  }
+
+  /**
+   * Cuánto de cada producto de `factura` sigue disponible para devolver —
+   * cantidad original menos lo ya devuelto por notas de crédito previas
+   * (mismo cálculo que FacturacionService.anular() usa para no duplicar el
+   * reintegro de inventario).
+   */
+  private calcularDisponibleParaDevolucion(factura: {
+    lineas: { productoId: string; cantidad: unknown }[];
+    notasRelacionadas?: { lineas: { productoId: string; cantidad: unknown }[] }[];
+  }) {
+    const yaDevueltoPorProducto = new Map<string, number>();
+    for (const nota of factura.notasRelacionadas ?? []) {
+      for (const lineaNota of nota.lineas) {
+        yaDevueltoPorProducto.set(
+          lineaNota.productoId,
+          (yaDevueltoPorProducto.get(lineaNota.productoId) ?? 0) + Number(lineaNota.cantidad),
+        );
+      }
+    }
+    const disponiblePorProducto = new Map<string, number>();
+    for (const linea of factura.lineas) {
+      const cantidadOrigen = Number(linea.cantidad);
+      const yaDevuelto = yaDevueltoPorProducto.get(linea.productoId) ?? 0;
+      disponiblePorProducto.set(linea.productoId, cantidadOrigen - yaDevuelto);
+    }
+    return disponiblePorProducto;
   }
 
   /** Guardar/Guardadas (F12/⇧F12) — aparcar el carrito actual para atender otro cliente sin perderlo. */

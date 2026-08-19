@@ -1239,6 +1239,48 @@ mantiene por fidelidad al mapeo de teclas de Cuadre — ambos accesos
 también tienen botón visible ("Guardar venta (F12)"/"Guardadas
 (⇧F12)") para cuando el atajo no dispara.
 
+### Devolución parcial desde POS (Fase 2e, F4)
+
+Reusa el mecanismo de Nota de Crédito existente (`FacturacionService.
+crear({ tipoFactura: 'NOTA_CREDITO', facturaOrigenId, lineas })`, que ya
+soporta líneas/cantidades parciales) — **no** una tabla `DevolucionVenta`
+propia, a diferencia del patrón que usa Compras (`DevolucionCompra`).
+Se eligió así porque Facturación ya resuelve todo lo necesario (NCF
+propio B04/E34, monto en negativo, reintegro de stock, exclusión al
+recalcular lo ya devuelto en una eventual anulación posterior) sin
+duplicar lógica.
+
+- **`PosService.registrarDevolucion`** (`POST /pos/devoluciones`,
+  permiso `facturacion.anular`): valida el turno abierto y la forma de
+  pago (mismo patrón que `registrarVenta`), busca la factura origen vía
+  `FacturacionService.buscarPorId` (ya incluye `lineas`,
+  `notasRelacionadas` con sus líneas, y `cliente`), rechaza si no está
+  `EMITIDA` o si es ella misma una nota. La bodega del reintegro es
+  siempre **la del turno actual**, no la de la factura original — el
+  reintegro físico ocurre donde está el cajero.
+- **`calcularDisponibleParaDevolucion`** (privado, compartido entre
+  `registrarDevolucion` y el endpoint de lectura de abajo): cantidad
+  original menos lo ya devuelto por notas de crédito previas — mismo
+  cálculo que `FacturacionService.anular()` ya usaba para no duplicar
+  el reintegro de inventario al anular una factura con devoluciones
+  parciales previas.
+- **Descuento proporcional**: si la línea original tenía un `descuento`
+  (monto flat), la nota de crédito prorratea `descuento original ×
+  (cantidad devuelta / cantidad original)` — para que devolver la mitad
+  de una línea con descuento no reintegre el monto lleno sin descontar.
+- **`GET /pos/facturas/:id/devolucion`** (permiso `facturacion.anular`,
+  no `facturacion.ver`): detalle de una factura con lo disponible por
+  producto, para que `ModalDevolucion` (frontend) muestre cantidades
+  antes de confirmar. Necesario porque Cajero/Vendedor **no tienen**
+  `facturacion.ver` (se lo quitaron en una fase anterior, ver "Vendedor
+  solo vende por POS" más abajo) — sin este endpoint dedicado, el
+  Cajero no podría ver el detalle de la venta a devolver.
+- **Alcance de búsqueda**: el modal de devolución solo ofrece elegir
+  entre las facturas **del turno actual** (`data.facturas`, ya cargadas
+  por `TurnoCajaDetalle`) — no hay buscador contra `/facturas?busqueda=`
+  (exigiría `facturacion.ver`). Devolver una venta de un turno anterior
+  queda fuera de alcance de esta fase.
+
 ### Roles de POS: Cajero, Vendedor, Supervisor de Caja
 
 Investigando el patrón de sesión de caja más a fondo (Odoo multi-cajero,

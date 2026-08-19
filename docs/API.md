@@ -289,6 +289,8 @@ para asientos manuales (ajustes, apertura, etc.).
 | POST | `/api/pos/turnos/:id/movimientos` | `pos.editar` — entrada/salida de efectivo que no es una venta (`{ tipo: ENTRADA\|SALIDA, monto, concepto }`) |
 | POST | `/api/pos/turnos/:id/cerrar` | `pos.editar` — `{ montoFinalContado }`, calcula `montoEsperado`/`diferencia` |
 | POST | `/api/pos/ventas` | `pos.editar` — venta CONTADO contra la bodega del turno (`{ turnoCajaId, clienteId, formaPagoId, referenciaPago?, vendedorEmpleadoId?, lineas }`); genera su asiento contable automático igual que cualquier factura |
+| POST | `/api/pos/devoluciones` | `facturacion.anular` — devolución parcial (`{ facturaOrigenId, turnoCajaId, formaPagoId, referenciaPago?, lineas: [{productoId, cantidad}] }`); emite una NOTA_CREDITO, 400 si la cantidad excede lo disponible |
+| GET | `/api/pos/facturas/:id/devolucion` | `facturacion.anular` (no `facturacion.ver` — Cajero/Vendedor no lo tienen) — detalle de una factura con lo disponible por producto, para armar la Devolución |
 | POST | `/api/pos/turnos/:id/guardar` | `pos.editar` — aparca el carrito actual (`{ clienteId?, vendedorEmpleadoId?, nota?, lineas: [{productoId, cantidad, precioUnitario, porcentajeItbis, descuento?}] }`), snapshot de precio/ITBIS al momento de guardar |
 | GET | `/api/pos/turnos/:id/guardadas` | `pos.editar` — ventas aparcadas de este turno |
 | DELETE | `/api/pos/ventas-aparcadas/:id` | `pos.editar` — se llama al recuperar una (o para descartarla) |

@@ -28,7 +28,7 @@ describe('PosService', () => {
       listarGuardadas: jest.fn(),
       eliminarGuardada: jest.fn(),
     } as unknown as jest.Mocked<PosRepository>;
-    facturacionService = { crear: jest.fn() } as unknown as jest.Mocked<FacturacionService>;
+    facturacionService = { crear: jest.fn(), buscarPorId: jest.fn() } as unknown as jest.Mocked<FacturacionService>;
     configuracionesService = { buscarValor: jest.fn().mockResolvedValue('50') } as unknown as jest.Mocked<ConfiguracionesService>;
     formasPagoRepository = { buscarPorId: jest.fn().mockResolvedValue({ id: 'fp1' }) } as unknown as jest.Mocked<FormasPagoRepository>;
     empleadosRepository = {
@@ -166,6 +166,141 @@ describe('PosService', () => {
         service.registrarVenta({ turnoCajaId: 't1', clienteId: 'c1', formaPagoId: 'fp1', lineas: [{ productoId: 'p1', cantidad: 1 }] }, 'tenant-1', 'cajero-1'),
       ).rejects.toThrow(BadRequestException);
       expect(facturacionService.crear).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('registrarDevolucion', () => {
+    const turno = { id: 't1', estado: 'ABIERTO', bodegaId: 'b1' };
+    const facturaOrigenBase = {
+      id: 'f1',
+      estado: 'EMITIDA',
+      tipoFactura: 'CONTADO',
+      clienteId: 'c1',
+      lineas: [{ productoId: 'p1', cantidad: 5, precioUnitario: 100, descuento: 50 }],
+      notasRelacionadas: [],
+    };
+
+    it('rechaza devolver contra un turno que no está abierto', async () => {
+      posRepository.buscarPorId.mockResolvedValue({ id: 't1', estado: 'CERRADO' } as never);
+
+      await expect(
+        service.registrarDevolucion(
+          { facturaOrigenId: 'f1', turnoCajaId: 't1', formaPagoId: 'fp1', lineas: [{ productoId: 'p1', cantidad: 1 }] },
+          'tenant-1',
+          'cajero-1',
+        ),
+      ).rejects.toThrow(BadRequestException);
+      expect(facturacionService.crear).not.toHaveBeenCalled();
+    });
+
+    it('rechaza devolver una factura que no está EMITIDA', async () => {
+      posRepository.buscarPorId.mockResolvedValue(turno as never);
+      facturacionService.buscarPorId.mockResolvedValue({ ...facturaOrigenBase, estado: 'ANULADA' } as never);
+
+      await expect(
+        service.registrarDevolucion(
+          { facturaOrigenId: 'f1', turnoCajaId: 't1', formaPagoId: 'fp1', lineas: [{ productoId: 'p1', cantidad: 1 }] },
+          'tenant-1',
+          'cajero-1',
+        ),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('rechaza devolver una nota de crédito', async () => {
+      posRepository.buscarPorId.mockResolvedValue(turno as never);
+      facturacionService.buscarPorId.mockResolvedValue({ ...facturaOrigenBase, tipoFactura: 'NOTA_CREDITO' } as never);
+
+      await expect(
+        service.registrarDevolucion(
+          { facturaOrigenId: 'f1', turnoCajaId: 't1', formaPagoId: 'fp1', lineas: [{ productoId: 'p1', cantidad: 1 }] },
+          'tenant-1',
+          'cajero-1',
+        ),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('rechaza devolver más cantidad de la disponible', async () => {
+      posRepository.buscarPorId.mockResolvedValue(turno as never);
+      facturacionService.buscarPorId.mockResolvedValue(facturaOrigenBase as never);
+
+      await expect(
+        service.registrarDevolucion(
+          { facturaOrigenId: 'f1', turnoCajaId: 't1', formaPagoId: 'fp1', lineas: [{ productoId: 'p1', cantidad: 6 }] },
+          'tenant-1',
+          'cajero-1',
+        ),
+      ).rejects.toThrow(BadRequestException);
+      expect(facturacionService.crear).not.toHaveBeenCalled();
+    });
+
+    it('descuenta lo ya devuelto por notas de crédito previas antes de validar la disponible', async () => {
+      posRepository.buscarPorId.mockResolvedValue(turno as never);
+      facturacionService.buscarPorId.mockResolvedValue({
+        ...facturaOrigenBase,
+        notasRelacionadas: [{ lineas: [{ productoId: 'p1', cantidad: 3 }] }],
+      } as never);
+
+      await expect(
+        service.registrarDevolucion(
+          { facturaOrigenId: 'f1', turnoCajaId: 't1', formaPagoId: 'fp1', lineas: [{ productoId: 'p1', cantidad: 3 }] },
+          'tenant-1',
+          'cajero-1',
+        ),
+      ).rejects.toThrow(BadRequestException); // 5 - 3 ya devueltas = 2 disponibles, se piden 3
+    });
+
+    it('crea una NOTA_CREDITO con el precio/descuento proporcional de la línea original, contra la bodega del turno', async () => {
+      posRepository.buscarPorId.mockResolvedValue(turno as never);
+      facturacionService.buscarPorId.mockResolvedValue(facturaOrigenBase as never);
+      facturacionService.crear.mockResolvedValue({ id: 'nc1' } as never);
+
+      await service.registrarDevolucion(
+        { facturaOrigenId: 'f1', turnoCajaId: 't1', formaPagoId: 'fp1', referenciaPago: 'ref', lineas: [{ productoId: 'p1', cantidad: 2 }] },
+        'tenant-1',
+        'cajero-1',
+      );
+
+      expect(facturacionService.crear).toHaveBeenCalledWith(
+        {
+          clienteId: 'c1',
+          bodegaId: 'b1',
+          tipoFactura: 'NOTA_CREDITO',
+          facturaOrigenId: 'f1',
+          lineas: [{ productoId: 'p1', cantidad: 2, precioUnitario: 100, descuento: 20 }], // descuento 50 * 2/5 = 20
+        },
+        'tenant-1',
+        'cajero-1',
+        { formaPagoId: 'fp1', referenciaPago: 'ref', turnoCajaId: 't1' },
+      );
+    });
+  });
+
+  describe('obtenerFacturaParaDevolucion', () => {
+    it('calcula lo disponible por producto descontando lo ya devuelto por notas previas', async () => {
+      facturacionService.buscarPorId.mockResolvedValue({
+        id: 'f1',
+        ncf: 'B0200000001',
+        clienteId: 'c1',
+        estado: 'EMITIDA',
+        tipoFactura: 'CONTADO',
+        lineas: [{ productoId: 'p1', cantidad: 5, producto: { nombre: 'Producto 1', codigo: 'P1' } }],
+        notasRelacionadas: [{ lineas: [{ productoId: 'p1', cantidad: 2 }] }],
+      } as never);
+
+      const resultado = await service.obtenerFacturaParaDevolucion('f1');
+
+      expect(resultado).toEqual({
+        id: 'f1',
+        ncf: 'B0200000001',
+        clienteId: 'c1',
+        lineas: [{ productoId: 'p1', nombre: 'Producto 1', codigo: 'P1', cantidadOriginal: 5, disponible: 3 }],
+      });
+    });
+
+    it('rechaza una factura que no está EMITIDA', async () => {
+      facturacionService.buscarPorId.mockResolvedValue({ estado: 'ANULADA', tipoFactura: 'CONTADO', lineas: [] } as never);
+
+      await expect(service.obtenerFacturaParaDevolucion('f1')).rejects.toThrow(BadRequestException);
     });
   });
 

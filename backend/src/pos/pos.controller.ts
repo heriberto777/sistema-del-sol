@@ -6,6 +6,7 @@ import { CerrarTurnoDto } from './dto/cerrar-turno.dto';
 import { CrearMovimientoCajaDto } from './dto/crear-movimiento-caja.dto';
 import { RegistrarVentaPosDto } from './dto/registrar-venta.dto';
 import { GuardarVentaDto } from './dto/guardar-venta.dto';
+import { RegistrarDevolucionDto } from './dto/registrar-devolucion.dto';
 import { ListarTurnosQueryDto } from './dto/listar-turnos-query.dto';
 import { Permissions } from '../common/decorators/permissions.decorator';
 import { RequiereModulo } from '../common/decorators/requiere-modulo.decorator';
@@ -68,6 +69,21 @@ export class PosController {
   @Permissions('pos.editar')
   registrarVenta(@Body() dto: RegistrarVentaPosDto, @CurrentUser() user: JwtPayloadUser) {
     return this.posService.registrarVenta(dto, user.tenantId, user.userId);
+  }
+
+  @Post('devoluciones')
+  @Permissions('facturacion.anular')
+  registrarDevolucion(@Body() dto: RegistrarDevolucionDto, @CurrentUser() user: JwtPayloadUser) {
+    return this.posService.registrarDevolucion(dto, user.tenantId, user.userId);
+  }
+
+  // Sin facturacion.ver a propósito — Cajero/Vendedor no lo tienen (ver
+  // ARCHITECTURE.md, "Vendedor solo vende por POS"), pero sí necesitan ver
+  // el detalle de una venta del turno para armar la Devolución (F4).
+  @Get('facturas/:id/devolucion')
+  @Permissions('facturacion.anular')
+  obtenerFacturaParaDevolucion(@Param('id') id: string) {
+    return this.posService.obtenerFacturaParaDevolucion(id);
   }
 
   @Post('turnos/:id/guardar')

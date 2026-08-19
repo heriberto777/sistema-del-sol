@@ -127,6 +127,7 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
   const [modalDescuento, setModalDescuento] = useState(false);
   const [modalGuardar, setModalGuardar] = useState(false);
   const [modalGuardadas, setModalGuardadas] = useState(false);
+  const [modalDevolucion, setModalDevolucion] = useState(false);
   const [ventaConfirmada, setVentaConfirmada] = useState<{ id: string; total: string } | null>(null);
   const [facturaAnulando, setFacturaAnulando] = useState<FacturaTurno | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -293,6 +294,7 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
     {
       F2: () => document.getElementById(ID_COMBOBOX_VENDEDOR)?.focus(),
       F3: () => document.getElementById(ID_COMBOBOX_CLIENTE)?.focus(),
+      F4: () => setModalDevolucion(true),
       F5: () => invalidar(),
       F6: () => setCarrito([]),
       F7: () => setModalMovimiento(true),
@@ -442,6 +444,11 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
             <Button variante="secundario" onClick={() => setModalMovimiento(true)}>
               Registrar entrada/salida de efectivo
             </Button>
+            {tienePermiso('facturacion.anular') && (
+              <Button variante="secundario" onClick={() => setModalDevolucion(true)}>
+                Devolución (F4)
+              </Button>
+            )}
             <Button variante="secundario" onClick={() => setModalGuardar(true)} disabled={carrito.length === 0}>
               Guardar venta (F12)
             </Button>
@@ -531,6 +538,18 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
           guardadas={guardadas ?? []}
           onRecuperar={cargarVentaAparcada}
           onClose={() => setModalGuardadas(false)}
+        />
+      )}
+
+      {modalDevolucion && (
+        <ModalDevolucion
+          turnoCajaId={turnoId}
+          facturas={data.facturas.filter((f) => f.estado === 'EMITIDA')}
+          onDevuelta={() => {
+            invalidar();
+            setModalDevolucion(false);
+          }}
+          onClose={() => setModalDevolucion(false)}
         />
       )}
 
@@ -711,6 +730,128 @@ function ModalGuardadas({
         ))}
         {guardadas.length === 0 && <li className="py-6 text-center text-sm text-slate-400">No hay ventas guardadas en este turno.</li>}
       </ul>
+    </Modal>
+  );
+}
+
+interface LineaFacturaDevolucion {
+  productoId: string;
+  nombre: string;
+  codigo: string;
+  cantidadOriginal: number;
+  disponible: number;
+}
+
+interface FacturaParaDevolucion {
+  id: string;
+  ncf: string | null;
+  lineas: LineaFacturaDevolucion[];
+}
+
+/** Devolución parcial (F4) — reusa Nota de Crédito en el backend, ver ARCHITECTURE.md. Solo lista ventas EMITIDA de este turno. */
+function ModalDevolucion({
+  turnoCajaId,
+  facturas,
+  onDevuelta,
+  onClose,
+}: {
+  turnoCajaId: string;
+  facturas: FacturaTurno[];
+  onDevuelta: () => void;
+  onClose: () => void;
+}) {
+  const [facturaId, setFacturaId] = useState('');
+  const [cantidades, setCantidades] = useState<Record<string, string>>({});
+  const [formaPagoId, setFormaPagoId] = useState('');
+  const [error, setError] = useState<string | null>(null);
+
+  const { data: factura, isLoading } = useQuery({
+    queryKey: ['pos-factura-devolucion', facturaId],
+    queryFn: async () => (await apiClient.get<FacturaParaDevolucion>(`/pos/facturas/${facturaId}/devolucion`)).data,
+    enabled: !!facturaId,
+  });
+
+  const devolver = useMutation({
+    mutationFn: async () => {
+      const lineas = Object.entries(cantidades)
+        .map(([productoId, cantidad]) => ({ productoId, cantidad: Number(cantidad) }))
+        .filter((l) => l.cantidad > 0);
+      return apiClient.post('/pos/devoluciones', { facturaOrigenId: facturaId, turnoCajaId, formaPagoId, lineas });
+    },
+    onSuccess: onDevuelta,
+    onError: () => setError('No se pudo registrar la devolución — revisá las cantidades.'),
+  });
+
+  function onSubmit(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    const hayCantidad = Object.values(cantidades).some((c) => Number(c) > 0);
+    if (!hayCantidad) {
+      setError('Indicá al menos una cantidad a devolver.');
+      return;
+    }
+    if (!formaPagoId) {
+      setError('Seleccioná la forma de pago del reintegro.');
+      return;
+    }
+    devolver.mutate();
+  }
+
+  return (
+    <Modal titulo="Devolución" onClose={onClose}>
+      <div className="space-y-3">
+        <div className="flex flex-col gap-1">
+          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Venta a devolver</label>
+          <select
+            value={facturaId}
+            onChange={(e) => {
+              setFacturaId(e.target.value);
+              setCantidades({});
+            }}
+            className="rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+          >
+            <option value="">Seleccionar…</option>
+            {facturas.map((f) => (
+              <option key={f.id} value={f.id}>
+                {f.ncf ?? f.id} — {formatoRD(f.total)}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {isLoading && <p className="text-sm text-slate-500">Cargando líneas…</p>}
+
+        {factura && (
+          <form onSubmit={onSubmit} className="space-y-3">
+            <ul className="space-y-2">
+              {factura.lineas.map((l) => (
+                <li key={l.productoId} className="flex items-center gap-2 text-sm">
+                  <span className="min-w-0 flex-1 truncate text-slate-700 dark:text-slate-300">{l.nombre}</span>
+                  <span className="shrink-0 text-xs text-slate-400">disponible: {l.disponible}</span>
+                  <input
+                    type="number"
+                    min={0}
+                    max={l.disponible}
+                    step="any"
+                    disabled={l.disponible <= 0}
+                    value={cantidades[l.productoId] ?? ''}
+                    onChange={(e) => setCantidades((prev) => ({ ...prev, [l.productoId]: e.target.value }))}
+                    className="w-20 rounded-md border border-slate-300 px-2 py-1 text-right text-sm disabled:opacity-40 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                  />
+                </li>
+              ))}
+            </ul>
+            <div className="flex flex-col gap-1">
+              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Forma de pago del reintegro</label>
+              <SelectFormaPago value={formaPagoId} onChange={setFormaPagoId} />
+            </div>
+            {error && <p className="text-sm text-red-600">{error}</p>}
+            <Button type="submit" variante="peligro" disabled={devolver.isPending} className="w-full">
+              {devolver.isPending ? 'Procesando…' : 'Confirmar devolución'}
+            </Button>
+          </form>
+        )}
+      </div>
     </Modal>
   );
 }
