@@ -36,6 +36,8 @@ interface LineaCarrito {
   cantidad: number;
   precioUnitario: number;
   porcentajeItbis: number;
+  /** Monto flat (no %) descontado de esta línea — ver ModalDescuento; misma unidad que LineaFactura.descuento en el backend. */
+  descuento: number;
 }
 
 interface MovimientoCaja {
@@ -104,6 +106,7 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
   const [formaPagoId, setFormaPagoId] = useState('');
   const [modalMovimiento, setModalMovimiento] = useState(false);
   const [modalCerrarTurno, setModalCerrarTurno] = useState(false);
+  const [modalDescuento, setModalDescuento] = useState(false);
   const [ventaConfirmada, setVentaConfirmada] = useState<{ id: string; total: string } | null>(null);
   const [facturaAnulando, setFacturaAnulando] = useState<FacturaTurno | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -135,7 +138,7 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
         clienteId: cliente?.id,
         formaPagoId,
         vendedorEmpleadoId: vendedor?.id,
-        lineas: carrito.map((l) => ({ productoId: l.productoId, cantidad: l.cantidad })),
+        lineas: carrito.map((l) => ({ productoId: l.productoId, cantidad: l.cantidad, descuento: l.descuento })),
       }),
     onSuccess: (respuesta) => {
       invalidar();
@@ -166,6 +169,7 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
       cantidad,
       precioUnitario: Number(producto.precioVenta),
       porcentajeItbis: Number(producto.porcentajeItbis),
+      descuento: 0,
     });
   }
 
@@ -177,9 +181,23 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
     setCarrito((prev) => prev.map((l) => (l.productoId === productoId ? { ...l, cantidad } : l)));
   }
 
-  const subtotal = carrito.reduce((acc, l) => acc + l.cantidad * l.precioUnitario, 0);
-  const itbis = carrito.reduce((acc, l) => acc + (l.cantidad * l.precioUnitario * l.porcentajeItbis) / 100, 0);
-  const total = subtotal + itbis;
+  /** Aplica un descuento (monto flat o %) a las líneas seleccionadas — ver ModalDescuento. */
+  function aplicarDescuento(productoIds: string[], montoOPct: number, modo: 'MONTO' | 'PORCENTAJE') {
+    setCarrito((prev) =>
+      prev.map((l) => {
+        if (!productoIds.includes(l.productoId)) return l;
+        const descuento = modo === 'PORCENTAJE' ? (l.cantidad * l.precioUnitario * montoOPct) / 100 : montoOPct;
+        return { ...l, descuento };
+      }),
+    );
+  }
+
+  // Subtotal bruto (antes de descuento) para el recibo; el ITBIS y el total sí
+  // se calculan sobre el neto, igual que FacturacionService.crear() en el backend.
+  const subtotalBruto = carrito.reduce((acc, l) => acc + l.cantidad * l.precioUnitario, 0);
+  const totalDescuentos = carrito.reduce((acc, l) => acc + l.descuento, 0);
+  const itbis = carrito.reduce((acc, l) => acc + (l.cantidad * l.precioUnitario - l.descuento) * (l.porcentajeItbis / 100), 0);
+  const total = subtotalBruto - totalDescuentos + itbis;
 
   function onCobrar() {
     setError(null);
@@ -207,6 +225,7 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
       F5: () => invalidar(),
       F6: () => setCarrito([]),
       F7: () => setModalMovimiento(true),
+      F8: () => carrito.length > 0 && setModalDescuento(true),
       F9: () => setModalCerrarTurno(true),
     },
     pantallaCompleta && puedeVender,
@@ -266,12 +285,26 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
               </div>
 
               <Card sinPadding>
+                {carrito.length > 0 && (
+                  <div className="flex justify-end border-b border-slate-100 px-3 py-1.5 dark:border-slate-800">
+                    <button
+                      type="button"
+                      onClick={() => setModalDescuento(true)}
+                      className="text-xs font-medium text-sol-600 hover:underline dark:text-sol-400"
+                    >
+                      Descuento (F8)
+                    </button>
+                  </div>
+                )}
                 <ul className="max-h-64 divide-y divide-slate-100 overflow-y-auto dark:divide-slate-800">
                   {carrito.map((l) => (
                     <li key={l.productoId} className="flex items-center gap-2 px-3 py-2 text-sm">
                       <div className="min-w-0 flex-1">
                         <p className="truncate font-medium text-slate-800 dark:text-slate-200">{l.nombre}</p>
-                        <p className="text-xs text-slate-400">{formatoRD(l.precioUnitario)} c/u</p>
+                        <p className="text-xs text-slate-400">
+                          {formatoRD(l.precioUnitario)} c/u
+                          {l.descuento > 0 && <span className="text-amber-600 dark:text-amber-400"> — desc. {formatoRD(l.descuento)}</span>}
+                        </p>
                       </div>
                       <input
                         type="number"
@@ -282,7 +315,7 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
                         className="w-16 rounded-md border border-slate-300 px-2 py-1 text-right text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
                       />
                       <span className="w-20 shrink-0 text-right font-medium text-slate-700 dark:text-slate-300">
-                        {formatoRD(l.cantidad * l.precioUnitario)}
+                        {formatoRD(l.cantidad * l.precioUnitario - l.descuento)}
                       </span>
                       <button
                         type="button"
@@ -301,8 +334,14 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
                   <div className="space-y-0.5 border-t border-slate-100 px-3 py-2 text-sm text-slate-600 dark:border-slate-800 dark:text-slate-400">
                     <div className="flex justify-between">
                       <span>Subtotal</span>
-                      <span>{formatoRD(subtotal)}</span>
+                      <span>{formatoRD(subtotalBruto)}</span>
                     </div>
+                    {totalDescuentos > 0 && (
+                      <div className="flex justify-between text-amber-600 dark:text-amber-400">
+                        <span>Descuento</span>
+                        <span>− {formatoRD(totalDescuentos)}</span>
+                      </div>
+                    )}
                     <div className="flex justify-between">
                       <span>ITBIS</span>
                       <span>{formatoRD(itbis)}</span>
@@ -400,6 +439,10 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
 
       {modalMovimiento && <ModalMovimiento turnoId={turnoId} onClose={() => setModalMovimiento(false)} onRegistrado={invalidar} />}
 
+      {modalDescuento && (
+        <ModalDescuento carrito={carrito} onAplicar={aplicarDescuento} onClose={() => setModalDescuento(false)} />
+      )}
+
       {modalCerrarTurno && (
         <ModalCerrarTurno
           data={data}
@@ -445,6 +488,72 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
       )}
       </div>
     </Card>
+  );
+}
+
+function ModalDescuento({
+  carrito,
+  onAplicar,
+  onClose,
+}: {
+  carrito: LineaCarrito[];
+  onAplicar: (productoIds: string[], montoOPct: number, modo: 'MONTO' | 'PORCENTAJE') => void;
+  onClose: () => void;
+}) {
+  const [modo, setModo] = useState<'PORCENTAJE' | 'MONTO'>('PORCENTAJE');
+  const [valor, setValor] = useState('');
+  const [seleccionadas, setSeleccionadas] = useState<string[]>(carrito.map((l) => l.productoId));
+
+  function alternar(productoId: string) {
+    setSeleccionadas((prev) => (prev.includes(productoId) ? prev.filter((id) => id !== productoId) : [...prev, productoId]));
+  }
+
+  function onSubmit(e: FormEvent) {
+    e.preventDefault();
+    if (seleccionadas.length === 0 || !valor) return;
+    onAplicar(seleccionadas, Number(valor), modo);
+    onClose();
+  }
+
+  return (
+    <Modal titulo="Descuento" onClose={onClose}>
+      <form onSubmit={onSubmit} className="space-y-3">
+        <div className="flex gap-2">
+          <Button type="button" variante={modo === 'PORCENTAJE' ? 'primario' : 'secundario'} onClick={() => setModo('PORCENTAJE')} className="flex-1">
+            %
+          </Button>
+          <Button type="button" variante={modo === 'MONTO' ? 'primario' : 'secundario'} onClick={() => setModo('MONTO')} className="flex-1">
+            Monto fijo
+          </Button>
+        </div>
+        <FormField
+          id="descuento-valor"
+          label={modo === 'PORCENTAJE' ? 'Porcentaje de descuento' : 'Monto de descuento (por línea)'}
+          type="number"
+          min={0}
+          step="any"
+          value={valor}
+          onChange={(e) => setValor(e.target.value)}
+          required
+        />
+        <div className="space-y-1">
+          <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Aplicar a</p>
+          <ul className="max-h-40 space-y-1 overflow-y-auto rounded-md border border-slate-200 p-2 dark:border-slate-800">
+            {carrito.map((l) => (
+              <li key={l.productoId}>
+                <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
+                  <input type="checkbox" checked={seleccionadas.includes(l.productoId)} onChange={() => alternar(l.productoId)} />
+                  {l.nombre}
+                </label>
+              </li>
+            ))}
+          </ul>
+        </div>
+        <Button type="submit" disabled={seleccionadas.length === 0 || !valor} className="w-full">
+          Aplicar descuento
+        </Button>
+      </form>
+    </Modal>
   );
 }
 

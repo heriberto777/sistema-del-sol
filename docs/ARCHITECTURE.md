@@ -1184,6 +1184,20 @@ registrarVenta` valida `vendedorEmpleadoId` tenant-scoped (si viene) con
 Frontend: `TurnoCajaDetalle.tsx` agrega un segundo `ComboboxBusqueda`
 ("Vendedor (opcional, para comisión)") junto al de Cliente, atado a F2.
 
+### Descuento por línea (Fase 2c — 100% frontend, F8)
+
+`LineaFactura.descuento` (monto flat por línea) ya existía en el schema
+desde antes de esta fase — el backend no necesitó ningún cambio.
+`ModalDescuento` (dentro de `TurnoCajaDetalle.tsx`) deja elegir
+%/monto fijo y a qué líneas del carrito aplica; si es %, el frontend lo
+convierte a monto flat (`cantidad * precioUnitario * pct / 100`) antes
+de guardarlo en el carrito local — el backend solo recibe montos, nunca
+porcentajes. El resumen de venta muestra **Subtotal bruto → Descuento →
+ITBIS (sobre el neto) → Total**, replicando exactamente la fórmula de
+`FacturacionService.crear()` (`totalLinea = cantidad*precio - descuento`)
+para que el monto mostrado antes de cobrar coincida con el que el
+backend termina calculando.
+
 ### Roles de POS: Cajero, Vendedor, Supervisor de Caja
 
 Investigando el patrón de sesión de caja más a fondo (Odoo multi-cajero,

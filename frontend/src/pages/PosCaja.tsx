@@ -17,6 +17,7 @@ const ATAJOS_VISIBLES = [
   { tecla: 'F5', etiqueta: 'Refrescar' },
   { tecla: 'F6', etiqueta: 'Cancelar' },
   { tecla: 'F7', etiqueta: 'Mov. Caja' },
+  { tecla: 'F8', etiqueta: 'Descuento' },
   { tecla: 'F9', etiqueta: 'Cerrar Caja' },
 ];
 
