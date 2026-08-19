@@ -5,6 +5,7 @@ import { EVENTOS } from '../event-bus/events';
 import { CrearPagoDto } from './dto/crear-pago.dto';
 import type { CrearPagoOrdenCompraDto } from '../compras/dto/crear-pago-orden-compra.dto';
 import { CierrePeriodoService } from '../contabilidad/cierre-periodo.service';
+import { FormasPagoRepository } from '../formas-pago/formas-pago.repository';
 
 const EPSILON = 0.005; // tolerancia de redondeo en centavos, igual que AsientosContablesService
 
@@ -14,6 +15,7 @@ export class PagosService {
     private readonly pagosRepository: PagosRepository,
     private readonly eventBus: EventBusService,
     private readonly cierrePeriodoService: CierrePeriodoService,
+    private readonly formasPagoRepository: FormasPagoRepository,
   ) {}
 
   /**
@@ -32,11 +34,14 @@ export class PagosService {
 
     const fecha = dto.fecha ? new Date(dto.fecha) : new Date();
     await this.cierrePeriodoService.validarFechaAbierta(fecha);
+    // Tenant-scoped: 404 si formaPagoId es de otro tenant.
+    await this.formasPagoRepository.buscarPorId(dto.formaPagoId);
     const pago = await this.pagosRepository.crear({
       tenantId,
       facturaId: factura.id,
       monto: dto.monto,
-      metodoPago: dto.metodoPago,
+      formaPagoId: dto.formaPagoId,
+      referencia: dto.referencia,
       fecha,
       userId,
     });
@@ -71,13 +76,15 @@ export class PagosService {
 
     const fecha = dto.fecha ? new Date(dto.fecha) : new Date();
     await this.cierrePeriodoService.validarFechaAbierta(fecha);
+    await this.formasPagoRepository.buscarPorId(dto.formaPagoId);
     const pago = await this.pagosRepository.crear({
       tenantId,
       ordenCompraId: orden.id,
       monto: dto.monto,
       retencionIsr,
       retencionItbis,
-      metodoPago: dto.metodoPago,
+      formaPagoId: dto.formaPagoId,
+      referencia: dto.referencia,
       fecha,
       userId,
     });

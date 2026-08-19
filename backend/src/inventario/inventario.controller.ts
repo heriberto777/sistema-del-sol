@@ -18,8 +18,12 @@ import { JwtPayloadUser } from '../common/types/authenticated-request';
 export class InventarioController {
   constructor(private readonly inventarioService: InventarioService) {}
 
+  // Sin @Permissions a propósito: es una lista de nombres de bodega, sin
+  // datos sensibles, usada como referencia por pantallas fuera de
+  // Inventario (ej. AbrirTurnoForm del POS) — un Cajero necesita verla
+  // para abrir su turno aunque no tenga inventario.ver (bug real
+  // encontrado al construir Formas de Pago, ver docs/ARCHITECTURE.md).
   @Get('bodegas')
-  @Permissions('inventario.ver')
   listarBodegas() {
     return this.inventarioService.listarBodegas();
   }

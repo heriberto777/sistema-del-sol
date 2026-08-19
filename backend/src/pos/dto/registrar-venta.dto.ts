@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { ArrayMinSize, IsArray, IsIn, IsUUID, ValidateNested } from 'class-validator';
+import { ArrayMinSize, IsArray, IsOptional, IsString, IsUUID, ValidateNested } from 'class-validator';
 import { LineaFacturaDto } from '../../facturacion/dto/crear-factura.dto';
 
 export class RegistrarVentaPosDto {
@@ -12,9 +12,14 @@ export class RegistrarVentaPosDto {
   @IsUUID()
   clienteId: string;
 
-  @ApiProperty({ enum: ['EFECTIVO', 'TARJETA', 'TRANSFERENCIA'] })
-  @IsIn(['EFECTIVO', 'TARJETA', 'TRANSFERENCIA'])
-  metodoPago: 'EFECTIVO' | 'TARJETA' | 'TRANSFERENCIA';
+  @ApiProperty()
+  @IsUUID()
+  formaPagoId: string;
+
+  @ApiProperty({ required: false, description: 'Solo aplica si la forma de pago elegida requiere referencia (transferencia, cheque, etc.)' })
+  @IsOptional()
+  @IsString()
+  referenciaPago?: string;
 
   @ApiProperty({ type: [LineaFacturaDto] })
   @IsArray()

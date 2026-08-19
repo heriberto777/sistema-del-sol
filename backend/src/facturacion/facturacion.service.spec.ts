@@ -454,7 +454,7 @@ describe('FacturacionService', () => {
   });
 
   describe('registrarPago', () => {
-    const dtoPago = { monto: 100, metodoPago: 'EFECTIVO' } as never;
+    const dtoPago = { monto: 100, formaPagoId: 'fp1' } as never;
 
     it('delega en PagosService.registrarPagoFactura cuando la factura es válida', async () => {
       const factura = { id: 'f1', estado: 'EMITIDA', pagada: false, tipoFactura: 'CREDITO' };

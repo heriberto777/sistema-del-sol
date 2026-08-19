@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { TenantPrismaService } from '../prisma/tenant-prisma.service';
-import { MetodoPago, ModalidadFacturacion, Prisma, TipoFactura, TipoNcf } from '@prisma/client';
+import { ModalidadFacturacion, Prisma, TipoFactura, TipoNcf } from '@prisma/client';
 
 interface LineaCalculada {
   productoId: string;
@@ -103,7 +103,8 @@ export class FacturacionRepository {
       tipoNcf?: TipoNcf;
       facturaOrigenId?: string;
       // Solo lo llenan las ventas de POS — ver PosService.registrarVenta.
-      metodoPago?: MetodoPago;
+      formaPagoId?: string;
+      referenciaPago?: string;
       turnoCajaId?: string;
       subtotal: number;
       descuento: number;
@@ -122,7 +123,8 @@ export class FacturacionRepository {
         ncf: params.ncf,
         tipoNcf: params.tipoNcf,
         facturaOrigenId: params.facturaOrigenId,
-        metodoPago: params.metodoPago,
+        formaPagoId: params.formaPagoId,
+        referenciaPago: params.referenciaPago,
         turnoCajaId: params.turnoCajaId,
         estado: 'EMITIDA',
         subtotal: params.subtotal,

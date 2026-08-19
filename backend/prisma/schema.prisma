@@ -62,6 +62,7 @@ model Tenant {
   periodosNomina PeriodoNomina[]
   turnosCaja    TurnoCaja[]
   pagos         Pago[]
+  formasPago    FormaPago[]
   cuentasBancarias CuentaBancaria[]
   gastosMenores GastoMenor[]
   suscripcion   Suscripcion?
@@ -577,7 +578,13 @@ model Factura {
   notasRelacionadas Factura[]   @relation("FacturaOrigenNota")
   // Solo lo llenan las ventas de POS (ver PosService.registrarVenta) — el resto de
   // flujos de facturación (venta normal, conversión de cotización/remisión) los deja null.
-  metodoPago      MetodoPago?
+  // FormaPago (catálogo configurable por tenant, ver formas-pago/) reemplazó al enum
+  // MetodoPago acá — ese enum sigue existiendo solo para PagoPlataforma (plataforma).
+  formaPagoId     String?
+  formaPago       FormaPago?    @relation(fields: [formaPagoId], references: [id])
+  // Solo aplica si formaPago.requiereReferencia — nro. de cheque, confirmación de
+  // transferencia, etc. Sin relación con `ncf`.
+  referenciaPago  String?
   turnoCajaId     String?
   // SetNull (no Cascade): si el turno se borra, la factura (documento fiscal) debe
   // sobrevivir siempre — solo se pierde el vínculo con el turno de caja.
@@ -1017,10 +1024,37 @@ model ReciboNomina {
 // POS (punto de venta) — sin modo offline en v1, ver ARCHITECTURE.md
 // ============================================================
 
+// Usado SOLO por PagoPlataforma (lo que la plataforma le cobra al
+// tenant) — el lado tenant (Factura/Pago) usa el catálogo configurable
+// FormaPago (ver abajo), no este enum.
 enum MetodoPago {
   EFECTIVO
   TARJETA
   TRANSFERENCIA
+}
+
+/// Catálogo de formas de pago configurable por tenant (Efectivo, Tarjeta,
+/// Transferencia, Crédito Cliente, Cheque, Nota de Crédito, etc.) — antes un
+/// enum fijo (`MetodoPago`, que sigue existiendo pero solo para
+/// PagoPlataforma). `esEfectivo` marca cuál de todas cuenta como efectivo
+/// físico para el arqueo de caja (ver PosRepository.calcularMovimientoEfectivo)
+/// — debería haber como mucho una en `true` por tenant, pero no se fuerza a
+/// nivel de base, se valida en FormasPagoService.
+model FormaPago {
+  id                 String   @id @default(uuid())
+  tenantId           String
+  tenant             Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  nombre             String
+  requiereReferencia Boolean  @default(false)
+  esEfectivo         Boolean  @default(false)
+  activa             Boolean  @default(true)
+  createdAt          DateTime @default(now())
+
+  facturas Factura[]
+  pagos    Pago[]
+
+  @@unique([tenantId, nombre])
+  @@map("formas_pago")
 }
 
 enum FormatoImpresion {
@@ -1399,7 +1433,9 @@ model Pago {
   // suma existente contra `orden.total` (ver PagosRepository.sumaPagosOrdenCompra).
   retencionIsr   Decimal     @default(0) @db.Decimal(14, 2)
   retencionItbis Decimal     @default(0) @db.Decimal(14, 2)
-  metodoPago    MetodoPago
+  formaPagoId   String
+  formaPago     FormaPago    @relation(fields: [formaPagoId], references: [id])
+  referencia    String?
   fecha         DateTime     @default(now())
   userId        String
   user          User         @relation(fields: [userId], references: [id])

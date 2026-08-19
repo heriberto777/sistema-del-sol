@@ -2,6 +2,7 @@ import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/com
 import { PosRepository } from './pos.repository';
 import { FacturacionService } from '../facturacion/facturacion.service';
 import { ConfiguracionesService } from '../configuraciones/configuraciones.service';
+import { FormasPagoRepository } from '../formas-pago/formas-pago.repository';
 import { AbrirTurnoDto } from './dto/abrir-turno.dto';
 import { CerrarTurnoDto } from './dto/cerrar-turno.dto';
 import { CrearMovimientoCajaDto } from './dto/crear-movimiento-caja.dto';
@@ -18,6 +19,7 @@ export class PosService {
     private readonly posRepository: PosRepository,
     private readonly facturacionService: FacturacionService,
     private readonly configuracionesService: ConfiguracionesService,
+    private readonly formasPagoRepository: FormasPagoRepository,
   ) {}
 
   async abrirTurno(dto: AbrirTurnoDto, tenantId: string, cajeroId: string) {
@@ -60,12 +62,15 @@ export class PosService {
   async registrarVenta(dto: RegistrarVentaPosDto, tenantId: string, cajeroId: string) {
     const turno = await this.posRepository.buscarPorId(dto.turnoCajaId);
     this.validarAbierto(turno);
+    // findUniqueOrThrow tenant-scoped: si formaPagoId es de otro tenant, 404 —
+    // mismo patrón que InventarioService.validarPertenencia (ver ARCHITECTURE.md).
+    await this.formasPagoRepository.buscarPorId(dto.formaPagoId);
 
     return this.facturacionService.crear(
       { clienteId: dto.clienteId, bodegaId: turno.bodegaId, tipoFactura: 'CONTADO', lineas: dto.lineas },
       tenantId,
       cajeroId,
-      { metodoPago: dto.metodoPago, turnoCajaId: dto.turnoCajaId },
+      { formaPagoId: dto.formaPagoId, referenciaPago: dto.referenciaPago, turnoCajaId: dto.turnoCajaId },
     );
   }
 

@@ -235,7 +235,7 @@ describe('ComprasService', () => {
   });
 
   describe('registrarPago', () => {
-    const dtoPago = { monto: 100, metodoPago: 'EFECTIVO' } as never;
+    const dtoPago = { monto: 100, formaPagoId: 'fp1' } as never;
 
     it('delega en PagosService.registrarPagoOrdenCompra cuando la orden es válida', async () => {
       const orden = { id: 'oc-1', estado: 'RECIBIDA_TOTAL', pagada: false, total: 500 };

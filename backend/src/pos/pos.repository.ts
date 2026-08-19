@@ -4,7 +4,15 @@ import { EstadoTurnoCaja, TipoMovimientoCaja } from '@prisma/client';
 
 const INCLUDE_TURNO = {
   movimientos: true,
-  facturas: { select: { id: true, ncf: true, total: true, metodoPago: true, estado: true } },
+  facturas: {
+    select: {
+      id: true,
+      ncf: true,
+      total: true,
+      estado: true,
+      formaPago: { select: { nombre: true, esEfectivo: true } },
+    },
+  },
   cajero: { select: { id: true, nombre: true } },
   cerradoPor: { select: { id: true, nombre: true } },
 } as const;
@@ -65,10 +73,13 @@ export class PosRepository {
     return this.db.movimientoCaja.create({ data: params });
   }
 
-  /** Suma de ventas en efectivo (facturas EMITIDA con metodoPago EFECTIVO) más entradas de caja, menos salidas — la base de `montoEsperado` al cerrar. */
+  /** Suma de ventas en efectivo (facturas EMITIDA con formaPago.esEfectivo) más entradas de caja, menos salidas — la base de `montoEsperado` al cerrar. */
   async calcularMovimientoEfectivo(turnoId: string) {
     const [ventasEfectivo, entradas, salidas] = await Promise.all([
-      this.db.factura.aggregate({ where: { turnoCajaId: turnoId, metodoPago: 'EFECTIVO', estado: 'EMITIDA' }, _sum: { total: true } }),
+      this.db.factura.aggregate({
+        where: { turnoCajaId: turnoId, formaPago: { esEfectivo: true }, estado: 'EMITIDA' },
+        _sum: { total: true },
+      }),
       this.db.movimientoCaja.aggregate({ where: { turnoId, tipo: 'ENTRADA' }, _sum: { monto: true } }),
       this.db.movimientoCaja.aggregate({ where: { turnoId, tipo: 'SALIDA' }, _sum: { monto: true } }),
     ]);

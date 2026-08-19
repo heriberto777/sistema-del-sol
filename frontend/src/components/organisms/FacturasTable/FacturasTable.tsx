@@ -5,8 +5,8 @@ import { ModalImprimir } from '../../molecules/ModalImprimir/ModalImprimir';
 import { Badge } from '../../atoms/Badge/Badge';
 import { Button } from '../../atoms/Button/Button';
 import { Card } from '../../atoms/Card/Card';
-import { Select } from '../../atoms/Select/Select';
 import { FormField } from '../../molecules/FormField/FormField';
+import { SelectFormaPago } from '../../molecules/SelectFormaPago/SelectFormaPago';
 import { Modal } from '../../molecules/Modal/Modal';
 import { SearchInput } from '../../molecules/SearchInput/SearchInput';
 import { Paginacion } from '../../molecules/Paginacion/Paginacion';
@@ -29,7 +29,7 @@ interface Factura {
 interface Pago {
   id: string;
   monto: string;
-  metodoPago: string;
+  formaPago: { nombre: string };
   fecha: string;
 }
 
@@ -200,7 +200,7 @@ function ModalAnularFactura({ factura, onClose }: { factura: Factura; onClose: (
 function ModalRegistrarCobro({ factura, onClose }: { factura: Factura; onClose: () => void }) {
   const queryClient = useQueryClient();
   const [monto, setMonto] = useState('');
-  const [metodoPago, setMetodoPago] = useState('EFECTIVO');
+  const [formaPagoId, setFormaPagoId] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   const { data: historial } = useQuery({
@@ -212,7 +212,7 @@ function ModalRegistrarCobro({ factura, onClose }: { factura: Factura; onClose: 
   const pendiente = Number(factura.total) - totalPagado;
 
   const registrar = useMutation({
-    mutationFn: async () => apiClient.post(`/facturas/${factura.id}/pagos`, { monto: Number(monto), metodoPago }),
+    mutationFn: async () => apiClient.post(`/facturas/${factura.id}/pagos`, { monto: Number(monto), formaPagoId }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['pagos-factura', factura.id] });
       queryClient.invalidateQueries({ queryKey: ['facturas'] });
@@ -243,7 +243,7 @@ function ModalRegistrarCobro({ factura, onClose }: { factura: Factura; onClose: 
             <ul className="space-y-1 text-sm text-slate-600 dark:text-slate-400">
               {historial.pagos.map((pago) => (
                 <li key={pago.id}>
-                  RD$ {Number(pago.monto).toLocaleString('es-DO')} — {pago.metodoPago} —{' '}
+                  RD$ {Number(pago.monto).toLocaleString('es-DO')} — {pago.formaPago.nombre} —{' '}
                   {new Date(pago.fecha).toLocaleDateString('es-DO')}
                 </li>
               ))}
@@ -265,12 +265,8 @@ function ModalRegistrarCobro({ factura, onClose }: { factura: Factura; onClose: 
               required
             />
             <div className="flex flex-col gap-1">
-              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Método de pago</label>
-              <Select value={metodoPago} onChange={(e) => setMetodoPago(e.target.value)}>
-                <option value="EFECTIVO">Efectivo</option>
-                <option value="TARJETA">Tarjeta</option>
-                <option value="TRANSFERENCIA">Transferencia</option>
-              </Select>
+              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Forma de pago</label>
+              <SelectFormaPago value={formaPagoId} onChange={setFormaPagoId} />
             </div>
             {error && <p className="text-sm text-red-600">{error}</p>}
             <Button type="submit" disabled={registrar.isPending} className="w-full">

@@ -85,6 +85,14 @@ pasa ninguna de ellas.
 | POST | `/api/admin/ncf` | `admin.configuracion` — `{ tipoNcf, secuenciaInicial?, secuenciaFinal, vigenciaHasta }` |
 | PATCH | `/api/admin/ncf/:tipoNcf` | `admin.configuracion` — `{ secuenciaFinal?, vigenciaHasta?, activo? }` |
 
+## Formas de pago (por tenant — catálogo configurable, reemplaza el enum fijo)
+
+| Método | Ruta | Permiso |
+|---|---|---|
+| GET | `/api/formas-pago?activa=true` | sin permiso — cualquier usuario autenticado (POS/Cobranza/Compras necesitan leer el catálogo) |
+| POST | `/api/formas-pago` | `admin.configuracion` — `{ nombre, requiereReferencia?, esEfectivo?, activa? }` |
+| PATCH | `/api/formas-pago/:id` | `admin.configuracion` — parcial; `esEfectivo: true` desmarca automáticamente cualquier otra forma de pago del tenant |
+
 ## Facturación
 
 | Método | Ruta | Permiso |
@@ -93,7 +101,8 @@ pasa ninguna de ellas.
 | GET | `/api/facturas?pagina&tamanoPagina&busqueda` | `facturacion.ver` — `busqueda` filtra por NCF o nombre de cliente |
 | GET | `/api/facturas/:id` | `facturacion.ver` |
 | POST | `/api/facturas/:id/anular` | `facturacion.anular` — reversa el efecto de inventario (ver ARCHITECTURE.md); 400 si ya estaba anulada; si la factura es de POS y quien pide la anulación no tiene `pos.supervisar`, 403 salvo que sea el mismo cajero del turno Y siga `ABIERTO` (ver "Roles de POS" en ARCHITECTURE.md) |
-| POST | `/api/facturas/:id/registrar-pago` | `facturacion.cobrar` — `{ fechaPago? }` (default: ahora); 400 si no está EMITIDA o ya estaba pagada |
+| POST | `/api/facturas/:id/pagos` | `facturacion.cobrar` — `{ monto, formaPagoId, referencia?, fecha? }`; pagos parciales soportados, marca `pagada: true` al cubrir el total; 400 si el monto excede el saldo pendiente |
+| GET | `/api/facturas/:id/pagos` | `facturacion.ver` — `{ pagos, totalPagado }` |
 | GET | `/api/facturas/:id/imprimir?formato=CARTA\|A4\|TERMICA_80MM\|TERMICA_58MM` | `facturacion.imprimir` — sin `formato`, resuelve el default (override de bodega > default de tenant > CARTA, ver ARCHITECTURE.md); devuelve PDF o HTML según formato. Separado de `facturacion.ver` para que Vendedor pueda imprimir un recibo de POS sin ver la pantalla general de Facturación |
 
 ## Cotizaciones
@@ -155,6 +164,9 @@ pasa ninguna de ellas.
 | GET | `/api/compras?pagina&tamanoPagina&busqueda` | `compras.ver` — `busqueda` filtra por número de orden o nombre de proveedor |
 | GET | `/api/compras/:id` | `compras.ver` |
 | POST | `/api/compras/:id/recibir` | `compras.recibir` |
+| POST | `/api/compras/:id/devolver` | `compras.recibir` — devolución parcial de mercancía ya recibida |
+| POST | `/api/compras/:id/pagos` | `compras.pagar` — `{ monto, formaPagoId, referencia?, retencionIsr?, retencionItbis?, fecha? }`; pagos parciales soportados, marca `pagada: true` al cubrir el total |
+| GET | `/api/compras/:id/pagos` | `compras.ver` — `{ pagos, totalPagado }` |
 
 ## Clientes / Proveedores
 
@@ -273,7 +285,7 @@ para asientos manuales (ajustes, apertura, etc.).
 | GET | `/api/pos/turnos/:id` | `pos.ver` — incluye movimientos y facturas del turno |
 | POST | `/api/pos/turnos/:id/movimientos` | `pos.editar` — entrada/salida de efectivo que no es una venta (`{ tipo: ENTRADA\|SALIDA, monto, concepto }`) |
 | POST | `/api/pos/turnos/:id/cerrar` | `pos.editar` — `{ montoFinalContado }`, calcula `montoEsperado`/`diferencia` |
-| POST | `/api/pos/ventas` | `pos.editar` — venta CONTADO contra la bodega del turno (`{ turnoCajaId, clienteId, metodoPago, lineas }`); genera su asiento contable automático igual que cualquier factura |
+| POST | `/api/pos/ventas` | `pos.editar` — venta CONTADO contra la bodega del turno (`{ turnoCajaId, clienteId, formaPagoId, referenciaPago?, lineas }`); genera su asiento contable automático igual que cualquier factura |
 
 ## IA
 

@@ -3,12 +3,14 @@ import { PosService } from './pos.service';
 import { PosRepository } from './pos.repository';
 import { FacturacionService } from '../facturacion/facturacion.service';
 import { ConfiguracionesService } from '../configuraciones/configuraciones.service';
+import { FormasPagoRepository } from '../formas-pago/formas-pago.repository';
 
 describe('PosService', () => {
   let service: PosService;
   let posRepository: jest.Mocked<PosRepository>;
   let facturacionService: jest.Mocked<FacturacionService>;
   let configuracionesService: jest.Mocked<ConfiguracionesService>;
+  let formasPagoRepository: jest.Mocked<FormasPagoRepository>;
 
   beforeEach(() => {
     posRepository = {
@@ -23,7 +25,8 @@ describe('PosService', () => {
     } as unknown as jest.Mocked<PosRepository>;
     facturacionService = { crear: jest.fn() } as unknown as jest.Mocked<FacturacionService>;
     configuracionesService = { buscarValor: jest.fn().mockResolvedValue('50') } as unknown as jest.Mocked<ConfiguracionesService>;
-    service = new PosService(posRepository, facturacionService, configuracionesService);
+    formasPagoRepository = { buscarPorId: jest.fn().mockResolvedValue({ id: 'fp1' }) } as unknown as jest.Mocked<FormasPagoRepository>;
+    service = new PosService(posRepository, facturacionService, configuracionesService, formasPagoRepository);
   });
 
   describe('listar', () => {
@@ -83,7 +86,7 @@ describe('PosService', () => {
       facturacionService.crear.mockResolvedValue({ id: 'f1' } as never);
 
       await service.registrarVenta(
-        { turnoCajaId: 't1', clienteId: 'c1', metodoPago: 'EFECTIVO', lineas: [{ productoId: 'p1', cantidad: 1 }] },
+        { turnoCajaId: 't1', clienteId: 'c1', formaPagoId: 'fp1', lineas: [{ productoId: 'p1', cantidad: 1 }] },
         'tenant-1',
         'cajero-1',
       );
@@ -92,15 +95,28 @@ describe('PosService', () => {
         { clienteId: 'c1', bodegaId: 'b1', tipoFactura: 'CONTADO', lineas: [{ productoId: 'p1', cantidad: 1 }] },
         'tenant-1',
         'cajero-1',
-        { metodoPago: 'EFECTIVO', turnoCajaId: 't1' },
+        { formaPagoId: 'fp1', referenciaPago: undefined, turnoCajaId: 't1' },
       );
+    });
+
+    it('valida que formaPagoId pertenezca al tenant antes de vender (404 si no, vía findUniqueOrThrow tenant-scoped)', async () => {
+      posRepository.buscarPorId.mockResolvedValue({ id: 't1', estado: 'ABIERTO', bodegaId: 'b1' } as never);
+      facturacionService.crear.mockResolvedValue({ id: 'f1' } as never);
+
+      await service.registrarVenta(
+        { turnoCajaId: 't1', clienteId: 'c1', formaPagoId: 'fp1', lineas: [{ productoId: 'p1', cantidad: 1 }] },
+        'tenant-1',
+        'cajero-1',
+      );
+
+      expect(formasPagoRepository.buscarPorId).toHaveBeenCalledWith('fp1');
     });
 
     it('rechaza vender contra un turno que no está abierto', async () => {
       posRepository.buscarPorId.mockResolvedValue({ id: 't1', estado: 'CERRADO', bodegaId: 'b1' } as never);
 
       await expect(
-        service.registrarVenta({ turnoCajaId: 't1', clienteId: 'c1', metodoPago: 'EFECTIVO', lineas: [{ productoId: 'p1', cantidad: 1 }] }, 'tenant-1', 'cajero-1'),
+        service.registrarVenta({ turnoCajaId: 't1', clienteId: 'c1', formaPagoId: 'fp1', lineas: [{ productoId: 'p1', cantidad: 1 }] }, 'tenant-1', 'cajero-1'),
       ).rejects.toThrow(BadRequestException);
       expect(facturacionService.crear).not.toHaveBeenCalled();
     });

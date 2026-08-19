@@ -3,6 +3,7 @@ import { EstadoTenant } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { PERMISOS_BASE, ROLES_BASE, CONFIGURACIONES_BASE } from './roles-base';
 import { CUENTAS_BASE } from '../contabilidad/cuentas-base';
+import { FORMAS_PAGO_BASE } from './formas-pago-base';
 
 @Injectable()
 export class TenantsRepository {
@@ -82,6 +83,10 @@ export class TenantsRepository {
       // Cliente genérico para POS — ver ClientesController.consumidorFinal.
       await tx.cliente.create({
         data: { tenantId: tenant.id, nombre: 'Consumidor Final', esConsumidorFinal: true },
+      });
+
+      await tx.formaPago.createMany({
+        data: FORMAS_PAGO_BASE.map((f) => ({ tenantId: tenant.id, ...f })),
       });
 
       let adminRoleId: string | undefined;

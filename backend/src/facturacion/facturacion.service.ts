@@ -1,5 +1,5 @@
 import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
-import { FormatoImpresion, MetodoPago, Prisma, TipoFactura, TipoNcf, TipoProducto } from '@prisma/client';
+import { FormatoImpresion, Prisma, TipoFactura, TipoNcf, TipoProducto } from '@prisma/client';
 import { FacturacionRepository } from './facturacion.repository';
 import { InventarioService } from '../inventario/inventario.service';
 import { TenantPrismaService } from '../prisma/tenant-prisma.service';
@@ -83,7 +83,7 @@ export class FacturacionService {
    * justifique. Envolver las tres cosas en una sola transacción
    * (`tenantPrisma.client.$transaction`) las hace todo-o-nada.
    */
-  async crear(dto: CrearFacturaDto, tenantId: string, vendedorId: string, opciones?: { metodoPago?: MetodoPago; turnoCajaId?: string }) {
+  async crear(dto: CrearFacturaDto, tenantId: string, vendedorId: string, opciones?: { formaPagoId?: string; referenciaPago?: string; turnoCajaId?: string }) {
     const lineasCalculadas = await Promise.all(
       dto.lineas.map(async (linea) => {
         const producto = await this.facturacionRepository.obtenerProductoConPrecioVigente(linea.productoId);
@@ -169,7 +169,8 @@ export class FacturacionService {
         ncf,
         tipoNcf,
         facturaOrigenId: dto.facturaOrigenId,
-        metodoPago: opciones?.metodoPago,
+        formaPagoId: opciones?.formaPagoId,
+        referenciaPago: opciones?.referenciaPago,
         turnoCajaId: opciones?.turnoCajaId,
         subtotal,
         descuento: descuentoTotal,

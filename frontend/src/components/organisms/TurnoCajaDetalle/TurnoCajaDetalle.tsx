@@ -9,11 +9,11 @@ import { CatalogoProductosPos, type ProductoCatalogo } from '../CatalogoProducto
 import { ComboboxBusqueda } from '../../molecules/ComboboxBusqueda/ComboboxBusqueda';
 import { FormField } from '../../molecules/FormField/FormField';
 import { Modal } from '../../molecules/Modal/Modal';
+import { SelectFormaPago } from '../../molecules/SelectFormaPago/SelectFormaPago';
 import { useAuth } from '../../../hooks/useAuth';
 import { PaginaResultado } from '../../../types/pagina-resultado';
 
 type EstadoTurno = 'ABIERTO' | 'CERRADO';
-type MetodoPago = 'EFECTIVO' | 'TARJETA' | 'TRANSFERENCIA';
 
 interface Cliente {
   id: string;
@@ -40,7 +40,7 @@ interface FacturaTurno {
   id: string;
   ncf: string | null;
   total: string;
-  metodoPago: MetodoPago | null;
+  formaPago: { nombre: string; esEfectivo: boolean } | null;
   estado: string;
 }
 
@@ -71,7 +71,7 @@ function formatoRD(valor: string | number) {
 /** Réplica del cálculo de pos.service.ts:88 — solo para mostrar el esperado ANTES de cerrar; el backend sigue siendo la fuente de verdad final. */
 function calcularMontoEsperado(data: TurnoCajaDetalleData): number {
   const ventasEfectivo = data.facturas
-    .filter((f) => f.metodoPago === 'EFECTIVO' && f.estado === 'EMITIDA')
+    .filter((f) => f.formaPago?.esEfectivo && f.estado === 'EMITIDA')
     .reduce((acc, f) => acc + Number(f.total), 0);
   const entradas = data.movimientos.filter((m) => m.tipo === 'ENTRADA').reduce((acc, m) => acc + Number(m.monto), 0);
   const salidas = data.movimientos.filter((m) => m.tipo === 'SALIDA').reduce((acc, m) => acc + Number(m.monto), 0);
@@ -83,7 +83,7 @@ export function TurnoCajaDetalle({ turnoId, onCerrado }: { turnoId: string; onCe
   const { tienePermiso } = useAuth();
   const [carrito, setCarrito] = useState<LineaCarrito[]>([]);
   const [cliente, setCliente] = useState<Cliente | null>(null);
-  const [metodoPago, setMetodoPago] = useState<MetodoPago>('EFECTIVO');
+  const [formaPagoId, setFormaPagoId] = useState('');
   const [modalMovimiento, setModalMovimiento] = useState(false);
   const [modalCerrarTurno, setModalCerrarTurno] = useState(false);
   const [ventaConfirmada, setVentaConfirmada] = useState<{ id: string; total: string } | null>(null);
@@ -115,7 +115,7 @@ export function TurnoCajaDetalle({ turnoId, onCerrado }: { turnoId: string; onCe
       apiClient.post('/pos/ventas', {
         turnoCajaId: turnoId,
         clienteId: cliente?.id,
-        metodoPago,
+        formaPagoId,
         lineas: carrito.map((l) => ({ productoId: l.productoId, cantidad: l.cantidad })),
       }),
     onSuccess: (respuesta) => {
@@ -169,6 +169,10 @@ export function TurnoCajaDetalle({ turnoId, onCerrado }: { turnoId: string; onCe
     }
     if (!cliente) {
       setError('Seleccioná un cliente (o dejá el Consumidor Final por defecto).');
+      return;
+    }
+    if (!formaPagoId) {
+      setError('Seleccioná una forma de pago.');
       return;
     }
     registrarVenta.mutate();
@@ -261,15 +265,9 @@ export function TurnoCajaDetalle({ turnoId, onCerrado }: { turnoId: string; onCe
                 )}
 
                 <div className="flex items-center gap-2 border-t border-slate-100 p-3 dark:border-slate-800">
-                  <select
-                    value={metodoPago}
-                    onChange={(e) => setMetodoPago(e.target.value as MetodoPago)}
-                    className="rounded-lg border border-slate-300 px-2 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-                  >
-                    <option value="EFECTIVO">Efectivo</option>
-                    <option value="TARJETA">Tarjeta</option>
-                    <option value="TRANSFERENCIA">Transferencia</option>
-                  </select>
+                  <div className="flex-1">
+                    <SelectFormaPago value={formaPagoId} onChange={setFormaPagoId} />
+                  </div>
                   <Button onClick={onCobrar} disabled={registrarVenta.isPending || carrito.length === 0} className="flex-1">
                     {registrarVenta.isPending ? 'Cobrando…' : `Cobrar ${carrito.length > 0 ? formatoRD(total) : ''}`}
                   </Button>
@@ -308,7 +306,7 @@ export function TurnoCajaDetalle({ turnoId, onCerrado }: { turnoId: string; onCe
           {data.facturas.map((f) => (
             <li key={f.id} className="flex items-center justify-between gap-2">
               <span>
-                {formatoRD(f.total)} — {f.metodoPago ?? '—'} <Badge tono={f.estado === 'EMITIDA' ? 'exito' : 'neutro'}>{f.estado}</Badge>
+                {formatoRD(f.total)} — {f.formaPago?.nombre ?? '—'} <Badge tono={f.estado === 'EMITIDA' ? 'exito' : 'neutro'}>{f.estado}</Badge>
               </span>
               <span className="flex items-center gap-3">
                 <button type="button" className="text-xs text-sol-600 hover:underline dark:text-sol-400" onClick={() => setFacturaImprimiendo(f.id)}>

@@ -7,6 +7,7 @@ import { Button } from '../components/atoms/Button/Button';
 import { Card } from '../components/atoms/Card/Card';
 import { Select } from '../components/atoms/Select/Select';
 import { FormField } from '../components/molecules/FormField/FormField';
+import { SelectFormaPago } from '../components/molecules/SelectFormaPago/SelectFormaPago';
 import { Modal } from '../components/molecules/Modal/Modal';
 import { SearchInput } from '../components/molecules/SearchInput/SearchInput';
 import { Paginacion } from '../components/molecules/Paginacion/Paginacion';
@@ -29,7 +30,7 @@ interface OrdenCompra {
 interface Pago {
   id: string;
   monto: string;
-  metodoPago: string;
+  formaPago: { nombre: string };
   fecha: string;
 }
 
@@ -704,7 +705,7 @@ function ModalDevolverOrden({ orden, onClose }: { orden: OrdenCompra; onClose: (
 function ModalRegistrarPago({ orden, onClose }: { orden: OrdenCompra; onClose: () => void }) {
   const queryClient = useQueryClient();
   const [monto, setMonto] = useState('');
-  const [metodoPago, setMetodoPago] = useState('TRANSFERENCIA');
+  const [formaPagoId, setFormaPagoId] = useState('');
   const [aplicaRetencion, setAplicaRetencion] = useState(false);
   const [retencionIsr, setRetencionIsr] = useState('');
   const [retencionItbis, setRetencionItbis] = useState('');
@@ -723,7 +724,7 @@ function ModalRegistrarPago({ orden, onClose }: { orden: OrdenCompra; onClose: (
     mutationFn: async () =>
       apiClient.post(`/compras/${orden.id}/pagos`, {
         monto: Number(monto),
-        metodoPago,
+        formaPagoId,
         ...(aplicaRetencion && Number(retencionIsr) > 0 ? { retencionIsr: Number(retencionIsr) } : {}),
         ...(aplicaRetencion && Number(retencionItbis) > 0 ? { retencionItbis: Number(retencionItbis) } : {}),
       }),
@@ -760,7 +761,7 @@ function ModalRegistrarPago({ orden, onClose }: { orden: OrdenCompra; onClose: (
             <ul className="space-y-1 text-sm text-slate-600 dark:text-slate-400">
               {historial.pagos.map((pago) => (
                 <li key={pago.id}>
-                  RD$ {Number(pago.monto).toLocaleString('es-DO')} — {pago.metodoPago} —{' '}
+                  RD$ {Number(pago.monto).toLocaleString('es-DO')} — {pago.formaPago.nombre} —{' '}
                   {new Date(pago.fecha).toLocaleDateString('es-DO')}
                 </li>
               ))}
@@ -782,12 +783,8 @@ function ModalRegistrarPago({ orden, onClose }: { orden: OrdenCompra; onClose: (
               required
             />
             <div className="flex flex-col gap-1">
-              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Método de pago</label>
-              <Select value={metodoPago} onChange={(e) => setMetodoPago(e.target.value)}>
-                <option value="TRANSFERENCIA">Transferencia</option>
-                <option value="EFECTIVO">Efectivo</option>
-                <option value="TARJETA">Tarjeta</option>
-              </Select>
+              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Forma de pago</label>
+              <SelectFormaPago value={formaPagoId} onChange={setFormaPagoId} />
             </div>
 
             <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">

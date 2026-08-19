@@ -961,22 +961,23 @@ para operar (ver "Fuera de alcance" abajo).
   automático** (ver la sección de Contabilidad) sin ningún código
   adicional — es el mismo beneficio que ya tenían Cotizaciones/
   Remisiones al convertir.
-- **`Factura.metodoPago`/`Factura.turnoCajaId`** son nullable y
+- **`Factura.formaPagoId`/`Factura.turnoCajaId`** son nullable y
   **solo los llena una venta de POS** — el resto de la facturación
   (venta normal desde el módulo de Facturación, conversión de
   cotización/remisión) los deja `null`. `FacturacionService.crear()`
-  acepta un tercer parámetro opcional (`{ metodoPago, turnoCajaId }`)
-  para esto, sin tocar `CrearFacturaDto` (que sigue validando solo lo
-  que la ruta HTTP de Facturación necesita).
+  acepta un tercer parámetro opcional (`{ formaPagoId, referenciaPago,
+  turnoCajaId }`) para esto, sin tocar `CrearFacturaDto` (que sigue
+  validando solo lo que la ruta HTTP de Facturación necesita).
 - **`POST /pos/turnos/:id/movimientos`**: entradas/salidas de efectivo
   que NO son una venta (retiro para gasto menor, ingreso de vuelto
   adicional). Las ventas ya se contabilizan solas vía
   `Factura.turnoCajaId` — no generan una fila en `MovimientoCaja`.
 - **`POST /pos/turnos/:id/cerrar`**: `montoEsperado = montoInicial +
-  Σ(ventas con metodoPago EFECTIVO de este turno) + Σ(entradas) -
+  Σ(ventas cuya `FormaPago.esEfectivo` de este turno) + Σ(entradas) -
   Σ(salidas)`; `diferencia = montoFinalContado - montoEsperado`. Ventas
-  con tarjeta/transferencia no se cuentan en el efectivo esperado (ese
-  dinero nunca pasó por la caja física).
+  con una forma de pago que no es efectivo (tarjeta/transferencia/etc.)
+  no se cuentan en el efectivo esperado (ese dinero nunca pasó por la
+  caja física).
 - **Arqueo: quién abre, quién cierra, y la tolerancia.** `TurnoCaja`
   guarda `cajeroId` (quien lo abrió) y `cerradoPorId` (quien lo cerró) —
   dos relaciones distintas a `User` (`cerradoPor` usa el nombre de
@@ -998,11 +999,46 @@ para operar (ver "Fuera de alcance" abajo).
 
 **Fuera de alcance deliberadamente**: modo offline/sincronización
 diferida (de ahí el nombre de esta sección — es la razón de ser del
-"sin offline en v1"), pagos con tarjeta procesados de verdad
-(`metodoPago: TARJETA` solo registra la intención, no integra una
-pasarela), y pagos divididos (una venta usa un solo `metodoPago`, no
+"sin offline en v1"), pagos con tarjeta procesados de verdad (elegir la
+forma de pago "Tarjeta" solo registra la intención, no integra una
+pasarela), y pagos divididos (una venta usa una sola `FormaPago`, no
 un mix efectivo+tarjeta en la misma factura). La impresión de tickets sí
 está cubierta — ver la sección siguiente.
+
+### Formas de pago (catálogo configurable, reemplaza el enum fijo)
+
+`backend/src/formas-pago/` — antes `Factura.metodoPago`/`Pago.metodoPago`
+eran un enum fijo (`EFECTIVO`/`TARJETA`/`TRANSFERENCIA`); ahora son
+`FormaPago`, un catálogo **tenant-scoped** (`formas_pago`, sembrado con 6
+valores por defecto en `TenantsRepository.crearConProvisioning` —
+`FORMAS_PAGO_BASE`) que el admin edita desde `/admin` → Facturación →
+"Formas de pago" (`FormasPagoPanel.tsx`). `MetodoPago` (el enum) se
+mantiene en el schema **solo para `PagoPlataforma`** (facturación de la
+plataforma a sus tenants, concepto no relacionado) — ver la sección de
+Suscripción/facturación de plataforma en el `CLAUDE.md` raíz.
+
+- **`esEfectivo`** marca cuál `FormaPago` cuenta como efectivo físico
+  para el arqueo de POS — a lo sumo una por tenant. La exclusividad se
+  aplica en el service (`FormasPagoService.crear()/actualizar()` llaman
+  `FormasPagoRepository.desmarcarEfectivoDeOtras()` antes de escribir
+  cuando `esEfectivo: true`), no con una constraint de DB.
+- **`requiereReferencia`** es solo informativo para el frontend (mostrar
+  un campo de referencia); el backend no lo valida al recibir
+  `referencia`/`referenciaPago`.
+- **`GET /formas-pago`** no tiene `@Permissions` a propósito — cualquier
+  usuario autenticado que registre un cobro/venta (POS, Cobranza,
+  Compras) necesita leer el catálogo, no solo quien lo administra.
+  `POST`/`PATCH /formas-pago/:id` sí exigen `admin.configuracion`.
+- **`formaPagoId` es una FK cliente-suministrada** — `PosService.
+  registrarVenta()` y `PagosService.registrarPagoFactura()/
+  registrarPagoOrdenCompra()` la validan con `FormasPagoRepository.
+  buscarPorId()` (tenant-scoped, 404 si no pertenece al tenant) antes de
+  usarla en cualquier `create`, siguiendo el mismo patrón de
+  prevención de IDOR ya documentado para tablas hijas.
+- **Migración de datos**: `20260819040000_formas_pago` sembró el
+  catálogo para tenants ya existentes y migró cada `Factura`/`Pago` con
+  `metodoPago` no nulo a la `FormaPago` equivalente por nombre, antes de
+  dropear la columna del enum.
 
 ### UX del cajero: carrito, cliente por defecto, y anulación en el mismo flujo
 

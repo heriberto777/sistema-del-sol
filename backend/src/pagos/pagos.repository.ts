@@ -1,5 +1,4 @@
 import { Injectable } from '@nestjs/common';
-import { MetodoPago } from '@prisma/client';
 import { TenantPrismaService } from '../prisma/tenant-prisma.service';
 
 @Injectable()
@@ -17,19 +16,28 @@ export class PagosRepository {
     monto: number;
     retencionIsr?: number;
     retencionItbis?: number;
-    metodoPago: MetodoPago;
+    formaPagoId: string;
+    referencia?: string;
     fecha: Date;
     userId: string;
   }) {
-    return this.db.pago.create({ data: params });
+    return this.db.pago.create({ data: params, include: { formaPago: { select: { nombre: true } } } });
   }
 
   listarPorFactura(facturaId: string) {
-    return this.db.pago.findMany({ where: { facturaId }, orderBy: { fecha: 'desc' } });
+    return this.db.pago.findMany({
+      where: { facturaId },
+      orderBy: { fecha: 'desc' },
+      include: { formaPago: { select: { nombre: true } } },
+    });
   }
 
   listarPorOrdenCompra(ordenCompraId: string) {
-    return this.db.pago.findMany({ where: { ordenCompraId }, orderBy: { fecha: 'desc' } });
+    return this.db.pago.findMany({
+      where: { ordenCompraId },
+      orderBy: { fecha: 'desc' },
+      include: { formaPago: { select: { nombre: true } } },
+    });
   }
 
   async sumaPagosFactura(facturaId: string): Promise<number> {

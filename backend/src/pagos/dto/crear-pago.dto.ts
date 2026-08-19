@@ -1,6 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { MetodoPago } from '@prisma/client';
-import { IsDateString, IsEnum, IsNumber, IsOptional, IsPositive } from 'class-validator';
+import { IsDateString, IsNumber, IsOptional, IsPositive, IsString, IsUUID } from 'class-validator';
 
 export class CrearPagoDto {
   @ApiProperty()
@@ -8,9 +7,14 @@ export class CrearPagoDto {
   @IsPositive()
   monto: number;
 
-  @ApiProperty({ enum: MetodoPago })
-  @IsEnum(MetodoPago)
-  metodoPago: MetodoPago;
+  @ApiProperty()
+  @IsUUID()
+  formaPagoId: string;
+
+  @ApiProperty({ required: false, description: 'Nro. de cheque, confirmación de transferencia, etc. — solo si la forma de pago lo requiere' })
+  @IsOptional()
+  @IsString()
+  referencia?: string;
 
   @ApiProperty({ required: false, description: 'Si se omite, se usa la fecha/hora actual' })
   @IsOptional()

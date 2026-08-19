@@ -39,4 +39,5 @@ export const TENANT_SCOPED_MODELS = new Set([
   'DevolucionCompra',
   'CuentaBancaria',
   'GastoMenor',
+  'FormaPago',
 ]);

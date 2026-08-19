@@ -46,7 +46,8 @@ PostgreSQL 16 + Prisma. Schema completo en `backend/prisma/schema.prisma`.
 | Contabilidad | `cuentas_contables`, `asientos_contables`, `lineas_asiento` |
 | Bancos / Gastos menores | `cuentas_bancarias`, `gastos_menores`, `lineas_gasto_menor` |
 | Nómina | `empleados`, `periodos_nomina`, `recibos_nomina` |
-| POS | `turnos_caja`, `movimientos_caja` (+ `facturas.metodoPago`/`facturas.turnoCajaId`) |
+| POS | `turnos_caja`, `movimientos_caja` (+ `facturas.formaPagoId`/`facturas.turnoCajaId`) |
+| Formas de pago | `formas_pago` (tenant-scoped, reemplaza el enum fijo `MetodoPago` para `facturas`/`pagos` — ese enum sigue existiendo solo para `PagoPlataforma`) |
 | Plataforma | `platform_admins`, `platform_audit_logs` |
 | RBAC de plataforma | `platform_permissions`, `platform_roles`, `platform_role_permissions` (catálogo global, sin `tenantId` — `platform_admins.roleId` es nullable) |
 | Suscripción/facturación de plataforma | `suscripciones`, `facturas_plataforma`, `pagos_plataforma` (tienen `tenantId` pero fuera de `TENANT_SCOPED_MODELS`/RLS — solo se acceden vía `PrismaService` raw desde controllers de plataforma, igual criterio que `Modulo`/`Plan`) |

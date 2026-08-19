@@ -9,6 +9,7 @@ import { HttpExceptionFilter } from '../src/common/filters/http-exception.filter
 import { EmailChannel } from '../src/notificaciones/canales/email.channel';
 import { CUENTAS_BASE } from '../src/contabilidad/cuentas-base';
 import { MODULOS_BASE } from '../src/tenants/modulos-base';
+import { FORMAS_PAGO_BASE } from '../src/tenants/formas-pago-base';
 
 function extraerTokenDeReset(cuerpoHtml: string): string {
   const href = cuerpoHtml.match(/href="([^"]+)"/)?.[1];
@@ -35,6 +36,9 @@ describe('App (e2e)', () => {
   let clienteAId: string;
   let productoAId: string;
   let bodegaAId: string;
+  let formaPagoEfectivoAId: string;
+  let formaPagoTarjetaAId: string;
+  let formaPagoTransferenciaAId: string;
 
   async function crearPermisos(claves: string[]) {
     for (const clave of claves) {
@@ -178,6 +182,12 @@ describe('App (e2e)', () => {
       email: 'admin@e2e-a.com',
     });
     tenantAId = tenantA.id;
+    await prisma.formaPago.createMany({
+      data: FORMAS_PAGO_BASE.map((f) => ({ tenantId: tenantAId, ...f })),
+    });
+    formaPagoEfectivoAId = (await prisma.formaPago.findFirstOrThrow({ where: { tenantId: tenantAId, nombre: 'Efectivo' } })).id;
+    formaPagoTarjetaAId = (await prisma.formaPago.findFirstOrThrow({ where: { tenantId: tenantAId, nombre: 'Tarjeta' } })).id;
+    formaPagoTransferenciaAId = (await prisma.formaPago.findFirstOrThrow({ where: { tenantId: tenantAId, nombre: 'Transferencia' } })).id;
     await prisma.cuentaContable.createMany({
       data: CUENTAS_BASE.map((c) => ({ tenantId: tenantAId, codigo: c.codigo, nombre: c.nombre, tipo: c.tipo, naturaleza: c.naturaleza })),
     });
@@ -1140,7 +1150,7 @@ describe('App (e2e)', () => {
       await request(app.getHttpServer())
         .post(`/api/facturas/${factura.body.id}/pagos`)
         .set('Authorization', `Bearer ${token}`)
-        .send({ monto: 118, metodoPago: 'EFECTIVO' })
+        .send({ monto: 118, formaPagoId: formaPagoEfectivoAId })
         .expect(201);
 
       const actualizada = await prisma.factura.findUniqueOrThrow({ where: { id: factura.body.id } });
@@ -1150,7 +1160,7 @@ describe('App (e2e)', () => {
       await request(app.getHttpServer())
         .post(`/api/facturas/${factura.body.id}/pagos`)
         .set('Authorization', `Bearer ${token}`)
-        .send({ monto: 1, metodoPago: 'EFECTIVO' })
+        .send({ monto: 1, formaPagoId: formaPagoEfectivoAId })
         .expect(400);
     });
   });
@@ -2235,11 +2245,11 @@ describe('App (e2e)', () => {
       const respuesta = await request(app.getHttpServer())
         .post('/api/pos/ventas')
         .set('Authorization', `Bearer ${token}`)
-        .send({ turnoCajaId: turnoId, clienteId: clienteAId, metodoPago: 'EFECTIVO', lineas: [{ productoId, cantidad: 2 }] })
+        .send({ turnoCajaId: turnoId, clienteId: clienteAId, formaPagoId: formaPagoEfectivoAId, lineas: [{ productoId, cantidad: 2 }] })
         .expect(201);
 
       expect(respuesta.body.tipoFactura).toBe('CONTADO');
-      expect(respuesta.body.metodoPago).toBe('EFECTIVO');
+      expect(respuesta.body.formaPagoId).toBe(formaPagoEfectivoAId);
       expect(respuesta.body.total).toBe('236'); // 2*100 + 18%
     });
 
@@ -2426,7 +2436,7 @@ describe('App (e2e)', () => {
         .send({
           turnoCajaId: turno.body.id,
           clienteId: clienteAId,
-          metodoPago: 'EFECTIVO',
+          formaPagoId: formaPagoEfectivoAId,
           lineas: [{ productoId: productoAId, cantidad: 1 }],
         })
         .expect(201);
@@ -2465,7 +2475,7 @@ describe('App (e2e)', () => {
         .send({
           turnoCajaId: turno.body.id,
           clienteId: clienteAId,
-          metodoPago: 'TARJETA',
+          formaPagoId: formaPagoTarjetaAId,
           lineas: [{ productoId: productoAId, cantidad: 1 }],
         })
         .expect(201);
@@ -2761,7 +2771,7 @@ describe('App (e2e)', () => {
       await request(app.getHttpServer())
         .post(`/api/facturas/${factura.body.id}/pagos`)
         .set('Authorization', `Bearer ${token}`)
-        .send({ monto: 50, metodoPago: 'EFECTIVO' })
+        .send({ monto: 50, formaPagoId: formaPagoEfectivoAId })
         .expect(201);
 
       const trasPrimerPago = await request(app.getHttpServer())
@@ -2774,13 +2784,13 @@ describe('App (e2e)', () => {
       await request(app.getHttpServer())
         .post(`/api/facturas/${factura.body.id}/pagos`)
         .set('Authorization', `Bearer ${token}`)
-        .send({ monto: 100, metodoPago: 'EFECTIVO' })
+        .send({ monto: 100, formaPagoId: formaPagoEfectivoAId })
         .expect(400);
 
       await request(app.getHttpServer())
         .post(`/api/facturas/${factura.body.id}/pagos`)
         .set('Authorization', `Bearer ${token}`)
-        .send({ monto: 68, metodoPago: 'TRANSFERENCIA' })
+        .send({ monto: 68, formaPagoId: formaPagoTransferenciaAId })
         .expect(201);
 
       const final = await request(app.getHttpServer())
@@ -2810,20 +2820,20 @@ describe('App (e2e)', () => {
       await request(app.getHttpServer())
         .post(`/api/compras/${orden.body.id}/pagos`)
         .set('Authorization', `Bearer ${token}`)
-        .send({ monto: 150, metodoPago: 'TRANSFERENCIA' })
+        .send({ monto: 150, formaPagoId: formaPagoTransferenciaAId })
         .expect(201);
 
       // pendiente = 50; pedir 100 debe rechazarse
       await request(app.getHttpServer())
         .post(`/api/compras/${orden.body.id}/pagos`)
         .set('Authorization', `Bearer ${token}`)
-        .send({ monto: 100, metodoPago: 'TRANSFERENCIA' })
+        .send({ monto: 100, formaPagoId: formaPagoTransferenciaAId })
         .expect(400);
 
       await request(app.getHttpServer())
         .post(`/api/compras/${orden.body.id}/pagos`)
         .set('Authorization', `Bearer ${token}`)
-        .send({ monto: 50, metodoPago: 'EFECTIVO' })
+        .send({ monto: 50, formaPagoId: formaPagoEfectivoAId })
         .expect(201);
 
       const ordenFinal = await request(app.getHttpServer())
@@ -2853,7 +2863,7 @@ describe('App (e2e)', () => {
       const pago = await request(app.getHttpServer())
         .post(`/api/compras/${orden.body.id}/pagos`)
         .set('Authorization', `Bearer ${token}`)
-        .send({ monto: 1000, metodoPago: 'TRANSFERENCIA', retencionIsr: 150, retencionItbis: 300 })
+        .send({ monto: 1000, formaPagoId: formaPagoTransferenciaAId, retencionIsr: 150, retencionItbis: 300 })
         .expect(201);
 
       // Retención que excede el monto del pago debe rechazarse.
@@ -2865,7 +2875,7 @@ describe('App (e2e)', () => {
       await request(app.getHttpServer())
         .post(`/api/compras/${otraOrden.body.id}/pagos`)
         .set('Authorization', `Bearer ${token}`)
-        .send({ monto: 100, metodoPago: 'EFECTIVO', retencionIsr: 80, retencionItbis: 50 })
+        .send({ monto: 100, formaPagoId: formaPagoEfectivoAId, retencionIsr: 80, retencionItbis: 50 })
         .expect(400);
 
       await esperarListener();
