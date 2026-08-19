@@ -15,11 +15,11 @@ interface ModalProps {
 export function Modal({ titulo, onClose, children }: ModalProps) {
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-[1px]"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-lg rounded-lg bg-white p-6 shadow-xl dark:bg-slate-900"
+        className="w-full max-w-lg rounded-xl border border-slate-200 bg-white p-6 shadow-xl dark:border-slate-800 dark:bg-slate-900"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex items-center justify-between">

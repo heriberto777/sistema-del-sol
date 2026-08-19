@@ -14,6 +14,8 @@ const TONOS: Record<NonNullable<BadgeProps['tono']>, string> = {
 
 export function Badge({ children, tono = 'neutro' }: BadgeProps) {
   return (
-    <span className={clsx('rounded-full px-2.5 py-0.5 text-xs font-medium', TONOS[tono])}>{children}</span>
+    <span className={clsx('inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium', TONOS[tono])}>
+      {children}
+    </span>
   );
 }

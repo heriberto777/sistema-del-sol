@@ -1,11 +1,32 @@
 import { useEffect, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import clsx from 'clsx';
+import {
+  BarChart3,
+  Bell,
+  BookOpen,
+  Boxes,
+  Contact,
+  FileText,
+  LayoutDashboard,
+  Landmark,
+  type LucideIcon,
+  Receipt,
+  Settings,
+  ShoppingBag,
+  Sparkles,
+  Store,
+  Tag,
+  Truck,
+  Users,
+  Wallet,
+} from 'lucide-react';
 import { useAuth } from '../../../hooks/useAuth';
 
 interface Enlace {
   ruta: string;
   etiqueta: string;
+  icono: LucideIcon;
   permisos?: string[];
   /** Clave de `MODULOS_BASE` — si está presente, además exige que el tenant lo tenga activo (plan + excepciones). */
   modulo?: string;
@@ -19,58 +40,58 @@ interface Grupo {
 
 // `permisos: undefined` = visible para cualquier usuario autenticado.
 // `permisos: string[]` = se muestra si el usuario tiene AL MENOS UNO.
-const SUELTOS_ARRIBA: Enlace[] = [{ ruta: '/', etiqueta: 'Dashboard', permisos: ['reportes.ver'] }];
+const SUELTOS_ARRIBA: Enlace[] = [{ ruta: '/', etiqueta: 'Dashboard', icono: LayoutDashboard, permisos: ['reportes.ver'] }];
 
 const GRUPOS: Grupo[] = [
   {
     id: 'ventas',
     etiqueta: 'Ventas',
     items: [
-      { ruta: '/facturacion', etiqueta: 'Facturación', permisos: ['facturacion.ver'], modulo: 'facturacion' },
-      { ruta: '/cotizaciones', etiqueta: 'Cotizaciones', permisos: ['cotizaciones.ver'], modulo: 'cotizaciones' },
-      { ruta: '/remisiones', etiqueta: 'Remisiones', permisos: ['remisiones.ver'], modulo: 'remisiones' },
-      { ruta: '/pos', etiqueta: 'Punto de venta', permisos: ['pos.ver'], modulo: 'pos' },
+      { ruta: '/facturacion', etiqueta: 'Facturación', icono: Receipt, permisos: ['facturacion.ver'], modulo: 'facturacion' },
+      { ruta: '/cotizaciones', etiqueta: 'Cotizaciones', icono: FileText, permisos: ['cotizaciones.ver'], modulo: 'cotizaciones' },
+      { ruta: '/remisiones', etiqueta: 'Remisiones', icono: Truck, permisos: ['remisiones.ver'], modulo: 'remisiones' },
+      { ruta: '/pos', etiqueta: 'Punto de venta', icono: Store, permisos: ['pos.ver'], modulo: 'pos' },
       // Sirve tanto a Ventas (clientes) como a Compras (proveedores) —
       // se prioriza acá por ser el uso más frecuente.
-      { ruta: '/contactos', etiqueta: 'Contactos', permisos: ['clientes.ver', 'compras.ver'] },
+      { ruta: '/contactos', etiqueta: 'Contactos', icono: Contact, permisos: ['clientes.ver', 'compras.ver'] },
     ],
   },
   {
     id: 'inventario-compras',
     etiqueta: 'Inventario y Compras',
     items: [
-      { ruta: '/inventario', etiqueta: 'Inventario', permisos: ['inventario.ver'], modulo: 'inventario' },
-      { ruta: '/compras', etiqueta: 'Compras', permisos: ['compras.ver'], modulo: 'compras' },
-      { ruta: '/productos', etiqueta: 'Productos', permisos: ['precios.ver'], modulo: 'productos' },
+      { ruta: '/inventario', etiqueta: 'Inventario', icono: Boxes, permisos: ['inventario.ver'], modulo: 'inventario' },
+      { ruta: '/compras', etiqueta: 'Compras', icono: ShoppingBag, permisos: ['compras.ver'], modulo: 'compras' },
+      { ruta: '/productos', etiqueta: 'Productos', icono: Tag, permisos: ['precios.ver'], modulo: 'productos' },
     ],
   },
   {
     id: 'finanzas',
     etiqueta: 'Finanzas',
     items: [
-      { ruta: '/contabilidad', etiqueta: 'Contabilidad', permisos: ['contabilidad.ver'] },
-      { ruta: '/bancos', etiqueta: 'Bancos', permisos: ['bancos.ver'], modulo: 'bancos' },
+      { ruta: '/contabilidad', etiqueta: 'Contabilidad', icono: BookOpen, permisos: ['contabilidad.ver'] },
+      { ruta: '/bancos', etiqueta: 'Bancos', icono: Landmark, permisos: ['bancos.ver'], modulo: 'bancos' },
       // Aunque el nombre sugiere "compras", lo que hace en el código es
       // 100% financiero: exige NCF fiscal, descuenta de una cuenta
       // bancaria puntual, valida que el período contable esté abierto, y
       // genera un asiento contable automático — no toca inventario ni
       // proveedores en ningún momento.
-      { ruta: '/gastos-menores', etiqueta: 'Gastos menores', permisos: ['gastosmenores.ver'], modulo: 'gastosmenores' },
-      { ruta: '/reportes', etiqueta: 'Reportes', permisos: ['reportes.ver'] },
+      { ruta: '/gastos-menores', etiqueta: 'Gastos menores', icono: Wallet, permisos: ['gastosmenores.ver'], modulo: 'gastosmenores' },
+      { ruta: '/reportes', etiqueta: 'Reportes', icono: BarChart3, permisos: ['reportes.ver'] },
     ],
   },
   {
     id: 'gestion-humana',
     etiqueta: 'Gestión Humana',
-    items: [{ ruta: '/nomina', etiqueta: 'Nómina', permisos: ['nomina.ver'], modulo: 'nomina' }],
+    items: [{ ruta: '/nomina', etiqueta: 'Nómina', icono: Users, permisos: ['nomina.ver'], modulo: 'nomina' }],
   },
   {
     id: 'sistema',
     etiqueta: 'Sistema',
     items: [
-      { ruta: '/ia', etiqueta: 'IA', permisos: ['ia.usar'], modulo: 'ia' },
-      { ruta: '/notificaciones', etiqueta: 'Notificaciones', permisos: ['notificaciones.ver'] },
-      { ruta: '/admin', etiqueta: 'Admin', permisos: ['admin.usuarios', 'admin.configuracion'] },
+      { ruta: '/ia', etiqueta: 'IA', icono: Sparkles, permisos: ['ia.usar'], modulo: 'ia' },
+      { ruta: '/notificaciones', etiqueta: 'Notificaciones', icono: Bell, permisos: ['notificaciones.ver'] },
+      { ruta: '/admin', etiqueta: 'Admin', icono: Settings, permisos: ['admin.usuarios', 'admin.configuracion'] },
     ],
   },
 ];
@@ -115,7 +136,7 @@ export function Sidebar() {
 
   const enlaceClase = ({ isActive }: { isActive: boolean }) =>
     clsx(
-      'block rounded-md px-3 py-2 text-sm font-medium',
+      'flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
       isActive
         ? 'bg-sol-50 text-sol-700 dark:bg-sol-900/40 dark:text-sol-300'
         : 'text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-900',
@@ -127,14 +148,20 @@ export function Sidebar() {
   })).filter((g) => g.items.length > 0);
 
   return (
-    <nav className="flex h-full w-56 flex-col gap-1 overflow-y-auto border-r border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950">
-      <div className="mb-4 px-2">
-        <p className="text-lg font-semibold text-sol-600 dark:text-sol-400">El Sistema del Sol</p>
-        {usuario?.tenant?.nombre && <p className="truncate text-xs text-slate-500 dark:text-slate-400">{usuario.tenant.nombre}</p>}
+    <nav className="flex h-full w-60 flex-col gap-1 overflow-y-auto border-r border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950">
+      <div className="mb-5 flex items-center gap-2.5 px-2">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-sol-500 text-base font-bold text-white shadow-sm">
+          S
+        </div>
+        <div className="min-w-0">
+          <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">El Sistema del Sol</p>
+          {usuario?.tenant?.nombre && <p className="truncate text-xs text-slate-500 dark:text-slate-400">{usuario.tenant.nombre}</p>}
+        </div>
       </div>
 
       {SUELTOS_ARRIBA.filter((enlace) => esVisible(enlace, tienePermiso, tieneModulo)).map((enlace) => (
         <NavLink key={enlace.ruta} to={enlace.ruta} end={enlace.ruta === '/'} className={enlaceClase}>
+          <enlace.icono size={17} className="shrink-0" />
           {enlace.etiqueta}
         </NavLink>
       ))}
@@ -142,7 +169,7 @@ export function Sidebar() {
       {gruposVisibles.map((grupo) => {
         const abierto = gruposAbiertos.has(grupo.id);
         return (
-          <div key={grupo.id}>
+          <div key={grupo.id} className="mt-1">
             <button
               type="button"
               onClick={() => alternarGrupo(grupo.id)}
@@ -152,9 +179,10 @@ export function Sidebar() {
               {grupo.etiqueta}
             </button>
             {abierto && (
-              <div className="ml-2 flex flex-col gap-1">
+              <div className="flex flex-col gap-0.5">
                 {grupo.items.map((enlace) => (
                   <NavLink key={enlace.ruta} to={enlace.ruta} className={enlaceClase}>
+                    <enlace.icono size={17} className="shrink-0" />
                     {enlace.etiqueta}
                   </NavLink>
                 ))}

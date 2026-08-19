@@ -4,6 +4,7 @@ import { apiClient } from '../../../lib/api-client';
 import { ModalImprimir } from '../../molecules/ModalImprimir/ModalImprimir';
 import { Badge } from '../../atoms/Badge/Badge';
 import { Button } from '../../atoms/Button/Button';
+import { Card } from '../../atoms/Card/Card';
 import { Select } from '../../atoms/Select/Select';
 import { FormField } from '../../molecules/FormField/FormField';
 import { Modal } from '../../molecules/Modal/Modal';
@@ -59,31 +60,36 @@ export function FacturasTable() {
 
   return (
     <div className="space-y-4">
-      <SearchInput
-        value={busqueda}
-        onChange={(v) => {
-          setBusqueda(v);
-          setPagina(1);
-        }}
-        placeholder="Buscar por NCF o cliente…"
-      />
-
-      {isLoading && <p className="text-sm text-slate-500">Cargando facturas…</p>}
       {error && <p className="text-sm text-red-600">No se pudieron cargar las facturas.</p>}
 
-      {data && (
-        <>
-          <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800">
+      <Card
+        sinPadding
+        titulo="Facturas"
+        descripcion={data ? `${data.total} factura(s)` : undefined}
+        acciones={
+          <SearchInput
+            value={busqueda}
+            onChange={(v) => {
+              setBusqueda(v);
+              setPagina(1);
+            }}
+            placeholder="Buscar por NCF o cliente…"
+          />
+        }
+      >
+        {isLoading && <p className="p-5 text-sm text-slate-500">Cargando facturas…</p>}
+        {data && (
+          <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
-              <thead className="bg-slate-50 text-slate-500 dark:bg-slate-900 dark:text-slate-400">
+              <thead className="bg-slate-50 text-slate-500 dark:bg-slate-900/60 dark:text-slate-400">
                 <tr>
-                  <th className="px-4 py-2">NCF</th>
-                  <th className="px-4 py-2">Cliente</th>
-                  <th className="px-4 py-2">Tipo</th>
-                  <th className="px-4 py-2">Total</th>
-                  <th className="px-4 py-2">Estado</th>
-                  <th className="px-4 py-2">Fecha</th>
-                  <th className="px-4 py-2"></th>
+                  <th className="px-5 py-3 font-medium">NCF</th>
+                  <th className="px-5 py-3 font-medium">Cliente</th>
+                  <th className="px-5 py-3 font-medium">Tipo</th>
+                  <th className="px-5 py-3 font-medium">Total</th>
+                  <th className="px-5 py-3 font-medium">Estado</th>
+                  <th className="px-5 py-3 font-medium">Fecha</th>
+                  <th className="px-5 py-3"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -102,33 +108,32 @@ export function FacturasTable() {
                   ];
 
                   return (
-                    <tr key={factura.id}>
-                      <td className="px-4 py-2 font-mono text-xs">{factura.ncf ?? '—'}</td>
-                      <td className="px-4 py-2">{factura.cliente?.nombre}</td>
-                      <td className="px-4 py-2">{factura.tipoFactura}</td>
-                      <td className="px-4 py-2">RD$ {Number(factura.total).toLocaleString('es-DO')}</td>
-                      <td className="px-4 py-2">
+                    <tr key={factura.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                      <td className="px-5 py-3 font-mono text-xs">{factura.ncf ?? '—'}</td>
+                      <td className="px-5 py-3">{factura.cliente?.nombre}</td>
+                      <td className="px-5 py-3">{factura.tipoFactura}</td>
+                      <td className="px-5 py-3 font-medium text-slate-900 dark:text-slate-100">RD$ {Number(factura.total).toLocaleString('es-DO')}</td>
+                      <td className="px-5 py-3">
                         <Badge tono={TONO_POR_ESTADO[factura.estado]}>{factura.estado}</Badge>
                         {factura.tipoFactura === 'CREDITO' && factura.estado === 'EMITIDA' && (
                           <span className="ml-2 text-xs text-slate-400">{factura.pagada ? 'pagada' : 'pendiente de cobro'}</span>
                         )}
                       </td>
-                      <td className="px-4 py-2">{new Date(factura.fecha).toLocaleDateString('es-DO')}</td>
-                      <td className="px-4 py-2 text-right">{acciones.length > 0 && <RowActionsMenu acciones={acciones} />}</td>
+                      <td className="px-5 py-3">{new Date(factura.fecha).toLocaleDateString('es-DO')}</td>
+                      <td className="px-5 py-3 text-right">{acciones.length > 0 && <RowActionsMenu acciones={acciones} />}</td>
                     </tr>
                   );
                 })}
               </tbody>
             </table>
           </div>
-          <Paginacion
-            pagina={data.pagina}
-            tamanoPagina={data.tamanoPagina}
-            total={data.total}
-            onCambiarPagina={setPagina}
-          />
-        </>
-      )}
+        )}
+        {data && (
+          <div className="px-5 py-3">
+            <Paginacion pagina={data.pagina} tamanoPagina={data.tamanoPagina} total={data.total} onCambiarPagina={setPagina} />
+          </div>
+        )}
+      </Card>
 
       {facturaCobrando && <ModalRegistrarCobro factura={facturaCobrando} onClose={() => setFacturaCobrando(null)} />}
       {facturaAnulando && <ModalAnularFactura factura={facturaAnulando} onClose={() => setFacturaAnulando(null)} />}
