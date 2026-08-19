@@ -33,10 +33,12 @@ interface Producto {
 
 interface Stock {
   productoId: string;
+  varianteId: string;
   cantidadActual: string;
   cantidadReservada: string;
   stockMinimo: string;
   producto: Producto;
+  valoresAtributo: { atributo: string; valor: string }[];
 }
 
 export function Inventario() {
@@ -46,8 +48,8 @@ export function Inventario() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [bodegaSeleccionadaId, setBodegaSeleccionadaId] = useState<string | null>(null);
   const [modalNuevaBodega, setModalNuevaBodega] = useState(false);
-  const [productoAjustando, setProductoAjustando] = useState<Producto | null>(null);
-  const [productoTransfiriendo, setProductoTransfiriendo] = useState<Producto | null>(null);
+  const [stockAjustando, setStockAjustando] = useState<Stock | null>(null);
+  const [stockTransfiriendo, setStockTransfiriendo] = useState<Stock | null>(null);
   const [bodegaEditandoFormato, setBodegaEditandoFormato] = useState<Bodega | null>(null);
   const [busquedaStock, setBusquedaStock] = useState('');
   const [paginaStock, setPaginaStock] = useState(1);
@@ -175,9 +177,14 @@ export function Inventario() {
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                   {stock?.datos.map((linea) => (
-                    <tr key={linea.productoId} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                    <tr key={linea.varianteId} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
                       <td className="px-5 py-3">
                         {linea.producto.codigo} — {linea.producto.nombre}
+                        {linea.valoresAtributo.length > 0 && (
+                          <span className="ml-2 text-xs text-slate-400">
+                            ({linea.valoresAtributo.map((va) => `${va.atributo}: ${va.valor}`).join(', ')})
+                          </span>
+                        )}
                       </td>
                       <td className="px-5 py-3">{Number(linea.cantidadActual)}</td>
                       <td className="px-5 py-3">{Number(linea.cantidadReservada)}</td>
@@ -187,10 +194,10 @@ export function Inventario() {
                         <RowActionsMenu
                           acciones={[
                             ...(tienePermisoAjustar
-                              ? [{ etiqueta: 'Ajustar stock', onClick: () => setProductoAjustando(linea.producto) }]
+                              ? [{ etiqueta: 'Ajustar stock', onClick: () => setStockAjustando(linea) }]
                               : []),
                             ...(tienePermisoTransferir
-                              ? [{ etiqueta: 'Transferir stock', onClick: () => setProductoTransfiriendo(linea.producto) }]
+                              ? [{ etiqueta: 'Transferir stock', onClick: () => setStockTransfiriendo(linea) }]
                               : []),
                           ]}
                         />
@@ -220,19 +227,19 @@ export function Inventario() {
       {bodegaEditandoFormato && (
         <ModalEditarFormatoBodega bodega={bodegaEditandoFormato} onClose={() => setBodegaEditandoFormato(null)} />
       )}
-      {productoAjustando && bodegaSeleccionadaId && (
+      {stockAjustando && bodegaSeleccionadaId && (
         <ModalAjustarStock
           bodegaId={bodegaSeleccionadaId}
-          productoInicial={productoAjustando}
-          onClose={() => setProductoAjustando(null)}
+          stockInicial={stockAjustando}
+          onClose={() => setStockAjustando(null)}
         />
       )}
-      {productoTransfiriendo && bodegaSeleccionadaId && (
+      {stockTransfiriendo && bodegaSeleccionadaId && (
         <ModalTransferirStock
           bodegaOrigenId={bodegaSeleccionadaId}
           bodegas={bodegas ?? []}
-          productoInicial={productoTransfiriendo}
-          onClose={() => setProductoTransfiriendo(null)}
+          stockInicial={stockTransfiriendo}
+          onClose={() => setStockTransfiriendo(null)}
         />
       )}
     </div>
@@ -308,11 +315,11 @@ function ModalEditarFormatoBodega({ bodega, onClose }: { bodega: Bodega; onClose
 
 function ModalAjustarStock({
   bodegaId,
-  productoInicial,
+  stockInicial,
   onClose,
 }: {
   bodegaId: string;
-  productoInicial: Producto;
+  stockInicial: Stock;
   onClose: () => void;
 }) {
   const queryClient = useQueryClient();
@@ -322,7 +329,13 @@ function ModalAjustarStock({
 
   const ajustar = useMutation({
     mutationFn: async () =>
-      apiClient.post('/inventario/ajustar', { productoId: productoInicial.id, bodegaId, cantidad: Number(cantidad), motivo }),
+      apiClient.post('/inventario/ajustar', {
+        productoId: stockInicial.producto.id,
+        varianteId: stockInicial.varianteId,
+        bodegaId,
+        cantidad: Number(cantidad),
+        motivo,
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['stock', bodegaId] });
       onClose();
@@ -342,7 +355,9 @@ function ModalAjustarStock({
         <div className="flex flex-col gap-1">
           <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Producto</label>
           <p className="rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-700 dark:bg-slate-800/60 dark:text-slate-300">
-            {productoInicial.codigo} — {productoInicial.nombre}
+            {stockInicial.producto.codigo} — {stockInicial.producto.nombre}
+            {stockInicial.valoresAtributo.length > 0 &&
+              ` (${stockInicial.valoresAtributo.map((va) => `${va.atributo}: ${va.valor}`).join(', ')})`}
           </p>
         </div>
         <FormField
@@ -366,12 +381,12 @@ function ModalAjustarStock({
 function ModalTransferirStock({
   bodegaOrigenId,
   bodegas,
-  productoInicial,
+  stockInicial,
   onClose,
 }: {
   bodegaOrigenId: string;
   bodegas: Bodega[];
-  productoInicial: Producto;
+  stockInicial: Stock;
   onClose: () => void;
 }) {
   const queryClient = useQueryClient();
@@ -382,7 +397,8 @@ function ModalTransferirStock({
   const transferir = useMutation({
     mutationFn: async () =>
       apiClient.post('/inventario/transferir', {
-        productoId: productoInicial.id,
+        productoId: stockInicial.producto.id,
+        varianteId: stockInicial.varianteId,
         bodegaOrigenId,
         bodegaDestinoId,
         cantidad: Number(cantidad),
@@ -407,7 +423,9 @@ function ModalTransferirStock({
         <div className="flex flex-col gap-1">
           <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Producto</label>
           <p className="rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-700 dark:bg-slate-800/60 dark:text-slate-300">
-            {productoInicial.codigo} — {productoInicial.nombre}
+            {stockInicial.producto.codigo} — {stockInicial.producto.nombre}
+            {stockInicial.valoresAtributo.length > 0 &&
+              ` (${stockInicial.valoresAtributo.map((va) => `${va.atributo}: ${va.valor}`).join(', ')})`}
           </p>
         </div>
         <div className="flex flex-col gap-1">

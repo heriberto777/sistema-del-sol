@@ -14,14 +14,22 @@ export class PreciosController {
 
   @Get(':productoId')
   @Permissions('precios.ver')
-  vigente(@Param('productoId') productoId: string, @Query('listaPrecio') listaPrecio?: string) {
-    return this.preciosService.vigente(productoId, listaPrecio);
+  vigente(
+    @Param('productoId') productoId: string,
+    @Query('varianteId') varianteId?: string,
+    @Query('listaPrecio') listaPrecio?: string,
+  ) {
+    return this.preciosService.vigente(productoId, varianteId, listaPrecio);
   }
 
   @Get(':productoId/historial')
   @Permissions('precios.ver')
-  historial(@Param('productoId') productoId: string, @Query('listaPrecio') listaPrecio?: string) {
-    return this.preciosService.historial(productoId, listaPrecio);
+  historial(
+    @Param('productoId') productoId: string,
+    @Query('varianteId') varianteId?: string,
+    @Query('listaPrecio') listaPrecio?: string,
+  ) {
+    return this.preciosService.historial(productoId, varianteId, listaPrecio);
   }
 
   @Post()

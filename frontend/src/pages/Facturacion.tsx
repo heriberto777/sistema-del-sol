@@ -11,6 +11,7 @@ import { EmitirNotaForm } from '../components/organisms/EmitirNotaForm/EmitirNot
 import { RequierePermiso } from '../components/organisms/RequierePermiso/RequierePermiso';
 import { useAuth } from '../hooks/useAuth';
 import { useListasPrecio } from '../hooks/useListasPrecio';
+import { SelectorLineaProducto } from '../components/molecules/SelectorLineaProducto/SelectorLineaProducto';
 import { PaginaResultado } from '../types/pagina-resultado';
 
 interface Cliente {
@@ -75,7 +76,7 @@ function ModalNuevaFactura({ onClose }: { onClose: () => void }) {
   const [clienteId, setClienteId] = useState('');
   const [bodegaId, setBodegaId] = useState('');
   const [tipoFactura, setTipoFactura] = useState<'CONTADO' | 'CREDITO'>('CONTADO');
-  const [lineas, setLineas] = useState([{ productoId: '', cantidad: '1', precioUnitario: '' }]);
+  const [lineas, setLineas] = useState([{ productoId: '', varianteId: '', cantidad: '1', precioUnitario: '' }]);
   const [mostrarNuevoCliente, setMostrarNuevoCliente] = useState(false);
   const [listaPrecioOverride, setListaPrecioOverride] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -111,6 +112,7 @@ function ModalNuevaFactura({ onClose }: { onClose: () => void }) {
           .filter((l) => l.productoId)
           .map((l) => ({
             productoId: l.productoId,
+            varianteId: l.varianteId || undefined,
             cantidad: Number(l.cantidad),
             precioUnitario: l.precioUnitario ? Number(l.precioUnitario) : undefined,
           })),
@@ -198,19 +200,13 @@ function ModalNuevaFactura({ onClose }: { onClose: () => void }) {
           <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Líneas</p>
           {lineas.map((linea, i) => (
             <div key={i} className="flex gap-2">
-              <Select
-                value={linea.productoId}
-                onChange={(e) => actualizarLinea(i, { productoId: e.target.value })}
-                required
+              <SelectorLineaProducto
+                productos={productos ?? []}
+                productoId={linea.productoId}
+                varianteId={linea.varianteId}
+                onChange={(productoId, varianteId) => actualizarLinea(i, { productoId, varianteId })}
                 className="flex-1"
-              >
-                <option value="">Producto…</option>
-                {productos?.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.codigo} — {p.nombre}
-                  </option>
-                ))}
-              </Select>
+              />
               <input
                 type="number"
                 min={1}
@@ -242,7 +238,7 @@ function ModalNuevaFactura({ onClose }: { onClose: () => void }) {
           ))}
           <button
             type="button"
-            onClick={() => setLineas((prev) => [...prev, { productoId: '', cantidad: '1', precioUnitario: '' }])}
+            onClick={() => setLineas((prev) => [...prev, { productoId: '', varianteId: '', cantidad: '1', precioUnitario: '' }])}
             className="text-sm font-medium text-sol-600 hover:text-sol-700 dark:text-sol-400"
           >
             + Agregar línea

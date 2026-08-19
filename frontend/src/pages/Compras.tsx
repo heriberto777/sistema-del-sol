@@ -14,6 +14,7 @@ import { Paginacion } from '../components/molecules/Paginacion/Paginacion';
 import { EstadoVacio } from '../components/molecules/EstadoVacio/EstadoVacio';
 import { RowActionsMenu } from '../components/molecules/RowActionsMenu/RowActionsMenu';
 import { RequierePermiso } from '../components/organisms/RequierePermiso/RequierePermiso';
+import { SelectorLineaProducto } from '../components/molecules/SelectorLineaProducto/SelectorLineaProducto';
 import { useAuth } from '../hooks/useAuth';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { PaginaResultado } from '../types/pagina-resultado';
@@ -281,7 +282,7 @@ function ModalNuevaOrdenCompra({ onClose }: { onClose: () => void }) {
   const queryClient = useQueryClient();
   const [proveedorId, setProveedorId] = useState('');
   const [numero, setNumero] = useState('');
-  const [lineas, setLineas] = useState([{ productoId: '', cantidad: '1', costoUnitario: '' }]);
+  const [lineas, setLineas] = useState([{ productoId: '', varianteId: '', cantidad: '1', costoUnitario: '' }]);
   const [mostrarNuevoProveedor, setMostrarNuevoProveedor] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -308,7 +309,12 @@ function ModalNuevaOrdenCompra({ onClose }: { onClose: () => void }) {
         numero,
         lineas: lineas
           .filter((l) => l.productoId)
-          .map((l) => ({ productoId: l.productoId, cantidad: Number(l.cantidad), costoUnitario: Number(l.costoUnitario) })),
+          .map((l) => ({
+            productoId: l.productoId,
+            varianteId: l.varianteId || undefined,
+            cantidad: Number(l.cantidad),
+            costoUnitario: Number(l.costoUnitario),
+          })),
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ordenes-compra'] });
@@ -362,19 +368,13 @@ function ModalNuevaOrdenCompra({ onClose }: { onClose: () => void }) {
           <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Líneas</p>
           {lineas.map((linea, i) => (
             <div key={i} className="flex gap-2">
-              <Select
-                value={linea.productoId}
-                onChange={(e) => actualizarLinea(i, { productoId: e.target.value })}
-                required
+              <SelectorLineaProducto
+                productos={productos ?? []}
+                productoId={linea.productoId}
+                varianteId={linea.varianteId}
+                onChange={(productoId, varianteId) => actualizarLinea(i, { productoId, varianteId })}
                 className="flex-1"
-              >
-                <option value="">Producto…</option>
-                {productos?.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.codigo} — {p.nombre}
-                  </option>
-                ))}
-              </Select>
+              />
               <input
                 type="number"
                 min={1}
@@ -406,7 +406,7 @@ function ModalNuevaOrdenCompra({ onClose }: { onClose: () => void }) {
           ))}
           <button
             type="button"
-            onClick={() => setLineas((prev) => [...prev, { productoId: '', cantidad: '1', costoUnitario: '' }])}
+            onClick={() => setLineas((prev) => [...prev, { productoId: '', varianteId: '', cantidad: '1', costoUnitario: '' }])}
             className="text-sm font-medium text-sol-600 hover:text-sol-700 dark:text-sol-400"
           >
             + Agregar línea

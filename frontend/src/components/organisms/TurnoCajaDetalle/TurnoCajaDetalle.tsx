@@ -34,6 +34,7 @@ interface Vendedor {
 
 interface LineaCarrito {
   productoId: string;
+  varianteId?: string;
   codigo: string;
   nombre: string;
   cantidad: number;
@@ -52,6 +53,7 @@ interface MovimientoCaja {
 
 interface VentaAparcadaLinea {
   productoId: string;
+  varianteId: string;
   cantidad: string;
   precioUnitario: string;
   porcentajeItbis: string;
@@ -174,7 +176,7 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
         vendedorEmpleadoId: vendedor?.id,
         listaPrecio: listaPrecioOverride || undefined,
         pagos,
-        lineas: carrito.map((l) => ({ productoId: l.productoId, cantidad: l.cantidad, descuento: l.descuento })),
+        lineas: carrito.map((l) => ({ productoId: l.productoId, varianteId: l.varianteId, cantidad: l.cantidad, descuento: l.descuento })),
       }),
     onSuccess: (respuesta) => {
       invalidar();
@@ -202,6 +204,7 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
         nota: nota || undefined,
         lineas: carrito.map((l) => ({
           productoId: l.productoId,
+          varianteId: l.varianteId,
           cantidad: l.cantidad,
           precioUnitario: l.precioUnitario,
           porcentajeItbis: l.porcentajeItbis,
@@ -222,18 +225,20 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
 
   function agregarAlCarrito(linea: LineaCarrito) {
     setCarrito((prev) => {
-      const existente = prev.find((l) => l.productoId === linea.productoId);
+      const mismaLinea = (l: LineaCarrito) => l.productoId === linea.productoId && l.varianteId === linea.varianteId;
+      const existente = prev.find(mismaLinea);
       if (existente) {
-        return prev.map((l) => (l.productoId === linea.productoId ? { ...l, cantidad: l.cantidad + linea.cantidad } : l));
+        return prev.map((l) => (mismaLinea(l) ? { ...l, cantidad: l.cantidad + linea.cantidad } : l));
       }
       return [...prev, linea];
     });
   }
 
-  function agregarProductoCatalogo(producto: ProductoCatalogo, cantidad: number) {
+  function agregarProductoCatalogo(producto: ProductoCatalogo, cantidad: number, varianteId?: string) {
     if (!producto.precioVenta) return;
     agregarAlCarrito({
       productoId: producto.id,
+      varianteId,
       codigo: producto.codigo,
       nombre: producto.nombre,
       cantidad,
@@ -256,6 +261,7 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
     setCarrito(
       venta.lineas.map((l) => ({
         productoId: l.productoId,
+        varianteId: l.varianteId,
         codigo: l.producto.codigo,
         nombre: l.producto.nombre,
         cantidad: Number(l.cantidad),

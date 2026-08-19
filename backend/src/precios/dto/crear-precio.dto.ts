@@ -6,6 +6,15 @@ export class CrearPrecioDto {
   @IsUUID()
   productoId: string;
 
+  @ApiProperty({
+    required: false,
+    description:
+      'Obligatorio si el producto tiene más de una variante (Fase 3c) — sin esto, no hay forma de saber a cuál de las variantes reales le corresponde este precio.',
+  })
+  @IsOptional()
+  @IsUUID()
+  varianteId?: string;
+
   @ApiProperty({ default: 'GENERAL' })
   @IsOptional()
   @IsString()

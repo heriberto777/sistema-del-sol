@@ -11,6 +11,7 @@ import { Select } from '../../atoms/Select/Select';
 import { Badge } from '../../atoms/Badge/Badge';
 import { SearchInput } from '../../molecules/SearchInput/SearchInput';
 import { Paginacion } from '../../molecules/Paginacion/Paginacion';
+import { SelectorLineaProducto } from '../../molecules/SelectorLineaProducto/SelectorLineaProducto';
 import { useDebouncedValue } from '../../../hooks/useDebouncedValue';
 import { useAuth } from '../../../hooks/useAuth';
 import { PaginaResultado } from '../../../types/pagina-resultado';
@@ -35,6 +36,7 @@ type EstadoCotizacion = 'BORRADOR' | 'ENVIADA' | 'ACEPTADA' | 'RECHAZADA' | 'VEN
 
 interface LineaCotizacion {
   productoId: string;
+  varianteId: string;
   cantidad: string;
   producto?: { nombre: string; codigo: string };
 }
@@ -59,7 +61,7 @@ const TONO_POR_ESTADO: Record<EstadoCotizacion, 'exito' | 'advertencia' | 'pelig
   VENCIDA: 'peligro',
 };
 
-type LineaForm = { productoId: string; cantidad: string };
+type LineaForm = { productoId: string; varianteId: string; cantidad: string };
 
 export function CotizacionesPanel() {
   const queryClient = useQueryClient();
@@ -218,7 +220,7 @@ function ModalNuevaCotizacion({
   const [numero, setNumero] = useState('');
   const [clienteId, setClienteId] = useState('');
   const [fechaVigenciaHasta, setFechaVigenciaHasta] = useState('');
-  const [lineas, setLineas] = useState<LineaForm[]>([{ productoId: '', cantidad: '1' }]);
+  const [lineas, setLineas] = useState<LineaForm[]>([{ productoId: '', varianteId: '', cantidad: '1' }]);
   const [error, setError] = useState<string | null>(null);
 
   const crear = useMutation({
@@ -229,7 +231,7 @@ function ModalNuevaCotizacion({
         fechaVigenciaHasta,
         lineas: lineas
           .filter((l) => l.productoId)
-          .map((l) => ({ productoId: l.productoId, cantidad: Number(l.cantidad) })),
+          .map((l) => ({ productoId: l.productoId, varianteId: l.varianteId || undefined, cantidad: Number(l.cantidad) })),
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['cotizaciones'] });
@@ -276,19 +278,13 @@ function ModalNuevaCotizacion({
           <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Líneas</p>
           {lineas.map((linea, i) => (
             <div key={i} className="flex items-center gap-2">
-              <Select
-                value={linea.productoId}
-                onChange={(e) => actualizarLinea(i, { productoId: e.target.value })}
-                required
+              <SelectorLineaProducto
+                productos={productos}
+                productoId={linea.productoId}
+                varianteId={linea.varianteId}
+                onChange={(productoId, varianteId) => actualizarLinea(i, { productoId, varianteId })}
                 className="flex-1"
-              >
-                <option value="">Producto…</option>
-                {productos.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.nombre} ({p.codigo})
-                  </option>
-                ))}
-              </Select>
+              />
               <input
                 type="number"
                 min={1}
@@ -304,7 +300,7 @@ function ModalNuevaCotizacion({
               )}
             </div>
           ))}
-          <Button type="button" variante="secundario" onClick={() => setLineas((prev) => [...prev, { productoId: '', cantidad: '1' }])}>
+          <Button type="button" variante="secundario" onClick={() => setLineas((prev) => [...prev, { productoId: '', varianteId: '', cantidad: '1' }])}>
             + Línea
           </Button>
         </div>
@@ -334,7 +330,7 @@ function ModalEditarCotizacion({
   const [clienteId, setClienteId] = useState(cotizacion.clienteId);
   const [fechaVigenciaHasta, setFechaVigenciaHasta] = useState(cotizacion.fechaVigenciaHasta.slice(0, 10));
   const [lineas, setLineas] = useState<LineaForm[]>(
-    cotizacion.lineas.map((l) => ({ productoId: l.productoId, cantidad: l.cantidad })),
+    cotizacion.lineas.map((l) => ({ productoId: l.productoId, varianteId: l.varianteId, cantidad: l.cantidad })),
   );
   const [error, setError] = useState<string | null>(null);
 
@@ -344,7 +340,7 @@ function ModalEditarCotizacion({
         numero,
         clienteId,
         fechaVigenciaHasta,
-        lineas: lineas.filter((l) => l.productoId).map((l) => ({ productoId: l.productoId, cantidad: Number(l.cantidad) })),
+        lineas: lineas.filter((l) => l.productoId).map((l) => ({ productoId: l.productoId, varianteId: l.varianteId || undefined, cantidad: Number(l.cantidad) })),
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['cotizaciones'] });
@@ -387,19 +383,15 @@ function ModalEditarCotizacion({
           <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Líneas</p>
           {lineas.map((linea, i) => (
             <div key={i} className="flex items-center gap-2">
-              <Select
-                value={linea.productoId}
-                onChange={(e) => setLineas((prev) => prev.map((l, idx) => (idx === i ? { ...l, productoId: e.target.value } : l)))}
-                required
+              <SelectorLineaProducto
+                productos={productos}
+                productoId={linea.productoId}
+                varianteId={linea.varianteId}
+                onChange={(productoId, varianteId) =>
+                  setLineas((prev) => prev.map((l, idx) => (idx === i ? { ...l, productoId, varianteId } : l)))
+                }
                 className="flex-1"
-              >
-                <option value="">Producto…</option>
-                {productos.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.nombre} ({p.codigo})
-                  </option>
-                ))}
-              </Select>
+              />
               <input
                 type="number"
                 min={1}
@@ -415,7 +407,7 @@ function ModalEditarCotizacion({
               )}
             </div>
           ))}
-          <Button type="button" variante="secundario" onClick={() => setLineas((prev) => [...prev, { productoId: '', cantidad: '1' }])}>
+          <Button type="button" variante="secundario" onClick={() => setLineas((prev) => [...prev, { productoId: '', varianteId: '', cantidad: '1' }])}>
             + Línea
           </Button>
         </div>

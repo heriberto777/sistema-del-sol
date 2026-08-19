@@ -110,7 +110,10 @@ token, así que un token nunca puede reusarse.
   es el único punto que decide la variante de una línea: se resuelve
   sola si el producto tiene una única variante, exige `varianteId`
   explícito (400) si tiene varias, y lanza 404 si el producto no tiene
-  ninguna (no existe, o es de otro tenant).
+  ninguna (no existe, o es de otro tenant). `PreciosService` usa el
+  mismo `resolverObligatoria` — un producto con variantes reales puede
+  tener un `precios` distinto por variante (Talla/Color con precio
+  propio), no solo por `listaPrecio`.
 - **`productos.tipo`** (`PRODUCTO`/`SERVICIO`/`COMBO`): un `SERVICIO`
   nunca tiene fila en `stock` (no mueve inventario al facturarse); un
   `COMBO` tampoco tiene fila propia — al facturarse expande a sus

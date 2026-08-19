@@ -57,7 +57,14 @@ export class InventarioRepository {
     return this.db.stock.findUnique({ where: { varianteId_bodegaId: { varianteId, bodegaId } } });
   }
 
-  /** Reaplana `variante.producto` a `producto` en cada fila, para que el consumidor (pantalla de Stock) no tenga que cambiar. */
+  /**
+   * Reaplana `variante.producto` a `producto` en cada fila (para que el
+   * consumidor no tenga que cambiar), pero expone `varianteId` y sus
+   * `valoresAtributo` — Fase 3c, incremento 4: un producto con variantes
+   * reales tiene una fila de Stock POR variante, y sin esto la pantalla
+   * de Inventario mostraría filas indistinguibles (mismo producto
+   * repetido) y no podría ajustar/transferir la variante correcta.
+   */
   async listarStockPorBodega(bodegaId: string, params: { skip: number; take: number; busqueda?: string }) {
     const where = {
       bodegaId,
@@ -77,14 +84,29 @@ export class InventarioRepository {
     const [filas, total] = await Promise.all([
       this.db.stock.findMany({
         where,
-        include: { variante: { include: { producto: true } } },
+        include: {
+          variante: {
+            include: {
+              producto: true,
+              valoresAtributo: { include: { valorAtributo: { include: { atributo: true } } } },
+            },
+          },
+        },
         orderBy: { variante: { producto: { nombre: 'asc' } } },
         skip: params.skip,
         take: params.take,
       }),
       this.db.stock.count({ where }),
     ]);
-    const datos = filas.map(({ variante, ...stock }) => ({ ...stock, producto: variante.producto }));
+    const datos = filas.map(({ variante, ...stock }) => ({
+      ...stock,
+      varianteId: variante.id,
+      producto: variante.producto,
+      valoresAtributo: variante.valoresAtributo.map((va) => ({
+        atributo: va.valorAtributo.atributo.nombre,
+        valor: va.valorAtributo.valor,
+      })),
+    }));
     return [datos, total] as const;
   }
 

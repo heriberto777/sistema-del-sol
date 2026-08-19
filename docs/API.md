@@ -177,17 +177,22 @@ Catálogo tenant-scoped con jerarquía real (mismo patrón de auto-relación que
 | GET | `/api/inventario/bodegas` | sin permiso — cualquier usuario autenticado (un Cajero puro necesita esta lista para abrir su turno de POS y no tiene `inventario.ver`) |
 | POST | `/api/inventario/bodegas` | `admin.configuracion` |
 | PATCH | `/api/inventario/bodegas/:id` | `admin.configuracion` — solo `{ formatoImpresion? }` (`null` quita el override, hereda el default del tenant) |
-| GET | `/api/inventario/stock/:bodegaId` | `inventario.ver` |
-| POST | `/api/inventario/ajustar` | `inventario.ajustar` |
-| POST | `/api/inventario/transferir` | `inventario.transferir` |
+| GET | `/api/inventario/stock/:bodegaId` | `inventario.ver` — cada fila incluye `varianteId` y `valoresAtributo` (Fase 3c) además de `producto`: un producto con variantes reales tiene una fila de stock POR variante |
+| POST | `/api/inventario/ajustar` | `inventario.ajustar` — `{ productoId, varianteId?, bodegaId, cantidad, motivo }` |
+| POST | `/api/inventario/transferir` | `inventario.transferir` — `{ productoId, varianteId?, bodegaOrigenId, bodegaDestinoId, cantidad }` |
 
 ## Precios
 
+`varianteId` (Fase 3c, incremento 4) sigue el mismo criterio que las
+líneas de venta/compra: se resuelve solo si el producto tiene una única
+variante; obligatorio (400) si tiene varias — sin esto no hay forma de
+saber a cuál de las variantes reales le corresponde el precio.
+
 | Método | Ruta | Permiso |
 |---|---|---|
-| GET | `/api/precios/:productoId?listaPrecio` | `precios.ver` |
-| GET | `/api/precios/:productoId/historial` | `precios.ver` |
-| POST | `/api/precios` | `precios.editar` |
+| GET | `/api/precios/:productoId?varianteId&listaPrecio` | `precios.ver` |
+| GET | `/api/precios/:productoId/historial?varianteId&listaPrecio` | `precios.ver` |
+| POST | `/api/precios` | `precios.editar` — `{ productoId, varianteId?, listaPrecio?, costo, margenPct?, precioVenta? }` |
 
 ## Compras
 

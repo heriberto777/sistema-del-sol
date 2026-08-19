@@ -1,11 +1,13 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Package } from 'lucide-react';
 import { apiClient } from '../../../lib/api-client';
 import { Card } from '../../atoms/Card/Card';
+import { Modal } from '../../molecules/Modal/Modal';
 import { SearchInput } from '../../molecules/SearchInput/SearchInput';
 import { useDebouncedValue } from '../../../hooks/useDebouncedValue';
 import { aplanarArbolCategorias, type CategoriaPlana } from '../../../lib/categorias-arbol';
+import { etiquetaVariante, type VarianteProducto } from '../../../hooks/useVariantesProducto';
 import { PaginaResultado } from '../../../types/pagina-resultado';
 
 export interface ProductoCatalogo {
@@ -30,12 +32,22 @@ function formatoRD(valor: string) {
  * producto como hacía la versión anterior. Chips de categoría (árbol real
  * de `Categoria`, aplanado en orden jerárquico — ver `/categorias`) y un
  * campo de cantidad rápida permiten armar el carrito sin volver a tocar
- * el mouse.
+ * el mouse. Un producto con más de una variante real (Talla/Color, Fase
+ * 3c) pide elegir cuál antes de agregarla — el caso normal (una sola
+ * variante "por defecto") se resuelve solo, sin ningún paso extra.
  */
-export function CatalogoProductosPos({ onAgregar }: { onAgregar: (producto: ProductoCatalogo, cantidad: number) => void }) {
+export function CatalogoProductosPos({
+  onAgregar,
+}: {
+  onAgregar: (producto: ProductoCatalogo, cantidad: number, varianteId?: string) => void;
+}) {
+  const queryClient = useQueryClient();
   const [busqueda, setBusqueda] = useState('');
   const [categoriaId, setCategoriaId] = useState<string | null>(null);
   const [cantidad, setCantidad] = useState('1');
+  const [eligiendoVariante, setEligiendoVariante] = useState<{ producto: ProductoCatalogo; variantes: VarianteProducto[] } | null>(
+    null,
+  );
   const busquedaDebounced = useDebouncedValue(busqueda);
 
   const { data: categorias } = useQuery({
@@ -54,10 +66,37 @@ export function CatalogoProductosPos({ onAgregar }: { onAgregar: (producto: Prod
       ).data,
   });
 
-  function agregar(producto: ProductoCatalogo) {
-    const cantidadNumerica = Number(cantidad);
-    onAgregar(producto, cantidadNumerica > 0 ? cantidadNumerica : 1);
+  async function agregar(producto: ProductoCatalogo) {
+    const cantidadNumerica = Number(cantidad) > 0 ? Number(cantidad) : 1;
+    const variantes = await queryClient.fetchQuery({
+      queryKey: ['variantes-producto', producto.id],
+      queryFn: async () => (await apiClient.get<VarianteProducto[]>(`/productos/${producto.id}/variantes`)).data,
+    });
+    if (variantes.length > 1) {
+      setEligiendoVariante({ producto, variantes });
+      return;
+    }
+    onAgregar(producto, cantidadNumerica, variantes[0]?.id);
     setCantidad('1');
+  }
+
+  async function agregarConVariante(varianteId: string) {
+    if (!eligiendoVariante) return;
+    const cantidadNumerica = Number(cantidad) > 0 ? Number(cantidad) : 1;
+    const { producto } = eligiendoVariante;
+    // El precio de la grilla es el de una variante "representativa" (ver
+    // ARCHITECTURE.md, Fase 3b) — con variantes reales, cada una puede
+    // tener su propio precio (ver FormularioPrecio en Productos.tsx), así
+    // que hay que resolver el precio de la variante REALMENTE elegida
+    // antes de agregarla al carrito, no reusar el de la grilla.
+    const precio = await queryClient.fetchQuery({
+      queryKey: ['precio-vigente', producto.id, varianteId],
+      queryFn: async () =>
+        (await apiClient.get<{ precioVenta: string } | null>(`/precios/${producto.id}`, { params: { varianteId } })).data,
+    });
+    onAgregar({ ...producto, precioVenta: precio?.precioVenta ?? null }, cantidadNumerica, varianteId);
+    setCantidad('1');
+    setEligiendoVariante(null);
   }
 
   return (
@@ -134,6 +173,23 @@ export function CatalogoProductosPos({ onAgregar }: { onAgregar: (producto: Prod
           </button>
         ))}
       </div>
+
+      {eligiendoVariante && (
+        <Modal titulo={`Elegí la variante — ${eligiendoVariante.producto.nombre}`} onClose={() => setEligiendoVariante(null)}>
+          <div className="space-y-2">
+            {eligiendoVariante.variantes.map((v) => (
+              <button
+                key={v.id}
+                type="button"
+                onClick={() => agregarConVariante(v.id)}
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-left text-sm hover:border-sol-400 hover:bg-sol-50/50 dark:border-slate-800 dark:hover:bg-sol-900/10"
+              >
+                {etiquetaVariante(v) || '(sin atributos)'}
+              </button>
+            ))}
+          </div>
+        </Modal>
+      )}
     </Card>
   );
 }

@@ -8,6 +8,7 @@ import { PaginaResultado } from '../../../types/pagina-resultado';
 
 interface LineaFactura {
   productoId: string;
+  varianteId: string;
   cantidad: string;
   producto: { nombre: string; codigo: string };
 }
@@ -73,6 +74,7 @@ export function EmitirNotaForm({ onClose }: { onClose: () => void }) {
         facturaOrigenId: facturaOrigen.id,
         lineas: facturaOrigen.lineas.map((l) => ({
           productoId: l.productoId,
+          varianteId: l.varianteId,
           cantidad: Number(cantidades[l.productoId] ?? l.cantidad),
         })),
       });

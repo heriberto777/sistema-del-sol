@@ -11,6 +11,7 @@ import { Select } from '../../atoms/Select/Select';
 import { Badge } from '../../atoms/Badge/Badge';
 import { SearchInput } from '../../molecules/SearchInput/SearchInput';
 import { Paginacion } from '../../molecules/Paginacion/Paginacion';
+import { SelectorLineaProducto } from '../../molecules/SelectorLineaProducto/SelectorLineaProducto';
 import { useDebouncedValue } from '../../../hooks/useDebouncedValue';
 import { useAuth } from '../../../hooks/useAuth';
 import { PaginaResultado } from '../../../types/pagina-resultado';
@@ -41,7 +42,7 @@ interface Remision {
   clienteId: string;
   bodegaId: string;
   cliente: { nombre: string };
-  lineas: { productoId: string; cantidad: string }[];
+  lineas: { productoId: string; varianteId: string; cantidad: string }[];
 }
 
 const TONO_POR_ESTADO: Record<EstadoRemision, 'exito' | 'advertencia' | 'peligro' | 'neutro'> = {
@@ -51,7 +52,7 @@ const TONO_POR_ESTADO: Record<EstadoRemision, 'exito' | 'advertencia' | 'peligro
   ANULADA: 'peligro',
 };
 
-type LineaForm = { productoId: string; cantidad: string };
+type LineaForm = { productoId: string; varianteId: string; cantidad: string };
 
 export function RemisionesPanel() {
   const queryClient = useQueryClient();
@@ -212,7 +213,7 @@ function ModalNuevaRemision({
   const [clienteId, setClienteId] = useState('');
   const [bodegaId, setBodegaId] = useState('');
   const [numero, setNumero] = useState('');
-  const [lineas, setLineas] = useState<LineaForm[]>([{ productoId: '', cantidad: '1' }]);
+  const [lineas, setLineas] = useState<LineaForm[]>([{ productoId: '', varianteId: '', cantidad: '1' }]);
   const [error, setError] = useState<string | null>(null);
 
   const crear = useMutation({
@@ -223,7 +224,7 @@ function ModalNuevaRemision({
         numero,
         lineas: lineas
           .filter((l) => l.productoId)
-          .map((l) => ({ productoId: l.productoId, cantidad: Number(l.cantidad) })),
+          .map((l) => ({ productoId: l.productoId, varianteId: l.varianteId || undefined, cantidad: Number(l.cantidad) })),
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['remisiones'] });
@@ -276,19 +277,13 @@ function ModalNuevaRemision({
           <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Líneas</p>
           {lineas.map((linea, i) => (
             <div key={i} className="flex items-center gap-2">
-              <Select
-                value={linea.productoId}
-                onChange={(e) => actualizarLinea(i, { productoId: e.target.value })}
-                required
+              <SelectorLineaProducto
+                productos={productos}
+                productoId={linea.productoId}
+                varianteId={linea.varianteId}
+                onChange={(productoId, varianteId) => actualizarLinea(i, { productoId, varianteId })}
                 className="flex-1"
-              >
-                <option value="">Producto…</option>
-                {productos.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.nombre} ({p.codigo})
-                  </option>
-                ))}
-              </Select>
+              />
               <input
                 type="number"
                 min={1}
@@ -304,7 +299,7 @@ function ModalNuevaRemision({
               )}
             </div>
           ))}
-          <Button type="button" variante="secundario" onClick={() => setLineas((prev) => [...prev, { productoId: '', cantidad: '1' }])}>
+          <Button type="button" variante="secundario" onClick={() => setLineas((prev) => [...prev, { productoId: '', varianteId: '', cantidad: '1' }])}>
             + Línea
           </Button>
         </div>
@@ -348,7 +343,7 @@ function ModalEditarRemision({
       numero: detalle.numero,
       clienteId: detalle.clienteId,
       bodegaId: detalle.bodegaId,
-      lineas: detalle.lineas.map((l) => ({ productoId: l.productoId, cantidad: l.cantidad })),
+      lineas: detalle.lineas.map((l) => ({ productoId: l.productoId, varianteId: l.varianteId, cantidad: l.cantidad })),
     });
   }, [detalle]);
 
@@ -358,7 +353,7 @@ function ModalEditarRemision({
         numero: valores!.numero,
         clienteId: valores!.clienteId,
         bodegaId: valores!.bodegaId,
-        lineas: valores!.lineas.filter((l) => l.productoId).map((l) => ({ productoId: l.productoId, cantidad: Number(l.cantidad) })),
+        lineas: valores!.lineas.filter((l) => l.productoId).map((l) => ({ productoId: l.productoId, varianteId: l.varianteId || undefined, cantidad: Number(l.cantidad) })),
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['remisiones'] });
@@ -418,21 +413,18 @@ function ModalEditarRemision({
           <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Líneas</p>
           {valores.lineas.map((linea, i) => (
             <div key={i} className="flex items-center gap-2">
-              <Select
-                value={linea.productoId}
-                onChange={(e) =>
-                  setValores({ ...valores, lineas: valores.lineas.map((l, idx) => (idx === i ? { ...l, productoId: e.target.value } : l)) })
+              <SelectorLineaProducto
+                productos={productos}
+                productoId={linea.productoId}
+                varianteId={linea.varianteId}
+                onChange={(productoId, varianteId) =>
+                  setValores({
+                    ...valores,
+                    lineas: valores.lineas.map((l, idx) => (idx === i ? { ...l, productoId, varianteId } : l)),
+                  })
                 }
-                required
                 className="flex-1"
-              >
-                <option value="">Producto…</option>
-                {productos.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.nombre} ({p.codigo})
-                  </option>
-                ))}
-              </Select>
+              />
               <input
                 type="number"
                 min={1}
@@ -457,7 +449,7 @@ function ModalEditarRemision({
           <Button
             type="button"
             variante="secundario"
-            onClick={() => setValores({ ...valores, lineas: [...valores.lineas, { productoId: '', cantidad: '1' }] })}
+            onClick={() => setValores({ ...valores, lineas: [...valores.lineas, { productoId: '', varianteId: '', cantidad: '1' }] })}
           >
             + Línea
           </Button>

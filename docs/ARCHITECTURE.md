@@ -659,10 +659,72 @@ variantes — indicá varianteId en la línea"), acepta con `varianteId`
 explícito, y el descuento de stock queda aislado a esa variante (la
 otra no se toca).
 
-Los incrementos que siguen (ya planeados, no implementados todavía):
-frontend — `SelectorProducto`/`SelectorProductoVariante` compartido,
-armado de combinaciones desde Talla/Color en Productos.tsx (incremento
-4).
+### Incremento 4: frontend
+
+`SelectorLineaProducto` (`frontend/src/components/molecules/
+SelectorLineaProducto/`) reemplaza el `<select>` de producto duplicado
+en cada formulario de línea (Facturación/Cotizaciones/Remisiones/
+Compras) por un componente que, además, resuelve la variante:
+consulta `GET /productos/:id/variantes` al elegir producto y — si hay
+más de una — muestra un segundo `<select>` de variante (etiquetado por
+sus valores de atributo, ej. "Talla: M, Color: Azul"), obligatorio
+antes de poder enviar la línea. Con una sola variante no se muestra
+nada extra — se resuelve sola, igual que en el backend. `EmitirNotaForm`
+(nota de crédito/débito) no necesita este selector: la variante ya
+viene fija en la línea de la factura original, solo se propaga.
+`ComprasService.recibir()`/`devolver()` tampoco: la variante se lee de
+la línea de la OC ya creada, nunca se le vuelve a preguntar al usuario
+(mismo criterio que `costoUnitario` en `devolver()`).
+
+**POS** (`CatalogoProductosPos.tsx`): clic en una tarjeta con más de una
+variante abre un modal para elegir cuál antes de agregar al carrito —
+no hay forma de mostrar N variantes como N tarjetas distintas en la
+grilla sin rehacer el catálogo completo, así que se resuelve al
+momento del clic. El precio mostrado en la tarjeta de catálogo es el de
+la variante "representativa" (ver el "fuera de alcance" documentado en
+Precios multinivel) — al elegir la variante real en el modal, se
+resuelve su precio específico (`GET /precios/:productoId?varianteId=`)
+antes de agregarla al carrito, para no cobrar el precio de una variante
+distinta a la elegida (bug real, encontrado y corregido en este
+incremento: antes se arrastraba el precio de la tarjeta sin re-resolver).
+
+**Precios por variante**: `PreciosService`/`PreciosRepository`/
+`CrearPrecioDto` ganan `varianteId` (mismo criterio `resolverObligatoria`
+que el resto) — antes de este incremento, `POST /precios` siempre
+resolvía "la variante más antigua del producto" sin importar cuántas
+variantes reales tuviera, así que no había forma de asignarle un precio
+distinto a cada Talla/Color (gap real, encontrado y corregido en este
+incremento). `FormularioPrecio` (Productos.tsx) gana el mismo selector
+de variante condicional; la celda "Precio vigente" del listado general
+muestra "Varias variantes" en vez de "—" cuando el producto tiene más
+de una (mostrar "—" ahí sería indistinguible de "sin precio").
+
+**Atributos y armado de variantes** (`Productos.tsx`): nuevo
+`AtributosPanel` (Admin → Catálogo → Atributos) para el CRUD de
+`Atributo`/`ValorAtributo`. `VariantesProductoPanel`, embebido en el
+formulario de producto (solo tipo `PRODUCTO`, solo editando uno ya
+creado — `ProductosService.actualizar()` es el único que dispara la
+regeneración), deja elegir qué valores de cada atributo aplican, arma
+el producto cartesiano en el cliente para mostrar cuántas variantes se
+generarían, y llama `PATCH /productos/:id` con `atributos: [...]` al
+confirmar. Precarga la selección desde las variantes ya existentes del
+producto para no perderla al reabrir el formulario.
+
+**Inventario** (`Inventario.tsx`): la pantalla de Stock por bodega pasa
+a operar por variante — cada fila ya trae `varianteId` y
+`valoresAtributo` (ver arriba, `listarStockPorBodega`), se muestra el
+valor de atributo junto al nombre del producto cuando aplica, y
+Ajustar/Transferir stock envían el `varianteId` de esa fila específica
+en vez de asumir "la variante por defecto del producto" (que ya no
+existe como concepto único una vez que el producto tiene variantes
+reales).
+
+Dos bugs reales encontrados por verificación manual en este incremento
+(ninguno cubierto por los tests automatizados, que no ejercitan la UI):
+un `reduce` multiplicativo con acumulador inicial `0` en vez de `1` en
+`VariantesProductoPanel` (mostraba "0 variantes" sin importar la
+selección), y el precio-de-tarjeta-sin-re-resolver del POS descrito
+arriba.
 
 ## Plugin system
 

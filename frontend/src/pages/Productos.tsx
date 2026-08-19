@@ -15,8 +15,10 @@ import { EstadoVacio } from '../components/molecules/EstadoVacio/EstadoVacio';
 import { RowActionsMenu } from '../components/molecules/RowActionsMenu/RowActionsMenu';
 import { RequierePermiso } from '../components/organisms/RequierePermiso/RequierePermiso';
 import { SelectCategoria } from '../components/molecules/SelectCategoria/SelectCategoria';
+import { VariantesProductoPanel } from '../components/organisms/VariantesProductoPanel/VariantesProductoPanel';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { useListasPrecio } from '../hooks/useListasPrecio';
+import { useVariantesProducto, etiquetaVariante } from '../hooks/useVariantesProducto';
 import { PaginaResultado } from '../types/pagina-resultado';
 
 type TipoProducto = 'PRODUCTO' | 'SERVICIO' | 'COMBO';
@@ -234,11 +236,17 @@ export function Productos() {
 }
 
 function PrecioVigente({ productoId }: { productoId: string }) {
+  const { data: variantes } = useVariantesProducto(productoId);
+  // Con más de una variante real, "el" precio vigente es ambiguo — cuál
+  // corresponde depende de qué variante se elija (ver FormularioPrecio).
+  const varias = (variantes?.length ?? 0) > 1;
   const { data } = useQuery({
     queryKey: ['precio-vigente', productoId],
     queryFn: async () => (await apiClient.get<Precio | null>(`/precios/${productoId}`)).data,
+    enabled: !varias,
   });
 
+  if (varias) return <span className="text-xs text-slate-400">Varias variantes</span>;
   if (!data) return <span className="text-slate-400">—</span>;
   return <span>RD$ {Number(data.precioVenta).toLocaleString('es-DO')}</span>;
 }
@@ -428,6 +436,11 @@ function FormularioProducto({ producto, onGuardado }: { producto: Producto | nul
         </div>
       )}
 
+      {valores.tipo === 'PRODUCTO' && producto && <VariantesProductoPanel productoId={producto.id} />}
+      {valores.tipo === 'PRODUCTO' && !producto && (
+        <p className="text-xs text-slate-400">Guardá el producto primero para poder armarle variantes (Talla, Color, etc.).</p>
+      )}
+
       {error && <p className="text-sm text-red-600">{error}</p>}
       <Button type="submit" disabled={guardar.isPending} className="w-full">
         {guardar.isPending ? 'Guardando…' : 'Guardar'}
@@ -439,10 +452,24 @@ function FormularioProducto({ producto, onGuardado }: { producto: Producto | nul
 function FormularioPrecio({ productoId, onGuardado }: { productoId: string; onGuardado: () => void }) {
   const queryClient = useQueryClient();
   const { data: listasPrecio } = useListasPrecio();
+  const { data: variantes } = useVariantesProducto(productoId);
   const [listaPrecio, setListaPrecio] = useState('GENERAL');
+  const [varianteId, setVarianteId] = useState('');
+  // Un producto sin atributos reales tiene una única variante — se resuelve
+  // sola, sin obligar a elegir nada. Con más de una, hay que elegir cuál.
+  useEffect(() => {
+    if (variantes?.length === 1 && varianteId !== variantes[0].id) setVarianteId(variantes[0].id);
+  }, [variantes, varianteId]);
+  const varianteLista = variantes && variantes.length > 1 ? varianteId : undefined;
   const { data: vigente } = useQuery({
-    queryKey: ['precio-vigente', productoId, listaPrecio],
-    queryFn: async () => (await apiClient.get<Precio | null>(`/precios/${productoId}`, { params: { listaPrecio } })).data,
+    queryKey: ['precio-vigente', productoId, varianteId, listaPrecio],
+    enabled: !(variantes && variantes.length > 1) || !!varianteId,
+    queryFn: async () =>
+      (
+        await apiClient.get<Precio | null>(`/precios/${productoId}`, {
+          params: { varianteId: varianteLista, listaPrecio },
+        })
+      ).data,
   });
   const [costo, setCosto] = useState('');
   const [margenPct, setMargenPct] = useState('');
@@ -453,6 +480,7 @@ function FormularioPrecio({ productoId, onGuardado }: { productoId: string; onGu
     mutationFn: async () =>
       apiClient.post('/precios', {
         productoId,
+        varianteId: varianteLista,
         listaPrecio,
         costo: Number(costo),
         margenPct: margenPct ? Number(margenPct) : undefined,
@@ -472,6 +500,10 @@ function FormularioPrecio({ productoId, onGuardado }: { productoId: string; onGu
       setError('Indicá el margen % o el precio de venta.');
       return;
     }
+    if (variantes && variantes.length > 1 && !varianteId) {
+      setError('Elegí a qué variante le corresponde este precio.');
+      return;
+    }
     guardar.mutate();
   }
 
@@ -486,6 +518,21 @@ function FormularioPrecio({ productoId, onGuardado }: { productoId: string; onGu
       <p className="text-xs text-slate-500 dark:text-slate-400">
         Cambiar el precio no edita el anterior: cierra el vigente y crea uno nuevo, para conservar el historial.
       </p>
+      {variantes && variantes.length > 1 && (
+        <div className="flex flex-col gap-1">
+          <label htmlFor="precio-variante" className="text-sm font-medium text-slate-700 dark:text-slate-300">
+            Variante
+          </label>
+          <Select id="precio-variante" value={varianteId} onChange={(e) => setVarianteId(e.target.value)} required>
+            <option value="">Elegir…</option>
+            {variantes.map((v) => (
+              <option key={v.id} value={v.id}>
+                {etiquetaVariante(v) || '(sin atributos)'}
+              </option>
+            ))}
+          </Select>
+        </div>
+      )}
       <div className="flex flex-col gap-1">
         <label htmlFor="precio-lista" className="text-sm font-medium text-slate-700 dark:text-slate-300">
           Nivel de precio
