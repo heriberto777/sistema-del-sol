@@ -1198,6 +1198,47 @@ ITBIS (sobre el neto) → Total**, replicando exactamente la fórmula de
 para que el monto mostrado antes de cobrar coincida con el que el
 backend termina calculando.
 
+### Guardar / Guardadas — aparcar una venta (Fase 2d, F12 / ⇧F12)
+
+Nuevo modelo tenant-scoped `VentaAparcada` + `VentaAparcadaLinea`
+(`backend/src/pos/`, endpoints `POST /pos/turnos/:id/guardar`,
+`GET /pos/turnos/:id/guardadas`, `DELETE /pos/ventas-aparcadas/:id`, todos
+`pos.editar`). Deja "aparcar" el carrito actual (líneas, cliente,
+vendedor, nota opcional) para atender otro cliente sin perderlo — el
+caso real es un cajero interrumpido a media venta.
+
+**Snapshot, no referencia viva**: `VentaAparcadaLinea` guarda
+`precioUnitario`/`porcentajeItbis`/`descuento` en el momento de
+guardar (mismas columnas que `LineaFactura`), no los deriva de
+`Producto`/`Precio` al recuperar — si el precio del producto cambia
+mientras la venta está aparcada, lo que se recupera sigue siendo el
+monto original, no el nuevo. Encaja con el caso de uso (aparcar minutos
+u horas, no días).
+
+**Vive y muere con el turno**: `turnoCajaId` es `onDelete: Cascade` —
+una venta aparcada no está pensada para sobrevivir al cierre del turno
+(no hay flujo para recuperarla después de cerrado). El repositorio no
+filtra por `cajeroId`: cualquiera con `pos.editar` que conozca el
+`turnoCajaId` ve sus guardadas — aceptable porque hoy un turno ya es
+1:1 con su cajero (`buscarTurnoAbierto` exige `bodegaId` único
+`ABIERTO`), no hay caso real de "varios cajeros comparten turno".
+
+**Recuperar = cargar + borrar, no "en uso"**: al elegir "Recuperar" en
+`ModalGuardadas`, el frontend repone el carrito local y llama
+`DELETE /pos/ventas-aparcadas/:id` de inmediato — no hay estado
+intermedio de "prestada"; si el cajero se arrepiente después de
+recuperarla, tendría que volver a guardarla (nueva fila). Elegido así
+para no sumar un enum de estado a una entidad que ya es efímera por
+diseño.
+
+**Atajos F12/⇧F12**: nota conocida — Chrome reserva F12 para abrir
+DevTools; en un teclado físico real el navegador puede interceptarlo
+antes de que llegue a `useAtajosTeclado` (los eventos sintéticos vía
+CDP sí llegan, que es como se verificó el flujo en esta fase). Se
+mantiene por fidelidad al mapeo de teclas de Cuadre — ambos accesos
+también tienen botón visible ("Guardar venta (F12)"/"Guardadas
+(⇧F12)") para cuando el atajo no dispara.
+
 ### Roles de POS: Cajero, Vendedor, Supervisor de Caja
 
 Investigando el patrón de sesión de caja más a fondo (Odoo multi-cajero,

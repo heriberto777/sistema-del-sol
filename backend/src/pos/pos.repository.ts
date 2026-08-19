@@ -18,6 +18,14 @@ const INCLUDE_TURNO = {
   cerradoPor: { select: { id: true, nombre: true } },
 } as const;
 
+const INCLUDE_VENTA_APARCADA = {
+  cliente: { select: { id: true, nombre: true } },
+  vendedorEmpleado: { select: { id: true, nombre: true } },
+  lineas: {
+    include: { producto: { select: { codigo: true, nombre: true } } },
+  },
+} as const;
+
 @Injectable()
 export class PosRepository {
   constructor(private readonly tenantPrisma: TenantPrismaService) {}
@@ -100,5 +108,42 @@ export class PosRepository {
       data: { ...params, estado: 'CERRADO' as EstadoTurnoCaja, cerradoEn: new Date() },
       include: INCLUDE_TURNO,
     });
+  }
+
+  guardarVenta(params: {
+    tenantId: string;
+    turnoCajaId: string;
+    clienteId?: string;
+    vendedorEmpleadoId?: string;
+    nota?: string;
+    lineas: { productoId: string; cantidad: number; precioUnitario: number; porcentajeItbis: number; descuento?: number }[];
+  }) {
+    return this.db.ventaAparcada.create({
+      data: {
+        tenantId: params.tenantId,
+        turnoCajaId: params.turnoCajaId,
+        clienteId: params.clienteId,
+        vendedorEmpleadoId: params.vendedorEmpleadoId,
+        nota: params.nota,
+        lineas: { create: params.lineas },
+      },
+      include: INCLUDE_VENTA_APARCADA,
+    });
+  }
+
+  listarGuardadas(turnoCajaId: string) {
+    return this.db.ventaAparcada.findMany({
+      where: { turnoCajaId },
+      include: INCLUDE_VENTA_APARCADA,
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  buscarGuardadaPorId(id: string) {
+    return this.db.ventaAparcada.findUniqueOrThrow({ where: { id }, include: INCLUDE_VENTA_APARCADA });
+  }
+
+  eliminarGuardada(id: string) {
+    return this.db.ventaAparcada.delete({ where: { id } });
   }
 }

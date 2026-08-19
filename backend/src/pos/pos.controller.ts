@@ -1,10 +1,11 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { PosService } from './pos.service';
 import { AbrirTurnoDto } from './dto/abrir-turno.dto';
 import { CerrarTurnoDto } from './dto/cerrar-turno.dto';
 import { CrearMovimientoCajaDto } from './dto/crear-movimiento-caja.dto';
 import { RegistrarVentaPosDto } from './dto/registrar-venta.dto';
+import { GuardarVentaDto } from './dto/guardar-venta.dto';
 import { ListarTurnosQueryDto } from './dto/listar-turnos-query.dto';
 import { Permissions } from '../common/decorators/permissions.decorator';
 import { RequiereModulo } from '../common/decorators/requiere-modulo.decorator';
@@ -67,5 +68,23 @@ export class PosController {
   @Permissions('pos.editar')
   registrarVenta(@Body() dto: RegistrarVentaPosDto, @CurrentUser() user: JwtPayloadUser) {
     return this.posService.registrarVenta(dto, user.tenantId, user.userId);
+  }
+
+  @Post('turnos/:id/guardar')
+  @Permissions('pos.editar')
+  guardarVenta(@Param('id') id: string, @Body() dto: GuardarVentaDto, @CurrentUser() user: JwtPayloadUser) {
+    return this.posService.guardarVenta(id, dto, user.tenantId);
+  }
+
+  @Get('turnos/:id/guardadas')
+  @Permissions('pos.editar')
+  listarGuardadas(@Param('id') id: string) {
+    return this.posService.listarGuardadas(id);
+  }
+
+  @Delete('ventas-aparcadas/:id')
+  @Permissions('pos.editar')
+  eliminarGuardada(@Param('id') id: string) {
+    return this.posService.eliminarGuardada(id);
   }
 }

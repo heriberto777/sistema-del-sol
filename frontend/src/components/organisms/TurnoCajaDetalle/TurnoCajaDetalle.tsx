@@ -47,6 +47,24 @@ interface MovimientoCaja {
   concepto: string;
 }
 
+interface VentaAparcadaLinea {
+  productoId: string;
+  cantidad: string;
+  precioUnitario: string;
+  porcentajeItbis: string;
+  descuento: string;
+  producto: { codigo: string; nombre: string };
+}
+
+interface VentaAparcada {
+  id: string;
+  nota: string | null;
+  createdAt: string;
+  cliente: Cliente | null;
+  vendedorEmpleado: Vendedor | null;
+  lineas: VentaAparcadaLinea[];
+}
+
 interface FacturaTurno {
   id: string;
   ncf: string | null;
@@ -107,6 +125,8 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
   const [modalMovimiento, setModalMovimiento] = useState(false);
   const [modalCerrarTurno, setModalCerrarTurno] = useState(false);
   const [modalDescuento, setModalDescuento] = useState(false);
+  const [modalGuardar, setModalGuardar] = useState(false);
+  const [modalGuardadas, setModalGuardadas] = useState(false);
   const [ventaConfirmada, setVentaConfirmada] = useState<{ id: string; total: string } | null>(null);
   const [facturaAnulando, setFacturaAnulando] = useState<FacturaTurno | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -150,6 +170,38 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
     onError: () => setError('No se pudo registrar la venta — revisá el stock disponible.'),
   });
 
+  const { data: guardadas } = useQuery({
+    queryKey: ['pos-guardadas', turnoId],
+    queryFn: async () => (await apiClient.get<VentaAparcada[]>(`/pos/turnos/${turnoId}/guardadas`)).data,
+    enabled: modalGuardadas,
+  });
+
+  const guardarVenta = useMutation({
+    mutationFn: async (nota: string) =>
+      apiClient.post(`/pos/turnos/${turnoId}/guardar`, {
+        clienteId: cliente?.id,
+        vendedorEmpleadoId: vendedor?.id,
+        nota: nota || undefined,
+        lineas: carrito.map((l) => ({
+          productoId: l.productoId,
+          cantidad: l.cantidad,
+          precioUnitario: l.precioUnitario,
+          porcentajeItbis: l.porcentajeItbis,
+          descuento: l.descuento,
+        })),
+      }),
+    onSuccess: () => {
+      setCarrito([]);
+      setVendedor(null);
+      setModalGuardar(false);
+    },
+  });
+
+  const eliminarGuardada = useMutation({
+    mutationFn: async (id: string) => apiClient.delete(`/pos/ventas-aparcadas/${id}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['pos-guardadas', turnoId] }),
+  });
+
   function agregarAlCarrito(linea: LineaCarrito) {
     setCarrito((prev) => {
       const existente = prev.find((l) => l.productoId === linea.productoId);
@@ -179,6 +231,25 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
 
   function cambiarCantidad(productoId: string, cantidad: number) {
     setCarrito((prev) => prev.map((l) => (l.productoId === productoId ? { ...l, cantidad } : l)));
+  }
+
+  /** Recupera una venta aparcada (Guardadas, ⇧F12): repone el carrito/cliente/vendedor y la borra de la lista. */
+  function cargarVentaAparcada(venta: VentaAparcada) {
+    setCarrito(
+      venta.lineas.map((l) => ({
+        productoId: l.productoId,
+        codigo: l.producto.codigo,
+        nombre: l.producto.nombre,
+        cantidad: Number(l.cantidad),
+        precioUnitario: Number(l.precioUnitario),
+        porcentajeItbis: Number(l.porcentajeItbis),
+        descuento: Number(l.descuento),
+      })),
+    );
+    setCliente(venta.cliente);
+    setVendedor(venta.vendedorEmpleado);
+    eliminarGuardada.mutate(venta.id);
+    setModalGuardadas(false);
   }
 
   /** Aplica un descuento (monto flat o %) a las líneas seleccionadas — ver ModalDescuento. */
@@ -227,6 +298,8 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
       F7: () => setModalMovimiento(true),
       F8: () => carrito.length > 0 && setModalDescuento(true),
       F9: () => setModalCerrarTurno(true),
+      F12: () => carrito.length > 0 && setModalGuardar(true),
+      'Shift+F12': () => setModalGuardadas(true),
     },
     pantallaCompleta && puedeVender,
   );
@@ -369,6 +442,12 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
             <Button variante="secundario" onClick={() => setModalMovimiento(true)}>
               Registrar entrada/salida de efectivo
             </Button>
+            <Button variante="secundario" onClick={() => setModalGuardar(true)} disabled={carrito.length === 0}>
+              Guardar venta (F12)
+            </Button>
+            <Button variante="secundario" onClick={() => setModalGuardadas(true)}>
+              Guardadas (⇧F12)
+            </Button>
             <Button variante="peligro" onClick={() => setModalCerrarTurno(true)}>
               Cerrar turno
             </Button>
@@ -441,6 +520,18 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
 
       {modalDescuento && (
         <ModalDescuento carrito={carrito} onAplicar={aplicarDescuento} onClose={() => setModalDescuento(false)} />
+      )}
+
+      {modalGuardar && (
+        <ModalGuardar onGuardar={(nota) => guardarVenta.mutate(nota)} guardando={guardarVenta.isPending} onClose={() => setModalGuardar(false)} />
+      )}
+
+      {modalGuardadas && (
+        <ModalGuardadas
+          guardadas={guardadas ?? []}
+          onRecuperar={cargarVentaAparcada}
+          onClose={() => setModalGuardadas(false)}
+        />
       )}
 
       {modalCerrarTurno && (
@@ -553,6 +644,73 @@ function ModalDescuento({
           Aplicar descuento
         </Button>
       </form>
+    </Modal>
+  );
+}
+
+function ModalGuardar({
+  onGuardar,
+  guardando,
+  onClose,
+}: {
+  onGuardar: (nota: string) => void;
+  guardando: boolean;
+  onClose: () => void;
+}) {
+  const [nota, setNota] = useState('');
+
+  function onSubmit(e: FormEvent) {
+    e.preventDefault();
+    onGuardar(nota);
+  }
+
+  return (
+    <Modal titulo="Guardar venta" onClose={onClose}>
+      <form onSubmit={onSubmit} className="space-y-3">
+        <p className="text-sm text-slate-600 dark:text-slate-400">
+          El carrito actual se aparca — podés recuperarlo después desde "Guardadas" (⇧F12) sin perder líneas, cliente ni vendedor.
+        </p>
+        <FormField id="guardar-venta-nota" label="Nota (opcional)" value={nota} onChange={(e) => setNota(e.target.value)} />
+        <Button type="submit" disabled={guardando} className="w-full">
+          {guardando ? 'Guardando…' : 'Guardar venta'}
+        </Button>
+      </form>
+    </Modal>
+  );
+}
+
+function ModalGuardadas({
+  guardadas,
+  onRecuperar,
+  onClose,
+}: {
+  guardadas: VentaAparcada[];
+  onRecuperar: (venta: VentaAparcada) => void;
+  onClose: () => void;
+}) {
+  return (
+    <Modal titulo="Ventas guardadas" onClose={onClose}>
+      <ul className="max-h-80 space-y-2 overflow-y-auto">
+        {guardadas.map((v) => (
+          <li key={v.id} className="rounded-md border border-slate-200 p-3 dark:border-slate-800">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-slate-800 dark:text-slate-200">
+                  {v.cliente?.nombre ?? 'Sin cliente'}
+                  {v.vendedorEmpleado && ` — vendedor: ${v.vendedorEmpleado.nombre}`}
+                </p>
+                <p className="text-xs text-slate-400">{new Date(v.createdAt).toLocaleString('es-DO')}</p>
+                {v.nota && <p className="text-xs text-slate-500 dark:text-slate-400">"{v.nota}"</p>}
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  {v.lineas.length} línea{v.lineas.length === 1 ? '' : 's'} — {v.lineas.map((l) => l.producto.nombre).join(', ')}
+                </p>
+              </div>
+              <Button onClick={() => onRecuperar(v)}>Recuperar</Button>
+            </div>
+          </li>
+        ))}
+        {guardadas.length === 0 && <li className="py-6 text-center text-sm text-slate-400">No hay ventas guardadas en este turno.</li>}
+      </ul>
     </Modal>
   );
 }

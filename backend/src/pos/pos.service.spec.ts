@@ -24,6 +24,9 @@ describe('PosService', () => {
       crearMovimiento: jest.fn(),
       calcularMovimientoEfectivo: jest.fn(),
       cerrarTurno: jest.fn(),
+      guardarVenta: jest.fn(),
+      listarGuardadas: jest.fn(),
+      eliminarGuardada: jest.fn(),
     } as unknown as jest.Mocked<PosRepository>;
     facturacionService = { crear: jest.fn() } as unknown as jest.Mocked<FacturacionService>;
     configuracionesService = { buscarValor: jest.fn().mockResolvedValue('50') } as unknown as jest.Mocked<ConfiguracionesService>;
@@ -252,6 +255,50 @@ describe('PosService', () => {
       await service.cerrarTurno('t1', { montoFinalContado: 900 }, 'cajero-1', 'tenant-1', false);
 
       expect(posRepository.cerrarTurno).toHaveBeenCalledWith('t1', expect.objectContaining({ justificacionDiferencia: undefined }));
+    });
+  });
+
+  describe('guardarVenta', () => {
+    it('rechaza aparcar una venta contra un turno que no está abierto', async () => {
+      posRepository.buscarPorId.mockResolvedValue({ id: 't1', estado: 'CERRADO' } as never);
+
+      await expect(
+        service.guardarVenta('t1', { lineas: [{ productoId: 'p1', cantidad: 1, precioUnitario: 100, porcentajeItbis: 18 }] } as never, 'tenant-1'),
+      ).rejects.toThrow(BadRequestException);
+      expect(posRepository.guardarVenta).not.toHaveBeenCalled();
+    });
+
+    it('guarda la venta aparcada con el turnoCajaId y tenantId correctos', async () => {
+      posRepository.buscarPorId.mockResolvedValue({ id: 't1', estado: 'ABIERTO' } as never);
+      posRepository.guardarVenta.mockResolvedValue({ id: 'va1' } as never);
+
+      const dto = { clienteId: 'c1', lineas: [{ productoId: 'p1', cantidad: 1, precioUnitario: 100, porcentajeItbis: 18 }] } as never;
+      await service.guardarVenta('t1', dto, 'tenant-1');
+
+      expect(posRepository.guardarVenta).toHaveBeenCalledWith(
+        expect.objectContaining({ tenantId: 'tenant-1', turnoCajaId: 't1', clienteId: 'c1' }),
+      );
+    });
+  });
+
+  describe('listarGuardadas', () => {
+    it('delega en el repositorio con el turnoId recibido', async () => {
+      posRepository.listarGuardadas.mockResolvedValue([{ id: 'va1' }] as never);
+
+      const resultado = await service.listarGuardadas('t1');
+
+      expect(posRepository.listarGuardadas).toHaveBeenCalledWith('t1');
+      expect(resultado).toEqual([{ id: 'va1' }]);
+    });
+  });
+
+  describe('eliminarGuardada', () => {
+    it('delega en el repositorio (tenant-scoped vía TenantPrismaService)', async () => {
+      posRepository.eliminarGuardada.mockResolvedValue({ id: 'va1' } as never);
+
+      await service.eliminarGuardada('va1');
+
+      expect(posRepository.eliminarGuardada).toHaveBeenCalledWith('va1');
     });
   });
 

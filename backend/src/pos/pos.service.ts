@@ -8,6 +8,7 @@ import { AbrirTurnoDto } from './dto/abrir-turno.dto';
 import { CerrarTurnoDto } from './dto/cerrar-turno.dto';
 import { CrearMovimientoCajaDto } from './dto/crear-movimiento-caja.dto';
 import { RegistrarVentaPosDto } from './dto/registrar-venta.dto';
+import { GuardarVentaDto } from './dto/guardar-venta.dto';
 import { ListarTurnosQueryDto } from './dto/listar-turnos-query.dto';
 import { paginar } from '../common/types/pagina-resultado';
 import { CONFIGURACIONES_BASE } from '../tenants/roles-base';
@@ -123,6 +124,21 @@ export class PosService {
       cerradoPorId: userId,
       justificacionDiferencia: dto.justificacionDiferencia,
     });
+  }
+
+  /** Guardar/Guardadas (F12/⇧F12) — aparcar el carrito actual para atender otro cliente sin perderlo. */
+  async guardarVenta(turnoId: string, dto: GuardarVentaDto, tenantId: string) {
+    const turno = await this.posRepository.buscarPorId(turnoId);
+    this.validarAbierto(turno);
+    return this.posRepository.guardarVenta({ tenantId, turnoCajaId: turnoId, ...dto });
+  }
+
+  listarGuardadas(turnoId: string) {
+    return this.posRepository.listarGuardadas(turnoId);
+  }
+
+  eliminarGuardada(id: string) {
+    return this.posRepository.eliminarGuardada(id);
   }
 
   private validarAbierto(turno: { estado: string }) {

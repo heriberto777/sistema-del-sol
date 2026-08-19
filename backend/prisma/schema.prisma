@@ -67,6 +67,7 @@ model Tenant {
   gastosMenores GastoMenor[]
   suscripcion   Suscripcion?
   facturasPlataforma FacturaPlataforma[]
+  ventasAparcadas VentaAparcada[]
 
   @@map("tenants")
 }
@@ -977,6 +978,7 @@ model Empleado {
 
   recibos             ReciboNomina[]
   ventasComoVendedor  Factura[]
+  ventasAparcadas     VentaAparcada[]
 
   @@unique([tenantId, cedula])
   @@map("empleados")
@@ -1110,6 +1112,7 @@ model TurnoCaja {
 
   movimientos MovimientoCaja[]
   facturas    Factura[]
+  ventasAparcadas VentaAparcada[]
 
   @@map("turnos_caja")
 }
@@ -1127,6 +1130,45 @@ model MovimientoCaja {
   createdAt DateTime           @default(now())
 
   @@map("movimientos_caja")
+}
+
+/// Carrito "aparcado" (Guardar/Guardadas, F12/⇧F12) — el cajero atiende
+/// otro cliente sin perder lo ya armado. Snapshot de precio/ITBIS/descuento
+/// por línea (no se re-cotiza al recuperar) para que el monto no cambie
+/// mientras estuvo aparcada. Vive mientras el turno sigue abierto
+/// (onDelete: Cascade) — no está pensada para sobrevivir al cierre.
+model VentaAparcada {
+  id                 String    @id @default(uuid())
+  tenantId           String
+  tenant             Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  turnoCajaId        String
+  turnoCaja          TurnoCaja @relation(fields: [turnoCajaId], references: [id], onDelete: Cascade)
+  clienteId          String?
+  cliente            Cliente?  @relation(fields: [clienteId], references: [id], onDelete: SetNull)
+  vendedorEmpleadoId String?
+  vendedorEmpleado   Empleado? @relation(fields: [vendedorEmpleadoId], references: [id], onDelete: SetNull)
+  nota               String?
+  createdAt          DateTime  @default(now())
+
+  lineas VentaAparcadaLinea[]
+
+  @@map("ventas_aparcadas")
+}
+
+// Tabla "hija" sin tenantId propio (mismo patrón que LineaFactura) — su
+// aislamiento depende de llegar siempre vía VentaAparcada, ya tenant-scoped.
+model VentaAparcadaLinea {
+  id              String        @id @default(uuid())
+  ventaAparcadaId String
+  ventaAparcada   VentaAparcada @relation(fields: [ventaAparcadaId], references: [id], onDelete: Cascade)
+  productoId      String
+  producto        Producto      @relation(fields: [productoId], references: [id])
+  cantidad        Decimal       @db.Decimal(14, 4)
+  precioUnitario  Decimal       @db.Decimal(14, 4)
+  porcentajeItbis Decimal       @db.Decimal(5, 2)
+  descuento       Decimal       @default(0) @db.Decimal(14, 2)
+
+  @@map("lineas_venta_aparcada")
 }
 
 // ============================================================
@@ -1172,6 +1214,7 @@ model Producto {
   lineasCotizacion LineaCotizacion[]
   lineasRemision   LineaRemision[]
   lineasDevolucionCompra LineaDevolucionCompra[]
+  lineasVentaAparcada VentaAparcadaLinea[]
   // Componentes de ESTE producto cuando `tipo: COMBO`.
   componentes    ComponenteCombo[] @relation("ComboComponentes")
   // Combos de los que este producto forma parte (como componente).
@@ -1483,6 +1526,7 @@ model Cliente {
   facturas    Factura[]
   cotizaciones Cotizacion[]
   remisiones  Remision[]
+  ventasAparcadas VentaAparcada[]
 
   @@map("clientes")
 }
