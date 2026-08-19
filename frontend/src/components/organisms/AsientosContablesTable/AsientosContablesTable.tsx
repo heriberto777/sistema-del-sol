@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../../lib/api-client';
 import { Badge } from '../../atoms/Badge/Badge';
 import { Button } from '../../atoms/Button/Button';
+import { Card } from '../../atoms/Card/Card';
 import { Input } from '../../atoms/Input/Input';
 import { FormField } from '../../molecules/FormField/FormField';
 import { Modal } from '../../molecules/Modal/Modal';
@@ -80,30 +81,33 @@ export function AsientosContablesTable() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h2 className="font-medium text-slate-900 dark:text-slate-100">Asientos</h2>
-        {tienePermiso('contabilidad.editar') && <Button onClick={() => setModalNuevoAsiento(true)}>Nuevo asiento</Button>}
-      </div>
-
       {error && <p className="text-sm text-red-600">{error}</p>}
 
-      <SearchInput
-        value={busqueda}
-        onChange={(v) => {
-          setBusqueda(v);
-          setPagina(1);
-        }}
-        placeholder="Buscar por concepto…"
-      />
+      <Card
+        sinPadding
+        titulo="Asientos"
+        descripcion={data ? `${data.total} asiento(s)` : undefined}
+        acciones={
+          <div className="flex items-center gap-2">
+            <SearchInput
+              value={busqueda}
+              onChange={(v) => {
+                setBusqueda(v);
+                setPagina(1);
+              }}
+              placeholder="Buscar por concepto…"
+            />
+            {tienePermiso('contabilidad.editar') && <Button onClick={() => setModalNuevoAsiento(true)}>Nuevo asiento</Button>}
+          </div>
+        }
+      >
+        {isLoading && <p className="p-5 text-sm text-slate-500">Cargando asientos…</p>}
+        {errorCarga && <p className="p-5 text-sm text-red-600">No se pudieron cargar los asientos.</p>}
 
-      {isLoading && <p className="text-sm text-slate-500">Cargando asientos…</p>}
-      {errorCarga && <p className="text-sm text-red-600">No se pudieron cargar los asientos.</p>}
-
-      {data && (
-        <>
-          <div className="space-y-3">
+        {data && (
+          <div className="divide-y divide-slate-100 dark:divide-slate-800">
             {data.datos.map((asiento) => (
-              <div key={asiento.id} className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
+              <div key={asiento.id} className="p-5">
                 <div className="flex items-center justify-between text-sm">
                   <span className="flex items-center gap-2 font-medium text-slate-900 dark:text-slate-100">
                     #{asiento.numero} — {asiento.concepto}
@@ -145,9 +149,13 @@ export function AsientosContablesTable() {
               </div>
             ))}
           </div>
-          <Paginacion pagina={data.pagina} tamanoPagina={data.tamanoPagina} total={data.total} onCambiarPagina={setPagina} />
-        </>
-      )}
+        )}
+        {data && (
+          <div className="px-5 py-3">
+            <Paginacion pagina={data.pagina} tamanoPagina={data.tamanoPagina} total={data.total} onCambiarPagina={setPagina} />
+          </div>
+        )}
+      </Card>
 
       {modalNuevoAsiento && <ModalNuevoAsiento onClose={() => setModalNuevoAsiento(false)} />}
     </div>

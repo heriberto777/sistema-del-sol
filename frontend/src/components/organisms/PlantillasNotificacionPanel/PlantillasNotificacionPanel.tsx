@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../../lib/api-client';
 import { Badge } from '../../atoms/Badge/Badge';
 import { Button } from '../../atoms/Button/Button';
+import { Card } from '../../atoms/Card/Card';
 import { Select } from '../../atoms/Select/Select';
 import { Switch } from '../../atoms/Switch/Switch';
 import { FormField } from '../../molecules/FormField/FormField';
@@ -48,50 +49,50 @@ export function PlantillasNotificacionPanel() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-slate-500 dark:text-slate-400">
-          Las variables como <code>{'{{cliente_nombre}}'}</code> se reemplazan automáticamente al enviar.
-        </p>
-        <Button onClick={abrirNueva}>Nueva plantilla</Button>
-      </div>
-
-      <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-slate-50 text-slate-500 dark:bg-slate-900 dark:text-slate-400">
-            <tr>
-              <th className="px-4 py-2">Canal</th>
-              <th className="px-4 py-2">Clave</th>
-              <th className="px-4 py-2">Asunto</th>
-              <th className="px-4 py-2">Activa</th>
-              <th className="px-4 py-2" />
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-            {plantillas?.map((p) => (
-              <tr key={p.id}>
-                <td className="px-4 py-2">
-                  <Badge>{p.canal}</Badge>
-                </td>
-                <td className="px-4 py-2 font-mono text-xs">{p.clave}</td>
-                <td className="px-4 py-2">{p.asunto ?? '—'}</td>
-                <td className="px-4 py-2">
-                  <Switch activo={p.activa} onChange={() => guardarActiva.mutate(p)} disabled={guardarActiva.isPending} />
-                </td>
-                <td className="px-4 py-2 text-right">
-                  <RowActionsMenu acciones={[{ etiqueta: 'Editar', onClick: () => abrirEditar(p) }]} />
-                </td>
-              </tr>
-            ))}
-            {plantillas?.length === 0 && (
+      <Card
+        sinPadding
+        titulo="Plantillas"
+        descripcion="Las variables como {{cliente_nombre}} se reemplazan automáticamente al enviar."
+        acciones={<Button onClick={abrirNueva}>Nueva plantilla</Button>}
+      >
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-slate-50 text-slate-500 dark:bg-slate-900/60 dark:text-slate-400">
               <tr>
-                <td colSpan={5} className="px-4 py-6 text-center text-slate-400">
-                  Todavía no hay plantillas configuradas.
-                </td>
+                <th className="px-5 py-3 font-medium">Canal</th>
+                <th className="px-5 py-3 font-medium">Clave</th>
+                <th className="px-5 py-3 font-medium">Asunto</th>
+                <th className="px-5 py-3 font-medium">Activa</th>
+                <th className="px-5 py-3" />
               </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+              {plantillas?.map((p) => (
+                <tr key={p.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                  <td className="px-5 py-3">
+                    <Badge>{p.canal}</Badge>
+                  </td>
+                  <td className="px-5 py-3 font-mono text-xs">{p.clave}</td>
+                  <td className="px-5 py-3">{p.asunto ?? '—'}</td>
+                  <td className="px-5 py-3">
+                    <Switch activo={p.activa} onChange={() => guardarActiva.mutate(p)} disabled={guardarActiva.isPending} />
+                  </td>
+                  <td className="px-5 py-3 text-right">
+                    <RowActionsMenu acciones={[{ etiqueta: 'Editar', onClick: () => abrirEditar(p) }]} />
+                  </td>
+                </tr>
+              ))}
+              {plantillas?.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="px-5 py-6 text-center text-slate-400">
+                    Todavía no hay plantillas configuradas.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </Card>
 
       {modalAbierto && <ModalPlantilla plantilla={plantillaEditando} onClose={() => setModalAbierto(false)} />}
     </div>

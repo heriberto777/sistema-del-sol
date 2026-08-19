@@ -4,6 +4,7 @@ import { apiClient } from '../../../lib/api-client';
 import { AbrirTurnoForm } from '../AbrirTurnoForm/AbrirTurnoForm';
 import { Badge } from '../../atoms/Badge/Badge';
 import { Button } from '../../atoms/Button/Button';
+import { Card } from '../../atoms/Card/Card';
 import { FormField } from '../../molecules/FormField/FormField';
 import { Modal } from '../../molecules/Modal/Modal';
 import { Paginacion } from '../../molecules/Paginacion/Paginacion';
@@ -80,11 +81,14 @@ export function TurnosCajaTable({ seleccionadoId, onSeleccionar }: TurnosCajaTab
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Turnos de caja</h2>
+        <div>
+          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Turnos de caja</h2>
+          <p className="text-sm text-slate-500 dark:text-slate-400">Apertura, cierre y arqueo por cajero.</p>
+        </div>
         {tienePermiso('pos.editar') && <Button onClick={() => setModalAbrirTurno(true)}>Abrir turno</Button>}
       </div>
 
-      <div className="flex flex-wrap items-end gap-3 rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
+      <Card className="flex flex-wrap items-end gap-3 p-4">
         <div>
           <label className="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">Cajero</label>
           <select
@@ -93,7 +97,7 @@ export function TurnosCajaTable({ seleccionadoId, onSeleccionar }: TurnosCajaTab
               setFiltroCajeroId(e.target.value);
               setPagina(1);
             }}
-            className="rounded-md border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+            className="rounded-lg border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
           >
             <option value="">Todos</option>
             {cajeros?.map((c) => (
@@ -111,7 +115,7 @@ export function TurnosCajaTable({ seleccionadoId, onSeleccionar }: TurnosCajaTab
               setFiltroEstado(e.target.value);
               setPagina(1);
             }}
-            className="rounded-md border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+            className="rounded-lg border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
           >
             <option value="">Todos</option>
             <option value="ABIERTO">Abierto</option>
@@ -131,41 +135,44 @@ export function TurnosCajaTable({ seleccionadoId, onSeleccionar }: TurnosCajaTab
             placeholder="Nombre del cajero…"
           />
         </div>
-      </div>
+      </Card>
 
       {isLoading && <p className="text-sm text-slate-500">Cargando turnos…</p>}
       {errorCarga && <p className="text-sm text-red-600">No se pudieron cargar los turnos.</p>}
 
       {data && (
         <>
-          <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800">
+          <Card sinPadding className="overflow-x-auto">
             <table className="w-full text-left text-sm">
-              <thead className="bg-slate-50 text-slate-500 dark:bg-slate-900 dark:text-slate-400">
+              <thead className="bg-slate-50 text-slate-500 dark:bg-slate-900/60 dark:text-slate-400">
                 <tr>
-                  <th className="px-4 py-2">Bodega</th>
-                  <th className="px-4 py-2">Cajero</th>
-                  <th className="px-4 py-2">Monto inicial</th>
-                  <th className="px-4 py-2">Estado</th>
-                  <th className="px-4 py-2">Abierto</th>
-                  <th className="px-4 py-2"></th>
+                  <th className="px-5 py-3 font-medium">Bodega</th>
+                  <th className="px-5 py-3 font-medium">Cajero</th>
+                  <th className="px-5 py-3 font-medium">Monto inicial</th>
+                  <th className="px-5 py-3 font-medium">Estado</th>
+                  <th className="px-5 py-3 font-medium">Abierto</th>
+                  <th className="px-5 py-3"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {data.datos.map((turno) => (
-                  <tr key={turno.id} className={turno.id === seleccionadoId ? 'bg-sol-50 dark:bg-sol-900/20' : ''}>
-                    <td className="px-4 py-2">{bodegas?.find((b) => b.id === turno.bodegaId)?.nombre ?? turno.bodegaId}</td>
-                    <td className="px-4 py-2">
+                  <tr
+                    key={turno.id}
+                    className={turno.id === seleccionadoId ? 'bg-sol-50 dark:bg-sol-900/20' : 'hover:bg-slate-50 dark:hover:bg-slate-800/40'}
+                  >
+                    <td className="px-5 py-3">{bodegas?.find((b) => b.id === turno.bodegaId)?.nombre ?? turno.bodegaId}</td>
+                    <td className="px-5 py-3">
                       {turno.cajero.nombre}
                       {turno.estado === 'CERRADO' && turno.cerradoPor && turno.cerradoPor.id !== turno.cajero.id && (
                         <span className="block text-xs text-slate-400">Cerrado por {turno.cerradoPor.nombre}</span>
                       )}
                     </td>
-                    <td className="px-4 py-2">RD$ {Number(turno.montoInicial).toLocaleString('es-DO')}</td>
-                    <td className="px-4 py-2">
+                    <td className="px-5 py-3">RD$ {Number(turno.montoInicial).toLocaleString('es-DO')}</td>
+                    <td className="px-5 py-3">
                       <Badge tono={turno.estado === 'ABIERTO' ? 'exito' : 'neutro'}>{turno.estado}</Badge>
                     </td>
-                    <td className="px-4 py-2">{new Date(turno.abiertoEn).toLocaleString('es-DO')}</td>
-                    <td className="px-4 py-2">
+                    <td className="px-5 py-3">{new Date(turno.abiertoEn).toLocaleString('es-DO')}</td>
+                    <td className="px-5 py-3">
                       <Button variante="secundario" onClick={() => onSeleccionar(turno.id)}>
                         Ver detalle
                       </Button>
@@ -174,7 +181,7 @@ export function TurnosCajaTable({ seleccionadoId, onSeleccionar }: TurnosCajaTab
                 ))}
               </tbody>
             </table>
-          </div>
+          </Card>
           <Paginacion pagina={data.pagina} tamanoPagina={data.tamanoPagina} total={data.total} onCambiarPagina={setPagina} />
         </>
       )}

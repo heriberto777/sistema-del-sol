@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '../../../lib/api-client';
+import { Card } from '../../atoms/Card/Card';
 import { Input } from '../../atoms/Input/Input';
 import { BotonesExportar } from '../../molecules/BotonesExportar/BotonesExportar';
+import { StatCard } from '../../molecules/StatCard/StatCard';
 
 interface FacturaReporte {
   id: string;
@@ -50,46 +52,39 @@ export function ReporteVentas() {
 
       {!isLoading && data && (
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-          <Resumen etiqueta="Facturas" valor={String(data.resumen.cantidad)} />
-          <Resumen etiqueta="Subtotal" valor={`RD$ ${data.resumen.subtotal.toLocaleString('es-DO', { minimumFractionDigits: 2 })}`} />
-          <Resumen etiqueta="ITBIS" valor={`RD$ ${data.resumen.itbis.toLocaleString('es-DO', { minimumFractionDigits: 2 })}`} />
-          <Resumen etiqueta="Total" valor={`RD$ ${data.resumen.total.toLocaleString('es-DO', { minimumFractionDigits: 2 })}`} />
+          <StatCard etiqueta="Facturas" valor={String(data.resumen.cantidad)} />
+          <StatCard etiqueta="Subtotal" valor={`RD$ ${data.resumen.subtotal.toLocaleString('es-DO', { minimumFractionDigits: 2 })}`} />
+          <StatCard etiqueta="ITBIS" valor={`RD$ ${data.resumen.itbis.toLocaleString('es-DO', { minimumFractionDigits: 2 })}`} />
+          <StatCard etiqueta="Total" valor={`RD$ ${data.resumen.total.toLocaleString('es-DO', { minimumFractionDigits: 2 })}`} />
         </div>
       )}
 
-      <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-slate-50 text-slate-500 dark:bg-slate-900 dark:text-slate-400">
-            <tr>
-              <th className="px-4 py-2">NCF</th>
-              <th className="px-4 py-2">Fecha</th>
-              <th className="px-4 py-2">Cliente</th>
-              <th className="px-4 py-2">Tipo</th>
-              <th className="px-4 py-2">Total</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-            {data?.facturas.map((f) => (
-              <tr key={f.id}>
-                <td className="px-4 py-2 font-mono text-xs">{f.ncf ?? '—'}</td>
-                <td className="px-4 py-2">{new Date(f.fecha).toLocaleDateString('es-DO')}</td>
-                <td className="px-4 py-2">{f.cliente.nombre}</td>
-                <td className="px-4 py-2">{f.tipoFactura}</td>
-                <td className="px-4 py-2">RD$ {Number(f.total).toLocaleString('es-DO')}</td>
+      <Card sinPadding titulo="Facturas del período">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-slate-50 text-slate-500 dark:bg-slate-900/60 dark:text-slate-400">
+              <tr>
+                <th className="px-5 py-3 font-medium">NCF</th>
+                <th className="px-5 py-3 font-medium">Fecha</th>
+                <th className="px-5 py-3 font-medium">Cliente</th>
+                <th className="px-5 py-3 font-medium">Tipo</th>
+                <th className="px-5 py-3 font-medium">Total</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
-
-function Resumen({ etiqueta, valor }: { etiqueta: string; valor: string }) {
-  return (
-    <div className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
-      <p className="text-xs text-slate-500 dark:text-slate-400">{etiqueta}</p>
-      <p className="text-lg font-semibold text-slate-900 dark:text-slate-100">{valor}</p>
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+              {data?.facturas.map((f) => (
+                <tr key={f.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                  <td className="px-5 py-3 font-mono text-xs">{f.ncf ?? '—'}</td>
+                  <td className="px-5 py-3">{new Date(f.fecha).toLocaleDateString('es-DO')}</td>
+                  <td className="px-5 py-3">{f.cliente.nombre}</td>
+                  <td className="px-5 py-3">{f.tipoFactura}</td>
+                  <td className="px-5 py-3">RD$ {Number(f.total).toLocaleString('es-DO')}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Card>
     </div>
   );
 }

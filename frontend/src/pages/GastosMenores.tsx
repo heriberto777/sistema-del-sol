@@ -2,6 +2,7 @@ import { FormEvent, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../lib/api-client';
 import { Button } from '../components/atoms/Button/Button';
+import { Card } from '../components/atoms/Card/Card';
 import { Select } from '../components/atoms/Select/Select';
 import { FormField } from '../components/molecules/FormField/FormField';
 import { Modal } from '../components/molecules/Modal/Modal';
@@ -85,14 +86,6 @@ export function GastosMenores() {
       </div>
 
       <RequierePermiso permiso="gastosmenores.ver">
-        <SearchInput
-          value={busqueda}
-          onChange={(v) => {
-            setBusqueda(v);
-            setPagina(1);
-          }}
-          placeholder="Buscar por NCF o notas…"
-        />
         {data?.datos.length === 0 ? (
           <EstadoVacio
             titulo="Todavía no has registrado gastos menores"
@@ -101,41 +94,59 @@ export function GastosMenores() {
             onAccion={() => setModalAbierto(true)}
           />
         ) : (
-          <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-slate-50 text-slate-500 dark:bg-slate-900 dark:text-slate-400">
-                <tr>
-                  <th className="px-4 py-2">NCF/Número</th>
-                  <th className="px-4 py-2">Notas</th>
-                  <th className="px-4 py-2">Fecha</th>
-                  <th className="px-4 py-2">Cuenta</th>
-                  <th className="px-4 py-2">Monto</th>
-                  <th className="px-4 py-2" />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {data?.datos.map((g) => (
-                  <tr key={g.id}>
-                    <td className="px-4 py-2 font-mono text-xs">{g.ncf ?? '—'}</td>
-                    <td className="px-4 py-2">{g.notas ?? '—'}</td>
-                    <td className="px-4 py-2">{new Date(g.fecha).toLocaleDateString('es-DO')}</td>
-                    <td className="px-4 py-2">
-                      {g.cuentaBancaria.banco} — {g.cuentaBancaria.numeroCuenta}
-                    </td>
-                    <td className="px-4 py-2">RD$ {Number(g.total).toLocaleString('es-DO')}</td>
-                    <td className="px-4 py-2 text-right">
-                      <Button variante="secundario" onClick={() => setGastoViendo(g)}>
-                        Ver detalle
-                      </Button>
-                    </td>
+          <Card
+            sinPadding
+            titulo="Gastos menores"
+            descripcion={data ? `${data.total} gasto(s)` : undefined}
+            acciones={
+              <SearchInput
+                value={busqueda}
+                onChange={(v) => {
+                  setBusqueda(v);
+                  setPagina(1);
+                }}
+                placeholder="Buscar por NCF o notas…"
+              />
+            }
+          >
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead className="bg-slate-50 text-slate-500 dark:bg-slate-900/60 dark:text-slate-400">
+                  <tr>
+                    <th className="px-5 py-3 font-medium">NCF/Número</th>
+                    <th className="px-5 py-3 font-medium">Notas</th>
+                    <th className="px-5 py-3 font-medium">Fecha</th>
+                    <th className="px-5 py-3 font-medium">Cuenta</th>
+                    <th className="px-5 py-3 font-medium">Monto</th>
+                    <th className="px-5 py-3" />
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-        {data && (
-          <Paginacion pagina={data.pagina} tamanoPagina={data.tamanoPagina} total={data.total} onCambiarPagina={setPagina} />
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {data?.datos.map((g) => (
+                    <tr key={g.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                      <td className="px-5 py-3 font-mono text-xs">{g.ncf ?? '—'}</td>
+                      <td className="px-5 py-3">{g.notas ?? '—'}</td>
+                      <td className="px-5 py-3">{new Date(g.fecha).toLocaleDateString('es-DO')}</td>
+                      <td className="px-5 py-3">
+                        {g.cuentaBancaria.banco} — {g.cuentaBancaria.numeroCuenta}
+                      </td>
+                      <td className="px-5 py-3">RD$ {Number(g.total).toLocaleString('es-DO')}</td>
+                      <td className="px-5 py-3 text-right">
+                        <Button variante="secundario" onClick={() => setGastoViendo(g)}>
+                          Ver detalle
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {data && (
+              <div className="px-5 py-3">
+                <Paginacion pagina={data.pagina} tamanoPagina={data.tamanoPagina} total={data.total} onCambiarPagina={setPagina} />
+              </div>
+            )}
+          </Card>
         )}
       </RequierePermiso>
 

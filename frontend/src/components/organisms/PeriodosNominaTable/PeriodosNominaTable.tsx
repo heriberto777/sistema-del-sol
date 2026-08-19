@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../../lib/api-client';
 import { Badge } from '../../atoms/Badge/Badge';
 import { Button } from '../../atoms/Button/Button';
+import { Card } from '../../atoms/Card/Card';
 import { Select } from '../../atoms/Select/Select';
 import { FormField } from '../../molecules/FormField/FormField';
 import { Modal } from '../../molecules/Modal/Modal';
@@ -251,58 +252,55 @@ export function PeriodosNominaTable() {
   return (
     <div className="space-y-4">
       {tienePermiso('nomina.editar') && (
-      <form
-        onSubmit={onSubmit}
-        className="flex flex-wrap items-end gap-3 rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
-      >
-        <div>
-          <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Tipo</label>
-          <select
-            value={tipo}
-            onChange={(e) => setTipo(e.target.value as 'QUINCENAL' | 'MENSUAL')}
-            className="rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-          >
-            <option value="MENSUAL">Mensual</option>
-            <option value="QUINCENAL">Quincenal</option>
-          </select>
-        </div>
-        <FormField id="periodo-inicio" label="Fecha inicio" type="date" value={fechaInicio} onChange={(e) => setFechaInicio(e.target.value)} required />
-        <FormField id="periodo-fin" label="Fecha fin" type="date" value={fechaFin} onChange={(e) => setFechaFin(e.target.value)} required />
-        <Button type="submit" disabled={generar.isPending}>
-          {generar.isPending ? 'Generando…' : 'Generar período'}
-        </Button>
-      </form>
+        <Card titulo="Generar período" descripcion="Crea los recibos de todos los empleados activos para el rango elegido.">
+          <form onSubmit={onSubmit} className="flex flex-wrap items-end gap-3">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Tipo</label>
+              <Select value={tipo} onChange={(e) => setTipo(e.target.value as 'QUINCENAL' | 'MENSUAL')} className="!w-auto">
+                <option value="MENSUAL">Mensual</option>
+                <option value="QUINCENAL">Quincenal</option>
+              </Select>
+            </div>
+            <FormField id="periodo-inicio" label="Fecha inicio" type="date" value={fechaInicio} onChange={(e) => setFechaInicio(e.target.value)} required />
+            <FormField id="periodo-fin" label="Fecha fin" type="date" value={fechaFin} onChange={(e) => setFechaFin(e.target.value)} required />
+            <Button type="submit" disabled={generar.isPending}>
+              {generar.isPending ? 'Generando…' : 'Generar período'}
+            </Button>
+          </form>
+          {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
+        </Card>
       )}
 
-      <div className="flex items-center gap-2">
-        <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Estado</label>
-        <Select
-          value={filtroEstado}
-          onChange={(e) => {
-            setFiltroEstado(e.target.value);
-            setPagina(1);
-          }}
-          className="!w-auto py-1"
-        >
-          <option value="">Todos</option>
-          <option value="BORRADOR">Borrador</option>
-          <option value="PROCESADO">Procesado</option>
-          <option value="PAGADO">Pagado</option>
-        </Select>
-      </div>
-
-      {error && <p className="text-sm text-red-600">{error}</p>}
       {isLoading && <p className="text-sm text-slate-500">Cargando períodos…</p>}
       {errorCarga && <p className="text-sm text-red-600">No se pudieron cargar los períodos.</p>}
 
       {data && (
-        <>
-          <div className="space-y-2">
+        <Card
+          sinPadding
+          titulo="Períodos"
+          descripcion={`${data.total} período(s)`}
+          acciones={
+            <Select
+              value={filtroEstado}
+              onChange={(e) => {
+                setFiltroEstado(e.target.value);
+                setPagina(1);
+              }}
+              className="!w-auto"
+            >
+              <option value="">Todos los estados</option>
+              <option value="BORRADOR">Borrador</option>
+              <option value="PROCESADO">Procesado</option>
+              <option value="PAGADO">Pagado</option>
+            </Select>
+          }
+        >
+          <div className="divide-y divide-slate-100 dark:divide-slate-800">
             {data.datos.map((periodo) => (
-              <div key={periodo.id} className="rounded-lg border border-slate-200 dark:border-slate-800">
+              <div key={periodo.id}>
                 <button
                   onClick={() => setExpandidoId(expandidoId === periodo.id ? null : periodo.id)}
-                  className="flex w-full items-center justify-between p-3 text-left text-sm"
+                  className="flex w-full items-center justify-between px-5 py-3 text-left text-sm hover:bg-slate-50 dark:hover:bg-slate-800/40"
                 >
                   <span className="text-slate-900 dark:text-slate-100">
                     {periodo.tipo} — {new Date(periodo.fechaInicio).toLocaleDateString('es-DO')} a{' '}
@@ -314,8 +312,10 @@ export function PeriodosNominaTable() {
               </div>
             ))}
           </div>
-          <Paginacion pagina={data.pagina} tamanoPagina={data.tamanoPagina} total={data.total} onCambiarPagina={setPagina} />
-        </>
+          <div className="px-5 py-3">
+            <Paginacion pagina={data.pagina} tamanoPagina={data.tamanoPagina} total={data.total} onCambiarPagina={setPagina} />
+          </div>
+        </Card>
       )}
     </div>
   );

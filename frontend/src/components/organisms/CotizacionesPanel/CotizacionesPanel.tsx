@@ -6,6 +6,7 @@ import { FormField } from '../../molecules/FormField/FormField';
 import { Modal } from '../../molecules/Modal/Modal';
 import { RowActionsMenu } from '../../molecules/RowActionsMenu/RowActionsMenu';
 import { Button } from '../../atoms/Button/Button';
+import { Card } from '../../atoms/Card/Card';
 import { Select } from '../../atoms/Select/Select';
 import { Badge } from '../../atoms/Badge/Badge';
 import { SearchInput } from '../../molecules/SearchInput/SearchInput';
@@ -66,12 +67,7 @@ export function CotizacionesPanel() {
   const [busqueda, setBusqueda] = useState('');
   const [pagina, setPagina] = useState(1);
   const busquedaDebounced = useDebouncedValue(busqueda);
-
-  const [numero, setNumero] = useState('');
-  const [clienteId, setClienteId] = useState('');
-  const [fechaVigenciaHasta, setFechaVigenciaHasta] = useState('');
-  const [lineas, setLineas] = useState<LineaForm[]>([{ productoId: '', cantidad: '1' }]);
-  const [error, setError] = useState<string | null>(null);
+  const [modalNuevaCotizacion, setModalNuevaCotizacion] = useState(false);
 
   const [cotizacionEditando, setCotizacionEditando] = useState<Cotizacion | null>(null);
   const [cotizacionConvirtiendo, setCotizacionConvirtiendo] = useState<Cotizacion | null>(null);
@@ -96,186 +92,95 @@ export function CotizacionesPanel() {
       ).data,
   });
 
-  const crear = useMutation({
-    mutationFn: async () =>
-      apiClient.post('/cotizaciones', {
-        numero,
-        clienteId,
-        fechaVigenciaHasta,
-        lineas: lineas
-          .filter((l) => l.productoId)
-          .map((l) => ({ productoId: l.productoId, cantidad: Number(l.cantidad) })),
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['cotizaciones'] });
-      setNumero('');
-      setClienteId('');
-      setFechaVigenciaHasta('');
-      setLineas([{ productoId: '', cantidad: '1' }]);
-      setError(null);
-    },
-    onError: () => setError('No se pudo crear la cotización. Revisa los datos.'),
-  });
-
   const cambiarEstado = useMutation({
     mutationFn: async ({ id, estado }: { id: string; estado: 'ENVIADA' | 'ACEPTADA' | 'RECHAZADA' }) =>
       apiClient.patch(`/cotizaciones/${id}/estado`, { estado }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['cotizaciones'] }),
   });
 
-  function agregarLinea() {
-    setLineas((prev) => [...prev, { productoId: '', cantidad: '1' }]);
-  }
-
-  function actualizarLinea(index: number, cambios: Partial<LineaForm>) {
-    setLineas((prev) => prev.map((l, i) => (i === index ? { ...l, ...cambios } : l)));
-  }
-
-  function quitarLinea(index: number) {
-    setLineas((prev) => prev.filter((_, i) => i !== index));
-  }
-
-  function onSubmit(e: FormEvent) {
-    e.preventDefault();
-    setError(null);
-    crear.mutate();
-  }
-
   return (
     <div className="space-y-4">
-      {tienePermiso('cotizaciones.crear') && (
-      <div className="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-        <h2 className="mb-3 font-medium text-slate-900 dark:text-slate-100">Nueva cotización</h2>
-        <form onSubmit={onSubmit} className="space-y-3">
-          <div className="grid grid-cols-3 gap-3">
-            <FormField id="numero" label="Número" value={numero} onChange={(e) => setNumero(e.target.value)} required />
-            <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Cliente</label>
-              <Select value={clienteId} onChange={(e) => setClienteId(e.target.value)} required>
-                <option value="">Seleccionar…</option>
-                {clientes?.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.nombre}
-                  </option>
-                ))}
-              </Select>
-            </div>
-            <FormField
-              id="fechaVigenciaHasta"
-              label="Válida hasta"
-              type="date"
-              value={fechaVigenciaHasta}
-              onChange={(e) => setFechaVigenciaHasta(e.target.value)}
-              required
+      <Card
+        sinPadding
+        titulo="Cotizaciones"
+        descripcion={data ? `${data.total} cotización(es)` : undefined}
+        acciones={
+          <div className="flex items-center gap-2">
+            <SearchInput
+              value={busqueda}
+              onChange={(v) => {
+                setBusqueda(v);
+                setPagina(1);
+              }}
+              placeholder="Buscar por número o cliente…"
             />
+            {tienePermiso('cotizaciones.crear') && <Button onClick={() => setModalNuevaCotizacion(true)}>Nueva cotización</Button>}
           </div>
+        }
+      >
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-slate-50 text-slate-500 dark:bg-slate-900/60 dark:text-slate-400">
+              <tr>
+                <th className="px-5 py-3 font-medium">Número</th>
+                <th className="px-5 py-3 font-medium">Cliente</th>
+                <th className="px-5 py-3 font-medium">Total</th>
+                <th className="px-5 py-3 font-medium">Válida hasta</th>
+                <th className="px-5 py-3 font-medium">Estado</th>
+                <th className="px-5 py-3" />
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+              {data?.datos.map((cotizacion) => {
+                const acciones = [
+                  { etiqueta: 'Imprimir', onClick: () => setCotizacionImprimiendo(cotizacion) },
+                  ...(tienePermiso('cotizaciones.editar') && cotizacion.estado === 'BORRADOR'
+                    ? [{ etiqueta: 'Editar', onClick: () => setCotizacionEditando(cotizacion) }]
+                    : []),
+                  ...(tienePermiso('cotizaciones.editar') && cotizacion.estado === 'BORRADOR'
+                    ? [{ etiqueta: 'Enviar', onClick: () => cambiarEstado.mutate({ id: cotizacion.id, estado: 'ENVIADA' }) }]
+                    : []),
+                  ...(tienePermiso('cotizaciones.editar') && (cotizacion.estado === 'BORRADOR' || cotizacion.estado === 'ENVIADA')
+                    ? [
+                        { etiqueta: 'Aceptar', onClick: () => cambiarEstado.mutate({ id: cotizacion.id, estado: 'ACEPTADA' }) },
+                        { etiqueta: 'Rechazar', onClick: () => cambiarEstado.mutate({ id: cotizacion.id, estado: 'RECHAZADA' }), tono: 'peligro' as const },
+                      ]
+                    : []),
+                  ...(tienePermiso('cotizaciones.editar') && cotizacion.estado === 'ACEPTADA' && !cotizacion.facturaId
+                    ? [{ etiqueta: 'Convertir en factura', onClick: () => setCotizacionConvirtiendo(cotizacion) }]
+                    : []),
+                ];
 
-          <div className="space-y-2">
-            <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Líneas</p>
-            {lineas.map((linea, i) => (
-              <div key={i} className="flex items-center gap-2">
-                <Select
-                  value={linea.productoId}
-                  onChange={(e) => actualizarLinea(i, { productoId: e.target.value })}
-                  required
-                  className="flex-1"
-                >
-                  <option value="">Producto…</option>
-                  {productos?.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.nombre} ({p.codigo})
-                    </option>
-                  ))}
-                </Select>
-                <input
-                  type="number"
-                  min={1}
-                  step="any"
-                  value={linea.cantidad}
-                  onChange={(e) => actualizarLinea(i, { cantidad: e.target.value })}
-                  className="w-24 rounded-md border border-slate-300 px-2 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-                />
-                {lineas.length > 1 && (
-                  <Button type="button" variante="secundario" onClick={() => quitarLinea(i)}>
-                    Quitar
-                  </Button>
-                )}
-              </div>
-            ))}
-            <Button type="button" variante="secundario" onClick={agregarLinea}>
-              + Línea
-            </Button>
+                return (
+                  <tr key={cotizacion.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                    <td className="px-5 py-3">{cotizacion.numero}</td>
+                    <td className="px-5 py-3">{cotizacion.cliente?.nombre}</td>
+                    <td className="px-5 py-3 font-medium text-slate-900 dark:text-slate-100">RD$ {Number(cotizacion.total).toLocaleString('es-DO')}</td>
+                    <td className="px-5 py-3">{new Date(cotizacion.fechaVigenciaHasta).toLocaleDateString('es-DO')}</td>
+                    <td className="px-5 py-3">
+                      <Badge tono={TONO_POR_ESTADO[cotizacion.estado]}>{cotizacion.estado}</Badge>
+                      {cotizacion.facturaId && <span className="ml-2 text-xs text-slate-400">Ya facturada</span>}
+                    </td>
+                    <td className="px-5 py-3 text-right">{acciones.length > 0 && <RowActionsMenu acciones={acciones} />}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        {data && (
+          <div className="px-5 py-3">
+            <Paginacion pagina={data.pagina} tamanoPagina={data.tamanoPagina} total={data.total} onCambiarPagina={setPagina} />
           </div>
+        )}
+      </Card>
 
-          {error && <p className="text-sm text-red-600">{error}</p>}
-          <Button type="submit" disabled={crear.isPending}>
-            {crear.isPending ? 'Creando…' : 'Crear cotización'}
-          </Button>
-        </form>
-      </div>
-      )}
-
-      <SearchInput
-        value={busqueda}
-        onChange={(v) => {
-          setBusqueda(v);
-          setPagina(1);
-        }}
-        placeholder="Buscar por número o cliente…"
-      />
-
-      <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-slate-50 text-slate-500 dark:bg-slate-900 dark:text-slate-400">
-            <tr>
-              <th className="px-4 py-2">Número</th>
-              <th className="px-4 py-2">Cliente</th>
-              <th className="px-4 py-2">Total</th>
-              <th className="px-4 py-2">Válida hasta</th>
-              <th className="px-4 py-2">Estado</th>
-              <th className="px-4 py-2" />
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-            {data?.datos.map((cotizacion) => {
-              const acciones = [
-                { etiqueta: 'Imprimir', onClick: () => setCotizacionImprimiendo(cotizacion) },
-                ...(tienePermiso('cotizaciones.editar') && cotizacion.estado === 'BORRADOR'
-                  ? [{ etiqueta: 'Editar', onClick: () => setCotizacionEditando(cotizacion) }]
-                  : []),
-                ...(tienePermiso('cotizaciones.editar') && cotizacion.estado === 'BORRADOR'
-                  ? [{ etiqueta: 'Enviar', onClick: () => cambiarEstado.mutate({ id: cotizacion.id, estado: 'ENVIADA' }) }]
-                  : []),
-                ...(tienePermiso('cotizaciones.editar') && (cotizacion.estado === 'BORRADOR' || cotizacion.estado === 'ENVIADA')
-                  ? [
-                      { etiqueta: 'Aceptar', onClick: () => cambiarEstado.mutate({ id: cotizacion.id, estado: 'ACEPTADA' }) },
-                      { etiqueta: 'Rechazar', onClick: () => cambiarEstado.mutate({ id: cotizacion.id, estado: 'RECHAZADA' }), tono: 'peligro' as const },
-                    ]
-                  : []),
-                ...(tienePermiso('cotizaciones.editar') && cotizacion.estado === 'ACEPTADA' && !cotizacion.facturaId
-                  ? [{ etiqueta: 'Convertir en factura', onClick: () => setCotizacionConvirtiendo(cotizacion) }]
-                  : []),
-              ];
-
-              return (
-                <tr key={cotizacion.id}>
-                  <td className="px-4 py-2">{cotizacion.numero}</td>
-                  <td className="px-4 py-2">{cotizacion.cliente?.nombre}</td>
-                  <td className="px-4 py-2">RD$ {Number(cotizacion.total).toLocaleString('es-DO')}</td>
-                  <td className="px-4 py-2">{new Date(cotizacion.fechaVigenciaHasta).toLocaleDateString('es-DO')}</td>
-                  <td className="px-4 py-2">
-                    <Badge tono={TONO_POR_ESTADO[cotizacion.estado]}>{cotizacion.estado}</Badge>
-                    {cotizacion.facturaId && <span className="ml-2 text-xs text-slate-400">Ya facturada</span>}
-                  </td>
-                  <td className="px-4 py-2 text-right">{acciones.length > 0 && <RowActionsMenu acciones={acciones} />}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-      {data && (
-        <Paginacion pagina={data.pagina} tamanoPagina={data.tamanoPagina} total={data.total} onCambiarPagina={setPagina} />
+      {modalNuevaCotizacion && (
+        <ModalNuevaCotizacion
+          productos={productos ?? []}
+          clientes={clientes ?? []}
+          onClose={() => setModalNuevaCotizacion(false)}
+        />
       )}
 
       {cotizacionEditando && (
@@ -297,6 +202,119 @@ export function CotizacionesPanel() {
         />
       )}
     </div>
+  );
+}
+
+function ModalNuevaCotizacion({
+  productos,
+  clientes,
+  onClose,
+}: {
+  productos: Producto[];
+  clientes: Cliente[];
+  onClose: () => void;
+}) {
+  const queryClient = useQueryClient();
+  const [numero, setNumero] = useState('');
+  const [clienteId, setClienteId] = useState('');
+  const [fechaVigenciaHasta, setFechaVigenciaHasta] = useState('');
+  const [lineas, setLineas] = useState<LineaForm[]>([{ productoId: '', cantidad: '1' }]);
+  const [error, setError] = useState<string | null>(null);
+
+  const crear = useMutation({
+    mutationFn: async () =>
+      apiClient.post('/cotizaciones', {
+        numero,
+        clienteId,
+        fechaVigenciaHasta,
+        lineas: lineas
+          .filter((l) => l.productoId)
+          .map((l) => ({ productoId: l.productoId, cantidad: Number(l.cantidad) })),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['cotizaciones'] });
+      onClose();
+    },
+    onError: () => setError('No se pudo crear la cotización. Revisa los datos.'),
+  });
+
+  function actualizarLinea(index: number, cambios: Partial<LineaForm>) {
+    setLineas((prev) => prev.map((l, i) => (i === index ? { ...l, ...cambios } : l)));
+  }
+
+  function onSubmit(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    crear.mutate();
+  }
+
+  return (
+    <Modal titulo="Nueva cotización" onClose={onClose}>
+      <form onSubmit={onSubmit} className="space-y-3">
+        <FormField id="numero" label="Número" value={numero} onChange={(e) => setNumero(e.target.value)} required />
+        <div>
+          <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Cliente</label>
+          <Select value={clienteId} onChange={(e) => setClienteId(e.target.value)} required>
+            <option value="">Seleccionar…</option>
+            {clientes.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.nombre}
+              </option>
+            ))}
+          </Select>
+        </div>
+        <FormField
+          id="fechaVigenciaHasta"
+          label="Válida hasta"
+          type="date"
+          value={fechaVigenciaHasta}
+          onChange={(e) => setFechaVigenciaHasta(e.target.value)}
+          required
+        />
+
+        <div className="space-y-2">
+          <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Líneas</p>
+          {lineas.map((linea, i) => (
+            <div key={i} className="flex items-center gap-2">
+              <Select
+                value={linea.productoId}
+                onChange={(e) => actualizarLinea(i, { productoId: e.target.value })}
+                required
+                className="flex-1"
+              >
+                <option value="">Producto…</option>
+                {productos.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.nombre} ({p.codigo})
+                  </option>
+                ))}
+              </Select>
+              <input
+                type="number"
+                min={1}
+                step="any"
+                value={linea.cantidad}
+                onChange={(e) => actualizarLinea(i, { cantidad: e.target.value })}
+                className="w-24 rounded-lg border border-slate-300 px-2 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+              />
+              {lineas.length > 1 && (
+                <Button type="button" variante="secundario" onClick={() => setLineas((prev) => prev.filter((_, idx) => idx !== i))}>
+                  Quitar
+                </Button>
+              )}
+            </div>
+          ))}
+          <Button type="button" variante="secundario" onClick={() => setLineas((prev) => [...prev, { productoId: '', cantidad: '1' }])}>
+            + Línea
+          </Button>
+        </div>
+
+        {error && <p className="text-sm text-red-600">{error}</p>}
+        <Button type="submit" disabled={crear.isPending} className="w-full">
+          {crear.isPending ? 'Creando…' : 'Crear cotización'}
+        </Button>
+      </form>
+    </Modal>
   );
 }
 

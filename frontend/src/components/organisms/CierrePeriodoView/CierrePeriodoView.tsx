@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../../lib/api-client';
 import { Badge } from '../../atoms/Badge/Badge';
 import { Button } from '../../atoms/Button/Button';
+import { Card } from '../../atoms/Card/Card';
 import { Input } from '../../atoms/Input/Input';
 import { useAuth } from '../../../hooks/useAuth';
 
@@ -53,18 +54,17 @@ export function CierrePeriodoView() {
       </p>
 
       {tienePermiso('contabilidad.editar') && (
-        <form
-          onSubmit={onSubmit}
-          className="flex flex-wrap items-end gap-3 rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
-        >
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Fecha de corte</label>
-            <Input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} required />
-          </div>
-          <Button type="submit" disabled={cerrar.isPending || !fecha}>
-            {cerrar.isPending ? 'Cerrando…' : 'Cerrar período'}
-          </Button>
-        </form>
+        <Card titulo="Cerrar período">
+          <form onSubmit={onSubmit} className="flex flex-wrap items-end gap-3">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Fecha de corte</label>
+              <Input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} required />
+            </div>
+            <Button type="submit" disabled={cerrar.isPending || !fecha}>
+              {cerrar.isPending ? 'Cerrando…' : 'Cerrar período'}
+            </Button>
+          </form>
+        </Card>
       )}
 
       {error && <p className="text-sm text-red-600">{error}</p>}
@@ -72,38 +72,40 @@ export function CierrePeriodoView() {
       {errorCarga && <p className="text-sm text-red-600">No se pudieron cargar los cierres anteriores.</p>}
 
       {data && (
-        <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-slate-50 text-slate-500 dark:bg-slate-900 dark:text-slate-400">
-              <tr>
-                <th className="px-4 py-2">Fecha de corte</th>
-                <th className="px-4 py-2">Asiento de cierre</th>
-                <th className="px-4 py-2 text-right">Utilidad neta</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {data.map((c) => {
-                const utilidad = Number(c.utilidadNeta);
-                return (
-                  <tr key={c.id}>
-                    <td className="px-4 py-2">{new Date(c.fecha).toLocaleDateString('es-DO')}</td>
-                    <td className="px-4 py-2">#{c.asientoCierre.numero}</td>
-                    <td className="px-4 py-2 text-right">
-                      <Badge tono={utilidad >= 0 ? 'exito' : 'peligro'}>{formatoRD(utilidad)}</Badge>
+        <Card titulo="Cierres anteriores" sinPadding>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-slate-50 text-slate-500 dark:bg-slate-900/60 dark:text-slate-400">
+                <tr>
+                  <th className="px-5 py-3 font-medium">Fecha de corte</th>
+                  <th className="px-5 py-3 font-medium">Asiento de cierre</th>
+                  <th className="px-5 py-3 text-right font-medium">Utilidad neta</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                {data.map((c) => {
+                  const utilidad = Number(c.utilidadNeta);
+                  return (
+                    <tr key={c.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                      <td className="px-5 py-3">{new Date(c.fecha).toLocaleDateString('es-DO')}</td>
+                      <td className="px-5 py-3">#{c.asientoCierre.numero}</td>
+                      <td className="px-5 py-3 text-right">
+                        <Badge tono={utilidad >= 0 ? 'exito' : 'peligro'}>{formatoRD(utilidad)}</Badge>
+                      </td>
+                    </tr>
+                  );
+                })}
+                {data.length === 0 && (
+                  <tr>
+                    <td className="px-5 py-3 text-slate-400" colSpan={3}>
+                      Todavía no se cerró ningún período
                     </td>
                   </tr>
-                );
-              })}
-              {data.length === 0 && (
-                <tr>
-                  <td className="px-4 py-2 text-slate-400" colSpan={3}>
-                    Todavía no se cerró ningún período
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </Card>
       )}
     </div>
   );

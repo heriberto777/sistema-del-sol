@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../../lib/api-client';
 import { Badge } from '../../atoms/Badge/Badge';
 import { Button } from '../../atoms/Button/Button';
+import { Card } from '../../atoms/Card/Card';
 import { FormField } from '../../molecules/FormField/FormField';
 import { Modal } from '../../molecules/Modal/Modal';
 import { RowActionsMenu } from '../../molecules/RowActionsMenu/RowActionsMenu';
@@ -58,13 +59,6 @@ export function WebhooksPanel() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-slate-500 dark:text-slate-400">
-          Notifican a una URL externa cuando ocurre un evento del negocio, con firma HMAC para verificar el origen.
-        </p>
-        <Button onClick={() => setModalNuevo(true)}>Nuevo webhook</Button>
-      </div>
-
       {error && <p className="text-sm text-red-600">{error}</p>}
 
       {webhooks?.length === 0 ? (
@@ -75,43 +69,50 @@ export function WebhooksPanel() {
           onAccion={() => setModalNuevo(true)}
         />
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-slate-50 text-slate-500 dark:bg-slate-900 dark:text-slate-400">
-              <tr>
-                <th className="px-4 py-2">URL</th>
-                <th className="px-4 py-2">Eventos</th>
-                <th className="px-4 py-2">Estado</th>
-                <th className="px-4 py-2" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {webhooks?.map((webhook) => (
-                <tr key={webhook.id}>
-                  <td className="px-4 py-2 font-mono text-xs">{webhook.url}</td>
-                  <td className="px-4 py-2">
-                    <div className="flex flex-wrap gap-1">
-                      {webhook.eventos.map((evento) => (
-                        <Badge key={evento}>{evento}</Badge>
-                      ))}
-                    </div>
-                  </td>
-                  <td className="px-4 py-2">
-                    <Badge tono={webhook.activo ? 'exito' : 'neutro'}>{webhook.activo ? 'Activo' : 'Inactivo'}</Badge>
-                  </td>
-                  <td className="px-4 py-2 text-right">
-                    <RowActionsMenu
-                      acciones={[
-                        { etiqueta: 'Ver entregas', onClick: () => setWebhookVerEntregas(webhook) },
-                        { etiqueta: 'Eliminar', onClick: () => eliminar.mutate(webhook.id), tono: 'peligro' as const },
-                      ]}
-                    />
-                  </td>
+        <Card
+          sinPadding
+          titulo="Webhooks"
+          descripcion="Notifican a una URL externa cuando ocurre un evento del negocio, con firma HMAC para verificar el origen."
+          acciones={<Button onClick={() => setModalNuevo(true)}>Nuevo webhook</Button>}
+        >
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-slate-50 text-slate-500 dark:bg-slate-900/60 dark:text-slate-400">
+                <tr>
+                  <th className="px-5 py-3 font-medium">URL</th>
+                  <th className="px-5 py-3 font-medium">Eventos</th>
+                  <th className="px-5 py-3 font-medium">Estado</th>
+                  <th className="px-5 py-3" />
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                {webhooks?.map((webhook) => (
+                  <tr key={webhook.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                    <td className="px-5 py-3 font-mono text-xs">{webhook.url}</td>
+                    <td className="px-5 py-3">
+                      <div className="flex flex-wrap gap-1">
+                        {webhook.eventos.map((evento) => (
+                          <Badge key={evento}>{evento}</Badge>
+                        ))}
+                      </div>
+                    </td>
+                    <td className="px-5 py-3">
+                      <Badge tono={webhook.activo ? 'exito' : 'neutro'}>{webhook.activo ? 'Activo' : 'Inactivo'}</Badge>
+                    </td>
+                    <td className="px-5 py-3 text-right">
+                      <RowActionsMenu
+                        acciones={[
+                          { etiqueta: 'Ver entregas', onClick: () => setWebhookVerEntregas(webhook) },
+                          { etiqueta: 'Eliminar', onClick: () => eliminar.mutate(webhook.id), tono: 'peligro' as const },
+                        ]}
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
       )}
 
       {modalNuevo && <ModalNuevoWebhook onClose={() => setModalNuevo(false)} />}

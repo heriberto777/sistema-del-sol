@@ -3,7 +3,9 @@ import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '../../../lib/api-client';
 import { Input } from '../../atoms/Input/Input';
 import { Badge } from '../../atoms/Badge/Badge';
+import { Card } from '../../atoms/Card/Card';
 import { BotonesExportar } from '../../molecules/BotonesExportar/BotonesExportar';
+import { StatCard } from '../../molecules/StatCard/StatCard';
 
 interface OrdenReporte {
   id: string;
@@ -49,51 +51,42 @@ export function ReporteCompras() {
 
       {!isLoading && data && (
         <div className="flex flex-wrap gap-4">
-          <div className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
-            <p className="text-xs text-slate-500 dark:text-slate-400">Órdenes</p>
-            <p className="text-lg font-semibold text-slate-900 dark:text-slate-100">{data.resumen.cantidad}</p>
-          </div>
-          <div className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
-            <p className="text-xs text-slate-500 dark:text-slate-400">Total</p>
-            <p className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-              RD$ {data.resumen.total.toLocaleString('es-DO', { minimumFractionDigits: 2 })}
-            </p>
-          </div>
+          <StatCard etiqueta="Órdenes" valor={String(data.resumen.cantidad)} />
+          <StatCard etiqueta="Total" valor={`RD$ ${data.resumen.total.toLocaleString('es-DO', { minimumFractionDigits: 2 })}`} />
           {Object.entries(data.resumen.porEstado).map(([estado, cantidad]) => (
-            <div key={estado} className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
-              <p className="text-xs text-slate-500 dark:text-slate-400">{estado}</p>
-              <p className="text-lg font-semibold text-slate-900 dark:text-slate-100">{cantidad}</p>
-            </div>
+            <StatCard key={estado} etiqueta={estado} valor={String(cantidad)} />
           ))}
         </div>
       )}
 
-      <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-slate-50 text-slate-500 dark:bg-slate-900 dark:text-slate-400">
-            <tr>
-              <th className="px-4 py-2">Número</th>
-              <th className="px-4 py-2">Fecha</th>
-              <th className="px-4 py-2">Proveedor</th>
-              <th className="px-4 py-2">Estado</th>
-              <th className="px-4 py-2">Total</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-            {data?.ordenes.map((o) => (
-              <tr key={o.id}>
-                <td className="px-4 py-2">{o.numero}</td>
-                <td className="px-4 py-2">{new Date(o.fecha).toLocaleDateString('es-DO')}</td>
-                <td className="px-4 py-2">{o.proveedor.nombre}</td>
-                <td className="px-4 py-2">
-                  <Badge>{o.estado}</Badge>
-                </td>
-                <td className="px-4 py-2">RD$ {Number(o.total).toLocaleString('es-DO')}</td>
+      <Card sinPadding titulo="Órdenes de compra">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-slate-50 text-slate-500 dark:bg-slate-900/60 dark:text-slate-400">
+              <tr>
+                <th className="px-5 py-3 font-medium">Número</th>
+                <th className="px-5 py-3 font-medium">Fecha</th>
+                <th className="px-5 py-3 font-medium">Proveedor</th>
+                <th className="px-5 py-3 font-medium">Estado</th>
+                <th className="px-5 py-3 font-medium">Total</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+              {data?.ordenes.map((o) => (
+                <tr key={o.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                  <td className="px-5 py-3">{o.numero}</td>
+                  <td className="px-5 py-3">{new Date(o.fecha).toLocaleDateString('es-DO')}</td>
+                  <td className="px-5 py-3">{o.proveedor.nombre}</td>
+                  <td className="px-5 py-3">
+                    <Badge>{o.estado}</Badge>
+                  </td>
+                  <td className="px-5 py-3">RD$ {Number(o.total).toLocaleString('es-DO')}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Card>
     </div>
   );
 }

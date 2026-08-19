@@ -4,6 +4,7 @@ import { apiClient } from '../../../lib/api-client';
 import { Input } from '../../atoms/Input/Input';
 import { Select } from '../../atoms/Select/Select';
 import { Button } from '../../atoms/Button/Button';
+import { Card } from '../../atoms/Card/Card';
 import { FORMATOS_IMPRESION } from '../../../constants/formato-impresion';
 
 interface Configuracion {
@@ -24,9 +25,9 @@ function FilaConfiguracion({ configuracion }: { configuracion: Configuracion }) 
   });
 
   return (
-    <tr>
-      <td className="px-4 py-2 font-mono text-xs">{configuracion.clave}</td>
-      <td className="px-4 py-2">
+    <tr className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+      <td className="px-5 py-3 font-mono text-xs">{configuracion.clave}</td>
+      <td className="px-5 py-3">
         {esFormatoImpresion ? (
           <Select value={valor} onChange={(e) => setValor(e.target.value)}>
             {FORMATOS_IMPRESION.map((f) => (
@@ -39,7 +40,7 @@ function FilaConfiguracion({ configuracion }: { configuracion: Configuracion }) 
           <Input value={valor} onChange={(e) => setValor(e.target.value)} />
         )}
       </td>
-      <td className="px-4 py-2">
+      <td className="px-5 py-3">
         <Button
           type="button"
           variante="secundario"
@@ -60,21 +61,23 @@ export function ConfiguracionesPanel() {
   });
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800">
-      <table className="w-full text-left text-sm">
-        <thead className="bg-slate-50 text-slate-500 dark:bg-slate-900 dark:text-slate-400">
-          <tr>
-            <th className="px-4 py-2">Clave</th>
-            <th className="px-4 py-2">Valor</th>
-            <th className="px-4 py-2"></th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-          {configuraciones?.map((configuracion) => (
-            <FilaConfiguracion key={configuracion.clave} configuracion={configuracion} />
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <Card sinPadding titulo="Parámetros" descripcion="Valores de referencia usados por distintos módulos del tenant.">
+      <div className="overflow-x-auto">
+        <table className="w-full text-left text-sm">
+          <thead className="bg-slate-50 text-slate-500 dark:bg-slate-900/60 dark:text-slate-400">
+            <tr>
+              <th className="px-5 py-3 font-medium">Clave</th>
+              <th className="px-5 py-3 font-medium">Valor</th>
+              <th className="px-5 py-3"></th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+            {configuraciones?.map((configuracion) => (
+              <FilaConfiguracion key={configuracion.clave} configuracion={configuracion} />
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </Card>
   );
 }

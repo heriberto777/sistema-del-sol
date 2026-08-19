@@ -69,10 +69,13 @@ export function Admin() {
   if (!categoriaActiva) {
     return (
       <div className="space-y-4">
-        <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Configuración</h1>
+        <div>
+          <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Configuración</h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400">Usuarios, roles, NCF, parámetros e integraciones del tenant.</p>
+        </div>
 
         {categoriasVisibles.length === 0 && (
-          <p className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-900/20 dark:text-amber-300">
+          <p className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-900/20 dark:text-amber-300">
             No tenés permiso para ver ninguna sección de configuración.
           </p>
         )}
@@ -85,7 +88,7 @@ export function Admin() {
                 setCategoriaId(c.id);
                 setPestanaId(null);
               }}
-              className="rounded-lg border border-slate-200 bg-white p-4 text-left transition-colors hover:border-sol-300 dark:border-slate-800 dark:bg-slate-900"
+              className="rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm transition-colors hover:border-sol-300 dark:border-slate-800 dark:bg-slate-900"
             >
               <p className="font-medium text-slate-900 dark:text-slate-100">{c.etiqueta}</p>
               <p className="text-sm text-slate-500 dark:text-slate-400">{c.descripcion}</p>

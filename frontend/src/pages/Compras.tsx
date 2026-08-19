@@ -4,6 +4,7 @@ import { useSearchParams } from 'react-router-dom';
 import { apiClient } from '../lib/api-client';
 import { Badge } from '../components/atoms/Badge/Badge';
 import { Button } from '../components/atoms/Button/Button';
+import { Card } from '../components/atoms/Card/Card';
 import { Select } from '../components/atoms/Select/Select';
 import { FormField } from '../components/molecules/FormField/FormField';
 import { Modal } from '../components/molecules/Modal/Modal';
@@ -109,74 +110,89 @@ export function Compras() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Compras</h1>
+        <div>
+          <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Compras</h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400">Órdenes de compra a tus proveedores.</p>
+        </div>
         <RequierePermiso permiso="compras.crear">
           <Button onClick={() => setModalNuevaOc(true)}>Nueva orden de compra</Button>
         </RequierePermiso>
       </div>
       <RequierePermiso permiso="compras.ver">
-        <SearchInput
-          value={busqueda}
-          onChange={(v) => {
-            setBusqueda(v);
-            setPagina(1);
-          }}
-          placeholder="Buscar por número o proveedor…"
-        />
-        {data?.datos.length === 0 ? (
-          <EstadoVacio
-            titulo="Todavía no hay órdenes de compra"
-            descripcion="Creá la primera para empezar a recibir mercancía de tus proveedores."
-            etiquetaAccion="Nueva orden de compra"
-            onAccion={() => setModalNuevaOc(true)}
-          />
-        ) : (
-          <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-slate-50 text-slate-500 dark:bg-slate-900 dark:text-slate-400">
-                <tr>
-                  <th className="px-4 py-2">Número</th>
-                  <th className="px-4 py-2">Proveedor</th>
-                  <th className="px-4 py-2">Total</th>
-                  <th className="px-4 py-2">Estado</th>
-                  <th className="px-4 py-2" />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {data?.datos.map((oc) => {
-                  const acciones = [
-                    { etiqueta: 'Ver detalle', onClick: () => setOrdenViendo(oc) },
-                    ...(ESTADOS_RECIBIBLES.includes(oc.estado) && tienePermiso('compras.recibir')
-                      ? [{ etiqueta: 'Recibir', onClick: () => setOrdenRecibiendo(oc) }]
-                      : []),
-                    ...(oc.estado !== 'CANCELADA' && !oc.pagada && tienePermiso('compras.pagar')
-                      ? [{ etiqueta: 'Registrar pago', onClick: () => setOrdenPagando(oc) }]
-                      : []),
-                    ...(ESTADOS_CON_MERCANCIA_RECIBIDA.includes(oc.estado) && tienePermiso('compras.recibir')
-                      ? [{ etiqueta: 'Devolver a proveedor', onClick: () => setOrdenDevolviendo(oc) }]
-                      : []),
-                  ];
+        <Card
+          sinPadding
+          titulo="Órdenes de compra"
+          descripcion={data ? `${data.total} orden(es)` : undefined}
+          acciones={
+            <SearchInput
+              value={busqueda}
+              onChange={(v) => {
+                setBusqueda(v);
+                setPagina(1);
+              }}
+              placeholder="Buscar por número o proveedor…"
+            />
+          }
+        >
+          {data?.datos.length === 0 ? (
+            <div className="p-5">
+              <EstadoVacio
+                titulo="Todavía no hay órdenes de compra"
+                descripcion="Creá la primera para empezar a recibir mercancía de tus proveedores."
+                etiquetaAccion="Nueva orden de compra"
+                onAccion={() => setModalNuevaOc(true)}
+              />
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead className="bg-slate-50 text-slate-500 dark:bg-slate-900/60 dark:text-slate-400">
+                  <tr>
+                    <th className="px-5 py-3 font-medium">Número</th>
+                    <th className="px-5 py-3 font-medium">Proveedor</th>
+                    <th className="px-5 py-3 font-medium">Total</th>
+                    <th className="px-5 py-3 font-medium">Estado</th>
+                    <th className="px-5 py-3" />
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {data?.datos.map((oc) => {
+                    const acciones = [
+                      { etiqueta: 'Ver detalle', onClick: () => setOrdenViendo(oc) },
+                      ...(ESTADOS_RECIBIBLES.includes(oc.estado) && tienePermiso('compras.recibir')
+                        ? [{ etiqueta: 'Recibir', onClick: () => setOrdenRecibiendo(oc) }]
+                        : []),
+                      ...(oc.estado !== 'CANCELADA' && !oc.pagada && tienePermiso('compras.pagar')
+                        ? [{ etiqueta: 'Registrar pago', onClick: () => setOrdenPagando(oc) }]
+                        : []),
+                      ...(ESTADOS_CON_MERCANCIA_RECIBIDA.includes(oc.estado) && tienePermiso('compras.recibir')
+                        ? [{ etiqueta: 'Devolver a proveedor', onClick: () => setOrdenDevolviendo(oc) }]
+                        : []),
+                    ];
 
-                  return (
-                    <tr key={oc.id}>
-                      <td className="px-4 py-2">{oc.numero}</td>
-                      <td className="px-4 py-2">{oc.proveedor?.nombre}</td>
-                      <td className="px-4 py-2">RD$ {Number(oc.total).toLocaleString('es-DO')}</td>
-                      <td className="px-4 py-2">
-                        <Badge>{oc.estado}</Badge>
-                        <span className="ml-2 text-xs text-slate-400">{oc.pagada ? 'pagada' : 'pendiente de pago'}</span>
-                      </td>
-                      <td className="px-4 py-2 text-right">{acciones.length > 0 && <RowActionsMenu acciones={acciones} />}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-        {data && (
-          <Paginacion pagina={data.pagina} tamanoPagina={data.tamanoPagina} total={data.total} onCambiarPagina={setPagina} />
-        )}
+                    return (
+                      <tr key={oc.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                        <td className="px-5 py-3">{oc.numero}</td>
+                        <td className="px-5 py-3">{oc.proveedor?.nombre}</td>
+                        <td className="px-5 py-3 font-medium text-slate-900 dark:text-slate-100">RD$ {Number(oc.total).toLocaleString('es-DO')}</td>
+                        <td className="px-5 py-3">
+                          <Badge>{oc.estado}</Badge>
+                          <span className="ml-2 text-xs text-slate-400">{oc.pagada ? 'pagada' : 'pendiente de pago'}</span>
+                        </td>
+                        <td className="px-5 py-3 text-right">{acciones.length > 0 && <RowActionsMenu acciones={acciones} />}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+          {data && (
+            <div className="px-5 py-3">
+              <Paginacion pagina={data.pagina} tamanoPagina={data.tamanoPagina} total={data.total} onCambiarPagina={setPagina} />
+            </div>
+          )}
+        </Card>
       </RequierePermiso>
 
       {modalNuevaOc && <ModalNuevaOrdenCompra onClose={() => setModalNuevaOc(false)} />}

@@ -4,6 +4,7 @@ import { apiClient } from '../../../lib/api-client';
 import { ModalImprimir } from '../../molecules/ModalImprimir/ModalImprimir';
 import { Badge } from '../../atoms/Badge/Badge';
 import { Button } from '../../atoms/Button/Button';
+import { Card } from '../../atoms/Card/Card';
 import { Input } from '../../atoms/Input/Input';
 import { ComboboxBusqueda } from '../../molecules/ComboboxBusqueda/ComboboxBusqueda';
 import { FormField } from '../../molecules/FormField/FormField';
@@ -174,20 +175,17 @@ export function TurnoCajaDetalle({ turnoId, onCerrado }: { turnoId: string; onCe
 
   if (isLoading || !data) return <p className="text-sm text-slate-500">Cargando turno…</p>;
 
+  const descripcion =
+    `Abierto por ${data.cajero.nombre}` +
+    (data.estado === 'CERRADO' && data.cerradoPor && data.cerradoPor.id !== data.cajero.id ? ` — cerrado por ${data.cerradoPor.nombre}` : '');
+
   return (
-    <div className="space-y-4 rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-      <div className="flex items-center justify-between">
-        <h2 className="font-medium text-slate-900 dark:text-slate-100">Turno de caja</h2>
-        <Badge tono={data.estado === 'ABIERTO' ? 'exito' : 'neutro'}>{data.estado}</Badge>
-      </div>
-
-      <p className="text-sm text-slate-600 dark:text-slate-400">
-        Abierto por {data.cajero.nombre}
-        {data.estado === 'CERRADO' && data.cerradoPor && data.cerradoPor.id !== data.cajero.id && (
-          <> — cerrado por {data.cerradoPor.nombre}</>
-        )}
-      </p>
-
+    <Card
+      titulo="Turno de caja"
+      descripcion={descripcion}
+      acciones={<Badge tono={data.estado === 'ABIERTO' ? 'exito' : 'neutro'}>{data.estado}</Badge>}
+    >
+      <div className="space-y-4">
       {error && <p className="text-sm text-red-600">{error}</p>}
 
       {data.estado === 'ABIERTO' && tienePermiso('pos.editar') && (
@@ -403,7 +401,8 @@ export function TurnoCajaDetalle({ turnoId, onCerrado }: { turnoId: string; onCe
           </div>
         </Modal>
       )}
-    </div>
+      </div>
+    </Card>
   );
 }
 

@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../../lib/api-client';
+import { Card } from '../../atoms/Card/Card';
 import { Input } from '../../atoms/Input/Input';
+import { Select } from '../../atoms/Select/Select';
 import { StatCard } from '../../molecules/StatCard/StatCard';
 import { useAuth } from '../../../hooks/useAuth';
 import { PaginaResultado } from '../../../types/pagina-resultado';
@@ -68,18 +70,14 @@ export function ConciliacionBancariaView() {
       <div className="flex flex-wrap items-end gap-4">
         <div>
           <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Cuenta bancaria</label>
-          <select
-            value={cuentaBancariaId}
-            onChange={(e) => setCuentaBancariaId(e.target.value)}
-            className="rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-          >
+          <Select value={cuentaBancariaId} onChange={(e) => setCuentaBancariaId(e.target.value)} className="w-auto">
             <option value="">Seleccionar…</option>
             {bancos?.map((b) => (
               <option key={b.id} value={b.id}>
                 {b.banco} — {b.numeroCuenta}
               </option>
             ))}
-          </select>
+          </Select>
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Desde</label>
@@ -103,44 +101,46 @@ export function ConciliacionBancariaView() {
             <StatCard etiqueta="Pendiente de conciliar" valor={formatoRD(data.saldoPendiente)} />
           </div>
 
-          <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-slate-50 text-slate-500 dark:bg-slate-900 dark:text-slate-400">
-                <tr>
-                  <th className="px-4 py-2">Fecha</th>
-                  <th className="px-4 py-2">Concepto</th>
-                  <th className="px-4 py-2 text-right">Débito</th>
-                  <th className="px-4 py-2 text-right">Crédito</th>
-                  <th className="px-4 py-2 text-center">Conciliado</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {data.movimientos.map((m) => (
-                  <tr key={m.id}>
-                    <td className="px-4 py-2">{new Date(m.fecha).toLocaleDateString('es-DO')}</td>
-                    <td className="px-4 py-2">{m.concepto}</td>
-                    <td className="px-4 py-2 text-right">{m.debito > 0 ? formatoRD(m.debito) : ''}</td>
-                    <td className="px-4 py-2 text-right">{m.credito > 0 ? formatoRD(m.credito) : ''}</td>
-                    <td className="px-4 py-2 text-center">
-                      <input
-                        type="checkbox"
-                        checked={m.conciliado}
-                        disabled={!tienePermiso('contabilidad.conciliar') || marcarConciliada.isPending}
-                        onChange={(e) => marcarConciliada.mutate({ lineaId: m.id, conciliado: e.target.checked })}
-                      />
-                    </td>
-                  </tr>
-                ))}
-                {data.movimientos.length === 0 && (
+          <Card titulo="Movimientos" sinPadding>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead className="bg-slate-50 text-slate-500 dark:bg-slate-900/60 dark:text-slate-400">
                   <tr>
-                    <td className="px-4 py-2 text-slate-400" colSpan={5}>
-                      Sin movimientos en el rango
-                    </td>
+                    <th className="px-5 py-3 font-medium">Fecha</th>
+                    <th className="px-5 py-3 font-medium">Concepto</th>
+                    <th className="px-5 py-3 text-right font-medium">Débito</th>
+                    <th className="px-5 py-3 text-right font-medium">Crédito</th>
+                    <th className="px-5 py-3 text-center font-medium">Conciliado</th>
                   </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {data.movimientos.map((m) => (
+                    <tr key={m.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                      <td className="px-5 py-3">{new Date(m.fecha).toLocaleDateString('es-DO')}</td>
+                      <td className="px-5 py-3">{m.concepto}</td>
+                      <td className="px-5 py-3 text-right">{m.debito > 0 ? formatoRD(m.debito) : ''}</td>
+                      <td className="px-5 py-3 text-right">{m.credito > 0 ? formatoRD(m.credito) : ''}</td>
+                      <td className="px-5 py-3 text-center">
+                        <input
+                          type="checkbox"
+                          checked={m.conciliado}
+                          disabled={!tienePermiso('contabilidad.conciliar') || marcarConciliada.isPending}
+                          onChange={(e) => marcarConciliada.mutate({ lineaId: m.id, conciliado: e.target.checked })}
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                  {data.movimientos.length === 0 && (
+                    <tr>
+                      <td className="px-5 py-3 text-slate-400" colSpan={5}>
+                        Sin movimientos en el rango
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </Card>
         </>
       )}
     </div>

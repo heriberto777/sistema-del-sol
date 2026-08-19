@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 import { apiClient } from '../lib/api-client';
 import { Button } from '../components/atoms/Button/Button';
+import { Card } from '../components/atoms/Card/Card';
 import { FormField } from '../components/molecules/FormField/FormField';
 import { SelectField } from '../components/molecules/FormField/SelectField';
 import { Modal } from '../components/molecules/Modal/Modal';
@@ -114,9 +115,12 @@ export function Contactos() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Contactos</h1>
+        <div>
+          <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Contactos</h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400">Clientes a los que facturás y proveedores a los que les comprás.</p>
+        </div>
         <Button onClick={abrirNuevo}>{pestana === 'clientes' ? 'Nuevo cliente' : 'Nuevo proveedor'}</Button>
       </div>
 
@@ -200,50 +204,72 @@ function ListaClientes({ busqueda, setBusqueda, pagina, setPagina, busquedaDebou
 
   return (
     <div className="space-y-4">
-      <SearchInput
-        value={busqueda}
-        onChange={(v) => {
-          setBusqueda(v);
-          setPagina(1);
-        }}
-        placeholder="Buscar por nombre, email o RNC/cédula…"
-      />
       {data?.datos.length === 0 ? (
-        <EstadoVacio
-          titulo="Todavía no hay clientes"
-          descripcion="Creá el primero para empezar a facturarle."
-          etiquetaAccion="Nuevo cliente"
-          onAccion={onNuevo}
-        />
+        <>
+          <SearchInput
+            value={busqueda}
+            onChange={(v) => {
+              setBusqueda(v);
+              setPagina(1);
+            }}
+            placeholder="Buscar por nombre, email o RNC/cédula…"
+          />
+          <EstadoVacio
+            titulo="Todavía no hay clientes"
+            descripcion="Creá el primero para empezar a facturarle."
+            etiquetaAccion="Nuevo cliente"
+            onAccion={onNuevo}
+          />
+        </>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-slate-50 text-slate-500 dark:bg-slate-900 dark:text-slate-400">
-              <tr>
-                <th className="px-4 py-2">Nombre</th>
-                <th className="px-4 py-2">RNC/Cédula</th>
-                <th className="px-4 py-2">Email</th>
-                <th className="px-4 py-2">Teléfono</th>
-                <th className="px-4 py-2" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {data?.datos.map((cliente) => (
-                <tr key={cliente.id}>
-                  <td className="px-4 py-2">{cliente.nombre}</td>
-                  <td className="px-4 py-2">{cliente.rncCedula ?? '—'}</td>
-                  <td className="px-4 py-2">{cliente.email ?? '—'}</td>
-                  <td className="px-4 py-2">{cliente.telefono ?? '—'}</td>
-                  <td className="px-4 py-2 text-right">
-                    <RowActionsMenu acciones={[{ etiqueta: 'Editar', onClick: () => onEditar(cliente) }]} />
-                  </td>
+        <Card
+          sinPadding
+          titulo="Clientes"
+          descripcion={data ? `${data.total} cliente(s)` : undefined}
+          acciones={
+            <SearchInput
+              value={busqueda}
+              onChange={(v) => {
+                setBusqueda(v);
+                setPagina(1);
+              }}
+              placeholder="Buscar por nombre, email o RNC/cédula…"
+            />
+          }
+        >
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-slate-50 text-slate-500 dark:bg-slate-900/60 dark:text-slate-400">
+                <tr>
+                  <th className="px-5 py-3 font-medium">Nombre</th>
+                  <th className="px-5 py-3 font-medium">RNC/Cédula</th>
+                  <th className="px-5 py-3 font-medium">Email</th>
+                  <th className="px-5 py-3 font-medium">Teléfono</th>
+                  <th className="px-5 py-3" />
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                {data?.datos.map((cliente) => (
+                  <tr key={cliente.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                    <td className="px-5 py-3">{cliente.nombre}</td>
+                    <td className="px-5 py-3">{cliente.rncCedula ?? '—'}</td>
+                    <td className="px-5 py-3">{cliente.email ?? '—'}</td>
+                    <td className="px-5 py-3">{cliente.telefono ?? '—'}</td>
+                    <td className="px-5 py-3 text-right">
+                      <RowActionsMenu acciones={[{ etiqueta: 'Editar', onClick: () => onEditar(cliente) }]} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {data && (
+            <div className="px-5 py-3">
+              <Paginacion pagina={data.pagina} tamanoPagina={data.tamanoPagina} total={data.total} onCambiarPagina={setPagina} />
+            </div>
+          )}
+        </Card>
       )}
-      {data && <Paginacion pagina={data.pagina} tamanoPagina={data.tamanoPagina} total={data.total} onCambiarPagina={setPagina} />}
     </div>
   );
 }
@@ -261,50 +287,72 @@ function ListaProveedores({ busqueda, setBusqueda, pagina, setPagina, busquedaDe
 
   return (
     <div className="space-y-4">
-      <SearchInput
-        value={busqueda}
-        onChange={(v) => {
-          setBusqueda(v);
-          setPagina(1);
-        }}
-        placeholder="Buscar por nombre o RNC…"
-      />
       {data?.datos.length === 0 ? (
-        <EstadoVacio
-          titulo="Todavía no hay proveedores"
-          descripcion="Creá el primero para poder registrar órdenes de compra."
-          etiquetaAccion="Nuevo proveedor"
-          onAccion={onNuevo}
-        />
+        <>
+          <SearchInput
+            value={busqueda}
+            onChange={(v) => {
+              setBusqueda(v);
+              setPagina(1);
+            }}
+            placeholder="Buscar por nombre o RNC…"
+          />
+          <EstadoVacio
+            titulo="Todavía no hay proveedores"
+            descripcion="Creá el primero para poder registrar órdenes de compra."
+            etiquetaAccion="Nuevo proveedor"
+            onAccion={onNuevo}
+          />
+        </>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-slate-50 text-slate-500 dark:bg-slate-900 dark:text-slate-400">
-              <tr>
-                <th className="px-4 py-2">Nombre</th>
-                <th className="px-4 py-2">RNC</th>
-                <th className="px-4 py-2">Email</th>
-                <th className="px-4 py-2">Teléfono</th>
-                <th className="px-4 py-2" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {data?.datos.map((proveedor) => (
-                <tr key={proveedor.id}>
-                  <td className="px-4 py-2">{proveedor.nombre}</td>
-                  <td className="px-4 py-2">{proveedor.rnc ?? '—'}</td>
-                  <td className="px-4 py-2">{proveedor.email ?? '—'}</td>
-                  <td className="px-4 py-2">{proveedor.telefono ?? '—'}</td>
-                  <td className="px-4 py-2 text-right">
-                    <RowActionsMenu acciones={[{ etiqueta: 'Editar', onClick: () => onEditar(proveedor) }]} />
-                  </td>
+        <Card
+          sinPadding
+          titulo="Proveedores"
+          descripcion={data ? `${data.total} proveedor(es)` : undefined}
+          acciones={
+            <SearchInput
+              value={busqueda}
+              onChange={(v) => {
+                setBusqueda(v);
+                setPagina(1);
+              }}
+              placeholder="Buscar por nombre o RNC…"
+            />
+          }
+        >
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-slate-50 text-slate-500 dark:bg-slate-900/60 dark:text-slate-400">
+                <tr>
+                  <th className="px-5 py-3 font-medium">Nombre</th>
+                  <th className="px-5 py-3 font-medium">RNC</th>
+                  <th className="px-5 py-3 font-medium">Email</th>
+                  <th className="px-5 py-3 font-medium">Teléfono</th>
+                  <th className="px-5 py-3" />
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                {data?.datos.map((proveedor) => (
+                  <tr key={proveedor.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                    <td className="px-5 py-3">{proveedor.nombre}</td>
+                    <td className="px-5 py-3">{proveedor.rnc ?? '—'}</td>
+                    <td className="px-5 py-3">{proveedor.email ?? '—'}</td>
+                    <td className="px-5 py-3">{proveedor.telefono ?? '—'}</td>
+                    <td className="px-5 py-3 text-right">
+                      <RowActionsMenu acciones={[{ etiqueta: 'Editar', onClick: () => onEditar(proveedor) }]} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {data && (
+            <div className="px-5 py-3">
+              <Paginacion pagina={data.pagina} tamanoPagina={data.tamanoPagina} total={data.total} onCambiarPagina={setPagina} />
+            </div>
+          )}
+        </Card>
       )}
-      {data && <Paginacion pagina={data.pagina} tamanoPagina={data.tamanoPagina} total={data.total} onCambiarPagina={setPagina} />}
     </div>
   );
 }

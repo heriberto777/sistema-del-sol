@@ -34,9 +34,12 @@ export function BalanceGeneralView() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Fecha (por defecto: hoy)</label>
-        <Input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} className="max-w-xs" />
+      <div className="flex flex-wrap items-end gap-4">
+        <div>
+          <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Fecha</label>
+          <Input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} className="max-w-xs" />
+        </div>
+        <p className="text-xs text-slate-500 dark:text-slate-400">Por defecto: hoy</p>
       </div>
 
       {isLoading && <p className="text-sm text-slate-500">Calculando balance general…</p>}

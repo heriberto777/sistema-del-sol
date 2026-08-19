@@ -4,6 +4,7 @@ import { useSearchParams } from 'react-router-dom';
 import { apiClient } from '../lib/api-client';
 import { Badge } from '../components/atoms/Badge/Badge';
 import { Button } from '../components/atoms/Button/Button';
+import { Card } from '../components/atoms/Card/Card';
 import { Select } from '../components/atoms/Select/Select';
 import { FormField } from '../components/molecules/FormField/FormField';
 import { Modal } from '../components/molecules/Modal/Modal';
@@ -109,72 +110,87 @@ export function Productos() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Productos</h1>
+        <div>
+          <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Productos</h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400">Catálogo de productos, servicios y combos.</p>
+        </div>
         <Button onClick={abrirNuevo}>Nuevo producto</Button>
       </div>
 
       <RequierePermiso permiso="precios.ver">
-        <SearchInput
-          value={busqueda}
-          onChange={(v) => {
-            setBusqueda(v);
-            setPagina(1);
-          }}
-          placeholder="Buscar por código o nombre…"
-        />
-        {data?.datos.length === 0 ? (
-          <EstadoVacio
-            titulo="Todavía no hay productos"
-            descripcion="Creá el primero para poder facturarlo o comprarlo."
-            etiquetaAccion="Nuevo producto"
-            onAccion={abrirNuevo}
-          />
-        ) : (
-          <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-slate-50 text-slate-500 dark:bg-slate-900 dark:text-slate-400">
-                <tr>
-                  <th className="px-4 py-2">Código</th>
-                  <th className="px-4 py-2">Nombre</th>
-                  <th className="px-4 py-2">Tipo</th>
-                  <th className="px-4 py-2">Categoría</th>
-                  <th className="px-4 py-2">Unidad</th>
-                  <th className="px-4 py-2">ITBIS %</th>
-                  <th className="px-4 py-2">Precio vigente</th>
-                  <th className="px-4 py-2" />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {data?.datos.map((producto) => (
-                  <tr key={producto.id}>
-                    <td className="px-4 py-2">{producto.codigo}</td>
-                    <td className="px-4 py-2">{producto.nombre}</td>
-                    <td className="px-4 py-2">
-                      <Badge tono={TONO_TIPO[producto.tipo]}>{ETIQUETA_TIPO[producto.tipo]}</Badge>
-                    </td>
-                    <td className="px-4 py-2">{producto.categoria ?? '—'}</td>
-                    <td className="px-4 py-2">{producto.unidadMedida}</td>
-                    <td className="px-4 py-2">{Number(producto.porcentajeItbis)}%</td>
-                    <td className="px-4 py-2">
-                      <PrecioVigente productoId={producto.id} />
-                    </td>
-                    <td className="px-4 py-2 text-right">
-                      <RowActionsMenu
-                        acciones={[
-                          { etiqueta: 'Cambiar precio', onClick: () => setProductoPrecio(producto) },
-                          { etiqueta: 'Editar', onClick: () => abrirEditar(producto) },
-                        ]}
-                      />
-                    </td>
+        <Card
+          sinPadding
+          titulo="Productos"
+          descripcion={data ? `${data.total} producto(s)` : undefined}
+          acciones={
+            <SearchInput
+              value={busqueda}
+              onChange={(v) => {
+                setBusqueda(v);
+                setPagina(1);
+              }}
+              placeholder="Buscar por código o nombre…"
+            />
+          }
+        >
+          {data?.datos.length === 0 ? (
+            <div className="p-5">
+              <EstadoVacio
+                titulo="Todavía no hay productos"
+                descripcion="Creá el primero para poder facturarlo o comprarlo."
+                etiquetaAccion="Nuevo producto"
+                onAccion={abrirNuevo}
+              />
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead className="bg-slate-50 text-slate-500 dark:bg-slate-900/60 dark:text-slate-400">
+                  <tr>
+                    <th className="px-5 py-3 font-medium">Código</th>
+                    <th className="px-5 py-3 font-medium">Nombre</th>
+                    <th className="px-5 py-3 font-medium">Tipo</th>
+                    <th className="px-5 py-3 font-medium">Categoría</th>
+                    <th className="px-5 py-3 font-medium">Unidad</th>
+                    <th className="px-5 py-3 font-medium">ITBIS %</th>
+                    <th className="px-5 py-3 font-medium">Precio vigente</th>
+                    <th className="px-5 py-3" />
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-        {data && (
-          <Paginacion pagina={data.pagina} tamanoPagina={data.tamanoPagina} total={data.total} onCambiarPagina={setPagina} />
-        )}
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {data?.datos.map((producto) => (
+                    <tr key={producto.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                      <td className="px-5 py-3">{producto.codigo}</td>
+                      <td className="px-5 py-3">{producto.nombre}</td>
+                      <td className="px-5 py-3">
+                        <Badge tono={TONO_TIPO[producto.tipo]}>{ETIQUETA_TIPO[producto.tipo]}</Badge>
+                      </td>
+                      <td className="px-5 py-3">{producto.categoria ?? '—'}</td>
+                      <td className="px-5 py-3">{producto.unidadMedida}</td>
+                      <td className="px-5 py-3">{Number(producto.porcentajeItbis)}%</td>
+                      <td className="px-5 py-3">
+                        <PrecioVigente productoId={producto.id} />
+                      </td>
+                      <td className="px-5 py-3 text-right">
+                        <RowActionsMenu
+                          acciones={[
+                            { etiqueta: 'Cambiar precio', onClick: () => setProductoPrecio(producto) },
+                            { etiqueta: 'Editar', onClick: () => abrirEditar(producto) },
+                          ]}
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          {data && (
+            <div className="px-5 py-3">
+              <Paginacion pagina={data.pagina} tamanoPagina={data.tamanoPagina} total={data.total} onCambiarPagina={setPagina} />
+            </div>
+          )}
+        </Card>
       </RequierePermiso>
 
       {modalProductoAbierto && (

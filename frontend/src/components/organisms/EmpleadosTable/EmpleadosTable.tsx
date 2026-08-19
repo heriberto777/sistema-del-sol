@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../../lib/api-client';
 import { Badge } from '../../atoms/Badge/Badge';
 import { Button } from '../../atoms/Button/Button';
+import { Card } from '../../atoms/Card/Card';
 import { FormField } from '../../molecules/FormField/FormField';
 import { Modal } from '../../molecules/Modal/Modal';
 import { SearchInput } from '../../molecules/SearchInput/SearchInput';
@@ -46,48 +47,53 @@ export function EmpleadosTable() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h2 className="font-medium text-slate-900 dark:text-slate-100">Empleados</h2>
-        {tienePermiso('nomina.editar') && <Button onClick={() => setModalNuevoEmpleado(true)}>Nuevo empleado</Button>}
-      </div>
+      {tienePermiso('nomina.editar') && (
+        <div className="flex justify-end">
+          <Button onClick={() => setModalNuevoEmpleado(true)}>Nuevo empleado</Button>
+        </div>
+      )}
 
-      <SearchInput
-        value={busqueda}
-        onChange={(v) => {
-          setBusqueda(v);
-          setPagina(1);
-        }}
-        placeholder="Buscar por nombre, cédula o cargo…"
-      />
-
-      {isLoading && <p className="text-sm text-slate-500">Cargando empleados…</p>}
-      {errorCarga && <p className="text-sm text-red-600">No se pudieron cargar los empleados.</p>}
-
-      {data && (
-        <>
-          <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800">
+      <Card
+        sinPadding
+        titulo="Empleados"
+        descripcion={data ? `${data.total} empleado(s)` : undefined}
+        acciones={
+          <SearchInput
+            value={busqueda}
+            onChange={(v) => {
+              setBusqueda(v);
+              setPagina(1);
+            }}
+            placeholder="Buscar por nombre, cédula o cargo…"
+          />
+        }
+      >
+        {isLoading && <p className="p-5 text-sm text-slate-500">Cargando empleados…</p>}
+        {errorCarga && <p className="p-5 text-sm text-red-600">No se pudieron cargar los empleados.</p>}
+        {data && (
+          <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
-              <thead className="bg-slate-50 text-slate-500 dark:bg-slate-900 dark:text-slate-400">
+              <thead className="bg-slate-50 text-slate-500 dark:bg-slate-900/60 dark:text-slate-400">
                 <tr>
-                  <th className="px-4 py-2">Nombre</th>
-                  <th className="px-4 py-2">Cédula</th>
-                  <th className="px-4 py-2">Cargo</th>
-                  <th className="px-4 py-2">Salario bruto</th>
-                  <th className="px-4 py-2">Estado</th>
-                  <th className="px-4 py-2"></th>
+                  <th className="px-5 py-3 font-medium">Nombre</th>
+                  <th className="px-5 py-3 font-medium">Cédula</th>
+                  <th className="px-5 py-3 font-medium">Cargo</th>
+                  <th className="px-5 py-3 font-medium">Salario bruto</th>
+                  <th className="px-5 py-3 font-medium">Estado</th>
+                  <th className="px-5 py-3"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {data.datos.map((empleado) => (
-                  <tr key={empleado.id}>
-                    <td className="px-4 py-2">{empleado.nombre}</td>
-                    <td className="px-4 py-2 font-mono text-xs">{empleado.cedula}</td>
-                    <td className="px-4 py-2">{empleado.cargo}</td>
-                    <td className="px-4 py-2">RD$ {Number(empleado.salarioBrutoMensual).toLocaleString('es-DO')}</td>
-                    <td className="px-4 py-2">
+                  <tr key={empleado.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                    <td className="px-5 py-3">{empleado.nombre}</td>
+                    <td className="px-5 py-3 font-mono text-xs">{empleado.cedula}</td>
+                    <td className="px-5 py-3">{empleado.cargo}</td>
+                    <td className="px-5 py-3">RD$ {Number(empleado.salarioBrutoMensual).toLocaleString('es-DO')}</td>
+                    <td className="px-5 py-3">
                       <Badge tono={empleado.activo ? 'exito' : 'neutro'}>{empleado.activo ? 'Activo' : 'Inactivo'}</Badge>
                     </td>
-                    <td className="px-4 py-2">
+                    <td className="px-5 py-3">
                       {empleado.activo && tienePermiso('nomina.editar') && (
                         <Button variante="peligro" onClick={() => desactivar.mutate(empleado.id)} disabled={desactivar.isPending}>
                           Desactivar
@@ -99,9 +105,13 @@ export function EmpleadosTable() {
               </tbody>
             </table>
           </div>
-          <Paginacion pagina={data.pagina} tamanoPagina={data.tamanoPagina} total={data.total} onCambiarPagina={setPagina} />
-        </>
-      )}
+        )}
+        {data && (
+          <div className="px-5 py-3">
+            <Paginacion pagina={data.pagina} tamanoPagina={data.tamanoPagina} total={data.total} onCambiarPagina={setPagina} />
+          </div>
+        )}
+      </Card>
 
       {modalNuevoEmpleado && <ModalNuevoEmpleado onClose={() => setModalNuevoEmpleado(false)} />}
     </div>

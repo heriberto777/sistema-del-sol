@@ -2,6 +2,7 @@ import { FormEvent, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../../lib/api-client';
 import { Button } from '../../atoms/Button/Button';
+import { Card } from '../../atoms/Card/Card';
 import { Select } from '../../atoms/Select/Select';
 import { FormField } from '../../molecules/FormField/FormField';
 
@@ -57,10 +58,8 @@ export function GastoRapidoForm() {
   }
 
   return (
-    <form
-      onSubmit={onSubmit}
-      className="flex flex-wrap items-end gap-3 rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
-    >
+    <Card titulo="Registrar gasto" descripcion="Crea un asiento de gasto en un solo paso, sin armar débito/crédito a mano.">
+    <form onSubmit={onSubmit} className="flex flex-wrap items-end gap-3">
       <FormField
         id="gasto-concepto"
         label="Concepto"
@@ -108,5 +107,6 @@ export function GastoRapidoForm() {
         {crear.isPending ? 'Registrando…' : 'Registrar gasto'}
       </Button>
     </form>
+    </Card>
   );
 }

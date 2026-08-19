@@ -3,6 +3,8 @@ import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '../../../lib/api-client';
 import { Input } from '../../atoms/Input/Input';
 import { Button } from '../../atoms/Button/Button';
+import { Card } from '../../atoms/Card/Card';
+import { StatCard } from '../../molecules/StatCard/StatCard';
 import { descargarBlob } from '../../../lib/descargar-archivo';
 
 interface ResumenItbis {
@@ -128,9 +130,9 @@ export function ReporteFiscalDgii() {
 
       {data && (
         <div className="grid grid-cols-3 gap-4">
-          <Resumen etiqueta="ITBIS en ventas (607)" valor={data.itbisEnVentas} />
-          <Resumen etiqueta="ITBIS en compras (606)" valor={data.itbisEnCompras} />
-          <Resumen etiqueta="ITBIS neto a pagar" valor={data.itbisNetoAPagar} />
+          <StatCard etiqueta="ITBIS en ventas (607)" valor={formatoRD(data.itbisEnVentas)} />
+          <StatCard etiqueta="ITBIS en compras (606)" valor={formatoRD(data.itbisEnCompras)} />
+          <StatCard etiqueta="ITBIS neto a pagar" valor={formatoRD(data.itbisNetoAPagar)} />
         </div>
       )}
 
@@ -153,10 +155,10 @@ export function ReporteFiscalDgii() {
         </p>
         {it1 && (
           <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-            <Resumen etiqueta="ITBIS en ventas" valor={it1.itbisEnVentas} />
-            <Resumen etiqueta="ITBIS en compras" valor={it1.itbisEnCompras} />
-            <Resumen etiqueta="ITBIS a pagar" valor={it1.itbisAPagar} />
-            <Resumen etiqueta="Saldo a favor" valor={it1.itbisSaldoAFavor} />
+            <StatCard etiqueta="ITBIS en ventas" valor={formatoRD(it1.itbisEnVentas)} />
+            <StatCard etiqueta="ITBIS en compras" valor={formatoRD(it1.itbisEnCompras)} />
+            <StatCard etiqueta="ITBIS a pagar" valor={formatoRD(it1.itbisAPagar)} />
+            <StatCard etiqueta="Saldo a favor" valor={formatoRD(it1.itbisSaldoAFavor)} />
           </div>
         )}
       </div>
@@ -169,38 +171,40 @@ export function ReporteFiscalDgii() {
         {retenciones && (
           <>
             <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
-              <Resumen etiqueta="Salario bruto total" valor={retenciones.resumen.salarioBruto} />
-              <Resumen etiqueta="ISR retenido total" valor={retenciones.resumen.isr} />
+              <StatCard etiqueta="Salario bruto total" valor={formatoRD(retenciones.resumen.salarioBruto)} />
+              <StatCard etiqueta="ISR retenido total" valor={formatoRD(retenciones.resumen.isr)} />
             </div>
-            <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800">
-              <table className="w-full text-left text-sm">
-                <thead className="bg-slate-50 text-slate-500 dark:bg-slate-900 dark:text-slate-400">
-                  <tr>
-                    <th className="px-4 py-2">Cédula</th>
-                    <th className="px-4 py-2">Nombre</th>
-                    <th className="px-4 py-2 text-right">Salario bruto</th>
-                    <th className="px-4 py-2 text-right">ISR retenido</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {retenciones.empleados.map((e) => (
-                    <tr key={e.cedula}>
-                      <td className="px-4 py-2 font-mono text-xs">{e.cedula}</td>
-                      <td className="px-4 py-2">{e.nombre}</td>
-                      <td className="px-4 py-2 text-right">{formatoRD(e.salarioBruto)}</td>
-                      <td className="px-4 py-2 text-right">{formatoRD(e.isr)}</td>
-                    </tr>
-                  ))}
-                  {retenciones.empleados.length === 0 && (
+            <Card sinPadding>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead className="bg-slate-50 text-slate-500 dark:bg-slate-900/60 dark:text-slate-400">
                     <tr>
-                      <td className="px-4 py-2 text-slate-400" colSpan={4}>
-                        Sin recibos de nómina en el rango
-                      </td>
+                      <th className="px-5 py-3 font-medium">Cédula</th>
+                      <th className="px-5 py-3 font-medium">Nombre</th>
+                      <th className="px-5 py-3 text-right font-medium">Salario bruto</th>
+                      <th className="px-5 py-3 text-right font-medium">ISR retenido</th>
                     </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                    {retenciones.empleados.map((e) => (
+                      <tr key={e.cedula} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                        <td className="px-5 py-3 font-mono text-xs">{e.cedula}</td>
+                        <td className="px-5 py-3">{e.nombre}</td>
+                        <td className="px-5 py-3 text-right">{formatoRD(e.salarioBruto)}</td>
+                        <td className="px-5 py-3 text-right">{formatoRD(e.isr)}</td>
+                      </tr>
+                    ))}
+                    {retenciones.empleados.length === 0 && (
+                      <tr>
+                        <td className="px-5 py-3 text-slate-400" colSpan={4}>
+                          Sin recibos de nómina en el rango
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
           </>
         )}
       </div>
@@ -214,60 +218,51 @@ export function ReporteFiscalDgii() {
         {retencionesProveedores && (
           <>
             <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-              <Resumen etiqueta="Monto bruto" valor={retencionesProveedores.resumen.montoBruto} />
-              <Resumen etiqueta="ISR retenido" valor={retencionesProveedores.resumen.retencionIsr} />
-              <Resumen etiqueta="ITBIS retenido" valor={retencionesProveedores.resumen.retencionItbis} />
-              <Resumen etiqueta="Neto pagado" valor={retencionesProveedores.resumen.netoPagado} />
+              <StatCard etiqueta="Monto bruto" valor={formatoRD(retencionesProveedores.resumen.montoBruto)} />
+              <StatCard etiqueta="ISR retenido" valor={formatoRD(retencionesProveedores.resumen.retencionIsr)} />
+              <StatCard etiqueta="ITBIS retenido" valor={formatoRD(retencionesProveedores.resumen.retencionItbis)} />
+              <StatCard etiqueta="Neto pagado" valor={formatoRD(retencionesProveedores.resumen.netoPagado)} />
             </div>
-            <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800">
-              <table className="w-full text-left text-sm">
-                <thead className="bg-slate-50 text-slate-500 dark:bg-slate-900 dark:text-slate-400">
-                  <tr>
-                    <th className="px-4 py-2">Proveedor</th>
-                    <th className="px-4 py-2">RNC</th>
-                    <th className="px-4 py-2">Fecha</th>
-                    <th className="px-4 py-2 text-right">Monto bruto</th>
-                    <th className="px-4 py-2 text-right">ISR retenido</th>
-                    <th className="px-4 py-2 text-right">ITBIS retenido</th>
-                    <th className="px-4 py-2 text-right">Neto pagado</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {retencionesProveedores.filas.map((f, i) => (
-                    <tr key={i}>
-                      <td className="px-4 py-2">{f.proveedorNombre}</td>
-                      <td className="px-4 py-2 font-mono text-xs">{f.proveedorRnc || '—'}</td>
-                      <td className="px-4 py-2">{new Date(f.fecha).toLocaleDateString('es-DO')}</td>
-                      <td className="px-4 py-2 text-right">{formatoRD(f.montoBruto)}</td>
-                      <td className="px-4 py-2 text-right">{formatoRD(f.retencionIsr)}</td>
-                      <td className="px-4 py-2 text-right">{formatoRD(f.retencionItbis)}</td>
-                      <td className="px-4 py-2 text-right">{formatoRD(f.netoPagado)}</td>
-                    </tr>
-                  ))}
-                  {retencionesProveedores.filas.length === 0 && (
+            <Card sinPadding>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead className="bg-slate-50 text-slate-500 dark:bg-slate-900/60 dark:text-slate-400">
                     <tr>
-                      <td className="px-4 py-2 text-slate-400" colSpan={7}>
-                        Sin pagos con retención en el rango
-                      </td>
+                      <th className="px-5 py-3 font-medium">Proveedor</th>
+                      <th className="px-5 py-3 font-medium">RNC</th>
+                      <th className="px-5 py-3 font-medium">Fecha</th>
+                      <th className="px-5 py-3 text-right font-medium">Monto bruto</th>
+                      <th className="px-5 py-3 text-right font-medium">ISR retenido</th>
+                      <th className="px-5 py-3 text-right font-medium">ITBIS retenido</th>
+                      <th className="px-5 py-3 text-right font-medium">Neto pagado</th>
                     </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                    {retencionesProveedores.filas.map((f, i) => (
+                      <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                        <td className="px-5 py-3">{f.proveedorNombre}</td>
+                        <td className="px-5 py-3 font-mono text-xs">{f.proveedorRnc || '—'}</td>
+                        <td className="px-5 py-3">{new Date(f.fecha).toLocaleDateString('es-DO')}</td>
+                        <td className="px-5 py-3 text-right">{formatoRD(f.montoBruto)}</td>
+                        <td className="px-5 py-3 text-right">{formatoRD(f.retencionIsr)}</td>
+                        <td className="px-5 py-3 text-right">{formatoRD(f.retencionItbis)}</td>
+                        <td className="px-5 py-3 text-right">{formatoRD(f.netoPagado)}</td>
+                      </tr>
+                    ))}
+                    {retencionesProveedores.filas.length === 0 && (
+                      <tr>
+                        <td className="px-5 py-3 text-slate-400" colSpan={7}>
+                          Sin pagos con retención en el rango
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
           </>
         )}
       </div>
-    </div>
-  );
-}
-
-function Resumen({ etiqueta, valor }: { etiqueta: string; valor: number }) {
-  return (
-    <div className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
-      <p className="text-xs text-slate-500 dark:text-slate-400">{etiqueta}</p>
-      <p className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-        RD$ {valor.toLocaleString('es-DO', { minimumFractionDigits: 2 })}
-      </p>
     </div>
   );
 }

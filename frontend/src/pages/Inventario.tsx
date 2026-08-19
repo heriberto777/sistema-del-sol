@@ -4,6 +4,7 @@ import { useSearchParams } from 'react-router-dom';
 import clsx from 'clsx';
 import { apiClient } from '../lib/api-client';
 import { Button } from '../components/atoms/Button/Button';
+import { Card } from '../components/atoms/Card/Card';
 import { Select } from '../components/atoms/Select/Select';
 import { FormField } from '../components/molecules/FormField/FormField';
 import { Modal } from '../components/molecules/Modal/Modal';
@@ -87,7 +88,10 @@ export function Inventario() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Inventario</h1>
+        <div>
+          <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Inventario</h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400">Bodegas y existencias por producto.</p>
+        </div>
         <RequierePermiso permiso="admin.configuracion">
           <Button onClick={() => setModalNuevaBodega(true)}>Nueva bodega</Button>
         </RequierePermiso>
@@ -142,39 +146,44 @@ export function Inventario() {
         )}
 
         {bodegaSeleccionada && (
-          <div className="space-y-3">
-            <h2 className="font-medium text-slate-900 dark:text-slate-100">Stock — {bodegaSeleccionada.nombre}</h2>
-            <SearchInput
-              value={busquedaStock}
-              onChange={(v) => {
-                setBusquedaStock(v);
-                setPaginaStock(1);
-              }}
-              placeholder="Buscar por código o nombre de producto…"
-            />
-            <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800">
+          <Card
+            sinPadding
+            titulo={`Stock — ${bodegaSeleccionada.nombre}`}
+            descripcion={stock ? `${stock.total} producto(s) en esta bodega` : undefined}
+            acciones={
+              <SearchInput
+                value={busquedaStock}
+                onChange={(v) => {
+                  setBusquedaStock(v);
+                  setPaginaStock(1);
+                }}
+                placeholder="Buscar por código o nombre de producto…"
+              />
+            }
+          >
+            <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
-                <thead className="bg-slate-50 text-slate-500 dark:bg-slate-900 dark:text-slate-400">
+                <thead className="bg-slate-50 text-slate-500 dark:bg-slate-900/60 dark:text-slate-400">
                   <tr>
-                    <th className="px-4 py-2">Producto</th>
-                    <th className="px-4 py-2">Actual</th>
-                    <th className="px-4 py-2">Reservada</th>
-                    <th className="px-4 py-2">Disponible</th>
-                    <th className="px-4 py-2">Mínimo</th>
-                    <th className="px-4 py-2" />
+                    <th className="px-5 py-3 font-medium">Producto</th>
+                    <th className="px-5 py-3 font-medium">Actual</th>
+                    <th className="px-5 py-3 font-medium">Reservada</th>
+                    <th className="px-5 py-3 font-medium">Disponible</th>
+                    <th className="px-5 py-3 font-medium">Mínimo</th>
+                    <th className="px-5 py-3" />
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                   {stock?.datos.map((linea) => (
-                    <tr key={linea.productoId}>
-                      <td className="px-4 py-2">
+                    <tr key={linea.productoId} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                      <td className="px-5 py-3">
                         {linea.producto.codigo} — {linea.producto.nombre}
                       </td>
-                      <td className="px-4 py-2">{Number(linea.cantidadActual)}</td>
-                      <td className="px-4 py-2">{Number(linea.cantidadReservada)}</td>
-                      <td className="px-4 py-2">{Number(linea.cantidadActual) - Number(linea.cantidadReservada)}</td>
-                      <td className="px-4 py-2">{Number(linea.stockMinimo)}</td>
-                      <td className="px-4 py-2 text-right">
+                      <td className="px-5 py-3">{Number(linea.cantidadActual)}</td>
+                      <td className="px-5 py-3">{Number(linea.cantidadReservada)}</td>
+                      <td className="px-5 py-3">{Number(linea.cantidadActual) - Number(linea.cantidadReservada)}</td>
+                      <td className="px-5 py-3">{Number(linea.stockMinimo)}</td>
+                      <td className="px-5 py-3 text-right">
                         <RowActionsMenu
                           acciones={[
                             ...(tienePermisoAjustar
@@ -190,7 +199,7 @@ export function Inventario() {
                   ))}
                   {stock?.datos.length === 0 && (
                     <tr>
-                      <td colSpan={6} className="px-4 py-6 text-center text-slate-400">
+                      <td colSpan={6} className="px-5 py-6 text-center text-slate-400">
                         Esta bodega no tiene stock registrado todavía.
                       </td>
                     </tr>
@@ -199,9 +208,11 @@ export function Inventario() {
               </table>
             </div>
             {stock && (
-              <Paginacion pagina={stock.pagina} tamanoPagina={stock.tamanoPagina} total={stock.total} onCambiarPagina={setPaginaStock} />
+              <div className="px-5 py-3">
+                <Paginacion pagina={stock.pagina} tamanoPagina={stock.tamanoPagina} total={stock.total} onCambiarPagina={setPaginaStock} />
+              </div>
             )}
-          </div>
+          </Card>
         )}
       </RequierePermiso>
 

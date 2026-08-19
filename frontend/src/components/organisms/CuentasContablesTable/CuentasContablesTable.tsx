@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../../lib/api-client';
 import { Badge } from '../../atoms/Badge/Badge';
 import { Button } from '../../atoms/Button/Button';
+import { Card } from '../../atoms/Card/Card';
 import { FormField } from '../../molecules/FormField/FormField';
 import { Modal } from '../../molecules/Modal/Modal';
 import { useAuth } from '../../../hooks/useAuth';
@@ -38,40 +39,42 @@ export function CuentasContablesTable() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h2 className="font-medium text-slate-900 dark:text-slate-100">Catálogo de cuentas</h2>
-        {tienePermiso('contabilidad.editar') && <Button onClick={() => setModalNuevaCuenta(true)}>Nueva cuenta</Button>}
-      </div>
-
-      {isLoading && <p className="text-sm text-slate-500">Cargando catálogo de cuentas…</p>}
       {errorCarga && <p className="text-sm text-red-600">No se pudo cargar el catálogo de cuentas.</p>}
 
-      {data && (
-        <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-slate-50 text-slate-500 dark:bg-slate-900 dark:text-slate-400">
-              <tr>
-                <th className="px-4 py-2">Código</th>
-                <th className="px-4 py-2">Nombre</th>
-                <th className="px-4 py-2">Tipo</th>
-                <th className="px-4 py-2">Naturaleza</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {data.map((cuenta) => (
-                <tr key={cuenta.id}>
-                  <td className="px-4 py-2 font-mono text-xs">{cuenta.codigo}</td>
-                  <td className="px-4 py-2">{cuenta.nombre}</td>
-                  <td className="px-4 py-2">
-                    <Badge tono={TONO_POR_TIPO[cuenta.tipo]}>{cuenta.tipo}</Badge>
-                  </td>
-                  <td className="px-4 py-2 text-slate-500 dark:text-slate-400">{cuenta.naturaleza}</td>
+      <Card
+        sinPadding
+        titulo="Catálogo de cuentas"
+        descripcion={data ? `${data.length} cuenta(s)` : undefined}
+        acciones={tienePermiso('contabilidad.editar') ? <Button onClick={() => setModalNuevaCuenta(true)}>Nueva cuenta</Button> : undefined}
+      >
+        {isLoading && <p className="p-5 text-sm text-slate-500">Cargando catálogo de cuentas…</p>}
+        {data && (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-slate-50 text-slate-500 dark:bg-slate-900/60 dark:text-slate-400">
+                <tr>
+                  <th className="px-5 py-3 font-medium">Código</th>
+                  <th className="px-5 py-3 font-medium">Nombre</th>
+                  <th className="px-5 py-3 font-medium">Tipo</th>
+                  <th className="px-5 py-3 font-medium">Naturaleza</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                {data.map((cuenta) => (
+                  <tr key={cuenta.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                    <td className="px-5 py-3 font-mono text-xs">{cuenta.codigo}</td>
+                    <td className="px-5 py-3">{cuenta.nombre}</td>
+                    <td className="px-5 py-3">
+                      <Badge tono={TONO_POR_TIPO[cuenta.tipo]}>{cuenta.tipo}</Badge>
+                    </td>
+                    <td className="px-5 py-3 text-slate-500 dark:text-slate-400">{cuenta.naturaleza}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
 
       {modalNuevaCuenta && <ModalNuevaCuenta onClose={() => setModalNuevaCuenta(false)} />}
     </div>

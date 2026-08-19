@@ -1,7 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '../../../lib/api-client';
 import { Badge } from '../../atoms/Badge/Badge';
+import { Card } from '../../atoms/Card/Card';
 import { BotonesExportar } from '../../molecules/BotonesExportar/BotonesExportar';
+import { StatCard } from '../../molecules/StatCard/StatCard';
 
 interface StockReporte {
   cantidadActual: string;
@@ -31,50 +33,43 @@ export function ReporteInventario() {
 
       {!isLoading && data && (
         <div className="grid grid-cols-3 gap-4">
-          <Resumen etiqueta="Líneas de producto" valor={String(data.resumen.productos)} />
-          <Resumen etiqueta="Unidades totales" valor={data.resumen.unidades.toLocaleString('es-DO')} />
-          <Resumen etiqueta="En alerta de stock bajo" valor={String(data.resumen.enAlerta)} />
+          <StatCard etiqueta="Líneas de producto" valor={String(data.resumen.productos)} />
+          <StatCard etiqueta="Unidades totales" valor={data.resumen.unidades.toLocaleString('es-DO')} />
+          <StatCard etiqueta="En alerta de stock bajo" valor={String(data.resumen.enAlerta)} />
         </div>
       )}
 
-      <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-slate-50 text-slate-500 dark:bg-slate-900 dark:text-slate-400">
-            <tr>
-              <th className="px-4 py-2">Código</th>
-              <th className="px-4 py-2">Producto</th>
-              <th className="px-4 py-2">Bodega</th>
-              <th className="px-4 py-2">Actual</th>
-              <th className="px-4 py-2">Mínimo</th>
-              <th className="px-4 py-2">Alerta</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-            {data?.items.map((s, i) => {
-              const enAlerta = Number(s.cantidadActual) < Number(s.stockMinimo);
-              return (
-                <tr key={i}>
-                  <td className="px-4 py-2 font-mono text-xs">{s.producto.codigo}</td>
-                  <td className="px-4 py-2">{s.producto.nombre}</td>
-                  <td className="px-4 py-2">{s.bodega.nombre}</td>
-                  <td className="px-4 py-2">{s.cantidadActual}</td>
-                  <td className="px-4 py-2">{s.stockMinimo}</td>
-                  <td className="px-4 py-2">{enAlerta && <Badge tono="advertencia">Bajo</Badge>}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
-
-function Resumen({ etiqueta, valor }: { etiqueta: string; valor: string }) {
-  return (
-    <div className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
-      <p className="text-xs text-slate-500 dark:text-slate-400">{etiqueta}</p>
-      <p className="text-lg font-semibold text-slate-900 dark:text-slate-100">{valor}</p>
+      <Card sinPadding titulo="Stock por bodega">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-slate-50 text-slate-500 dark:bg-slate-900/60 dark:text-slate-400">
+              <tr>
+                <th className="px-5 py-3 font-medium">Código</th>
+                <th className="px-5 py-3 font-medium">Producto</th>
+                <th className="px-5 py-3 font-medium">Bodega</th>
+                <th className="px-5 py-3 font-medium">Actual</th>
+                <th className="px-5 py-3 font-medium">Mínimo</th>
+                <th className="px-5 py-3 font-medium">Alerta</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+              {data?.items.map((s, i) => {
+                const enAlerta = Number(s.cantidadActual) < Number(s.stockMinimo);
+                return (
+                  <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                    <td className="px-5 py-3 font-mono text-xs">{s.producto.codigo}</td>
+                    <td className="px-5 py-3">{s.producto.nombre}</td>
+                    <td className="px-5 py-3">{s.bodega.nombre}</td>
+                    <td className="px-5 py-3">{s.cantidadActual}</td>
+                    <td className="px-5 py-3">{s.stockMinimo}</td>
+                    <td className="px-5 py-3">{enAlerta && <Badge tono="advertencia">Bajo</Badge>}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </Card>
     </div>
   );
 }

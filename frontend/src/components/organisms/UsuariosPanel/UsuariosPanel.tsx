@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../../lib/api-client';
 import { FormField } from '../../molecules/FormField/FormField';
 import { Button } from '../../atoms/Button/Button';
+import { Card } from '../../atoms/Card/Card';
 import { Modal } from '../../molecules/Modal/Modal';
 import { Switch } from '../../atoms/Switch/Switch';
 import { Badge } from '../../atoms/Badge/Badge';
@@ -49,60 +50,69 @@ export function UsuariosPanel() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h2 className="font-medium text-slate-900 dark:text-slate-100">Usuarios</h2>
+      <div className="flex justify-end">
         <Button onClick={() => setModalNuevoUsuario(true)}>Nuevo usuario</Button>
       </div>
 
-      <SearchInput
-        value={busqueda}
-        onChange={(v) => {
-          setBusqueda(v);
-          setPagina(1);
-        }}
-        placeholder="Buscar por nombre o email…"
-      />
-      <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-slate-50 text-slate-500 dark:bg-slate-900 dark:text-slate-400">
-            <tr>
-              <th className="px-4 py-2">Nombre</th>
-              <th className="px-4 py-2">Email</th>
-              <th className="px-4 py-2">Roles</th>
-              <th className="px-4 py-2">Activo</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-            {usuarios?.datos.map((usuario) => (
-              <tr key={usuario.id}>
-                <td className="px-4 py-2">{usuario.nombre}</td>
-                <td className="px-4 py-2">{usuario.email}</td>
-                <td className="px-4 py-2">
-                  <div className="flex flex-wrap gap-1">
-                    {usuario.roles.map(({ role }) => (
-                      <Badge key={role.id}>{role.nombre}</Badge>
-                    ))}
-                  </div>
-                </td>
-                <td className="px-4 py-2">
-                  <Switch
-                    activo={usuario.activo}
-                    onChange={(activo) => cambiarActivo.mutate({ id: usuario.id, activo })}
-                  />
-                </td>
+      <Card
+        sinPadding
+        titulo="Usuarios"
+        descripcion={usuarios ? `${usuarios.total} usuario(s)` : undefined}
+        acciones={
+          <SearchInput
+            value={busqueda}
+            onChange={(v) => {
+              setBusqueda(v);
+              setPagina(1);
+            }}
+            placeholder="Buscar por nombre o email…"
+          />
+        }
+      >
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-slate-50 text-slate-500 dark:bg-slate-900/60 dark:text-slate-400">
+              <tr>
+                <th className="px-5 py-3 font-medium">Nombre</th>
+                <th className="px-5 py-3 font-medium">Email</th>
+                <th className="px-5 py-3 font-medium">Roles</th>
+                <th className="px-5 py-3 font-medium">Activo</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      {usuarios && (
-        <Paginacion
-          pagina={usuarios.pagina}
-          tamanoPagina={usuarios.tamanoPagina}
-          total={usuarios.total}
-          onCambiarPagina={setPagina}
-        />
-      )}
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+              {usuarios?.datos.map((usuario) => (
+                <tr key={usuario.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                  <td className="px-5 py-3">{usuario.nombre}</td>
+                  <td className="px-5 py-3">{usuario.email}</td>
+                  <td className="px-5 py-3">
+                    <div className="flex flex-wrap gap-1">
+                      {usuario.roles.map(({ role }) => (
+                        <Badge key={role.id}>{role.nombre}</Badge>
+                      ))}
+                    </div>
+                  </td>
+                  <td className="px-5 py-3">
+                    <Switch
+                      activo={usuario.activo}
+                      onChange={(activo) => cambiarActivo.mutate({ id: usuario.id, activo })}
+                    />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {usuarios && (
+          <div className="px-5 py-3">
+            <Paginacion
+              pagina={usuarios.pagina}
+              tamanoPagina={usuarios.tamanoPagina}
+              total={usuarios.total}
+              onCambiarPagina={setPagina}
+            />
+          </div>
+        )}
+      </Card>
 
       {modalNuevoUsuario && <ModalNuevoUsuario onClose={() => setModalNuevoUsuario(false)} />}
     </div>

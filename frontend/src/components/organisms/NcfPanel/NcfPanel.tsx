@@ -4,6 +4,7 @@ import { apiClient } from '../../../lib/api-client';
 import { FormField } from '../../molecules/FormField/FormField';
 import { Button } from '../../atoms/Button/Button';
 import { Badge } from '../../atoms/Badge/Badge';
+import { Card } from '../../atoms/Card/Card';
 
 interface NcfAsignado {
   tipoNcf: string;
@@ -63,9 +64,8 @@ export function NcfPanel() {
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-      <div className="lg:col-span-3 rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-        <h2 className="font-medium text-slate-900 dark:text-slate-100">Modalidad de facturación</h2>
-        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+      <Card className="lg:col-span-3" titulo="Modalidad de facturación">
+        <p className="text-sm text-slate-500 dark:text-slate-400">
           NCF tradicional o e-CF (comprobante electrónico DGII). En modalidad e-CF, las facturas se numeran con
           secuencias E3x — la firma digital y el envío a la DGII todavía no están implementados (ver el panel de
           reportes fiscales para más detalle sobre esta brecha).
@@ -83,72 +83,73 @@ export function NcfPanel() {
             </Button>
           ))}
         </div>
-      </div>
+      </Card>
 
-      <form onSubmit={onSubmit} className="space-y-3 rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-        <h2 className="font-medium text-slate-900 dark:text-slate-100">Nueva secuencia de NCF</h2>
-        <div>
-          <label htmlFor="tipoNcf" className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
-            Tipo de NCF
-          </label>
-          <select
-            id="tipoNcf"
-            value={tipoNcf}
-            onChange={(e) => setTipoNcf(e.target.value)}
-            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-          >
-            {TIPOS_NCF.map((tipo) => (
-              <option key={tipo} value={tipo}>
-                {tipo}
-              </option>
-            ))}
-          </select>
-        </div>
-        <FormField
-          id="secuenciaFinal"
-          label="Secuencia final autorizada"
-          type="number"
-          value={secuenciaFinal}
-          onChange={(e) => setSecuenciaFinal(e.target.value)}
-          required
-        />
-        <FormField
-          id="vigenciaHasta"
-          label="Vigente hasta"
-          type="date"
-          value={vigenciaHasta}
-          onChange={(e) => setVigenciaHasta(e.target.value)}
-          required
-        />
-        {error && <p className="text-sm text-red-600">{error}</p>}
-        <Button type="submit" disabled={crear.isPending} className="w-full">
-          {crear.isPending ? 'Creando…' : 'Crear secuencia'}
-        </Button>
-      </form>
+      <Card titulo="Nueva secuencia de NCF">
+        <form onSubmit={onSubmit} className="space-y-3">
+          <div>
+            <label htmlFor="tipoNcf" className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+              Tipo de NCF
+            </label>
+            <select
+              id="tipoNcf"
+              value={tipoNcf}
+              onChange={(e) => setTipoNcf(e.target.value)}
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+            >
+              {TIPOS_NCF.map((tipo) => (
+                <option key={tipo} value={tipo}>
+                  {tipo}
+                </option>
+              ))}
+            </select>
+          </div>
+          <FormField
+            id="secuenciaFinal"
+            label="Secuencia final autorizada"
+            type="number"
+            value={secuenciaFinal}
+            onChange={(e) => setSecuenciaFinal(e.target.value)}
+            required
+          />
+          <FormField
+            id="vigenciaHasta"
+            label="Vigente hasta"
+            type="date"
+            value={vigenciaHasta}
+            onChange={(e) => setVigenciaHasta(e.target.value)}
+            required
+          />
+          {error && <p className="text-sm text-red-600">{error}</p>}
+          <Button type="submit" disabled={crear.isPending} className="w-full">
+            {crear.isPending ? 'Creando…' : 'Crear secuencia'}
+          </Button>
+        </form>
+      </Card>
 
-      <div className="lg:col-span-2 overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800">
+      <Card sinPadding className="lg:col-span-2 overflow-x-auto" titulo="Secuencias">
         <table className="w-full text-left text-sm">
-          <thead className="bg-slate-50 text-slate-500 dark:bg-slate-900 dark:text-slate-400">
+          <thead className="bg-slate-50 text-slate-500 dark:bg-slate-900/60 dark:text-slate-400">
             <tr>
-              <th className="px-4 py-2">Tipo</th>
-              <th className="px-4 py-2">Actual</th>
-              <th className="px-4 py-2">Final</th>
-              <th className="px-4 py-2">Vigente hasta</th>
-              <th className="px-4 py-2">Estado</th>
-              <th className="px-4 py-2"></th>
+              <th className="px-5 py-3 font-medium">Tipo</th>
+              <th className="px-5 py-3 font-medium">Actual</th>
+              <th className="px-5 py-3 font-medium">Final</th>
+              <th className="px-5 py-3 font-medium">Vigente hasta</th>
+              <th className="px-5 py-3 font-medium">Estado</th>
+              <th className="px-5 py-3"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
             {secuencias?.map((s) => (
-              <tr key={s.tipoNcf}>
-                <td className="px-4 py-2 font-mono text-xs">{s.tipoNcf}</td>
-                <td className="px-4 py-2">{s.secuenciaActual}</td>
-                <td className="px-4 py-2">{s.secuenciaFinal}</td>
-                <td className="px-4 py-2">{new Date(s.vigenciaHasta).toLocaleDateString('es-DO')}</td>
-                <td className="px-4 py-2">
+              <tr key={s.tipoNcf} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                <td className="px-5 py-3 font-mono text-xs">{s.tipoNcf}</td>
+                <td className="px-5 py-3">{s.secuenciaActual}</td>
+                <td className="px-5 py-3">{s.secuenciaFinal}</td>
+                <td className="px-5 py-3">{new Date(s.vigenciaHasta).toLocaleDateString('es-DO')}</td>
+                <td className="px-5 py-3">
                   <Badge tono={s.activo ? 'exito' : 'neutro'}>{s.activo ? 'Activa' : 'Inactiva'}</Badge>
                 </td>
-                <td className="px-4 py-2">
+                <td className="px-5 py-3">
                   {s.activo && (
                     <Button variante="peligro" onClick={() => desactivar.mutate(s.tipoNcf)}>
                       Desactivar
@@ -159,7 +160,7 @@ export function NcfPanel() {
             ))}
           </tbody>
         </table>
-      </div>
+      </Card>
     </div>
   );
 }

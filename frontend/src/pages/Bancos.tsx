@@ -2,6 +2,7 @@ import { FormEvent, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../lib/api-client';
 import { Button } from '../components/atoms/Button/Button';
+import { Card } from '../components/atoms/Card/Card';
 import { Select } from '../components/atoms/Select/Select';
 import { FormField } from '../components/molecules/FormField/FormField';
 import { Modal } from '../components/molecules/Modal/Modal';
@@ -54,21 +55,16 @@ export function Bancos() {
   });
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Bancos</h1>
+        <div>
+          <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Bancos</h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400">Cuentas bancarias del tenant, usadas para pagos y gastos menores.</p>
+        </div>
         {tienePermiso('bancos.editar') && <Button onClick={() => setModalAbierto(true)}>Nueva cuenta bancaria</Button>}
       </div>
 
       <RequierePermiso permiso="bancos.ver">
-        <SearchInput
-          value={busqueda}
-          onChange={(v) => {
-            setBusqueda(v);
-            setPagina(1);
-          }}
-          placeholder="Buscar por banco o número de cuenta…"
-        />
         {data?.datos.length === 0 ? (
           <EstadoVacio
             titulo="Todavía no hay cuentas bancarias"
@@ -77,52 +73,70 @@ export function Bancos() {
             onAccion={() => setModalAbierto(true)}
           />
         ) : (
-          <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-slate-50 text-slate-500 dark:bg-slate-900 dark:text-slate-400">
-                <tr>
-                  <th className="px-4 py-2">Banco</th>
-                  <th className="px-4 py-2">Número de cuenta</th>
-                  <th className="px-4 py-2">Tipo</th>
-                  <th className="px-4 py-2">Cuenta contable</th>
-                  <th className="px-4 py-2" />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {data?.datos.map((c) => (
-                  <tr key={c.id}>
-                    <td className="px-4 py-2">{c.banco}</td>
-                    <td className="px-4 py-2 font-mono text-xs">{c.numeroCuenta}</td>
-                    <td className="px-4 py-2">{c.tipoCuenta === 'CORRIENTE' ? 'Corriente' : 'Ahorros'}</td>
-                    <td className="px-4 py-2">
-                      {c.cuentaContable.codigo} — {c.cuentaContable.nombre}
-                    </td>
-                    <td className="px-4 py-2 text-right">
-                      {tienePermiso('bancos.editar') && (
-                        <RowActionsMenu
-                          acciones={[
-                            { etiqueta: 'Editar', onClick: () => setCuentaEditando(c) },
-                            {
-                              etiqueta: 'Desactivar',
-                              tono: 'peligro',
-                              onClick: () => {
-                                if (window.confirm(`¿Desactivar la cuenta ${c.banco} — ${c.numeroCuenta}?`)) {
-                                  desactivar.mutate(c.id);
-                                }
-                              },
-                            },
-                          ]}
-                        />
-                      )}
-                    </td>
+          <Card
+            sinPadding
+            titulo="Cuentas bancarias"
+            descripcion={data ? `${data.total} cuenta(s)` : undefined}
+            acciones={
+              <SearchInput
+                value={busqueda}
+                onChange={(v) => {
+                  setBusqueda(v);
+                  setPagina(1);
+                }}
+                placeholder="Buscar por banco o número de cuenta…"
+              />
+            }
+          >
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead className="bg-slate-50 text-slate-500 dark:bg-slate-900/60 dark:text-slate-400">
+                  <tr>
+                    <th className="px-5 py-3 font-medium">Banco</th>
+                    <th className="px-5 py-3 font-medium">Número de cuenta</th>
+                    <th className="px-5 py-3 font-medium">Tipo</th>
+                    <th className="px-5 py-3 font-medium">Cuenta contable</th>
+                    <th className="px-5 py-3" />
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-        {data && (
-          <Paginacion pagina={data.pagina} tamanoPagina={data.tamanoPagina} total={data.total} onCambiarPagina={setPagina} />
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {data?.datos.map((c) => (
+                    <tr key={c.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                      <td className="px-5 py-3">{c.banco}</td>
+                      <td className="px-5 py-3 font-mono text-xs">{c.numeroCuenta}</td>
+                      <td className="px-5 py-3">{c.tipoCuenta === 'CORRIENTE' ? 'Corriente' : 'Ahorros'}</td>
+                      <td className="px-5 py-3">
+                        {c.cuentaContable.codigo} — {c.cuentaContable.nombre}
+                      </td>
+                      <td className="px-5 py-3 text-right">
+                        {tienePermiso('bancos.editar') && (
+                          <RowActionsMenu
+                            acciones={[
+                              { etiqueta: 'Editar', onClick: () => setCuentaEditando(c) },
+                              {
+                                etiqueta: 'Desactivar',
+                                tono: 'peligro',
+                                onClick: () => {
+                                  if (window.confirm(`¿Desactivar la cuenta ${c.banco} — ${c.numeroCuenta}?`)) {
+                                    desactivar.mutate(c.id);
+                                  }
+                                },
+                              },
+                            ]}
+                          />
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {data && (
+              <div className="px-5 py-3">
+                <Paginacion pagina={data.pagina} tamanoPagina={data.tamanoPagina} total={data.total} onCambiarPagina={setPagina} />
+              </div>
+            )}
+          </Card>
         )}
       </RequierePermiso>
 
