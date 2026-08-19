@@ -106,6 +106,7 @@ export class FacturacionRepository {
       formaPagoId?: string;
       referenciaPago?: string;
       turnoCajaId?: string;
+      vendedorEmpleadoId?: string;
       subtotal: number;
       descuento: number;
       itbis: number;
@@ -126,6 +127,7 @@ export class FacturacionRepository {
         formaPagoId: params.formaPagoId,
         referenciaPago: params.referenciaPago,
         turnoCajaId: params.turnoCajaId,
+        vendedorEmpleadoId: params.vendedorEmpleadoId,
         estado: 'EMITIDA',
         subtotal: params.subtotal,
         descuento: params.descuento,

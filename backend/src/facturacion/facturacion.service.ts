@@ -83,7 +83,12 @@ export class FacturacionService {
    * justifique. Envolver las tres cosas en una sola transacción
    * (`tenantPrisma.client.$transaction`) las hace todo-o-nada.
    */
-  async crear(dto: CrearFacturaDto, tenantId: string, vendedorId: string, opciones?: { formaPagoId?: string; referenciaPago?: string; turnoCajaId?: string }) {
+  async crear(
+    dto: CrearFacturaDto,
+    tenantId: string,
+    vendedorId: string,
+    opciones?: { formaPagoId?: string; referenciaPago?: string; turnoCajaId?: string; vendedorEmpleadoId?: string },
+  ) {
     const lineasCalculadas = await Promise.all(
       dto.lineas.map(async (linea) => {
         const producto = await this.facturacionRepository.obtenerProductoConPrecioVigente(linea.productoId);
@@ -172,6 +177,7 @@ export class FacturacionService {
         formaPagoId: opciones?.formaPagoId,
         referenciaPago: opciones?.referenciaPago,
         turnoCajaId: opciones?.turnoCajaId,
+        vendedorEmpleadoId: opciones?.vendedorEmpleadoId,
         subtotal,
         descuento: descuentoTotal,
         itbis,

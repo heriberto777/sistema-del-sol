@@ -283,10 +283,12 @@ para asientos manuales (ajustes, apertura, etc.).
 |---|---|---|
 | POST | `/api/pos/turnos` | `pos.editar` — abre un turno (`{ bodegaId, montoInicial }`); 400 si esa bodega ya tiene uno ABIERTO |
 | GET | `/api/pos/turnos?pagina&tamanoPagina` | `pos.ver` |
+| GET | `/api/pos/cajeros` | `pos.ver` — cajeros distintos que han tenido al menos un turno, sin exigir `admin.usuarios` |
+| GET | `/api/pos/vendedores?busqueda` | `pos.ver` — `Empleado` activos con cargo "Vendedor" (texto libre, no relacionado a `User`); sin exigir `nomina.ver` ni el módulo Nómina activo |
 | GET | `/api/pos/turnos/:id` | `pos.ver` — incluye movimientos y facturas del turno |
 | POST | `/api/pos/turnos/:id/movimientos` | `pos.editar` — entrada/salida de efectivo que no es una venta (`{ tipo: ENTRADA\|SALIDA, monto, concepto }`) |
 | POST | `/api/pos/turnos/:id/cerrar` | `pos.editar` — `{ montoFinalContado }`, calcula `montoEsperado`/`diferencia` |
-| POST | `/api/pos/ventas` | `pos.editar` — venta CONTADO contra la bodega del turno (`{ turnoCajaId, clienteId, formaPagoId, referenciaPago?, lineas }`); genera su asiento contable automático igual que cualquier factura |
+| POST | `/api/pos/ventas` | `pos.editar` — venta CONTADO contra la bodega del turno (`{ turnoCajaId, clienteId, formaPagoId, referenciaPago?, vendedorEmpleadoId?, lineas }`); genera su asiento contable automático igual que cualquier factura |
 
 ## IA
 

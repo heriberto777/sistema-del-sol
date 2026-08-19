@@ -21,6 +21,11 @@ export class RegistrarVentaPosDto {
   @IsString()
   referenciaPago?: string;
 
+  @ApiProperty({ required: false, description: 'Empleado (cargo "Vendedor") acreditado por comisión en esta venta — distinto del cajero que la registra' })
+  @IsOptional()
+  @IsUUID()
+  vendedorEmpleadoId?: string;
+
   @ApiProperty({ type: [LineaFacturaDto] })
   @IsArray()
   @ArrayMinSize(1)

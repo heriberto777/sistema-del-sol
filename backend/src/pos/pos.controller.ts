@@ -36,6 +36,15 @@ export class PosController {
     return this.posService.listarCajeros();
   }
 
+  // Sin @RequiereModulo('nomina') ni permiso nomina.ver a propósito — el
+  // vendedor de comisión es un dato del carrito, lo necesita cualquiera
+  // con pos.ver (mismo criterio que GET /pos/cajeros).
+  @Get('vendedores')
+  @Permissions('pos.ver')
+  listarVendedores(@Query('busqueda') busqueda?: string) {
+    return this.posService.listarVendedores(busqueda);
+  }
+
   @Get('turnos/:id')
   @Permissions('pos.ver')
   buscarTurno(@Param('id') id: string) {

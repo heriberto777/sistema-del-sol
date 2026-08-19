@@ -12,6 +12,7 @@ interface TurnoCajaResumen {
 }
 
 const ATAJOS_VISIBLES = [
+  { tecla: 'F2', etiqueta: 'Vendedor' },
   { tecla: 'F3', etiqueta: 'Cliente' },
   { tecla: 'F5', etiqueta: 'Refrescar' },
   { tecla: 'F6', etiqueta: 'Cancelar' },

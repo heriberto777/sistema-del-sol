@@ -11,6 +11,7 @@ const INCLUDE_TURNO = {
       total: true,
       estado: true,
       formaPago: { select: { nombre: true, esEfectivo: true } },
+      vendedorEmpleado: { select: { nombre: true } },
     },
   },
   cajero: { select: { id: true, nombre: true } },

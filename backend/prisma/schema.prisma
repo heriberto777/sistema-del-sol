@@ -589,6 +589,11 @@ model Factura {
   // SetNull (no Cascade): si el turno se borra, la factura (documento fiscal) debe
   // sobrevivir siempre — solo se pierde el vínculo con el turno de caja.
   turnoCaja       TurnoCaja?    @relation(fields: [turnoCajaId], references: [id], onDelete: SetNull)
+  // Empleado (cargo "Vendedor" en Nómina) acreditado por comisión en la venta —
+  // distinto de `vendedorId` (User, quien la registra/cobra). Solo lo llenan
+  // ventas de POS que eligen un vendedor (F2) — ver PosService.registrarVenta.
+  vendedorEmpleadoId String?
+  vendedorEmpleado   Empleado?  @relation(fields: [vendedorEmpleadoId], references: [id], onDelete: SetNull)
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 
@@ -971,6 +976,7 @@ model Empleado {
   createdAt           DateTime      @default(now())
 
   recibos             ReciboNomina[]
+  ventasComoVendedor  Factura[]
 
   @@unique([tenantId, cedula])
   @@map("empleados")

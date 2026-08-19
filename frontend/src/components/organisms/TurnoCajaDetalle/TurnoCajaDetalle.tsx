@@ -15,10 +15,16 @@ import { useAtajosTeclado } from '../../../hooks/useAtajosTeclado';
 import { PaginaResultado } from '../../../types/pagina-resultado';
 
 const ID_COMBOBOX_CLIENTE = 'turno-cliente-combobox';
+const ID_COMBOBOX_VENDEDOR = 'turno-vendedor-combobox';
 
 type EstadoTurno = 'ABIERTO' | 'CERRADO';
 
 interface Cliente {
+  id: string;
+  nombre: string;
+}
+
+interface Vendedor {
   id: string;
   nombre: string;
 }
@@ -44,6 +50,7 @@ interface FacturaTurno {
   ncf: string | null;
   total: string;
   formaPago: { nombre: string; esEfectivo: boolean } | null;
+  vendedorEmpleado: { nombre: string } | null;
   estado: string;
 }
 
@@ -93,6 +100,7 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
   const { tienePermiso } = useAuth();
   const [carrito, setCarrito] = useState<LineaCarrito[]>([]);
   const [cliente, setCliente] = useState<Cliente | null>(null);
+  const [vendedor, setVendedor] = useState<Vendedor | null>(null);
   const [formaPagoId, setFormaPagoId] = useState('');
   const [modalMovimiento, setModalMovimiento] = useState(false);
   const [modalCerrarTurno, setModalCerrarTurno] = useState(false);
@@ -126,11 +134,13 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
         turnoCajaId: turnoId,
         clienteId: cliente?.id,
         formaPagoId,
+        vendedorEmpleadoId: vendedor?.id,
         lineas: carrito.map((l) => ({ productoId: l.productoId, cantidad: l.cantidad })),
       }),
     onSuccess: (respuesta) => {
       invalidar();
       setCarrito([]);
+      setVendedor(null);
       setError(null);
       setVentaConfirmada({ id: respuesta.data.id, total: respuesta.data.total });
     },
@@ -192,6 +202,7 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
 
   useAtajosTeclado(
     {
+      F2: () => document.getElementById(ID_COMBOBOX_VENDEDOR)?.focus(),
       F3: () => document.getElementById(ID_COMBOBOX_CLIENTE)?.focus(),
       F5: () => invalidar(),
       F6: () => setCarrito([]),
@@ -238,6 +249,19 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
                   buscar={async (texto) =>
                     (await apiClient.get<PaginaResultado<Cliente>>('/clientes', { params: { busqueda: texto, tamanoPagina: 10 } })).data.datos
                   }
+                />
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Vendedor (opcional, para comisión)</label>
+                <ComboboxBusqueda<Vendedor>
+                  id={ID_COMBOBOX_VENDEDOR}
+                  valor={vendedor}
+                  onSeleccionar={setVendedor}
+                  obtenerId={(v) => v.id}
+                  obtenerEtiqueta={(v) => v.nombre}
+                  placeholder="Buscar vendedor…"
+                  buscar={async (texto) => (await apiClient.get<Vendedor[]>('/pos/vendedores', { params: { busqueda: texto } })).data}
                 />
               </div>
 
@@ -332,7 +356,9 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
           {data.facturas.map((f) => (
             <li key={f.id} className="flex items-center justify-between gap-2">
               <span>
-                {formatoRD(f.total)} — {f.formaPago?.nombre ?? '—'} <Badge tono={f.estado === 'EMITIDA' ? 'exito' : 'neutro'}>{f.estado}</Badge>
+                {formatoRD(f.total)} — {f.formaPago?.nombre ?? '—'}
+                {f.vendedorEmpleado && ` — vendedor: ${f.vendedorEmpleado.nombre}`}{' '}
+                <Badge tono={f.estado === 'EMITIDA' ? 'exito' : 'neutro'}>{f.estado}</Badge>
               </span>
               <span className="flex items-center gap-3">
                 <button type="button" className="text-xs text-sol-600 hover:underline dark:text-sol-400" onClick={() => setFacturaImprimiendo(f.id)}>

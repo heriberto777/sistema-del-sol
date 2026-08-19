@@ -4,6 +4,7 @@ import { PosRepository } from './pos.repository';
 import { FacturacionService } from '../facturacion/facturacion.service';
 import { ConfiguracionesService } from '../configuraciones/configuraciones.service';
 import { FormasPagoRepository } from '../formas-pago/formas-pago.repository';
+import { EmpleadosRepository } from '../nomina/empleados.repository';
 
 describe('PosService', () => {
   let service: PosService;
@@ -11,6 +12,7 @@ describe('PosService', () => {
   let facturacionService: jest.Mocked<FacturacionService>;
   let configuracionesService: jest.Mocked<ConfiguracionesService>;
   let formasPagoRepository: jest.Mocked<FormasPagoRepository>;
+  let empleadosRepository: jest.Mocked<EmpleadosRepository>;
 
   beforeEach(() => {
     posRepository = {
@@ -26,7 +28,11 @@ describe('PosService', () => {
     facturacionService = { crear: jest.fn() } as unknown as jest.Mocked<FacturacionService>;
     configuracionesService = { buscarValor: jest.fn().mockResolvedValue('50') } as unknown as jest.Mocked<ConfiguracionesService>;
     formasPagoRepository = { buscarPorId: jest.fn().mockResolvedValue({ id: 'fp1' }) } as unknown as jest.Mocked<FormasPagoRepository>;
-    service = new PosService(posRepository, facturacionService, configuracionesService, formasPagoRepository);
+    empleadosRepository = {
+      buscarPorId: jest.fn().mockResolvedValue({ id: 'emp1' }),
+      listarVendedores: jest.fn(),
+    } as unknown as jest.Mocked<EmpleadosRepository>;
+    service = new PosService(posRepository, facturacionService, configuracionesService, formasPagoRepository, empleadosRepository);
   });
 
   describe('listar', () => {
@@ -95,8 +101,46 @@ describe('PosService', () => {
         { clienteId: 'c1', bodegaId: 'b1', tipoFactura: 'CONTADO', lineas: [{ productoId: 'p1', cantidad: 1 }] },
         'tenant-1',
         'cajero-1',
-        { formaPagoId: 'fp1', referenciaPago: undefined, turnoCajaId: 't1' },
+        { formaPagoId: 'fp1', referenciaPago: undefined, turnoCajaId: 't1', vendedorEmpleadoId: undefined },
       );
+    });
+
+    it('valida vendedorEmpleadoId contra el tenant cuando viene en el DTO y lo propaga a FacturacionService.crear', async () => {
+      posRepository.buscarPorId.mockResolvedValue({ id: 't1', estado: 'ABIERTO', bodegaId: 'b1' } as never);
+      facturacionService.crear.mockResolvedValue({ id: 'f1' } as never);
+
+      await service.registrarVenta(
+        {
+          turnoCajaId: 't1',
+          clienteId: 'c1',
+          formaPagoId: 'fp1',
+          vendedorEmpleadoId: 'emp1',
+          lineas: [{ productoId: 'p1', cantidad: 1 }],
+        } as never,
+        'tenant-1',
+        'cajero-1',
+      );
+
+      expect(empleadosRepository.buscarPorId).toHaveBeenCalledWith('emp1');
+      expect(facturacionService.crear).toHaveBeenCalledWith(
+        expect.anything(),
+        'tenant-1',
+        'cajero-1',
+        expect.objectContaining({ vendedorEmpleadoId: 'emp1' }),
+      );
+    });
+
+    it('no valida vendedorEmpleadoId si no viene en el DTO', async () => {
+      posRepository.buscarPorId.mockResolvedValue({ id: 't1', estado: 'ABIERTO', bodegaId: 'b1' } as never);
+      facturacionService.crear.mockResolvedValue({ id: 'f1' } as never);
+
+      await service.registrarVenta(
+        { turnoCajaId: 't1', clienteId: 'c1', formaPagoId: 'fp1', lineas: [{ productoId: 'p1', cantidad: 1 }] },
+        'tenant-1',
+        'cajero-1',
+      );
+
+      expect(empleadosRepository.buscarPorId).not.toHaveBeenCalled();
     });
 
     it('valida que formaPagoId pertenezca al tenant antes de vender (404 si no, vía findUniqueOrThrow tenant-scoped)', async () => {
@@ -208,6 +252,17 @@ describe('PosService', () => {
       await service.cerrarTurno('t1', { montoFinalContado: 900 }, 'cajero-1', 'tenant-1', false);
 
       expect(posRepository.cerrarTurno).toHaveBeenCalledWith('t1', expect.objectContaining({ justificacionDiferencia: undefined }));
+    });
+  });
+
+  describe('listarVendedores', () => {
+    it('delega en EmpleadosRepository.listarVendedores con la búsqueda recibida', async () => {
+      empleadosRepository.listarVendedores.mockResolvedValue([{ id: 'emp1', nombre: 'Juan Pérez' }] as never);
+
+      const resultado = await service.listarVendedores('juan');
+
+      expect(empleadosRepository.listarVendedores).toHaveBeenCalledWith('juan');
+      expect(resultado).toEqual([{ id: 'emp1', nombre: 'Juan Pérez' }]);
     });
   });
 });

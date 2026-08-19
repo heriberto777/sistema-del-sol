@@ -1155,6 +1155,35 @@ compras de más de una unidad.
 opción resaltada y `Escape` para cerrar — antes solo aceptaba clic de
 mouse en cada resultado.
 
+### Vendedor de la venta (Fase 2b — comisión, distinto del cajero)
+
+En Cuadre el "Cajero" (quien opera la caja) y el "Vendedor" (a quien se
+le acredita la venta para comisión) son personas distintas elegidas por
+separado en cada venta. `Factura.vendedorId` ya existía pero apunta a
+`User` (quien factura/cobra — el cajero); se agregó
+**`Factura.vendedorEmpleadoId`** (nullable, → `Empleado`, `onDelete:
+SetNull`) para el segundo concepto, sin tocar `vendedorId`.
+
+**`Empleado.cargo` (texto libre de Nómina) no tiene ninguna relación con
+`User`/roles del sistema** — son dos catálogos independientes. "Vendedor
+de comisión" se resuelve como `Empleado` con
+`cargo: { contains: 'Vendedor', mode: 'insensitive' }` (mismo criterio
+laxo que ya usa `EmpleadosRepository.listar` para buscar por cargo). Un
+vendedor de comisión **no necesita poder loguearse** — por eso se eligió
+`Empleado` y no una segunda referencia a `User`.
+
+**`GET /pos/vendedores`** vive en `PosModule` (que importa `NominaModule`
+solo para inyectar `EmpleadosRepository`, sin exponer sus endpoints) y
+**no exige `@RequiereModulo('nomina')` ni `nomina.ver`** — mismo criterio
+que `GET /pos/cajeros`: un Cajero con solo `pos.ver` necesita elegir
+vendedor sin que el tenant tenga el módulo Nómina activo. `PosService.
+registrarVenta` valida `vendedorEmpleadoId` tenant-scoped (si viene) con
+`EmpleadosRepository.buscarPorId` antes de pasarlo a
+`FacturacionService.crear()`, mismo patrón que `formaPagoId`.
+
+Frontend: `TurnoCajaDetalle.tsx` agrega un segundo `ComboboxBusqueda`
+("Vendedor (opcional, para comisión)") junto al de Cliente, atado a F2.
+
 ### Roles de POS: Cajero, Vendedor, Supervisor de Caja
 
 Investigando el patrón de sesión de caja más a fondo (Odoo multi-cajero,

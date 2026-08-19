@@ -33,6 +33,23 @@ export class EmpleadosRepository {
     return this.db.empleado.findMany({ where: { activo: true }, orderBy: { nombre: 'asc' } });
   }
 
+  /**
+   * "Vendedor" acá es `Empleado.cargo` (texto libre de Nómina) — no el rol
+   * de sistema homónimo (`ROLES_BASE`, ligado a `User`). Son dos conceptos
+   * sin relación: un vendedor de comisión no necesita poder loguearse.
+   */
+  listarVendedores(busqueda?: string) {
+    return this.db.empleado.findMany({
+      where: {
+        activo: true,
+        cargo: { contains: 'Vendedor', mode: 'insensitive' },
+        ...(busqueda ? { nombre: { contains: busqueda, mode: 'insensitive' as const } } : {}),
+      },
+      orderBy: { nombre: 'asc' },
+      take: 20,
+    });
+  }
+
   listar(params: { skip: number; take: number; busqueda?: string }) {
     const where = params.busqueda
       ? {
