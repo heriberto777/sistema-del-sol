@@ -8,6 +8,7 @@ import { EVENTOS } from '../event-bus/events';
 import { CrearFacturaDto } from './dto/crear-factura.dto';
 import { PagosService } from '../pagos/pagos.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { ClientesService } from '../clientes/clientes.service';
 
 describe('FacturacionService', () => {
   let service: FacturacionService;
@@ -17,6 +18,7 @@ describe('FacturacionService', () => {
   let eventBus: jest.Mocked<EventBusService>;
   let pagosService: jest.Mocked<PagosService>;
   let prisma: jest.Mocked<PrismaService>;
+  let clientesService: jest.Mocked<ClientesService>;
 
   // Un tx opaco: crear()/anular() abren la transacción con tenantPrisma.client.$transaction
   // y pasan este objeto a los métodos *EnTx — para las pruebas basta con que sea el mismo
@@ -68,6 +70,9 @@ describe('FacturacionService', () => {
       bodega: { findFirst: jest.fn().mockResolvedValue(null) },
       configuracion: { findUnique: jest.fn().mockResolvedValue(null) },
     } as unknown as jest.Mocked<PrismaService>;
+    clientesService = {
+      buscarPorId: jest.fn().mockResolvedValue({ id: 'cliente-1', listaPrecio: null }),
+    } as unknown as jest.Mocked<ClientesService>;
     service = new FacturacionService(
       repository,
       inventarioService,
@@ -75,6 +80,7 @@ describe('FacturacionService', () => {
       eventBus,
       pagosService,
       prisma,
+      clientesService,
     );
   });
 
@@ -87,6 +93,38 @@ describe('FacturacionService', () => {
       ...overrides,
     } as CrearFacturaDto;
   }
+
+  describe('resolución del nivel de precio (Fase 3b)', () => {
+    it('usa GENERAL si el cliente no tiene lista asignada y no hay override', async () => {
+      clientesService.buscarPorId.mockResolvedValue({ id: 'cliente-1', listaPrecio: null } as never);
+      repository.obtenerProductoConPrecioVigente.mockResolvedValue(producto(18, 100) as never);
+      repository.crearFacturaEnTx.mockResolvedValue(facturaCreada() as never);
+
+      await service.crear(dto(), 'tenant-1', 'vendedor-1');
+
+      expect(repository.obtenerProductoConPrecioVigente).toHaveBeenCalledWith('prod-1', 'GENERAL');
+    });
+
+    it('usa la lista del cliente cuando no hay override explícito en el dto', async () => {
+      clientesService.buscarPorId.mockResolvedValue({ id: 'cliente-1', listaPrecio: { id: 'lp-1', nombre: 'Mayorista' } } as never);
+      repository.obtenerProductoConPrecioVigente.mockResolvedValue(producto(18, 100) as never);
+      repository.crearFacturaEnTx.mockResolvedValue(facturaCreada() as never);
+
+      await service.crear(dto(), 'tenant-1', 'vendedor-1');
+
+      expect(repository.obtenerProductoConPrecioVigente).toHaveBeenCalledWith('prod-1', 'Mayorista');
+    });
+
+    it('el override explícito del dto.listaPrecio tiene prioridad sobre la lista del cliente', async () => {
+      clientesService.buscarPorId.mockResolvedValue({ id: 'cliente-1', listaPrecio: { id: 'lp-1', nombre: 'Mayorista' } } as never);
+      repository.obtenerProductoConPrecioVigente.mockResolvedValue(producto(18, 100) as never);
+      repository.crearFacturaEnTx.mockResolvedValue(facturaCreada() as never);
+
+      await service.crear(dto({ listaPrecio: 'Distribuidor' }), 'tenant-1', 'vendedor-1');
+
+      expect(repository.obtenerProductoConPrecioVigente).toHaveBeenCalledWith('prod-1', 'Distribuidor');
+    });
+  });
 
   it('calcula subtotal/itbis/total usando el precio vigente del producto cuando no se envía precioUnitario', async () => {
     repository.obtenerProductoConPrecioVigente.mockResolvedValue(producto(18, 150) as never);

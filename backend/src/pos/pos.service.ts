@@ -78,7 +78,7 @@ export class PosService {
     }
 
     return this.facturacionService.crear(
-      { clienteId: dto.clienteId, bodegaId: turno.bodegaId, tipoFactura: 'CONTADO', lineas: dto.lineas },
+      { clienteId: dto.clienteId, bodegaId: turno.bodegaId, tipoFactura: 'CONTADO', lineas: dto.lineas, listaPrecio: dto.listaPrecio },
       tenantId,
       cajeroId,
       {

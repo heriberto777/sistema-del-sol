@@ -97,7 +97,7 @@ pasa ninguna de ellas.
 
 | Método | Ruta | Permiso |
 |---|---|---|
-| POST | `/api/facturas` | `facturacion.crear` — `{ clienteId, bodegaId, tipoFactura, lineas[], facturaOrigenId? }`; `facturaOrigenId` requerido para `NOTA_CREDITO`/`NOTA_DEBITO` |
+| POST | `/api/facturas` | `facturacion.crear` — `{ clienteId, bodegaId, tipoFactura, lineas[], facturaOrigenId?, listaPrecio? }`; `facturaOrigenId` requerido para `NOTA_CREDITO`/`NOTA_DEBITO`; `listaPrecio` (nombre de `ListaPrecio`, no id) sobreescribe el nivel de precio resuelto del cliente para esta venta puntual — ver ARCHITECTURE.md, "Precios multinivel" |
 | GET | `/api/facturas?pagina&tamanoPagina&busqueda` | `facturacion.ver` — `busqueda` filtra por NCF o nombre de cliente |
 | GET | `/api/facturas/:id` | `facturacion.ver` |
 | POST | `/api/facturas/:id/anular` | `facturacion.anular` — reversa el efecto de inventario (ver ARCHITECTURE.md); 400 si ya estaba anulada; si la factura es de POS y quien pide la anulación no tiene `pos.supervisar`, 403 salvo que sea el mismo cajero del turno Y siga `ABIERTO` (ver "Roles de POS" en ARCHITECTURE.md) |
@@ -109,7 +109,7 @@ pasa ninguna de ellas.
 
 | Método | Ruta | Permiso |
 |---|---|---|
-| POST | `/api/cotizaciones` | `cotizaciones.crear` — `{ clienteId, fechaVigenciaHasta, lineas[] }` |
+| POST | `/api/cotizaciones` | `cotizaciones.crear` — `{ clienteId, fechaVigenciaHasta, lineas[], listaPrecio? }` — mismo override de nivel de precio que Facturación |
 | GET | `/api/cotizaciones?pagina&tamanoPagina&busqueda` | `cotizaciones.ver` — `busqueda` filtra por nombre de cliente |
 | GET | `/api/cotizaciones/:id` | `cotizaciones.ver` |
 | PATCH | `/api/cotizaciones/:id/estado` | `cotizaciones.editar` — `{ estado: ENVIADA\|ACEPTADA\|RECHAZADA }` |
@@ -183,10 +183,23 @@ Catálogo tenant-scoped con jerarquía real (mismo patrón de auto-relación que
 
 | Método | Ruta | Permiso |
 |---|---|---|
-| POST / PATCH | `/api/clientes` | `clientes.*` |
+| POST / PATCH | `/api/clientes` | `clientes.*` — acepta `listaPrecioId` (FK a `ListaPrecio`, `null` explícito quita la asignación) |
 | GET | `/api/clientes?pagina&tamanoPagina&busqueda` | `clientes.ver` — `busqueda` filtra por nombre, email o RNC/cédula |
 | POST | `/api/proveedores` | `compras.*` |
 | GET | `/api/proveedores?pagina&tamanoPagina&busqueda` | `compras.ver` — `busqueda` filtra por nombre o RNC |
+
+## Listas de precio
+
+Catálogo de niveles de precio por tenant (Fase 3b de adopción de Cuadre) —
+alimenta `Cliente.listaPrecioId` y el override manual de
+Facturación/Cotizaciones/POS. Sin endpoint de borrado — se desactiva, no
+se elimina (igual criterio que Formas de pago).
+
+| Método | Ruta | Permiso |
+|---|---|---|
+| POST | `/api/listas-precio` | `precios.editar` — `{ nombre, activa? }` |
+| GET | `/api/listas-precio?activa=true` | `precios.ver` — sin el query param trae también las inactivas |
+| PATCH | `/api/listas-precio/:id` | `precios.editar` — 400 si se intenta renombrar la lista `"GENERAL"` (default histórico de `Precio.listaPrecio`) |
 
 ## Notificaciones
 
@@ -298,7 +311,7 @@ para asientos manuales (ajustes, apertura, etc.).
 | GET | `/api/pos/turnos/:id` | `pos.ver` — incluye movimientos y facturas del turno |
 | POST | `/api/pos/turnos/:id/movimientos` | `pos.editar` — entrada/salida de efectivo que no es una venta (`{ tipo: ENTRADA\|SALIDA, monto, concepto }`) |
 | POST | `/api/pos/turnos/:id/cerrar` | `pos.editar` — `{ montoFinalContado }`, calcula `montoEsperado`/`diferencia` |
-| POST | `/api/pos/ventas` | `pos.editar` — venta CONTADO contra la bodega del turno (`{ turnoCajaId, clienteId, vendedorEmpleadoId?, pagos: [{formaPagoId, monto, referencia?}], lineas }`); soporta pago dividido (uno o más pagos que sumen exacto el total); genera su asiento contable automático igual que cualquier factura |
+| POST | `/api/pos/ventas` | `pos.editar` — venta CONTADO contra la bodega del turno (`{ turnoCajaId, clienteId, vendedorEmpleadoId?, listaPrecio?, pagos: [{formaPagoId, monto, referencia?}], lineas }`); soporta pago dividido (uno o más pagos que sumen exacto el total); `listaPrecio` sobreescribe el nivel de precio resuelto del cliente para esta venta puntual; genera su asiento contable automático igual que cualquier factura |
 | POST | `/api/pos/devoluciones` | `facturacion.anular` — devolución parcial (`{ facturaOrigenId, turnoCajaId, formaPagoId, referenciaPago?, lineas: [{productoId, cantidad}] }`); emite una NOTA_CREDITO, 400 si la cantidad excede lo disponible |
 | GET | `/api/pos/facturas/:id/devolucion` | `facturacion.anular` (no `facturacion.ver` — Cajero/Vendedor no lo tienen) — detalle de una factura con lo disponible por producto, para armar la Devolución |
 | POST | `/api/pos/turnos/:id/guardar` | `pos.editar` — aparca el carrito actual (`{ clienteId?, vendedorEmpleadoId?, nota?, lineas: [{productoId, cantidad, precioUnitario, porcentajeItbis, descuento?}] }`), snapshot de precio/ITBIS al momento de guardar |

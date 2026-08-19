@@ -10,8 +10,10 @@ import { ComboboxBusqueda } from '../../molecules/ComboboxBusqueda/ComboboxBusqu
 import { FormField } from '../../molecules/FormField/FormField';
 import { Modal } from '../../molecules/Modal/Modal';
 import { SelectFormaPago, type FormaPago } from '../../molecules/SelectFormaPago/SelectFormaPago';
+import { Select } from '../../atoms/Select/Select';
 import { useAuth } from '../../../hooks/useAuth';
 import { useAtajosTeclado } from '../../../hooks/useAtajosTeclado';
+import { useListasPrecio } from '../../../hooks/useListasPrecio';
 import { PaginaResultado } from '../../../types/pagina-resultado';
 
 const ID_COMBOBOX_CLIENTE = 'turno-cliente-combobox';
@@ -22,6 +24,7 @@ type EstadoTurno = 'ABIERTO' | 'CERRADO';
 interface Cliente {
   id: string;
   nombre: string;
+  listaPrecio: { id: string; nombre: string } | null;
 }
 
 interface Vendedor {
@@ -129,6 +132,9 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
   const [carrito, setCarrito] = useState<LineaCarrito[]>([]);
   const [cliente, setCliente] = useState<Cliente | null>(null);
   const [vendedor, setVendedor] = useState<Vendedor | null>(null);
+  const [listaPrecioOverride, setListaPrecioOverride] = useState('');
+  const { data: listasPrecio } = useListasPrecio();
+  const listaPrecioResuelta = cliente?.listaPrecio?.nombre ?? 'GENERAL';
   const [modalMovimiento, setModalMovimiento] = useState(false);
   const [modalCerrarTurno, setModalCerrarTurno] = useState(false);
   const [modalDescuento, setModalDescuento] = useState(false);
@@ -166,6 +172,7 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
         turnoCajaId: turnoId,
         clienteId: cliente?.id,
         vendedorEmpleadoId: vendedor?.id,
+        listaPrecio: listaPrecioOverride || undefined,
         pagos,
         lineas: carrito.map((l) => ({ productoId: l.productoId, cantidad: l.cantidad, descuento: l.descuento })),
       }),
@@ -173,6 +180,7 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
       invalidar();
       setCarrito([]);
       setVendedor(null);
+      setListaPrecioOverride('');
       setError(null);
       setModalCheckout(false);
       setVentaConfirmada({ id: respuesta.data.id, total: respuesta.data.total });
@@ -350,6 +358,18 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
                     (await apiClient.get<PaginaResultado<Cliente>>('/clientes', { params: { busqueda: texto, tamanoPagina: 10 } })).data.datos
                   }
                 />
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Nivel de precio</label>
+                <Select value={listaPrecioOverride} onChange={(e) => setListaPrecioOverride(e.target.value)}>
+                  <option value="">Usar el del cliente ({listaPrecioResuelta})</option>
+                  {listasPrecio?.map((lista) => (
+                    <option key={lista.id} value={lista.nombre}>
+                      {lista.nombre}
+                    </option>
+                  ))}
+                </Select>
               </div>
 
               <div className="flex flex-col gap-1">

@@ -10,11 +10,13 @@ import { FacturasTable } from '../components/organisms/FacturasTable/FacturasTab
 import { EmitirNotaForm } from '../components/organisms/EmitirNotaForm/EmitirNotaForm';
 import { RequierePermiso } from '../components/organisms/RequierePermiso/RequierePermiso';
 import { useAuth } from '../hooks/useAuth';
+import { useListasPrecio } from '../hooks/useListasPrecio';
 import { PaginaResultado } from '../types/pagina-resultado';
 
 interface Cliente {
   id: string;
   nombre: string;
+  listaPrecio: { id: string; nombre: string } | null;
 }
 
 interface Producto {
@@ -75,12 +77,16 @@ function ModalNuevaFactura({ onClose }: { onClose: () => void }) {
   const [tipoFactura, setTipoFactura] = useState<'CONTADO' | 'CREDITO'>('CONTADO');
   const [lineas, setLineas] = useState([{ productoId: '', cantidad: '1', precioUnitario: '' }]);
   const [mostrarNuevoCliente, setMostrarNuevoCliente] = useState(false);
+  const [listaPrecioOverride, setListaPrecioOverride] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   const { data: clientes } = useQuery({
     queryKey: ['clientes-select'],
     queryFn: async () => (await apiClient.get<PaginaResultado<Cliente>>('/clientes', { params: { tamanoPagina: 100 } })).data.datos,
   });
+  const { data: listasPrecio } = useListasPrecio();
+  const clienteSeleccionado = clientes?.find((c) => c.id === clienteId);
+  const listaPrecioResuelta = clienteSeleccionado?.listaPrecio?.nombre ?? 'GENERAL';
   const { data: productos } = useQuery({
     queryKey: ['productos-select'],
     queryFn: async () => (await apiClient.get<PaginaResultado<Producto>>('/productos', { params: { tamanoPagina: 100 } })).data.datos,
@@ -100,6 +106,7 @@ function ModalNuevaFactura({ onClose }: { onClose: () => void }) {
         clienteId,
         bodegaId,
         tipoFactura,
+        listaPrecio: listaPrecioOverride || undefined,
         lineas: lineas
           .filter((l) => l.productoId)
           .map((l) => ({
@@ -153,6 +160,18 @@ function ModalNuevaFactura({ onClose }: { onClose: () => void }) {
               }}
             />
           )}
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Nivel de precio</label>
+          <Select value={listaPrecioOverride} onChange={(e) => setListaPrecioOverride(e.target.value)}>
+            <option value="">Usar el del cliente ({listaPrecioResuelta})</option>
+            {listasPrecio?.map((lista) => (
+              <option key={lista.id} value={lista.nombre}>
+                {lista.nombre}
+              </option>
+            ))}
+          </Select>
         </div>
 
         <div className="flex flex-col gap-1">

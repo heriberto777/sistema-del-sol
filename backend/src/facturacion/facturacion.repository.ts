@@ -29,12 +29,12 @@ export class FacturacionRepository {
     return tenant.modalidadFacturacion;
   }
 
-  obtenerProductoConPrecioVigente(productoId: string) {
+  obtenerProductoConPrecioVigente(productoId: string, listaPrecio = 'GENERAL') {
     return this.db.producto.findUniqueOrThrow({
       where: { id: productoId },
       include: {
         precios: {
-          where: { listaPrecio: 'GENERAL', vigenteHasta: null },
+          where: { listaPrecio, vigenteHasta: null },
           take: 1,
         },
         // Solo tiene filas si el producto es COMBO — ver

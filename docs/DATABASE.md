@@ -37,7 +37,7 @@ PostgreSQL 16 + Prisma. Schema completo en `backend/prisma/schema.prisma`.
 | Auditoría | `audit_logs` (tenant), `platform_audit_logs` (plataforma, sin `tenantId`) |
 | Facturación | `ncf_asignados`, `facturas`, `linea_factura` |
 | Cotizaciones / Remisiones | `cotizaciones`, `linea_cotizacion`, `remisiones`, `linea_remision` |
-| Productos / precios | `productos`, `precios`, `componentes_combo`, `categorias` (jerarquía real vía `categoriaPadreId`, self-relation — mismo patrón que `cuentas_contables.cuentaPadreId`) |
+| Productos / precios | `productos`, `precios`, `componentes_combo`, `categorias` (jerarquía real vía `categoriaPadreId`, self-relation — mismo patrón que `cuentas_contables.cuentaPadreId`), `listas_precio` (catálogo de niveles de precio, sin FK desde `precios.listaPrecio`) |
 | Inventario | `bodegas`, `stock`, `movimiento_inventario` |
 | Compras | `proveedores`, `orden_compra`, `linea_oc`, `recepcion_compra`, `linea_recepcion` |
 | Clientes | `clientes`, `direccion_cliente` |
@@ -72,6 +72,18 @@ token, así que un token nunca puede reusarse.
 - **Precios**: `precios` es un historial — cada cambio cierra el registro
   vigente (`vigenteHasta = now()`) y crea uno nuevo con `vigenteHasta:
   null`. La vigente es siempre `WHERE vigenteHasta IS NULL`.
+- **Niveles de precio (Fase 3b de adopción de Cuadre)**: `precios.listaPrecio`
+  sigue siendo un `String` libre (default `"GENERAL"`), **sin FK** —
+  `listas_precio` es solo un catálogo de UI (selectores del formulario de
+  Precio, `clientes.listaPrecioId`, override manual al facturar) que debe
+  usar exactamente los mismos nombres. `clientes.listaPrecioId` (`onDelete:
+  SetNull`) resuelve el nivel por defecto de cada venta;
+  `FacturacionService.crear()`/`CotizacionesService.crear()` lo leen del
+  cliente y lo pueden sobreescribir con `dto.listaPrecio` explícito
+  (prioridad: override > cliente > `"GENERAL"`). `ListasPrecioService.
+  actualizar()` rechaza renombrar la fila `"GENERAL"` — es el default
+  hardcodeado en el schema y en varios services, renombrarla dejaría los
+  precios ya creados con esa lista inalcanzables desde el catálogo.
 - **Stock**: `stock.cantidadActual - stock.cantidadReservada` es el
   disponible; nunca se permite que una venta lo deje negativo
   (`InventarioService.verificarYDescontarStock`). Cada movimiento queda

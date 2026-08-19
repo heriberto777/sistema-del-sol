@@ -64,6 +64,7 @@ model Tenant {
   turnosCaja    TurnoCaja[]
   pagos         Pago[]
   formasPago    FormaPago[]
+  listasPrecio  ListaPrecio[]
   cuentasBancarias CuentaBancaria[]
   gastosMenores GastoMenor[]
   suscripcion   Suscripcion?
@@ -1068,6 +1069,28 @@ model FormaPago {
   @@map("formas_pago")
 }
 
+/// Catálogo de niveles de precio por tenant (General, Mayorista,
+/// Distribuidor, Especial, etc.). `Precio.listaPrecio` sigue siendo un
+/// String libre sin FK a esta tabla — este catálogo solo alimenta
+/// selectores de UI (Cliente.listaPrecioId, el formulario de Precio, el
+/// override manual al facturar) y debe usar exactamente los mismos
+/// nombres que ya circulan como `Precio.listaPrecio` (empezando por
+/// "GENERAL", el default histórico). Sin endpoint de borrado — igual
+/// criterio que FormaPago: se desactiva, no se elimina.
+model ListaPrecio {
+  id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  nombre    String
+  activa    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  clientes Cliente[]
+
+  @@unique([tenantId, nombre])
+  @@map("listas_precio")
+}
+
 /// Ledger de "con qué se pagó" una venta de POS — permite pagos divididos
 /// (parte efectivo + parte tarjeta en la misma factura). Distinto de `Pago`
 /// (abonos POSTERIORES de AR/AP, ej. una factura a crédito) — acá el pago
@@ -1567,6 +1590,11 @@ model Cliente {
   // por defecto en la venta rápida, para no exigir elegir un cliente
   // real en cada venta de mostrador.
   esConsumidorFinal Boolean @default(false)
+  // Nivel de precio por defecto de este cliente (Fase 3b de adopción de
+  // Cuadre) — null resuelve a "GENERAL" (ver FacturacionService.crear).
+  // Se puede sobreescribir puntualmente al facturar/cotizar/vender en POS.
+  listaPrecioId String?
+  listaPrecio   ListaPrecio? @relation(fields: [listaPrecioId], references: [id], onDelete: SetNull)
   createdAt     DateTime    @default(now())
 
   direcciones DireccionCliente[]

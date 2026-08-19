@@ -8,6 +8,7 @@ import { EVENTOS } from '../event-bus/events';
 import { CrearFacturaDto } from './dto/crear-factura.dto';
 import { CrearPagoDto } from '../pagos/dto/crear-pago.dto';
 import { PagosService } from '../pagos/pagos.service';
+import { ClientesService } from '../clientes/clientes.service';
 import { ListadoQueryDto } from '../common/dto/listado-query.dto';
 import { paginar } from '../common/types/pagina-resultado';
 import { DocumentoPdfParams, generarDocumentoPdf } from '../common/pdf/documento-pdf';
@@ -72,6 +73,7 @@ export class FacturacionService {
     private readonly eventBus: EventBusService,
     private readonly pagosService: PagosService,
     private readonly prisma: PrismaService,
+    private readonly clientesService: ClientesService,
   ) {}
 
   /**
@@ -95,9 +97,16 @@ export class FacturacionService {
       pagos?: { formaPagoId: string; monto: number; referencia?: string }[];
     },
   ) {
+    // findUniqueOrThrow tenant-scoped: si clienteId es de otro tenant, 404 —
+    // mismo patrón de prevención de IDOR ya documentado para FKs
+    // cliente-suministradas. De paso resuelve el nivel de precio del
+    // cliente para las líneas que no traen precioUnitario explícito.
+    const cliente = await this.clientesService.buscarPorId(dto.clienteId);
+    const listaPrecio = dto.listaPrecio ?? cliente.listaPrecio?.nombre ?? 'GENERAL';
+
     const lineasCalculadas = await Promise.all(
       dto.lineas.map(async (linea) => {
-        const producto = await this.facturacionRepository.obtenerProductoConPrecioVigente(linea.productoId);
+        const producto = await this.facturacionRepository.obtenerProductoConPrecioVigente(linea.productoId, listaPrecio);
         const precioUnitario = linea.precioUnitario ?? Number(producto.precios[0]?.precioVenta ?? 0);
         const porcentajeItbis = Number(producto.porcentajeItbis);
         const descuento = linea.descuento ?? 0;

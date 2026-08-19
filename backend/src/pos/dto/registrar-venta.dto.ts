@@ -49,4 +49,13 @@ export class RegistrarVentaPosDto {
   @ValidateNested({ each: true })
   @Type(() => LineaFacturaDto)
   lineas: LineaFacturaDto[];
+
+  @ApiProperty({
+    required: false,
+    description:
+      'Nivel de precio para esta venta puntual. Si se omite, se usa el listaPrecioId del cliente (o "GENERAL" si no tiene uno asignado).',
+  })
+  @IsOptional()
+  @IsString()
+  listaPrecio?: string;
 }

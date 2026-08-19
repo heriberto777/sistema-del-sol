@@ -44,4 +44,13 @@ export class CrearCotizacionDto {
   @ValidateNested({ each: true })
   @Type(() => LineaCotizacionDto)
   lineas: LineaCotizacionDto[];
+
+  @ApiProperty({
+    required: false,
+    description:
+      'Nivel de precio para resolver el precio vigente de cada línea sin precioUnitario explícito. Si se omite, se usa el listaPrecioId del cliente (o "GENERAL" si no tiene uno asignado).',
+  })
+  @IsOptional()
+  @IsString()
+  listaPrecio?: string;
 }

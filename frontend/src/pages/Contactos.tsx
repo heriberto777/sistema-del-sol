@@ -12,6 +12,7 @@ import { Paginacion } from '../components/molecules/Paginacion/Paginacion';
 import { EstadoVacio } from '../components/molecules/EstadoVacio/EstadoVacio';
 import { RowActionsMenu } from '../components/molecules/RowActionsMenu/RowActionsMenu';
 import { RequierePermiso } from '../components/organisms/RequierePermiso/RequierePermiso';
+import { SelectListaPrecio } from '../components/molecules/SelectListaPrecio/SelectListaPrecio';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { PaginaResultado } from '../types/pagina-resultado';
 
@@ -25,6 +26,7 @@ interface Cliente {
   email: string | null;
   telefono: string | null;
   limiteCredito: string | null;
+  listaPrecioId: string | null;
 }
 
 interface Proveedor {
@@ -42,6 +44,7 @@ interface ClienteFormValues {
   email: string;
   telefono: string;
   limiteCredito: string;
+  listaPrecioId: string;
 }
 
 interface ProveedorFormValues {
@@ -58,6 +61,7 @@ const CLIENTE_VACIO: ClienteFormValues = {
   email: '',
   telefono: '',
   limiteCredito: '',
+  listaPrecioId: '',
 };
 
 const PROVEEDOR_VACIO: ProveedorFormValues = { nombre: '', rnc: '', email: '', telefono: '' };
@@ -368,6 +372,7 @@ function FormularioCliente({ cliente, onGuardado }: { cliente: Cliente | null; o
           email: cliente.email ?? '',
           telefono: cliente.telefono ?? '',
           limiteCredito: cliente.limiteCredito ?? '',
+          listaPrecioId: cliente.listaPrecioId ?? '',
         }
       : CLIENTE_VACIO,
   );
@@ -381,6 +386,7 @@ function FormularioCliente({ cliente, onGuardado }: { cliente: Cliente | null; o
       email: valores.email || undefined,
       telefono: valores.telefono || undefined,
       limiteCredito: valores.limiteCredito ? Number(valores.limiteCredito) : undefined,
+      listaPrecioId: valores.listaPrecioId || null,
     };
   }
 
@@ -445,6 +451,16 @@ function FormularioCliente({ cliente, onGuardado }: { cliente: Cliente | null; o
         value={valores.limiteCredito}
         onChange={(e) => setValores((v) => ({ ...v, limiteCredito: e.target.value }))}
       />
+      <div className="flex flex-col gap-1">
+        <label htmlFor="cliente-lista-precio" className="text-sm font-medium text-slate-700 dark:text-slate-300">
+          Nivel de precio
+        </label>
+        <SelectListaPrecio
+          id="cliente-lista-precio"
+          value={valores.listaPrecioId}
+          onChange={(id) => setValores((v) => ({ ...v, listaPrecioId: id }))}
+        />
+      </div>
       {error && <p className="text-sm text-red-600">{error}</p>}
       <Button type="submit" disabled={guardar.isPending} className="w-full">
         {guardar.isPending ? 'Guardando…' : 'Guardar'}

@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { CotizacionesRepository } from './cotizaciones.repository';
 import { FacturacionService } from '../facturacion/facturacion.service';
+import { ClientesService } from '../clientes/clientes.service';
 import { CrearCotizacionDto } from './dto/crear-cotizacion.dto';
 import { ConvertirCotizacionDto } from './dto/convertir-cotizacion.dto';
 import { ListadoQueryDto } from '../common/dto/listado-query.dto';
@@ -26,14 +27,15 @@ export class CotizacionesService {
   constructor(
     private readonly cotizacionesRepository: CotizacionesRepository,
     private readonly facturacionService: FacturacionService,
+    private readonly clientesService: ClientesService,
     private readonly eventBus: EventBusService,
     private readonly prisma: PrismaService,
   ) {}
 
-  private async calcularLineas(lineas: CrearCotizacionDto['lineas']) {
+  private async calcularLineas(lineas: CrearCotizacionDto['lineas'], listaPrecio: string) {
     const lineasCalculadas = await Promise.all(
       lineas.map(async (linea) => {
-        const producto = await this.cotizacionesRepository.obtenerProductoConPrecioVigente(linea.productoId);
+        const producto = await this.cotizacionesRepository.obtenerProductoConPrecioVigente(linea.productoId, listaPrecio);
         const precioUnitario = linea.precioUnitario ?? Number(producto.precios[0]?.precioVenta ?? 0);
         const porcentajeItbis = Number(producto.porcentajeItbis);
         const descuento = linea.descuento ?? 0;
@@ -61,8 +63,18 @@ export class CotizacionesService {
     return { lineasCalculadas, subtotal, itbis, descuentoTotal, total };
   }
 
+  private async resolverListaPrecio(dto: CrearCotizacionDto) {
+    // findUniqueOrThrow tenant-scoped: si clienteId es de otro tenant, 404 —
+    // mismo patrón de prevención de IDOR ya documentado para FKs
+    // cliente-suministradas. Se valida siempre, incluso con listaPrecio
+    // explícito, porque clienteId también se usa para crear la cotización.
+    const cliente = await this.clientesService.buscarPorId(dto.clienteId);
+    return dto.listaPrecio ?? cliente.listaPrecio?.nombre ?? 'GENERAL';
+  }
+
   async crear(dto: CrearCotizacionDto, tenantId: string, vendedorId: string) {
-    const { lineasCalculadas, subtotal, itbis, descuentoTotal, total } = await this.calcularLineas(dto.lineas);
+    const listaPrecio = await this.resolverListaPrecio(dto);
+    const { lineasCalculadas, subtotal, itbis, descuentoTotal, total } = await this.calcularLineas(dto.lineas, listaPrecio);
 
     return this.cotizacionesRepository.crear({
       tenantId,
@@ -84,7 +96,8 @@ export class CotizacionesService {
       throw new BadRequestException('Solo se puede editar una cotización en borrador');
     }
 
-    const { lineasCalculadas, subtotal, itbis, descuentoTotal, total } = await this.calcularLineas(dto.lineas);
+    const listaPrecio = await this.resolverListaPrecio(dto);
+    const { lineasCalculadas, subtotal, itbis, descuentoTotal, total } = await this.calcularLineas(dto.lineas, listaPrecio);
 
     return this.cotizacionesRepository.actualizar(id, {
       numero: dto.numero,

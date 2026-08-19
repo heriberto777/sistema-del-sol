@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { PERMISOS_BASE, ROLES_BASE, CONFIGURACIONES_BASE } from './roles-base';
 import { CUENTAS_BASE } from '../contabilidad/cuentas-base';
 import { FORMAS_PAGO_BASE } from './formas-pago-base';
+import { LISTAS_PRECIO_BASE } from './listas-precio-base';
 
 @Injectable()
 export class TenantsRepository {
@@ -87,6 +88,10 @@ export class TenantsRepository {
 
       await tx.formaPago.createMany({
         data: FORMAS_PAGO_BASE.map((f) => ({ tenantId: tenant.id, ...f })),
+      });
+
+      await tx.listaPrecio.createMany({
+        data: LISTAS_PRECIO_BASE.map((l) => ({ tenantId: tenant.id, ...l })),
       });
 
       let adminRoleId: string | undefined;

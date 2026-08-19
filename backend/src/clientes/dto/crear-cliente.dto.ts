@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { TipoCliente } from '@prisma/client';
-import { IsEmail, IsEnum, IsNumber, IsOptional, IsString, Min } from 'class-validator';
+import { IsEmail, IsEnum, IsNumber, IsOptional, IsString, IsUUID, Min } from 'class-validator';
 
 export class CrearClienteDto {
   @ApiProperty()
@@ -31,4 +31,9 @@ export class CrearClienteDto {
   @IsNumber()
   @Min(0)
   limiteCredito?: number;
+
+  @ApiProperty({ required: false, description: 'Nivel de precio por defecto de este cliente. Si se omite/null, resuelve a "GENERAL" al facturar.' })
+  @IsOptional()
+  @IsUUID()
+  listaPrecioId?: string | null;
 }

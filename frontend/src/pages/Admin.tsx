@@ -7,6 +7,7 @@ import { ConfiguracionesPanel } from '../components/organisms/ConfiguracionesPan
 import { NcfPanel } from '../components/organisms/NcfPanel/NcfPanel';
 import { FormasPagoPanel } from '../components/organisms/FormasPagoPanel/FormasPagoPanel';
 import { CategoriasPanel } from '../components/organisms/CategoriasPanel/CategoriasPanel';
+import { ListasPrecioPanel } from '../components/organisms/ListasPrecioPanel/ListasPrecioPanel';
 import { useAuth } from '../hooks/useAuth';
 
 interface Pestana {
@@ -45,8 +46,11 @@ const CATEGORIAS: Categoria[] = [
   {
     id: 'catalogo',
     etiqueta: 'Catálogo',
-    descripcion: 'Categorías de productos.',
-    pestanas: [{ id: 'categorias', etiqueta: 'Categorías', permiso: 'admin.configuracion', panel: CategoriasPanel }],
+    descripcion: 'Categorías de productos y niveles de precio.',
+    pestanas: [
+      { id: 'categorias', etiqueta: 'Categorías', permiso: 'admin.configuracion', panel: CategoriasPanel },
+      { id: 'listas-precio', etiqueta: 'Niveles de precio', permiso: 'admin.configuracion', panel: ListasPrecioPanel },
+    ],
   },
   {
     id: 'general',

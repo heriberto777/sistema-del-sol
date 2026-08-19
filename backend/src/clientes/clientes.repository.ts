@@ -28,18 +28,30 @@ export class ClientesRepository {
         : {}),
     };
     return Promise.all([
-      this.db.cliente.findMany({ where, orderBy: { nombre: 'asc' }, skip: params.skip, take: params.take }),
+      this.db.cliente.findMany({
+        where,
+        orderBy: { nombre: 'asc' },
+        skip: params.skip,
+        take: params.take,
+        include: { listaPrecio: { select: { id: true, nombre: true } } },
+      }),
       this.db.cliente.count({ where }),
     ]);
   }
 
   buscarPorId(id: string) {
-    return this.db.cliente.findUniqueOrThrow({ where: { id }, include: { direcciones: true } });
+    return this.db.cliente.findUniqueOrThrow({
+      where: { id },
+      include: { direcciones: true, listaPrecio: { select: { id: true, nombre: true } } },
+    });
   }
 
   /** Sembrado al provisionar el tenant (ver TenantsRepository.crearConProvisioning) — nunca debería faltar, pero null en vez de throw por si un tenant viejo no fue backfilleado todavía. */
   buscarConsumidorFinal() {
-    return this.db.cliente.findFirst({ where: { esConsumidorFinal: true } });
+    return this.db.cliente.findFirst({
+      where: { esConsumidorFinal: true },
+      include: { listaPrecio: { select: { id: true, nombre: true } } },
+    });
   }
 
   actualizar(id: string, dto: Partial<CrearClienteDto>) {

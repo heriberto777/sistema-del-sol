@@ -16,6 +16,7 @@ import { RowActionsMenu } from '../components/molecules/RowActionsMenu/RowAction
 import { RequierePermiso } from '../components/organisms/RequierePermiso/RequierePermiso';
 import { SelectCategoria } from '../components/molecules/SelectCategoria/SelectCategoria';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
+import { useListasPrecio } from '../hooks/useListasPrecio';
 import { PaginaResultado } from '../types/pagina-resultado';
 
 type TipoProducto = 'PRODUCTO' | 'SERVICIO' | 'COMBO';
@@ -437,9 +438,11 @@ function FormularioProducto({ producto, onGuardado }: { producto: Producto | nul
 
 function FormularioPrecio({ productoId, onGuardado }: { productoId: string; onGuardado: () => void }) {
   const queryClient = useQueryClient();
+  const { data: listasPrecio } = useListasPrecio();
+  const [listaPrecio, setListaPrecio] = useState('GENERAL');
   const { data: vigente } = useQuery({
-    queryKey: ['precio-vigente', productoId],
-    queryFn: async () => (await apiClient.get<Precio | null>(`/precios/${productoId}`)).data,
+    queryKey: ['precio-vigente', productoId, listaPrecio],
+    queryFn: async () => (await apiClient.get<Precio | null>(`/precios/${productoId}`, { params: { listaPrecio } })).data,
   });
   const [costo, setCosto] = useState('');
   const [margenPct, setMargenPct] = useState('');
@@ -450,6 +453,7 @@ function FormularioPrecio({ productoId, onGuardado }: { productoId: string; onGu
     mutationFn: async () =>
       apiClient.post('/precios', {
         productoId,
+        listaPrecio,
         costo: Number(costo),
         margenPct: margenPct ? Number(margenPct) : undefined,
         precioVenta: precioVenta ? Number(precioVenta) : undefined,
@@ -482,6 +486,18 @@ function FormularioPrecio({ productoId, onGuardado }: { productoId: string; onGu
       <p className="text-xs text-slate-500 dark:text-slate-400">
         Cambiar el precio no edita el anterior: cierra el vigente y crea uno nuevo, para conservar el historial.
       </p>
+      <div className="flex flex-col gap-1">
+        <label htmlFor="precio-lista" className="text-sm font-medium text-slate-700 dark:text-slate-300">
+          Nivel de precio
+        </label>
+        <Select id="precio-lista" value={listaPrecio} onChange={(e) => setListaPrecio(e.target.value)}>
+          {listasPrecio?.map((lista) => (
+            <option key={lista.id} value={lista.nombre}>
+              {lista.nombre}
+            </option>
+          ))}
+        </Select>
+      </div>
       <FormField id="precio-costo" label="Costo" type="number" min={0} step="0.01" value={costo} onChange={(e) => setCosto(e.target.value)} required />
       <FormField
         id="precio-margen"

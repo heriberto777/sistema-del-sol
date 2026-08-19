@@ -459,6 +459,55 @@ no incluye descendientes. Decisión deliberada para no over-engineering
 esta sub-fase: filtrar por "Bebidas" no trae los productos de su hija
 "Gaseosas" a menos que se seleccione "Gaseosas" directamente.
 
+## Precios multinivel (Fase 3b de adopción de Cuadre)
+
+`Precio.listaPrecio` ya era un `String` libre con índice (default
+`"GENERAL"`) — el modelo ya soportaba múltiples listas por producto sin
+migración de esa tabla. Lo que faltaba era de dónde sale la lista
+aplicable a cada venta, sin quedar hardcodeada. `ListaPrecio` (tenant-scoped,
+`backend/src/listas-precio/`, mismo patrón CRUD que `FormaPago` — sin
+endpoint de borrado, solo activar/desactivar) es un catálogo de UI, **sin
+FK real desde `Precio.listaPrecio`**: sirve para poblar selectores
+(formulario de Precio en Productos, `Cliente.listaPrecioId`, el override
+manual al facturar) y debe usar exactamente los mismos strings que ya
+circulan como `listaPrecio` en `Precio` — empezando por `"GENERAL"`, que
+sigue siendo el default hardcodeado del schema y de varios services.
+Cambiar esa relación a una FK real habría exigido migrar/validar todo el
+histórico de `Precio` ya escrito con ese string, para una tabla que hoy
+está en uso — se optó por el catálogo desacoplado (mínimo cambio posible
+sobre una tabla ya viva). `ListasPrecioService.actualizar()` rechaza
+renombrar la fila `"GENERAL"` (400) por esta misma razón: haría
+inalcanzables desde el catálogo los precios ya creados con ese nombre.
+
+Resolución del nivel de precio, con override manual (requisito explícito
+del usuario: "si al momento se puede asignar un precio diferente, se
+puede?"): `Cliente.listaPrecioId` (`onDelete: SetNull`) fija el nivel por
+defecto de un cliente. `FacturacionService.crear()`/`CotizacionesService.
+crear()` resuelven `dto.listaPrecio ?? cliente.listaPrecio?.nombre ??
+'GENERAL'` — el override explícito del DTO siempre gana sobre el default
+del cliente, que a su vez gana sobre `"GENERAL"`. El override por venta
+convive sin conflicto con el override por línea ya existente
+(`LineaFacturaDto.precioUnitario`): la lista resuelve el precio de
+catálogo cuando la línea NO trae un `precioUnitario` explícito, nunca al
+revés. `PosService.registrarVenta`/`RegistrarVentaPosDto.listaPrecio`
+exponen el mismo override en el checkout del POS. `CotizacionesService.
+convertirEnFactura()` no participa de esta resolución: siempre manda
+`precioUnitario` explícito por línea (el ya congelado al crear la
+cotización), así que el nivel de precio es irrelevante en ese paso.
+
+Como efecto colateral de resolver el cliente en `FacturacionService.
+crear()`/`CotizacionesService.crear()` (`clientesService.buscarPorId(dto.
+clienteId)`, tenant-scoped vía `TenantPrismaService`), ambos services
+ahora también 404 si `clienteId` pertenece a otro tenant — antes de esta
+fase no había ninguna validación de tenant sobre esa FK en particular.
+
+**Fuera de alcance a propósito**: `ProductosRepository.catalogo()` (la
+grilla visual del POS) sigue mostrando siempre el precio `GENERAL` como
+referencia de navegación — resolver la lista multi-nivel ahí habría
+significado re-resolver precio por cliente en cada tecla de búsqueda,
+para una grilla que es solo apoyo visual (el precio real correcto se
+resuelve recién al facturar, con el mecanismo de arriba).
+
 ## Plugin system
 
 Instalación **manual** (git/deploy): un plugin es un paquete del
