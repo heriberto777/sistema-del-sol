@@ -34,14 +34,25 @@ interface AuthContextValue {
 export const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 /**
- * "Cajero puro": tiene acceso al POS pero ninguna visibilidad de la
- * pantalla general de Facturación — hoy es exactamente el rol Vendedor
- * (ver docs/ARCHITECTURE.md, "Vendedor solo vende por POS"). Se usa
- * para decidir a dónde aterriza el login y cómo se comporta `Pos.tsx`,
- * sin hardcodear el nombre del rol.
+ * Tiene acceso al POS pero ninguna visibilidad de la pantalla general de
+ * Facturación — hoy es la firma de Cajero Y de Supervisor de Caja (ver
+ * docs/ARCHITECTURE.md, "Roles de POS: Cajero, Vendedor, Supervisor de
+ * Caja"). Ninguno de los dos tiene reportes.ver, así que el Dashboard
+ * les quedaría vacío — por eso ambos aterrizan en /pos al loguearse, sin
+ * hardcodear nombres de rol.
+ */
+export function usaPosComoInicio(usuario: Pick<UsuarioAutenticado, 'permisos'> | null): boolean {
+  return !!usuario?.permisos?.includes('pos.editar') && !usuario.permisos.includes('facturacion.ver');
+}
+
+/**
+ * "Cajero puro": además de `usaPosComoInicio`, NO supervisa otros
+ * turnos (`pos.supervisar`) — hoy es exactamente el rol Cajero, nunca
+ * Supervisor de Caja/Admin/Gerente. Decide si `Pos.tsx` muestra la vista
+ * restringida (solo su propio turno) o la tabla completa de turnos.
  */
 export function esCajeroPuro(usuario: Pick<UsuarioAutenticado, 'permisos'> | null): boolean {
-  return !!usuario?.permisos?.includes('pos.editar') && !usuario.permisos.includes('facturacion.ver');
+  return usaPosComoInicio(usuario) && !usuario?.permisos?.includes('pos.supervisar');
 }
 
 const STORAGE_KEY = 'sol_access_token';

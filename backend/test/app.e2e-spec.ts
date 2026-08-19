@@ -2308,7 +2308,7 @@ describe('App (e2e)', () => {
       bodegaArqueoId = bodega.id;
 
       const rolCajero = await prisma.role.create({ data: { tenantId: tenantAId, nombre: 'CajeroArqueoE2E' } });
-      for (const clave of ['pos.ver', 'pos.editar']) {
+      for (const clave of ['pos.ver', 'pos.editar', 'facturacion.anular']) {
         const permiso = await prisma.permission.findUniqueOrThrow({ where: { clave } });
         await prisma.rolePermission.create({ data: { roleId: rolCajero.id, permissionId: permiso.id } });
       }
@@ -2317,6 +2317,10 @@ describe('App (e2e)', () => {
         const usuario = await prisma.user.create({ data: { tenantId: tenantAId, email, nombre: email, passwordHash } });
         await prisma.userRole.create({ data: { userId: usuario.id, roleId: rolCajero.id } });
       }
+
+      // Stock del producto E2E compartido, ahora también en esta bodega —
+      // necesario para registrar ventas de POS en los tests de anulación.
+      await prisma.stock.create({ data: { productoId: productoAId, bodegaId: bodegaArqueoId, cantidadActual: 50, stockMinimo: 5 } });
 
       tokenAdminArqueo = await login('admin@e2e-a.com', SUBDOMINIO_A); // CompletoA tiene pos.supervisar
       tokenCajero2Arqueo = await login('cajero2@e2e-a.com', SUBDOMINIO_A);
@@ -2407,6 +2411,83 @@ describe('App (e2e)', () => {
         .set('Authorization', `Bearer ${tokenAdminArqueo}`)
         .expect(200);
       expect(cajeros.body.some((c: { id: string }) => c.id === cajeroId)).toBe(true);
+    });
+
+    it('un cajero sin pos.supervisar no puede anular la venta de POS de OTRO cajero', async () => {
+      const turno = await request(app.getHttpServer())
+        .post('/api/pos/turnos')
+        .set('Authorization', `Bearer ${tokenCajero2Arqueo}`)
+        .send({ bodegaId: bodegaArqueoId, montoInicial: 500 })
+        .expect(201);
+
+      const venta = await request(app.getHttpServer())
+        .post('/api/pos/ventas')
+        .set('Authorization', `Bearer ${tokenCajero2Arqueo}`)
+        .send({
+          turnoCajaId: turno.body.id,
+          clienteId: clienteAId,
+          metodoPago: 'EFECTIVO',
+          lineas: [{ productoId: productoAId, cantidad: 1 }],
+        })
+        .expect(201);
+
+      await request(app.getHttpServer())
+        .post(`/api/facturas/${venta.body.id}/anular`)
+        .set('Authorization', `Bearer ${tokenCajero3Arqueo}`)
+        .send({ motivo: 'No es mi venta' })
+        .expect(403);
+
+      // El mismo cajero que la vendió sí puede anularla mientras su turno sigue abierto.
+      await request(app.getHttpServer())
+        .post(`/api/facturas/${venta.body.id}/anular`)
+        .set('Authorization', `Bearer ${tokenCajero2Arqueo}`)
+        .send({ motivo: 'Cliente se arrepintió' })
+        .expect(201);
+
+      // Cerrar para no dejar un turno ABIERTO en esta bodega (bloquearía el próximo test).
+      await request(app.getHttpServer())
+        .post(`/api/pos/turnos/${turno.body.id}/cerrar`)
+        .set('Authorization', `Bearer ${tokenCajero2Arqueo}`)
+        .send({ montoFinalContado: 500 })
+        .expect(201);
+    });
+
+    it('un cajero sin pos.supervisar ya no puede anular una venta de su propio turno una vez cerrado', async () => {
+      const turno = await request(app.getHttpServer())
+        .post('/api/pos/turnos')
+        .set('Authorization', `Bearer ${tokenCajero3Arqueo}`)
+        .send({ bodegaId: bodegaArqueoId, montoInicial: 500 })
+        .expect(201);
+
+      const venta = await request(app.getHttpServer())
+        .post('/api/pos/ventas')
+        .set('Authorization', `Bearer ${tokenCajero3Arqueo}`)
+        .send({
+          turnoCajaId: turno.body.id,
+          clienteId: clienteAId,
+          metodoPago: 'TARJETA',
+          lineas: [{ productoId: productoAId, cantidad: 1 }],
+        })
+        .expect(201);
+
+      await request(app.getHttpServer())
+        .post(`/api/pos/turnos/${turno.body.id}/cerrar`)
+        .set('Authorization', `Bearer ${tokenCajero3Arqueo}`)
+        .send({ montoFinalContado: 500 })
+        .expect(201);
+
+      await request(app.getHttpServer())
+        .post(`/api/facturas/${venta.body.id}/anular`)
+        .set('Authorization', `Bearer ${tokenCajero3Arqueo}`)
+        .send({ motivo: 'Turno ya cerrado' })
+        .expect(403);
+
+      // Un supervisor (pos.supervisar) sí puede, sin la restricción de turno propio/abierto.
+      await request(app.getHttpServer())
+        .post(`/api/facturas/${venta.body.id}/anular`)
+        .set('Authorization', `Bearer ${tokenAdminArqueo}`)
+        .send({ motivo: 'Ajuste post-cierre autorizado' })
+        .expect(201);
     });
   });
 

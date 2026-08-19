@@ -1060,24 +1060,63 @@ one-off `ajustar-permisos-vendedor:migrar`
 es deliberadamente aditivo (nunca borra), así que remover un permiso de
 `ROLES_BASE` siempre va a necesitar un script puntual como este.
 
-**Aterrizaje directo en POS para un cajero puro.** En Lightspeed/Square/
-Odoo el patrón no es "recomendable" abrir turno, es un bloqueo duro —
-"sales can be recorded only when a session is active" — y el login del
-cajero termina directo en esa apertura, no en un dashboard genérico.
-`AuthContext.esCajeroPuro(usuario)` (`pos.editar` sin `facturacion.ver`
-— hoy exactamente la firma de `Vendedor`, sin hardcodear el nombre del
-rol) decide dos cosas: `Login.tsx` lo manda a `/pos` en vez de `/` al
-autenticarse, y `Pos.tsx` le muestra una vista distinta a la de quien
-supervisa varios cajeros (`PosCajero` vs. la `TurnosCajaTable`
-completa) — sin la tabla de turnos de otros cajeros (no le sirve, no
-tiene `pos.supervisar`), busca directo si YA tiene un turno `ABIERTO`
-propio (`GET /pos/turnos?cajeroId=<yo>&estado=ABIERTO`) y si no, muestra
-solo el formulario de apertura (`AbrirTurnoForm`, compartido con el
-modal de `TurnosCajaTable` para no duplicar la lógica) — nunca una
-pantalla vacía sin acción clara. Cotizaciones/Remisiones/Contactos
-siguen accesibles igual que antes para este rol — no mueven caja, y
-ninguna fuente consultada (tampoco Odoo) respalda bloquear módulos que
-no tocan efectivo solo porque el turno esté cerrado.
+**Aterrizaje directo en POS.** En Lightspeed/Square/Odoo el patrón no es
+"recomendable" abrir turno, es un bloqueo duro — "sales can be recorded
+only when a session is active" — y el login del cajero termina directo
+en esa apertura, no en un dashboard genérico. `AuthContext.
+usaPosComoInicio(usuario)` (`pos.editar` sin `facturacion.ver` — hoy la
+firma de Cajero Y de Supervisor de Caja, ninguno de los dos tiene
+`reportes.ver` así que el Dashboard les quedaría vacío) decide a dónde
+manda `Login.tsx` al autenticarse. Dentro de `Pos.tsx`, un criterio más
+angosto — `esCajeroPuro` (lo mismo, pero además SIN `pos.supervisar`) —
+decide qué vista se muestra: un Cajero puro va a `PosCajero` (sin la
+tabla de turnos de otros cajeros, no le sirve de nada); un Supervisor de
+Caja o Admin/Gerente ve la `TurnosCajaTable` completa. Un Cajero puro
+busca directo si YA tiene un turno `ABIERTO` propio (`GET /pos/turnos?
+cajeroId=<yo>&estado=ABIERTO`) y si no, muestra solo el formulario de
+apertura (`AbrirTurnoForm`, compartido con el modal de
+`TurnosCajaTable` para no duplicar la lógica) — nunca una pantalla
+vacía sin acción clara.
+
+### Roles de POS: Cajero, Vendedor, Supervisor de Caja
+
+Investigando el patrón de sesión de caja más a fondo (Odoo multi-cajero,
+X/Z reports de Lightspeed/ConnectPOS) surgieron dos huecos reales en el
+modelo de un solo rol "Vendedor" que hacía de todo:
+
+1. **Cajero de mostrador y vendedor de campo/oficina son roles
+   distintos en la vida real** — antes estaban fusionados. Ahora:
+   - **Vendedor**: `cotizaciones.*`, `remisiones.*`, `clientes.*`,
+     `precios.ver` — sin ningún permiso `pos.*` ni `facturacion.*`. No
+     toca caja en absoluto.
+   - **Cajero**: `pos.ver`, `pos.editar`, `facturacion.anular`,
+     `facturacion.imprimir`, `clientes.crear/ver`, `precios.ver` — solo
+     POS, sin cotizaciones/remisiones.
+2. **No existía forma de dar `pos.supervisar` (cerrar el turno de otro
+   cajero, ver todos los turnos) sin también dar nómina/contabilidad/
+   admin** — antes solo lo tenían Admin Total/Gerente. Nuevo rol
+   **Supervisor de Caja**: igual que Cajero + `pos.supervisar`, nada más.
+
+**`facturacion.anular` ahora tiene alcance acotado por rol.**
+`FacturacionService.anular()` recibe un cuarto parámetro
+(`puedeSupervisarCaja`, resuelto en el controller desde
+`user.permisos.includes('pos.supervisar')`): si la factura vino de POS
+(`turnoCaja` no nulo) y quien pide la anulación NO tiene
+`pos.supervisar`, debe ser el mismo `cajeroId` del turno Y ese turno debe
+seguir `ABIERTO` — si no, `ForbiddenException`. Un Supervisor de
+Caja/Admin/Gerente nunca tiene esta restricción. El frontend
+(`TurnoCajaDetalle.tsx`) oculta el botón "Anular/Devolver" cuando sabe
+de antemano que fallaría (turno ya cerrado y sin `pos.supervisar`), pero
+la regla real vive 100% en el backend.
+
+Migrar tenants ya provisionados necesitó `backend/scripts/
+migrar-roles-pos.ts` (uso: `pnpm --filter ./backend migrar-roles-pos`):
+crea "Cajero"/"Supervisor de Caja" donde falten, suma el rol Cajero a
+cada usuario que hoy tiene Vendedor (para no cortarles el acceso a POS
+que ya tenían), y le quita a Vendedor los permisos que ya no le
+corresponden — mismo patrón que `ajustar-permisos-vendedor-pos.ts`, ya
+que `permisos:backfill` es aditivo y no crea roles nuevos ni quita
+permisos.
 
 **Apertura/cierre de turno en modal**: el cierre muestra el
 `montoEsperado` calculado en el propio frontend (misma fórmula que

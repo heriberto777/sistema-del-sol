@@ -272,7 +272,7 @@ describe('Plataforma (e2e)', () => {
       );
     });
 
-    it('GET /clientes/consumidor-final devuelve el contacto sembrado al provisionar, y el rol Vendedor puede anular facturas', async () => {
+    it('GET /clientes/consumidor-final devuelve el contacto sembrado al provisionar', async () => {
       const loginTenant = await request(app.getHttpServer())
         .post('/api/auth/login')
         .send({ email: 'admin@e2e-provisioned.com', password: 'Provisionado123!', tenantSubdominio: SUBDOMINIO_NUEVO });
@@ -283,19 +283,41 @@ describe('Plataforma (e2e)', () => {
         .set('Authorization', `Bearer ${tokenTenant}`)
         .expect(200);
       expect(respuesta.body.nombre).toBe('Consumidor Final');
+    });
 
-      const rolVendedor = await prisma.role.findUniqueOrThrow({
-        where: { tenantId_nombre: { tenantId: tenantCreadoId!, nombre: 'Vendedor' } },
-        include: { rolePermissions: { include: { permission: true } } },
-      });
-      const clavesVendedor = rolVendedor.rolePermissions.map((rp) => rp.permission.clave);
-      expect(clavesVendedor).toContain('facturacion.anular');
-      expect(clavesVendedor).toContain('facturacion.imprimir');
-      // Vendedor solo vende por POS — nunca por la pantalla de Facturación
-      // directa (ver docs/ARCHITECTURE.md, "Vendedor solo vende por POS").
+    it('provisiona los roles Cajero y Supervisor de Caja, separados de Vendedor (ver docs/ARCHITECTURE.md, "Roles de POS")', async () => {
+      const permisosDe = async (nombreRol: string) => {
+        const rol = await prisma.role.findUniqueOrThrow({
+          where: { tenantId_nombre: { tenantId: tenantCreadoId!, nombre: nombreRol } },
+          include: { rolePermissions: { include: { permission: true } } },
+        });
+        return rol.rolePermissions.map((rp) => rp.permission.clave);
+      };
+
+      const clavesVendedor = await permisosDe('Vendedor');
+      // Vendedor: solo cotizaciones/remisiones de oficina/campo, nunca POS ni
+      // la pantalla de Facturación directa.
+      expect(clavesVendedor).toContain('cotizaciones.crear');
+      expect(clavesVendedor).toContain('remisiones.crear');
+      expect(clavesVendedor).not.toContain('pos.editar');
+      expect(clavesVendedor).not.toContain('facturacion.anular');
+      expect(clavesVendedor).not.toContain('facturacion.imprimir');
       expect(clavesVendedor).not.toContain('facturacion.crear');
       expect(clavesVendedor).not.toContain('facturacion.ver');
-      expect(clavesVendedor).not.toContain('facturacion.cobrar');
+
+      const clavesCajero = await permisosDe('Cajero');
+      expect(clavesCajero).toContain('pos.ver');
+      expect(clavesCajero).toContain('pos.editar');
+      expect(clavesCajero).toContain('facturacion.anular');
+      expect(clavesCajero).toContain('facturacion.imprimir');
+      expect(clavesCajero).not.toContain('pos.supervisar');
+      expect(clavesCajero).not.toContain('cotizaciones.crear');
+
+      const clavesSupervisor = await permisosDe('Supervisor de Caja');
+      expect(clavesSupervisor).toContain('pos.supervisar');
+      expect(clavesSupervisor).toContain('facturacion.anular');
+      expect(clavesSupervisor).not.toContain('nomina.ver');
+      expect(clavesSupervisor).not.toContain('contabilidad.ver');
     });
   });
 

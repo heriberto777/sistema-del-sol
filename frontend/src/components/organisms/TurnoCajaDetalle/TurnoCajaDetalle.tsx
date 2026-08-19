@@ -324,7 +324,9 @@ export function TurnoCajaDetalle({ turnoId, onCerrado }: { turnoId: string; onCe
                 <button type="button" className="text-xs text-sol-600 hover:underline dark:text-sol-400" onClick={() => setFacturaImprimiendo(f.id)}>
                   Imprimir
                 </button>
-                {f.estado === 'EMITIDA' && tienePermiso('facturacion.anular') && (
+                {f.estado === 'EMITIDA' &&
+                  tienePermiso('facturacion.anular') &&
+                  (data.estado === 'ABIERTO' || tienePermiso('pos.supervisar')) && (
                   <button
                     type="button"
                     className="text-xs text-red-600 hover:underline dark:text-red-400"

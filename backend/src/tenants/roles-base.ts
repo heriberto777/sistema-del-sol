@@ -24,21 +24,33 @@ export const PERMISOS_BASE = [
 export const ROLES_BASE: Record<string, string[]> = {
   'Admin Total': PERMISOS_BASE,
   Gerente: PERMISOS_BASE.filter((p) => !p.startsWith('admin.')),
+  // Vendedor y Cajero se separaron en dos roles (antes uno solo hacía
+  // ambas cosas) — ver docs/ARCHITECTURE.md, "Roles de POS: Cajero,
+  // Vendedor, Supervisor de Caja". Vendedor = ventas de oficina/campo
+  // (cotizaciones, remisiones) SIN tocar caja; Cajero = solo POS.
   Vendedor: [
-    // Vendedor NO tiene facturacion.crear/ver/cobrar a propósito: su única
-    // pantalla de venta es el POS (ver docs/ARCHITECTURE.md, "UX del
-    // cajero") — antes también veía "Facturación" en el menú y podía
-    // cobrar en efectivo ahí, una venta que no queda amarrada a ningún
-    // turno y por lo tanto nunca entra al arqueo de caja. facturacion.anular
-    // (para anular/devolver una venta de POS desde el mismo turno, ver
-    // TurnoCajaDetalle.tsx) y facturacion.imprimir (para "Imprimir recibo"
-    // ahí mismo) reusan los endpoints de Facturación normal — no hay una
-    // ruta separada solo para POS.
-    'facturacion.anular', 'facturacion.imprimir',
     'cotizaciones.crear', 'cotizaciones.editar', 'cotizaciones.ver',
     'remisiones.crear', 'remisiones.editar', 'remisiones.ver',
     'clientes.crear', 'clientes.ver', 'precios.ver',
+    'ia.usar', 'notificaciones.ver',
+  ],
+  Cajero: [
+    // facturacion.anular (acotado a la propia venta de POS mientras el
+    // turno sigue abierto — ver FacturacionService.anular) y
+    // facturacion.imprimir reusan los endpoints de Facturación normal, no
+    // hay una ruta separada solo para POS.
+    'facturacion.anular', 'facturacion.imprimir',
+    'clientes.crear', 'clientes.ver', 'precios.ver',
     'pos.ver', 'pos.editar', 'ia.usar', 'notificaciones.ver',
+  ],
+  // Mismo alcance que Cajero + pos.supervisar: puede cerrar el turno de
+  // OTRO cajero y anular cualquier venta de POS sin la restricción de
+  // "propio turno abierto" — sin darle nómina/contabilidad/admin, que sí
+  // traería venir de Gerente/Admin Total.
+  'Supervisor de Caja': [
+    'facturacion.anular', 'facturacion.imprimir',
+    'clientes.crear', 'clientes.ver', 'precios.ver',
+    'pos.ver', 'pos.editar', 'pos.supervisar', 'ia.usar', 'notificaciones.ver',
   ],
   Almacenero: ['inventario.ver', 'inventario.ajustar', 'inventario.transferir', 'compras.recibir', 'remisiones.ver'],
   Contador: ['facturacion.ver', 'facturacion.cobrar', 'facturacion.imprimir', 'compras.ver', 'compras.pagar', 'reportes.ver', 'precios.ver', 'contabilidad.ver', 'contabilidad.editar', 'contabilidad.anular', 'contabilidad.cerrarperiodo', 'contabilidad.conciliar', 'bancos.ver', 'bancos.editar', 'gastosmenores.ver', 'gastosmenores.crear', 'nomina.ver', 'nomina.editar', 'ia.usar', 'notificaciones.ver'],

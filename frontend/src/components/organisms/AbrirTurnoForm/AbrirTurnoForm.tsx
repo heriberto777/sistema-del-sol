@@ -18,7 +18,7 @@ interface AbrirTurnoFormProps {
  * Formulario puro (sin Modal alrededor) para reusar tanto en
  * `ModalAbrirTurno` (TurnosCajaTable, para quien supervisa varios
  * cajeros) como en la apertura forzada de `Pos.tsx` para un cajero puro
- * (Vendedor) — ahí no hay nada detrás que "cerrar", es la pantalla
+ * (rol Cajero) — ahí no hay nada detrás que "cerrar", es la pantalla
  * entera.
  */
 export function AbrirTurnoForm({ bodegas, onAbierto }: AbrirTurnoFormProps) {

@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { FacturacionService } from './facturacion.service';
 import { FacturacionRepository } from './facturacion.repository';
 import { InventarioService } from '../inventario/inventario.service';
@@ -302,7 +302,7 @@ describe('FacturacionService', () => {
       repository.buscarPorId.mockResolvedValue(facturaExistente() as never);
       repository.anularEnTx.mockResolvedValue(facturaCreada({ total: 200, subtotal: 200 }) as never);
 
-      const resultado = await service.anular('f1', 'Motivo de prueba', 'tenant-1', 'user-1');
+      const resultado = await service.anular('f1', 'Motivo de prueba', 'tenant-1', 'user-1', true);
 
       expect(repository.anularEnTx).toHaveBeenCalledWith(TX, 'f1', 'Motivo de prueba');
       expect(eventBus.emit).toHaveBeenCalledWith(
@@ -315,15 +315,44 @@ describe('FacturacionService', () => {
     it('rechaza anular una factura que ya está anulada', async () => {
       repository.buscarPorId.mockResolvedValue(facturaExistente({ estado: 'ANULADA' }) as never);
 
-      await expect(service.anular('f1', 'Motivo de prueba', 'tenant-1', 'user-1')).rejects.toThrow(BadRequestException);
+      await expect(service.anular('f1', 'Motivo de prueba', 'tenant-1', 'user-1', true)).rejects.toThrow(BadRequestException);
       expect(repository.anularEnTx).not.toHaveBeenCalled();
+    });
+
+    it('un Cajero sin pos.supervisar no puede anular una venta de POS del turno de OTRO cajero', async () => {
+      repository.buscarPorId.mockResolvedValue(
+        facturaExistente({ turnoCaja: { cajeroId: 'otro-cajero', estado: 'ABIERTO' } }) as never,
+      );
+
+      await expect(service.anular('f1', 'Motivo de prueba', 'tenant-1', 'user-1', false)).rejects.toThrow(ForbiddenException);
+      expect(repository.anularEnTx).not.toHaveBeenCalled();
+    });
+
+    it('un Cajero sin pos.supervisar no puede anular una venta de POS de SU turno ya cerrado', async () => {
+      repository.buscarPorId.mockResolvedValue(
+        facturaExistente({ turnoCaja: { cajeroId: 'user-1', estado: 'CERRADO' } }) as never,
+      );
+
+      await expect(service.anular('f1', 'Motivo de prueba', 'tenant-1', 'user-1', false)).rejects.toThrow(ForbiddenException);
+      expect(repository.anularEnTx).not.toHaveBeenCalled();
+    });
+
+    it('un Cajero sin pos.supervisar sí puede anular una venta de POS de SU propio turno abierto', async () => {
+      repository.buscarPorId.mockResolvedValue(
+        facturaExistente({ turnoCaja: { cajeroId: 'user-1', estado: 'ABIERTO' } }) as never,
+      );
+      repository.anularEnTx.mockResolvedValue(facturaCreada({ total: 200, subtotal: 200 }) as never);
+
+      await service.anular('f1', 'Motivo de prueba', 'tenant-1', 'user-1', false);
+
+      expect(repository.anularEnTx).toHaveBeenCalledWith(TX, 'f1', 'Motivo de prueba');
     });
 
     it('anular una venta normal (CONTADO/CREDITO) devuelve el stock a la bodega', async () => {
       repository.buscarPorId.mockResolvedValue(facturaExistente() as never);
       repository.anularEnTx.mockResolvedValue(facturaCreada({ total: 200, subtotal: 200 }) as never);
 
-      await service.anular('f1', 'Motivo de prueba', 'tenant-1', 'user-1');
+      await service.anular('f1', 'Motivo de prueba', 'tenant-1', 'user-1', true);
 
       expect(inventarioService.entradaStockEnTx).toHaveBeenCalledWith(
         TX,
@@ -336,7 +365,7 @@ describe('FacturacionService', () => {
       repository.buscarPorId.mockResolvedValue(facturaExistente({ tipoFactura: 'NOTA_CREDITO', total: -200, subtotal: -200 }) as never);
       repository.anularEnTx.mockResolvedValue(facturaCreada({ total: -200, subtotal: -200 }) as never);
 
-      await service.anular('f1', 'Motivo de prueba', 'tenant-1', 'user-1');
+      await service.anular('f1', 'Motivo de prueba', 'tenant-1', 'user-1', true);
 
       expect(inventarioService.verificarYDescontarStockEnTx).toHaveBeenCalledWith(
         TX,
@@ -354,7 +383,7 @@ describe('FacturacionService', () => {
       );
       repository.anularEnTx.mockResolvedValue(facturaCreada({ total: 200, subtotal: 200 }) as never);
 
-      await service.anular('f1', 'Motivo de prueba', 'tenant-1', 'user-1');
+      await service.anular('f1', 'Motivo de prueba', 'tenant-1', 'user-1', true);
 
       // 5 originales - 2 ya devueltos por la nota = 3 a reintegrar, no 5
       expect(inventarioService.entradaStockEnTx).toHaveBeenCalledTimes(1);
@@ -373,7 +402,7 @@ describe('FacturacionService', () => {
       );
       repository.anularEnTx.mockResolvedValue(facturaCreada({ total: 200, subtotal: 200 }) as never);
 
-      await service.anular('f1', 'Motivo de prueba', 'tenant-1', 'user-1');
+      await service.anular('f1', 'Motivo de prueba', 'tenant-1', 'user-1', true);
 
       expect(inventarioService.entradaStockEnTx).not.toHaveBeenCalled();
     });
@@ -395,7 +424,7 @@ describe('FacturacionService', () => {
       );
       repository.anularEnTx.mockResolvedValue(facturaCreada({ total: 200, subtotal: 200 }) as never);
 
-      await service.anular('f1', 'Motivo de prueba', 'tenant-1', 'user-1');
+      await service.anular('f1', 'Motivo de prueba', 'tenant-1', 'user-1', true);
 
       expect(inventarioService.entradaStockEnTx).toHaveBeenCalledWith(
         TX,
@@ -407,7 +436,7 @@ describe('FacturacionService', () => {
       repository.buscarPorId.mockResolvedValue(facturaExistente({ tipoFactura: 'NOTA_DEBITO' }) as never);
       repository.anularEnTx.mockResolvedValue(facturaCreada({ total: 200, subtotal: 200 }) as never);
 
-      await service.anular('f1', 'Motivo de prueba', 'tenant-1', 'user-1');
+      await service.anular('f1', 'Motivo de prueba', 'tenant-1', 'user-1', true);
 
       expect(inventarioService.entradaStockEnTx).not.toHaveBeenCalled();
       expect(inventarioService.verificarYDescontarStockEnTx).not.toHaveBeenCalled();
@@ -417,7 +446,7 @@ describe('FacturacionService', () => {
       repository.buscarPorId.mockResolvedValue(facturaExistente({ bodegaId: null }) as never);
       repository.anularEnTx.mockResolvedValue(facturaCreada({ total: 200, subtotal: 200 }) as never);
 
-      await service.anular('f1', 'Motivo de prueba', 'tenant-1', 'user-1');
+      await service.anular('f1', 'Motivo de prueba', 'tenant-1', 'user-1', true);
 
       expect(inventarioService.entradaStockEnTx).not.toHaveBeenCalled();
       expect(inventarioService.verificarYDescontarStockEnTx).not.toHaveBeenCalled();

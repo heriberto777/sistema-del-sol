@@ -155,6 +155,9 @@ export class FacturacionRepository {
         // parciales contra esta factura, solo hay que reintegrar lo que
         // aún no se había devuelto (ver FacturacionService.anular).
         notasRelacionadas: { where: { tipoFactura: 'NOTA_CREDITO', estado: 'EMITIDA' }, include: { lineas: true } },
+        // Necesario para anular(): un Cajero (sin pos.supervisar) solo puede
+        // anular ventas de SU propio turno mientras sigue abierto.
+        turnoCaja: { select: { cajeroId: true, estado: true } },
       },
     });
   }

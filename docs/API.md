@@ -92,7 +92,7 @@ pasa ninguna de ellas.
 | POST | `/api/facturas` | `facturacion.crear` — `{ clienteId, bodegaId, tipoFactura, lineas[], facturaOrigenId? }`; `facturaOrigenId` requerido para `NOTA_CREDITO`/`NOTA_DEBITO` |
 | GET | `/api/facturas?pagina&tamanoPagina&busqueda` | `facturacion.ver` — `busqueda` filtra por NCF o nombre de cliente |
 | GET | `/api/facturas/:id` | `facturacion.ver` |
-| POST | `/api/facturas/:id/anular` | `facturacion.anular` — reversa el efecto de inventario (ver ARCHITECTURE.md); 400 si ya estaba anulada |
+| POST | `/api/facturas/:id/anular` | `facturacion.anular` — reversa el efecto de inventario (ver ARCHITECTURE.md); 400 si ya estaba anulada; si la factura es de POS y quien pide la anulación no tiene `pos.supervisar`, 403 salvo que sea el mismo cajero del turno Y siga `ABIERTO` (ver "Roles de POS" en ARCHITECTURE.md) |
 | POST | `/api/facturas/:id/registrar-pago` | `facturacion.cobrar` — `{ fechaPago? }` (default: ahora); 400 si no está EMITIDA o ya estaba pagada |
 | GET | `/api/facturas/:id/imprimir?formato=CARTA\|A4\|TERMICA_80MM\|TERMICA_58MM` | `facturacion.imprimir` — sin `formato`, resuelve el default (override de bodega > default de tenant > CARTA, ver ARCHITECTURE.md); devuelve PDF o HTML según formato. Separado de `facturacion.ver` para que Vendedor pueda imprimir un recibo de POS sin ver la pantalla general de Facturación |
 

@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
 import { FormatoImpresion, MetodoPago, Prisma, TipoFactura, TipoNcf, TipoProducto } from '@prisma/client';
 import { FacturacionRepository } from './facturacion.repository';
 import { InventarioService } from '../inventario/inventario.service';
@@ -240,10 +240,22 @@ export class FacturacionService {
   }
 
   /** Misma razón que en `crear()`: la reintegración/re-descuento de stock y el cambio de estado de la factura corren en una sola transacción. */
-  async anular(id: string, motivo: string, tenantId: string, userId: string) {
+  async anular(id: string, motivo: string, tenantId: string, userId: string, puedeSupervisarCaja: boolean) {
     const factura = await this.facturacionRepository.buscarPorId(id);
     if (factura.estado === 'ANULADA') {
       throw new BadRequestException('La factura ya está anulada');
+    }
+
+    // Un Cajero (sin pos.supervisar) solo puede anular ventas de POS de SU
+    // propio turno mientras sigue abierto — ver docs/ARCHITECTURE.md,
+    // "Roles de POS: Cajero, Vendedor, Supervisor de Caja". Facturas que no
+    // vienen de POS (turnoCaja null) no aplican esta restricción — hoy solo
+    // Admin Total/Gerente/Supervisor de Caja llegan a anular esas, y todos
+    // tienen pos.supervisar.
+    if (!puedeSupervisarCaja && factura.turnoCaja) {
+      if (factura.turnoCaja.cajeroId !== userId || factura.turnoCaja.estado !== 'ABIERTO') {
+        throw new ForbiddenException('Solo podés anular ventas de tu propio turno mientras sigue abierto.');
+      }
     }
 
     const facturaAnulada = await this.tenantPrisma.client.$transaction(async (tx) => {

@@ -37,7 +37,7 @@ export function Pos() {
 }
 
 /**
- * Vista para un cajero puro (Vendedor, ver `esCajeroPuro`): sin la tabla
+ * Vista para un cajero puro (rol Cajero, ver `esCajeroPuro`): sin la tabla
  * de todos los turnos de todos los cajeros — no le sirve de nada, no
  * puede abrir/cerrar el turno de otro (`pos.supervisar`). Aterriza
  * directo en su propio turno abierto si ya tiene uno, o en el
