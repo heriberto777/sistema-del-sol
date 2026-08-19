@@ -656,8 +656,19 @@ describe('Plataforma (e2e)', () => {
   });
 
   describe('Auditoría de plataforma', () => {
+    // AuditLogInterceptor escribe fire-and-forget (no espera el INSERT antes
+    // de responder al request que lo dispara, ver el comentario de abajo) —
+    // mismo criterio que el listener de asientos contables en app.e2e-spec.ts:
+    // una espera corta y determinista alcanza porque solo escribe en la
+    // misma base, sin red externa de por medio. Sin esto, el test pasa solo
+    // en aislamiento pero es flaky corriendo la suite completa en paralelo
+    // (bug real: encontrado corriendo `pnpm test:e2e` completo, no reproducía
+    // ejecutando este archivo solo).
+    const esperarAuditLog = () => new Promise((resolve) => setTimeout(resolve, 300));
+
     it('registra las acciones de creación y suspensión de tenants hechas más arriba', async () => {
       const tokenPlataforma = await loginPlataforma();
+      await esperarAuditLog();
 
       const respuesta = await request(app.getHttpServer())
         .get('/api/platform/audit-log')
