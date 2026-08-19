@@ -121,6 +121,42 @@ export class ProductosRepository {
     });
   }
 
+  /** Para el upsert por código de la importación masiva (Fase 3e). */
+  buscarPorCodigo(codigo: string) {
+    return this.db.producto.findFirst({ where: { codigo } });
+  }
+
+  /**
+   * Trae TODAS las variantes de cada producto (no solo la "por defecto",
+   * a diferencia de `catalogo()`) para agregar código de barras/stock de
+   * las 4 (Fase 3e, export): el precio GENERAL mostrado sigue el mismo
+   * criterio de "variante representativa" que `catalogo()` (la más
+   * antigua, `orderBy: createdAt asc` deja `variantes[0]` como esa),
+   * pero código de barras y stock se agregan sobre todas.
+   */
+  exportarDatos() {
+    return this.db.producto.findMany({
+      where: { activo: true },
+      orderBy: { nombre: 'asc' },
+      select: {
+        codigo: true,
+        nombre: true,
+        tipo: true,
+        unidadMedida: true,
+        porcentajeItbis: true,
+        categoria: { select: { nombre: true } },
+        variantes: {
+          orderBy: { createdAt: 'asc' },
+          select: {
+            codigoBarras: true,
+            precios: { where: { listaPrecio: 'GENERAL', vigenteHasta: null }, select: { precioVenta: true }, take: 1 },
+            stock: { select: { cantidadActual: true } },
+          },
+        },
+      },
+    });
+  }
+
   /**
    * Variante para cuando quien llama ya está dentro de una transacción
    * abierta (ver InventarioService.validarPertenencia) — usar `tx` en vez

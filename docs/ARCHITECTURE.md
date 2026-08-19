@@ -759,6 +759,81 @@ asignado. `jsbarcode` no trae sus propios tipos en el paquete (no
 declara `types`/`typings` en su `package.json`) — se instaló
 `@types/jsbarcode` aparte como devDependency.
 
+## Import/export de catálogo por Excel (Fase 3e)
+
+**Export** (`GET /productos/exportar`, `ProductosService.exportar()`)
+reusa `generarExcel()` (`backend/src/reportes/exportadores/
+excel-exportador.ts`), el mismo helper que ya usa `ReportesService` —
+sin exportador nuevo. `ProductosRepository.exportarDatos()` trae TODAS
+las variantes de cada producto (no solo la "por defecto" como
+`catalogo()`): el precio GENERAL de la columna sigue el mismo criterio
+de "variante representativa" (la más antigua) que `catalogo()`, pero
+código de barras y stock se agregan sobre TODAS las variantes (join de
+códigos de barras con `, `, suma de stock de todas las bodegas de todas
+las variantes) — reflejar el catálogo completo en un export importa más
+que mantener la misma simplificación que la grilla del POS.
+
+**Import** (`POST /productos/importar`,
+`ProductosService.importar()`/`importarFila()`) deliberadamente **no
+usa `multer`** — sigue la misma filosofía 100% client-side que
+`CampoImagen` (comprime y manda base64 en JSON, nunca multipart): el
+`.xlsx` se parsea y valida ENTERO en el navegador
+(`frontend/src/lib/importar-productos-excel.ts`, con ExcelJS también —
+ver más abajo) antes de mandar nada; recién al confirmar se envía el
+arreglo ya validado como JSON plano. Upsert por código
+(`ProductosRepository.buscarPorCodigo`), **fila por fila, sin
+transacción cruzada entre filas** — cada fila se procesa de forma
+independiente y un error en una no aborta las demás (`try/catch` por
+fila dentro de `importar()`), por eso el resumen es
+`{ creados, actualizados, errores }` en vez de todo-o-nada. Si la
+categoría indicada (por nombre) no existe, se crea a nivel raíz
+(`CategoriasRepository.buscarPorNombre` + `crear`) — más amigable para
+una carga masiva que rechazar la fila por un nombre no precreado.
+
+Deliberadamente **fuera de alcance** (documentado, no un gap
+accidental): productos `COMBO` (sin forma razonable de expresar
+`componentes` en una fila plana — la validación del DTO ya rechaza
+`tipo` fuera de `PRODUCTO`/`SERVICIO`), variantes reales de Talla/Color
+(precio/código de barras de una fila importada siempre se aplican a la
+variante "por defecto" vía `VariantesService.resolverObligatoria` sin
+`varianteId` — si el producto YA tiene variantes reales de una edición
+anterior por la UI, esa llamada explota con 400 y la fila queda en
+`errores`, aunque el nombre/categoría/código ya se hayan actualizado
+con éxito: comportamiento correcto, no un bug, ver el comentario en
+`ProductosService.importarFila`), y stock (se gestiona vía Inventario,
+nunca sobreescribiéndolo desde un catálogo). Cuando la fila trae
+`precioGeneral`, se crea un `Precio` con `costo = precioVenta` (margen
+0%) vía `PreciosRepository` — sin desglose de costo/margen en una fila
+plana, se refina después desde la pantalla de Precios si hace falta.
+
+`PreciosRepository` se provee directo en `ProductosModule` (no
+importando `PreciosModule`) para que `ProductosService` pueda crear ese
+`Precio` sin ciclo de módulos: `PreciosModule` ya importa
+`ProductosModule` (para `PreciosService`), así que lo inverso
+(`ProductosModule` importando `PreciosModule`) sería circular.
+`PreciosRepository` no depende de nada de Productos, así que darle su
+propia instancia en `ProductosModule.providers` es seguro (dos módulos
+proveyendo la misma clase, cada uno con su propia instancia stateless
+salvo por `TenantPrismaService`, ya request-scoped).
+
+**El parseo del `.xlsx` en el navegador usa ExcelJS, no `xlsx`/SheetJS**
+(la dependencia que suele mencionarse por defecto para esto): la
+versión de `xlsx` publicada en el registro de npm (0.18.5) tiene
+vulnerabilidades conocidas (prototype pollution, ReDoS) sin parche ahí
+— SheetJS solo publica versiones arregladas en su propio CDN, no en
+npm. ExcelJS ya está vetado en el proyecto (lo usa el backend para
+reportes) y no tiene ese historial, así que se reusó en vez de sumar
+una dependencia nueva con ese riesgo. Import **dinámico**
+(`await import('exceljs')`) en vez de import top-level — ExcelJS pesa
+~1MB minificado y solo hace falta para quien realmente abre "Importar
+Excel"; Vite lo separa en su propio chunk (`exceljs.min-*.js`), sin
+inflar el bundle principal para todo el mundo.
+
+`Modal` (`frontend/src/components/molecules/Modal/Modal.tsx`) ganó un
+prop opcional `ancho?: 'lg' | 'xl'` (default `'lg'`, retrocompatible con
+los ~25 usos existentes) para la vista previa de importación, que
+necesita más espacio horizontal que un formulario normal.
+
 ## Plugin system
 
 Instalación **manual** (git/deploy): un plugin es un paquete del

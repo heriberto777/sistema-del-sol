@@ -1,8 +1,10 @@
-import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, Res } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { Response } from 'express';
 import { ProductosService } from './productos.service';
 import { CrearProductoDto } from './dto/crear-producto.dto';
 import { CatalogoQueryDto } from './dto/catalogo-query.dto';
+import { ImportarProductosDto } from './dto/importar-productos.dto';
 import { Permissions } from '../common/decorators/permissions.decorator';
 import { RequiereModulo } from '../common/decorators/requiere-modulo.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -34,6 +36,25 @@ export class ProductosController {
   @Permissions('precios.ver')
   catalogo(@Query() query: CatalogoQueryDto) {
     return this.productosService.catalogo(query);
+  }
+
+  // Antes de ':id' por el mismo motivo que 'catalogo' arriba.
+  @Get('exportar')
+  @Permissions('precios.ver')
+  async exportar(@Res() res: Response) {
+    const archivo = await this.productosService.exportar();
+    res.set({
+      'Content-Type': archivo.mimeType,
+      'Content-Disposition': `attachment; filename="${archivo.nombreArchivo}"`,
+      'Content-Length': archivo.buffer.length,
+    });
+    res.send(archivo.buffer);
+  }
+
+  @Post('importar')
+  @Permissions('precios.editar')
+  importar(@Body() dto: ImportarProductosDto, @CurrentUser() user: JwtPayloadUser) {
+    return this.productosService.importar(dto, user.tenantId);
   }
 
   @Get(':id')

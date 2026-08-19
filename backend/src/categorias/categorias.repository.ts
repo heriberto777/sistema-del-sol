@@ -25,6 +25,11 @@ export class CategoriasRepository {
     });
   }
 
+  /** Para resolver el nombre de categoría de una fila de importación (Fase 3e) — nombre exacto, sin fuzzy match. */
+  buscarPorNombre(nombre: string) {
+    return this.db.categoria.findFirst({ where: { nombre } });
+  }
+
   actualizar(id: string, dto: Partial<CrearCategoriaDto>) {
     return this.db.categoria.update({ where: { id }, data: dto });
   }

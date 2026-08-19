@@ -3,30 +3,41 @@ import { ProductosService } from './productos.service';
 import { ProductosRepository } from './productos.repository';
 import { CategoriasRepository } from '../categorias/categorias.repository';
 import { VariantesService } from '../variantes/variantes.service';
+import { PreciosRepository } from '../precios/precios.repository';
 
 describe('ProductosService', () => {
   let service: ProductosService;
   let repository: jest.Mocked<ProductosRepository>;
   let categoriasRepository: jest.Mocked<CategoriasRepository>;
   let variantesService: jest.Mocked<VariantesService>;
+  let preciosRepository: jest.Mocked<PreciosRepository>;
 
   beforeEach(() => {
     repository = {
-      crear: jest.fn(),
+      crear: jest.fn().mockResolvedValue({ id: 'nuevo-1' }),
       listar: jest.fn(),
       catalogo: jest.fn(),
       buscarPorId: jest.fn(),
       buscarPorIdEnTx: jest.fn(),
       actualizar: jest.fn(),
+      buscarPorCodigo: jest.fn().mockResolvedValue(null),
+      exportarDatos: jest.fn().mockResolvedValue([]),
     } as unknown as jest.Mocked<ProductosRepository>;
     categoriasRepository = {
       buscarPorId: jest.fn().mockResolvedValue({ id: 'cat-1' }),
+      buscarPorNombre: jest.fn().mockResolvedValue(null),
+      crear: jest.fn().mockResolvedValue({ id: 'cat-nueva' }),
     } as unknown as jest.Mocked<CategoriasRepository>;
     variantesService = {
       generarCombinaciones: jest.fn(),
       listarPorProducto: jest.fn(),
+      resolverObligatoria: jest.fn().mockResolvedValue('variante-1'),
+      actualizarCodigoBarras: jest.fn(),
     } as unknown as jest.Mocked<VariantesService>;
-    service = new ProductosService(repository, categoriasRepository, variantesService);
+    preciosRepository = {
+      crear: jest.fn(),
+    } as unknown as jest.Mocked<PreciosRepository>;
+    service = new ProductosService(repository, categoriasRepository, variantesService, preciosRepository);
   });
 
   describe('crear', () => {
@@ -186,6 +197,90 @@ describe('ProductosService', () => {
       await service.actualizar('p1', { atributos: [] }, 'tenant-1');
 
       expect(variantesService.generarCombinaciones).toHaveBeenCalledWith('p1', 'tenant-1', []);
+    });
+  });
+
+  describe('exportar', () => {
+    it('agrega precio GENERAL de la variante más antigua, código de barras y stock de todas las variantes', async () => {
+      repository.exportarDatos.mockResolvedValue([
+        {
+          codigo: 'P1',
+          nombre: 'Producto 1',
+          tipo: 'PRODUCTO',
+          unidadMedida: 'UND',
+          porcentajeItbis: '18' as never,
+          categoria: { nombre: 'Bebidas' },
+          variantes: [
+            { codigoBarras: '111', precios: [{ precioVenta: '100' as never }], stock: [{ cantidadActual: '5' as never }] },
+            { codigoBarras: '222', precios: [{ precioVenta: '999' as never }], stock: [{ cantidadActual: '3' as never }] },
+          ],
+        },
+      ] as never);
+
+      const archivo = await service.exportar();
+
+      expect(archivo.nombreArchivo).toBe('productos.xlsx');
+      expect(archivo.buffer.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('importar', () => {
+    it('crea un producto nuevo cuando el código no existe', async () => {
+      const resumen = await service.importar({ productos: [{ codigo: 'NUEVO-1', nombre: 'Producto nuevo' }] }, 'tenant-1');
+
+      expect(repository.crear).toHaveBeenCalledWith(
+        expect.objectContaining({ codigo: 'NUEVO-1', nombre: 'Producto nuevo', tipo: 'PRODUCTO' }),
+        'tenant-1',
+      );
+      expect(resumen).toEqual({ creados: 1, actualizados: 0, errores: [] });
+    });
+
+    it('actualiza un producto existente por código en vez de crear uno nuevo', async () => {
+      repository.buscarPorCodigo.mockResolvedValue({ id: 'existente-1' } as never);
+
+      const resumen = await service.importar({ productos: [{ codigo: 'YA-EXISTE', nombre: 'Nombre nuevo' }] }, 'tenant-1');
+
+      expect(repository.actualizar).toHaveBeenCalledWith('existente-1', expect.objectContaining({ nombre: 'Nombre nuevo' }));
+      expect(repository.crear).not.toHaveBeenCalled();
+      expect(resumen).toEqual({ creados: 0, actualizados: 1, errores: [] });
+    });
+
+    it('resuelve la categoría por nombre y la crea si no existe', async () => {
+      await service.importar({ productos: [{ codigo: 'P1', nombre: 'Producto', categoria: 'Nueva categoría' }] }, 'tenant-1');
+
+      expect(categoriasRepository.buscarPorNombre).toHaveBeenCalledWith('Nueva categoría');
+      expect(categoriasRepository.crear).toHaveBeenCalledWith({ nombre: 'Nueva categoría' }, 'tenant-1');
+      expect(repository.crear).toHaveBeenCalledWith(expect.objectContaining({ categoriaId: 'cat-nueva' }), 'tenant-1');
+    });
+
+    it('crea el precio GENERAL (costo = precioVenta, margen 0) cuando la fila trae precioGeneral', async () => {
+      await service.importar({ productos: [{ codigo: 'P1', nombre: 'Producto', precioGeneral: 150 }] }, 'tenant-1');
+
+      expect(preciosRepository.crear).toHaveBeenCalledWith({
+        varianteId: 'variante-1',
+        listaPrecio: 'GENERAL',
+        costo: 150,
+        margenPct: 0,
+        precioVenta: 150,
+      });
+    });
+
+    it('asigna el código de barras a la variante por defecto cuando la fila lo trae', async () => {
+      await service.importar({ productos: [{ codigo: 'P1', nombre: 'Producto', codigoBarras: '7501234567890' }] }, 'tenant-1');
+
+      expect(variantesService.actualizarCodigoBarras).toHaveBeenCalledWith('nuevo-1', 'variante-1', '7501234567890');
+    });
+
+    it('una fila que falla no aborta las demás — el error queda en el resumen', async () => {
+      repository.crear.mockRejectedValueOnce(new Error('boom')).mockResolvedValueOnce({ id: 'ok-1' } as never);
+
+      const resumen = await service.importar(
+        { productos: [{ codigo: 'MALA', nombre: 'Falla' }, { codigo: 'BUENA', nombre: 'OK' }] },
+        'tenant-1',
+      );
+
+      expect(resumen.creados).toBe(1);
+      expect(resumen.errores).toEqual([{ codigo: 'MALA', mensaje: 'boom' }]);
     });
   });
 });

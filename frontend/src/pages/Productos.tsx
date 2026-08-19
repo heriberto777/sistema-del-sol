@@ -16,9 +16,11 @@ import { RowActionsMenu } from '../components/molecules/RowActionsMenu/RowAction
 import { RequierePermiso } from '../components/organisms/RequierePermiso/RequierePermiso';
 import { SelectCategoria } from '../components/molecules/SelectCategoria/SelectCategoria';
 import { VariantesProductoPanel } from '../components/organisms/VariantesProductoPanel/VariantesProductoPanel';
+import { ImportarProductosModal } from '../components/organisms/ImportarProductosModal/ImportarProductosModal';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { useListasPrecio } from '../hooks/useListasPrecio';
 import { useVariantesProducto, etiquetaVariante } from '../hooks/useVariantesProducto';
+import { descargarBlob } from '../lib/descargar-archivo';
 import { PaginaResultado } from '../types/pagina-resultado';
 
 type TipoProducto = 'PRODUCTO' | 'SERVICIO' | 'COMBO';
@@ -89,6 +91,9 @@ export function Productos() {
   const [productoEditando, setProductoEditando] = useState<Producto | null>(null);
   const [modalProductoAbierto, setModalProductoAbierto] = useState(false);
   const [productoPrecio, setProductoPrecio] = useState<Producto | null>(null);
+  const [modalImportarAbierto, setModalImportarAbierto] = useState(false);
+  const [exportando, setExportando] = useState(false);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     if (searchParams.get('crear') === '1') {
@@ -124,6 +129,16 @@ export function Productos() {
     setProductoEditando(null);
   }
 
+  async function exportarExcel() {
+    setExportando(true);
+    try {
+      const respuesta = await apiClient.get('/productos/exportar', { responseType: 'blob' });
+      descargarBlob(respuesta.data, 'productos.xlsx');
+    } finally {
+      setExportando(false);
+    }
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -131,7 +146,15 @@ export function Productos() {
           <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Productos</h1>
           <p className="text-sm text-slate-500 dark:text-slate-400">Catálogo de productos, servicios y combos.</p>
         </div>
-        <Button onClick={abrirNuevo}>Nuevo producto</Button>
+        <div className="flex gap-2">
+          <Button variante="secundario" disabled={exportando} onClick={exportarExcel}>
+            {exportando ? 'Generando…' : 'Exportar Excel'}
+          </Button>
+          <Button variante="secundario" onClick={() => setModalImportarAbierto(true)}>
+            Importar Excel
+          </Button>
+          <Button onClick={abrirNuevo}>Nuevo producto</Button>
+        </div>
       </div>
 
       <RequierePermiso permiso="precios.ver">
@@ -229,6 +252,20 @@ export function Productos() {
       {productoPrecio && (
         <Modal titulo={`Cambiar precio — ${productoPrecio.nombre}`} onClose={() => setProductoPrecio(null)}>
           <FormularioPrecio productoId={productoPrecio.id} onGuardado={() => setProductoPrecio(null)} />
+        </Modal>
+      )}
+      {modalImportarAbierto && (
+        <Modal titulo="Importar productos" ancho="xl" onClose={() => setModalImportarAbierto(false)}>
+          <ImportarProductosModal
+            onImportado={() => {
+              queryClient.invalidateQueries({ queryKey: ['productos'] });
+              // Una fila importada puede traer precioGeneral — sin esto, la
+              // columna "Precio vigente" de filas ya renderizadas se queda
+              // con el valor viejo en caché hasta recargar la página (bug
+              // real, encontrado en la verificación manual de esta fase).
+              queryClient.invalidateQueries({ queryKey: ['precio-vigente'] });
+            }}
+          />
         </Modal>
       )}
     </div>
