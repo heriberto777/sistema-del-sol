@@ -2,6 +2,7 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { CotizacionesRepository } from './cotizaciones.repository';
 import { FacturacionService } from '../facturacion/facturacion.service';
 import { ClientesService } from '../clientes/clientes.service';
+import { VariantesService } from '../variantes/variantes.service';
 import { CrearCotizacionDto } from './dto/crear-cotizacion.dto';
 import { ConvertirCotizacionDto } from './dto/convertir-cotizacion.dto';
 import { ListadoQueryDto } from '../common/dto/listado-query.dto';
@@ -28,6 +29,7 @@ export class CotizacionesService {
     private readonly cotizacionesRepository: CotizacionesRepository,
     private readonly facturacionService: FacturacionService,
     private readonly clientesService: ClientesService,
+    private readonly variantesService: VariantesService,
     private readonly eventBus: EventBusService,
     private readonly prisma: PrismaService,
   ) {}
@@ -35,7 +37,8 @@ export class CotizacionesService {
   private async calcularLineas(lineas: CrearCotizacionDto['lineas'], listaPrecio: string) {
     const lineasCalculadas = await Promise.all(
       lineas.map(async (linea) => {
-        const producto = await this.cotizacionesRepository.obtenerProductoConPrecioVigente(linea.productoId, listaPrecio);
+        const varianteId = await this.variantesService.resolverObligatoria(linea.productoId, linea.varianteId);
+        const producto = await this.cotizacionesRepository.obtenerProductoConPrecioVigente(linea.productoId, varianteId, listaPrecio);
         const precioUnitario = linea.precioUnitario ?? Number(producto.precios[0]?.precioVenta ?? 0);
         const porcentajeItbis = Number(producto.porcentajeItbis);
         const descuento = linea.descuento ?? 0;
@@ -45,6 +48,7 @@ export class CotizacionesService {
 
         return {
           productoId: linea.productoId,
+          varianteId,
           cantidad: linea.cantidad,
           precioUnitario,
           descuento,
@@ -189,6 +193,7 @@ export class CotizacionesService {
         tipoFactura: dto.tipoFactura,
         lineas: cotizacion.lineas.map((linea) => ({
           productoId: linea.productoId,
+          varianteId: linea.varianteId,
           cantidad: Number(linea.cantidad),
           precioUnitario: Number(linea.precioUnitario),
           descuento: Number(linea.descuento),

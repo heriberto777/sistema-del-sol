@@ -8,6 +8,11 @@ export class LineaFacturaDto {
   @IsUUID()
   productoId: string;
 
+  @ApiProperty({ required: false, description: 'Obligatorio si el producto tiene más de una variante (Fase 3c)' })
+  @IsOptional()
+  @IsUUID()
+  varianteId?: string;
+
   @ApiProperty()
   @IsNumber()
   @IsPositive()

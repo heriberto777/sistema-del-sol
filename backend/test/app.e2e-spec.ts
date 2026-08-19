@@ -2676,7 +2676,7 @@ describe('App (e2e)', () => {
               { productoId: '00000000-0000-0000-0000-000000000000', cantidadRecibida: 1, costoUnitario: 20 },
             ],
           })
-          .expect(409); // el producto inexistente viola la FK de linea_recepcion.productoId al crear la recepción, dentro de la transacción
+          .expect(404); // VariantesService.resolverObligatoria valida que el producto exista ANTES de tocar la base — nunca llega a violar la FK de linea_recepcion.productoId
 
         const stockDespues = await prisma.stock.findUnique({ where: { varianteId_bodegaId: { varianteId: await idVarianteDefault(productoId), bodegaId } } });
         expect(Number(stockDespues?.cantidadActual)).toBe(Number(stockAntes?.cantidadActual));

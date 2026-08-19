@@ -2,6 +2,7 @@ import { BadRequestException } from '@nestjs/common';
 import { InventarioService } from './inventario.service';
 import { InventarioRepository } from './inventario.repository';
 import { ProductosService } from '../productos/productos.service';
+import { VariantesService } from '../variantes/variantes.service';
 import { EventBusService } from '../event-bus/event-bus.service';
 import { EVENTOS } from '../event-bus/events';
 
@@ -9,6 +10,7 @@ describe('InventarioService', () => {
   let service: InventarioService;
   let repository: jest.Mocked<InventarioRepository>;
   let productosService: jest.Mocked<ProductosService>;
+  let variantesService: jest.Mocked<VariantesService>;
   let eventBus: jest.Mocked<EventBusService>;
 
   beforeEach(() => {
@@ -24,8 +26,9 @@ describe('InventarioService', () => {
       buscarBodegaPorId: jest.fn().mockResolvedValue({ id: 'b1' }),
     } as unknown as jest.Mocked<InventarioRepository>;
     productosService = { buscarPorId: jest.fn().mockResolvedValue({ id: 'p1' }) } as unknown as jest.Mocked<ProductosService>;
+    variantesService = { resolverObligatoria: jest.fn().mockResolvedValue('v1') } as unknown as jest.Mocked<VariantesService>;
     eventBus = { emit: jest.fn(), on: jest.fn() } as unknown as jest.Mocked<EventBusService>;
-    service = new InventarioService(repository, productosService, eventBus);
+    service = new InventarioService(repository, productosService, variantesService, eventBus);
   });
 
   describe('verificarYDescontarStock', () => {
@@ -56,6 +59,7 @@ describe('InventarioService', () => {
       expect(repository.descontarStockCondicional).toHaveBeenCalledWith({
         tenantId: 't1',
         productoId: 'p1',
+        varianteId: 'v1',
         bodegaId: 'b1',
         cantidad: 5,
         tipo: 'SALIDA',
@@ -145,7 +149,7 @@ describe('InventarioService', () => {
 
     await service.transferirStock(params);
 
-    expect(repository.transferir).toHaveBeenCalledWith(params);
+    expect(repository.transferir).toHaveBeenCalledWith({ ...params, varianteId: 'v1' });
     expect(repository.ajustarCantidad).not.toHaveBeenCalled();
   });
 });

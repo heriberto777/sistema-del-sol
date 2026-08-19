@@ -4,9 +4,10 @@ import { CotizacionesController } from './cotizaciones.controller';
 import { CotizacionesRepository } from './cotizaciones.repository';
 import { FacturacionModule } from '../facturacion/facturacion.module';
 import { ClientesModule } from '../clientes/clientes.module';
+import { VariantesModule } from '../variantes/variantes.module';
 
 @Module({
-  imports: [FacturacionModule, ClientesModule],
+  imports: [FacturacionModule, ClientesModule, VariantesModule],
   controllers: [CotizacionesController],
   providers: [CotizacionesService, CotizacionesRepository],
 })

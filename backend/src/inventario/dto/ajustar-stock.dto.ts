@@ -1,10 +1,15 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNumber, IsString, IsUUID } from 'class-validator';
+import { IsNumber, IsOptional, IsString, IsUUID } from 'class-validator';
 
 export class AjustarStockDto {
   @ApiProperty()
   @IsUUID()
   productoId: string;
+
+  @ApiProperty({ required: false, description: 'Obligatorio si el producto tiene más de una variante' })
+  @IsOptional()
+  @IsUUID()
+  varianteId?: string;
 
   @ApiProperty()
   @IsUUID()

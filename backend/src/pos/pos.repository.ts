@@ -127,7 +127,7 @@ export class PosRepository {
     clienteId?: string;
     vendedorEmpleadoId?: string;
     nota?: string;
-    lineas: { productoId: string; cantidad: number; precioUnitario: number; porcentajeItbis: number; descuento?: number }[];
+    lineas: { productoId: string; varianteId: string; cantidad: number; precioUnitario: number; porcentajeItbis: number; descuento?: number }[];
   }) {
     return this.db.ventaAparcada.create({
       data: {

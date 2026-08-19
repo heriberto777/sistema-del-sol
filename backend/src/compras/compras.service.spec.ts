@@ -2,6 +2,7 @@ import { BadRequestException } from '@nestjs/common';
 import { ComprasService } from './compras.service';
 import { ComprasRepository } from './compras.repository';
 import { InventarioService } from '../inventario/inventario.service';
+import { VariantesService } from '../variantes/variantes.service';
 import { TenantPrismaService } from '../prisma/tenant-prisma.service';
 import { EventBusService } from '../event-bus/event-bus.service';
 import { EVENTOS } from '../event-bus/events';
@@ -12,6 +13,7 @@ describe('ComprasService', () => {
   let service: ComprasService;
   let repository: jest.Mocked<ComprasRepository>;
   let inventarioService: jest.Mocked<InventarioService>;
+  let variantesService: jest.Mocked<VariantesService>;
   let tenantPrisma: { client: { $transaction: jest.Mock; producto: { findMany: jest.Mock } } };
   let eventBus: jest.Mocked<EventBusService>;
   let pagosService: jest.Mocked<PagosService>;
@@ -49,7 +51,17 @@ describe('ComprasService', () => {
       listarPorFactura: jest.fn(),
       listarPorOrdenCompra: jest.fn(),
     } as unknown as jest.Mocked<PagosService>;
-    service = new ComprasService(repository, inventarioService, tenantPrisma as unknown as TenantPrismaService, eventBus, pagosService);
+    variantesService = {
+      resolverObligatoria: jest.fn().mockResolvedValue('variante-1'),
+    } as unknown as jest.Mocked<VariantesService>;
+    service = new ComprasService(
+      repository,
+      inventarioService,
+      variantesService,
+      tenantPrisma as unknown as TenantPrismaService,
+      eventBus,
+      pagosService,
+    );
   });
 
   describe('crear', () => {

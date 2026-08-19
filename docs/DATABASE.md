@@ -101,7 +101,16 @@ token, así que un token nunca puede reusarse.
   (`onDelete: Restrict`, a propósito, a diferencia de `precios`/`stock`
   que cuelgan con `Cascade`). `valores_atributo` es una tabla "hija" sin
   tenantId propio (como `componentes_combo`) — su aislamiento depende de
-  validar primero el `atributo` padre.
+  validar primero el `atributo` padre. Las líneas de venta/compra
+  (`linea_factura`, `linea_cotizacion`, `linea_remision`, `linea_oc`,
+  `linea_recepcion`, `linea_devolucion_compra`, `lineas_venta_aparcada`)
+  también tienen `varianteId` (`NOT NULL`, FK `RESTRICT` — perder a qué
+  variante corresponde una línea ya emitida sería perder historial
+  real). `VariantesService.resolverObligatoria(productoId, varianteId?)`
+  es el único punto que decide la variante de una línea: se resuelve
+  sola si el producto tiene una única variante, exige `varianteId`
+  explícito (400) si tiene varias, y lanza 404 si el producto no tiene
+  ninguna (no existe, o es de otro tenant).
 - **`productos.tipo`** (`PRODUCTO`/`SERVICIO`/`COMBO`): un `SERVICIO`
   nunca tiene fila en `stock` (no mueve inventario al facturarse); un
   `COMBO` tampoco tiene fila propia — al facturarse expande a sus

@@ -613,11 +613,56 @@ el listado de variantes de un producto con sus valores de atributo —
 para el consumo de incrementos posteriores (selector de variante en
 Facturación/POS, tabla de variantes en Productos.tsx).
 
+### Incremento 3: líneas con `varianteId` explícito
+
+Las líneas de venta/compra (`LineaFactura`, `LineaCotizacion`,
+`LineaRemision`, `LineaOc`, `LineaRecepcion`, `LineaDevolucionCompra`,
+`VentaAparcadaLinea`) ganan `varianteId` (migración
+`20260819110000_lineas_variante`, `NOT NULL` + FK `RESTRICT` — perder a
+qué variante corresponde una línea ya emitida/recibida sería perder
+historial real). Backfill determinista: cada línea existente se asigna
+a la variante más antigua de su producto (en ese momento todo producto
+tiene como mucho una variante real, porque regenerar variantes ya
+estaba bloqueado si el producto tenía movimientos — ver incremento 2).
+
+`VariantesService.resolverObligatoria(productoId, varianteId?)` es el
+único punto que decide qué variante usa una línea: si el producto tiene
+una sola variante, se resuelve sola (el `varianteId` del DTO puede
+omitirse — retrocompatible con todo lo que no usa atributos reales); si
+tiene más de una, exige `varianteId` explícito (400 si falta) y valida
+que esa variante realmente pertenezca a ese producto (mismo patrón de
+IDOR ya documentado para FKs cliente-suministradas). `FacturacionService.
+crear()`/`CotizacionesService.calcularLineas()`/`RemisionesService.
+resolverLineas()`/`ComprasService.crear()`/`PosService.
+guardarVenta()` resuelven la variante **una vez por línea** y reusan ese
+mismo id tanto para el precio (`obtenerProductoConPrecioVigente(productoId,
+varianteId, listaPrecio)`) como para el movimiento de stock
+(`InventarioService.*(..., varianteId?)`, que a su vez llama
+`resolverObligatoria` internamente si no le llega ya resuelto) — nunca
+dos resoluciones independientes que podrían discrepar. `ComprasService.
+recibir()`/`devolver()` NO piden `varianteId` de nuevo al cliente: lo
+leen de la línea de la OC ya creada (mismo criterio que `costoUnitario`
+en `devolver()` — se lee de la línea original, no se vuelve a preguntar).
+
+Bug real encontrado por el e2e de atomicidad de Compras (`recibir con
+una línea de producto inexistente...`) y corregido en este incremento:
+`resolverObligatoria` no validaba el caso de **cero** variantes (un
+`productoId` que no existe, o de otro tenant) — `variantes[0].id`
+explotaba con un `TypeError` crudo (500) en vez de un 404 claro. Ahora
+lanza `NotFoundException` en ese caso; el e2e correspondiente pasó de
+esperar 409 (violación de FK cruda, el comportamiento viejo) a esperar
+404 (validación limpia antes de tocar la base).
+
+Verificado manualmente contra la base real: producto con dos variantes
+reales (Talla S/M) rechaza facturarse sin `varianteId` ("tiene varias
+variantes — indicá varianteId en la línea"), acepta con `varianteId`
+explícito, y el descuento de stock queda aislado a esa variante (la
+otra no se toca).
+
 Los incrementos que siguen (ya planeados, no implementados todavía):
-las líneas de venta/compra ganan `varianteId` explícito y dejan de
-asumir "la variante por defecto" cuando el producto tiene más de una
-(incremento 3); frontend — selector de variante, armado de
-combinaciones desde Talla/Color (incremento 4).
+frontend — `SelectorProducto`/`SelectorProductoVariante` compartido,
+armado de combinaciones desde Talla/Color en Productos.tsx (incremento
+4).
 
 ## Plugin system
 

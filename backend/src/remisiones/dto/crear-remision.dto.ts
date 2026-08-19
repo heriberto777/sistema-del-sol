@@ -1,11 +1,16 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { ArrayMinSize, IsArray, IsNumber, IsPositive, IsString, IsUUID, ValidateNested } from 'class-validator';
+import { ArrayMinSize, IsArray, IsNumber, IsOptional, IsPositive, IsString, IsUUID, ValidateNested } from 'class-validator';
 
 export class LineaRemisionDto {
   @ApiProperty()
   @IsUUID()
   productoId: string;
+
+  @ApiProperty({ required: false, description: 'Obligatorio si el producto tiene más de una variante (Fase 3c)' })
+  @IsOptional()
+  @IsUUID()
+  varianteId?: string;
 
   @ApiProperty()
   @IsNumber()

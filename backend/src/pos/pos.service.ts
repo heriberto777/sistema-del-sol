@@ -4,6 +4,7 @@ import { FacturacionService } from '../facturacion/facturacion.service';
 import { ConfiguracionesService } from '../configuraciones/configuraciones.service';
 import { FormasPagoRepository } from '../formas-pago/formas-pago.repository';
 import { EmpleadosRepository } from '../nomina/empleados.repository';
+import { VariantesService } from '../variantes/variantes.service';
 import { AbrirTurnoDto } from './dto/abrir-turno.dto';
 import { CerrarTurnoDto } from './dto/cerrar-turno.dto';
 import { CrearMovimientoCajaDto } from './dto/crear-movimiento-caja.dto';
@@ -24,6 +25,7 @@ export class PosService {
     private readonly configuracionesService: ConfiguracionesService,
     private readonly formasPagoRepository: FormasPagoRepository,
     private readonly empleadosRepository: EmpleadosRepository,
+    private readonly variantesService: VariantesService,
   ) {}
 
   listarVendedores(busqueda?: string) {
@@ -161,6 +163,7 @@ export class PosService {
 
       return {
         productoId: linea.productoId,
+        varianteId: lineaOrigen.varianteId,
         cantidad: linea.cantidad,
         precioUnitario: Number(lineaOrigen.precioUnitario),
         descuento,
@@ -242,7 +245,13 @@ export class PosService {
   async guardarVenta(turnoId: string, dto: GuardarVentaDto, tenantId: string) {
     const turno = await this.posRepository.buscarPorId(turnoId);
     this.validarAbierto(turno);
-    return this.posRepository.guardarVenta({ tenantId, turnoCajaId: turnoId, ...dto });
+    const lineas = await Promise.all(
+      dto.lineas.map(async (linea) => ({
+        ...linea,
+        varianteId: await this.variantesService.resolverObligatoria(linea.productoId, linea.varianteId),
+      })),
+    );
+    return this.posRepository.guardarVenta({ tenantId, turnoCajaId: turnoId, ...dto, lineas });
   }
 
   listarGuardadas(turnoId: string) {

@@ -16,7 +16,7 @@ export class ComprasRepository {
     numero: string;
     userId: string;
     total: number;
-    lineas: { productoId: string; cantidad: number; costoUnitario: number }[];
+    lineas: { productoId: string; varianteId: string; cantidad: number; costoUnitario: number }[];
   }) {
     return this.db.ordenCompra.create({
       data: {
@@ -91,7 +91,7 @@ export class ComprasRepository {
       ordenCompraId: string;
       bodegaId: string;
       motivo?: string;
-      lineas: { productoId: string; cantidad: number; costoUnitario: number }[];
+      lineas: { productoId: string; varianteId: string; cantidad: number; costoUnitario: number }[];
     },
   ) {
     return tx.devolucionCompra.create({
@@ -101,7 +101,12 @@ export class ComprasRepository {
         bodegaId: params.bodegaId,
         motivo: params.motivo,
         lineas: {
-          create: params.lineas.map((l) => ({ productoId: l.productoId, cantidad: l.cantidad, costoUnitario: l.costoUnitario })),
+          create: params.lineas.map((l) => ({
+            productoId: l.productoId,
+            varianteId: l.varianteId,
+            cantidad: l.cantidad,
+            costoUnitario: l.costoUnitario,
+          })),
         },
       },
       include: { lineas: true },
@@ -115,7 +120,7 @@ export class ComprasRepository {
       ordenCompraId: string;
       facturaProveedorNumero?: string;
       montoFacturaProveedor?: number;
-      lineas: { productoId: string; cantidadRecibida: number; costoUnitario: number }[];
+      lineas: { productoId: string; varianteId: string; cantidadRecibida: number; costoUnitario: number }[];
     },
   ) {
     return tx.recepcionCompra.create({

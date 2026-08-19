@@ -5,6 +5,7 @@ import { FormatoImpresion, Prisma, TipoMovimientoInventario } from '@prisma/clie
 interface ParamsAjuste {
   tenantId: string;
   productoId: string;
+  varianteId: string;
   bodegaId: string;
   delta: number;
   tipo: TipoMovimientoInventario;
@@ -15,6 +16,7 @@ interface ParamsAjuste {
 interface ParamsDescuento {
   tenantId: string;
   productoId: string;
+  varianteId: string;
   bodegaId: string;
   cantidad: number;
   tipo: TipoMovimientoInventario;
@@ -50,25 +52,9 @@ export class InventarioRepository {
     return tx.bodega.findUniqueOrThrow({ where: { id } });
   }
 
-  /**
-   * Stock cuelga de VarianteProducto desde la Fase 3c — mientras un
-   * producto no tenga atributos reales, tiene exactamente una variante
-   * "por defecto", que es la que resuelven estos dos helpers. Los métodos
-   * públicos de este repositorio siguen recibiendo `productoId` sin
-   * cambios, para no tocar `InventarioService`/`FacturacionService`/
-   * `ComprasService`.
-   */
-  private resolverVarianteDefault(productoId: string) {
-    return this.db.varianteProducto.findFirstOrThrow({ where: { productoId }, orderBy: { createdAt: 'asc' } });
-  }
-
-  private resolverVarianteDefaultEnTx(tx: Prisma.TransactionClient, productoId: string) {
-    return tx.varianteProducto.findFirstOrThrow({ where: { productoId }, orderBy: { createdAt: 'asc' } });
-  }
-
-  async obtenerStock(productoId: string, bodegaId: string) {
-    const variante = await this.resolverVarianteDefault(productoId);
-    return this.db.stock.findUnique({ where: { varianteId_bodegaId: { varianteId: variante.id, bodegaId } } });
+  /** Stock cuelga de VarianteProducto desde la Fase 3c — `varianteId` ya viene resuelto por `InventarioService` (ver `VariantesService.resolverObligatoria`, incremento 3). */
+  obtenerStock(varianteId: string, bodegaId: string) {
+    return this.db.stock.findUnique({ where: { varianteId_bodegaId: { varianteId, bodegaId } } });
   }
 
   /** Reaplana `variante.producto` a `producto` en cada fila, para que el consumidor (pantalla de Stock) no tenga que cambiar. */
@@ -111,17 +97,16 @@ export class InventarioRepository {
    * la factura compartan una sola transacción).
    */
   async ajustarCantidadEnTx(tx: Prisma.TransactionClient, params: ParamsAjuste) {
-    const { tenantId, productoId, bodegaId, delta, tipo, userId, motivo } = params;
-    const variante = await this.resolverVarianteDefaultEnTx(tx, productoId);
+    const { tenantId, productoId, varianteId, bodegaId, delta, tipo, userId, motivo } = params;
 
     const stock = await tx.stock.upsert({
-      where: { varianteId_bodegaId: { varianteId: variante.id, bodegaId } },
-      create: { varianteId: variante.id, bodegaId, cantidadActual: Math.max(delta, 0) },
+      where: { varianteId_bodegaId: { varianteId, bodegaId } },
+      create: { varianteId, bodegaId, cantidadActual: Math.max(delta, 0) },
       update: { cantidadActual: { increment: delta } },
     });
 
     await tx.movimientoInventario.create({
-      data: { tenantId, productoId, varianteId: variante.id, bodegaId, tipo, cantidad: Math.abs(delta), motivo, userId },
+      data: { tenantId, productoId, varianteId, bodegaId, tipo, cantidad: Math.abs(delta), motivo, userId },
     });
 
     return stock;
@@ -148,13 +133,12 @@ export class InventarioRepository {
    * alcanza — el caller decide el mensaje/excepción.
    */
   async descontarStockCondicionalEnTx(tx: Prisma.TransactionClient, params: ParamsDescuento) {
-    const { tenantId, productoId, bodegaId, cantidad, tipo, userId, motivo } = params;
-    const variante = await this.resolverVarianteDefaultEnTx(tx, productoId);
+    const { tenantId, productoId, varianteId, bodegaId, cantidad, tipo, userId, motivo } = params;
 
     const filas = await tx.$queryRaw<StockRow[]>`
       UPDATE stock
       SET "cantidadActual" = "cantidadActual" - ${cantidad}, "updatedAt" = now()
-      WHERE "varianteId" = ${variante.id} AND "bodegaId" = ${bodegaId}
+      WHERE "varianteId" = ${varianteId} AND "bodegaId" = ${bodegaId}
         AND ("cantidadActual" - "cantidadReservada") >= ${cantidad}
       RETURNING *
     `;
@@ -164,7 +148,7 @@ export class InventarioRepository {
     }
 
     await tx.movimientoInventario.create({
-      data: { tenantId, productoId, varianteId: variante.id, bodegaId, tipo, cantidad, motivo, userId },
+      data: { tenantId, productoId, varianteId, bodegaId, tipo, cantidad, motivo, userId },
     });
 
     return stock;
@@ -187,11 +171,20 @@ export class InventarioRepository {
    * sin el chequeo, una transferencia podía dejar `cantidadActual`
    * negativo en la bodega origen incluso sin concurrencia de por medio.
    */
-  async transferir(params: { tenantId: string; productoId: string; bodegaOrigenId: string; bodegaDestinoId: string; cantidad: number; userId: string }) {
+  async transferir(params: {
+    tenantId: string;
+    productoId: string;
+    varianteId: string;
+    bodegaOrigenId: string;
+    bodegaDestinoId: string;
+    cantidad: number;
+    userId: string;
+  }) {
     return this.db.$transaction(async (tx) => {
       const origen = await this.descontarStockCondicionalEnTx(tx, {
         tenantId: params.tenantId,
         productoId: params.productoId,
+        varianteId: params.varianteId,
         bodegaId: params.bodegaOrigenId,
         cantidad: params.cantidad,
         tipo: 'TRANSFERENCIA',
@@ -206,6 +199,7 @@ export class InventarioRepository {
       return this.ajustarCantidadEnTx(tx, {
         tenantId: params.tenantId,
         productoId: params.productoId,
+        varianteId: params.varianteId,
         bodegaId: params.bodegaDestinoId,
         delta: params.cantidad,
         tipo: 'TRANSFERENCIA',

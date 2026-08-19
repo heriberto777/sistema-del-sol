@@ -2,12 +2,14 @@ import { BadRequestException } from '@nestjs/common';
 import { RemisionesService } from './remisiones.service';
 import { RemisionesRepository } from './remisiones.repository';
 import { FacturacionService } from '../facturacion/facturacion.service';
+import { VariantesService } from '../variantes/variantes.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 describe('RemisionesService', () => {
   let service: RemisionesService;
   let repository: jest.Mocked<RemisionesRepository>;
   let facturacionService: jest.Mocked<FacturacionService>;
+  let variantesService: jest.Mocked<VariantesService>;
   let prisma: jest.Mocked<PrismaService>;
 
   beforeEach(() => {
@@ -26,7 +28,10 @@ describe('RemisionesService', () => {
       bodega: { findFirst: jest.fn().mockResolvedValue(null) },
       configuracion: { findUnique: jest.fn().mockResolvedValue(null) },
     } as unknown as jest.Mocked<PrismaService>;
-    service = new RemisionesService(repository, facturacionService, prisma);
+    variantesService = {
+      resolverObligatoria: jest.fn().mockResolvedValue('variante-1'),
+    } as unknown as jest.Mocked<VariantesService>;
+    service = new RemisionesService(repository, facturacionService, variantesService, prisma);
   });
 
   describe('crear', () => {
@@ -45,7 +50,7 @@ describe('RemisionesService', () => {
         bodegaId: 'bodega-1',
         vendedorId: 'vendedor-1',
         numero: 'REM-001',
-        lineas: [{ productoId: 'prod-1', cantidad: 3 }],
+        lineas: [{ productoId: 'prod-1', varianteId: 'variante-1', cantidad: 3 }],
       });
       expect(facturacionService.crear).not.toHaveBeenCalled();
     });
@@ -60,7 +65,10 @@ describe('RemisionesService', () => {
 
       await service.actualizar('r1', dto);
 
-      expect(repository.actualizar).toHaveBeenCalledWith('r1', dto);
+      expect(repository.actualizar).toHaveBeenCalledWith('r1', {
+        ...dto,
+        lineas: [{ productoId: 'prod-2', varianteId: 'variante-1', cantidad: 5 }],
+      });
     });
 
     it('rechaza editar una remisión ya entregada', async () => {

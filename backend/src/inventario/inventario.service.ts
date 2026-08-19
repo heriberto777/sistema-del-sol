@@ -2,6 +2,7 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { FormatoImpresion, Prisma } from '@prisma/client';
 import { InventarioRepository } from './inventario.repository';
 import { ProductosService } from '../productos/productos.service';
+import { VariantesService } from '../variantes/variantes.service';
 import { EventBusService } from '../event-bus/event-bus.service';
 import { EVENTOS } from '../event-bus/events';
 import { ListadoQueryDto } from '../common/dto/listado-query.dto';
@@ -12,6 +13,7 @@ export class InventarioService {
   constructor(
     private readonly inventarioRepository: InventarioRepository,
     private readonly productosService: ProductosService,
+    private readonly variantesService: VariantesService,
     private readonly eventBus: EventBusService,
   ) {}
 
@@ -64,16 +66,19 @@ export class InventarioService {
   async verificarYDescontarStock(params: {
     tenantId: string;
     productoId: string;
+    varianteId?: string;
     bodegaId: string;
     cantidad: number;
     userId: string;
     referencia: string;
   }) {
     await this.validarPertenencia({ productoId: params.productoId, bodegaId: params.bodegaId });
+    const varianteId = await this.variantesService.resolverObligatoria(params.productoId, params.varianteId);
 
     const stock = await this.inventarioRepository.descontarStockCondicional({
       tenantId: params.tenantId,
       productoId: params.productoId,
+      varianteId,
       bodegaId: params.bodegaId,
       cantidad: params.cantidad,
       tipo: 'SALIDA',
@@ -82,7 +87,7 @@ export class InventarioService {
     });
 
     if (!stock) {
-      await this.lanzarStockInsuficiente(params.productoId, params.bodegaId);
+      await this.lanzarStockInsuficiente(params.productoId, varianteId, params.bodegaId);
     }
 
     // `lanzarStockInsuficiente` siempre lanza — si llegamos acá, `stock` no es null (TS no infiere
@@ -93,8 +98,8 @@ export class InventarioService {
   }
 
   /** Mensaje de error con el disponible real — solo se lee en el camino de error, no afecta la atomicidad del descuento. */
-  private async lanzarStockInsuficiente(productoId: string, bodegaId: string): Promise<never> {
-    const stockActual = await this.inventarioRepository.obtenerStock(productoId, bodegaId);
+  private async lanzarStockInsuficiente(productoId: string, varianteId: string, bodegaId: string): Promise<never> {
+    const stockActual = await this.inventarioRepository.obtenerStock(varianteId, bodegaId);
     const disponible = Number(stockActual?.cantidadActual ?? 0) - Number(stockActual?.cantidadReservada ?? 0);
     throw new BadRequestException(
       `Stock insuficiente para el producto ${productoId} en la bodega ${bodegaId} (disponible: ${disponible})`,
@@ -128,13 +133,15 @@ export class InventarioService {
    */
   async verificarYDescontarStockEnTx(
     tx: Prisma.TransactionClient,
-    params: { tenantId: string; productoId: string; bodegaId: string; cantidad: number; userId: string; referencia: string },
+    params: { tenantId: string; productoId: string; varianteId?: string; bodegaId: string; cantidad: number; userId: string; referencia: string },
   ) {
     await this.validarPertenencia({ productoId: params.productoId, bodegaId: params.bodegaId }, tx);
+    const varianteId = await this.variantesService.resolverObligatoria(params.productoId, params.varianteId);
 
     const stock = await this.inventarioRepository.descontarStockCondicionalEnTx(tx, {
       tenantId: params.tenantId,
       productoId: params.productoId,
+      varianteId,
       bodegaId: params.bodegaId,
       cantidad: params.cantidad,
       tipo: 'SALIDA',
@@ -143,7 +150,7 @@ export class InventarioService {
     });
 
     if (!stock) {
-      await this.lanzarStockInsuficiente(params.productoId, params.bodegaId);
+      await this.lanzarStockInsuficiente(params.productoId, varianteId, params.bodegaId);
     }
 
     // `lanzarStockInsuficiente` siempre lanza — si llegamos acá, `stock` no es null (TS no infiere
@@ -156,12 +163,14 @@ export class InventarioService {
   /** Ver el comentario de `verificarYDescontarStockEnTx` — misma razón, para el caso de entrada (nota de crédito, anulación). */
   async entradaStockEnTx(
     tx: Prisma.TransactionClient,
-    params: { tenantId: string; productoId: string; bodegaId: string; cantidad: number; userId: string; motivo: string },
+    params: { tenantId: string; productoId: string; varianteId?: string; bodegaId: string; cantidad: number; userId: string; motivo: string },
   ) {
     await this.validarPertenencia({ productoId: params.productoId, bodegaId: params.bodegaId }, tx);
+    const varianteId = await this.variantesService.resolverObligatoria(params.productoId, params.varianteId);
     return this.inventarioRepository.ajustarCantidadEnTx(tx, {
       tenantId: params.tenantId,
       productoId: params.productoId,
+      varianteId,
       bodegaId: params.bodegaId,
       delta: params.cantidad,
       tipo: 'ENTRADA',
@@ -173,15 +182,18 @@ export class InventarioService {
   async entradaStock(params: {
     tenantId: string;
     productoId: string;
+    varianteId?: string;
     bodegaId: string;
     cantidad: number;
     userId: string;
     motivo: string;
   }) {
     await this.validarPertenencia({ productoId: params.productoId, bodegaId: params.bodegaId });
+    const varianteId = await this.variantesService.resolverObligatoria(params.productoId, params.varianteId);
     return this.inventarioRepository.ajustarCantidad({
       tenantId: params.tenantId,
       productoId: params.productoId,
+      varianteId,
       bodegaId: params.bodegaId,
       delta: params.cantidad,
       tipo: 'ENTRADA',
@@ -193,15 +205,18 @@ export class InventarioService {
   async ajustarStock(params: {
     tenantId: string;
     productoId: string;
+    varianteId?: string;
     bodegaId: string;
     cantidad: number;
     userId: string;
     motivo: string;
   }) {
     await this.validarPertenencia({ productoId: params.productoId, bodegaId: params.bodegaId });
+    const varianteId = await this.variantesService.resolverObligatoria(params.productoId, params.varianteId);
     return this.inventarioRepository.ajustarCantidad({
       tenantId: params.tenantId,
       productoId: params.productoId,
+      varianteId,
       bodegaId: params.bodegaId,
       delta: params.cantidad,
       tipo: 'AJUSTE',
@@ -213,6 +228,7 @@ export class InventarioService {
   async transferirStock(params: {
     tenantId: string;
     productoId: string;
+    varianteId?: string;
     bodegaOrigenId: string;
     bodegaDestinoId: string;
     cantidad: number;
@@ -222,7 +238,8 @@ export class InventarioService {
       this.validarPertenencia({ productoId: params.productoId, bodegaId: params.bodegaOrigenId }),
       this.validarPertenencia({ bodegaId: params.bodegaDestinoId }),
     ]);
-    return this.inventarioRepository.transferir(params);
+    const varianteId = await this.variantesService.resolverObligatoria(params.productoId, params.varianteId);
+    return this.inventarioRepository.transferir({ ...params, varianteId });
   }
 
   async listarStockPorBodega(bodegaId: string, query: ListadoQueryDto) {

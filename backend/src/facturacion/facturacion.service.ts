@@ -9,6 +9,7 @@ import { CrearFacturaDto } from './dto/crear-factura.dto';
 import { CrearPagoDto } from '../pagos/dto/crear-pago.dto';
 import { PagosService } from '../pagos/pagos.service';
 import { ClientesService } from '../clientes/clientes.service';
+import { VariantesService } from '../variantes/variantes.service';
 import { ListadoQueryDto } from '../common/dto/listado-query.dto';
 import { paginar } from '../common/types/pagina-resultado';
 import { DocumentoPdfParams, generarDocumentoPdf } from '../common/pdf/documento-pdf';
@@ -47,6 +48,14 @@ const ECF_POR_TIPO: Record<TipoFactura, TipoNcf> = {
  * ProductosService a PRODUCTO/SERVICIO (nunca otro COMBO), así que un solo
  * nivel de expansión alcanza, sin necesidad de recursión.
  */
+/**
+ * `varianteId` (Fase 3c) es la variante YA resuelta de `productoId` — solo
+ * tiene sentido para el producto vendido directamente, no para los
+ * componentes de un combo (nadie elige variante por componente; cada uno
+ * resuelve la suya propia — su "por defecto" si tiene una sola, o rechaza
+ * si tiene varias — en `InventarioService`, ver `VariantesService.
+ * resolverObligatoria`).
+ */
 function expandirParaInventario(
   producto: {
     tipoProducto: TipoProducto;
@@ -54,14 +63,15 @@ function expandirParaInventario(
   },
   productoId: string,
   cantidad: number,
-): Array<{ productoId: string; cantidad: number }> {
+  varianteId?: string,
+): Array<{ productoId: string; cantidad: number; varianteId?: string }> {
   if (producto.tipoProducto === 'SERVICIO') return [];
   if (producto.tipoProducto === 'COMBO') {
     return producto.componentesCombo
       .filter((c) => c.componente.tipo !== 'SERVICIO')
       .map((c) => ({ productoId: c.componente.id, cantidad: cantidad * Number(c.cantidad) }));
   }
-  return [{ productoId, cantidad }];
+  return [{ productoId, cantidad, varianteId }];
 }
 
 @Injectable()
@@ -74,6 +84,7 @@ export class FacturacionService {
     private readonly pagosService: PagosService,
     private readonly prisma: PrismaService,
     private readonly clientesService: ClientesService,
+    private readonly variantesService: VariantesService,
   ) {}
 
   /**
@@ -106,7 +117,12 @@ export class FacturacionService {
 
     const lineasCalculadas = await Promise.all(
       dto.lineas.map(async (linea) => {
-        const producto = await this.facturacionRepository.obtenerProductoConPrecioVigente(linea.productoId, listaPrecio);
+        // La variante se resuelve UNA vez por línea y se reusa tanto para el
+        // precio (abajo) como para el descuento/reintegro de stock (en la
+        // transacción) — así ambos operan sobre la misma variante, nunca
+        // una resolución distinta de la otra.
+        const varianteId = await this.variantesService.resolverObligatoria(linea.productoId, linea.varianteId);
+        const producto = await this.facturacionRepository.obtenerProductoConPrecioVigente(linea.productoId, varianteId, listaPrecio);
         const precioUnitario = linea.precioUnitario ?? Number(producto.precios[0]?.precioVenta ?? 0);
         const porcentajeItbis = Number(producto.porcentajeItbis);
         const descuento = linea.descuento ?? 0;
@@ -116,6 +132,7 @@ export class FacturacionService {
 
         return {
           productoId: linea.productoId,
+          varianteId,
           cantidad: linea.cantidad,
           precioUnitario,
           descuento,
@@ -173,10 +190,11 @@ export class FacturacionService {
       // descuenta.
       if (dto.tipoFactura === 'NOTA_CREDITO') {
         for (const linea of lineasCalculadas) {
-          for (const item of expandirParaInventario(linea, linea.productoId, linea.cantidad)) {
+          for (const item of expandirParaInventario(linea, linea.productoId, linea.cantidad, linea.varianteId)) {
             await this.inventarioService.entradaStockEnTx(tx, {
               tenantId,
               productoId: item.productoId,
+              varianteId: item.varianteId,
               bodegaId: dto.bodegaId,
               cantidad: item.cantidad,
               userId: vendedorId,
@@ -186,10 +204,11 @@ export class FacturacionService {
         }
       } else if (dto.tipoFactura !== 'NOTA_DEBITO') {
         for (const linea of lineasCalculadas) {
-          for (const item of expandirParaInventario(linea, linea.productoId, linea.cantidad)) {
+          for (const item of expandirParaInventario(linea, linea.productoId, linea.cantidad, linea.varianteId)) {
             await this.inventarioService.verificarYDescontarStockEnTx(tx, {
               tenantId,
               productoId: item.productoId,
+              varianteId: item.varianteId,
               bodegaId: dto.bodegaId,
               cantidad: item.cantidad,
               userId: vendedorId,
@@ -308,10 +327,11 @@ export class FacturacionService {
           // La nota había devuelto stock al crearse; anularla lo retira de nuevo.
           for (const linea of factura.lineas) {
             const producto = { tipoProducto: linea.producto.tipo, componentesCombo: linea.producto.componentes };
-            for (const item of expandirParaInventario(producto, linea.productoId, Number(linea.cantidad))) {
+            for (const item of expandirParaInventario(producto, linea.productoId, Number(linea.cantidad), linea.varianteId)) {
               await this.inventarioService.verificarYDescontarStockEnTx(tx, {
                 tenantId,
                 productoId: item.productoId,
+                varianteId: item.varianteId,
                 bodegaId: factura.bodegaId,
                 cantidad: item.cantidad,
                 userId,
@@ -338,10 +358,11 @@ export class FacturacionService {
             const cantidadAReintegrar = Number(linea.cantidad) - yaDevuelto;
             if (cantidadAReintegrar > 0) {
               const producto = { tipoProducto: linea.producto.tipo, componentesCombo: linea.producto.componentes };
-              for (const item of expandirParaInventario(producto, linea.productoId, cantidadAReintegrar)) {
+              for (const item of expandirParaInventario(producto, linea.productoId, cantidadAReintegrar, linea.varianteId)) {
                 await this.inventarioService.entradaStockEnTx(tx, {
                   tenantId,
                   productoId: item.productoId,
+                  varianteId: item.varianteId,
                   bodegaId: factura.bodegaId,
                   cantidad: item.cantidad,
                   userId,

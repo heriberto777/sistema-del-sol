@@ -150,6 +150,15 @@ pasa ninguna de ellas.
 | DELETE | `/api/atributos/:id` | `precios.editar` — 400 si alguno de sus valores está en uso |
 | GET | `/api/productos/:productoId/variantes` | `precios.ver` — variantes del producto con sus valores de atributo |
 
+Toda línea de venta/compra (`/api/facturas`, `/api/cotizaciones`,
+`/api/remisiones`, `/api/compras`, `/api/pos/ventas`) acepta
+`varianteId?` opcional junto a `productoId`. Si el producto tiene una
+sola variante (el caso normal, sin atributos reales), se resuelve solo
+y `varianteId` puede omitirse. Si tiene más de una, es **obligatorio**
+— 400 con un mensaje claro si falta, y 400 si la variante indicada no
+pertenece a ese producto. Ver `VariantesService.resolverObligatoria` en
+ARCHITECTURE.md.
+
 ## Categorías
 
 Catálogo tenant-scoped con jerarquía real (mismo patrón de auto-relación que `CuentaContable.cuentaPadreId`, ver ARCHITECTURE.md). Reemplaza el antiguo `GET /api/productos/categorias` (texto libre sin tabla propia).

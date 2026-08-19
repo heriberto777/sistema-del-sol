@@ -9,6 +9,7 @@ import { CrearFacturaDto } from './dto/crear-factura.dto';
 import { PagosService } from '../pagos/pagos.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ClientesService } from '../clientes/clientes.service';
+import { VariantesService } from '../variantes/variantes.service';
 
 describe('FacturacionService', () => {
   let service: FacturacionService;
@@ -19,6 +20,7 @@ describe('FacturacionService', () => {
   let pagosService: jest.Mocked<PagosService>;
   let prisma: jest.Mocked<PrismaService>;
   let clientesService: jest.Mocked<ClientesService>;
+  let variantesService: jest.Mocked<VariantesService>;
 
   // Un tx opaco: crear()/anular() abren la transacción con tenantPrisma.client.$transaction
   // y pasan este objeto a los métodos *EnTx — para las pruebas basta con que sea el mismo
@@ -73,6 +75,9 @@ describe('FacturacionService', () => {
     clientesService = {
       buscarPorId: jest.fn().mockResolvedValue({ id: 'cliente-1', listaPrecio: null }),
     } as unknown as jest.Mocked<ClientesService>;
+    variantesService = {
+      resolverObligatoria: jest.fn().mockResolvedValue('variante-1'),
+    } as unknown as jest.Mocked<VariantesService>;
     service = new FacturacionService(
       repository,
       inventarioService,
@@ -81,6 +86,7 @@ describe('FacturacionService', () => {
       pagosService,
       prisma,
       clientesService,
+      variantesService,
     );
   });
 
@@ -102,7 +108,7 @@ describe('FacturacionService', () => {
 
       await service.crear(dto(), 'tenant-1', 'vendedor-1');
 
-      expect(repository.obtenerProductoConPrecioVigente).toHaveBeenCalledWith('prod-1', 'GENERAL');
+      expect(repository.obtenerProductoConPrecioVigente).toHaveBeenCalledWith('prod-1', 'variante-1', 'GENERAL');
     });
 
     it('usa la lista del cliente cuando no hay override explícito en el dto', async () => {
@@ -112,7 +118,7 @@ describe('FacturacionService', () => {
 
       await service.crear(dto(), 'tenant-1', 'vendedor-1');
 
-      expect(repository.obtenerProductoConPrecioVigente).toHaveBeenCalledWith('prod-1', 'Mayorista');
+      expect(repository.obtenerProductoConPrecioVigente).toHaveBeenCalledWith('prod-1', 'variante-1', 'Mayorista');
     });
 
     it('el override explícito del dto.listaPrecio tiene prioridad sobre la lista del cliente', async () => {
@@ -122,7 +128,7 @@ describe('FacturacionService', () => {
 
       await service.crear(dto({ listaPrecio: 'Distribuidor' }), 'tenant-1', 'vendedor-1');
 
-      expect(repository.obtenerProductoConPrecioVigente).toHaveBeenCalledWith('prod-1', 'Distribuidor');
+      expect(repository.obtenerProductoConPrecioVigente).toHaveBeenCalledWith('prod-1', 'variante-1', 'Distribuidor');
     });
   });
 

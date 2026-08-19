@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { ComprasRepository } from './compras.repository';
 import { InventarioService } from '../inventario/inventario.service';
+import { VariantesService } from '../variantes/variantes.service';
 import { TenantPrismaService } from '../prisma/tenant-prisma.service';
 import { EventBusService } from '../event-bus/event-bus.service';
 import { EVENTOS } from '../event-bus/events';
@@ -17,6 +18,7 @@ export class ComprasService {
   constructor(
     private readonly comprasRepository: ComprasRepository,
     private readonly inventarioService: InventarioService,
+    private readonly variantesService: VariantesService,
     private readonly tenantPrisma: TenantPrismaService,
     private readonly eventBus: EventBusService,
     private readonly pagosService: PagosService,
@@ -34,7 +36,13 @@ export class ComprasService {
     }
 
     const total = dto.lineas.reduce((acc, l) => acc + l.cantidad * l.costoUnitario, 0);
-    return this.comprasRepository.crearOrden({ ...dto, tenantId, userId, total });
+    const lineas = await Promise.all(
+      dto.lineas.map(async (linea) => ({
+        ...linea,
+        varianteId: await this.variantesService.resolverObligatoria(linea.productoId, linea.varianteId),
+      })),
+    );
+    return this.comprasRepository.crearOrden({ ...dto, tenantId, userId, total, lineas });
   }
 
   async listar(query: ListadoQueryDto) {
@@ -57,6 +65,19 @@ export class ComprasService {
    */
   async recibir(ordenCompraId: string, dto: RecibirOrdenCompraDto, userId: string, tenantId: string) {
     const orden = await this.comprasRepository.buscarPorId(ordenCompraId);
+    // La variante de cada línea es la que ya quedó fija al crear la OC —
+    // no se vuelve a pedir/resolver al recibir (mismo criterio que
+    // costoUnitario en devolver(): se lee de la línea original, no del DTO).
+    // Si el producto no pertenece a esta orden (dato mal formado), se
+    // resuelve igual que cualquier línea suelta — nunca se manda un
+    // varianteId vacío/adivinado a la base.
+    const lineasConVariante = await Promise.all(
+      dto.lineas.map(async (linea) => {
+        const lineaOc = orden.lineas.find((l) => l.productoId === linea.productoId);
+        const varianteId = lineaOc?.varianteId ?? (await this.variantesService.resolverObligatoria(linea.productoId));
+        return { ...linea, varianteId };
+      }),
+    );
 
     const { recepcion } = await this.tenantPrisma.client.$transaction(async (tx) => {
       const recepcion = await this.comprasRepository.crearRecepcion(tx, {
@@ -64,10 +85,10 @@ export class ComprasService {
         ordenCompraId,
         facturaProveedorNumero: dto.facturaProveedorNumero,
         montoFacturaProveedor: dto.montoFacturaProveedor,
-        lineas: dto.lineas,
+        lineas: lineasConVariante,
       });
 
-      for (const linea of dto.lineas) {
+      for (const linea of lineasConVariante) {
         const lineaOc = orden.lineas.find((l) => l.productoId === linea.productoId);
         if (lineaOc) {
           await this.comprasRepository.actualizarCantidadRecibida(tx, lineaOc.id, linea.cantidadRecibida);
@@ -78,6 +99,7 @@ export class ComprasService {
           await this.inventarioService.entradaStockEnTx(tx, {
             tenantId,
             productoId: linea.productoId,
+            varianteId: linea.varianteId,
             bodegaId: dto.bodegaId,
             cantidad: linea.cantidadRecibida,
             userId,
@@ -137,6 +159,7 @@ export class ComprasService {
       }
       return {
         productoId: linea.productoId,
+        varianteId: lineaOc.varianteId,
         cantidad: linea.cantidad,
         costoUnitario: Number(lineaOc.costoUnitario),
         porcentajeItbis: itbisPorProducto.get(linea.productoId) ?? 0,
@@ -161,6 +184,7 @@ export class ComprasService {
           await this.inventarioService.verificarYDescontarStockEnTx(tx, {
             tenantId,
             productoId: linea.productoId,
+            varianteId: linea.varianteId,
             bodegaId: dto.bodegaId,
             cantidad: linea.cantidad,
             userId,

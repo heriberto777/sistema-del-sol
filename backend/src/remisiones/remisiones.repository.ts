@@ -18,7 +18,7 @@ export class RemisionesRepository {
     bodegaId: string;
     vendedorId: string;
     numero: string;
-    lineas: { productoId: string; cantidad: number }[];
+    lineas: { productoId: string; varianteId: string; cantidad: number }[];
   }) {
     return this.db.remision.create({
       data: {
@@ -40,7 +40,12 @@ export class RemisionesRepository {
   /** Reemplaza líneas por completo (delete+recreate) — solo se permite en BORRADOR, ver RemisionesService.actualizar. */
   actualizar(
     id: string,
-    params: { clienteId: string; bodegaId: string; numero: string; lineas: { productoId: string; cantidad: number }[] },
+    params: {
+      clienteId: string;
+      bodegaId: string;
+      numero: string;
+      lineas: { productoId: string; varianteId: string; cantidad: number }[];
+    },
   ) {
     return this.db.$transaction(async (tx) => {
       await tx.lineaRemision.deleteMany({ where: { remisionId: id } });

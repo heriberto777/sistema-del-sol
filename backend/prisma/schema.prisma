@@ -619,6 +619,12 @@ model LineaFactura {
   factura           Factura @relation(fields: [facturaId], references: [id], onDelete: Cascade)
   productoId        String
   producto          Producto @relation(fields: [productoId], references: [id])
+  // Fase 3c, incremento 3: la variante realmente vendida — necesaria para
+  // que anular() reintegre stock a la MISMA variante, no a "la que sea".
+  // Restrict (no Cascade): perder esto sería perder a qué variante
+  // corresponde una línea fiscal ya emitida.
+  varianteId        String
+  variante          VarianteProducto @relation(fields: [varianteId], references: [id])
   cantidad          Decimal @db.Decimal(14, 4)
   precioUnitario    Decimal @db.Decimal(14, 4)
   porcentajeItbis   Decimal @db.Decimal(5, 2)
@@ -680,6 +686,10 @@ model LineaCotizacion {
   // cascada del tenant puede fallar por una carrera en el orden en que
   // Postgres resuelve las cascadas de "productos" vs. "cotizaciones".
   producto        Producto   @relation(fields: [productoId], references: [id], onDelete: Cascade)
+  // Ver el comentario equivalente en LineaFactura.varianteId — se propaga
+  // sin cambios al convertir la cotización en factura.
+  varianteId      String
+  variante        VarianteProducto @relation(fields: [varianteId], references: [id])
   cantidad        Decimal    @db.Decimal(14, 4)
   precioUnitario  Decimal    @db.Decimal(14, 4)
   porcentajeItbis Decimal    @db.Decimal(5, 2)
@@ -734,6 +744,9 @@ model LineaRemision {
   productoId String
   // Ver comentario equivalente en LineaCotizacion.producto.
   producto   Producto @relation(fields: [productoId], references: [id], onDelete: Cascade)
+  // Ver el comentario equivalente en LineaFactura.varianteId.
+  varianteId String
+  variante   VarianteProducto @relation(fields: [varianteId], references: [id])
   cantidad   Decimal  @db.Decimal(14, 4)
 
   @@map("linea_remision")
@@ -1213,6 +1226,9 @@ model VentaAparcadaLinea {
   ventaAparcada   VentaAparcada @relation(fields: [ventaAparcadaId], references: [id], onDelete: Cascade)
   productoId      String
   producto        Producto      @relation(fields: [productoId], references: [id])
+  // Ver el comentario equivalente en LineaFactura.varianteId.
+  varianteId      String
+  variante        VarianteProducto @relation(fields: [varianteId], references: [id])
   cantidad        Decimal       @db.Decimal(14, 4)
   precioUnitario  Decimal       @db.Decimal(14, 4)
   porcentajeItbis Decimal       @db.Decimal(5, 2)
@@ -1339,6 +1355,13 @@ model VarianteProducto {
   precios         Precio[]
   stock           Stock[]
   movimientos     MovimientoInventario[]
+  lineasFactura   LineaFactura[]
+  lineasCotizacion LineaCotizacion[]
+  lineasRemision  LineaRemision[]
+  lineasOc        LineaOc[]
+  lineasRecepcion LineaRecepcion[]
+  lineasDevolucionCompra LineaDevolucionCompra[]
+  lineasVentaAparcada VentaAparcadaLinea[]
 
   @@unique([tenantId, codigoBarras])
   @@map("variantes_producto")
@@ -1538,6 +1561,9 @@ model LineaOc {
   // el tenant completo (carrera real de Postgres, no solo teórica — encontrada
   // corriendo los e2e de Compras).
   producto          Producto    @relation(fields: [productoId], references: [id], onDelete: Cascade)
+  // Ver el comentario equivalente en LineaFactura.varianteId.
+  varianteId        String
+  variante          VarianteProducto @relation(fields: [varianteId], references: [id])
   cantidad          Decimal     @db.Decimal(14, 4)
   costoUnitario     Decimal     @db.Decimal(14, 4)
   cantidadRecibida  Decimal     @default(0) @db.Decimal(14, 4)
@@ -1571,6 +1597,9 @@ model LineaRecepcion {
   productoId        String
   // Cascade: mismo patrón que LineaOc.producto (ver ese comentario).
   producto          Producto        @relation(fields: [productoId], references: [id], onDelete: Cascade)
+  // Ver el comentario equivalente en LineaFactura.varianteId.
+  varianteId        String
+  variante          VarianteProducto @relation(fields: [varianteId], references: [id])
   cantidadRecibida  Decimal         @db.Decimal(14, 4)
   costoUnitario     Decimal         @db.Decimal(14, 4)
 
@@ -1608,6 +1637,9 @@ model LineaDevolucionCompra {
   productoId    String
   // Cascade: mismo patrón que LineaOc.producto/LineaRecepcion.producto (ver esos comentarios).
   producto      Producto         @relation(fields: [productoId], references: [id], onDelete: Cascade)
+  // Ver el comentario equivalente en LineaFactura.varianteId.
+  varianteId    String
+  variante      VarianteProducto @relation(fields: [varianteId], references: [id])
   cantidad      Decimal          @db.Decimal(14, 4)
   costoUnitario Decimal          @db.Decimal(14, 4)
 

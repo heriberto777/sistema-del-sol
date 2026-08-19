@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { VariantesService } from './variantes.service';
 import { VariantesRepository } from './variantes.repository';
 import { AtributosRepository } from '../atributos/atributos.repository';
@@ -11,7 +11,9 @@ describe('VariantesService', () => {
   beforeEach(() => {
     variantesRepository = {
       listarPorProducto: jest.fn().mockResolvedValue([]),
+      listarIdsPorProducto: jest.fn().mockResolvedValue([{ id: 'v-unica' }]),
       contarMovimientos: jest.fn().mockResolvedValue(0),
+      contarUsoEnLineas: jest.fn().mockResolvedValue(0),
       regenerar: jest.fn().mockResolvedValue([{ id: 'v1' }]),
     } as unknown as jest.Mocked<VariantesRepository>;
     atributosRepository = {
@@ -73,6 +75,14 @@ describe('VariantesService', () => {
     expect(variantesRepository.regenerar).not.toHaveBeenCalled();
   });
 
+  it('rechaza regenerar si las variantes actuales ya tienen líneas de venta/compra (cotización/remisión/OC sin movimiento de stock)', async () => {
+    variantesRepository.listarPorProducto.mockResolvedValue([{ id: 'v-vieja' }] as never);
+    variantesRepository.contarUsoEnLineas.mockResolvedValue(1);
+
+    await expect(service.generarCombinaciones('p1', 't1', [])).rejects.toThrow(BadRequestException);
+    expect(variantesRepository.regenerar).not.toHaveBeenCalled();
+  });
+
   it('rechaza una combinatoria que excede el máximo soportado', async () => {
     atributosRepository.buscarPorId.mockImplementation(
       ((id: string) =>
@@ -90,5 +100,41 @@ describe('VariantesService', () => {
       ]),
     ).rejects.toThrow(BadRequestException);
     expect(variantesRepository.regenerar).not.toHaveBeenCalled();
+  });
+
+  describe('resolverObligatoria', () => {
+    it('resuelve sola cuando el producto tiene una única variante y no se indica varianteId', async () => {
+      variantesRepository.listarIdsPorProducto.mockResolvedValue([{ id: 'v-unica' }] as never);
+
+      const resultado = await service.resolverObligatoria('p1');
+
+      expect(resultado).toBe('v-unica');
+    });
+
+    it('rechaza (400) si el producto tiene varias variantes y no se indica varianteId', async () => {
+      variantesRepository.listarIdsPorProducto.mockResolvedValue([{ id: 'v1' }, { id: 'v2' }] as never);
+
+      await expect(service.resolverObligatoria('p1')).rejects.toThrow(BadRequestException);
+    });
+
+    it('usa el varianteId explícito si pertenece al producto', async () => {
+      variantesRepository.listarIdsPorProducto.mockResolvedValue([{ id: 'v1' }, { id: 'v2' }] as never);
+
+      const resultado = await service.resolverObligatoria('p1', 'v2');
+
+      expect(resultado).toBe('v2');
+    });
+
+    it('rechaza (400) si el varianteId explícito no pertenece al producto', async () => {
+      variantesRepository.listarIdsPorProducto.mockResolvedValue([{ id: 'v1' }] as never);
+
+      await expect(service.resolverObligatoria('p1', 'v-ajena')).rejects.toThrow(BadRequestException);
+    });
+
+    it('rechaza (404) si el producto no tiene ninguna variante — no existe o es de otro tenant', async () => {
+      variantesRepository.listarIdsPorProducto.mockResolvedValue([]);
+
+      await expect(service.resolverObligatoria('producto-inexistente')).rejects.toThrow(NotFoundException);
+    });
   });
 });

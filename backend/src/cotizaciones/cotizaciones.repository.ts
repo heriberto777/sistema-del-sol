@@ -4,6 +4,7 @@ import { EstadoCotizacion } from '@prisma/client';
 
 interface LineaCalculada {
   productoId: string;
+  varianteId: string;
   cantidad: number;
   precioUnitario: number;
   descuento: number;
@@ -23,13 +24,12 @@ export class CotizacionesRepository {
   }
 
   /** Ver el comentario equivalente en FacturacionRepository — Precio cuelga de VarianteProducto desde la Fase 3c, reaplanado acá a `producto.precios`. */
-  async obtenerProductoConPrecioVigente(productoId: string, listaPrecio = 'GENERAL') {
+  async obtenerProductoConPrecioVigente(productoId: string, varianteId: string, listaPrecio = 'GENERAL') {
     const producto = await this.db.producto.findUniqueOrThrow({
       where: { id: productoId },
       include: {
         variantes: {
-          take: 1,
-          orderBy: { createdAt: 'asc' },
+          where: { id: varianteId },
           include: { precios: { where: { listaPrecio, vigenteHasta: null }, take: 1 } },
         },
       },

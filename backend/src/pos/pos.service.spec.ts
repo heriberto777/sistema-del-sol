@@ -5,6 +5,7 @@ import { FacturacionService } from '../facturacion/facturacion.service';
 import { ConfiguracionesService } from '../configuraciones/configuraciones.service';
 import { FormasPagoRepository } from '../formas-pago/formas-pago.repository';
 import { EmpleadosRepository } from '../nomina/empleados.repository';
+import { VariantesService } from '../variantes/variantes.service';
 
 describe('PosService', () => {
   let service: PosService;
@@ -13,6 +14,7 @@ describe('PosService', () => {
   let configuracionesService: jest.Mocked<ConfiguracionesService>;
   let formasPagoRepository: jest.Mocked<FormasPagoRepository>;
   let empleadosRepository: jest.Mocked<EmpleadosRepository>;
+  let variantesService: jest.Mocked<VariantesService>;
 
   beforeEach(() => {
     posRepository = {
@@ -35,7 +37,17 @@ describe('PosService', () => {
       buscarPorId: jest.fn().mockResolvedValue({ id: 'emp1' }),
       listarVendedores: jest.fn(),
     } as unknown as jest.Mocked<EmpleadosRepository>;
-    service = new PosService(posRepository, facturacionService, configuracionesService, formasPagoRepository, empleadosRepository);
+    variantesService = {
+      resolverObligatoria: jest.fn().mockResolvedValue('variante-1'),
+    } as unknown as jest.Mocked<VariantesService>;
+    service = new PosService(
+      posRepository,
+      facturacionService,
+      configuracionesService,
+      formasPagoRepository,
+      empleadosRepository,
+      variantesService,
+    );
   });
 
   describe('listar', () => {

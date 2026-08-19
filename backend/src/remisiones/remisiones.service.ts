@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { RemisionesRepository } from './remisiones.repository';
 import { FacturacionService } from '../facturacion/facturacion.service';
+import { VariantesService } from '../variantes/variantes.service';
 import { CrearRemisionDto } from './dto/crear-remision.dto';
 import { ConvertirRemisionDto } from './dto/convertir-remision.dto';
 import { ListadoQueryDto } from '../common/dto/listado-query.dto';
@@ -16,17 +17,28 @@ export class RemisionesService {
   constructor(
     private readonly remisionesRepository: RemisionesRepository,
     private readonly facturacionService: FacturacionService,
+    private readonly variantesService: VariantesService,
     private readonly prisma: PrismaService,
   ) {}
 
-  crear(dto: CrearRemisionDto, tenantId: string, vendedorId: string) {
+  private async resolverLineas(lineas: CrearRemisionDto['lineas']) {
+    return Promise.all(
+      lineas.map(async (linea) => ({
+        productoId: linea.productoId,
+        varianteId: await this.variantesService.resolverObligatoria(linea.productoId, linea.varianteId),
+        cantidad: linea.cantidad,
+      })),
+    );
+  }
+
+  async crear(dto: CrearRemisionDto, tenantId: string, vendedorId: string) {
     return this.remisionesRepository.crear({
       tenantId,
       clienteId: dto.clienteId,
       bodegaId: dto.bodegaId,
       vendedorId,
       numero: dto.numero,
-      lineas: dto.lineas,
+      lineas: await this.resolverLineas(dto.lineas),
     });
   }
 
@@ -43,7 +55,7 @@ export class RemisionesService {
       clienteId: dto.clienteId,
       bodegaId: dto.bodegaId,
       numero: dto.numero,
-      lineas: dto.lineas,
+      lineas: await this.resolverLineas(dto.lineas),
     });
   }
 
@@ -70,6 +82,7 @@ export class RemisionesService {
         tipoFactura: dto.tipoFactura,
         lineas: remision.lineas.map((linea) => ({
           productoId: linea.productoId,
+          varianteId: linea.varianteId,
           cantidad: Number(linea.cantidad),
         })),
       },
