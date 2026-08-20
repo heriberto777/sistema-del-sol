@@ -8,6 +8,7 @@ import { Card } from '../components/atoms/Card/Card';
 import { Select } from '../components/atoms/Select/Select';
 import { FormField } from '../components/molecules/FormField/FormField';
 import { Modal } from '../components/molecules/Modal/Modal';
+import { CampoPin } from '../components/molecules/CampoPin/CampoPin';
 import { EstadoVacio } from '../components/molecules/EstadoVacio/EstadoVacio';
 import { RequierePermiso } from '../components/organisms/RequierePermiso/RequierePermiso';
 import { RowActionsMenu } from '../components/molecules/RowActionsMenu/RowActionsMenu';
@@ -381,6 +382,7 @@ function ModalAjustarStock({
   const [numeroLote, setNumeroLote] = useState('');
   const [fechaVencimiento, setFechaVencimiento] = useState('');
   const [loteId, setLoteId] = useState('');
+  const [pin, setPin] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   const controlaVencimiento = stockInicial.producto.controlaVencimiento;
@@ -396,12 +398,19 @@ function ModalAjustarStock({
         motivo,
         ...(controlaVencimiento && esEntrada ? { numeroLote, fechaVencimiento } : {}),
         ...(controlaVencimiento && !esEntrada ? { loteId } : {}),
+        ...(!esEntrada ? { pin: pin || undefined } : {}),
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['stock', bodegaId] });
       onClose();
     },
-    onError: () => setError('No se pudo ajustar el stock. Revisa los datos.'),
+    onError: (err: unknown) => {
+      const mensaje =
+        err && typeof err === 'object' && 'response' in err
+          ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
+          : undefined;
+      setError(mensaje ?? 'No se pudo ajustar el stock. Revisa los datos.');
+    },
   });
 
   function onSubmit(e: FormEvent) {
@@ -446,6 +455,7 @@ function ModalAjustarStock({
           <SelectorLoteAjuste varianteId={stockInicial.varianteId} bodegaId={bodegaId} value={loteId} onChange={setLoteId} />
         )}
         <FormField id="ajuste-motivo" label="Motivo" value={motivo} onChange={(e) => setMotivo(e.target.value)} required />
+        {cantidad !== '' && !esEntrada && <CampoPin value={pin} onChange={setPin} id="ajuste-pin" />}
         {error && <p className="text-sm text-red-600">{error}</p>}
         <Button type="submit" disabled={ajustar.isPending} className="w-full">
           {ajustar.isPending ? 'Ajustando…' : 'Ajustar'}

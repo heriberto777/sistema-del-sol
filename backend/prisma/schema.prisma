@@ -403,6 +403,14 @@ model User {
   activo                 Boolean   @default(true)
   resetPasswordTokenHash String?
   resetPasswordExpiraEn  DateTime?
+  /// PIN corto (4-6 dígitos) de confirmación para acciones sensibles
+  /// (Fase 9 de adopción de Cuadre) — NO reemplaza ningún permiso RBAC,
+  /// es una capa extra. Nullable/autoservicio: sin PIN configurado, las
+  /// acciones gateadas siguen funcionando igual que hoy (default
+  /// permisivo, mismo criterio que sucursales sin asignar).
+  pinHash                String?
+  pinIntentosFallidos    Int       @default(0)
+  pinBloqueadoHasta      DateTime?
   createdAt              DateTime  @default(now())
   updatedAt              DateTime  @updatedAt
 

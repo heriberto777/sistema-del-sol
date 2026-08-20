@@ -64,7 +64,7 @@ export class FacturacionController {
   @Post(':id/anular')
   @Permissions('facturacion.anular')
   anular(@Param('id') id: string, @Body() dto: AnularFacturaDto, @CurrentUser() user: JwtPayloadUser) {
-    return this.facturacionService.anular(id, dto.motivo, user.tenantId, user.userId, user.permisos.includes('pos.supervisar'));
+    return this.facturacionService.anular(id, dto.motivo, user.tenantId, user.userId, user.permisos.includes('pos.supervisar'), dto.pin);
   }
 
   @Post(':id/pagos')

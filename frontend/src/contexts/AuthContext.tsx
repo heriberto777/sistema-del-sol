@@ -8,6 +8,8 @@ export interface UsuarioAutenticado {
   roles: string[];
   permisos: string[];
   modulosActivos: string[];
+  /** Fase 9 — solo para decidir si el frontend muestra el modal de PIN en acciones sensibles; la validación real es 100% del backend. */
+  tienePin?: boolean;
   tenant?: { subdominio: string; nombre: string };
 }
 
@@ -29,6 +31,8 @@ interface AuthContextValue {
    * el backend.
    */
   tieneModulo: (modulo: string) => boolean;
+  /** Fase 9 — actualiza `tienePin` localmente tras configurar/eliminar el PIN, sin esperar al próximo login. */
+  actualizarTienePin: (tienePin: boolean) => void;
 }
 
 export const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -91,9 +95,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const tienePermiso = useCallback((permiso: string) => usuario?.permisos?.includes(permiso) ?? false, [usuario]);
   const tieneModulo = useCallback((modulo: string) => usuario?.modulosActivos?.includes(modulo) ?? false, [usuario]);
 
+  const actualizarTienePin = useCallback((tienePin: boolean) => {
+    setUsuario((actual) => {
+      if (!actual) return actual;
+      const actualizado = { ...actual, tienePin };
+      localStorage.setItem(STORAGE_USER_KEY, JSON.stringify(actualizado));
+      return actualizado;
+    });
+  }, []);
+
   const value = useMemo(
-    () => ({ usuario, cargando, login, logout, tienePermiso, tieneModulo }),
-    [usuario, cargando, login, logout, tienePermiso, tieneModulo],
+    () => ({ usuario, cargando, login, logout, tienePermiso, tieneModulo, actualizarTienePin }),
+    [usuario, cargando, login, logout, tienePermiso, tieneModulo, actualizarTienePin],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -1,4 +1,6 @@
-import { BadRequestException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import { EstablecerPinDto } from './dto/establecer-pin.dto';
+import { EliminarPinDto } from './dto/eliminar-pin.dto';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../prisma/prisma.service';
@@ -13,6 +15,13 @@ import { resolverModulosActivos } from '../planes/resolver-modulos-activos';
 const RESPUESTA_GENERICA_OLVIDE = {
   mensaje: 'Si el correo existe, se envió un enlace para restablecer la contraseña.',
 };
+
+// Fase 9 (adopción de Cuadre): PIN corto de confirmación para acciones
+// sensibles. Sin freno de fuerza bruta, un PIN de 4-6 dígitos sería un
+// hueco real dado que gatea acciones como anular facturas.
+const PIN_INTENTOS_MAX = 5;
+const PIN_BLOQUEO_MS = 15 * 60 * 1000;
+const PIN_REGEX = /^\d{4,6}$/;
 
 @Injectable()
 export class AuthService {
@@ -85,6 +94,10 @@ export class AuthService {
         roles,
         permisos,
         modulosActivos,
+        // Solo para que el frontend decida si muestra el modal de PIN en
+        // acciones sensibles (Fase 9) — la validación real es 100% del
+        // backend (verificarPin), igual criterio que modulosActivos.
+        tienePin: !!user.pinHash,
         tenant: { subdominio: tenant.subdominio, nombre: tenant.nombre },
       },
     };
@@ -134,5 +147,71 @@ export class AuthService {
     });
 
     return { mensaje: 'Contraseña actualizada correctamente' };
+  }
+
+  /** Autoservicio — probar la contraseña completa antes de fijar el atajo corto (mismo criterio que cambiar contraseña). */
+  async establecerPin(userId: string, dto: EstablecerPinDto) {
+    const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
+    // ForbiddenException (403), no Unauthorized (401): el usuario YA está
+    // autenticado con un JWT válido — un 401 acá dispara el interceptor
+    // global del frontend que asume sesión vencida y cierra sesión sola
+    // (bug real encontrado en la verificación manual de esta fase).
+    if (!(await bcrypt.compare(dto.passwordActual, user.passwordHash))) {
+      throw new ForbiddenException('Contraseña actual incorrecta');
+    }
+    if (!PIN_REGEX.test(dto.pin)) {
+      throw new BadRequestException('El PIN debe tener entre 4 y 6 dígitos numéricos');
+    }
+
+    const pinHash = await bcrypt.hash(dto.pin, 10);
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { pinHash, pinIntentosFallidos: 0, pinBloqueadoHasta: null },
+    });
+
+    return { mensaje: 'PIN configurado correctamente' };
+  }
+
+  async eliminarPin(userId: string, dto: EliminarPinDto) {
+    const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
+    if (!(await bcrypt.compare(dto.passwordActual, user.passwordHash))) {
+      throw new ForbiddenException('Contraseña actual incorrecta');
+    }
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { pinHash: null, pinIntentosFallidos: 0, pinBloqueadoHasta: null },
+    });
+
+    return { mensaje: 'PIN eliminado' };
+  }
+
+  /**
+   * Confirmación de identidad para acciones sensibles (Fase 9). Sin PIN
+   * configurado, no bloquea nada (default permisivo — no puede romper a
+   * ningún usuario existente el día del deploy). Con PIN configurado,
+   * bloquea 15 minutos tras 5 intentos fallidos consecutivos.
+   */
+  async verificarPin(userId: string, pin?: string) {
+    const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
+    if (!user.pinHash) return;
+
+    if (user.pinBloqueadoHasta && user.pinBloqueadoHasta > new Date()) {
+      throw new ForbiddenException('PIN bloqueado temporalmente por demasiados intentos fallidos — probá de nuevo más tarde');
+    }
+
+    if (!pin || !(await bcrypt.compare(pin, user.pinHash))) {
+      const intentos = user.pinIntentosFallidos + 1;
+      await this.prisma.user.update({
+        where: { id: userId },
+        data: {
+          pinIntentosFallidos: intentos,
+          pinBloqueadoHasta: intentos >= PIN_INTENTOS_MAX ? new Date(Date.now() + PIN_BLOQUEO_MS) : null,
+        },
+      });
+      throw new ForbiddenException('PIN incorrecto');
+    }
+
+    await this.prisma.user.update({ where: { id: userId }, data: { pinIntentosFallidos: 0, pinBloqueadoHasta: null } });
   }
 }

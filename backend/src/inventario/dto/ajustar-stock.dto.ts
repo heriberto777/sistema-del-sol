@@ -39,4 +39,9 @@ export class AjustarStockDto {
   @IsOptional()
   @IsUUID()
   loteId?: string;
+
+  @ApiProperty({ required: false, description: 'Requerido solo si el usuario tiene un PIN configurado (Fase 9) y cantidad < 0 (salida/merma)' })
+  @IsOptional()
+  @IsString()
+  pin?: string;
 }

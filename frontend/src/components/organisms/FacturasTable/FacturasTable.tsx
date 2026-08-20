@@ -8,6 +8,7 @@ import { Card } from '../../atoms/Card/Card';
 import { FormField } from '../../molecules/FormField/FormField';
 import { SelectFormaPago } from '../../molecules/SelectFormaPago/SelectFormaPago';
 import { Modal } from '../../molecules/Modal/Modal';
+import { CampoPin } from '../../molecules/CampoPin/CampoPin';
 import { SearchInput } from '../../molecules/SearchInput/SearchInput';
 import { Paginacion } from '../../molecules/Paginacion/Paginacion';
 import { RowActionsMenu } from '../../molecules/RowActionsMenu/RowActionsMenu';
@@ -159,15 +160,22 @@ function ModalAnularFactura({ factura, onClose }: { factura: Factura; onClose: (
   const queryClient = useQueryClient();
   const [motivo, setMotivo] = useState('');
   const [confirmado, setConfirmado] = useState(false);
+  const [pin, setPin] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   const anular = useMutation({
-    mutationFn: async () => apiClient.post(`/facturas/${factura.id}/anular`, { motivo }),
+    mutationFn: async () => apiClient.post(`/facturas/${factura.id}/anular`, { motivo, pin: pin || undefined }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['facturas'] });
       onClose();
     },
-    onError: () => setError('No se pudo anular la factura.'),
+    onError: (err: unknown) => {
+      const mensaje =
+        err && typeof err === 'object' && 'response' in err
+          ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
+          : undefined;
+      setError(mensaje ?? 'No se pudo anular la factura.');
+    },
   });
 
   function onSubmit(e: FormEvent) {
@@ -195,6 +203,7 @@ function ModalAnularFactura({ factura, onClose }: { factura: Factura; onClose: (
           <input type="checkbox" checked={confirmado} onChange={(e) => setConfirmado(e.target.checked)} />
           Confirmo que quiero anular esta factura.
         </label>
+        <CampoPin value={pin} onChange={setPin} id="anular-pin" />
         {error && <p className="text-sm text-red-600">{error}</p>}
         <Button type="submit" variante="peligro" disabled={anular.isPending} className="w-full">
           {anular.isPending ? 'Anulando…' : 'Anular factura'}

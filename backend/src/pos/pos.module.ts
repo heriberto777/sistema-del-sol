@@ -7,9 +7,11 @@ import { ConfiguracionesModule } from '../configuraciones/configuraciones.module
 import { FormasPagoModule } from '../formas-pago/formas-pago.module';
 import { NominaModule } from '../nomina/nomina.module';
 import { VariantesModule } from '../variantes/variantes.module';
+import { InventarioModule } from '../inventario/inventario.module';
+import { AuthModule } from '../auth/auth.module';
 
 @Module({
-  imports: [FacturacionModule, ConfiguracionesModule, FormasPagoModule, NominaModule, VariantesModule],
+  imports: [FacturacionModule, ConfiguracionesModule, FormasPagoModule, NominaModule, VariantesModule, InventarioModule, AuthModule],
   controllers: [PosController],
   providers: [PosService, PosRepository],
 })

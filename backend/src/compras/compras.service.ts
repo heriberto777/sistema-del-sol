@@ -64,6 +64,8 @@ export class ComprasService {
    * sin actualizar el estado de la orden ni procesar el resto.
    */
   async recibir(ordenCompraId: string, dto: RecibirOrdenCompraDto, userId: string, tenantId: string) {
+    // Fase 9: enforcement real de acceso por sucursal (Fase 8 solo filtraba la UX).
+    await this.inventarioService.validarAccesoBodega(dto.bodegaId, userId);
     const orden = await this.comprasRepository.buscarPorId(ordenCompraId);
     // La variante de cada línea es la que ya quedó fija al crear la OC —
     // no se vuelve a pedir/resolver al recibir (mismo criterio que
@@ -152,6 +154,8 @@ export class ComprasService {
    * mismo patrón todo-o-nada que `recibir`.
    */
   async devolver(ordenCompraId: string, dto: DevolverOrdenCompraDto, userId: string, tenantId: string) {
+    // Fase 9: enforcement real de acceso por sucursal (Fase 8 solo filtraba la UX).
+    await this.inventarioService.validarAccesoBodega(dto.bodegaId, userId);
     const orden = await this.comprasRepository.buscarPorId(ordenCompraId);
     const productos = await this.tenantPrisma.client.producto.findMany({
       where: { id: { in: dto.lineas.map((l) => l.productoId) } },

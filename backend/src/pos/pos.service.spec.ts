@@ -6,6 +6,8 @@ import { ConfiguracionesService } from '../configuraciones/configuraciones.servi
 import { FormasPagoRepository } from '../formas-pago/formas-pago.repository';
 import { EmpleadosRepository } from '../nomina/empleados.repository';
 import { VariantesService } from '../variantes/variantes.service';
+import { InventarioService } from '../inventario/inventario.service';
+import { AuthService } from '../auth/auth.service';
 
 describe('PosService', () => {
   let service: PosService;
@@ -15,6 +17,8 @@ describe('PosService', () => {
   let formasPagoRepository: jest.Mocked<FormasPagoRepository>;
   let empleadosRepository: jest.Mocked<EmpleadosRepository>;
   let variantesService: jest.Mocked<VariantesService>;
+  let inventarioService: jest.Mocked<InventarioService>;
+  let authService: jest.Mocked<AuthService>;
 
   beforeEach(() => {
     posRepository = {
@@ -40,6 +44,12 @@ describe('PosService', () => {
     variantesService = {
       resolverObligatoria: jest.fn().mockResolvedValue('variante-1'),
     } as unknown as jest.Mocked<VariantesService>;
+    inventarioService = {
+      validarAccesoBodega: jest.fn().mockResolvedValue({ id: 'b1', sucursalId: 's1' }),
+    } as unknown as jest.Mocked<InventarioService>;
+    authService = {
+      verificarPin: jest.fn().mockResolvedValue(undefined),
+    } as unknown as jest.Mocked<AuthService>;
     service = new PosService(
       posRepository,
       facturacionService,
@@ -47,6 +57,8 @@ describe('PosService', () => {
       formasPagoRepository,
       empleadosRepository,
       variantesService,
+      inventarioService,
+      authService,
     );
   });
 
@@ -79,7 +91,15 @@ describe('PosService', () => {
 
       await service.abrirTurno({ bodegaId: 'b1', montoInicial: 1000 }, 'tenant-1', 'cajero-1');
 
+      expect(inventarioService.validarAccesoBodega).toHaveBeenCalledWith('b1', 'cajero-1');
       expect(posRepository.crearTurno).toHaveBeenCalledWith({ tenantId: 'tenant-1', bodegaId: 'b1', cajeroId: 'cajero-1', montoInicial: 1000 });
+    });
+
+    it('Fase 9: propaga el rechazo (bodega ajena o sin acceso a su sucursal) sin crear el turno', async () => {
+      inventarioService.validarAccesoBodega.mockRejectedValue(new ForbiddenException('No tenés acceso a la sucursal de esta bodega'));
+
+      await expect(service.abrirTurno({ bodegaId: 'b1', montoInicial: 1000 }, 'tenant-1', 'cajero-1')).rejects.toThrow(ForbiddenException);
+      expect(posRepository.crearTurno).not.toHaveBeenCalled();
     });
   });
 
@@ -424,6 +444,61 @@ describe('PosService', () => {
       await service.cerrarTurno('t1', { montoFinalContado: 900 }, 'cajero-1', 'tenant-1', false);
 
       expect(posRepository.cerrarTurno).toHaveBeenCalledWith('t1', expect.objectContaining({ justificacionDiferencia: undefined }));
+    });
+
+    describe('Fase 9 — PIN de confirmación', () => {
+      it('NO pide PIN en un cierre normal (propio turno, sin diferencia)', async () => {
+        posRepository.buscarPorId.mockResolvedValue({ id: 't1', estado: 'ABIERTO', montoInicial: 1000, cajeroId: 'cajero-1' } as never);
+        posRepository.calcularMovimientoEfectivo.mockResolvedValue({ ventasEfectivo: 0, entradas: 0, salidas: 0 });
+        posRepository.cerrarTurno.mockResolvedValue({ id: 't1', estado: 'CERRADO' } as never);
+
+        await service.cerrarTurno('t1', { montoFinalContado: 1000 }, 'cajero-1', 'tenant-1', false);
+
+        expect(authService.verificarPin).not.toHaveBeenCalled();
+      });
+
+      it('pide y valida el PIN cuando la diferencia supera la tolerancia (con justificación)', async () => {
+        posRepository.buscarPorId.mockResolvedValue({ id: 't1', estado: 'ABIERTO', montoInicial: 1000, cajeroId: 'cajero-1' } as never);
+        posRepository.calcularMovimientoEfectivo.mockResolvedValue({ ventasEfectivo: 0, entradas: 0, salidas: 0 });
+        posRepository.cerrarTurno.mockResolvedValue({ id: 't1', estado: 'CERRADO' } as never);
+
+        await service.cerrarTurno(
+          't1',
+          { montoFinalContado: 900, justificacionDiferencia: 'Error al dar cambio', pin: '1234' },
+          'cajero-1',
+          'tenant-1',
+          false,
+        );
+
+        expect(authService.verificarPin).toHaveBeenCalledWith('cajero-1', '1234');
+      });
+
+      it('propaga el PIN incorrecto sin cerrar el turno, aunque la justificación esté presente', async () => {
+        posRepository.buscarPorId.mockResolvedValue({ id: 't1', estado: 'ABIERTO', montoInicial: 1000, cajeroId: 'cajero-1' } as never);
+        posRepository.calcularMovimientoEfectivo.mockResolvedValue({ ventasEfectivo: 0, entradas: 0, salidas: 0 });
+        authService.verificarPin.mockRejectedValue(new Error('PIN incorrecto'));
+
+        await expect(
+          service.cerrarTurno(
+            't1',
+            { montoFinalContado: 900, justificacionDiferencia: 'Error al dar cambio', pin: 'mal' },
+            'cajero-1',
+            'tenant-1',
+            false,
+          ),
+        ).rejects.toThrow('PIN incorrecto');
+        expect(posRepository.cerrarTurno).not.toHaveBeenCalled();
+      });
+
+      it('pide PIN al cerrar el turno de otro cajero, aunque no haya diferencia', async () => {
+        posRepository.buscarPorId.mockResolvedValue({ id: 't1', estado: 'ABIERTO', montoInicial: 1000, cajeroId: 'cajero-1' } as never);
+        posRepository.calcularMovimientoEfectivo.mockResolvedValue({ ventasEfectivo: 0, entradas: 0, salidas: 0 });
+        posRepository.cerrarTurno.mockResolvedValue({ id: 't1', estado: 'CERRADO' } as never);
+
+        await service.cerrarTurno('t1', { montoFinalContado: 1000, pin: '1234' }, 'supervisor-1', 'tenant-1', true);
+
+        expect(authService.verificarPin).toHaveBeenCalledWith('supervisor-1', '1234');
+      });
     });
   });
 

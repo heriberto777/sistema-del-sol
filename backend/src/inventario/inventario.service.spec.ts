@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { InventarioService } from './inventario.service';
 import { InventarioRepository } from './inventario.repository';
 import { ProductosService } from '../productos/productos.service';
@@ -6,6 +6,7 @@ import { VariantesService } from '../variantes/variantes.service';
 import { SucursalesRepository } from '../sucursales/sucursales.repository';
 import { EventBusService } from '../event-bus/event-bus.service';
 import { EVENTOS } from '../event-bus/events';
+import { AuthService } from '../auth/auth.service';
 
 describe('InventarioService', () => {
   let service: InventarioService;
@@ -14,6 +15,7 @@ describe('InventarioService', () => {
   let variantesService: jest.Mocked<VariantesService>;
   let sucursalesRepository: jest.Mocked<SucursalesRepository>;
   let eventBus: jest.Mocked<EventBusService>;
+  let authService: jest.Mocked<AuthService>;
 
   beforeEach(() => {
     repository = {
@@ -25,15 +27,20 @@ describe('InventarioService', () => {
       listarStockPorBodega: jest.fn(),
       listarBodegas: jest.fn(),
       crearBodega: jest.fn(),
-      buscarBodegaPorId: jest.fn().mockResolvedValue({ id: 'b1' }),
+      buscarBodegaPorId: jest.fn().mockResolvedValue({ id: 'b1', sucursalId: 's1' }),
       obtenerVarianteConProducto: jest.fn(),
       movimientosPorVarianteBodega: jest.fn(),
     } as unknown as jest.Mocked<InventarioRepository>;
     productosService = { buscarPorId: jest.fn().mockResolvedValue({ id: 'p1' }) } as unknown as jest.Mocked<ProductosService>;
     variantesService = { resolverObligatoria: jest.fn().mockResolvedValue('v1') } as unknown as jest.Mocked<VariantesService>;
-    sucursalesRepository = { buscarPorId: jest.fn().mockResolvedValue({ id: 's1' }) } as unknown as jest.Mocked<SucursalesRepository>;
+    sucursalesRepository = {
+      buscarPorId: jest.fn().mockResolvedValue({ id: 's1' }),
+      usuarioPuedeOperar: jest.fn().mockResolvedValue(true),
+      usuarioPuedeOperarEnTx: jest.fn().mockResolvedValue(true),
+    } as unknown as jest.Mocked<SucursalesRepository>;
     eventBus = { emit: jest.fn(), on: jest.fn() } as unknown as jest.Mocked<EventBusService>;
-    service = new InventarioService(repository, productosService, variantesService, sucursalesRepository, eventBus);
+    authService = { verificarPin: jest.fn().mockResolvedValue(undefined) } as unknown as jest.Mocked<AuthService>;
+    service = new InventarioService(repository, productosService, variantesService, sucursalesRepository, eventBus, authService);
   });
 
   describe('crearBodega', () => {
@@ -118,6 +125,49 @@ describe('InventarioService', () => {
     });
   });
 
+  describe('Fase 9 — enforcement de permisos por sucursal', () => {
+    it('verificarYDescontarStock lanza ForbiddenException si el usuario no tiene acceso a la sucursal de la bodega', async () => {
+      sucursalesRepository.usuarioPuedeOperar.mockResolvedValue(false);
+      repository.descontarStockCondicional.mockResolvedValue({ cantidadActual: 15, stockMinimo: 5 } as never);
+
+      await expect(
+        service.verificarYDescontarStock({ tenantId: 't1', productoId: 'p1', bodegaId: 'b1', cantidad: 5, userId: 'u1', referencia: 'x' }),
+      ).rejects.toThrow(ForbiddenException);
+      expect(sucursalesRepository.usuarioPuedeOperar).toHaveBeenCalledWith('u1', 's1');
+      expect(repository.descontarStockCondicional).not.toHaveBeenCalled();
+    });
+
+    it('sin ninguna sucursal asignada (default permisivo), usuarioPuedeOperar resuelve true y la operación procede', async () => {
+      repository.descontarStockCondicional.mockResolvedValue({ cantidadActual: 15, stockMinimo: 5 } as never);
+
+      await service.verificarYDescontarStock({ tenantId: 't1', productoId: 'p1', bodegaId: 'b1', cantidad: 5, userId: 'u1', referencia: 'x' });
+
+      expect(repository.descontarStockCondicional).toHaveBeenCalled();
+    });
+
+    it('ajustarStock también queda cubierto por el enforcement', async () => {
+      sucursalesRepository.usuarioPuedeOperar.mockResolvedValue(false);
+
+      await expect(
+        service.ajustarStock({ tenantId: 't1', productoId: 'p1', bodegaId: 'b1', cantidad: -3, userId: 'u1', motivo: 'merma' }),
+      ).rejects.toThrow(ForbiddenException);
+      expect(repository.ajustarCantidad).not.toHaveBeenCalled();
+    });
+
+    it('kardex (solo lectura) NO aplica el enforcement — no llama a usuarioPuedeOperar', async () => {
+      repository.movimientosPorVarianteBodega.mockResolvedValue([]);
+      repository.obtenerVarianteConProducto.mockResolvedValue({
+        id: 'v1',
+        sku: 'sku-1',
+        producto: { id: 'p1', codigo: 'P1', nombre: 'Producto 1' },
+      } as never);
+
+      await service.kardex('v1', 'b1');
+
+      expect(sucursalesRepository.usuarioPuedeOperar).not.toHaveBeenCalled();
+    });
+  });
+
   it('entradaStock ajusta con delta positivo y tipo ENTRADA', async () => {
     await service.entradaStock({ tenantId: 't1', productoId: 'p1', bodegaId: 'b1', cantidad: 7, userId: 'u1', motivo: 'compra' });
     expect(repository.ajustarCantidad).toHaveBeenCalledWith(
@@ -130,6 +180,27 @@ describe('InventarioService', () => {
     expect(repository.ajustarCantidad).toHaveBeenCalledWith(
       expect.objectContaining({ delta: -3, tipo: 'AJUSTE' }),
     );
+  });
+
+  describe('ajustarStock — Fase 9, PIN de confirmación solo en salidas', () => {
+    it('NO pide PIN en una entrada (cantidad positiva)', async () => {
+      await service.ajustarStock({ tenantId: 't1', productoId: 'p1', bodegaId: 'b1', cantidad: 5, userId: 'u1', motivo: 'conteo de más' });
+      expect(authService.verificarPin).not.toHaveBeenCalled();
+    });
+
+    it('pide y valida el PIN en una salida (cantidad negativa)', async () => {
+      await service.ajustarStock({ tenantId: 't1', productoId: 'p1', bodegaId: 'b1', cantidad: -3, userId: 'u1', motivo: 'merma', pin: '1234' });
+      expect(authService.verificarPin).toHaveBeenCalledWith('u1', '1234');
+    });
+
+    it('propaga el PIN incorrecto sin ajustar el stock', async () => {
+      authService.verificarPin.mockRejectedValue(new Error('PIN incorrecto'));
+
+      await expect(
+        service.ajustarStock({ tenantId: 't1', productoId: 'p1', bodegaId: 'b1', cantidad: -3, userId: 'u1', motivo: 'merma', pin: 'mal' }),
+      ).rejects.toThrow('PIN incorrecto');
+      expect(repository.ajustarCantidad).not.toHaveBeenCalled();
+    });
   });
 
   describe('aislamiento de tenant (Stock no tiene tenantId propio)', () => {
@@ -174,6 +245,45 @@ describe('InventarioService', () => {
 
     expect(repository.transferir).toHaveBeenCalledWith({ ...params, varianteId: 'v1' });
     expect(repository.ajustarCantidad).not.toHaveBeenCalled();
+  });
+
+  describe('transferirStock — Fase 9, exige acceso a AMBAS sucursales (origen y destino)', () => {
+    const params = { tenantId: 't1', productoId: 'p1', bodegaOrigenId: 'origen', bodegaDestinoId: 'destino', cantidad: 4, userId: 'u1' };
+
+    beforeEach(() => {
+      repository.buscarBodegaPorId.mockImplementation((id: string) =>
+        Promise.resolve({ id, sucursalId: id === 'origen' ? 's-origen' : 's-destino' }) as never,
+      );
+    });
+
+    it('permite si tiene acceso a las dos sucursales', async () => {
+      sucursalesRepository.usuarioPuedeOperar.mockResolvedValue(true);
+
+      await service.transferirStock(params);
+
+      expect(repository.transferir).toHaveBeenCalled();
+    });
+
+    it('lanza ForbiddenException si tiene acceso a la de origen pero no a la de destino', async () => {
+      sucursalesRepository.usuarioPuedeOperar.mockImplementation((_userId, sucursalId) => Promise.resolve(sucursalId === 's-origen'));
+
+      await expect(service.transferirStock(params)).rejects.toThrow(ForbiddenException);
+      expect(repository.transferir).not.toHaveBeenCalled();
+    });
+
+    it('lanza ForbiddenException si tiene acceso a la de destino pero no a la de origen', async () => {
+      sucursalesRepository.usuarioPuedeOperar.mockImplementation((_userId, sucursalId) => Promise.resolve(sucursalId === 's-destino'));
+
+      await expect(service.transferirStock(params)).rejects.toThrow(ForbiddenException);
+      expect(repository.transferir).not.toHaveBeenCalled();
+    });
+
+    it('lanza ForbiddenException si no tiene acceso a NINGUNA de las dos', async () => {
+      sucursalesRepository.usuarioPuedeOperar.mockResolvedValue(false);
+
+      await expect(service.transferirStock(params)).rejects.toThrow(ForbiddenException);
+      expect(repository.transferir).not.toHaveBeenCalled();
+    });
   });
 
   describe('kardex (Fase 5a)', () => {

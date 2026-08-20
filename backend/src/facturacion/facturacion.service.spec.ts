@@ -12,6 +12,7 @@ import { ClientesService } from '../clientes/clientes.service';
 import { VariantesService } from '../variantes/variantes.service';
 import { OfertasService } from '../ofertas/ofertas.service';
 import { BonosService } from '../bonos/bonos.service';
+import { AuthService } from '../auth/auth.service';
 
 describe('FacturacionService', () => {
   let service: FacturacionService;
@@ -25,6 +26,7 @@ describe('FacturacionService', () => {
   let variantesService: jest.Mocked<VariantesService>;
   let ofertasService: jest.Mocked<OfertasService>;
   let bonosService: jest.Mocked<BonosService>;
+  let authService: jest.Mocked<AuthService>;
 
   // Un tx opaco: crear()/anular() abren la transacción con tenantPrisma.client.$transaction
   // y pasan este objeto a los métodos *EnTx — para las pruebas basta con que sea el mismo
@@ -64,6 +66,7 @@ describe('FacturacionService', () => {
       verificarYDescontarStockEnTx: jest.fn().mockResolvedValue(undefined),
       entradaStockEnTx: jest.fn().mockResolvedValue(undefined),
       reconstruirLotesDeVentaEnTx: jest.fn().mockResolvedValue([]),
+      validarAccesoBodega: jest.fn().mockResolvedValue({ id: 'bodega-1', sucursalId: 's1' }),
     } as unknown as jest.Mocked<InventarioService>;
     tenantPrisma = { client: { $transaction: jest.fn((callback: (tx: unknown) => unknown) => callback(TX)) } };
     eventBus = { emit: jest.fn(), on: jest.fn() } as unknown as jest.Mocked<EventBusService>;
@@ -90,6 +93,9 @@ describe('FacturacionService', () => {
     bonosService = {
       procesarPagoEnTx: jest.fn().mockResolvedValue(undefined),
     } as unknown as jest.Mocked<BonosService>;
+    authService = {
+      verificarPin: jest.fn().mockResolvedValue(undefined),
+    } as unknown as jest.Mocked<AuthService>;
     service = new FacturacionService(
       repository,
       inventarioService,
@@ -101,6 +107,7 @@ describe('FacturacionService', () => {
       variantesService,
       ofertasService,
       bonosService,
+      authService,
     );
   });
 
@@ -113,6 +120,24 @@ describe('FacturacionService', () => {
       ...overrides,
     } as CrearFacturaDto;
   }
+
+  describe('Fase 9 — enforcement de acceso por sucursal en crear()', () => {
+    it('valida acceso a la sucursal de la bodega antes de calcular/crear la factura', async () => {
+      repository.obtenerProductoConPrecioVigente.mockResolvedValue(producto(18, 100) as never);
+      repository.crearFacturaEnTx.mockResolvedValue(facturaCreada() as never);
+
+      await service.crear(dto({ bodegaId: 'bodega-9' }), 'tenant-1', 'vendedor-1');
+
+      expect(inventarioService.validarAccesoBodega).toHaveBeenCalledWith('bodega-9', 'vendedor-1');
+    });
+
+    it('propaga el rechazo (bodega de una sucursal no asignada) sin crear la factura', async () => {
+      inventarioService.validarAccesoBodega.mockRejectedValue(new ForbiddenException('No tenés acceso a la sucursal de esta bodega'));
+
+      await expect(service.crear(dto(), 'tenant-1', 'vendedor-1')).rejects.toThrow(ForbiddenException);
+      expect(repository.crearFacturaEnTx).not.toHaveBeenCalled();
+    });
+  });
 
   describe('resolución del nivel de precio (Fase 3b)', () => {
     it('usa GENERAL si el cliente no tiene lista asignada y no hay override', async () => {
@@ -611,6 +636,22 @@ describe('FacturacionService', () => {
         expect.objectContaining({ tenantId: 'tenant-1', facturaId: 'f1', clienteId: 'cliente-1', total: '200' }),
       );
       expect(resultado).toEqual(expect.objectContaining({ id: 'f1' }));
+    });
+
+    it('Fase 9: propaga el PIN incorrecto/faltante sin llegar a tocar la factura', async () => {
+      authService.verificarPin.mockRejectedValue(new Error('PIN incorrecto'));
+
+      await expect(service.anular('f1', 'Motivo de prueba', 'tenant-1', 'user-1', true, 'mal')).rejects.toThrow('PIN incorrecto');
+      expect(repository.buscarPorId).not.toHaveBeenCalled();
+    });
+
+    it('Fase 9: valida acceso a la sucursal de la bodega de la factura antes de anular', async () => {
+      repository.buscarPorId.mockResolvedValue(facturaExistente() as never);
+      inventarioService.validarAccesoBodega.mockRejectedValue(new ForbiddenException('No tenés acceso a la sucursal de esta bodega'));
+
+      await expect(service.anular('f1', 'Motivo de prueba', 'tenant-1', 'user-1', true)).rejects.toThrow(ForbiddenException);
+      expect(inventarioService.validarAccesoBodega).toHaveBeenCalledWith('bodega-1', 'user-1');
+      expect(repository.anularEnTx).not.toHaveBeenCalled();
     });
 
     it('rechaza anular una factura que ya está anulada', async () => {

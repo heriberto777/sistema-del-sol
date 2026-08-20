@@ -1921,6 +1921,80 @@ sucursal activa (8c) → reportes filtrables (8d). Fase 9 (PIN + permisos
 por sucursal) es la que convierte la asignación de 8b en un límite de
 acceso real.
 
+### Fase 9 — PIN de confirmación + enforcement real de permisos por sucursal
+
+Última fase de adopción de Cuadre. Dos piezas independientes que
+comparten fase por tocarse en los mismos endpoints:
+
+**Enforcement real de acceso por sucursal**: hasta acá (Fase 8), la
+asignación de `UsuarioSucursal` solo alimentaba la UX (selector de
+sucursal activa, filtros de reporte) — cualquier usuario podía igual
+facturar/ajustar/transferir/recibir/abrir turno contra la bodega de una
+sucursal que no tenía asignada. `SucursalesRepository.usuarioPuedeOperar
+(userId, sucursalId)` (y su variante `EnTx`) resuelve el mismo default
+permisivo de 8b (0 sucursales asignadas = puede operar cualquiera) pero
+ahora se usa para BLOQUEAR, no solo para filtrar: `InventarioService`
+gana un helper `validarAccesoSucursal` (privado) invocado desde
+`validarPertenencia` cuando el llamador pasa `userId` — los llamadores
+de ESCRITURA (`verificarYDescontarStock(EnTx)`, `entradaStock(EnTx)`,
+`ajustarStock`, `transferirStock`) lo pasan; los de LECTURA (`kardex`,
+`listarStockPorBodega`, etc.) no, así que la lectura/reportes se quedan
+exactamente como en Fase 8 (filtro UX, sin bloquear — decisión
+deliberada, no un olvido). `InventarioService.validarAccesoBodega
+(bodegaId, userId)` es la variante pública (resuelve bodega + valida
+acceso en un solo paso) para servicios de otros módulos que no pasan por
+`validarPertenencia`: `FacturacionService.crear()`/`anular()` (cubre
+automáticamente POS, que reusa `crear()`, y la conversión de
+Cotizaciones/Remisiones a factura — ninguno de los tres necesita su
+propio chequeo), `ComprasService.recibir()`/`devolver()`, y
+`PosService.abrirTurno()`. **`transferirStock` exige acceso a las DOS
+sucursales tocadas** (origen y destino), no solo una — a diferencia del
+selector de UI de Fase 8c (que sí permite elegir cualquier bodega
+destino como caso de uso legítimo), el usuario que EJECUTA la
+transferencia necesita estar autorizado en ambos extremos; alguien que
+mueve stock legítimamente entre locales (ej. un gerente regional)
+simplemente tiene las dos sucursales asignadas.
+
+**PIN de confirmación**: `User` gana `pinHash`/`pinIntentosFallidos`/
+`pinBloqueadoHasta` (nullable — sin PIN configurado, no-op total, mismo
+default permisivo). Autoservicio vía `PUT`/`DELETE /auth/mi-pin`
+(requiere la contraseña completa para fijar/eliminar el PIN corto,
+mismo criterio que cambiar contraseña en otros sistemas) — sin endpoint
+de "cambiar" directo: para reemplazar un PIN ya configurado, primero se
+elimina y después se configura uno nuevo. `AuthService.verificarPin
+(userId, pin?)` bloquea 15 minutos tras 5 intentos fallidos consecutivos
+(un PIN de 4-6 dígitos sin ningún freno de fuerza bruta sería un hueco
+real, dado que gatea acciones como anular facturas) — **lanza
+`ForbiddenException` (403), nunca `UnauthorizedException` (401)**: el
+usuario ya está autenticado con un JWT válido en este punto, y el
+interceptor global de axios del frontend trata cualquier 401 como
+"sesión vencida" y desloguea sola — un PIN incorrecto con 401 cerraba
+la sesión en vez de mostrar el error inline (bug real, encontrado y
+corregido durante la verificación manual de esta fase).
+
+Acciones gateadas por PIN (parámetro `pin?` opcional al final de la
+firma existente de cada método, sin romper ningún call site):
+`FacturacionService.anular()` (siempre, si hay PIN configurado);
+`PosService.cerrarTurno()` solo cuando la diferencia de arqueo supera
+la tolerancia configurada O se cierra el turno de otro cajero (un
+cierre normal del propio turno sin diferencia, el caso más frecuente,
+no pide nada); `InventarioService.ajustarStock()` solo cuando
+`cantidad < 0` (salida/merma — riesgo real de encubrir faltantes; una
+entrada positiva no lo pide). **Fuera de alcance, deliberado**: el
+descuento manual por línea de factura (`linea.descuento`) NO se gatea
+con PIN — es una operación rutinaria de todos los días en POS/
+Facturación, forzar PIN en cualquier venta con descuento sería fricción
+constante en vez de una confirmación excepcional.
+
+Frontend: molecule `CampoPin` (`frontend/src/components/molecules/`) se
+renderiza solo si `usuario.tienePin` (viaja en el login, igual criterio
+que `modulosActivos` — solo UX, la validación real es 100% del backend)
+y se reusa en los 3 formularios de arriba; no se marca `required` vía
+HTML porque el backend solo lo exige en ciertas condiciones que no
+siempre son calculables de antemano en el formulario (ej. si el turno
+es ajeno). `ModalMiPin` (`frontend/src/components/organisms/`, acción
+"Mi PIN" en el header) es la pantalla de autoservicio.
+
 ## POS (punto de venta)
 
 `backend/src/pos/` es una capa delgada sobre Facturación: no duplica

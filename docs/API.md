@@ -21,6 +21,8 @@ propios campos relevantes (ver docs/ARCHITECTURE.md).
 | POST | `/api/auth/login` | público | `{ email, password, tenantSubdominio }` → `{ accessToken, usuario }` |
 | POST | `/api/auth/password/olvide` | público (5/hora) | `{ email, tenantSubdominio }` → mensaje genérico siempre (no filtra si el email existe); envía el link por correo |
 | POST | `/api/auth/password/restablecer` | público | `{ token, tenantSubdominio, password }` — token de un solo uso, vence en 1h |
+| PUT | `/api/auth/mi-pin` | autenticado | `{ passwordActual, pin }` — Fase 9, autoservicio; `pin` de 4-6 dígitos |
+| DELETE | `/api/auth/mi-pin` | autenticado | `{ passwordActual }` — Fase 9, elimina el PIN configurado |
 
 ## Plataforma (super admin — token y secreto separados del de tenants)
 
@@ -97,10 +99,10 @@ pasa ninguna de ellas.
 
 | Método | Ruta | Permiso |
 |---|---|---|
-| POST | `/api/facturas` | `facturacion.crear` — `{ clienteId, bodegaId, tipoFactura, lineas[], facturaOrigenId?, listaPrecio? }`; `facturaOrigenId` requerido para `NOTA_CREDITO`/`NOTA_DEBITO`; `listaPrecio` (nombre de `ListaPrecio`, no id) sobreescribe el nivel de precio resuelto del cliente para esta venta puntual — ver ARCHITECTURE.md, "Precios multinivel" |
+| POST | `/api/facturas` | `facturacion.crear` — `{ clienteId, bodegaId, tipoFactura, lineas[], facturaOrigenId?, listaPrecio? }`; `facturaOrigenId` requerido para `NOTA_CREDITO`/`NOTA_DEBITO`; `listaPrecio` (nombre de `ListaPrecio`, no id) sobreescribe el nivel de precio resuelto del cliente para esta venta puntual — ver ARCHITECTURE.md, "Precios multinivel"; 403 (Fase 9) si la bodega es de una sucursal no asignada al usuario (cubre también POS y conversión de Cotizaciones/Remisiones, que reusan este mismo endpoint internamente) |
 | GET | `/api/facturas?pagina&tamanoPagina&busqueda&tipoFactura` | `facturacion.ver` — `busqueda` filtra por NCF o nombre de cliente; `tipoFactura` (repetible: `?tipoFactura=NOTA_CREDITO&tipoFactura=NOTA_DEBITO`) filtra por tipo — usado por la pantalla de Notas de Crédito/Débito (Fase 4a de adopción de Cuadre) |
 | GET | `/api/facturas/:id` | `facturacion.ver` |
-| POST | `/api/facturas/:id/anular` | `facturacion.anular` — reversa el efecto de inventario (ver ARCHITECTURE.md); 400 si ya estaba anulada; si la factura es de POS y quien pide la anulación no tiene `pos.supervisar`, 403 salvo que sea el mismo cajero del turno Y siga `ABIERTO` (ver "Roles de POS" en ARCHITECTURE.md) |
+| POST | `/api/facturas/:id/anular` | `facturacion.anular` — `{ motivo, pin? }` (Fase 9, `pin` requerido solo si el usuario tiene uno configurado); reversa el efecto de inventario (ver ARCHITECTURE.md); 400 si ya estaba anulada; 403 si la bodega de la factura es de una sucursal no asignada al usuario; si la factura es de POS y quien pide la anulación no tiene `pos.supervisar`, 403 salvo que sea el mismo cajero del turno Y siga `ABIERTO` (ver "Roles de POS" en ARCHITECTURE.md) |
 | POST | `/api/facturas/:id/pagos` | `facturacion.cobrar` — `{ monto, formaPagoId, referencia?, fecha? }`; pagos parciales soportados, marca `pagada: true` al cubrir el total; 400 si el monto excede el saldo pendiente |
 | GET | `/api/facturas/:id/pagos` | `facturacion.ver` — `{ pagos, totalPagado }` |
 | GET | `/api/facturas/:id/imprimir?formato=CARTA\|A4\|TERMICA_80MM\|TERMICA_58MM` | `facturacion.imprimir` — sin `formato`, resuelve el default (override de bodega > default de tenant > CARTA, ver ARCHITECTURE.md); devuelve PDF o HTML según formato. Separado de `facturacion.ver` para que Vendedor pueda imprimir un recibo de POS sin ver la pantalla general de Facturación |
@@ -225,8 +227,8 @@ Catálogo tenant-scoped con jerarquía real (mismo patrón de auto-relación que
 | GET | `/api/inventario/kardex/:varianteId?bodegaId&desde&hasta` | `inventario.ver` — historial cronológico con saldo corriente (Fase 5a); sin `desde`/`hasta`, default mes actual (mismo criterio que `libro-mayor`); sin paginar — devuelve `{ variante, bodegaId, rango, saldoInicial, movimientos, saldoFinal }` |
 | GET | `/api/inventario/lotes?varianteId&bodegaId` | `inventario.ver` — lotes con saldo de esa variante+bodega (Fase 5b), para elegir "de qué lote sale" en devolución a proveedor / ajuste manual negativo |
 | GET | `/api/inventario/vencimientos?diasProximidad` | `inventario.ver` — lotes con saldo que vencen dentro de `diasProximidad` (default 30, Fase 5b), todas las bodegas del tenant; sin paginar |
-| POST | `/api/inventario/ajustar` | `inventario.ajustar` — `{ productoId, varianteId?, bodegaId, cantidad, motivo, numeroLote?, fechaVencimiento?, loteId? }`; `numeroLote`+`fechaVencimiento` obligatorios si el producto controla vencimiento y `cantidad > 0` (entrada); `loteId` obligatorio si controla vencimiento y `cantidad < 0` (salida, siempre explícito — nunca FEFO en una corrección manual) |
-| POST | `/api/inventario/transferir` | `inventario.transferir` — `{ productoId, varianteId?, bodegaOrigenId, bodegaDestinoId, cantidad }`; si el producto controla vencimiento, FEFO automático en origen y el lote (número+vencimiento) se preserva intacto en destino |
+| POST | `/api/inventario/ajustar` | `inventario.ajustar` — `{ productoId, varianteId?, bodegaId, cantidad, motivo, numeroLote?, fechaVencimiento?, loteId?, pin? }`; `numeroLote`+`fechaVencimiento` obligatorios si el producto controla vencimiento y `cantidad > 0` (entrada); `loteId` obligatorio si controla vencimiento y `cantidad < 0` (salida, siempre explícito — nunca FEFO en una corrección manual); `pin` (Fase 9) requerido solo si `cantidad < 0` y el usuario tiene uno configurado; 403 si la bodega es de una sucursal no asignada al usuario |
+| POST | `/api/inventario/transferir` | `inventario.transferir` — `{ productoId, varianteId?, bodegaOrigenId, bodegaDestinoId, cantidad }`; si el producto controla vencimiento, FEFO automático en origen y el lote (número+vencimiento) se preserva intacto en destino; 403 (Fase 9) si el usuario no tiene acceso a la sucursal de la bodega de ORIGEN o de DESTINO (exige las dos, no solo una) |
 
 ## Precios
 
@@ -248,8 +250,8 @@ saber a cuál de las variantes reales le corresponde el precio.
 | POST | `/api/compras` | `compras.crear` |
 | GET | `/api/compras?pagina&tamanoPagina&busqueda` | `compras.ver` — `busqueda` filtra por número de orden o nombre de proveedor |
 | GET | `/api/compras/:id` | `compras.ver` |
-| POST | `/api/compras/:id/recibir` | `compras.recibir` — cada línea admite `numeroLote?`/`fechaVencimiento?` (Fase 5b), obligatorios si el producto controla vencimiento |
-| POST | `/api/compras/:id/devolver` | `compras.recibir` — devolución parcial de mercancía ya recibida; cada línea admite `loteId?` (Fase 5b), obligatorio si el producto controla vencimiento (elegido a mano, nunca FEFO) |
+| POST | `/api/compras/:id/recibir` | `compras.recibir` — cada línea admite `numeroLote?`/`fechaVencimiento?` (Fase 5b), obligatorios si el producto controla vencimiento; 403 (Fase 9) si la bodega destino es de una sucursal no asignada al usuario |
+| POST | `/api/compras/:id/devolver` | `compras.recibir` — devolución parcial de mercancía ya recibida; cada línea admite `loteId?` (Fase 5b), obligatorio si el producto controla vencimiento (elegido a mano, nunca FEFO); 403 (Fase 9) si la bodega es de una sucursal no asignada al usuario |
 | POST | `/api/compras/:id/pagos` | `compras.pagar` — `{ monto, formaPagoId, referencia?, retencionIsr?, retencionItbis?, fecha? }`; pagos parciales soportados, marca `pagada: true` al cubrir el total |
 | GET | `/api/compras/:id/pagos` | `compras.ver` — `{ pagos, totalPagado }` |
 
@@ -390,13 +392,13 @@ para asientos manuales (ajustes, apertura, etc.).
 
 | Método | Ruta | Permiso |
 |---|---|---|
-| POST | `/api/pos/turnos` | `pos.editar` — abre un turno (`{ bodegaId, montoInicial }`); 400 si esa bodega ya tiene uno ABIERTO |
+| POST | `/api/pos/turnos` | `pos.editar` — abre un turno (`{ bodegaId, montoInicial }`); 400 si esa bodega ya tiene uno ABIERTO; 403 (Fase 9) si la bodega es de una sucursal no asignada al usuario |
 | GET | `/api/pos/turnos?pagina&tamanoPagina` | `pos.ver` |
 | GET | `/api/pos/cajeros` | `pos.ver` — cajeros distintos que han tenido al menos un turno, sin exigir `admin.usuarios` |
 | GET | `/api/pos/vendedores?busqueda` | `pos.ver` — `Empleado` activos con cargo "Vendedor" (texto libre, no relacionado a `User`); sin exigir `nomina.ver` ni el módulo Nómina activo |
 | GET | `/api/pos/turnos/:id` | `pos.ver` — incluye movimientos y facturas del turno |
 | POST | `/api/pos/turnos/:id/movimientos` | `pos.editar` — entrada/salida de efectivo que no es una venta (`{ tipo: ENTRADA\|SALIDA, monto, concepto }`) |
-| POST | `/api/pos/turnos/:id/cerrar` | `pos.editar` — `{ montoFinalContado }`, calcula `montoEsperado`/`diferencia` |
+| POST | `/api/pos/turnos/:id/cerrar` | `pos.editar` — `{ montoFinalContado, justificacionDiferencia?, pin? }`, calcula `montoEsperado`/`diferencia`; `pin` (Fase 9) requerido solo si el usuario tiene uno configurado Y (la diferencia supera la tolerancia O se cierra el turno de otro cajero) |
 | POST | `/api/pos/cotizar` | `pos.editar` — previsualización de solo lectura (`{ clienteId, lineas, listaPrecio? }`, mismo shape de líneas que `/pos/ventas`), sin `turnoCajaId` ni `pagos`: devuelve `{ lineas, subtotal, descuento, itbis, total }` ya con ofertas/nivel de precio resueltos, sin tocar stock/NCF/pagos. El checkout del POS la llama antes de armar los pagos para no cobrar sobre un estimado del navegador que ignora ofertas (Fase 4c — ver ARCHITECTURE.md) |
 | POST | `/api/pos/ventas` | `pos.editar` — venta CONTADO contra la bodega del turno (`{ turnoCajaId, clienteId, vendedorEmpleadoId?, listaPrecio?, pagos: [{formaPagoId, monto, referencia?}], lineas }`); soporta pago dividido (uno o más pagos que sumen exacto el total); `listaPrecio` sobreescribe el nivel de precio resuelto del cliente para esta venta puntual; genera su asiento contable automático igual que cualquier factura |
 | POST | `/api/pos/devoluciones` | `facturacion.anular` — devolución parcial (`{ facturaOrigenId, turnoCajaId, formaPagoId, referenciaPago?, lineas: [{productoId, cantidad}] }`); emite una NOTA_CREDITO, 400 si la cantidad excede lo disponible |

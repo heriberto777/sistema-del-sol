@@ -59,6 +59,12 @@ PostgreSQL 16 + Prisma. Schema completo en `backend/prisma/schema.prisma`.
 contraseña" — ver ARCHITECTURE.md. Se limpian (`null`) al canjear el
 token, así que un token nunca puede reusarse.
 
+`users` también tiene `pinHash`/`pinIntentosFallidos`/
+`pinBloqueadoHasta` (Fase 9 de adopción de Cuadre — PIN corto de
+confirmación para acciones sensibles, todos nullable/con default, sin
+backfill). Sin `pinHash`, las acciones que lo piden funcionan igual que
+antes de esta fase (default permisivo) — ver ARCHITECTURE.md.
+
 ## Reglas de negocio relevantes al modelo
 
 - **NCF**: `ncf_asignados` guarda, por tenant y tipo (`B01` Crédito Fiscal,

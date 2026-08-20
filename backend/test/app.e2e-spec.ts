@@ -3354,4 +3354,112 @@ describe('App (e2e)', () => {
         .expect(200);
     });
   });
+
+  /**
+   * Fase 9: la Fase 8 solo filtraba la UX (selector de sucursal activa,
+   * reportes) — esta es la red que atrapa que el enforcement real (403
+   * duro) esté conectado en los 5 flujos transaccionales, no solo en
+   * InventarioService de forma aislada.
+   */
+  describe('Fase 9 — enforcement real de permisos por sucursal', () => {
+    let bodegaAsignadaId: string;
+    let bodegaAjenaId: string;
+    let productoId: string;
+    let tokenRestringido: string;
+    let proveedorId: string;
+
+    beforeAll(async () => {
+      const sucursalAsignada = await prisma.sucursal.create({ data: { tenantId: tenantAId, nombre: 'Sucursal Fase9 Asignada' } });
+      const sucursalAjena = await prisma.sucursal.create({ data: { tenantId: tenantAId, nombre: 'Sucursal Fase9 Ajena' } });
+      const bodegaAsignada = await prisma.bodega.create({ data: { tenantId: tenantAId, sucursalId: sucursalAsignada.id, nombre: 'Bodega Fase9 Asignada' } });
+      const bodegaAjena = await prisma.bodega.create({ data: { tenantId: tenantAId, sucursalId: sucursalAjena.id, nombre: 'Bodega Fase9 Ajena' } });
+      bodegaAsignadaId = bodegaAsignada.id;
+      bodegaAjenaId = bodegaAjena.id;
+
+      const producto = await prisma.producto.create({
+        data: { tenantId: tenantAId, codigo: 'E2E-FASE9', nombre: 'Producto Fase9 E2E', porcentajeItbis: 18 },
+      });
+      productoId = producto.id;
+      const varianteId = await idVarianteDefault(productoId);
+      await prisma.stock.create({ data: { varianteId, bodegaId: bodegaAsignadaId, cantidadActual: 100, stockMinimo: 5 } });
+      await prisma.stock.create({ data: { varianteId, bodegaId: bodegaAjenaId, cantidadActual: 100, stockMinimo: 5 } });
+      await prisma.precio.create({ data: { varianteId, listaPrecio: 'GENERAL', costo: 50, margenPct: 100, precioVenta: 100 } });
+
+      const proveedor = await prisma.proveedor.create({ data: { tenantId: tenantAId, nombre: 'Proveedor Fase9 E2E' } });
+      proveedorId = proveedor.id;
+
+      // Mismos permisos operativos que admin@e2e-a.com — cualquier 403 que
+      // veamos abajo es 100% del enforcement de sucursal, no de RBAC.
+      const rol = await prisma.role.create({ data: { tenantId: tenantAId, nombre: 'RestringidoSucursalFase9' } });
+      for (const clave of ['facturacion.crear', 'inventario.ver', 'inventario.ajustar', 'inventario.transferir', 'compras.recibir', 'pos.editar']) {
+        const permiso = await prisma.permission.findUniqueOrThrow({ where: { clave } });
+        await prisma.rolePermission.create({ data: { roleId: rol.id, permissionId: permiso.id } });
+      }
+      const passwordHash = await bcrypt.hash(PASSWORD, 10);
+      const usuario = await prisma.user.create({
+        data: { tenantId: tenantAId, email: 'restringido-fase9@e2e-a.com', nombre: 'Restringido Fase9', passwordHash },
+      });
+      await prisma.userRole.create({ data: { userId: usuario.id, roleId: rol.id } });
+      // Única sucursal asignada: la "Asignada" — deja de ver/operar TODAS
+      // (default permisivo de Fase 8) para quedar restringido a esta sola.
+      await prisma.usuarioSucursal.create({ data: { userId: usuario.id, sucursalId: sucursalAsignada.id } });
+
+      tokenRestringido = await login('restringido-fase9@e2e-a.com', SUBDOMINIO_A);
+    });
+
+    it('403 al facturar contra una bodega de una sucursal no asignada', async () => {
+      await request(app.getHttpServer())
+        .post('/api/facturas')
+        .set('Authorization', `Bearer ${tokenRestringido}`)
+        .send({ clienteId: clienteAId, bodegaId: bodegaAjenaId, tipoFactura: 'CONTADO', lineas: [{ productoId, cantidad: 1 }] })
+        .expect(403);
+    });
+
+    it('200 al facturar contra la bodega de la sucursal SÍ asignada (control positivo)', async () => {
+      await request(app.getHttpServer())
+        .post('/api/facturas')
+        .set('Authorization', `Bearer ${tokenRestringido}`)
+        .send({ clienteId: clienteAId, bodegaId: bodegaAsignadaId, tipoFactura: 'CONTADO', lineas: [{ productoId, cantidad: 1 }] })
+        .expect(201);
+    });
+
+    it('403 al ajustar stock en una bodega de una sucursal no asignada', async () => {
+      await request(app.getHttpServer())
+        .post('/api/inventario/ajustar')
+        .set('Authorization', `Bearer ${tokenRestringido}`)
+        .send({ productoId, bodegaId: bodegaAjenaId, cantidad: 5, motivo: 'Ajuste Fase 9 E2E' })
+        .expect(403);
+    });
+
+    it('403 al transferir stock hacia una bodega de una sucursal no asignada (aunque el origen sí esté asignado)', async () => {
+      await request(app.getHttpServer())
+        .post('/api/inventario/transferir')
+        .set('Authorization', `Bearer ${tokenRestringido}`)
+        .send({ productoId, bodegaOrigenId: bodegaAsignadaId, bodegaDestinoId: bodegaAjenaId, cantidad: 1 })
+        .expect(403);
+    });
+
+    it('403 al abrir un turno de caja en una bodega de una sucursal no asignada', async () => {
+      await request(app.getHttpServer())
+        .post('/api/pos/turnos')
+        .set('Authorization', `Bearer ${tokenRestringido}`)
+        .send({ bodegaId: bodegaAjenaId, montoInicial: 500 })
+        .expect(403);
+    });
+
+    it('403 al recibir una orden de compra en una bodega de una sucursal no asignada', async () => {
+      const tokenAdmin = await login('admin@e2e-a.com', SUBDOMINIO_A);
+      const orden = await request(app.getHttpServer())
+        .post('/api/compras')
+        .set('Authorization', `Bearer ${tokenAdmin}`)
+        .send({ proveedorId, numero: 'OC-E2E-FASE9', lineas: [{ productoId, cantidad: 5, costoUnitario: 20 }] })
+        .expect(201);
+
+      await request(app.getHttpServer())
+        .post(`/api/compras/${orden.body.id}/recibir`)
+        .set('Authorization', `Bearer ${tokenRestringido}`)
+        .send({ bodegaId: bodegaAjenaId, lineas: [{ productoId, cantidadRecibida: 5, costoUnitario: 20 }] })
+        .expect(403);
+    });
+  });
 });

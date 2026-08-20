@@ -9,6 +9,7 @@ import { CatalogoProductosPos, type ProductoCatalogo } from '../CatalogoProducto
 import { ComboboxBusqueda } from '../../molecules/ComboboxBusqueda/ComboboxBusqueda';
 import { FormField } from '../../molecules/FormField/FormField';
 import { Modal } from '../../molecules/Modal/Modal';
+import { CampoPin } from '../../molecules/CampoPin/CampoPin';
 import { SelectFormaPago, type FormaPago } from '../../molecules/SelectFormaPago/SelectFormaPago';
 import { Select } from '../../atoms/Select/Select';
 import { useAuth } from '../../../hooks/useAuth';
@@ -1204,6 +1205,7 @@ function ModalCerrarTurno({
 }) {
   const [conteo, setConteo] = useState<Record<number, string>>({});
   const [justificacionDiferencia, setJustificacionDiferencia] = useState('');
+  const [pin, setPin] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   const algoContado = Object.values(conteo).some((v) => v.trim() !== '');
@@ -1219,6 +1221,7 @@ function ModalCerrarTurno({
       apiClient.post(`/pos/turnos/${data.id}/cerrar`, {
         montoFinalContado,
         justificacionDiferencia: justificacionDiferencia || undefined,
+        pin: pin || undefined,
       }),
     onSuccess: () => onCerrado(),
     onError: (err: unknown) => setError(mensajeErrorApi(err, 'No se pudo cerrar el turno.')),
@@ -1289,6 +1292,7 @@ function ModalCerrarTurno({
             className="rounded-md border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
           />
         </div>
+        <CampoPin value={pin} onChange={setPin} id="cerrar-turno-pin" />
         {error && <p className="text-sm text-red-600">{error}</p>}
         <Button type="submit" variante="peligro" disabled={cerrarTurno.isPending} className="w-full">
           {cerrarTurno.isPending ? 'Cerrando…' : 'Cerrar turno'}

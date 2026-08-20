@@ -11,4 +11,13 @@ export class CerrarTurnoDto {
   @IsOptional()
   @IsString()
   justificacionDiferencia?: string;
+
+  @ApiProperty({
+    required: false,
+    description:
+      'Requerido solo si el usuario tiene un PIN configurado (Fase 9) y (a) la diferencia supera la tolerancia, o (b) se cierra el turno de otro cajero',
+  })
+  @IsOptional()
+  @IsString()
+  pin?: string;
 }

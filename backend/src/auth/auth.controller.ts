@@ -1,12 +1,16 @@
-import { Body, Controller, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Post, Put } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
-import { ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { ResolverEmpresasDto } from './dto/resolver-empresas.dto';
 import { OlvidePasswordDto } from './dto/olvide-password.dto';
 import { RestablecerPasswordDto } from './dto/restablecer-password.dto';
+import { EstablecerPinDto } from './dto/establecer-pin.dto';
+import { EliminarPinDto } from './dto/eliminar-pin.dto';
 import { Public } from '../common/decorators/public.decorator';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { JwtPayloadUser } from '../common/types/authenticated-request';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -40,5 +44,19 @@ export class AuthController {
   @Post('password/restablecer')
   restablecerPassword(@Body() dto: RestablecerPasswordDto) {
     return this.authService.restablecerPassword(dto);
+  }
+
+  // Autoservicio (Fase 9) — sin @Permissions, cualquier usuario autenticado
+  // administra su propio PIN, igual criterio que cambiar su contraseña.
+  @ApiBearerAuth()
+  @Put('mi-pin')
+  establecerPin(@Body() dto: EstablecerPinDto, @CurrentUser() user: JwtPayloadUser) {
+    return this.authService.establecerPin(user.userId, dto);
+  }
+
+  @ApiBearerAuth()
+  @Delete('mi-pin')
+  eliminarPin(@Body() dto: EliminarPinDto, @CurrentUser() user: JwtPayloadUser) {
+    return this.authService.eliminarPin(user.userId, dto);
   }
 }

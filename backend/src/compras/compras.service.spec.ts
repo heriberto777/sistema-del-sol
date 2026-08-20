@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { ComprasService } from './compras.service';
 import { ComprasRepository } from './compras.repository';
 import { InventarioService } from '../inventario/inventario.service';
@@ -37,6 +37,7 @@ describe('ComprasService', () => {
     inventarioService = {
       entradaStockEnTx: jest.fn(),
       verificarYDescontarStockEnTx: jest.fn(),
+      validarAccesoBodega: jest.fn().mockResolvedValue({ id: 'bodega-1', sucursalId: 's1' }),
     } as unknown as jest.Mocked<InventarioService>;
     tenantPrisma = {
       client: {
@@ -112,6 +113,14 @@ describe('ComprasService', () => {
       bodegaId: 'bodega-1',
       lineas: [{ productoId: 'p1', cantidadRecibida: 10, costoUnitario: 5 }],
     };
+
+    it('Fase 9: valida acceso a la sucursal de la bodega destino antes de recibir', async () => {
+      inventarioService.validarAccesoBodega.mockRejectedValue(new ForbiddenException('No tenés acceso a la sucursal de esta bodega'));
+
+      await expect(service.recibir('oc-1', dtoRecepcion, 'user-1', 'tenant-1')).rejects.toThrow(ForbiddenException);
+      expect(inventarioService.validarAccesoBodega).toHaveBeenCalledWith('bodega-1', 'user-1');
+      expect(repository.buscarPorId).not.toHaveBeenCalled();
+    });
 
     it('marca RECIBIDA_TOTAL cuando la cantidad recibida acumulada cubre lo pedido', async () => {
       repository.buscarPorId.mockResolvedValue(ordenBase(0) as never); // antes de recibir
@@ -308,6 +317,14 @@ describe('ComprasService', () => {
     }
 
     const dtoDevolucion = { bodegaId: 'bodega-1', motivo: 'Mercancía defectuosa', lineas: [{ productoId: 'p1', cantidad: 4 }] };
+
+    it('Fase 9: valida acceso a la sucursal de la bodega de donde sale la mercancía antes de devolver', async () => {
+      inventarioService.validarAccesoBodega.mockRejectedValue(new ForbiddenException('No tenés acceso a la sucursal de esta bodega'));
+
+      await expect(service.devolver('oc-1', dtoDevolucion, 'user-1', 'tenant-1')).rejects.toThrow(ForbiddenException);
+      expect(inventarioService.validarAccesoBodega).toHaveBeenCalledWith('bodega-1', 'user-1');
+      expect(repository.buscarPorId).not.toHaveBeenCalled();
+    });
 
     it('reduce cantidadRecibida, saca stock, y marca RECIBIDA_PARCIAL si ya no cubre todo lo pedido', async () => {
       repository.buscarPorId.mockResolvedValue(ordenRecibida() as never);

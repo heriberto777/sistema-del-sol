@@ -17,6 +17,8 @@ import { NotificacionesModule } from '../notificaciones/notificaciones.module';
   ],
   controllers: [AuthController],
   providers: [AuthService, JwtStrategy],
-  exports: [JwtModule],
+  // AuthService: FacturacionModule/PosModule/InventarioModule lo importan
+  // para llamar verificarPin() en las acciones sensibles de Fase 9.
+  exports: [JwtModule, AuthService],
 })
 export class AuthModule {}

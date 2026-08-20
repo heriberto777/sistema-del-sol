@@ -1,9 +1,11 @@
+import { useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import { Sidebar } from '../../organisms/Sidebar/Sidebar';
 import { Button } from '../../atoms/Button/Button';
 import { ThemeToggle } from '../../molecules/ThemeToggle/ThemeToggle';
 import { GlobalCrearMenu } from '../../organisms/GlobalCrearMenu/GlobalCrearMenu';
 import { MarcarAsistenciaWidget } from '../../organisms/MarcarAsistenciaWidget/MarcarAsistenciaWidget';
+import { ModalMiPin } from '../../organisms/ModalMiPin/ModalMiPin';
 import { useAuth } from '../../../hooks/useAuth';
 
 function iniciales(nombre?: string) {
@@ -14,6 +16,7 @@ function iniciales(nombre?: string) {
 
 export function AppLayout() {
   const { usuario, logout } = useAuth();
+  const [modalPinAbierto, setModalPinAbierto] = useState(false);
 
   return (
     <div className="flex h-screen bg-slate-50 dark:bg-slate-950">
@@ -30,6 +33,9 @@ export function AppLayout() {
             <MarcarAsistenciaWidget />
             <GlobalCrearMenu />
             <ThemeToggle />
+            <Button variante="secundario" onClick={() => setModalPinAbierto(true)}>
+              Mi PIN
+            </Button>
             <Button variante="secundario" onClick={logout}>
               Cerrar sesión
             </Button>
@@ -39,6 +45,7 @@ export function AppLayout() {
           <Outlet />
         </main>
       </div>
+      {modalPinAbierto && <ModalMiPin onClose={() => setModalPinAbierto(false)} />}
     </div>
   );
 }

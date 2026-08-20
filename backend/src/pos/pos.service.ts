@@ -5,6 +5,8 @@ import { ConfiguracionesService } from '../configuraciones/configuraciones.servi
 import { FormasPagoRepository } from '../formas-pago/formas-pago.repository';
 import { EmpleadosRepository } from '../nomina/empleados.repository';
 import { VariantesService } from '../variantes/variantes.service';
+import { InventarioService } from '../inventario/inventario.service';
+import { AuthService } from '../auth/auth.service';
 import { AbrirTurnoDto } from './dto/abrir-turno.dto';
 import { CerrarTurnoDto } from './dto/cerrar-turno.dto';
 import { CrearMovimientoCajaDto } from './dto/crear-movimiento-caja.dto';
@@ -27,6 +29,8 @@ export class PosService {
     private readonly formasPagoRepository: FormasPagoRepository,
     private readonly empleadosRepository: EmpleadosRepository,
     private readonly variantesService: VariantesService,
+    private readonly inventarioService: InventarioService,
+    private readonly authService: AuthService,
   ) {}
 
   listarVendedores(busqueda?: string) {
@@ -34,6 +38,9 @@ export class PosService {
   }
 
   async abrirTurno(dto: AbrirTurnoDto, tenantId: string, cajeroId: string) {
+    // Valida que la bodega pertenezca al tenant (antes ni se chequeaba) y,
+    // Fase 9, que el cajero tenga acceso a la sucursal de esa bodega.
+    await this.inventarioService.validarAccesoBodega(dto.bodegaId, cajeroId);
     const turnoAbierto = await this.posRepository.buscarTurnoAbierto(dto.bodegaId);
     if (turnoAbierto) {
       throw new BadRequestException('Esta bodega ya tiene un turno de caja abierto');
@@ -124,10 +131,19 @@ export class PosService {
     const tolerancia = Number(
       await this.configuracionesService.buscarValor(CLAVE_TOLERANCIA_ARQUEO, tenantId, CONFIGURACIONES_BASE.POS_TOLERANCIA_ARQUEO),
     );
-    if (Math.abs(diferencia) > tolerancia && !dto.justificacionDiferencia?.trim()) {
+    const diferenciaExcedeTolerancia = Math.abs(diferencia) > tolerancia;
+    if (diferenciaExcedeTolerancia && !dto.justificacionDiferencia?.trim()) {
       throw new BadRequestException(
         `La diferencia (RD$ ${diferencia.toFixed(2)}) supera la tolerancia configurada (RD$ ${tolerancia.toFixed(2)}) — agregá una justificación para poder cerrar el turno.`,
       );
+    }
+
+    // Fase 9: PIN de confirmación en los dos momentos sensibles del cierre
+    // — diferencia de arqueo fuera de tolerancia, o cierre de un turno
+    // ajeno (supervisor cerrando el de otro cajero). No-op si el usuario
+    // no tiene PIN configurado (default permisivo).
+    if (diferenciaExcedeTolerancia || turno.cajeroId !== userId) {
+      await this.authService.verificarPin(userId, dto.pin);
     }
 
     return this.posRepository.cerrarTurno(id, {

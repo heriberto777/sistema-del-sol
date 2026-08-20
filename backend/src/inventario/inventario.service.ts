@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
 import { FormatoImpresion, Prisma } from '@prisma/client';
 import { InventarioRepository, LoteEntrada } from './inventario.repository';
 import { ProductosService } from '../productos/productos.service';
@@ -8,6 +8,7 @@ import { EventBusService } from '../event-bus/event-bus.service';
 import { EVENTOS } from '../event-bus/events';
 import { ListadoQueryDto } from '../common/dto/listado-query.dto';
 import { paginar } from '../common/types/pagina-resultado';
+import { AuthService } from '../auth/auth.service';
 
 @Injectable()
 export class InventarioService {
@@ -17,6 +18,7 @@ export class InventarioService {
     private readonly variantesService: VariantesService,
     private readonly sucursalesRepository: SucursalesRepository,
     private readonly eventBus: EventBusService,
+    private readonly authService: AuthService,
   ) {}
 
   /**
@@ -41,7 +43,10 @@ export class InventarioService {
    * e2e contra Postgres con RLS activo, no algo que un mock hubiera
    * detectado.
    */
-  private async validarPertenencia(params: { productoId?: string; bodegaId?: string }, tx?: Prisma.TransactionClient) {
+  private async validarPertenencia(
+    params: { productoId?: string; bodegaId?: string; userId?: string },
+    tx?: Prisma.TransactionClient,
+  ) {
     const [producto, bodega] = await Promise.all([
       params.productoId
         ? tx
@@ -54,7 +59,35 @@ export class InventarioService {
           : this.inventarioRepository.buscarBodegaPorId(params.bodegaId)
         : undefined,
     ]);
+    if (bodega && params.userId) {
+      await this.validarAccesoSucursal(params.userId, bodega.sucursalId, tx);
+    }
     return { producto, bodega };
+  }
+
+  /**
+   * Fase 9 — enforcement real de "permisos por sucursal" (Fase 8 solo
+   * filtraba la UX). Solo se llama con `userId` desde las operaciones
+   * transaccionales de escritura (descuento/entrada/ajuste/transferencia de
+   * stock) — las de solo lectura (`kardex`, `listarLotes`, etc.) siguen
+   * llamando a `validarPertenencia` sin `userId`, así que no quedan
+   * restringidas (decisión explícita: el enforcement duro es solo para
+   * escritura, lectura se queda como filtro UX de Fase 8).
+   */
+  private async validarAccesoSucursal(userId: string, sucursalId: string, tx?: Prisma.TransactionClient) {
+    const permitido = tx
+      ? await this.sucursalesRepository.usuarioPuedeOperarEnTx(tx, userId, sucursalId)
+      : await this.sucursalesRepository.usuarioPuedeOperar(userId, sucursalId);
+    if (!permitido) {
+      throw new ForbiddenException('No tenés acceso a la sucursal de esta bodega');
+    }
+  }
+
+  /** Para servicios que no mueven stock pero sí necesitan validar bodega+acceso antes de operar (ver PosService.abrirTurno). */
+  async validarAccesoBodega(bodegaId: string, userId: string) {
+    const bodega = await this.inventarioRepository.buscarBodegaPorId(bodegaId);
+    await this.validarAccesoSucursal(userId, bodega.sucursalId);
+    return bodega;
   }
 
   /**
@@ -77,7 +110,7 @@ export class InventarioService {
     /** Solo si el producto controla vencimiento — devolución a proveedor (elige explícito, no FEFO); si se omite, FEFO automático. */
     loteId?: string;
   }) {
-    const { producto } = await this.validarPertenencia({ productoId: params.productoId, bodegaId: params.bodegaId });
+    const { producto } = await this.validarPertenencia({ productoId: params.productoId, bodegaId: params.bodegaId, userId: params.userId });
     const varianteId = await this.variantesService.resolverObligatoria(params.productoId, params.varianteId);
 
     const stock = await this.inventarioRepository.descontarStockCondicional({
@@ -153,7 +186,10 @@ export class InventarioService {
       loteId?: string;
     },
   ) {
-    const { producto } = await this.validarPertenencia({ productoId: params.productoId, bodegaId: params.bodegaId }, tx);
+    const { producto } = await this.validarPertenencia(
+      { productoId: params.productoId, bodegaId: params.bodegaId, userId: params.userId },
+      tx,
+    );
     const varianteId = await this.variantesService.resolverObligatoria(params.productoId, params.varianteId);
 
     const stock = await this.inventarioRepository.descontarStockCondicionalEnTx(tx, {
@@ -199,7 +235,10 @@ export class InventarioService {
       lotes?: LoteEntrada[];
     },
   ) {
-    const { producto } = await this.validarPertenencia({ productoId: params.productoId, bodegaId: params.bodegaId }, tx);
+    const { producto } = await this.validarPertenencia(
+      { productoId: params.productoId, bodegaId: params.bodegaId, userId: params.userId },
+      tx,
+    );
     const varianteId = await this.variantesService.resolverObligatoria(params.productoId, params.varianteId);
     return this.inventarioRepository.ajustarCantidadEnTx(tx, {
       tenantId: params.tenantId,
@@ -227,7 +266,7 @@ export class InventarioService {
     motivo: string;
     lotes?: LoteEntrada[];
   }) {
-    const { producto } = await this.validarPertenencia({ productoId: params.productoId, bodegaId: params.bodegaId });
+    const { producto } = await this.validarPertenencia({ productoId: params.productoId, bodegaId: params.bodegaId, userId: params.userId });
     const varianteId = await this.variantesService.resolverObligatoria(params.productoId, params.varianteId);
     return this.inventarioRepository.ajustarCantidad({
       tenantId: params.tenantId,
@@ -256,8 +295,15 @@ export class InventarioService {
     fechaVencimiento?: Date;
     /** Solo si el producto controla vencimiento — salida (cantidad < 0): de qué lote sale (siempre explícito, nunca FEFO en un ajuste manual). */
     loteId?: string;
+    /** Requerido solo si el usuario tiene PIN configurado (Fase 9) y la cantidad es negativa (salida/merma). */
+    pin?: string;
   }) {
-    const { producto } = await this.validarPertenencia({ productoId: params.productoId, bodegaId: params.bodegaId });
+    const { producto } = await this.validarPertenencia({ productoId: params.productoId, bodegaId: params.bodegaId, userId: params.userId });
+    // Fase 9: PIN de confirmación solo en salidas (riesgo real de encubrir
+    // faltantes) — una entrada positiva (corregir un conteo de más) no lo pide.
+    if (params.cantidad < 0) {
+      await this.authService.verificarPin(params.userId, params.pin);
+    }
     const varianteId = await this.variantesService.resolverObligatoria(params.productoId, params.varianteId);
     return this.inventarioRepository.ajustarCantidad({
       tenantId: params.tenantId,
@@ -286,9 +332,15 @@ export class InventarioService {
     cantidad: number;
     userId: string;
   }) {
+    // Transferir entre sucursales sigue siendo una operación de negocio
+    // válida (Fase 8c) pero quien la ejecuta necesita acceso a las DOS
+    // sucursales que toca, no solo a la de origen — si no, alguien con una
+    // sola sucursal asignada podría sacar/recibir stock de otra sin estar
+    // autorizado ahí. Un usuario que legítimamente mueve stock entre
+    // locales (ej. un gerente regional) simplemente tiene ambas asignadas.
     const [{ producto }] = await Promise.all([
-      this.validarPertenencia({ productoId: params.productoId, bodegaId: params.bodegaOrigenId }),
-      this.validarPertenencia({ bodegaId: params.bodegaDestinoId }),
+      this.validarPertenencia({ productoId: params.productoId, bodegaId: params.bodegaOrigenId, userId: params.userId }),
+      this.validarPertenencia({ bodegaId: params.bodegaDestinoId, userId: params.userId }),
     ]);
     const varianteId = await this.variantesService.resolverObligatoria(params.productoId, params.varianteId);
     return this.inventarioRepository.transferir({ ...params, varianteId, controlaVencimiento: producto!.controlaVencimiento });

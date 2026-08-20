@@ -20,6 +20,7 @@ import { DocumentoPdfParams, generarDocumentoPdf } from '../common/pdf/documento
 import { generarDocumentoTicketHtml } from '../common/pdf/documento-ticket';
 import { resolverFormatoImpresion } from '../common/impresion/resolver-formato-impresion';
 import { PrismaService } from '../prisma/prisma.service';
+import { AuthService } from '../auth/auth.service';
 
 const NOMBRE_TIPO_FACTURA: Record<TipoFactura, string> = {
   CONTADO: 'Factura de venta',
@@ -91,6 +92,7 @@ export class FacturacionService {
     private readonly variantesService: VariantesService,
     private readonly ofertasService: OfertasService,
     private readonly bonosService: BonosService,
+    private readonly authService: AuthService,
   ) {}
 
   /**
@@ -241,6 +243,10 @@ export class FacturacionService {
     // cliente-suministradas. De paso resuelve el nivel de precio del
     // cliente para las líneas que no traen precioUnitario explícito.
     const cliente = await this.clientesService.buscarPorId(dto.clienteId);
+    // Fase 9: cubre Facturación directa, ventas de POS (PosService reusa
+    // crear()) y conversión de Cotizaciones/Remisiones a factura — ninguno
+    // de esos módulos necesita su propio chequeo de acceso por sucursal.
+    await this.inventarioService.validarAccesoBodega(dto.bodegaId, vendedorId);
     const { lineasCalculadas, subtotal, itbis, total, descuentoTotal } = await this.calcularLineasYTotales(dto, cliente);
 
     // Pago dividido (POS, ver PosService.registrarVenta): si vienen `pagos`
@@ -422,10 +428,18 @@ export class FacturacionService {
   }
 
   /** Misma razón que en `crear()`: la reintegración/re-descuento de stock y el cambio de estado de la factura corren en una sola transacción. */
-  async anular(id: string, motivo: string, tenantId: string, userId: string, puedeSupervisarCaja: boolean) {
+  async anular(id: string, motivo: string, tenantId: string, userId: string, puedeSupervisarCaja: boolean, pin?: string) {
+    // Fase 9: anular es una acción sensible — confirmación de PIN además
+    // del permiso `facturacion.anular` que ya gatea el endpoint. No-op si
+    // el usuario no tiene PIN configurado (default permisivo).
+    await this.authService.verificarPin(userId, pin);
+
     const factura = await this.facturacionRepository.buscarPorId(id);
     if (factura.estado === 'ANULADA') {
       throw new BadRequestException('La factura ya está anulada');
+    }
+    if (factura.bodegaId) {
+      await this.inventarioService.validarAccesoBodega(factura.bodegaId, userId);
     }
 
     // Un Cajero (sin pos.supervisar) solo puede anular ventas de POS de SU
