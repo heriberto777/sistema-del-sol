@@ -1749,6 +1749,25 @@ Node corre en la zona horaria del contenedor Docker (típicamente UTC),
 así que usar `new Date()`/`toLocaleTimeString()` sin especificar esa
 zona habría registrado la hora equivocada para el empleado.
 
+**Ausencias (7c, implementado)**: `Ausencia` — solicitud con flujo de
+aprobación `SOLICITADA → APROBADA/RECHAZADA` (mismo patrón que
+`EstadoCotizacion`), dos relaciones nombradas a `User`
+(`solicitadoPorId`/`aprobadoPorId`, mismo patrón que
+`TurnoCaja.cajeroId`/`cerradoPorId`). `POST /nomina/ausencias`
+(`rrhh.editar`) crea siempre en `SOLICITADA`; `conGoceDeSueldo` tiene
+un default por `tipo` (`INJUSTIFICADA` → `false`, todo el resto →
+`true`) que el caller puede sobreescribir explícito.
+`PATCH /nomina/ausencias/:id/estado` (`rrhh.aprobar`) exige que la
+ausencia siga en `SOLICITADA` — no se puede re-aprobar/re-rechazar una
+ya resuelta. Solo una ausencia `APROBADA` afecta algo más allá de este
+registro — `conGoceDeSueldo: false` + `APROBADA` es lo que la Fase 7d
+usa para prorratear el salario en nómina; `SOLICITADA`/`RECHAZADA`
+quedan como historial sin ningún efecto. **Validación de balance de
+vacaciones pendiente**: crear una `Ausencia` tipo `VACACIONES` hoy NO
+valida contra los días disponibles del empleado — esa validación se
+agrega en la Fase 7d, junto con el cálculo del balance real (necesita
+`vacaciones.util.ts`, que todavía no existe).
+
 ## POS (punto de venta)
 
 `backend/src/pos/` es una capa delgada sobre Facturación: no duplica

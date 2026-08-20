@@ -206,6 +206,11 @@ token, así que un token nunca puede reusarse.
   entrada, `horaSalida` después). `fecha` se guarda a medianoche UTC
   del día calendario de RD (no del servidor) — ver
   `zona-horaria-rd.util.ts` en ARCHITECTURE.md.
+- **`ausencias.solicitadoPorId`/`aprobadoPorId`** (RRHH, Fase 7c) son
+  `ON DELETE CASCADE` hacia `users` — mismo patrón de rama hermana que
+  `turnos_caja.cajeroId`/`cerradoPorId`; `aprobadoPorId` es nullable y
+  usa relación nombrada por la misma razón (dos FK al mismo modelo
+  desde una sola tabla).
 - **`facturas.turnoCajaId`** es `ON DELETE SET NULL` (no `RESTRICT` ni
   `CASCADE`) — a diferencia de `recibos_nomina.empleadoId`/
   `lineas_asiento.cuentaContableId`, aquí el documento fiscal (`Factura`)

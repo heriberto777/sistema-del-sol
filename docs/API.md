@@ -374,6 +374,10 @@ para asientos manuales (ajustes, apertura, etc.).
 | POST | `/api/nomina/asistencia/marcar-salida` | Autoservicio, sin permiso — 400 si no marcó entrada hoy o si ya marcó salida |
 | POST | `/api/nomina/asistencia` | `rrhh.editar` — registro manual (`{ empleadoId, fecha, horaEntrada?, horaSalida? }`), para empleados sin login o corregir un olvido |
 | GET | `/api/nomina/asistencia?empleadoId&desde&hasta&pagina&tamanoPagina` | `rrhh.ver` |
+| POST | `/api/nomina/ausencias` | `rrhh.editar` — crea en `SOLICITADA` (`{ empleadoId, tipo, fechaDesde, fechaHasta, conGoceDeSueldo?, motivo? }`, RRHH Fase 7c) |
+| GET | `/api/nomina/ausencias?empleadoId&estado&pagina&tamanoPagina` | `rrhh.ver` |
+| GET | `/api/nomina/ausencias/:id` | `rrhh.ver` |
+| PATCH | `/api/nomina/ausencias/:id/estado` | `rrhh.aprobar` — `{ estado: APROBADA\|RECHAZADA }`, 400 si no está en SOLICITADA |
 
 ## POS
 

@@ -74,6 +74,7 @@ model Tenant {
   gastosMenores GastoMenor[]
   horariosEmpleado HorarioEmpleado[]
   registrosAsistencia RegistroAsistencia[]
+  ausencias     Ausencia[]
   suscripcion   Suscripcion?
   facturasPlataforma FacturaPlataforma[]
   ventasAparcadas VentaAparcada[]
@@ -417,6 +418,8 @@ model User {
   // Nullable: no todo User de sistema tiene un Empleado de nómina asociado
   // (ej. un Admin Total que no está en planilla).
   empleado      Empleado?
+  ausenciasSolicitadas Ausencia[] @relation("AusenciaSolicitadaPor")
+  ausenciasAprobadas   Ausencia[] @relation("AusenciaAprobadaPor")
 
   @@unique([tenantId, email])
   @@map("users")
@@ -1014,6 +1017,7 @@ model Empleado {
   ventasAparcadas     VentaAparcada[]
   horarios            HorarioEmpleado[]
   registrosAsistencia RegistroAsistencia[]
+  ausencias           Ausencia[]
 
   @@unique([tenantId, cedula])
   @@map("empleados")
@@ -1078,6 +1082,52 @@ model RegistroAsistencia {
 
   @@unique([tenantId, empleadoId, fecha])
   @@map("registros_asistencia")
+}
+
+enum TipoAusencia {
+  VACACIONES
+  ENFERMEDAD
+  PERMISO
+  INJUSTIFICADA
+  MATERNIDAD_PATERNIDAD
+  OTRO
+}
+
+enum EstadoAusencia {
+  SOLICITADA
+  APROBADA
+  RECHAZADA
+}
+
+/// Solicitud de ausencia con flujo de aprobación (Fase 7c de adopción de
+/// Cuadre) — SOLICITADA -> APROBADA/RECHAZADA, mismo patrón de dos FK
+/// nombradas hacia `User` que `TurnoCaja.cajeroId`/`cerradoPorId`.
+/// `conGoceDeSueldo` decide si esta ausencia descuenta salario al
+/// generar nómina (Fase 7d, `PeriodosNominaService.generarPeriodo`) —
+/// el usuario pidió explícitamente que las ausencias SIN goce SÍ
+/// rebajen el sueldo real, no que quede solo informativo. Solo una
+/// `APROBADA` afecta nómina/balance de vacaciones; `SOLICITADA`/
+/// `RECHAZADA` son historial sin efecto.
+model Ausencia {
+  id              String         @id @default(uuid())
+  tenantId        String
+  tenant          Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  empleadoId      String
+  empleado        Empleado       @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+  tipo            TipoAusencia
+  fechaDesde      DateTime
+  fechaHasta      DateTime
+  conGoceDeSueldo Boolean
+  motivo          String?
+  estado          EstadoAusencia @default(SOLICITADA)
+  solicitadoPorId String
+  solicitadoPor   User           @relation("AusenciaSolicitadaPor", fields: [solicitadoPorId], references: [id], onDelete: Cascade)
+  aprobadoPorId   String?
+  aprobadoPor     User?          @relation("AusenciaAprobadaPor", fields: [aprobadoPorId], references: [id], onDelete: Cascade)
+  fechaResolucion DateTime?
+  createdAt       DateTime       @default(now())
+
+  @@map("ausencias")
 }
 
 model PeriodoNomina {
