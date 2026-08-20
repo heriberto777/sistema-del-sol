@@ -284,10 +284,16 @@ function ModalNuevaBodega({ onClose }: { onClose: () => void }) {
   const queryClient = useQueryClient();
   const [nombre, setNombre] = useState('');
   const [direccion, setDireccion] = useState('');
+  const [sucursalId, setSucursalId] = useState('');
   const [error, setError] = useState<string | null>(null);
 
+  const { data: sucursales } = useQuery({
+    queryKey: ['sucursales'],
+    queryFn: async () => (await apiClient.get<{ id: string; nombre: string }[]>('/sucursales')).data,
+  });
+
   const crear = useMutation({
-    mutationFn: async () => apiClient.post('/inventario/bodegas', { nombre, direccion: direccion || undefined }),
+    mutationFn: async () => apiClient.post('/inventario/bodegas', { nombre, direccion: direccion || undefined, sucursalId }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['bodegas'] });
       onClose();
@@ -304,6 +310,19 @@ function ModalNuevaBodega({ onClose }: { onClose: () => void }) {
   return (
     <Modal titulo="Nueva bodega" onClose={onClose}>
       <form onSubmit={onSubmit} className="space-y-3">
+        <div className="flex flex-col gap-1">
+          <label htmlFor="bodega-sucursal" className="text-sm font-medium text-slate-700 dark:text-slate-300">
+            Sucursal
+          </label>
+          <Select id="bodega-sucursal" value={sucursalId} onChange={(e) => setSucursalId(e.target.value)} required>
+            <option value="">Seleccionar…</option>
+            {sucursales?.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.nombre}
+              </option>
+            ))}
+          </Select>
+        </div>
         <FormField id="bodega-nombre" label="Nombre" value={nombre} onChange={(e) => setNombre(e.target.value)} required />
         <FormField id="bodega-direccion" label="Dirección" value={direccion} onChange={(e) => setDireccion(e.target.value)} />
         {error && <p className="text-sm text-red-600">{error}</p>}

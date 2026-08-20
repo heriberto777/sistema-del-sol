@@ -3,6 +3,7 @@ import { InventarioService } from './inventario.service';
 import { InventarioRepository } from './inventario.repository';
 import { ProductosService } from '../productos/productos.service';
 import { VariantesService } from '../variantes/variantes.service';
+import { SucursalesRepository } from '../sucursales/sucursales.repository';
 import { EventBusService } from '../event-bus/event-bus.service';
 import { EVENTOS } from '../event-bus/events';
 
@@ -11,6 +12,7 @@ describe('InventarioService', () => {
   let repository: jest.Mocked<InventarioRepository>;
   let productosService: jest.Mocked<ProductosService>;
   let variantesService: jest.Mocked<VariantesService>;
+  let sucursalesRepository: jest.Mocked<SucursalesRepository>;
   let eventBus: jest.Mocked<EventBusService>;
 
   beforeEach(() => {
@@ -29,8 +31,27 @@ describe('InventarioService', () => {
     } as unknown as jest.Mocked<InventarioRepository>;
     productosService = { buscarPorId: jest.fn().mockResolvedValue({ id: 'p1' }) } as unknown as jest.Mocked<ProductosService>;
     variantesService = { resolverObligatoria: jest.fn().mockResolvedValue('v1') } as unknown as jest.Mocked<VariantesService>;
+    sucursalesRepository = { buscarPorId: jest.fn().mockResolvedValue({ id: 's1' }) } as unknown as jest.Mocked<SucursalesRepository>;
     eventBus = { emit: jest.fn(), on: jest.fn() } as unknown as jest.Mocked<EventBusService>;
-    service = new InventarioService(repository, productosService, variantesService, eventBus);
+    service = new InventarioService(repository, productosService, variantesService, sucursalesRepository, eventBus);
+  });
+
+  describe('crearBodega', () => {
+    it('valida que la sucursal pertenezca al tenant antes de crear la bodega', async () => {
+      repository.crearBodega.mockResolvedValue({ id: 'b1' } as never);
+
+      await service.crearBodega('t1', 's1', 'Bodega Norte', 'Calle 1');
+
+      expect(sucursalesRepository.buscarPorId).toHaveBeenCalledWith('s1');
+      expect(repository.crearBodega).toHaveBeenCalledWith('t1', 's1', 'Bodega Norte', 'Calle 1');
+    });
+
+    it('propaga el 404 si la sucursal no pertenece al tenant (cross-tenant)', async () => {
+      sucursalesRepository.buscarPorId.mockRejectedValue(new Error('not found'));
+
+      await expect(service.crearBodega('t1', 's-otro-tenant', 'Bodega Norte')).rejects.toThrow('not found');
+      expect(repository.crearBodega).not.toHaveBeenCalled();
+    });
   });
 
   describe('verificarYDescontarStock', () => {

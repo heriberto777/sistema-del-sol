@@ -96,10 +96,16 @@ async function main() {
     });
   }
 
-  const bodega = await prisma.bodega.upsert({
+  const sucursal = await prisma.sucursal.upsert({
     where: { tenantId_nombre: { tenantId: tenant.id, nombre: 'Principal' } },
     update: {},
     create: { tenantId: tenant.id, nombre: 'Principal' },
+  });
+
+  const bodega = await prisma.bodega.upsert({
+    where: { tenantId_nombre: { tenantId: tenant.id, nombre: 'Principal' } },
+    update: {},
+    create: { tenantId: tenant.id, sucursalId: sucursal.id, nombre: 'Principal' },
   });
 
   const producto = await prisma.producto.upsert({

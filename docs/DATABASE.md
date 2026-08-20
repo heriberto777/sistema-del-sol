@@ -38,7 +38,8 @@ PostgreSQL 16 + Prisma. Schema completo en `backend/prisma/schema.prisma`.
 | Facturación | `ncf_asignados`, `facturas`, `linea_factura` |
 | Cotizaciones / Remisiones | `cotizaciones`, `linea_cotizacion`, `remisiones`, `linea_remision` |
 | Productos / precios | `productos`, `precios` (cuelga de `variantes_producto`, no de `productos`), `componentes_combo`, `categorias` (jerarquía real vía `categoriaPadreId`, self-relation — mismo patrón que `cuentas_contables.cuentaPadreId`), `listas_precio` (catálogo de niveles de precio, sin FK desde `precios.listaPrecio`), `variantes_producto`/`atributos`/`valores_atributo`/`valores_atributo_variante` (SKU real, Fase 3c — ver ARCHITECTURE.md), `ofertas` (descuentos automáticos por producto/categoría/carrito, Fase 4b — ver ARCHITECTURE.md) |
-| Inventario | `bodegas`, `stock` (cuelga de `variantes_producto`), `movimiento_inventario` (conserva `productoId` denormalizado + `varianteId` como FK real), `lotes` (control de vencimiento por variante+bodega, opt-in vía `productos.controlaVencimiento`, Fase 5b — ver ARCHITECTURE.md) |
+| Inventario | `bodegas` (cuelga de `sucursales`, Fase 8a), `stock` (cuelga de `variantes_producto`), `movimiento_inventario` (conserva `productoId` denormalizado + `varianteId` como FK real), `lotes` (control de vencimiento por variante+bodega, opt-in vía `productos.controlaVencimiento`, Fase 5b — ver ARCHITECTURE.md) |
+| Sucursales | `sucursales` (locales físicos, Fase 8 — ver ARCHITECTURE.md) |
 | Compras | `proveedores`, `orden_compra`, `linea_oc`, `recepcion_compra`, `linea_recepcion` |
 | Clientes | `clientes`, `direccion_cliente` |
 | Webhooks | `webhooks`, `webhook_deliveries` |
@@ -228,6 +229,16 @@ token, así que un token nunca puede reusarse.
   nullable (solo se llena al cerrar) y usa la relación nombrada
   `"TurnoCajaCerradoPor"` porque `User` ya tiene la relación por defecto
   hacia `TurnoCaja` vía `cajeroId`.
+- **`bodegas.sucursalId`** (Fase 8a, requerido) es `ON DELETE CASCADE`
+  hacia `sucursales` — a diferencia de los casos de arriba, esto NO es
+  una carrera de ramas hermanas: `Tenant → Sucursal → Bodega` es una
+  cadena normal de padre-hijo, borrar la sucursal se lleva sus bodegas
+  (y en cascada, su stock/facturas/etc., igual que borrar un tenant
+  completo hoy). Backfill de datos existentes hecho a mano en la
+  migración (`20260821090000_sucursales`, mismo patrón 3 pasos que
+  `20260819080000_categorias`): columna nullable → `INSERT` de una
+  "Sucursal Principal" por tenant con ≥1 bodega + `UPDATE` de esas
+  bodegas → `ALTER COLUMN ... SET NOT NULL`.
 - **`cuentas_bancarias.cuentaContableId`, `gastos_menores.cuentaBancariaId`
   y `lineas_gasto_menor.cuentaContableId`** son `ON DELETE CASCADE` por el
   mismo patrón de ramas hermanas: `Tenant -> CuentaContable` y

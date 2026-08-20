@@ -10,4 +10,8 @@ export class CrearBodegaDto {
   @IsOptional()
   @IsString()
   direccion?: string;
+
+  @ApiProperty({ description: 'Sucursal (local físico) a la que pertenece esta bodega' })
+  @IsString()
+  sucursalId: string;
 }

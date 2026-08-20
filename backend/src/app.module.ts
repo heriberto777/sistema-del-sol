@@ -47,6 +47,7 @@ import { AtributosModule } from './atributos/atributos.module';
 import { VariantesModule } from './variantes/variantes.module';
 import { OfertasModule } from './ofertas/ofertas.module';
 import { BonosModule } from './bonos/bonos.module';
+import { SucursalesModule } from './sucursales/sucursales.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { PermissionsGuard } from './common/guards/permissions.guard';
 import { ModuloActivoGuard } from './common/guards/modulo-activo.guard';
@@ -71,6 +72,7 @@ import { TenantMiddleware } from './common/middleware/tenant.middleware';
     PluginsModule,
     AuthModule,
     FacturacionModule,
+    SucursalesModule,
     InventarioModule,
     ProductosModule,
     PreciosModule,

@@ -464,8 +464,8 @@ export class InventarioRepository {
     return this.db.bodega.findMany({ where: { activa: true } });
   }
 
-  crearBodega(tenantId: string, nombre: string, direccion?: string) {
-    return this.db.bodega.create({ data: { tenantId, nombre, direccion } });
+  crearBodega(tenantId: string, sucursalId: string, nombre: string, direccion?: string) {
+    return this.db.bodega.create({ data: { tenantId, sucursalId, nombre, direccion } });
   }
 
   actualizarBodega(id: string, data: { formatoImpresion?: FormatoImpresion | null }) {

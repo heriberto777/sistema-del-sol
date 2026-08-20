@@ -1814,6 +1814,53 @@ Con esto, Fase 7 (RRHH) de la adopción de Cuadre queda completa:
 Horarios (7a) → Asistencia (7b) → Ausencias (7c) → integración con
 Nómina + vacaciones (7d).
 
+## Sucursales
+
+`backend/src/sucursales/` (Fase 8 de adopción de Cuadre — 8a, modelo y
+gestión). Antes de esta fase, `Bodega` (`backend/prisma/schema.prisma`)
+ya funcionaba de facto como "local físico" (tiene `direccion`, y
+`Factura`/`Remision`/`TurnoCaja`/`Stock`/`MovimientoInventario`/`Lote`/
+`DevolucionCompra` ya se atan a una bodega) pero sin ningún concepto de
+agrupación comercial ni gestión propia (vivía embebida como cards
+dentro de `Inventario.tsx`).
+
+**`Sucursal` agrupa 1+ `Bodega`** (decisión explícita del usuario, no
+renombrar/fusionar Bodega) — el caso común (1 sucursal = 1 bodega)
+sigue siendo igual de simple, pero un local grande puede tener varias
+bodegas internas (piso de venta + depósito). `Bodega.sucursalId` es
+requerido; la migración (`20260821090000_sucursales`) hizo el backfill
+a mano (mismo patrón 3 pasos que `20260819080000_categorias`): creó una
+"Sucursal Principal" por tenant que ya tuviera ≥1 bodega y le colgó
+todas sus bodegas existentes, preservando el comportamiento de hoy sin
+perder ninguna.
+
+**Sin gateo por plan**: `SucursalesController` no lleva
+`@RequiereModulo` — Sucursales no es un módulo activable/desactivable
+por plan, es plomería de ubicación compartida (mismo criterio que
+Contabilidad/Contactos/Reportes). Permisos nuevos `sucursales.ver`/
+`sucursales.editar`.
+
+**Campos comerciales separados de `direccion`**: `nombreComercial`/
+`telefono`/`ciudad` son campos propios de `Sucursal` (no reutilizados
+de `Bodega.direccion`, que sigue siendo un `String?` libre) — a
+diferencia de Bodega, que solo permite editar `formatoImpresion` tras
+crearla, `Sucursal` tiene edición completa de todos sus campos desde
+el día uno.
+
+**Validación IDOR-safe al crear una Bodega**: `InventarioService.crearBodega`
+valida que el `sucursalId` recibido pertenezca al tenant actual (vía
+`SucursalesRepository.buscarPorId`, que lanza 404 automático — mismo
+patrón que `HorariosService`/`AsistenciaService` validando `empleadoId`
+en Fase 7) antes de colgarle una bodega — sin esto, cualquier
+`sucursalId` de otro tenant adivinado permitía crear una bodega
+"huérfana" apuntando a una sucursal ajena.
+
+**Siguientes sub-fases** (8b/8c/8d, pendientes): asignar a cada usuario
+las sucursales en las que trabaja (`UsuarioSucursal`, sin ningún
+enforcement de acceso todavía — eso es Fase 9), selector de "sucursal
+activa" persistido en la sesión del navegador, y filtros de sucursal en
+Dashboard/Reporte de inventario.
+
 ## POS (punto de venta)
 
 `backend/src/pos/` es una capa delgada sobre Facturación: no duplica

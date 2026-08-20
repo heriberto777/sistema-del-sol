@@ -213,8 +213,12 @@ Catálogo tenant-scoped con jerarquía real (mismo patrón de auto-relación que
 | Método | Ruta | Permiso |
 |---|---|---|
 | GET | `/api/inventario/bodegas` | sin permiso — cualquier usuario autenticado (un Cajero puro necesita esta lista para abrir su turno de POS y no tiene `inventario.ver`) |
-| POST | `/api/inventario/bodegas` | `admin.configuracion` |
+| POST | `/api/inventario/bodegas` | `admin.configuracion` — `sucursalId` requerido desde Fase 8 (400/404 si no pertenece al tenant) |
 | PATCH | `/api/inventario/bodegas/:id` | `admin.configuracion` — solo `{ formatoImpresion? }` (`null` quita el override, hereda el default del tenant) |
+| POST | `/api/sucursales` | `sucursales.editar` — `{ nombre, nombreComercial?, telefono?, direccion?, ciudad? }` (RRHH/Sucursales, Fase 8a) |
+| GET | `/api/sucursales` | `sucursales.ver` — sin paginar |
+| GET | `/api/sucursales/:id` | `sucursales.ver` |
+| PATCH | `/api/sucursales/:id` | `sucursales.editar` — cualquier campo de arriba + `activa` |
 | GET | `/api/inventario/stock/:bodegaId` | `inventario.ver` — cada fila incluye `varianteId` y `valoresAtributo` (Fase 3c) además de `producto`: un producto con variantes reales tiene una fila de stock POR variante |
 | GET | `/api/inventario/kardex/:varianteId?bodegaId&desde&hasta` | `inventario.ver` — historial cronológico con saldo corriente (Fase 5a); sin `desde`/`hasta`, default mes actual (mismo criterio que `libro-mayor`); sin paginar — devuelve `{ variante, bodegaId, rango, saldoInicial, movimientos, saldoFinal }` |
 | GET | `/api/inventario/lotes?varianteId&bodegaId` | `inventario.ver` — lotes con saldo de esa variante+bodega (Fase 5b), para elegir "de qué lote sale" en devolución a proveedor / ajuste manual negativo |

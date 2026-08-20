@@ -6,6 +6,7 @@ import {
   Bell,
   BookOpen,
   Boxes,
+  Building2,
   CalendarClock,
   Contact,
   FileText,
@@ -66,6 +67,9 @@ const GRUPOS: Grupo[] = [
       { ruta: '/inventario', etiqueta: 'Inventario', icono: Boxes, permisos: ['inventario.ver'], modulo: 'inventario' },
       { ruta: '/compras', etiqueta: 'Compras', icono: ShoppingBag, permisos: ['compras.ver'], modulo: 'compras' },
       { ruta: '/productos', etiqueta: 'Productos', icono: Tag, permisos: ['precios.ver'], modulo: 'productos' },
+      // Sin `modulo`: Sucursales no es gateable por plan, es plomería de
+      // ubicación compartida (mismo criterio que Contabilidad/Contactos).
+      { ruta: '/sucursales', etiqueta: 'Sucursales', icono: Building2, permisos: ['sucursales.ver'] },
     ],
   },
   {

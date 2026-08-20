@@ -34,7 +34,7 @@ export class InventarioController {
   @Post('bodegas')
   @Permissions('admin.configuracion')
   crearBodega(@Body() dto: CrearBodegaDto, @CurrentUser() user: JwtPayloadUser) {
-    return this.inventarioService.crearBodega(user.tenantId, dto.nombre, dto.direccion);
+    return this.inventarioService.crearBodega(user.tenantId, dto.sucursalId, dto.nombre, dto.direccion);
   }
 
   @Patch('bodegas/:id')

@@ -3,6 +3,7 @@ import { FormatoImpresion, Prisma } from '@prisma/client';
 import { InventarioRepository, LoteEntrada } from './inventario.repository';
 import { ProductosService } from '../productos/productos.service';
 import { VariantesService } from '../variantes/variantes.service';
+import { SucursalesRepository } from '../sucursales/sucursales.repository';
 import { EventBusService } from '../event-bus/event-bus.service';
 import { EVENTOS } from '../event-bus/events';
 import { ListadoQueryDto } from '../common/dto/listado-query.dto';
@@ -14,6 +15,7 @@ export class InventarioService {
     private readonly inventarioRepository: InventarioRepository,
     private readonly productosService: ProductosService,
     private readonly variantesService: VariantesService,
+    private readonly sucursalesRepository: SucursalesRepository,
     private readonly eventBus: EventBusService,
   ) {}
 
@@ -385,8 +387,11 @@ export class InventarioService {
     return this.inventarioRepository.listarBodegas();
   }
 
-  crearBodega(tenantId: string, nombre: string, direccion?: string) {
-    return this.inventarioRepository.crearBodega(tenantId, nombre, direccion);
+  async crearBodega(tenantId: string, sucursalId: string, nombre: string, direccion?: string) {
+    // Valida que la sucursal pertenezca al tenant antes de colgarle una
+    // bodega — mismo patrón IDOR-safe que validarPertenencia() de arriba.
+    await this.sucursalesRepository.buscarPorId(sucursalId);
+    return this.inventarioRepository.crearBodega(tenantId, sucursalId, nombre, direccion);
   }
 
   actualizarBodega(id: string, data: { formatoImpresion?: FormatoImpresion | null }) {

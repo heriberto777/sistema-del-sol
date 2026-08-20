@@ -49,6 +49,7 @@ model Tenant {
   variantesProducto VarianteProducto[]
   atributos     Atributo[]
   bodegas       Bodega[]
+  sucursales    Sucursal[]
   movimientosInventario MovimientoInventario[]
   clientes      Cliente[]
   proveedores   Proveedor[]
@@ -1570,10 +1571,38 @@ model Precio {
   @@map("precios")
 }
 
+/// Local físico (Fase 8 de adopción de Cuadre) que agrupa 1+ Bodegas —
+/// el caso común (1 sucursal = 1 bodega) sigue siendo igual de simple,
+/// pero un local grande puede tener varias bodegas internas (piso de
+/// venta + depósito). Campos "comerciales" (nombreComercial/telefono/
+/// ciudad) separados de `direccion` a propósito, para no forzar a
+/// estructurar lo que hoy es solo un `String?` libre en `Bodega`.
+model Sucursal {
+  id              String   @id @default(uuid())
+  tenantId        String
+  tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  nombre          String
+  nombreComercial String?
+  telefono        String?
+  direccion       String?
+  ciudad          String?
+  activa          Boolean  @default(true)
+  createdAt       DateTime @default(now())
+
+  bodegas  Bodega[]
+
+  @@unique([tenantId, nombre])
+  @@map("sucursales")
+}
+
 model Bodega {
   id        String   @id @default(uuid())
   tenantId  String
   tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  sucursalId String
+  // Cascade: Tenant -> Sucursal -> Bodega es una cadena normal (no una
+  // carrera de ramas hermanas) — borrar la sucursal se lleva sus bodegas.
+  sucursal  Sucursal @relation(fields: [sucursalId], references: [id], onDelete: Cascade)
   nombre    String
   direccion String?
   activa    Boolean  @default(true)

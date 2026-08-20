@@ -17,6 +17,12 @@ function extraerTokenDeReset(cuerpoHtml: string): string {
   return new URL(href).searchParams.get('token')!;
 }
 
+/** Bodega.sucursalId es requerido desde Fase 8 — crea una Sucursal descartable junto con la bodega para no repetirlo en cada test. */
+async function crearBodegaE2E(prisma: PrismaClient, tenantId: string, nombre: string) {
+  const sucursal = await prisma.sucursal.create({ data: { tenantId, nombre: `Sucursal ${nombre}` } });
+  return prisma.bodega.create({ data: { tenantId, sucursalId: sucursal.id, nombre } });
+}
+
 /**
  * Cubre el aislamiento real por tenant (regresión del bug encontrado en
  * TenantPrismaService: tenantId capturado antes de que el guard poblara
@@ -230,7 +236,7 @@ describe('App (e2e)', () => {
     clienteAId = cliente.id;
 
     // Fixtures para el flujo de facturación del tenant A.
-    const bodega = await prisma.bodega.create({ data: { tenantId: tenantAId, nombre: 'Bodega E2E' } });
+    const bodega = await crearBodegaE2E(prisma, tenantAId, 'Bodega E2E');
     bodegaAId = bodega.id;
     const producto = await prisma.producto.create({
       data: { tenantId: tenantAId, codigo: 'E2E-001', nombre: 'Producto E2E', porcentajeItbis: 18 },
@@ -780,7 +786,7 @@ describe('App (e2e)', () => {
     });
 
     it('un tenant no puede anular el override de formato de una bodega de otro tenant', async () => {
-      const bodegaTenantB = await prisma.bodega.create({ data: { tenantId: tenantBId, nombre: 'Bodega B — impresión' } });
+      const bodegaTenantB = await crearBodegaE2E(prisma, tenantBId, 'Bodega B — impresión');
 
       // El PATCH "funciona" (200) porque TenantPrismaService inyecta el
       // tenantId de quien llama en el `where` — el resultado real es que
@@ -1028,7 +1034,7 @@ describe('App (e2e)', () => {
     let facturaContadoId: string;
 
     beforeAll(async () => {
-      const bodega = await prisma.bodega.create({ data: { tenantId: tenantAId, nombre: 'Bodega Notas E2E' } });
+      const bodega = await crearBodegaE2E(prisma, tenantAId, 'Bodega Notas E2E');
       bodegaNotasId = bodega.id;
       const producto = await prisma.producto.create({
         data: { tenantId: tenantAId, codigo: 'E2E-NOTAS', nombre: 'Producto Notas E2E', porcentajeItbis: 18 },
@@ -1177,7 +1183,7 @@ describe('App (e2e)', () => {
     let productoId: string;
 
     beforeAll(async () => {
-      const bodega = await prisma.bodega.create({ data: { tenantId: tenantAId, nombre: 'Bodega Cotiz E2E' } });
+      const bodega = await crearBodegaE2E(prisma, tenantAId, 'Bodega Cotiz E2E');
       bodegaId = bodega.id;
       const producto = await prisma.producto.create({
         data: { tenantId: tenantAId, codigo: 'E2E-COTIZ', nombre: 'Producto Cotiz E2E', porcentajeItbis: 18 },
@@ -1414,7 +1420,7 @@ describe('App (e2e)', () => {
     let productoId: string;
 
     beforeAll(async () => {
-      const bodega = await prisma.bodega.create({ data: { tenantId: tenantAId, nombre: 'Bodega PDF E2E' } });
+      const bodega = await crearBodegaE2E(prisma, tenantAId, 'Bodega PDF E2E');
       bodegaId = bodega.id;
       const producto = await prisma.producto.create({
         data: { tenantId: tenantAId, codigo: 'E2E-PDF', nombre: 'Producto PDF E2E', porcentajeItbis: 18 },
@@ -1490,7 +1496,7 @@ describe('App (e2e)', () => {
     const esperarListener = () => new Promise((resolve) => setTimeout(resolve, 300));
 
     beforeAll(async () => {
-      const bodega = await prisma.bodega.create({ data: { tenantId: tenantAId, nombre: 'Bodega Contabilidad E2E' } });
+      const bodega = await crearBodegaE2E(prisma, tenantAId, 'Bodega Contabilidad E2E');
       bodegaId = bodega.id;
       const producto = await prisma.producto.create({
         data: { tenantId: tenantAId, codigo: 'E2E-CONTA', nombre: 'Producto Contabilidad E2E', porcentajeItbis: 18 },
@@ -2209,7 +2215,7 @@ describe('App (e2e)', () => {
     let turnoId: string;
 
     beforeAll(async () => {
-      const bodega = await prisma.bodega.create({ data: { tenantId: tenantAId, nombre: 'Bodega POS E2E' } });
+      const bodega = await crearBodegaE2E(prisma, tenantAId, 'Bodega POS E2E');
       bodegaId = bodega.id;
       const producto = await prisma.producto.create({
         data: { tenantId: tenantAId, codigo: 'E2E-POS', nombre: 'Producto POS E2E', porcentajeItbis: 18 },
@@ -2326,7 +2332,7 @@ describe('App (e2e)', () => {
     let tokenCajero3Arqueo: string;
 
     beforeAll(async () => {
-      const bodega = await prisma.bodega.create({ data: { tenantId: tenantAId, nombre: 'Bodega Arqueo E2E' } });
+      const bodega = await crearBodegaE2E(prisma, tenantAId, 'Bodega Arqueo E2E');
       bodegaArqueoId = bodega.id;
 
       const rolCajero = await prisma.role.create({ data: { tenantId: tenantAId, nombre: 'CajeroArqueoE2E' } });
@@ -2412,7 +2418,7 @@ describe('App (e2e)', () => {
     });
 
     it('GET /pos/turnos filtra por cajeroId y GET /pos/cajeros lista los cajeros distintos', async () => {
-      const bodegaFiltro = await prisma.bodega.create({ data: { tenantId: tenantAId, nombre: 'Bodega Filtro E2E' } });
+      const bodegaFiltro = await crearBodegaE2E(prisma, tenantAId, 'Bodega Filtro E2E');
 
       const turnoCajero2 = await request(app.getHttpServer())
         .post('/api/pos/turnos')
@@ -2569,7 +2575,7 @@ describe('App (e2e)', () => {
     let proveedorId: string;
 
     beforeAll(async () => {
-      const bodega = await prisma.bodega.create({ data: { tenantId: tenantAId, nombre: 'Bodega Compras E2E' } });
+      const bodega = await crearBodegaE2E(prisma, tenantAId, 'Bodega Compras E2E');
       bodegaId = bodega.id;
       const producto = await prisma.producto.create({
         data: { tenantId: tenantAId, codigo: 'E2E-COMPRA', nombre: 'Producto Compras E2E', porcentajeItbis: 18 },
@@ -2765,7 +2771,7 @@ describe('App (e2e)', () => {
     let proveedorId: string;
 
     beforeAll(async () => {
-      const bodega = await prisma.bodega.create({ data: { tenantId: tenantAId, nombre: 'Bodega Pagos E2E' } });
+      const bodega = await crearBodegaE2E(prisma, tenantAId, 'Bodega Pagos E2E');
       bodegaId = bodega.id;
       const producto = await prisma.producto.create({
         data: { tenantId: tenantAId, codigo: 'E2E-PAGOS', nombre: 'Producto Pagos E2E', porcentajeItbis: 18 },
@@ -2970,7 +2976,7 @@ describe('App (e2e)', () => {
     let productoSinStockId: string;
 
     beforeAll(async () => {
-      const bodega = await prisma.bodega.create({ data: { tenantId: tenantAId, nombre: 'Bodega Atomicidad E2E' } });
+      const bodega = await crearBodegaE2E(prisma, tenantAId, 'Bodega Atomicidad E2E');
       bodegaId = bodega.id;
 
       const productoConStock = await prisma.producto.create({
@@ -3026,7 +3032,7 @@ describe('App (e2e)', () => {
     const CANTIDAD_CONCURRENTE = 10;
 
     beforeAll(async () => {
-      const bodega = await prisma.bodega.create({ data: { tenantId: tenantAId, nombre: 'Bodega Concurrencia E2E' } });
+      const bodega = await crearBodegaE2E(prisma, tenantAId, 'Bodega Concurrencia E2E');
       bodegaId = bodega.id;
       const producto = await prisma.producto.create({
         data: { tenantId: tenantAId, codigo: 'E2E-CONC', nombre: 'Producto Concurrencia E2E', porcentajeItbis: 18 },

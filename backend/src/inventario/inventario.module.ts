@@ -5,9 +5,10 @@ import { InventarioRepository } from './inventario.repository';
 import { LotesCronService } from './lotes-cron.service';
 import { ProductosModule } from '../productos/productos.module';
 import { VariantesModule } from '../variantes/variantes.module';
+import { SucursalesModule } from '../sucursales/sucursales.module';
 
 @Module({
-  imports: [ProductosModule, VariantesModule],
+  imports: [ProductosModule, VariantesModule, SucursalesModule],
   controllers: [InventarioController],
   providers: [InventarioService, InventarioRepository, LotesCronService],
   exports: [InventarioService],
