@@ -13,6 +13,8 @@ describe('SucursalesService', () => {
       listar: jest.fn(),
       buscarPorId: jest.fn(),
       actualizar: jest.fn(),
+      listarAsignadasA: jest.fn(),
+      contarAsignadasA: jest.fn(),
     } as unknown as jest.Mocked<SucursalesRepository>;
     service = new SucursalesService(repository);
   });
@@ -53,5 +55,27 @@ describe('SucursalesService', () => {
     await service.buscarPorId('s1');
 
     expect(repository.buscarPorId).toHaveBeenCalledWith('s1');
+  });
+
+  describe('mias', () => {
+    it('devuelve todas las sucursales si el usuario no tiene ninguna asignación', async () => {
+      repository.contarAsignadasA.mockResolvedValue(0);
+      repository.listar.mockResolvedValue([{ id: 's1' }, { id: 's2' }] as never);
+
+      const resultado = await service.mias('u1');
+
+      expect(resultado).toEqual([{ id: 's1' }, { id: 's2' }]);
+      expect(repository.listarAsignadasA).not.toHaveBeenCalled();
+    });
+
+    it('devuelve solo las asignadas si el usuario tiene al menos una', async () => {
+      repository.contarAsignadasA.mockResolvedValue(1);
+      repository.listarAsignadasA.mockResolvedValue([{ id: 's1' }] as never);
+
+      const resultado = await service.mias('u1');
+
+      expect(resultado).toEqual([{ id: 's1' }]);
+      expect(repository.listar).not.toHaveBeenCalled();
+    });
   });
 });

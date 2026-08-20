@@ -17,6 +17,15 @@ export class SucursalesRepository {
     return this.db.sucursal.findMany({ where: { activa: true }, orderBy: { nombre: 'asc' } });
   }
 
+  /** Sucursales asignadas a un usuario (Fase 8c, ver AsistenciaController.miEstadoHoy para el mismo criterio de autoservicio). */
+  listarAsignadasA(userId: string) {
+    return this.db.sucursal.findMany({ where: { activa: true, usuarios: { some: { userId } } }, orderBy: { nombre: 'asc' } });
+  }
+
+  contarAsignadasA(userId: string) {
+    return this.db.usuarioSucursal.count({ where: { userId } });
+  }
+
   /** Lanza (404) si la sucursal no existe o no pertenece al tenant actual — Sucursal es tenant-scoped, TenantPrismaService inyecta el filtro. */
   buscarPorId(id: string) {
     return this.db.sucursal.findUniqueOrThrow({ where: { id } });

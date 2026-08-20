@@ -12,6 +12,7 @@ import { RequierePermiso } from '../components/organisms/RequierePermiso/Requier
 import { useAuth } from '../hooks/useAuth';
 import { useListasPrecio } from '../hooks/useListasPrecio';
 import { SelectorLineaProducto } from '../components/molecules/SelectorLineaProducto/SelectorLineaProducto';
+import { SelectorBodega } from '../components/molecules/SelectorBodega/SelectorBodega';
 import { PaginaResultado } from '../types/pagina-resultado';
 
 interface Cliente {
@@ -23,11 +24,6 @@ interface Cliente {
 interface Producto {
   id: string;
   codigo: string;
-  nombre: string;
-}
-
-interface Bodega {
-  id: string;
   nombre: string;
 }
 
@@ -92,11 +88,6 @@ function ModalNuevaFactura({ onClose }: { onClose: () => void }) {
     queryKey: ['productos-select'],
     queryFn: async () => (await apiClient.get<PaginaResultado<Producto>>('/productos', { params: { tamanoPagina: 100 } })).data.datos,
   });
-  const { data: bodegas } = useQuery({
-    queryKey: ['bodegas-select'],
-    queryFn: async () => (await apiClient.get<Bodega[]>('/inventario/bodegas')).data,
-  });
-
   function actualizarLinea(i: number, cambios: Partial<(typeof lineas)[number]>) {
     setLineas((prev) => prev.map((l, idx) => (idx === i ? { ...l, ...cambios } : l)));
   }
@@ -178,14 +169,7 @@ function ModalNuevaFactura({ onClose }: { onClose: () => void }) {
 
         <div className="flex flex-col gap-1">
           <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Bodega (de donde sale el inventario)</label>
-          <Select value={bodegaId} onChange={(e) => setBodegaId(e.target.value)} required>
-            <option value="">Seleccionar…</option>
-            {bodegas?.map((b) => (
-              <option key={b.id} value={b.id}>
-                {b.nombre}
-              </option>
-            ))}
-          </Select>
+          <SelectorBodega value={bodegaId} onChange={setBodegaId} required />
         </div>
 
         <div className="flex flex-col gap-1">

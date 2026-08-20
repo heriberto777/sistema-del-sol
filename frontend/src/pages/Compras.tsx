@@ -15,6 +15,7 @@ import { EstadoVacio } from '../components/molecules/EstadoVacio/EstadoVacio';
 import { RowActionsMenu } from '../components/molecules/RowActionsMenu/RowActionsMenu';
 import { RequierePermiso } from '../components/organisms/RequierePermiso/RequierePermiso';
 import { SelectorLineaProducto } from '../components/molecules/SelectorLineaProducto/SelectorLineaProducto';
+import { SelectorBodega } from '../components/molecules/SelectorBodega/SelectorBodega';
 import { useAuth } from '../hooks/useAuth';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { PaginaResultado } from '../types/pagina-resultado';
@@ -47,10 +48,6 @@ interface Producto {
   controlaVencimiento: boolean;
 }
 
-interface Bodega {
-  id: string;
-  nombre: string;
-}
 
 interface LineaOcDetalle {
   productoId: string;
@@ -491,10 +488,6 @@ function ModalRecibirOrden({ orden, onClose }: { orden: OrdenCompra; onClose: ()
     queryKey: ['orden-compra', orden.id],
     queryFn: async () => (await apiClient.get<OrdenCompraDetalle>(`/compras/${orden.id}`)).data,
   });
-  const { data: bodegas } = useQuery({
-    queryKey: ['bodegas-select'],
-    queryFn: async () => (await apiClient.get<Bodega[]>('/inventario/bodegas')).data,
-  });
   const { data: productos } = useQuery({
     queryKey: ['productos-select'],
     queryFn: async () => (await apiClient.get<PaginaResultado<Producto>>('/productos', { params: { tamanoPagina: 100 } })).data.datos,
@@ -563,14 +556,7 @@ function ModalRecibirOrden({ orden, onClose }: { orden: OrdenCompra; onClose: ()
       <form onSubmit={onSubmit} className="space-y-3">
         <div className="flex flex-col gap-1">
           <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Bodega destino</label>
-          <Select value={bodegaId} onChange={(e) => setBodegaId(e.target.value)} required>
-            <option value="">Seleccionar…</option>
-            {bodegas?.map((b) => (
-              <option key={b.id} value={b.id}>
-                {b.nombre}
-              </option>
-            ))}
-          </Select>
+          <SelectorBodega value={bodegaId} onChange={setBodegaId} required />
         </div>
 
         <div className="space-y-2">
@@ -656,10 +642,6 @@ function ModalDevolverOrden({ orden, onClose }: { orden: OrdenCompra; onClose: (
     queryKey: ['orden-compra', orden.id],
     queryFn: async () => (await apiClient.get<OrdenCompraDetalle>(`/compras/${orden.id}`)).data,
   });
-  const { data: bodegas } = useQuery({
-    queryKey: ['bodegas-select'],
-    queryFn: async () => (await apiClient.get<Bodega[]>('/inventario/bodegas')).data,
-  });
   const { data: productos } = useQuery({
     queryKey: ['productos-select'],
     queryFn: async () => (await apiClient.get<PaginaResultado<Producto>>('/productos', { params: { tamanoPagina: 100 } })).data.datos,
@@ -705,14 +687,7 @@ function ModalDevolverOrden({ orden, onClose }: { orden: OrdenCompra; onClose: (
       <form onSubmit={onSubmit} className="space-y-3">
         <div className="flex flex-col gap-1">
           <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Bodega de donde sale la mercancía</label>
-          <Select value={bodegaId} onChange={(e) => setBodegaId(e.target.value)} required>
-            <option value="">Seleccionar…</option>
-            {bodegas?.map((b) => (
-              <option key={b.id} value={b.id}>
-                {b.nombre}
-              </option>
-            ))}
-          </Select>
+          <SelectorBodega value={bodegaId} onChange={setBodegaId} required />
         </div>
 
         <div className="space-y-2">

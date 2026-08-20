@@ -23,6 +23,12 @@ export class SucursalesService {
     return this.sucursalesRepository.listar();
   }
 
+  /** Sin ninguna asignación = ve TODAS (default permisivo, ver ARCHITECTURE.md) — Fase 9 es la que agrega el enforcement real. */
+  async mias(userId: string) {
+    const totalAsignadas = await this.sucursalesRepository.contarAsignadasA(userId);
+    return totalAsignadas > 0 ? this.sucursalesRepository.listarAsignadasA(userId) : this.sucursalesRepository.listar();
+  }
+
   buscarPorId(id: string) {
     return this.sucursalesRepository.buscarPorId(id);
   }

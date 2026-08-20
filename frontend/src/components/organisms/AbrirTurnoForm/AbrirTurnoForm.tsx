@@ -3,10 +3,12 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../../lib/api-client';
 import { Button } from '../../atoms/Button/Button';
 import { FormField } from '../../molecules/FormField/FormField';
+import { useSucursalActiva } from '../../../hooks/useSucursalActiva';
 
 interface Bodega {
   id: string;
   nombre: string;
+  sucursalId: string;
 }
 
 interface AbrirTurnoFormProps {
@@ -23,9 +25,11 @@ interface AbrirTurnoFormProps {
  */
 export function AbrirTurnoForm({ bodegas, onAbierto }: AbrirTurnoFormProps) {
   const queryClient = useQueryClient();
+  const { sucursalActivaId } = useSucursalActiva();
   const [bodegaId, setBodegaId] = useState('');
   const [montoInicial, setMontoInicial] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const bodegasFiltradas = bodegas.filter((b) => !sucursalActivaId || b.sucursalId === sucursalActivaId);
 
   const abrir = useMutation({
     mutationFn: async () => apiClient.post('/pos/turnos', { bodegaId, montoInicial: Number(montoInicial) }),
@@ -54,7 +58,7 @@ export function AbrirTurnoForm({ bodegas, onAbierto }: AbrirTurnoFormProps) {
           className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
         >
           <option value="">Seleccionar…</option>
-          {bodegas.map((b) => (
+          {bodegasFiltradas.map((b) => (
             <option key={b.id} value={b.id}>
               {b.nombre}
             </option>

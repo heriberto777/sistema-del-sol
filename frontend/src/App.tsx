@@ -4,6 +4,7 @@ import { queryClient } from './lib/query-client';
 import { AuthProvider } from './contexts/AuthContext';
 import { PlatformAuthProvider } from './contexts/PlatformAuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
+import { SucursalActivaProvider } from './contexts/SucursalActivaContext';
 import { router } from './router';
 
 export function App() {
@@ -11,9 +12,11 @@ export function App() {
     <ThemeProvider>
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
-          <PlatformAuthProvider>
-            <RouterProvider router={router} />
-          </PlatformAuthProvider>
+          <SucursalActivaProvider>
+            <PlatformAuthProvider>
+              <RouterProvider router={router} />
+            </PlatformAuthProvider>
+          </SucursalActivaProvider>
         </AuthProvider>
       </QueryClientProvider>
     </ThemeProvider>

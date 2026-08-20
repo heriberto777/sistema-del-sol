@@ -1870,10 +1870,34 @@ guard que restrinja acceso (eso es Fase 9, PIN + permisos por
 sucursal), así que un usuario recién creado no queda bloqueado de nada
 por no tener asignación explícita todavía.
 
-**Siguientes sub-fases** (8c/8d, pendientes): selector de "sucursal
-activa" persistido en la sesión del navegador (usa esta asignación
-para acotar las opciones), y filtros de sucursal en Dashboard/Reporte
-de inventario.
+**Selector de sucursal activa (8c, implementado)**:
+`GET /sucursales/mias` (autoservicio, sin permiso — mismo criterio que
+`AsistenciaController.miEstadoHoy`) devuelve las sucursales asignadas
+al usuario logueado, o TODAS si no tiene ninguna (mismo default
+permisivo de 8b). `SucursalActivaContext` (`frontend/src/contexts/`)
+es un híbrido entre `AuthContext` (trae la lista real vía `useQuery`) y
+`ThemeContext` (persiste la ELECCIÓN en `localStorage`, key
+`sol_sucursal_activa`, como efecto secundario del cambio de estado,
+igual mecanismo que `sol_tema`) — si la sucursal guardada ya no está en
+la lista vigente, cae a la primera disponible. Puramente UX: no
+restringe nada por sí solo (Fase 9 le da un enforcement real).
+
+Nuevo molecule `SelectorBodega` (`frontend/src/components/molecules/`)
+consolida el `<Select>` de bodega que estaba duplicado casi idéntico en
+Facturación y Compras (2 lugares) — cuando hay una sucursal activa,
+acota las opciones a sus bodegas. **Excepción deliberada**: el selector
+de bodega DESTINO en "Transferir stock" (`Inventario.tsx`) NO usa
+`SelectorBodega` — transferir stock entre sucursales distintas es un
+caso de uso legítimo (ej. surtir una sucursal nueva desde el depósito
+principal), así que acotarlo a la sucursal activa sería contraproducente
+ahí. El selector de bodega en `AbrirTurnoForm` (POS) tampoco usa el
+molecule nuevo — ya recibe `bodegas` por prop desde sus dos llamadores
+(`Pos.tsx`, `TurnosCajaTable.tsx`, que también las usan para mostrar
+nombres en tablas), así que solo se le agregó el filtro por sucursal
+activa internamente, sin duplicar el fetch.
+
+**Siguiente sub-fase** (8d, pendiente): filtros de sucursal en
+Dashboard/Reporte de inventario.
 
 ## POS (punto de venta)
 

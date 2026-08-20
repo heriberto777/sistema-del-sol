@@ -13,6 +13,7 @@ import { PaginaResultado } from '../types/pagina-resultado';
 interface Bodega {
   id: string;
   nombre: string;
+  sucursalId: string;
 }
 
 interface TurnoCajaResumen {

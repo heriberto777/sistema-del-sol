@@ -28,6 +28,14 @@ export class SucursalesController {
     return this.sucursalesService.listar();
   }
 
+  // Sin @Permissions — autoservicio: cualquier usuario logueado puede
+  // saber en qué sucursales puede elegir trabajar (mismo criterio que
+  // AsistenciaController.miEstadoHoy en RRHH).
+  @Get('mias')
+  mias(@CurrentUser() user: JwtPayloadUser) {
+    return this.sucursalesService.mias(user.userId);
+  }
+
   @Get(':id')
   @Permissions('sucursales.ver')
   buscarPorId(@Param('id') id: string) {
