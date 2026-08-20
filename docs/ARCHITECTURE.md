@@ -1683,10 +1683,44 @@ extensión natural.
 
 **Fuera de alcance deliberadamente**: pago de horas extra/comisiones/
 bonificaciones (solo salario fijo mensual por ahora), liquidación por
-despido (preaviso + cesantía del Art. 80), vacaciones y regalía pascual
-(salario 13), remesa real a la TSS/DGII (el asiento registra la
-obligación, no la transferencia bancaria de pago a esas entidades), y
-control de asistencia/horas trabajadas.
+despido (preaviso + cesantía del Art. 80), regalía pascual (salario
+13), remesa real a la TSS/DGII (el asiento registra la obligación, no
+la transferencia bancaria de pago a esas entidades). El control de
+asistencia/horas trabajadas y las vacaciones se están incorporando en
+Fase 7 (RRHH, ver abajo) — a la fecha de este documento, cubre
+horarios; asistencia, ausencias y su integración con el prorrateo de
+nómina todavía no.
+
+### RRHH: Horarios, asistencia y ausencias (Fase 7 de adopción de Cuadre)
+
+`backend/src/nomina/` también aloja RRHH — deliberadamente NO un módulo
+NestJS separado, para evitar una dependencia circular (Nómina
+necesitará consultar Ausencias al generar un período; un módulo Rrhh
+separado necesitaría a su vez Empleado de Nómina) — pero con su PROPIO
+namespace de permisos (`rrhh.ver`/`rrhh.editar`/`rrhh.aprobar`,
+distinto de `nomina.*`) para poder dárselo a un supervisor de personal
+sin exponerle los recibos de sueldo.
+
+**Horarios (7a, implementado)**: `HorarioEmpleado` — una fila por día
+de la semana (`DiaSemana`) en que el empleado trabaja; la AUSENCIA de
+fila para un día significa que ese día no se trabaja (no hay un
+booleano "trabaja" separado). `horaEntrada`/`horaSalida` son `String
+"HH:MM"` a propósito, no `DateTime` — ya se encontraron dos bugs de
+timezone esta fase con campos de hora/fecha sin zona (Kardex, Lote);
+un string zero-padded ordena y compara bien sin ese riesgo.
+`PUT /nomina/empleados/:id/horario` reemplaza el horario completo
+(borra y recrea las filas, mismo patrón que `ComponenteCombo`) — un
+`dias: []` dejaría al empleado sin ningún día configurado. Pensado
+para que la próxima sub-fase (Asistencia) calcule `tardanza`
+comparando la hora de marcaje contra el horario del día correspondiente
+— si el empleado no tiene horario configurado para ese día, no hay
+contra qué comparar y no se marca tardanza.
+
+`Empleado.userId` (nullable, único) vincula opcionalmente un empleado a
+su `User` de login — no todo empleado necesita acceso al sistema (ej.
+personal de bodega). Es la base para que la sub-fase de Asistencia
+resuelva "quién soy" desde el JWT (`req.user.userId`) sin pedirle al
+empleado que elija su propio registro de una lista.
 
 ## POS (punto de venta)
 

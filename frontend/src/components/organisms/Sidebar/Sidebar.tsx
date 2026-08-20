@@ -6,6 +6,7 @@ import {
   Bell,
   BookOpen,
   Boxes,
+  CalendarClock,
   Contact,
   FileText,
   LayoutDashboard,
@@ -85,7 +86,10 @@ const GRUPOS: Grupo[] = [
   {
     id: 'gestion-humana',
     etiqueta: 'Gestión Humana',
-    items: [{ ruta: '/nomina', etiqueta: 'Nómina', icono: Users, permisos: ['nomina.ver'], modulo: 'nomina' }],
+    items: [
+      { ruta: '/nomina', etiqueta: 'Nómina', icono: Users, permisos: ['nomina.ver'], modulo: 'nomina' },
+      { ruta: '/rrhh', etiqueta: 'RRHH', icono: CalendarClock, permisos: ['rrhh.ver'], modulo: 'nomina' },
+    ],
   },
   {
     id: 'sistema',

@@ -9,6 +9,7 @@ export const PERMISOS_BASE = [
   'bancos.ver', 'bancos.editar',
   'gastosmenores.ver', 'gastosmenores.crear',
   'nomina.ver', 'nomina.editar',
+  'rrhh.ver', 'rrhh.editar', 'rrhh.aprobar',
   'pos.ver', 'pos.editar', 'pos.supervisar',
   'ia.usar',
   'notificaciones.ver',
@@ -55,8 +56,8 @@ export const ROLES_BASE: Record<string, string[]> = {
     'pos.ver', 'pos.editar', 'pos.supervisar', 'ia.usar', 'notificaciones.ver',
   ],
   Almacenero: ['inventario.ver', 'inventario.ajustar', 'inventario.transferir', 'compras.recibir', 'remisiones.ver'],
-  Contador: ['facturacion.ver', 'facturacion.cobrar', 'facturacion.imprimir', 'compras.ver', 'compras.pagar', 'reportes.ver', 'precios.ver', 'contabilidad.ver', 'contabilidad.editar', 'contabilidad.anular', 'contabilidad.cerrarperiodo', 'contabilidad.conciliar', 'bancos.ver', 'bancos.editar', 'gastosmenores.ver', 'gastosmenores.crear', 'nomina.ver', 'nomina.editar', 'ia.usar', 'notificaciones.ver'],
-  Auditor: ['auditoria.ver', 'facturacion.ver', 'facturacion.imprimir', 'inventario.ver', 'compras.ver', 'reportes.ver', 'cotizaciones.ver', 'remisiones.ver', 'contabilidad.ver', 'bancos.ver', 'gastosmenores.ver', 'nomina.ver', 'notificaciones.ver'],
+  Contador: ['facturacion.ver', 'facturacion.cobrar', 'facturacion.imprimir', 'compras.ver', 'compras.pagar', 'reportes.ver', 'precios.ver', 'contabilidad.ver', 'contabilidad.editar', 'contabilidad.anular', 'contabilidad.cerrarperiodo', 'contabilidad.conciliar', 'bancos.ver', 'bancos.editar', 'gastosmenores.ver', 'gastosmenores.crear', 'nomina.ver', 'nomina.editar', 'rrhh.ver', 'ia.usar', 'notificaciones.ver'],
+  Auditor: ['auditoria.ver', 'facturacion.ver', 'facturacion.imprimir', 'inventario.ver', 'compras.ver', 'reportes.ver', 'cotizaciones.ver', 'remisiones.ver', 'contabilidad.ver', 'bancos.ver', 'gastosmenores.ver', 'nomina.ver', 'rrhh.ver', 'notificaciones.ver'],
 };
 
 export const CONFIGURACIONES_BASE: Record<string, string> = {

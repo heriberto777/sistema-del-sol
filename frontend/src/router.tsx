@@ -20,6 +20,7 @@ import { Productos } from './pages/Productos';
 import { Reportes } from './pages/Reportes';
 import { Contabilidad } from './pages/Contabilidad';
 import { Nomina } from './pages/Nomina';
+import { RRHH } from './pages/RRHH';
 import { Pos } from './pages/Pos';
 import { PosCaja } from './pages/PosCaja';
 import { Ia } from './pages/Ia';
@@ -86,6 +87,7 @@ export const router = createBrowserRouter([
           { path: '/bancos', element: <Bancos /> },
           { path: '/gastos-menores', element: <GastosMenores /> },
           { path: '/nomina', element: <Nomina /> },
+          { path: '/rrhh', element: <RRHH /> },
           { path: '/pos', element: <Pos /> },
           { path: '/ia', element: <Ia /> },
           { path: '/notificaciones', element: <Notificaciones /> },

@@ -367,6 +367,8 @@ para asientos manuales (ajustes, apertura, etc.).
 | POST | `/api/nomina/periodos` | `nomina.editar` — genera recibos para todos los empleados activos (`{ tipo: QUINCENAL\|MENSUAL, fechaInicio, fechaFin }`) |
 | POST | `/api/nomina/periodos/:id/procesar` | `nomina.editar` — `BORRADOR → PROCESADO`, 400 si ya no está en BORRADOR |
 | POST | `/api/nomina/periodos/:id/marcar-pagado` | `nomina.editar` — `PROCESADO → PAGADO`, dispara el asiento contable automático (ver ARCHITECTURE.md) |
+| GET | `/api/nomina/empleados/:empleadoId/horario` | `rrhh.ver` — horario semanal (RRHH, Fase 7a) |
+| PUT | `/api/nomina/empleados/:empleadoId/horario` | `rrhh.editar` — reemplaza el horario completo (`{ dias: [{ diaSemana, horaEntrada, horaSalida }] }`, `dias: []` lo deja sin ningún día configurado) |
 
 ## POS
 

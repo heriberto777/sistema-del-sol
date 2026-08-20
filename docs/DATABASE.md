@@ -192,6 +192,13 @@ token, así que un token nunca puede reusarse.
   período. No hay historial de cambios de salario (a diferencia de
   `precios`) — si se necesita auditar aumentos salariales, es la
   extensión natural.
+- **`empleados.userId`** (nullable, único) es `ON DELETE SET NULL` —
+  borrar el `User` de login no debe borrar el historial de nómina del
+  empleado, solo desvincularlo (RRHH, Fase 7a). `horarios_empleado`
+  sigue el mismo patrón de rama hermana que `recibos_nomina`/
+  `lineas_asiento` (`ON DELETE CASCADE` hacia `tenants` y hacia
+  `empleados`) — la ausencia de una fila para un `diaSemana` dado
+  significa que ese día no se trabaja, no hay columna booleana aparte.
 - **`facturas.turnoCajaId`** es `ON DELETE SET NULL` (no `RESTRICT` ni
   `CASCADE`) — a diferencia de `recibos_nomina.empleadoId`/
   `lineas_asiento.cuentaContableId`, aquí el documento fiscal (`Factura`)

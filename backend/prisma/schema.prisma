@@ -72,6 +72,7 @@ model Tenant {
   listasPrecio  ListaPrecio[]
   cuentasBancarias CuentaBancaria[]
   gastosMenores GastoMenor[]
+  horariosEmpleado HorarioEmpleado[]
   suscripcion   Suscripcion?
   facturasPlataforma FacturaPlataforma[]
   ventasAparcadas VentaAparcada[]
@@ -412,6 +413,9 @@ model User {
   turnosCaja    TurnoCaja[]
   turnosCajaCerrados TurnoCaja[] @relation("TurnoCajaCerradoPor")
   pagos         Pago[]
+  // Nullable: no todo User de sistema tiene un Empleado de nómina asociado
+  // (ej. un Admin Total que no está en planilla).
+  empleado      Empleado?
 
   @@unique([tenantId, email])
   @@map("users")
@@ -996,13 +1000,53 @@ model Empleado {
   email               String?
   telefono            String?
   createdAt           DateTime      @default(now())
+  // Nullable + único: no todo empleado necesita login (ej. personal de
+  // bodega sin acceso al sistema); habilita el check-in/check-out de
+  // autoservicio (RegistroAsistencia) resolviendo req.user.userId -> este
+  // campo. onDelete SetNull: borrar el User no debe borrar el historial
+  // de nómina del empleado.
+  userId              String?       @unique
+  user                User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   recibos             ReciboNomina[]
   ventasComoVendedor  Factura[]
   ventasAparcadas     VentaAparcada[]
+  horarios            HorarioEmpleado[]
 
   @@unique([tenantId, cedula])
   @@map("empleados")
+}
+
+enum DiaSemana {
+  LUNES
+  MARTES
+  MIERCOLES
+  JUEVES
+  VIERNES
+  SABADO
+  DOMINGO
+}
+
+/// Horario semanal recurrente por empleado (Fase 7a de adopción de Cuadre).
+/// Una fila por día de la semana en que el empleado trabaja — la AUSENCIA
+/// de fila para un día significa que ese día no se trabaja (no hay un
+/// booleano "trabaja"). `horaEntrada`/`horaSalida` son `String "HH:MM"` a
+/// propósito, no `DateTime`: ya se encontraron dos bugs de timezone esta
+/// fase con campos de hora/fecha sin zona (ver Kardex/Lote) — un string
+/// zero-padded ordena y compara bien sin ese riesgo. Usado por
+/// AsistenciaService para calcular `tardanza` al marcar entrada.
+model HorarioEmpleado {
+  id          String    @id @default(uuid())
+  tenantId    String
+  tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  empleadoId  String
+  empleado    Empleado  @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+  diaSemana   DiaSemana
+  horaEntrada String
+  horaSalida  String
+
+  @@unique([tenantId, empleadoId, diaSemana])
+  @@map("horarios_empleado")
 }
 
 model PeriodoNomina {
