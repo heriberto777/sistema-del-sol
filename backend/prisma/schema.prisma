@@ -1164,6 +1164,10 @@ model ReciboNomina {
   afpEmpleado      Decimal       @db.Decimal(14, 2)
   isr              Decimal       @db.Decimal(14, 2)
   otrasDeducciones Decimal       @default(0) @db.Decimal(14, 2)
+  // Descuento por ausencias sin goce de sueldo (Fase 7d de RRHH) — se
+  // muestra separado de otrasDeducciones (ese sigue siendo el ajuste
+  // manual de siempre) para que quede visible por qué se descontó.
+  descuentoAusencias Decimal     @default(0) @db.Decimal(14, 2)
   salarioNeto      Decimal       @db.Decimal(14, 2)
   sfsEmpleador     Decimal       @db.Decimal(14, 2)
   afpEmpleador     Decimal       @db.Decimal(14, 2)

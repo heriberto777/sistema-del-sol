@@ -160,6 +160,13 @@ const CON_GOCE_POR_DEFECTO: Record<TipoAusencia, boolean> = {
   OTRO: true,
 };
 
+interface BalanceVacaciones {
+  aniosCompletos: number;
+  diasAcumulados: number;
+  diasDisponibles: number;
+  diasPagoPorAntiguedad: number;
+}
+
 function ModalSolicitarAusencia({ onClose, onCreada }: { onClose: () => void; onCreada: () => void }) {
   const [empleado, setEmpleado] = useState<Empleado | null>(null);
   const [tipo, setTipo] = useState<TipoAusencia>('VACACIONES');
@@ -168,6 +175,12 @@ function ModalSolicitarAusencia({ onClose, onCreada }: { onClose: () => void; on
   const [conGoceDeSueldo, setConGoceDeSueldo] = useState(true);
   const [motivo, setMotivo] = useState('');
   const [error, setError] = useState<string | null>(null);
+
+  const { data: balance } = useQuery({
+    queryKey: ['rrhh-balance-vacaciones', empleado?.id],
+    queryFn: async () => (await apiClient.get<BalanceVacaciones>(`/nomina/empleados/${empleado!.id}/balance-vacaciones`)).data,
+    enabled: !!empleado && tipo === 'VACACIONES',
+  });
 
   const crear = useMutation({
     mutationFn: async () =>
@@ -236,6 +249,13 @@ function ModalSolicitarAusencia({ onClose, onCreada }: { onClose: () => void; on
             ))}
           </Select>
         </div>
+        {tipo === 'VACACIONES' && empleado && (
+          <p className="text-sm text-slate-600 dark:text-slate-400">
+            {balance
+              ? `Balance disponible: ${balance.diasDisponibles} día(s) (${balance.aniosCompletos} año(s) de antigüedad, ${balance.diasAcumulados} acumulado(s))`
+              : 'Calculando balance de vacaciones…'}
+          </p>
+        )}
         <FormField id="ausencia-desde" label="Desde" type="date" value={fechaDesde} onChange={(e) => setFechaDesde(e.target.value)} required />
         <FormField id="ausencia-hasta" label="Hasta" type="date" value={fechaHasta} onChange={(e) => setFechaHasta(e.target.value)} required />
         <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">

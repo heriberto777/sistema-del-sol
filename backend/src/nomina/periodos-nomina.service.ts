@@ -1,8 +1,11 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { PeriodosNominaRepository } from './periodos-nomina.repository';
 import { EmpleadosRepository } from './empleados.repository';
+import { AusenciasRepository } from './ausencias.repository';
 import { GenerarPeriodoDto } from './dto/generar-periodo.dto';
 import { calcularRecibo } from './calculo-nomina';
+import { DIVISOR_SALARIO_DIARIO } from './nomina-config';
+import { contarDiasNoDomingo } from './vacaciones.util';
 import { EventBusService } from '../event-bus/event-bus.service';
 import { EVENTOS } from '../event-bus/events';
 import { paginar } from '../common/types/pagina-resultado';
@@ -13,8 +16,26 @@ export class PeriodosNominaService {
   constructor(
     private readonly periodosRepository: PeriodosNominaRepository,
     private readonly empleadosRepository: EmpleadosRepository,
+    private readonly ausenciasRepository: AusenciasRepository,
     private readonly eventBus: EventBusService,
   ) {}
+
+  /**
+   * Días de ausencia sin goce de sueldo del empleado que se solapan con el
+   * período, excluyendo domingos — simplificación consciente (Fase 7d): no
+   * distingue contra `HorarioEmpleado`, así el cálculo de nómina no depende
+   * de si RRHH configuró un horario o no. Recorta cada ausencia a los
+   * límites del período antes de contar (una ausencia puede empezar antes
+   * o terminar después del período).
+   */
+  private async diasDescuentoAusencias(empleadoId: string, fechaInicio: Date, fechaFin: Date) {
+    const ausencias = await this.ausenciasRepository.listarSinGoceSolapadas(empleadoId, fechaInicio, fechaFin);
+    return ausencias.reduce((acc, a) => {
+      const desde = a.fechaDesde > fechaInicio ? a.fechaDesde : fechaInicio;
+      const hasta = a.fechaHasta < fechaFin ? a.fechaHasta : fechaFin;
+      return acc + contarDiasNoDomingo(desde, hasta);
+    }, 0);
+  }
 
   /** Genera un recibo por cada empleado activo, calculado sobre su salario vigente en este momento. */
   async generarPeriodo(dto: GenerarPeriodoDto, tenantId: string) {
@@ -24,16 +45,23 @@ export class PeriodosNominaService {
     }
 
     const factorPeriodo = dto.tipo === 'QUINCENAL' ? 0.5 : 1;
-    const recibos = empleados.map((empleado) => ({
-      empleadoId: empleado.id,
-      ...calcularRecibo(Number(empleado.salarioBrutoMensual), factorPeriodo),
-    }));
+    const fechaInicio = new Date(dto.fechaInicio);
+    const fechaFin = new Date(dto.fechaFin);
+
+    const recibos = await Promise.all(
+      empleados.map(async (empleado) => {
+        const salarioBrutoMensual = Number(empleado.salarioBrutoMensual);
+        const diasDescuento = await this.diasDescuentoAusencias(empleado.id, fechaInicio, fechaFin);
+        const descuentoAusencias = diasDescuento * (salarioBrutoMensual / DIVISOR_SALARIO_DIARIO);
+        return { empleadoId: empleado.id, ...calcularRecibo(salarioBrutoMensual, factorPeriodo, 0, descuentoAusencias) };
+      }),
+    );
 
     return this.periodosRepository.crear({
       tenantId,
       tipo: dto.tipo,
-      fechaInicio: new Date(dto.fechaInicio),
-      fechaFin: new Date(dto.fechaFin),
+      fechaInicio,
+      fechaFin,
       recibos,
     });
   }
@@ -66,8 +94,19 @@ export class PeriodosNominaService {
 
     const actualizado = await this.periodosRepository.actualizarEstado(id, 'PAGADO', new Date());
 
-    const sumar = (campo: 'salarioBruto' | 'sfsEmpleado' | 'afpEmpleado' | 'isr' | 'otrasDeducciones' | 'salarioNeto' | 'sfsEmpleador' | 'afpEmpleador' | 'infotep') =>
-      actualizado.recibos.reduce((acc, r) => acc + Number(r[campo]), 0);
+    const sumar = (
+      campo:
+        | 'salarioBruto'
+        | 'sfsEmpleado'
+        | 'afpEmpleado'
+        | 'isr'
+        | 'otrasDeducciones'
+        | 'descuentoAusencias'
+        | 'salarioNeto'
+        | 'sfsEmpleador'
+        | 'afpEmpleador'
+        | 'infotep',
+    ) => actualizado.recibos.reduce((acc, r) => acc + Number(r[campo]), 0);
 
     this.eventBus.emit(EVENTOS.NOMINA_PERIODO_PAGADO, {
       tenantId: actualizado.tenantId,
@@ -77,6 +116,7 @@ export class PeriodosNominaService {
       totalAfpEmpleado: String(sumar('afpEmpleado')),
       totalIsr: String(sumar('isr')),
       totalOtrasDeducciones: String(sumar('otrasDeducciones')),
+      totalDescuentoAusencias: String(sumar('descuentoAusencias')),
       totalSalarioNeto: String(sumar('salarioNeto')),
       totalSfsEmpleador: String(sumar('sfsEmpleador')),
       totalAfpEmpleador: String(sumar('afpEmpleador')),

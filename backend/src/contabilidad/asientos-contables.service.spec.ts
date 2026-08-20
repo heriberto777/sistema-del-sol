@@ -241,6 +241,7 @@ describe('AsientosContablesService', () => {
         totalAfpEmpleado: 1004.5,
         totalIsr: 0,
         totalOtrasDeducciones: 0,
+        totalDescuentoAusencias: 0,
         totalSalarioNeto: 32931.5,
         totalSfsEmpleador: 2481.5,
         totalAfpEmpleador: 2485,
@@ -254,6 +255,38 @@ describe('AsientosContablesService', () => {
         expect.arrayContaining([
           expect.objectContaining({ cuentaContableId: `cuenta-${CODIGOS_CUENTA.GASTOS_DE_NOMINA}`, debito: 40316.5 }),
           expect.objectContaining({ cuentaContableId: `cuenta-${CODIGOS_CUENTA.CAJA_BANCOS}`, credito: 32931.5 }),
+          expect.objectContaining({ cuentaContableId: `cuenta-${CODIGOS_CUENTA.TSS_ISR_POR_PAGAR}`, credito: 7385 }),
+        ]),
+      );
+      const totalDebito = lineas.reduce((acc: number, l: { debito: number }) => acc + l.debito, 0);
+      const totalCredito = lineas.reduce((acc: number, l: { credito: number }) => acc + l.credito, 0);
+      expect(totalDebito).toBeCloseTo(totalCredito, 5);
+    });
+
+    it('con descuentoAusencias (Fase 7d): resta el descuento del débito de Gastos de Nómina, no lo suma al crédito de TSS/ISR, y el asiento sigue cuadrando', async () => {
+      asientosRepository.crearGlobal.mockResolvedValue({ id: 'a1' } as never);
+
+      await service.generarDesdeNomina({
+        tenantId: 't1',
+        periodoId: 'p1',
+        totalSalarioBruto: 35000,
+        totalSfsEmpleado: 1064,
+        totalAfpEmpleado: 1004.5,
+        totalIsr: 0,
+        totalOtrasDeducciones: 0,
+        totalDescuentoAusencias: 1200,
+        totalSalarioNeto: 31731.5,
+        totalSfsEmpleador: 2481.5,
+        totalAfpEmpleador: 2485,
+        totalInfotep: 350,
+      });
+
+      const [llamada] = asientosRepository.crearGlobal.mock.calls[0];
+      const lineas = llamada.lineas;
+      expect(lineas).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ cuentaContableId: `cuenta-${CODIGOS_CUENTA.GASTOS_DE_NOMINA}`, debito: 39116.5 }),
+          expect.objectContaining({ cuentaContableId: `cuenta-${CODIGOS_CUENTA.CAJA_BANCOS}`, credito: 31731.5 }),
           expect.objectContaining({ cuentaContableId: `cuenta-${CODIGOS_CUENTA.TSS_ISR_POR_PAGAR}`, credito: 7385 }),
         ]),
       );

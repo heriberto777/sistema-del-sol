@@ -2,6 +2,7 @@ import { BadRequestException } from '@nestjs/common';
 import { PeriodosNominaService } from './periodos-nomina.service';
 import { PeriodosNominaRepository } from './periodos-nomina.repository';
 import { EmpleadosRepository } from './empleados.repository';
+import { AusenciasRepository } from './ausencias.repository';
 import { EventBusService } from '../event-bus/event-bus.service';
 import { EVENTOS } from '../event-bus/events';
 
@@ -9,13 +10,15 @@ describe('PeriodosNominaService', () => {
   let service: PeriodosNominaService;
   let periodosRepository: jest.Mocked<PeriodosNominaRepository>;
   let empleadosRepository: jest.Mocked<EmpleadosRepository>;
+  let ausenciasRepository: jest.Mocked<AusenciasRepository>;
   let eventBus: jest.Mocked<EventBusService>;
 
   beforeEach(() => {
     periodosRepository = { crear: jest.fn(), buscarPorId: jest.fn(), listar: jest.fn(), actualizarEstado: jest.fn() } as unknown as jest.Mocked<PeriodosNominaRepository>;
     empleadosRepository = { listarActivos: jest.fn() } as unknown as jest.Mocked<EmpleadosRepository>;
+    ausenciasRepository = { listarSinGoceSolapadas: jest.fn().mockResolvedValue([]) } as unknown as jest.Mocked<AusenciasRepository>;
     eventBus = { emit: jest.fn() } as unknown as jest.Mocked<EventBusService>;
-    service = new PeriodosNominaService(periodosRepository, empleadosRepository, eventBus);
+    service = new PeriodosNominaService(periodosRepository, empleadosRepository, ausenciasRepository, eventBus);
   });
 
   describe('listar', () => {
@@ -58,6 +61,36 @@ describe('PeriodosNominaService', () => {
       const [llamada] = periodosRepository.crear.mock.calls[0];
       expect(llamada.recibos[0].salarioBruto).toBe(17500);
     });
+
+    it('descuenta salario por ausencias APROBADAS sin goce que se solapan con el período, sin tocar TSS/ISR', async () => {
+      empleadosRepository.listarActivos.mockResolvedValue([{ id: 'e1', salarioBrutoMensual: 23830 }] as never);
+      periodosRepository.crear.mockResolvedValue({ id: 'p1' } as never);
+      // 3 días (lun-mié) dentro del período, ninguno domingo -> 3 * (23830/23.83) = 3000
+      ausenciasRepository.listarSinGoceSolapadas.mockResolvedValue([
+        { fechaDesde: new Date('2026-01-05T00:00:00.000Z'), fechaHasta: new Date('2026-01-07T00:00:00.000Z') },
+      ] as never);
+
+      await service.generarPeriodo({ tipo: 'MENSUAL', fechaInicio: '2026-01-01', fechaFin: '2026-01-31' }, 't1');
+
+      expect(ausenciasRepository.listarSinGoceSolapadas).toHaveBeenCalledWith('e1', new Date('2026-01-01'), new Date('2026-01-31'));
+      const [llamada] = periodosRepository.crear.mock.calls[0];
+      expect(llamada.recibos[0].descuentoAusencias).toBeCloseTo(3000, 5);
+      expect(llamada.recibos[0].sfsEmpleado).toBeCloseTo(23830 * 0.0304, 2);
+    });
+
+    it('recorta una ausencia que empieza antes del período a los límites reales del período', async () => {
+      empleadosRepository.listarActivos.mockResolvedValue([{ id: 'e1', salarioBrutoMensual: 23830 }] as never);
+      periodosRepository.crear.mockResolvedValue({ id: 'p1' } as never);
+      // La ausencia empieza el 2025-12-29 pero el período arranca el 2026-01-01 -> solo cuentan 1 y 2 de enero (2 días).
+      ausenciasRepository.listarSinGoceSolapadas.mockResolvedValue([
+        { fechaDesde: new Date('2025-12-29T00:00:00.000Z'), fechaHasta: new Date('2026-01-02T00:00:00.000Z') },
+      ] as never);
+
+      await service.generarPeriodo({ tipo: 'MENSUAL', fechaInicio: '2026-01-01', fechaFin: '2026-01-31' }, 't1');
+
+      const [llamada] = periodosRepository.crear.mock.calls[0];
+      expect(llamada.recibos[0].descuentoAusencias).toBeCloseTo(2 * (23830 / 23.83), 5);
+    });
   });
 
   describe('procesar', () => {
@@ -85,8 +118,8 @@ describe('PeriodosNominaService', () => {
         tenantId: 't1',
         estado: 'PAGADO',
         recibos: [
-          { salarioBruto: 35000, sfsEmpleado: 1064, afpEmpleado: 1004.5, isr: 0, otrasDeducciones: 0, salarioNeto: 32931.5, sfsEmpleador: 2481.5, afpEmpleador: 2485, infotep: 350 },
-          { salarioBruto: 20000, sfsEmpleado: 608, afpEmpleado: 574, isr: 0, otrasDeducciones: 0, salarioNeto: 18818, sfsEmpleador: 1418, afpEmpleador: 1420, infotep: 200 },
+          { salarioBruto: 35000, sfsEmpleado: 1064, afpEmpleado: 1004.5, isr: 0, otrasDeducciones: 0, descuentoAusencias: 1200, salarioNeto: 31731.5, sfsEmpleador: 2481.5, afpEmpleador: 2485, infotep: 350 },
+          { salarioBruto: 20000, sfsEmpleado: 608, afpEmpleado: 574, isr: 0, otrasDeducciones: 0, descuentoAusencias: 0, salarioNeto: 18818, sfsEmpleador: 1418, afpEmpleador: 1420, infotep: 200 },
         ],
       } as never);
 
@@ -99,7 +132,8 @@ describe('PeriodosNominaService', () => {
           tenantId: 't1',
           periodoId: 'p1',
           totalSalarioBruto: '55000',
-          totalSalarioNeto: '51749.5',
+          totalDescuentoAusencias: '1200',
+          totalSalarioNeto: '50549.5',
         }),
       );
     });

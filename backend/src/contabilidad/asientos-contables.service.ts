@@ -187,6 +187,14 @@ export class AsientosContablesService {
    * fiscales, p. ej. un préstamo interno) se agrupa también en TSS e ISR
    * por Pagar en vez de tener su propia sub-cuenta — si el negocio
    * necesita rastrear eso por separado, es la extensión natural.
+   *
+   * `totalDescuentoAusencias` (Fase 7d de RRHH) es distinto: no es una
+   * retención que se le deba a alguien, es salario que nunca se generó
+   * (el empleado no trabajó esos días) — por eso se resta directo del
+   * costo laboral (débito), NO se agrega al crédito de TSS e ISR por
+   * Pagar como `otrasDeducciones`. Si se agregara ahí, el asiento
+   * quedaría descuadrado (crédito > débito) apenas alguna ausencia sin
+   * goce entre en un período.
    */
   async generarDesdeNomina(params: {
     tenantId: string;
@@ -196,6 +204,7 @@ export class AsientosContablesService {
     totalAfpEmpleado: number;
     totalIsr: number;
     totalOtrasDeducciones: number;
+    totalDescuentoAusencias: number;
     totalSalarioNeto: number;
     totalSfsEmpleador: number;
     totalAfpEmpleador: number;
@@ -207,7 +216,12 @@ export class AsientosContablesService {
       this.cuentasRepository.buscarPorCodigoGlobal(params.tenantId, CODIGOS_CUENTA.TSS_ISR_POR_PAGAR),
     ]);
 
-    const costoLaboral = params.totalSalarioBruto + params.totalSfsEmpleador + params.totalAfpEmpleador + params.totalInfotep;
+    const costoLaboral =
+      params.totalSalarioBruto +
+      params.totalSfsEmpleador +
+      params.totalAfpEmpleador +
+      params.totalInfotep -
+      params.totalDescuentoAusencias;
     const porPagarTssIsr =
       params.totalSfsEmpleado +
       params.totalAfpEmpleado +

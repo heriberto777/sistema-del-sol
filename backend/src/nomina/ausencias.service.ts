@@ -5,6 +5,7 @@ import { EmpleadosRepository } from './empleados.repository';
 import { CrearAusenciaDto } from './dto/crear-ausencia.dto';
 import { ListarAusenciasQueryDto } from './dto/listar-ausencias-query.dto';
 import { paginar } from '../common/types/pagina-resultado';
+import { calcularBalanceVacaciones, contarDiasNoDomingo } from './vacaciones.util';
 
 /** INJUSTIFICADA es la única con goce=false por defecto — el resto se asume pagada salvo que el caller lo indique explícito. */
 const CON_GOCE_POR_DEFECTO: Record<TipoAusencia, boolean> = {
@@ -24,12 +25,22 @@ export class AusenciasService {
   ) {}
 
   async crear(dto: CrearAusenciaDto, tenantId: string, solicitadoPorId: string) {
-    await this.empleadosRepository.buscarPorId(dto.empleadoId);
+    const empleado = await this.empleadosRepository.buscarPorId(dto.empleadoId);
 
     const fechaDesde = new Date(dto.fechaDesde);
     const fechaHasta = new Date(dto.fechaHasta);
     if (fechaHasta < fechaDesde) {
       throw new BadRequestException('fechaHasta no puede ser anterior a fechaDesde');
+    }
+
+    if (dto.tipo === 'VACACIONES') {
+      const diasSolicitados = contarDiasNoDomingo(fechaDesde, fechaHasta);
+      const balance = await this.balanceVacaciones(dto.empleadoId, empleado.fechaIngreso);
+      if (diasSolicitados > balance.diasDisponibles) {
+        throw new BadRequestException(
+          `El empleado tiene ${balance.diasDisponibles} día(s) de vacaciones disponibles — se solicitaron ${diasSolicitados}`,
+        );
+      }
     }
 
     return this.ausenciasRepository.crear({
@@ -60,5 +71,12 @@ export class AusenciasService {
     const { pagina, tamanoPagina, skip, take } = paginar(query.pagina, query.tamanoPagina);
     const [datos, total] = await this.ausenciasRepository.listar({ empleadoId: query.empleadoId, estado: query.estado, skip, take });
     return { datos, total, pagina, tamanoPagina };
+  }
+
+  /** Balance de vacaciones (Fase 7d) — expuesto también en GET /nomina/empleados/:id/balance-vacaciones. */
+  async balanceVacaciones(empleadoId: string, fechaIngreso: Date) {
+    const vacacionesAprobadas = await this.ausenciasRepository.listarVacacionesAprobadas(empleadoId);
+    const diasYaTomados = vacacionesAprobadas.reduce((acc, v) => acc + contarDiasNoDomingo(v.fechaDesde, v.fechaHasta), 0);
+    return calcularBalanceVacaciones(fechaIngreso, diasYaTomados);
   }
 }

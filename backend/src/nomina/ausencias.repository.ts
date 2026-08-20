@@ -44,4 +44,20 @@ export class AusenciasRepository {
       this.db.ausencia.count({ where }),
     ]);
   }
+
+  /** VACACIONES ya tomadas (APROBADA) — usado por el balance de vacaciones. */
+  listarVacacionesAprobadas(empleadoId: string) {
+    return this.db.ausencia.findMany({
+      where: { empleadoId, tipo: 'VACACIONES', estado: 'APROBADA' },
+      select: { fechaDesde: true, fechaHasta: true },
+    });
+  }
+
+  /** Ausencias APROBADAS sin goce de sueldo que se solapan con un período — usado por el prorrateo de nómina. */
+  listarSinGoceSolapadas(empleadoId: string, desde: Date, hasta: Date) {
+    return this.db.ausencia.findMany({
+      where: { empleadoId, estado: 'APROBADA', conGoceDeSueldo: false, fechaDesde: { lte: hasta }, fechaHasta: { gte: desde } },
+      select: { fechaDesde: true, fechaHasta: true },
+    });
+  }
 }

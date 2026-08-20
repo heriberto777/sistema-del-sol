@@ -1762,11 +1762,57 @@ ausencia siga en `SOLICITADA` — no se puede re-aprobar/re-rechazar una
 ya resuelta. Solo una ausencia `APROBADA` afecta algo más allá de este
 registro — `conGoceDeSueldo: false` + `APROBADA` es lo que la Fase 7d
 usa para prorratear el salario en nómina; `SOLICITADA`/`RECHAZADA`
-quedan como historial sin ningún efecto. **Validación de balance de
-vacaciones pendiente**: crear una `Ausencia` tipo `VACACIONES` hoy NO
-valida contra los días disponibles del empleado — esa validación se
-agrega en la Fase 7d, junto con el cálculo del balance real (necesita
-`vacaciones.util.ts`, que todavía no existe).
+quedan como historial sin ningún efecto.
+
+**Integración con Nómina y balance de vacaciones (7d, implementado —
+última sub-fase de RRHH)**: `PeriodosNominaService.generarPeriodo()`
+calcula, por cada empleado, los días de sus `Ausencia` `APROBADA` +
+`conGoceDeSueldo: false` que se solapan con el período (recortados a
+los límites del período si la ausencia empieza antes o termina
+después), contando solo días que no sean domingo
+(`contarDiasNoDomingo`, `vacaciones.util.ts`) — simplificación
+consciente: no distingue contra `HorarioEmpleado`, para que el cálculo
+de nómina no dependa de si RRHH configuró un horario. El descuento en
+RD$ es `días * (salarioBrutoMensual / DIVISOR_SALARIO_DIARIO)`
+(`23.83`, `nomina-config.ts`). `calcularRecibo()` resta
+`descuentoAusencias` SOLO en el paso final de `salarioNeto` (igual que
+`otrasDeducciones`) — la base de TSS/ISR sigue siendo el salario
+mensual completo, cero riesgo de regresión al cálculo fiscal.
+
+**Asiento contable — por qué `descuentoAusencias` NO se agrupa con
+`otrasDeducciones`**: a diferencia de una deducción no fiscal (que sí
+se le debe a alguien, por eso se acredita en `TSS e ISR por Pagar`),
+un descuento por ausencia es salario que nunca se generó — el
+empleado no trabajó esos días. `AsientosContablesService.generarDesdeNomina`
+lo resta directo del débito a `Gastos de Nómina` (el costo laboral
+real fue menor), no lo suma al crédito de `TSS e ISR por Pagar` — si
+se hiciera así, el asiento quedaría descuadrado (crédito > débito) en
+cualquier período con alguna ausencia sin goce. Verificado
+manualmente: período real con 2 días de ausencia sin goce sobre un
+salario de RD$35,000 generó un asiento con débito = crédito =
+RD$37,379.03 exactos.
+
+**Balance de vacaciones** (`vacaciones.util.ts`,
+`calcularBalanceVacaciones`): Ley 16-92 Art. 177-184 — 14 días
+laborables por año de servicio CUMPLIDO (meses parciales del año en
+curso no acumulan), pagados a 14 días de salario si <5 años de
+antigüedad o 18 si ≥5 (Art. 178 — el pago sube, no los días de
+descanso). `GET /nomina/empleados/:id/balance-vacaciones` (`rrhh.ver`)
+lo expone; `AusenciasService.crear()` lo usa para rechazar con 400 una
+solicitud `VACACIONES` que exceda el balance disponible. **Límites
+conscientes, documentados y no resueltos en esta fase**: (1) el balance
+corre de por vida desde `fechaIngreso`, nunca resetea por año
+calendario — no se modela vencimiento anual de días no tomados; (2) el
+pago monetario especial a 18 días de salario (vs. 14) para empleados
+con ≥5 años NO se liquida automáticamente — `diasPagoPorAntiguedad` es
+solo informativo, calcularlo/pagarlo queda manual; (3) la incapacidad
+por enfermedad (días 1-3 sin subsidio TSS, ver Ley 87-01 Art. 140) no
+tiene regla automática — `conGoceDeSueldo` para `ENFERMEDAD` es una
+decisión editable por quien registra la ausencia, no una regla legal.
+
+Con esto, Fase 7 (RRHH) de la adopción de Cuadre queda completa:
+Horarios (7a) → Asistencia (7b) → Ausencias (7c) → integración con
+Nómina + vacaciones (7d).
 
 ## POS (punto de venta)
 

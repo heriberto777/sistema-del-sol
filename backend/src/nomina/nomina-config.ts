@@ -37,3 +37,25 @@ export const TRAMOS_ISR_ANUAL = [
   { desde: 624329, hasta: 867123, tasa: 0.2, sumaFija: 31216 },
   { desde: 867123, hasta: Infinity, tasa: 0.25, sumaFija: 79776 },
 ] as const;
+
+/**
+ * Divisor oficial del Ministerio de Trabajo de RD para el salario diario
+ * (no 30 — ver ARCHITECTURE.md, sección RRHH). Usado tanto para el
+ * prorrateo de ausencias sin goce de sueldo como, informativamente, para
+ * el pago de vacaciones. Mismo disclaimer que el resto de este archivo:
+ * no verificado contra fuente oficial en tiempo real.
+ */
+export const DIVISOR_SALARIO_DIARIO = 23.83;
+
+/**
+ * Código de Trabajo (Ley 16-92, Art. 177-184): 14 días laborables de
+ * descanso por año de servicio cumplido — siempre 14, sin importar
+ * antigüedad. Lo que cambia con la antigüedad es el PAGO de esos días
+ * (ver `DIAS_PAGO_VACACIONES_POR_ANTIGUEDAD`), no la cantidad de días
+ * libres. Mismo disclaimer: no verificado contra fuente oficial.
+ */
+export const DIAS_VACACIONES_POR_ANIO = 14;
+
+/** Años de antigüedad a partir de los cuales el pago de vacaciones sube de 14 a 18 días de salario (Art. 178). */
+export const ANTIGUEDAD_VACACIONES_18_DIAS = 5;
+export const DIAS_PAGO_VACACIONES_POR_ANTIGUEDAD = { MENOS_DE_5_ANIOS: 14, DESDE_5_ANIOS: 18 } as const;

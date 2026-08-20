@@ -7,6 +7,7 @@ export interface ReciboCalculado {
   afpEmpleado: number;
   isr: number;
   otrasDeducciones: number;
+  descuentoAusencias: number;
   salarioNeto: number;
   sfsEmpleador: number;
   afpEmpleador: number;
@@ -21,7 +22,14 @@ export interface ReciboCalculado {
  * antes de aplicar el tope de TSS daría un resultado distinto (y
  * incorrecto) al del salario mensual real.
  */
-export function calcularRecibo(salarioBrutoMensual: number, factorPeriodo: number, otrasDeducciones = 0): ReciboCalculado {
+/**
+ * `descuentoAusencias` se resta SOLO en el paso final de `salarioNeto`,
+ * igual que `otrasDeducciones` — nunca toca la base de TSS/ISR (que
+ * sigue siendo el salario mensual completo). Decisión deliberada: cero
+ * riesgo de regresión al cálculo fiscal ya en producción por una
+ * feature (RRHH, Fase 7d) que no tiene nada que ver con TSS/ISR.
+ */
+export function calcularRecibo(salarioBrutoMensual: number, factorPeriodo: number, otrasDeducciones = 0, descuentoAusencias = 0): ReciboCalculado {
   const cotizableSfs = Math.min(salarioBrutoMensual, TOPES_TSS.SFS);
   const cotizableAfp = Math.min(salarioBrutoMensual, TOPES_TSS.AFP);
 
@@ -48,7 +56,8 @@ export function calcularRecibo(salarioBrutoMensual: number, factorPeriodo: numbe
     afpEmpleado,
     isr,
     otrasDeducciones,
-    salarioNeto: salarioBruto - sfsEmpleado - afpEmpleado - isr - otrasDeducciones,
+    descuentoAusencias,
+    salarioNeto: salarioBruto - sfsEmpleado - afpEmpleado - isr - otrasDeducciones - descuentoAusencias,
     sfsEmpleador,
     afpEmpleador,
     infotep,

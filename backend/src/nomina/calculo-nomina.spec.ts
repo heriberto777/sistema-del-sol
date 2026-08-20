@@ -41,4 +41,14 @@ describe('calcularRecibo', () => {
     expect(conDeduccion.salarioNeto).toBeCloseTo(sinDeduccion.salarioNeto - 500, 5);
     expect(conDeduccion.sfsEmpleado).toBeCloseTo(sinDeduccion.sfsEmpleado, 5);
   });
+
+  it('descuentoAusencias (Fase 7d) se resta del neto sin afectar los cálculos de TSS/ISR', () => {
+    const sinDescuento = calcularRecibo(35000, 1);
+    const conDescuento = calcularRecibo(35000, 1, 0, 1200);
+
+    expect(conDescuento.descuentoAusencias).toBe(1200);
+    expect(conDescuento.salarioNeto).toBeCloseTo(sinDescuento.salarioNeto - 1200, 5);
+    expect(conDescuento.sfsEmpleado).toBeCloseTo(sinDescuento.sfsEmpleado, 5);
+    expect(conDescuento.isr).toBeCloseTo(sinDescuento.isr, 5);
+  });
 });

@@ -378,6 +378,7 @@ para asientos manuales (ajustes, apertura, etc.).
 | GET | `/api/nomina/ausencias?empleadoId&estado&pagina&tamanoPagina` | `rrhh.ver` |
 | GET | `/api/nomina/ausencias/:id` | `rrhh.ver` |
 | PATCH | `/api/nomina/ausencias/:id/estado` | `rrhh.aprobar` — `{ estado: APROBADA\|RECHAZADA }`, 400 si no está en SOLICITADA |
+| GET | `/api/nomina/empleados/:id/balance-vacaciones` | `rrhh.ver` — `{ aniosCompletos, diasAcumulados, diasDisponibles, diasPagoPorAntiguedad }` (RRHH, Fase 7d) |
 
 ## POS
 

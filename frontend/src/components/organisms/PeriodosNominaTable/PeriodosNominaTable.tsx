@@ -28,6 +28,7 @@ interface ReciboNomina {
   afpEmpleado: string;
   isr: string;
   otrasDeducciones: string;
+  descuentoAusencias: string;
   salarioNeto: string;
   sfsEmpleador: string;
   afpEmpleador: string;
@@ -112,6 +113,9 @@ function ModalDetalleRecibo({ recibo, onClose }: { recibo: ReciboNomina; onClose
         <div className="flex justify-between"><span>AFP (empleado)</span><span>{formatoRD(recibo.afpEmpleado)}</span></div>
         <div className="flex justify-between"><span>ISR</span><span>{formatoRD(recibo.isr)}</span></div>
         <div className="flex justify-between"><span>Otras deducciones</span><span>{formatoRD(recibo.otrasDeducciones)}</span></div>
+        {Number(recibo.descuentoAusencias) > 0 && (
+          <div className="flex justify-between"><span>Descuento por ausencias</span><span>{formatoRD(recibo.descuentoAusencias)}</span></div>
+        )}
         <hr className="border-slate-200 dark:border-slate-800" />
         <div className="flex justify-between font-medium text-slate-900 dark:text-slate-100">
           <span>Salario neto</span><span>{formatoRD(recibo.salarioNeto)}</span>

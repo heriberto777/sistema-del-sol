@@ -53,6 +53,7 @@ export interface NominaPeriodoPagadoPayload {
   totalAfpEmpleado: string;
   totalIsr: string;
   totalOtrasDeducciones: string;
+  totalDescuentoAusencias: string;
   totalSalarioNeto: string;
   totalSfsEmpleador: string;
   totalAfpEmpleador: string;

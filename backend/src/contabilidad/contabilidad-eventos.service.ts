@@ -164,6 +164,7 @@ export class ContabilidadEventosService {
         totalAfpEmpleado: Number(payload.totalAfpEmpleado),
         totalIsr: Number(payload.totalIsr),
         totalOtrasDeducciones: Number(payload.totalOtrasDeducciones),
+        totalDescuentoAusencias: Number(payload.totalDescuentoAusencias),
         totalSalarioNeto: Number(payload.totalSalarioNeto),
         totalSfsEmpleador: Number(payload.totalSfsEmpleador),
         totalAfpEmpleador: Number(payload.totalAfpEmpleador),

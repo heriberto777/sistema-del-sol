@@ -211,6 +211,11 @@ token, así que un token nunca puede reusarse.
   `turnos_caja.cajeroId`/`cerradoPorId`; `aprobadoPorId` es nullable y
   usa relación nombrada por la misma razón (dos FK al mismo modelo
   desde una sola tabla).
+- **`recibos_nomina.descuentoAusencias`** (RRHH, Fase 7d, `@default(0)`)
+  se muestra separado de `otrasDeducciones` en el recibo — mismo campo
+  numérico, pero con una semántica contable distinta (ver
+  ARCHITECTURE.md: no se agrupa con `otrasDeducciones` en el asiento
+  automático porque no es una retención que se le deba a alguien).
 - **`facturas.turnoCajaId`** es `ON DELETE SET NULL` (no `RESTRICT` ni
   `CASCADE`) — a diferencia de `recibos_nomina.empleadoId`/
   `lineas_asiento.cuentaContableId`, aquí el documento fiscal (`Factura`)
