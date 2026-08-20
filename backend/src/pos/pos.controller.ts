@@ -5,6 +5,7 @@ import { AbrirTurnoDto } from './dto/abrir-turno.dto';
 import { CerrarTurnoDto } from './dto/cerrar-turno.dto';
 import { CrearMovimientoCajaDto } from './dto/crear-movimiento-caja.dto';
 import { RegistrarVentaPosDto } from './dto/registrar-venta.dto';
+import { CotizarVentaPosDto } from './dto/cotizar-venta.dto';
 import { GuardarVentaDto } from './dto/guardar-venta.dto';
 import { RegistrarDevolucionDto } from './dto/registrar-devolucion.dto';
 import { ListarTurnosQueryDto } from './dto/listar-turnos-query.dto';
@@ -63,6 +64,14 @@ export class PosController {
   @Permissions('pos.editar')
   cerrarTurno(@Param('id') id: string, @Body() dto: CerrarTurnoDto, @CurrentUser() user: JwtPayloadUser) {
     return this.posService.cerrarTurno(id, dto, user.userId, user.tenantId, user.permisos.includes('pos.supervisar'));
+  }
+
+  // Sin efectos secundarios — el checkout la llama antes de armar los pagos
+  // para saber el total real (con ofertas ya resueltas), ver ARCHITECTURE.md.
+  @Post('cotizar')
+  @Permissions('pos.editar')
+  cotizar(@Body() dto: CotizarVentaPosDto) {
+    return this.posService.cotizar(dto);
   }
 
   @Post('ventas')

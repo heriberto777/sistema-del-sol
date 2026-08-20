@@ -30,7 +30,7 @@ describe('PosService', () => {
       listarGuardadas: jest.fn(),
       eliminarGuardada: jest.fn(),
     } as unknown as jest.Mocked<PosRepository>;
-    facturacionService = { crear: jest.fn(), buscarPorId: jest.fn() } as unknown as jest.Mocked<FacturacionService>;
+    facturacionService = { crear: jest.fn(), buscarPorId: jest.fn(), cotizar: jest.fn() } as unknown as jest.Mocked<FacturacionService>;
     configuracionesService = { buscarValor: jest.fn().mockResolvedValue('50') } as unknown as jest.Mocked<ConfiguracionesService>;
     formasPagoRepository = { buscarPorId: jest.fn().mockResolvedValue({ id: 'fp1' }) } as unknown as jest.Mocked<FormasPagoRepository>;
     empleadosRepository = {
@@ -98,6 +98,18 @@ describe('PosService', () => {
       await service.registrarMovimiento('t1', { tipo: 'SALIDA', monto: 500, concepto: 'Compra de insumos' });
 
       expect(posRepository.crearMovimiento).toHaveBeenCalledWith({ turnoId: 't1', tipo: 'SALIDA', monto: 500, concepto: 'Compra de insumos' });
+    });
+  });
+
+  describe('cotizar (Fase 4c, gap Ofertas+POS)', () => {
+    it('delega en FacturacionService.cotizar sin resolver turno ni bodega (no tiene efectos secundarios)', async () => {
+      facturacionService.cotizar.mockResolvedValue({ subtotal: 180, descuento: 20, itbis: 32.4, total: 212.4, lineas: [] } as never);
+
+      const resultado = await service.cotizar({ clienteId: 'c1', lineas: [{ productoId: 'p1', cantidad: 2 }] });
+
+      expect(facturacionService.cotizar).toHaveBeenCalledWith({ clienteId: 'c1', lineas: [{ productoId: 'p1', cantidad: 2 }] });
+      expect(posRepository.buscarPorId).not.toHaveBeenCalled();
+      expect(resultado).toEqual(expect.objectContaining({ total: 212.4 }));
     });
   });
 

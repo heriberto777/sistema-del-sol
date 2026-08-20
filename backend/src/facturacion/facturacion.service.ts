@@ -5,7 +5,7 @@ import { InventarioService } from '../inventario/inventario.service';
 import { TenantPrismaService } from '../prisma/tenant-prisma.service';
 import { EventBusService } from '../event-bus/event-bus.service';
 import { EVENTOS } from '../event-bus/events';
-import { CrearFacturaDto } from './dto/crear-factura.dto';
+import { CrearFacturaDto, LineaFacturaDto } from './dto/crear-factura.dto';
 import { CrearPagoDto } from '../pagos/dto/crear-pago.dto';
 import { PagosService } from '../pagos/pagos.service';
 import { ClientesService } from '../clientes/clientes.service';
@@ -101,23 +101,19 @@ export class FacturacionService {
    * justifique. Envolver las tres cosas en una sola transacción
    * (`tenantPrisma.client.$transaction`) las hace todo-o-nada.
    */
-  async crear(
-    dto: CrearFacturaDto,
-    tenantId: string,
-    vendedorId: string,
-    opciones?: {
-      formaPagoId?: string;
-      referenciaPago?: string;
-      turnoCajaId?: string;
-      vendedorEmpleadoId?: string;
-      pagos?: { formaPagoId: string; monto: number; referencia?: string }[];
-    },
+  /**
+   * Resuelve variante/precio/descuento (manual u ofertas) y prorratea el
+   * descuento de carrito — sin ningún efecto secundario (no toca stock/NCF/
+   * pagos). Compartido por `crear()` y `cotizar()` (Fase 4c, previsualización
+   * sin efectos secundarios: ver ARCHITECTURE.md, "Ofertas — limitación
+   * conocida") para que ambos calculen exactamente el mismo total — el POS
+   * llama a `cotizar()` antes de armar los pagos, así el total que el cajero
+   * ve YA incluye cualquier oferta que vaya a aplicar `crear()` después.
+   */
+  private async calcularLineasYTotales(
+    dto: { tipoFactura: TipoFactura; listaPrecio?: string; lineas: LineaFacturaDto[] },
+    cliente: { listaPrecio?: { nombre: string } | null },
   ) {
-    // findUniqueOrThrow tenant-scoped: si clienteId es de otro tenant, 404 —
-    // mismo patrón de prevención de IDOR ya documentado para FKs
-    // cliente-suministradas. De paso resuelve el nivel de precio del
-    // cliente para las líneas que no traen precioUnitario explícito.
-    const cliente = await this.clientesService.buscarPorId(dto.clienteId);
     const listaPrecio = dto.listaPrecio ?? cliente.listaPrecio?.nombre ?? 'GENERAL';
     // Ofertas (Fase 4b) solo aplican a una venta nueva — una nota de
     // crédito/débito ajusta un monto YA facturado, nunca recalcula un
@@ -189,6 +185,59 @@ export class FacturacionService {
     const subtotal = subtotalLineas * signo;
     const itbis = itbisLineas * signo;
     const total = (subtotalLineas + itbisLineas) * signo;
+
+    return { lineasCalculadas, subtotal, itbis, total, descuentoTotal };
+  }
+
+  /**
+   * Previsualización de solo lectura — mismo cálculo que `crear()` pero sin
+   * abrir transacción ni tocar stock/NCF/pagos (Fase 4c: el checkout del POS
+   * la llama al armar el carrito para mostrar el total YA con ofertas
+   * resueltas, antes de que el cajero arme los pagos — ver
+   * ARCHITECTURE.md, "Ofertas — limitación conocida").
+   */
+  async cotizar(dto: { clienteId: string; lineas: LineaFacturaDto[]; listaPrecio?: string }) {
+    const cliente = await this.clientesService.buscarPorId(dto.clienteId);
+    const { lineasCalculadas, subtotal, itbis, total, descuentoTotal } = await this.calcularLineasYTotales(
+      { tipoFactura: 'CONTADO', listaPrecio: dto.listaPrecio, lineas: dto.lineas },
+      cliente,
+    );
+    return {
+      lineas: lineasCalculadas.map((l) => ({
+        productoId: l.productoId,
+        varianteId: l.varianteId,
+        cantidad: l.cantidad,
+        precioUnitario: l.precioUnitario,
+        descuento: l.descuento,
+        porcentajeItbis: l.porcentajeItbis,
+        montoItbis: l.montoItbis,
+        montoTotal: l.montoTotal,
+      })),
+      subtotal,
+      descuento: descuentoTotal,
+      itbis,
+      total,
+    };
+  }
+
+  async crear(
+    dto: CrearFacturaDto,
+    tenantId: string,
+    vendedorId: string,
+    opciones?: {
+      formaPagoId?: string;
+      referenciaPago?: string;
+      turnoCajaId?: string;
+      vendedorEmpleadoId?: string;
+      pagos?: { formaPagoId: string; monto: number; referencia?: string }[];
+    },
+  ) {
+    // findUniqueOrThrow tenant-scoped: si clienteId es de otro tenant, 404 —
+    // mismo patrón de prevención de IDOR ya documentado para FKs
+    // cliente-suministradas. De paso resuelve el nivel de precio del
+    // cliente para las líneas que no traen precioUnitario explícito.
+    const cliente = await this.clientesService.buscarPorId(dto.clienteId);
+    const { lineasCalculadas, subtotal, itbis, total, descuentoTotal } = await this.calcularLineasYTotales(dto, cliente);
 
     // Pago dividido (POS, ver PosService.registrarVenta): si vienen `pagos`
     // explícitos, deben sumar exacto el total (EPSILON, mismo criterio que

@@ -90,6 +90,14 @@ interface Cajero {
   nombre: string;
 }
 
+/** Respuesta de POST /pos/cotizar — previsualización de solo lectura (Fase 4c, gap Ofertas+POS, ver ARCHITECTURE.md). */
+interface CotizacionPos {
+  subtotal: number;
+  descuento: number;
+  itbis: number;
+  total: number;
+}
+
 interface TurnoCajaDetalleData {
   id: string;
   bodegaId: string;
@@ -107,6 +115,14 @@ interface TurnoCajaDetalleData {
 
 function formatoRD(valor: string | number) {
   return `RD$ ${Number(valor).toLocaleString('es-DO', { minimumFractionDigits: 2 })}`;
+}
+
+function mensajeErrorApi(err: unknown, fallback: string): string {
+  const mensaje =
+    err && typeof err === 'object' && 'response' in err
+      ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
+      : undefined;
+  return mensaje ?? fallback;
 }
 
 /** Réplica del cálculo de pos.service.ts (calcularMovimientoEfectivo) — solo para mostrar el esperado ANTES de cerrar; el backend sigue siendo la fuente de verdad final. */
@@ -144,6 +160,8 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
   const [modalGuardadas, setModalGuardadas] = useState(false);
   const [modalDevolucion, setModalDevolucion] = useState(false);
   const [modalCheckout, setModalCheckout] = useState(false);
+  const [cotizacion, setCotizacion] = useState<CotizacionPos | null>(null);
+  const [cotizando, setCotizando] = useState(false);
   const [ventaConfirmada, setVentaConfirmada] = useState<{ id: string; total: string } | null>(null);
   const [facturaAnulando, setFacturaAnulando] = useState<FacturaTurno | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -197,6 +215,7 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
       setListaPrecioOverride('');
       setError(null);
       setModalCheckout(false);
+      setCotizacion(null);
       setVentaConfirmada({ id: respuesta.data.id, total: respuesta.data.total });
     },
     // Antes era un mensaje genérico ("revisá el stock") — con Bonos (Fase
@@ -204,13 +223,7 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
     // vencido o sin saldo, y ese mensaje real (que el backend ya arma
     // bien) es el que el cajero necesita ver, no una excusa de stock que
     // no aplica.
-    onError: (err: unknown) => {
-      const mensaje =
-        err && typeof err === 'object' && 'response' in err
-          ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
-          : undefined;
-      setError(mensaje ?? 'No se pudo registrar la venta — revisá el stock disponible.');
-    },
+    onError: (err: unknown) => setError(mensajeErrorApi(err, 'No se pudo registrar la venta — revisá el stock disponible.')),
   });
 
   const { data: guardadas } = useQuery({
@@ -317,7 +330,16 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
   const itbis = carrito.reduce((acc, l) => acc + (l.cantidad * l.precioUnitario - l.descuento) * (l.porcentajeItbis / 100), 0);
   const total = subtotalBruto - totalDescuentos + itbis;
 
-  function onAbrirCheckout() {
+  /**
+   * Antes abría el checkout directo con el total estimado en el navegador —
+   * si había una Oferta vigente (Fase 4b), ese estimado no incluía el
+   * descuento real y la venta terminaba fallando al confirmar ("La suma de
+   * los pagos no coincide con el total"). Ahora cotiza contra el backend
+   * primero (POST /pos/cotizar, sin efectos secundarios) y el checkout se
+   * arma sobre ESE total — ver ARCHITECTURE.md, "Ofertas — limitación
+   * conocida" (Fase 4c).
+   */
+  async function onAbrirCheckout() {
     setError(null);
     if (carrito.length === 0) {
       setError('Agregá al menos un producto al carrito.');
@@ -327,7 +349,25 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
       setError('Seleccioná un cliente (o dejá el Consumidor Final por defecto).');
       return;
     }
-    setModalCheckout(true);
+    setCotizando(true);
+    try {
+      const { data: resultado } = await apiClient.post<CotizacionPos>('/pos/cotizar', {
+        clienteId: cliente.id,
+        listaPrecio: listaPrecioOverride || undefined,
+        lineas: carrito.map((l) => ({
+          productoId: l.productoId,
+          varianteId: l.varianteId,
+          cantidad: l.cantidad,
+          ...(l.descuento > 0 ? { descuento: l.descuento } : {}),
+        })),
+      });
+      setCotizacion(resultado);
+      setModalCheckout(true);
+    } catch (err) {
+      setError(mensajeErrorApi(err, 'No se pudo calcular el total de la venta.'));
+    } finally {
+      setCotizando(false);
+    }
   }
 
   const puedeVender = !!data && data.estado === 'ABIERTO';
@@ -484,8 +524,8 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
                 )}
 
                 <div className="border-t border-slate-100 p-3 dark:border-slate-800">
-                  <Button onClick={onAbrirCheckout} disabled={carrito.length === 0} className="w-full">
-                    {`Cobrar (F10) ${carrito.length > 0 ? formatoRD(total) : ''}`}
+                  <Button onClick={onAbrirCheckout} disabled={carrito.length === 0 || cotizando} className="w-full">
+                    {cotizando ? 'Calculando…' : `Cobrar (F10) ${carrito.length > 0 ? formatoRD(total) : ''}`}
                   </Button>
                 </div>
               </Card>
@@ -582,12 +622,15 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
         <ModalDescuento carrito={carrito} onAplicar={aplicarDescuento} onClose={() => setModalDescuento(false)} />
       )}
 
-      {modalCheckout && (
+      {modalCheckout && cotizacion && (
         <ModalCheckout
-          total={total}
+          cotizacion={cotizacion}
           registrando={registrarVenta.isPending}
           onConfirmar={(pagos) => registrarVenta.mutate(pagos)}
-          onClose={() => setModalCheckout(false)}
+          onClose={() => {
+            setModalCheckout(false);
+            setCotizacion(null);
+          }}
         />
       )}
 
@@ -937,16 +980,17 @@ interface PagoAgregado {
  * pago para que la suma enviada sea exacta al total (ver ARCHITECTURE.md).
  */
 function ModalCheckout({
-  total,
+  cotizacion,
   registrando,
   onConfirmar,
   onClose,
 }: {
-  total: number;
+  cotizacion: { subtotal: number; descuento: number; itbis: number; total: number };
   registrando: boolean;
   onConfirmar: (pagos: { formaPagoId: string; monto: number; referencia?: string }[]) => void;
   onClose: () => void;
 }) {
+  const { total } = cotizacion;
   const [pagos, setPagos] = useState<PagoAgregado[]>([]);
   const [formaSeleccionada, setFormaSeleccionada] = useState<FormaPago | undefined>(undefined);
   const [formaPagoId, setFormaPagoId] = useState('');
@@ -990,9 +1034,25 @@ function ModalCheckout({
   return (
     <Modal titulo="Cobrar" onClose={onClose}>
       <div className="space-y-3">
-        <div className="flex justify-between text-sm text-slate-600 dark:text-slate-400">
-          <span>Total a cobrar</span>
-          <span className="text-base font-semibold text-slate-900 dark:text-slate-100">{formatoRD(total)}</span>
+        <div className="space-y-0.5 text-sm text-slate-600 dark:text-slate-400">
+          <div className="flex justify-between">
+            <span>Subtotal</span>
+            <span>{formatoRD(cotizacion.subtotal + cotizacion.descuento)}</span>
+          </div>
+          {cotizacion.descuento > 0 && (
+            <div className="flex justify-between text-amber-600 dark:text-amber-400">
+              <span>Descuento (incluye ofertas vigentes)</span>
+              <span>− {formatoRD(cotizacion.descuento)}</span>
+            </div>
+          )}
+          <div className="flex justify-between">
+            <span>ITBIS</span>
+            <span>{formatoRD(cotizacion.itbis)}</span>
+          </div>
+          <div className="flex justify-between">
+            <span>Total a cobrar</span>
+            <span className="text-base font-semibold text-slate-900 dark:text-slate-100">{formatoRD(total)}</span>
+          </div>
         </div>
 
         {pagos.length > 0 && (
@@ -1161,13 +1221,7 @@ function ModalCerrarTurno({
         justificacionDiferencia: justificacionDiferencia || undefined,
       }),
     onSuccess: () => onCerrado(),
-    onError: (err: unknown) => {
-      const mensaje =
-        err && typeof err === 'object' && 'response' in err
-          ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
-          : undefined;
-      setError(mensaje ?? 'No se pudo cerrar el turno.');
-    },
+    onError: (err: unknown) => setError(mensajeErrorApi(err, 'No se pudo cerrar el turno.')),
   });
 
   function onSubmit(e: FormEvent) {

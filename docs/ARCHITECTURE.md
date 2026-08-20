@@ -304,18 +304,22 @@ provisionado, no llega solo a tenants existentes (ver nota en
 `backfill-permisos.ts`); correr `pnpm --filter ./backend
 permisos:backfill` una vez.
 
-**Limitación conocida — el POS no previsualiza el descuento antes de
-cobrar**: `TurnoCajaDetalle` (POS) calcula "Total a cobrar"/"Pendiente"
-en el navegador a partir del carrito, sin conocer las ofertas que el
-backend va a resolver recién dentro de `FacturacionService.crear()`. Si
-el cajero completa el pago exacto según el total SIN descontar, la
-venta explota con el `BadRequestException` existente "La suma de los
-pagos... no coincide con el total de la venta" en cuanto haya una
-oferta vigente que aplique al carrito — no hay ningún endpoint de
-"cotizar antes de cobrar" que el POS pueda consultar para mostrar el
-total ya descontado antes de que el cajero arme los pagos. Pendiente de
-decisión: un endpoint de previsualización, o restringir dónde aplican
-las ofertas.
+**Previsualización antes de cobrar (`POST /pos/cotizar`)**: el POS
+calculaba "Total a cobrar"/"Pendiente" en el navegador a partir del
+carrito, sin conocer las ofertas que el backend recién resolvía dentro
+de `FacturacionService.crear()` — si el cajero completaba el pago
+exacto según ese estimado sin descuento, la venta explotaba con el
+`BadRequestException` existente "La suma de los pagos... no coincide
+con el total de la venta" en cuanto había una oferta vigente (bug real,
+encontrado al verificar Bonos junto con Ofertas). Se resolvió
+extrayendo el cálculo de líneas/descuento/ITBIS de `crear()` a
+`FacturacionService.calcularLineasYTotales()` (privado, sin efectos
+secundarios), reusado por un nuevo método público `cotizar()` — mismo
+resultado que `crear()` pero sin abrir transacción ni tocar stock/NCF/
+pagos. `PosService.cotizar()`/`POST /pos/cotizar` (`pos.editar`) lo
+exponen al POS: `TurnoCajaDetalle.onAbrirCheckout()` lo llama al armar
+el carrito, ANTES de abrir el modal de pago, y el checkout se arma
+sobre ESE total ya resuelto — no sobre el estimado del navegador.
 
 ## Bonos — gift cards canjeables como forma de pago (Fase 4c de adopción de Cuadre)
 

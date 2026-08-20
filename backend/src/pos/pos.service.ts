@@ -9,6 +9,7 @@ import { AbrirTurnoDto } from './dto/abrir-turno.dto';
 import { CerrarTurnoDto } from './dto/cerrar-turno.dto';
 import { CrearMovimientoCajaDto } from './dto/crear-movimiento-caja.dto';
 import { RegistrarVentaPosDto } from './dto/registrar-venta.dto';
+import { CotizarVentaPosDto } from './dto/cotizar-venta.dto';
 import { GuardarVentaDto } from './dto/guardar-venta.dto';
 import { RegistrarDevolucionDto } from './dto/registrar-devolucion.dto';
 import { ListarTurnosQueryDto } from './dto/listar-turnos-query.dto';
@@ -66,6 +67,16 @@ export class PosService {
     const turno = await this.posRepository.buscarPorId(turnoId);
     this.validarAbierto(turno);
     return this.posRepository.crearMovimiento({ turnoId, tipo: dto.tipo, monto: dto.monto, concepto: dto.concepto });
+  }
+
+  /**
+   * Previsualización sin efectos secundarios (Fase 4c, gap Ofertas+POS —
+   * ver ARCHITECTURE.md): el cajero la dispara al abrir el checkout, ANTES
+   * de armar los pagos, para ver el total real (ya con ofertas resueltas)
+   * en vez del estimado del carrito calculado en el navegador.
+   */
+  cotizar(dto: CotizarVentaPosDto) {
+    return this.facturacionService.cotizar(dto);
   }
 
   /** Venta rápida de POS: siempre CONTADO, siempre contra la bodega del turno — reutiliza FacturacionService.crear() como Cotizaciones/Remisiones. */

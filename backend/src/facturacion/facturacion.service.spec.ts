@@ -470,6 +470,30 @@ describe('FacturacionService', () => {
     });
   });
 
+  describe('cotizar (Fase 4c, previsualización sin efectos secundarios — gap Ofertas+POS)', () => {
+    it('resuelve el mismo total que crear() incluyendo el descuento automático de ofertas', async () => {
+      repository.obtenerProductoConPrecioVigente.mockResolvedValue(producto(18, 100) as never);
+      ofertasService.resolverDescuentoLinea.mockResolvedValue(20);
+
+      const resultado = await service.cotizar({ clienteId: 'cliente-1', lineas: [{ productoId: 'prod-1', cantidad: 2 }] });
+
+      // 2*100=200 - 20 descuento = 180 subtotal; itbis 18% de 180 = 32.4
+      expect(resultado).toEqual(expect.objectContaining({ subtotal: 180, itbis: 32.4, descuento: 20, total: 212.4 }));
+    });
+
+    it('no abre transacción ni toca stock/NCF/pagos', async () => {
+      repository.obtenerProductoConPrecioVigente.mockResolvedValue(producto(18, 100) as never);
+
+      await service.cotizar({ clienteId: 'cliente-1', lineas: [{ productoId: 'prod-1', cantidad: 1 }] });
+
+      expect(tenantPrisma.client.$transaction).not.toHaveBeenCalled();
+      expect(inventarioService.verificarYDescontarStockEnTx).not.toHaveBeenCalled();
+      expect(repository.siguienteNcfEnTx).not.toHaveBeenCalled();
+      expect(repository.crearFacturaEnTx).not.toHaveBeenCalled();
+      expect(bonosService.procesarPagoEnTx).not.toHaveBeenCalled();
+    });
+  });
+
   describe('notas de crédito y débito', () => {
     it('NOTA_CREDITO devuelve stock (entradaStockEnTx) en vez de descontarlo', async () => {
       repository.obtenerProductoConPrecioVigente.mockResolvedValue(producto(18, 100) as never);
