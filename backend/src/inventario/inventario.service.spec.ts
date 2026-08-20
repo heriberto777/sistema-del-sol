@@ -24,6 +24,8 @@ describe('InventarioService', () => {
       listarBodegas: jest.fn(),
       crearBodega: jest.fn(),
       buscarBodegaPorId: jest.fn().mockResolvedValue({ id: 'b1' }),
+      obtenerVarianteConProducto: jest.fn(),
+      movimientosPorVarianteBodega: jest.fn(),
     } as unknown as jest.Mocked<InventarioRepository>;
     productosService = { buscarPorId: jest.fn().mockResolvedValue({ id: 'p1' }) } as unknown as jest.Mocked<ProductosService>;
     variantesService = { resolverObligatoria: jest.fn().mockResolvedValue('v1') } as unknown as jest.Mocked<VariantesService>;
@@ -151,5 +153,73 @@ describe('InventarioService', () => {
 
     expect(repository.transferir).toHaveBeenCalledWith({ ...params, varianteId: 'v1' });
     expect(repository.ajustarCantidad).not.toHaveBeenCalled();
+  });
+
+  describe('kardex (Fase 5a)', () => {
+    function movimiento(overrides: Record<string, unknown> = {}) {
+      return {
+        id: 'm1',
+        createdAt: new Date('2026-07-10'),
+        tipo: 'ENTRADA',
+        direccion: 'ENTRADA',
+        cantidad: 10,
+        motivo: null,
+        user: { nombre: 'Ana' },
+        ...overrides,
+      };
+    }
+
+    beforeEach(() => {
+      repository.obtenerVarianteConProducto.mockResolvedValue({
+        id: 'v1',
+        sku: 'SKU-1',
+        producto: { id: 'p1', codigo: 'COD-1', nombre: 'Producto 1' },
+      } as never);
+    });
+
+    it('usa `direccion` (no `tipo`) para el signo — un AJUSTE negativo resta del saldo', async () => {
+      repository.movimientosPorVarianteBodega.mockResolvedValue([
+        movimiento({ tipo: 'ENTRADA', direccion: 'ENTRADA', cantidad: 20, createdAt: new Date('2026-07-01') }),
+        movimiento({ tipo: 'AJUSTE', direccion: 'SALIDA', cantidad: 3, createdAt: new Date('2026-07-05') }),
+      ] as never);
+
+      const resultado = await service.kardex('v1', 'b1', '2026-07-01', '2026-07-31');
+
+      expect(resultado.movimientos[1].saldoAcumulado).toBe(17);
+      expect(resultado.saldoFinal).toBe(17);
+    });
+
+    it('acumula en saldoInicial los movimientos anteriores a `desde`, sin listarlos', async () => {
+      repository.movimientosPorVarianteBodega.mockResolvedValue([
+        movimiento({ direccion: 'ENTRADA', cantidad: 50, createdAt: new Date('2026-06-15') }),
+        movimiento({ direccion: 'SALIDA', cantidad: 10, createdAt: new Date('2026-07-10') }),
+      ] as never);
+
+      const resultado = await service.kardex('v1', 'b1', '2026-07-01', '2026-07-31');
+
+      expect(resultado.saldoInicial).toBe(50);
+      expect(resultado.movimientos).toHaveLength(1);
+      expect(resultado.movimientos[0].saldoAcumulado).toBe(40);
+    });
+
+    it('sin movimientos en el rango, saldoFinal es igual a saldoInicial', async () => {
+      repository.movimientosPorVarianteBodega.mockResolvedValue([
+        movimiento({ direccion: 'ENTRADA', cantidad: 8, createdAt: new Date('2026-06-01') }),
+      ] as never);
+
+      const resultado = await service.kardex('v1', 'b1', '2026-07-01', '2026-07-31');
+
+      expect(resultado.movimientos).toEqual([]);
+      expect(resultado.saldoInicial).toBe(8);
+      expect(resultado.saldoFinal).toBe(8);
+    });
+
+    it('valida que la bodega pertenezca al tenant antes de consultar', async () => {
+      repository.movimientosPorVarianteBodega.mockResolvedValue([]);
+
+      await service.kardex('v1', 'b1');
+
+      expect(repository.buscarBodegaPorId).toHaveBeenCalledWith('b1');
+    });
   });
 });

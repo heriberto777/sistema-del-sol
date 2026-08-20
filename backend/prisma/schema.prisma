@@ -1479,6 +1479,18 @@ enum TipoMovimientoInventario {
   AJUSTE
 }
 
+// `TRANSFERENCIA` se usa para AMBOS lados de una transferencia (origen y
+// destino, mismo valor de `tipo`) y `AJUSTE` puede ser positivo o negativo
+// — `cantidad` siempre se guarda en valor absoluto, así que sin esto no hay
+// forma confiable de reconstruir el signo real de esos dos tipos (Fase 5a,
+// Kardex — ver ARCHITECTURE.md). Se calcula automáticamente en los dos
+// únicos escritores de bajo nivel (`ajustarCantidadEnTx`/
+// `descontarStockCondicionalEnTx`), nunca a mano por el caller.
+enum DireccionMovimiento {
+  ENTRADA
+  SALIDA
+}
+
 model MovimientoInventario {
   id             String                   @id @default(uuid())
   tenantId       String
@@ -1493,6 +1505,7 @@ model MovimientoInventario {
   bodegaId       String
   bodega         Bodega                   @relation(fields: [bodegaId], references: [id])
   tipo           TipoMovimientoInventario
+  direccion      DireccionMovimiento
   cantidad       Decimal                  @db.Decimal(14, 4)
   motivo         String?
   referenciaTipo String?

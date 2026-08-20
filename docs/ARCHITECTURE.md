@@ -378,6 +378,38 @@ igual que con `ofertas.*`, no llegan solo a tenants existentes; correr
 también a Cajero/Supervisor de Caja (necesitan poder ver el catálogo al
 cobrar), `bonos.editar` queda solo para Admin Total/Gerente.
 
+## Kardex (Fase 5a de adopción de Cuadre)
+
+Historial cronológico de `MovimientoInventario` por variante+bodega con
+saldo corriente — `InventarioService.kardex()`
+(`GET /inventario/kardex/:varianteId?bodegaId&desde&hasta`, permiso
+`inventario.ver`), molde calcado de
+`EstadosFinancierosService.libroMayor()` (Contabilidad): saldo inicial
+acumulado antes de `desde` + movimientos del rango con saldo corriente
++ saldo final, **sin paginar** (mismo criterio que todos los reportes
+de este proyecto — el rango completo se trae y se calcula en el propio
+proceso Node). Frontend: `KardexView.tsx`, montado en un modal desde
+`Inventario.tsx` (acción "Ver kardex" por fila de stock — sin selector
+propio de producto/bodega, ya vienen resueltos por la fila elegida).
+
+**`MovimientoInventario.direccion` (nuevo campo, `ENTRADA`/`SALIDA`)**:
+`cantidad` siempre se guarda en valor absoluto
+(`Math.abs(delta)`/`cantidad` positivo tal cual) — el signo real de un
+movimiento no se puede inferir de `tipo` solo, porque `TRANSFERENCIA`
+se usa para AMBOS lados de una transferencia (origen y destino, mismo
+valor de enum) y `AJUSTE` puede ser positivo o negativo sin que quedara
+registrado cuál. `direccion` se calcula automáticamente dentro de los
+dos únicos escritores de bajo nivel de `InventarioRepository`
+(`ajustarCantidadEnTx`: signo de `delta`; `descontarStockCondicionalEnTx`:
+siempre `SALIDA`, por definición solo resta) — ningún caller externo
+(Facturación, Compras, POS) tuvo que cambiar. **Limitación conocida**:
+el backfill de la migración no puede reconstruir el signo real de
+movimientos `AJUSTE`/`TRANSFERENCIA` anteriores a esta fase (el dato ya
+se perdía al guardar `Math.abs(delta)`) — se asumieron `ENTRADA` por
+defecto, así que el saldo inicial de un Kardex que cruce esa frontera
+puede no ser exacto; desde esta fase en adelante el signo siempre es
+correcto.
+
 ## Cotizaciones y Remisiones
 
 Documentos sin efecto fiscal que preceden a una factura, cada uno en su

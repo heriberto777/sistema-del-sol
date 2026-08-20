@@ -11,6 +11,7 @@ import { Modal } from '../components/molecules/Modal/Modal';
 import { EstadoVacio } from '../components/molecules/EstadoVacio/EstadoVacio';
 import { RequierePermiso } from '../components/organisms/RequierePermiso/RequierePermiso';
 import { RowActionsMenu } from '../components/molecules/RowActionsMenu/RowActionsMenu';
+import { KardexView } from '../components/organisms/KardexView/KardexView';
 import { SearchInput } from '../components/molecules/SearchInput/SearchInput';
 import { useAuth } from '../hooks/useAuth';
 import { Paginacion } from '../components/molecules/Paginacion/Paginacion';
@@ -50,6 +51,7 @@ export function Inventario() {
   const [modalNuevaBodega, setModalNuevaBodega] = useState(false);
   const [stockAjustando, setStockAjustando] = useState<Stock | null>(null);
   const [stockTransfiriendo, setStockTransfiriendo] = useState<Stock | null>(null);
+  const [stockVerKardex, setStockVerKardex] = useState<Stock | null>(null);
   const [bodegaEditandoFormato, setBodegaEditandoFormato] = useState<Bodega | null>(null);
   const [busquedaStock, setBusquedaStock] = useState('');
   const [paginaStock, setPaginaStock] = useState(1);
@@ -193,6 +195,7 @@ export function Inventario() {
                       <td className="px-5 py-3 text-right">
                         <RowActionsMenu
                           acciones={[
+                            { etiqueta: 'Ver kardex', onClick: () => setStockVerKardex(linea) },
                             ...(tienePermisoAjustar
                               ? [{ etiqueta: 'Ajustar stock', onClick: () => setStockAjustando(linea) }]
                               : []),
@@ -241,6 +244,15 @@ export function Inventario() {
           stockInicial={stockTransfiriendo}
           onClose={() => setStockTransfiriendo(null)}
         />
+      )}
+      {stockVerKardex && bodegaSeleccionadaId && (
+        <Modal
+          titulo={`Kardex — ${stockVerKardex.producto.codigo} — ${stockVerKardex.producto.nombre}`}
+          ancho="xl"
+          onClose={() => setStockVerKardex(null)}
+        >
+          <KardexView varianteId={stockVerKardex.varianteId} bodegaId={bodegaSeleccionadaId} />
+        </Modal>
       )}
     </div>
   );

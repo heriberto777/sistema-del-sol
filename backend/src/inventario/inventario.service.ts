@@ -242,6 +242,66 @@ export class InventarioService {
     return this.inventarioRepository.transferir({ ...params, varianteId });
   }
 
+  /**
+   * Historial cronológico de una variante en una bodega, con saldo
+   * corriente — molde calcado de `EstadosFinancierosService.libroMayor()`
+   * (Fase 5a): sin paginar (ningún reporte de este proyecto pagina), las
+   * filas anteriores a `desde` se acumulan en `saldoInicial` sin listarse.
+   * `direccion` (no `tipo`) decide el signo — ver comentario en
+   * `InventarioRepository.ajustarCantidadEnTx` sobre por qué `tipo` solo
+   * no alcanza (TRANSFERENCIA/AJUSTE no tienen signo fijo).
+   */
+  async kardex(varianteId: string, bodegaId: string, desde?: string, hasta?: string) {
+    await this.validarPertenencia({ bodegaId });
+    const variante = await this.inventarioRepository.obtenerVarianteConProducto(varianteId);
+
+    const hastaFecha = hasta ? new Date(hasta) : new Date();
+    const desdeFecha = desde ? new Date(desde) : new Date(hastaFecha.getFullYear(), hastaFecha.getMonth(), 1);
+
+    const movimientos = await this.inventarioRepository.movimientosPorVarianteBodega(varianteId, bodegaId, hastaFecha);
+
+    let saldoInicial = 0;
+    const filas: {
+      id: string;
+      fecha: Date;
+      tipo: string;
+      direccion: string;
+      cantidad: number;
+      motivo: string | null;
+      usuario: string;
+      saldoAcumulado: number;
+    }[] = [];
+    let saldoAcumulado = 0;
+
+    for (const m of movimientos) {
+      const delta = m.direccion === 'ENTRADA' ? Number(m.cantidad) : -Number(m.cantidad);
+      if (m.createdAt < desdeFecha) {
+        saldoInicial += delta;
+        continue;
+      }
+      saldoAcumulado = (filas.length === 0 ? saldoInicial : saldoAcumulado) + delta;
+      filas.push({
+        id: m.id,
+        fecha: m.createdAt,
+        tipo: m.tipo,
+        direccion: m.direccion,
+        cantidad: Number(m.cantidad),
+        motivo: m.motivo,
+        usuario: m.user.nombre,
+        saldoAcumulado,
+      });
+    }
+
+    return {
+      variante: { id: variante.id, sku: variante.sku, producto: { id: variante.producto.id, codigo: variante.producto.codigo, nombre: variante.producto.nombre } },
+      bodegaId,
+      rango: { desde: desdeFecha, hasta: hastaFecha },
+      saldoInicial,
+      movimientos: filas,
+      saldoFinal: filas.length > 0 ? filas[filas.length - 1].saldoAcumulado : saldoInicial,
+    };
+  }
+
   async listarStockPorBodega(bodegaId: string, query: ListadoQueryDto) {
     await this.validarPertenencia({ bodegaId });
     const { pagina, tamanoPagina, skip, take } = paginar(query.pagina, query.tamanoPagina);

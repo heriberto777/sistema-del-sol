@@ -128,7 +128,21 @@ export class InventarioRepository {
     });
 
     await tx.movimientoInventario.create({
-      data: { tenantId, productoId, varianteId, bodegaId, tipo, cantidad: Math.abs(delta), motivo, userId },
+      data: {
+        tenantId,
+        productoId,
+        varianteId,
+        bodegaId,
+        tipo,
+        // Calculado del signo real de `delta` (no del `tipo`) — `TRANSFERENCIA`
+        // se usa para ambos lados de una transferencia y `AJUSTE` puede ser
+        // positivo o negativo, así que `tipo` solo no alcanza para el saldo
+        // corriente del Kardex (Fase 5a, ver ARCHITECTURE.md).
+        direccion: delta >= 0 ? 'ENTRADA' : 'SALIDA',
+        cantidad: Math.abs(delta),
+        motivo,
+        userId,
+      },
     });
 
     return stock;
@@ -170,7 +184,10 @@ export class InventarioRepository {
     }
 
     await tx.movimientoInventario.create({
-      data: { tenantId, productoId, varianteId, bodegaId, tipo, cantidad, motivo, userId },
+      // Siempre SALIDA — este método, por definición, solo resta (ver
+      // comentario de `ajustarCantidadEnTx` sobre por qué `tipo` solo no
+      // alcanza para reconstruir el signo).
+      data: { tenantId, productoId, varianteId, bodegaId, tipo, direccion: 'SALIDA', cantidad, motivo, userId },
     });
 
     return stock;
@@ -228,6 +245,20 @@ export class InventarioRepository {
         userId: params.userId,
         motivo: `Transferencia desde bodega ${params.bodegaOrigenId}`,
       });
+    });
+  }
+
+  /** VarianteProducto es tenant-scoped — `findUniqueOrThrow` vía el cliente con RLS ya da 404 si la variante es de otro tenant, sin validación manual aparte. */
+  obtenerVarianteConProducto(varianteId: string) {
+    return this.db.varianteProducto.findUniqueOrThrow({ where: { id: varianteId }, include: { producto: true } });
+  }
+
+  /** Kardex (Fase 5a) — molde calcado de AsientosContablesRepository.lineasPorCuenta: cronológico hasta `hasta`, el service separa "antes de desde" (saldo inicial) de "dentro del rango". */
+  movimientosPorVarianteBodega(varianteId: string, bodegaId: string, hasta: Date) {
+    return this.db.movimientoInventario.findMany({
+      where: { varianteId, bodegaId, createdAt: { lte: hasta } },
+      include: { user: true },
+      orderBy: { createdAt: 'asc' },
     });
   }
 

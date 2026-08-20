@@ -6,6 +6,7 @@ import { TransferirStockDto } from './dto/transferir-stock.dto';
 import { CrearBodegaDto } from './dto/crear-bodega.dto';
 import { ActualizarBodegaDto } from './dto/actualizar-bodega.dto';
 import { ListadoQueryDto } from '../common/dto/listado-query.dto';
+import { KardexQueryDto } from './dto/kardex-query.dto';
 import { Permissions } from '../common/decorators/permissions.decorator';
 import { RequiereModulo } from '../common/decorators/requiere-modulo.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -44,6 +45,14 @@ export class InventarioController {
   @Permissions('inventario.ver')
   listarStock(@Param('bodegaId') bodegaId: string, @Query() query: ListadoQueryDto) {
     return this.inventarioService.listarStockPorBodega(bodegaId, query);
+  }
+
+  // Fase 5a — historial cronológico con saldo corriente, mismo criterio de
+  // permiso que el resto de consultas de solo lectura de Inventario.
+  @Get('kardex/:varianteId')
+  @Permissions('inventario.ver')
+  kardex(@Param('varianteId') varianteId: string, @Query() query: KardexQueryDto) {
+    return this.inventarioService.kardex(varianteId, query.bodegaId, query.desde, query.hasta);
   }
 
   @Post('ajustar')

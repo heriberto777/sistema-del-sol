@@ -89,6 +89,10 @@ token, así que un token nunca puede reusarse.
   disponible; nunca se permite que una venta lo deje negativo
   (`InventarioService.verificarYDescontarStock`). Cada movimiento queda
   también en `movimiento_inventario` (ENTRADA/SALIDA/TRANSFERENCIA/AJUSTE).
+  `movimiento_inventario.direccion` (`ENTRADA`/`SALIDA`, Fase 5a) es el
+  signo real del movimiento — `cantidad` siempre se guarda en valor
+  absoluto, y `tipo` solo no alcanza para saber el signo de
+  `TRANSFERENCIA`/`AJUSTE` (ver ARCHITECTURE.md, "Kardex").
 - **Variantes de producto (Fase 3c)**: `stock`/`precios` cuelgan de
   `variantes_producto`, no de `productos` directo — todo producto tiene
   siempre al menos una variante "por defecto" (sin valores de atributo),
