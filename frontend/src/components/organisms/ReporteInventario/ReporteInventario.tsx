@@ -1,9 +1,12 @@
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '../../../lib/api-client';
 import { Badge } from '../../atoms/Badge/Badge';
 import { Card } from '../../atoms/Card/Card';
+import { Select } from '../../atoms/Select/Select';
 import { BotonesExportar } from '../../molecules/BotonesExportar/BotonesExportar';
 import { StatCard } from '../../molecules/StatCard/StatCard';
+import { useSucursalActiva } from '../../../hooks/useSucursalActiva';
 
 interface StockReporte {
   cantidadActual: string;
@@ -19,16 +22,37 @@ interface ReporteInventarioResponse {
 }
 
 export function ReporteInventario() {
+  const { sucursales, sucursalActivaId } = useSucursalActiva();
+  const [sucursalId, setSucursalId] = useState('');
+  const sucursalFiltro = sucursalId || sucursalActivaId || '';
+
   const { data, isLoading } = useQuery({
-    queryKey: ['reporte-inventario'],
-    queryFn: async () => (await apiClient.get<ReporteInventarioResponse>('/reportes/inventario')).data,
+    queryKey: ['reporte-inventario', sucursalFiltro],
+    queryFn: async () =>
+      (await apiClient.get<ReporteInventarioResponse>('/reportes/inventario', { params: { sucursalId: sucursalFiltro || undefined } }))
+        .data,
   });
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div />
-        <BotonesExportar endpoint="/reportes/inventario/exportar" nombreBase="reporte-inventario" />
+      <div className="flex items-center justify-between gap-3">
+        {sucursales.length > 1 ? (
+          <Select value={sucursalFiltro} onChange={(e) => setSucursalId(e.target.value)} className="!w-auto">
+            <option value="">Todas las sucursales</option>
+            {sucursales.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.nombre}
+              </option>
+            ))}
+          </Select>
+        ) : (
+          <div />
+        )}
+        <BotonesExportar
+          endpoint="/reportes/inventario/exportar"
+          params={{ sucursalId: sucursalFiltro || undefined }}
+          nombreBase="reporte-inventario"
+        />
       </div>
 
       {!isLoading && data && (

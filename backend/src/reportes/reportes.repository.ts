@@ -21,11 +21,18 @@ export class ReportesRepository {
     return this.tenantPrisma.client;
   }
 
-  async ventasDeHoy() {
+  /** Resuelve un `sucursalId` a los ids de sus bodegas — usado para filtrar Dashboard/Reporte de inventario por sucursal (Fase 8d). */
+  async bodegaIdsDeSucursal(sucursalId: string) {
+    const bodegas = await this.db.bodega.findMany({ where: { sucursalId }, select: { id: true } });
+    return bodegas.map((b) => b.id);
+  }
+
+  async ventasDeHoy(bodegaIds?: string[]) {
     const inicio = inicioDelDia();
+    const where = { estado: 'EMITIDA' as const, fecha: { gte: inicio }, ...(bodegaIds ? { bodegaId: { in: bodegaIds } } : {}) };
     const [agregado, cantidad] = await Promise.all([
-      this.db.factura.aggregate({ where: { estado: 'EMITIDA', fecha: { gte: inicio } }, _sum: { total: true } }),
-      this.db.factura.count({ where: { estado: 'EMITIDA', fecha: { gte: inicio } } }),
+      this.db.factura.aggregate({ where, _sum: { total: true } }),
+      this.db.factura.count({ where }),
     ]);
     return { total: Number(agregado._sum.total ?? 0), cantidad };
   }
@@ -36,32 +43,33 @@ export class ReportesRepository {
    * hay que filtrar explícitamente por producto.tenantId (Fase 3c: Stock
    * cuelga de VarianteProducto, no directo de Producto).
    */
-  async stockBajoConteo(tenantId: string) {
+  async stockBajoConteo(tenantId: string, bodegaIds?: string[]) {
     const stock = await this.db.stock.findMany({
-      where: { variante: { producto: { tenantId } } },
+      where: { variante: { producto: { tenantId } }, ...(bodegaIds ? { bodegaId: { in: bodegaIds } } : {}) },
       select: { cantidadActual: true, stockMinimo: true },
     });
     return stock.filter((s) => Number(s.cantidadActual) < Number(s.stockMinimo)).length;
   }
 
+  /** Sin bodegaId en OrdenCompra (solo su RecepcionCompra lo tiene) — no se puede filtrar por sucursal sin un cambio estructural, ver ARCHITECTURE.md. */
   ordenesCompraPendientesConteo() {
     return this.db.ordenCompra.count({
       where: { estado: { in: ['BORRADOR', 'ENVIADA', 'RECIBIDA_PARCIAL'] } },
     });
   }
 
-  facturasEnRango(desde: Date, hasta: Date) {
+  facturasEnRango(desde: Date, hasta: Date, bodegaIds?: string[]) {
     return this.db.factura.findMany({
-      where: { estado: 'EMITIDA', fecha: { gte: desde, lte: finDelDia(hasta) } },
+      where: { estado: 'EMITIDA', fecha: { gte: desde, lte: finDelDia(hasta) }, ...(bodegaIds ? { bodegaId: { in: bodegaIds } } : {}) },
       orderBy: { fecha: 'asc' },
       include: { cliente: true },
     });
   }
 
   /** Reaplana `variante.producto` a `producto` en cada fila, para que ReportesService no tenga que cambiar. */
-  async stockActual(tenantId: string) {
+  async stockActual(tenantId: string, bodegaIds?: string[]) {
     const filas = await this.db.stock.findMany({
-      where: { variante: { producto: { tenantId } } },
+      where: { variante: { producto: { tenantId } }, ...(bodegaIds ? { bodegaId: { in: bodegaIds } } : {}) },
       include: { variante: { include: { producto: true } }, bodega: true },
       orderBy: [{ bodega: { nombre: 'asc' } }, { variante: { producto: { nombre: 'asc' } } }],
     });

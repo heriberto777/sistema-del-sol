@@ -2,7 +2,7 @@ import { Controller, Get, Query, Res } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
 import { ReportesService, ArchivoGenerado } from './reportes.service';
-import { ReporteQueryDto, ExportarReporteQueryDto, FormatoQueryDto } from './dto/reporte-query.dto';
+import { ReporteQueryDto, ExportarReporteQueryDto, SucursalQueryDto, FormatoConSucursalQueryDto } from './dto/reporte-query.dto';
 import { Permissions } from '../common/decorators/permissions.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtPayloadUser } from '../common/types/authenticated-request';
@@ -24,8 +24,8 @@ export class ReportesController {
 
   @Get('dashboard')
   @Permissions('reportes.ver')
-  dashboard(@CurrentUser() user: JwtPayloadUser) {
-    return this.reportesService.dashboard(user.tenantId);
+  dashboard(@Query() query: SucursalQueryDto, @CurrentUser() user: JwtPayloadUser) {
+    return this.reportesService.dashboard(user.tenantId, query.sucursalId);
   }
 
   @Get('ventas')
@@ -43,14 +43,14 @@ export class ReportesController {
 
   @Get('inventario')
   @Permissions('reportes.ver')
-  reporteInventario(@CurrentUser() user: JwtPayloadUser) {
-    return this.reportesService.reporteInventario(user.tenantId);
+  reporteInventario(@Query() query: SucursalQueryDto, @CurrentUser() user: JwtPayloadUser) {
+    return this.reportesService.reporteInventario(user.tenantId, query.sucursalId);
   }
 
   @Get('inventario/exportar')
   @Permissions('reportes.ver')
-  async exportarInventario(@Query() query: FormatoQueryDto, @CurrentUser() user: JwtPayloadUser, @Res() res: Response) {
-    const archivo = await this.reportesService.exportarInventario(user.tenantId, query.formato);
+  async exportarInventario(@Query() query: FormatoConSucursalQueryDto, @CurrentUser() user: JwtPayloadUser, @Res() res: Response) {
+    const archivo = await this.reportesService.exportarInventario(user.tenantId, query.formato, query.sucursalId);
     this.enviarArchivo(res, archivo);
   }
 

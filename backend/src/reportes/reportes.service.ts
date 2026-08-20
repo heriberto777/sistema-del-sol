@@ -33,20 +33,27 @@ export class ReportesService {
     private readonly redis: RedisService,
   ) {}
 
-  async dashboard(tenantId: string): Promise<DashboardResultado> {
-    const claveCache = `reportes:dashboard:${tenantId}`;
+  /**
+   * `sucursalId` (Fase 8d) filtra ventasHoyTotal/facturasHoyCantidad/
+   * productosStockBajo — `ordenesCompraPendientes` queda siempre
+   * tenant-wide porque `OrdenCompra` no tiene `bodegaId` propio (ver
+   * ARCHITECTURE.md).
+   */
+  async dashboard(tenantId: string, sucursalId?: string): Promise<DashboardResultado> {
+    const claveCache = `reportes:dashboard:${tenantId}:${sucursalId ?? 'todas'}`;
     const enCache = await this.redis.obtenerJson<DashboardResultado>(claveCache);
     if (enCache) return enCache;
 
-    const resultado = await this.calcularDashboard(tenantId);
+    const bodegaIds = sucursalId ? await this.reportesRepository.bodegaIdsDeSucursal(sucursalId) : undefined;
+    const resultado = await this.calcularDashboard(tenantId, bodegaIds);
     await this.redis.guardarJson(claveCache, resultado, TTL_DASHBOARD_SEGUNDOS);
     return resultado;
   }
 
-  private async calcularDashboard(tenantId: string): Promise<DashboardResultado> {
+  private async calcularDashboard(tenantId: string, bodegaIds?: string[]): Promise<DashboardResultado> {
     const [ventasHoy, productosStockBajo, ordenesCompraPendientes] = await Promise.all([
-      this.reportesRepository.ventasDeHoy(),
-      this.reportesRepository.stockBajoConteo(tenantId),
+      this.reportesRepository.ventasDeHoy(bodegaIds),
+      this.reportesRepository.stockBajoConteo(tenantId, bodegaIds),
       this.reportesRepository.ordenesCompraPendientesConteo(),
     ]);
 
@@ -118,19 +125,20 @@ export class ReportesService {
     return { buffer, nombreArchivo: 'reporte-ventas.pdf', mimeType: 'application/pdf' };
   }
 
-  async reporteInventario(tenantId: string) {
-    const claveCache = `reportes:inventario:${tenantId}`;
+  async reporteInventario(tenantId: string, sucursalId?: string) {
+    const claveCache = `reportes:inventario:${tenantId}:${sucursalId ?? 'todas'}`;
     type ReporteInventarioResultado = Awaited<ReturnType<typeof this.calcularReporteInventario>>;
     const enCache = await this.redis.obtenerJson<ReporteInventarioResultado>(claveCache);
     if (enCache) return enCache;
 
-    const resultado = await this.calcularReporteInventario(tenantId);
+    const bodegaIds = sucursalId ? await this.reportesRepository.bodegaIdsDeSucursal(sucursalId) : undefined;
+    const resultado = await this.calcularReporteInventario(tenantId, bodegaIds);
     await this.redis.guardarJson(claveCache, resultado, TTL_INVENTARIO_SEGUNDOS);
     return resultado;
   }
 
-  private async calcularReporteInventario(tenantId: string) {
-    const items = await this.reportesRepository.stockActual(tenantId);
+  private async calcularReporteInventario(tenantId: string, bodegaIds?: string[]) {
+    const items = await this.reportesRepository.stockActual(tenantId, bodegaIds);
     const resumen = items.reduce(
       (acc, s) => ({
         productos: acc.productos + 1,
@@ -142,8 +150,8 @@ export class ReportesService {
     return { items, resumen };
   }
 
-  async exportarInventario(tenantId: string, formato: 'xlsx' | 'pdf'): Promise<ArchivoGenerado> {
-    const { items } = await this.reporteInventario(tenantId);
+  async exportarInventario(tenantId: string, formato: 'xlsx' | 'pdf', sucursalId?: string): Promise<ArchivoGenerado> {
+    const { items } = await this.reporteInventario(tenantId, sucursalId);
     const filas = items.map((s) => ({
       codigo: s.producto.codigo,
       producto: s.producto.nombre,

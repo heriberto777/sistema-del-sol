@@ -1896,8 +1896,30 @@ molecule nuevo — ya recibe `bodegas` por prop desde sus dos llamadores
 nombres en tablas), así que solo se le agregó el filtro por sucursal
 activa internamente, sin duplicar el fetch.
 
-**Siguiente sub-fase** (8d, pendiente): filtros de sucursal en
-Dashboard/Reporte de inventario.
+**Reportes/Dashboard filtrables por sucursal (8d, implementado — última
+sub-fase de Sucursales)**: `sucursalId` opcional en `GET
+/reportes/dashboard` y `GET /reportes/inventario` (+ su `/exportar`) —
+se resuelve a la lista de `bodegaId` de esa sucursal
+(`ReportesRepository.bodegaIdsDeSucursal`) y filtra
+`ventasHoyTotal`/`facturasHoyCantidad`/`productosStockBajo` en el
+dashboard, y el detalle de stock en el reporte de inventario. La clave
+de caché de Redis incorpora `sucursalId` (o `'todas'`) para no servir
+un resultado filtrado a quien pidió el total o viceversa.
+
+**Fuera de alcance, documentado**: `ordenesCompraPendientes` sigue
+siempre tenant-wide — `OrdenCompra` no tiene `bodegaId` propio (solo su
+`RecepcionCompra` lo tiene, una vez recibida), así que no hay forma de
+filtrarla por sucursal sin un cambio estructural que nadie pidió; el
+frontend lo aclara con una nota bajo los KPIs cuando hay un filtro
+activo. `/reportes/compras` y los reportes fiscales DGII (606/607/608/
+IT-1/retenciones) tampoco ganan filtro — son declaraciones legales
+tenant-wide, filtrarlos por ubicación no tiene sentido regulatorio.
+
+Con esto, Fase 8 (Sucursales) de la adopción de Cuadre queda completa:
+modelo y gestión (8a) → asignación de usuarios (8b) → selector de
+sucursal activa (8c) → reportes filtrables (8d). Fase 9 (PIN + permisos
+por sucursal) es la que convierte la asignación de 8b en un límite de
+acceso real.
 
 ## POS (punto de venta)
 

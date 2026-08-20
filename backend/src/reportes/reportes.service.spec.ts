@@ -15,6 +15,7 @@ describe('ReportesService', () => {
       facturasEnRango: jest.fn(),
       stockActual: jest.fn(),
       ordenesCompraEnRango: jest.fn(),
+      bodegaIdsDeSucursal: jest.fn(),
     } as unknown as jest.Mocked<ReportesRepository>;
     redis = {
       obtenerJson: jest.fn().mockResolvedValue(null),
@@ -38,7 +39,7 @@ describe('ReportesService', () => {
         productosStockBajo: 2,
         ordenesCompraPendientes: 1,
       });
-      expect(repository.stockBajoConteo).toHaveBeenCalledWith('tenant-1');
+      expect(repository.stockBajoConteo).toHaveBeenCalledWith('tenant-1', undefined);
     });
 
     it('guarda el resultado en Redis con clave por tenant tras calcularlo', async () => {
@@ -48,7 +49,7 @@ describe('ReportesService', () => {
 
       await service.dashboard('tenant-1');
 
-      expect(redis.guardarJson).toHaveBeenCalledWith('reportes:dashboard:tenant-1', expect.any(Object), 30);
+      expect(redis.guardarJson).toHaveBeenCalledWith('reportes:dashboard:tenant-1:todas', expect.any(Object), 30);
     });
 
     it('si hay un valor en caché, lo devuelve sin consultar el repositorio', async () => {
@@ -69,7 +70,21 @@ describe('ReportesService', () => {
 
       await service.dashboard('tenant-2');
 
-      expect(redis.obtenerJson).toHaveBeenCalledWith('reportes:dashboard:tenant-2');
+      expect(redis.obtenerJson).toHaveBeenCalledWith('reportes:dashboard:tenant-2:todas');
+    });
+
+    it('con sucursalId, resuelve sus bodegas y filtra ventas/stock bajo — órdenes pendientes queda tenant-wide (Fase 8d)', async () => {
+      repository.bodegaIdsDeSucursal.mockResolvedValue(['b1', 'b2']);
+      repository.ventasDeHoy.mockResolvedValue({ total: 500, cantidad: 1 });
+      repository.stockBajoConteo.mockResolvedValue(1);
+      repository.ordenesCompraPendientesConteo.mockResolvedValue(4);
+
+      await service.dashboard('tenant-1', 'sucursal-1');
+
+      expect(repository.bodegaIdsDeSucursal).toHaveBeenCalledWith('sucursal-1');
+      expect(repository.ventasDeHoy).toHaveBeenCalledWith(['b1', 'b2']);
+      expect(repository.stockBajoConteo).toHaveBeenCalledWith('tenant-1', ['b1', 'b2']);
+      expect(redis.guardarJson).toHaveBeenCalledWith('reportes:dashboard:tenant-1:sucursal-1', expect.any(Object), 30);
     });
   });
 
@@ -124,6 +139,16 @@ describe('ReportesService', () => {
 
       expect(resultado).toEqual(enCache);
       expect(repository.stockActual).not.toHaveBeenCalled();
+    });
+
+    it('con sucursalId, resuelve sus bodegas y filtra el stock (Fase 8d)', async () => {
+      repository.bodegaIdsDeSucursal.mockResolvedValue(['b1']);
+      repository.stockActual.mockResolvedValue([{ cantidadActual: 5, stockMinimo: 10 }] as never);
+
+      await service.reporteInventario('tenant-1', 'sucursal-1');
+
+      expect(repository.bodegaIdsDeSucursal).toHaveBeenCalledWith('sucursal-1');
+      expect(repository.stockActual).toHaveBeenCalledWith('tenant-1', ['b1']);
     });
   });
 

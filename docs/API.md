@@ -330,11 +330,11 @@ Ver `plugins/inmobiliaria/src/inmobiliaria.controller.ts`.
 
 | Método | Ruta | Permiso |
 |---|---|---|
-| GET | `/api/reportes/dashboard` | `reportes.ver` — `{ ventasHoyTotal, facturasHoyCantidad, productosStockBajo, ordenesCompraPendientes }`, cacheado en Redis 30s por tenant |
+| GET | `/api/reportes/dashboard?sucursalId` | `reportes.ver` — `{ ventasHoyTotal, facturasHoyCantidad, productosStockBajo, ordenesCompraPendientes }`, cacheado en Redis 30s por tenant+sucursal. `sucursalId` opcional (Fase 8d) filtra los primeros 3 KPIs; `ordenesCompraPendientes` siempre tenant-wide (`OrdenCompra` no tiene `bodegaId` propio) |
 | GET | `/api/reportes/ventas?desde&hasta` | `reportes.ver` — facturas emitidas en el rango (default: últimos 30 días) + resumen |
 | GET | `/api/reportes/ventas/exportar?desde&hasta&formato=xlsx\|pdf` | `reportes.ver` — descarga binaria (`.xlsx` real vía exceljs, `.pdf` real vía pdfkit) |
-| GET | `/api/reportes/inventario` | `reportes.ver` — snapshot de stock actual por producto/bodega + resumen, cacheado en Redis 30s por tenant |
-| GET | `/api/reportes/inventario/exportar?formato=xlsx\|pdf` | `reportes.ver` |
+| GET | `/api/reportes/inventario?sucursalId` | `reportes.ver` — snapshot de stock actual por producto/bodega + resumen, cacheado en Redis 30s por tenant+sucursal. `sucursalId` opcional (Fase 8d) |
+| GET | `/api/reportes/inventario/exportar?sucursalId&formato=xlsx\|pdf` | `reportes.ver` |
 | GET | `/api/reportes/compras?desde&hasta` | `reportes.ver` — órdenes de compra en el rango + resumen por estado |
 | GET | `/api/reportes/compras/exportar?desde&hasta&formato=xlsx\|pdf` | `reportes.ver` |
 
