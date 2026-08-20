@@ -10,6 +10,7 @@ import { CategoriasPanel } from '../components/organisms/CategoriasPanel/Categor
 import { ListasPrecioPanel } from '../components/organisms/ListasPrecioPanel/ListasPrecioPanel';
 import { AtributosPanel } from '../components/organisms/AtributosPanel/AtributosPanel';
 import { OfertasPanel } from '../components/organisms/OfertasPanel/OfertasPanel';
+import { BonosPanel } from '../components/organisms/BonosPanel/BonosPanel';
 import { useAuth } from '../hooks/useAuth';
 
 interface Pestana {
@@ -39,10 +40,11 @@ const CATEGORIAS: Categoria[] = [
   {
     id: 'facturacion',
     etiqueta: 'Facturación',
-    descripcion: 'Numeraciones de NCF (comprobantes fiscales) y formas de pago.',
+    descripcion: 'Numeraciones de NCF (comprobantes fiscales), formas de pago y bonos.',
     pestanas: [
       { id: 'ncf', etiqueta: 'NCF', permiso: 'admin.configuracion', panel: NcfPanel },
       { id: 'formas-pago', etiqueta: 'Formas de pago', permiso: 'admin.configuracion', panel: FormasPagoPanel },
+      { id: 'bonos', etiqueta: 'Bonos', permiso: 'admin.configuracion', panel: BonosPanel },
     ],
   },
   {

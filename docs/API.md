@@ -90,7 +90,7 @@ pasa ninguna de ellas.
 | Método | Ruta | Permiso |
 |---|---|---|
 | GET | `/api/formas-pago?activa=true` | sin permiso — cualquier usuario autenticado (POS/Cobranza/Compras necesitan leer el catálogo) |
-| POST | `/api/formas-pago` | `admin.configuracion` — `{ nombre, requiereReferencia?, esEfectivo?, activa? }` |
+| POST | `/api/formas-pago` | `admin.configuracion` — `{ nombre, requiereReferencia?, esEfectivo?, esBono?, activa? }` |
 | PATCH | `/api/formas-pago/:id` | `admin.configuracion` — parcial; `esEfectivo: true` desmarca automáticamente cualquier otra forma de pago del tenant |
 
 ## Facturación
@@ -117,6 +117,20 @@ en sí no es un endpoint propio.
 | GET | `/api/ofertas` | `ofertas.ver` |
 | PATCH | `/api/ofertas/:id` | `ofertas.editar` — mismas reglas de exclusividad que crear |
 | DELETE | `/api/ofertas/:id` | `ofertas.editar` |
+
+## Bonos (Fase 4c de adopción de Cuadre)
+
+Gift cards emitidas en lote, canjeables como forma de pago en
+Facturación/POS seleccionando la forma "Bono" y tipeando el código en
+`referencia` (ver ARCHITECTURE.md) — este CRUD solo administra
+emisión/consulta/anulación, el canje en sí ocurre dentro de
+`POST /api/facturas`/`POST /api/pos/ventas`, no es un endpoint propio.
+
+| Método | Ruta | Permiso |
+|---|---|---|
+| POST | `/api/bonos/lotes` | `bonos.editar` — `{ cantidad (1-500), montoPorBono, fechaVencimiento }`, devuelve el arreglo de bonos creados (con su `codigo`) |
+| GET | `/api/bonos?busqueda` | `bonos.ver` — `busqueda` filtra por código |
+| POST | `/api/bonos/:id/anular` | `bonos.editar` — 400 si ya estaba `ANULADO` |
 
 ## Cotizaciones
 

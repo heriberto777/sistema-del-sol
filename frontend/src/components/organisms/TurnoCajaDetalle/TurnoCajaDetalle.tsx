@@ -176,7 +176,19 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
         vendedorEmpleadoId: vendedor?.id,
         listaPrecio: listaPrecioOverride || undefined,
         pagos,
-        lineas: carrito.map((l) => ({ productoId: l.productoId, varianteId: l.varianteId, cantidad: l.cantidad, descuento: l.descuento })),
+        // `descuento` solo se manda si el cajero realmente lo tocó con F8
+        // (Descuento) — mandar siempre 0 por defecto bloqueaba las ofertas
+        // automáticas (Fase 4b): el backend trata CUALQUIER descuento
+        // explícito, incluido 0, como "el caller ya decidió, no resuelvas
+        // nada automático" (bug real, encontrado en la verificación manual
+        // de esta fase — el 10% de una oferta activa nunca se aplicaba en
+        // el POS, solo en Facturación manual).
+        lineas: carrito.map((l) => ({
+          productoId: l.productoId,
+          varianteId: l.varianteId,
+          cantidad: l.cantidad,
+          ...(l.descuento > 0 ? { descuento: l.descuento } : {}),
+        })),
       }),
     onSuccess: (respuesta) => {
       invalidar();
@@ -187,7 +199,18 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
       setModalCheckout(false);
       setVentaConfirmada({ id: respuesta.data.id, total: respuesta.data.total });
     },
-    onError: () => setError('No se pudo registrar la venta — revisá el stock disponible.'),
+    // Antes era un mensaje genérico ("revisá el stock") — con Bonos (Fase
+    // 4c) esta venta también puede fallar por un código de bono inválido,
+    // vencido o sin saldo, y ese mensaje real (que el backend ya arma
+    // bien) es el que el cajero necesita ver, no una excusa de stock que
+    // no aplica.
+    onError: (err: unknown) => {
+      const mensaje =
+        err && typeof err === 'object' && 'response' in err
+          ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
+          : undefined;
+      setError(mensaje ?? 'No se pudo registrar la venta — revisá el stock disponible.');
+    },
   });
 
   const { data: guardadas } = useQuery({
@@ -1043,7 +1066,7 @@ function ModalCheckout({
                 type="text"
                 value={referencia}
                 onChange={(e) => setReferencia(e.target.value)}
-                placeholder="Referencia"
+                placeholder={formaSeleccionada?.esBono ? 'Código del bono (BONO-XXXXXXXX)' : 'Referencia'}
                 className="flex-1 rounded-md border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
               />
             )}

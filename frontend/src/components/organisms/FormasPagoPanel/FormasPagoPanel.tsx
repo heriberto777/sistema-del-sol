@@ -11,6 +11,7 @@ interface FormaPago {
   nombre: string;
   requiereReferencia: boolean;
   esEfectivo: boolean;
+  esBono: boolean;
   activa: boolean;
 }
 
@@ -19,6 +20,7 @@ export function FormasPagoPanel() {
   const [nombre, setNombre] = useState('');
   const [requiereReferencia, setRequiereReferencia] = useState(false);
   const [esEfectivo, setEsEfectivo] = useState(false);
+  const [esBono, setEsBono] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const { data: formasPago } = useQuery({
@@ -32,12 +34,13 @@ export function FormasPagoPanel() {
   }
 
   const crear = useMutation({
-    mutationFn: async () => apiClient.post('/formas-pago', { nombre, requiereReferencia, esEfectivo }),
+    mutationFn: async () => apiClient.post('/formas-pago', { nombre, requiereReferencia, esEfectivo, esBono }),
     onSuccess: () => {
       invalidar();
       setNombre('');
       setRequiereReferencia(false);
       setEsEfectivo(false);
+      setEsBono(false);
       setError(null);
     },
     onError: () => setError('No se pudo crear la forma de pago (¿ya existe una con ese nombre?).'),
@@ -69,6 +72,10 @@ export function FormasPagoPanel() {
           <p className="text-xs text-slate-500 dark:text-slate-400">
             Solo puede haber una forma de pago marcada como efectivo — marcar esta desmarca automáticamente cualquier otra.
           </p>
+          <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
+            <input type="checkbox" checked={esBono} onChange={(e) => setEsBono(e.target.checked)} />
+            Es canje de Bono (valida y descuenta un Bono real por su código)
+          </label>
           {error && <p className="text-sm text-red-600">{error}</p>}
           <Button type="submit" disabled={crear.isPending} className="w-full">
             {crear.isPending ? 'Creando…' : 'Crear forma de pago'}
@@ -83,6 +90,7 @@ export function FormasPagoPanel() {
               <th className="px-5 py-3 font-medium">Nombre</th>
               <th className="px-5 py-3 font-medium">Referencia</th>
               <th className="px-5 py-3 font-medium">Efectivo</th>
+              <th className="px-5 py-3 font-medium">Bono</th>
               <th className="px-5 py-3 font-medium">Estado</th>
               <th className="px-5 py-3"></th>
             </tr>
@@ -94,6 +102,9 @@ export function FormasPagoPanel() {
                 <td className="px-5 py-3">{f.requiereReferencia ? 'Sí' : 'No'}</td>
                 <td className="px-5 py-3">
                   {f.esEfectivo ? <Badge tono="exito">Efectivo</Badge> : <span className="text-slate-400">—</span>}
+                </td>
+                <td className="px-5 py-3">
+                  {f.esBono ? <Badge tono="advertencia">Bono</Badge> : <span className="text-slate-400">—</span>}
                 </td>
                 <td className="px-5 py-3">
                   <Badge tono={f.activa ? 'exito' : 'neutro'}>{f.activa ? 'Activa' : 'Inactiva'}</Badge>
@@ -111,7 +122,7 @@ export function FormasPagoPanel() {
             ))}
             {formasPago?.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-5 py-6 text-center text-slate-400">
+                <td colSpan={6} className="px-5 py-6 text-center text-slate-400">
                   Sin formas de pago todavía.
                 </td>
               </tr>

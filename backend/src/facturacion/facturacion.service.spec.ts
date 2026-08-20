@@ -11,6 +11,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ClientesService } from '../clientes/clientes.service';
 import { VariantesService } from '../variantes/variantes.service';
 import { OfertasService } from '../ofertas/ofertas.service';
+import { BonosService } from '../bonos/bonos.service';
 
 describe('FacturacionService', () => {
   let service: FacturacionService;
@@ -23,6 +24,7 @@ describe('FacturacionService', () => {
   let clientesService: jest.Mocked<ClientesService>;
   let variantesService: jest.Mocked<VariantesService>;
   let ofertasService: jest.Mocked<OfertasService>;
+  let bonosService: jest.Mocked<BonosService>;
 
   // Un tx opaco: crear()/anular() abren la transacción con tenantPrisma.client.$transaction
   // y pasan este objeto a los métodos *EnTx — para las pruebas basta con que sea el mismo
@@ -84,6 +86,9 @@ describe('FacturacionService', () => {
       resolverDescuentoLinea: jest.fn().mockResolvedValue(0),
       resolverDescuentoCarritoTotal: jest.fn().mockResolvedValue(0),
     } as unknown as jest.Mocked<OfertasService>;
+    bonosService = {
+      procesarPagoEnTx: jest.fn().mockResolvedValue(undefined),
+    } as unknown as jest.Mocked<BonosService>;
     service = new FacturacionService(
       repository,
       inventarioService,
@@ -94,6 +99,7 @@ describe('FacturacionService', () => {
       clientesService,
       variantesService,
       ofertasService,
+      bonosService,
     );
   });
 
@@ -431,6 +437,36 @@ describe('FacturacionService', () => {
       });
 
       expect(repository.crearFacturaEnTx).toHaveBeenCalled();
+    });
+  });
+
+  describe('canje de Bono (Fase 4c)', () => {
+    it('llama BonosService.procesarPagoEnTx una vez por cada pago, antes de tocar inventario', async () => {
+      repository.obtenerProductoConPrecioVigente.mockResolvedValue(producto(18, 100) as never);
+      repository.crearFacturaEnTx.mockResolvedValue(facturaCreada({ total: 236 }) as never);
+
+      await service.crear(dto(), 'tenant-1', 'vendedor-1', {
+        pagos: [
+          { formaPagoId: 'fp-bono', monto: 200, referencia: 'BONO-AAAAAAAA' },
+          { formaPagoId: 'fp-efectivo', monto: 36 },
+        ],
+      });
+
+      expect(bonosService.procesarPagoEnTx).toHaveBeenCalledTimes(2);
+      expect(bonosService.procesarPagoEnTx).toHaveBeenCalledWith(TX, 'tenant-1', { formaPagoId: 'fp-bono', monto: 200, referencia: 'BONO-AAAAAAAA' });
+      const ordenBono = bonosService.procesarPagoEnTx.mock.invocationCallOrder[0];
+      const ordenStock = inventarioService.verificarYDescontarStockEnTx.mock.invocationCallOrder[0];
+      expect(ordenBono).toBeLessThan(ordenStock);
+    });
+
+    it('si BonosService.procesarPagoEnTx rechaza (código inválido/saldo insuficiente), no crea la factura', async () => {
+      repository.obtenerProductoConPrecioVigente.mockResolvedValue(producto(18, 100) as never);
+      bonosService.procesarPagoEnTx.mockRejectedValueOnce(new BadRequestException('El bono no tiene saldo suficiente'));
+
+      await expect(
+        service.crear(dto(), 'tenant-1', 'vendedor-1', { pagos: [{ formaPagoId: 'fp-bono', monto: 236, referencia: 'BONO-X' }] }),
+      ).rejects.toThrow(BadRequestException);
+      expect(repository.crearFacturaEnTx).not.toHaveBeenCalled();
     });
   });
 

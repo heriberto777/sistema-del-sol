@@ -12,6 +12,7 @@ import { ClientesService } from '../clientes/clientes.service';
 import { VariantesService } from '../variantes/variantes.service';
 import { OfertasService } from '../ofertas/ofertas.service';
 import { prorratearDescuentoCarrito } from '../ofertas/prorratear-descuento-carrito';
+import { BonosService } from '../bonos/bonos.service';
 import { ListarFacturasQueryDto } from './dto/listar-facturas-query.dto';
 import { paginar } from '../common/types/pagina-resultado';
 import { DocumentoPdfParams, generarDocumentoPdf } from '../common/pdf/documento-pdf';
@@ -88,6 +89,7 @@ export class FacturacionService {
     private readonly clientesService: ClientesService,
     private readonly variantesService: VariantesService,
     private readonly ofertasService: OfertasService,
+    private readonly bonosService: BonosService,
   ) {}
 
   /**
@@ -212,6 +214,14 @@ export class FacturacionService {
     const tipoNcf = (modalidad === 'ECF' ? ECF_POR_TIPO : NCF_POR_TIPO)[dto.tipoFactura];
 
     const factura = await this.tenantPrisma.client.$transaction(async (tx) => {
+      // Canje de Bono (Fase 4c) primero — fail-fast antes de tocar stock/
+      // NCF si el código no existe, venció o no alcanza el saldo. No hace
+      // nada si ningún pago usa una FormaPago con esBono (ver
+      // BonosService.procesarPagoEnTx).
+      for (const pago of pagosResueltos) {
+        await this.bonosService.procesarPagoEnTx(tx, tenantId, pago);
+      }
+
       // Una nota de crédito devuelve al cliente lo comprado: el inventario
       // debe aumentar, no descontarse otra vez. Una nota de débito es un
       // ajuste monetario (recargo, interés) sin contrapartida física, así

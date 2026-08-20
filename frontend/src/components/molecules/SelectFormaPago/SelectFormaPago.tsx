@@ -7,6 +7,7 @@ export interface FormaPago {
   nombre: string;
   requiereReferencia: boolean;
   esEfectivo: boolean;
+  esBono: boolean;
 }
 
 interface SelectFormaPagoProps {

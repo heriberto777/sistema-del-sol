@@ -17,6 +17,11 @@ export class CrearFormaPagoDto {
   @IsBoolean()
   esEfectivo?: boolean;
 
+  @ApiProperty({ required: false, default: false, description: 'Marca esta forma de pago como canje de Bono (Fase 4c) — el pago se valida y descuenta contra un Bono real por su código, guardado en la referencia.' })
+  @IsOptional()
+  @IsBoolean()
+  esBono?: boolean;
+
   @ApiProperty({ required: false, default: true })
   @IsOptional()
   @IsBoolean()

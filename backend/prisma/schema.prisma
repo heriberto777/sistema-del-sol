@@ -57,6 +57,7 @@ model Tenant {
   notificaciones Notificacion[]
   plantillasNotificacion NotificacionPlantilla[]
   ofertas       Oferta[]
+  bonos         Bono[]
   cotizaciones  Cotizacion[]
   remisiones    Remision[]
   cuentasContables  CuentaContable[]
@@ -1074,6 +1075,11 @@ model FormaPago {
   nombre             String
   requiereReferencia Boolean  @default(false)
   esEfectivo         Boolean  @default(false)
+  // Marca la forma de pago "Bono" (Fase 4c) para identificarla en código
+  // sin comparar por nombre — mismo criterio que esEfectivo.
+  // FacturacionService.crear() usa esto para tratar `PagoVenta.referencia`
+  // como el código de un Bono a canjear, en vez de una referencia libre.
+  esBono             Boolean  @default(false)
   activa             Boolean  @default(true)
   createdAt          DateTime @default(now())
 
@@ -1854,4 +1860,34 @@ model Oferta {
   createdAt          DateTime            @default(now())
 
   @@map("ofertas")
+}
+
+enum EstadoBono {
+  ACTIVO
+  AGOTADO
+  VENCIDO
+  ANULADO
+}
+
+/// Gift card emitida por lote (Fase 4c de adopción de Cuadre), canjeable
+/// como forma de pago en el POS. Sin tabla de movimientos propia — el
+/// ledger de canjes YA es `PagoVenta` (filtrado por `formaPago.esBono`
+/// y `referencia = codigo`), mismo criterio que MovimientoInventario es
+/// el único ledger de stock: no duplicar lo que ya se registra en otro
+/// lado. `saldoActual` es la única fuente de verdad sobre cuánto queda,
+/// actualizada atómicamente dentro de la misma transacción que crea la
+/// factura que lo canjea (BonosService.procesarPagoEnTx).
+model Bono {
+  id               String     @id @default(uuid())
+  tenantId         String
+  tenant           Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  codigo           String
+  montoInicial     Decimal    @db.Decimal(14, 2)
+  saldoActual      Decimal    @db.Decimal(14, 2)
+  fechaVencimiento DateTime
+  estado           EstadoBono @default(ACTIVO)
+  createdAt        DateTime   @default(now())
+
+  @@unique([tenantId, codigo])
+  @@map("bonos")
 }

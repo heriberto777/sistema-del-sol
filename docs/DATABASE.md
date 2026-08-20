@@ -47,7 +47,8 @@ PostgreSQL 16 + Prisma. Schema completo en `backend/prisma/schema.prisma`.
 | Bancos / Gastos menores | `cuentas_bancarias`, `gastos_menores`, `lineas_gasto_menor` |
 | Nómina | `empleados`, `periodos_nomina`, `recibos_nomina` |
 | POS | `turnos_caja`, `movimientos_caja`, `ventas_aparcadas`/`lineas_venta_aparcada`, `pagos_venta` (ledger de pago dividido, hija de `facturas` sin tenantId propio) (+ `facturas.formaPagoId`/`facturas.turnoCajaId`/`facturas.vendedorEmpleadoId`) |
-| Formas de pago | `formas_pago` (tenant-scoped, reemplaza el enum fijo `MetodoPago` para `facturas`/`pagos` — ese enum sigue existiendo solo para `PagoPlataforma`) |
+| Formas de pago | `formas_pago` (tenant-scoped, reemplaza el enum fijo `MetodoPago` para `facturas`/`pagos` — ese enum sigue existiendo solo para `PagoPlataforma`; `esBono: Boolean` identifica la forma "Bono" igual que `esEfectivo`, Fase 4c — ver ARCHITECTURE.md) |
+| Bonos | `bonos` (tenant-scoped, gift cards; `saldoActual` es la única fuente de verdad, sin tabla de movimientos propia — `pagos_venta` filtrado por `formaPago.esBono` ya sirve de ledger, Fase 4c — ver ARCHITECTURE.md) |
 | Plataforma | `platform_admins`, `platform_audit_logs` |
 | RBAC de plataforma | `platform_permissions`, `platform_roles`, `platform_role_permissions` (catálogo global, sin `tenantId` — `platform_admins.roleId` es nullable) |
 | Suscripción/facturación de plataforma | `suscripciones`, `facturas_plataforma`, `pagos_plataforma` (tienen `tenantId` pero fuera de `TENANT_SCOPED_MODELS`/RLS — solo se acceden vía `PrismaService` raw desde controllers de plataforma, igual criterio que `Modulo`/`Plan`) |

@@ -8,6 +8,7 @@ export interface FormaPagoBase {
   nombre: string;
   requiereReferencia: boolean;
   esEfectivo: boolean;
+  esBono?: boolean;
 }
 
 export const FORMAS_PAGO_BASE: FormaPagoBase[] = [
@@ -17,4 +18,7 @@ export const FORMAS_PAGO_BASE: FormaPagoBase[] = [
   { nombre: 'Crédito Cliente', requiereReferencia: false, esEfectivo: false },
   { nombre: 'Cheque', requiereReferencia: true, esEfectivo: false },
   { nombre: 'Nota de Crédito', requiereReferencia: false, esEfectivo: false },
+  // requiereReferencia: true — el código del bono se guarda en
+  // PagoVenta.referencia (Fase 4c, ver BonosService.procesarPagoEnTx).
+  { nombre: 'Bono', requiereReferencia: true, esEfectivo: false, esBono: true },
 ];

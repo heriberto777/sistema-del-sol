@@ -304,6 +304,76 @@ provisionado, no llega solo a tenants existentes (ver nota en
 `backfill-permisos.ts`); correr `pnpm --filter ./backend
 permisos:backfill` una vez.
 
+**Limitación conocida — el POS no previsualiza el descuento antes de
+cobrar**: `TurnoCajaDetalle` (POS) calcula "Total a cobrar"/"Pendiente"
+en el navegador a partir del carrito, sin conocer las ofertas que el
+backend va a resolver recién dentro de `FacturacionService.crear()`. Si
+el cajero completa el pago exacto según el total SIN descontar, la
+venta explota con el `BadRequestException` existente "La suma de los
+pagos... no coincide con el total de la venta" en cuanto haya una
+oferta vigente que aplique al carrito — no hay ningún endpoint de
+"cotizar antes de cobrar" que el POS pueda consultar para mostrar el
+total ya descontado antes de que el cajero arme los pagos. Pendiente de
+decisión: un endpoint de previsualización, o restringir dónde aplican
+las ofertas.
+
+## Bonos — gift cards canjeables como forma de pago (Fase 4c de adopción de Cuadre)
+
+`backend/src/bonos/` (`Bono`, tenant-scoped) son gift cards emitidas en
+lote (`POST /bonos/lotes`, hasta 500 por lote,
+`EmitirLoteBonosDto.cantidad/montoPorBono/fechaVencimiento`) con código
+generado (`generarCodigoBono()`, `BONO-` + 8 caracteres sin
+ambigüedad O/0/I/1) y vencimiento configurable por lote — decisión
+explícita del usuario, contra la alternativa más simple de "sin
+vencimiento".
+
+**Sin tabla de movimientos propia**: `Bono.saldoActual` es la única
+fuente de verdad, descontada atómicamente dentro de la MISMA
+transacción de la venta que lo canjea. El propio `PagoVenta` (filtrado
+por `formaPago.esBono` + `referencia = código`) ya sirve como libro de
+canjes — mismo criterio que `MovimientoInventario`/`LineaAsiento` como
+libros canónicos en vez de tablas redundantes.
+
+**Reusa el catálogo de `FormaPago` en vez de inventar schema nuevo**:
+`FormaPago.esBono: Boolean` sigue el mismo patrón que `esEfectivo` —
+identifica la forma de pago programáticamente sin comparar por
+`nombre`. Ya existía una forma de pago puramente informativa ("Nota de
+Crédito", sin validación real detrás); Bono es la primera con
+validación de negocio y efecto secundario real (descuento de saldo) al
+canjearse. Un tenant existente puede autoservirse la forma "Bono" desde
+`FormasPagoPanel` (checkbox "Es canje de Bono...") — no hace falta
+backfill para esto, a diferencia de los permisos nuevos.
+
+**Punto de conexión — `FacturacionService.crear()`**: dentro de la
+misma transacción de la venta, ANTES de descontar inventario (fail
+fast), se recorre cada pago resuelto y se llama
+`BonosService.procesarPagoEnTx(tx, tenantId, pago)`, que es un no-op
+si `formaPago.esBono` es `false`. Si es un canje de Bono, valida en
+orden: viene `referencia` (código) → existe el código → no está
+`ANULADO` → no está vencido (por fecha, aunque el estado en la fila
+todavía diga `ACTIVO` — cubre la ventana antes de que corra el cron
+diario) → el saldo alcanza (con el mismo `EPSILON = 0.005` que
+`PagosService`/`PagosPlataformaService`). Si pasa todo, descuenta el
+saldo y deja el bono en `AGOTADO` si llegó a cero, o `ACTIVO` si le
+queda remanente. `BonosRepository.buscarPorCodigoEnTx`/
+`descontarSaldoEnTx` reciben y reusan el mismo `tx` que abrió
+`FacturacionService.crear()` — igual que con `InventarioService.
+validarPertenencia`, si se usara el cliente top-level en vez del `tx`
+recibido, RLS bloquearía la query en otra conexión sin el `SET LOCAL`
+de esa transacción.
+
+`BonosCronService` (`@Cron(CronExpression.EVERY_DAY_AT_8AM)`, patrón
+igual a `RecordatoriosService`) marca `VENCIDO` los bonos cuya
+`fechaVencimiento` ya pasó, vía `BonosRepository.marcarVencidosGlobal`
+con el `PrismaService` global (no `TenantPrismaService`) — corre fuera
+de cualquier request/tenant, mismo criterio que el resto de los crons.
+
+`bonos.ver`/`bonos.editar` son permisos nuevos en `PERMISOS_BASE` —
+igual que con `ofertas.*`, no llegan solo a tenants existentes; correr
+`pnpm --filter ./backend permisos:backfill`. `bonos.ver` se otorga
+también a Cajero/Supervisor de Caja (necesitan poder ver el catálogo al
+cobrar), `bonos.editar` queda solo para Admin Total/Gerente.
+
 ## Cotizaciones y Remisiones
 
 Documentos sin efecto fiscal que preceden a una factura, cada uno en su
