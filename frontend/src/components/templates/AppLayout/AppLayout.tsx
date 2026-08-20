@@ -3,6 +3,7 @@ import { Sidebar } from '../../organisms/Sidebar/Sidebar';
 import { Button } from '../../atoms/Button/Button';
 import { ThemeToggle } from '../../molecules/ThemeToggle/ThemeToggle';
 import { GlobalCrearMenu } from '../../organisms/GlobalCrearMenu/GlobalCrearMenu';
+import { MarcarAsistenciaWidget } from '../../organisms/MarcarAsistenciaWidget/MarcarAsistenciaWidget';
 import { useAuth } from '../../../hooks/useAuth';
 
 function iniciales(nombre?: string) {
@@ -26,6 +27,7 @@ export function AppLayout() {
             <span className="text-sm font-medium text-slate-700 dark:text-slate-300">{usuario?.nombre}</span>
           </div>
           <div className="flex items-center gap-3">
+            <MarcarAsistenciaWidget />
             <GlobalCrearMenu />
             <ThemeToggle />
             <Button variante="secundario" onClick={logout}>

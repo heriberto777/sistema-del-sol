@@ -73,6 +73,7 @@ model Tenant {
   cuentasBancarias CuentaBancaria[]
   gastosMenores GastoMenor[]
   horariosEmpleado HorarioEmpleado[]
+  registrosAsistencia RegistroAsistencia[]
   suscripcion   Suscripcion?
   facturasPlataforma FacturaPlataforma[]
   ventasAparcadas VentaAparcada[]
@@ -1012,6 +1013,7 @@ model Empleado {
   ventasComoVendedor  Factura[]
   ventasAparcadas     VentaAparcada[]
   horarios            HorarioEmpleado[]
+  registrosAsistencia RegistroAsistencia[]
 
   @@unique([tenantId, cedula])
   @@map("empleados")
@@ -1047,6 +1049,35 @@ model HorarioEmpleado {
 
   @@unique([tenantId, empleadoId, diaSemana])
   @@map("horarios_empleado")
+}
+
+/// Marcaje de asistencia (Fase 7b de adopción de Cuadre) — una fila por
+/// empleado por día calendario, completada progresivamente (entrada
+/// primero, salida después). Deliberadamente separado de cualquier
+/// evento de login/logout del sistema (`User`/JWT): el usuario pidió
+/// explícitamente que el empleado tenga que "hacer un registro para
+/// RRHH", no que loguearse cuente como marcaje. `fecha` es el día
+/// calendario a medianoche UTC (mismo patrón que el resto del proyecto
+/// para fechas sin hora — ver ARCHITECTURE.md sobre mostrar siempre con
+/// `{timeZone:'UTC'}`); `horaEntrada`/`horaSalida` son `String "HH:MM"`
+/// en hora de República Dominicana (America/Santo_Domingo, sin DST),
+/// calculada en el backend con `zona-horaria-rd.util.ts` — nunca la
+/// hora local del proceso Node, que puede correr en UTC dentro de
+/// Docker. `tardanza` se calcula una sola vez al marcar la entrada,
+/// comparando contra `HorarioEmpleado` del día correspondiente.
+model RegistroAsistencia {
+  id          String    @id @default(uuid())
+  tenantId    String
+  tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  empleadoId  String
+  empleado    Empleado  @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+  fecha       DateTime
+  horaEntrada String?
+  horaSalida  String?
+  tardanza    Boolean   @default(false)
+
+  @@unique([tenantId, empleadoId, fecha])
+  @@map("registros_asistencia")
 }
 
 model PeriodoNomina {

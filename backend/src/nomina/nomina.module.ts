@@ -8,10 +8,22 @@ import { PeriodosNominaRepository } from './periodos-nomina.repository';
 import { HorariosService } from './horarios.service';
 import { HorariosController } from './horarios.controller';
 import { HorariosRepository } from './horarios.repository';
+import { AsistenciaService } from './asistencia.service';
+import { AsistenciaController } from './asistencia.controller';
+import { AsistenciaRepository } from './asistencia.repository';
 
 @Module({
-  controllers: [EmpleadosController, PeriodosNominaController, HorariosController],
-  providers: [EmpleadosService, EmpleadosRepository, PeriodosNominaService, PeriodosNominaRepository, HorariosService, HorariosRepository],
+  controllers: [EmpleadosController, PeriodosNominaController, HorariosController, AsistenciaController],
+  providers: [
+    EmpleadosService,
+    EmpleadosRepository,
+    PeriodosNominaService,
+    PeriodosNominaRepository,
+    HorariosService,
+    HorariosRepository,
+    AsistenciaService,
+    AsistenciaRepository,
+  ],
   // EmpleadosRepository: la usa PosModule para "vendedor de la venta" (F2)
   // sin exigir el módulo Nómina activo ni el permiso nomina.ver — ver
   // GET /pos/vendedores.

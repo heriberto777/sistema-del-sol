@@ -55,6 +55,17 @@ describe('EmpleadosService', () => {
     await expect(service.actualizar('e1', { cedula: '001-1' })).rejects.toThrow(BadRequestException);
   });
 
+  it('rechaza con 400 con mensaje distinto si el userId ya lo tiene otro empleado vinculado', async () => {
+    const error = new Prisma.PrismaClientKnownRequestError('duplicado', {
+      code: 'P2002',
+      clientVersion: 'x',
+      meta: { target: ['tenantId', 'userId'] },
+    });
+    repository.actualizar.mockRejectedValue(error);
+
+    await expect(service.actualizar('e1', { userId: 'u1' })).rejects.toThrow('Ese usuario ya está vinculado a otro empleado');
+  });
+
   it('listar pagina con los defaults', async () => {
     repository.listar.mockResolvedValue([[{ id: 'e1' }], 1] as never);
 

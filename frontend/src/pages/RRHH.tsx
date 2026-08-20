@@ -1,9 +1,13 @@
 import { useState } from 'react';
 import clsx from 'clsx';
 import { HorarioEmpleadoPanel } from '../components/organisms/HorarioEmpleadoPanel/HorarioEmpleadoPanel';
+import { AsistenciaTable } from '../components/organisms/AsistenciaTable/AsistenciaTable';
 import { RequierePermiso } from '../components/organisms/RequierePermiso/RequierePermiso';
 
-const PESTANAS = [{ id: 'horarios', etiqueta: 'Horarios' }] as const;
+const PESTANAS = [
+  { id: 'horarios', etiqueta: 'Horarios' },
+  { id: 'asistencia', etiqueta: 'Asistencia' },
+] as const;
 
 type PestanaId = (typeof PESTANAS)[number]['id'];
 
@@ -34,7 +38,10 @@ export function RRHH() {
         ))}
       </div>
 
-      <RequierePermiso permiso="rrhh.ver">{pestana === 'horarios' && <HorarioEmpleadoPanel />}</RequierePermiso>
+      <RequierePermiso permiso="rrhh.ver">
+        {pestana === 'horarios' && <HorarioEmpleadoPanel />}
+        {pestana === 'asistencia' && <AsistenciaTable />}
+      </RequierePermiso>
     </div>
   );
 }

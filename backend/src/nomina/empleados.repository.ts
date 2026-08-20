@@ -29,6 +29,11 @@ export class EmpleadosRepository {
     return this.db.empleado.findUniqueOrThrow({ where: { id } });
   }
 
+  /** Resuelve "quién soy" para el check-in/check-out de autoservicio (Asistencia) desde req.user.userId. */
+  buscarPorUserId(userId: string) {
+    return this.db.empleado.findUnique({ where: { userId } });
+  }
+
   listarActivos() {
     return this.db.empleado.findMany({ where: { activo: true }, orderBy: { nombre: 'asc' } });
   }
@@ -80,6 +85,7 @@ export class EmpleadosRepository {
       telefono: string;
       activo: boolean;
       fechaSalida: Date;
+      userId: string | null;
     }>,
   ) {
     return this.db.empleado.update({ where: { id }, data });

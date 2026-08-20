@@ -54,4 +54,5 @@ export const TENANT_SCOPED_MODELS = new Set([
   'Bono',
   'Lote',
   'HorarioEmpleado',
+  'RegistroAsistencia',
 ]);

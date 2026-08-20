@@ -1720,7 +1720,34 @@ contra qué comparar y no se marca tardanza.
 su `User` de login — no todo empleado necesita acceso al sistema (ej.
 personal de bodega). Es la base para que la sub-fase de Asistencia
 resuelva "quién soy" desde el JWT (`req.user.userId`) sin pedirle al
-empleado que elija su propio registro de una lista.
+empleado que elija su propio registro de una lista. **Sin UI dedicada
+todavía** para vincularlo — se hace vía `PATCH /nomina/empleados/:id
+{ userId }` (Swagger/API directo); agregar un selector de usuario en la
+ficha de Empleado es la extensión natural cuando se defina el flujo de
+UX (¿lo vincula RRHH desde ahí, o lo reclama el propio empleado?).
+
+**Asistencia (7b, implementado)**: `RegistroAsistencia` — una fila por
+empleado por día calendario, completada progresivamente
+(`horaEntrada` primero, `horaSalida` después). El usuario pidió
+explícitamente que el marcaje sea una acción separada del login/logout
+del sistema — `POST /nomina/asistencia/marcar-entrada`/`marcar-salida`
+son de autoservicio (sin permiso `rrhh.*`, cualquier usuario logueado
+con `Empleado.userId` vinculado puede marcar SU PROPIA asistencia) y
+nunca se disparan desde `AuthService`/JWT. `tardanza` se calcula una
+sola vez al marcar la entrada, comparando la hora real contra
+`HorarioEmpleado` del día de la semana correspondiente — sin horario
+configurado ese día, no hay contra qué comparar y no se marca
+tardanza. RRHH puede además registrar manualmente
+(`POST /nomina/asistencia`, `rrhh.editar`) para empleados sin login o
+para corregir un olvido de marcaje.
+
+**Hora real de RD, no la del proceso Node**: `horaActualRD()`/
+`fechaHoyRD()` (`backend/src/common/utils/zona-horaria-rd.util.ts`)
+calculan la hora/fecha de marcaje con `Intl.DateTimeFormat` fijado a
+`America/Santo_Domingo` (UTC-4, sin horario de verano) — el proceso
+Node corre en la zona horaria del contenedor Docker (típicamente UTC),
+así que usar `new Date()`/`toLocaleTimeString()` sin especificar esa
+zona habría registrado la hora equivocada para el empleado.
 
 ## POS (punto de venta)
 

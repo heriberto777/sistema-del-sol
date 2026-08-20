@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsBoolean, IsDateString, IsEmail, IsIn, IsNumber, IsOptional, IsPositive, IsString, MinLength } from 'class-validator';
+import { IsBoolean, IsDateString, IsEmail, IsIn, IsNumber, IsOptional, IsPositive, IsString, IsUUID, MinLength } from 'class-validator';
 
 export class ActualizarEmpleadoDto {
   @ApiProperty({ required: false })
@@ -59,4 +59,13 @@ export class ActualizarEmpleadoDto {
   @IsOptional()
   @IsString()
   telefono?: string;
+
+  @ApiProperty({
+    required: false,
+    description: 'Vincula el empleado a un User de login (habilita el check-in/check-out de autoservicio) — enviar null para desvincular',
+    nullable: true,
+  })
+  @IsOptional()
+  @IsUUID()
+  userId?: string | null;
 }

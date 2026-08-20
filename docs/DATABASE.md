@@ -199,6 +199,13 @@ token, así que un token nunca puede reusarse.
   `lineas_asiento` (`ON DELETE CASCADE` hacia `tenants` y hacia
   `empleados`) — la ausencia de una fila para un `diaSemana` dado
   significa que ese día no se trabaja, no hay columna booleana aparte.
+- **`registros_asistencia`** (RRHH, Fase 7b) sigue el mismo patrón de
+  rama hermana `ON DELETE CASCADE` que `horarios_empleado`.
+  `@@unique([tenantId, empleadoId, fecha])` — una fila por empleado por
+  día calendario, completada progresivamente (`horaEntrada` al marcar
+  entrada, `horaSalida` después). `fecha` se guarda a medianoche UTC
+  del día calendario de RD (no del servidor) — ver
+  `zona-horaria-rd.util.ts` en ARCHITECTURE.md.
 - **`facturas.turnoCajaId`** es `ON DELETE SET NULL` (no `RESTRICT` ni
   `CASCADE`) — a diferencia de `recibos_nomina.empleadoId`/
   `lineas_asiento.cuentaContableId`, aquí el documento fiscal (`Factura`)

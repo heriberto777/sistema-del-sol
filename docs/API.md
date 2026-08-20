@@ -369,6 +369,11 @@ para asientos manuales (ajustes, apertura, etc.).
 | POST | `/api/nomina/periodos/:id/marcar-pagado` | `nomina.editar` — `PROCESADO → PAGADO`, dispara el asiento contable automático (ver ARCHITECTURE.md) |
 | GET | `/api/nomina/empleados/:empleadoId/horario` | `rrhh.ver` — horario semanal (RRHH, Fase 7a) |
 | PUT | `/api/nomina/empleados/:empleadoId/horario` | `rrhh.editar` — reemplaza el horario completo (`{ dias: [{ diaSemana, horaEntrada, horaSalida }] }`, `dias: []` lo deja sin ningún día configurado) |
+| GET | `/api/nomina/asistencia/mi-estado-hoy` | Autoservicio, sin permiso — `{ tieneEmpleado, registro }` del usuario logueado (RRHH, Fase 7b) |
+| POST | `/api/nomina/asistencia/marcar-entrada` | Autoservicio, sin permiso — 400 si el usuario no tiene `Empleado.userId` vinculado o si ya marcó entrada hoy |
+| POST | `/api/nomina/asistencia/marcar-salida` | Autoservicio, sin permiso — 400 si no marcó entrada hoy o si ya marcó salida |
+| POST | `/api/nomina/asistencia` | `rrhh.editar` — registro manual (`{ empleadoId, fecha, horaEntrada?, horaSalida? }`), para empleados sin login o corregir un olvido |
+| GET | `/api/nomina/asistencia?empleadoId&desde&hasta&pagina&tamanoPagina` | `rrhh.ver` |
 
 ## POS
 

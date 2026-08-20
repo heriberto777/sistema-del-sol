@@ -49,9 +49,14 @@ export class EmpleadosService {
         telefono: dto.telefono,
         activo: dto.fechaSalida ? false : dto.activo,
         fechaSalida: dto.fechaSalida ? new Date(dto.fechaSalida) : undefined,
+        userId: dto.userId,
       });
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        const campo = (error.meta?.target as string[] | undefined)?.join(',') ?? '';
+        if (campo.includes('userId')) {
+          throw new BadRequestException('Ese usuario ya está vinculado a otro empleado');
+        }
         throw new BadRequestException('Ya existe otro empleado con esa cédula');
       }
       throw error;
