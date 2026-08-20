@@ -16,8 +16,12 @@ interface DashboardStats {
 
 export function Dashboard() {
   const { sucursales, sucursalActivaId } = useSucursalActiva();
-  const [sucursalId, setSucursalId] = useState('');
-  const sucursalFiltro = sucursalId || sucursalActivaId || '';
+  // `null` = el usuario todavía no tocó el filtro (usar la sucursal activa
+  // como default); `''` = el usuario eligió explícitamente "Todas las
+  // sucursales" — hay que respetarlo, NO recaer en sucursalActivaId (si
+  // no, nunca se podría volver a "todas" una vez que hay una activa).
+  const [sucursalId, setSucursalId] = useState<string | null>(null);
+  const sucursalFiltro = sucursalId !== null ? sucursalId : (sucursalActivaId ?? '');
 
   const { data, isLoading } = useQuery({
     queryKey: ['reportes-dashboard', sucursalFiltro],

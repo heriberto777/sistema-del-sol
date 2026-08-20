@@ -23,8 +23,11 @@ interface ReporteInventarioResponse {
 
 export function ReporteInventario() {
   const { sucursales, sucursalActivaId } = useSucursalActiva();
-  const [sucursalId, setSucursalId] = useState('');
-  const sucursalFiltro = sucursalId || sucursalActivaId || '';
+  // `null` = todavía no se tocó el filtro (usar la sucursal activa como
+  // default); `''` = se eligió explícitamente "Todas las sucursales" —
+  // hay que respetarlo, no recaer en sucursalActivaId otra vez.
+  const [sucursalId, setSucursalId] = useState<string | null>(null);
+  const sucursalFiltro = sucursalId !== null ? sucursalId : (sucursalActivaId ?? '');
 
   const { data, isLoading } = useQuery({
     queryKey: ['reporte-inventario', sucursalFiltro],
