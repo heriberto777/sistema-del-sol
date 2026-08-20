@@ -153,6 +153,29 @@ describe('ComprasService', () => {
       expect(repository.crearRecepcion).toHaveBeenCalledWith(TX, expect.anything());
     });
 
+    it('Fase 5b: propaga numeroLote/fechaVencimiento y referenciaTipo/referenciaId a entradaStockEnTx', async () => {
+      repository.buscarPorId.mockResolvedValue(ordenBase(0) as never);
+      repository.buscarPorIdEnTx.mockResolvedValue(ordenBase(10) as never);
+      repository.crearRecepcion.mockResolvedValue({ id: 'rec-1' } as never);
+      const fechaVencimiento = new Date('2026-12-01');
+
+      await service.recibir(
+        'oc-1',
+        { bodegaId: 'bodega-1', lineas: [{ productoId: 'p1', cantidadRecibida: 10, costoUnitario: 5, numeroLote: 'L1', fechaVencimiento }] },
+        'user-1',
+        'tenant-1',
+      );
+
+      expect(inventarioService.entradaStockEnTx).toHaveBeenCalledWith(
+        TX,
+        expect.objectContaining({
+          referenciaTipo: 'RECEPCION_COMPRA',
+          referenciaId: 'rec-1',
+          lotes: [{ numeroLote: 'L1', fechaVencimiento, cantidad: 10 }],
+        }),
+      );
+    });
+
     it('un producto SERVICIO no mueve inventario al recibirse (solo actualiza la cantidad recibida)', async () => {
       const ordenConServicio = {
         numero: 'OC-001',
@@ -302,6 +325,20 @@ describe('ComprasService', () => {
         expect.objectContaining({ tenantId: 'tenant-1', productoId: 'p1', bodegaId: 'bodega-1', cantidad: 4, userId: 'user-1' }),
       );
       expect(repository.actualizarEstado).toHaveBeenCalledWith(TX, 'oc-1', 'RECIBIDA_PARCIAL');
+    });
+
+    it('Fase 5b: propaga loteId (elegido a mano) y referenciaTipo/referenciaId a verificarYDescontarStockEnTx', async () => {
+      repository.buscarPorId.mockResolvedValue(ordenRecibida() as never);
+      tenantPrisma.client.producto.findMany.mockResolvedValue([{ id: 'p1', porcentajeItbis: 18 }] as never);
+      repository.crearDevolucionEnTx.mockResolvedValue({ id: 'dev-1' } as never);
+      repository.buscarPorIdEnTx.mockResolvedValue({ lineas: [{ productoId: 'p1', cantidad: 10, cantidadRecibida: 6 }] } as never);
+
+      await service.devolver('oc-1', { ...dtoDevolucion, lineas: [{ productoId: 'p1', cantidad: 4, loteId: 'lote-x' }] }, 'user-1', 'tenant-1');
+
+      expect(inventarioService.verificarYDescontarStockEnTx).toHaveBeenCalledWith(
+        TX,
+        expect.objectContaining({ referenciaTipo: 'DEVOLUCION_COMPRA', referenciaId: 'dev-1', loteId: 'lote-x' }),
+      );
     });
 
     it('un producto SERVICIO no descuenta stock al devolverse (nunca entró a Stock al recibirse)', async () => {

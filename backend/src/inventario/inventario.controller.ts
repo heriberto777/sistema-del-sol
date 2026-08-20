@@ -7,6 +7,8 @@ import { CrearBodegaDto } from './dto/crear-bodega.dto';
 import { ActualizarBodegaDto } from './dto/actualizar-bodega.dto';
 import { ListadoQueryDto } from '../common/dto/listado-query.dto';
 import { KardexQueryDto } from './dto/kardex-query.dto';
+import { LotesQueryDto } from './dto/lotes-query.dto';
+import { VencimientosQueryDto } from './dto/vencimientos-query.dto';
 import { Permissions } from '../common/decorators/permissions.decorator';
 import { RequiereModulo } from '../common/decorators/requiere-modulo.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -53,6 +55,20 @@ export class InventarioController {
   @Permissions('inventario.ver')
   kardex(@Param('varianteId') varianteId: string, @Query() query: KardexQueryDto) {
     return this.inventarioService.kardex(varianteId, query.bodegaId, query.desde, query.hasta);
+  }
+
+  // Fase 5b — para elegir "de qué lote sale" en devolución a proveedor / ajuste manual negativo.
+  @Get('lotes')
+  @Permissions('inventario.ver')
+  listarLotes(@Query() query: LotesQueryDto) {
+    return this.inventarioService.listarLotes(query.varianteId, query.bodegaId);
+  }
+
+  // Fase 5b — todas las bodegas del tenant, sin paginar (Patrón A de reportes/).
+  @Get('vencimientos')
+  @Permissions('inventario.ver')
+  vencimientos(@Query() query: VencimientosQueryDto) {
+    return this.inventarioService.vencimientos(query.diasProximidad);
   }
 
   @Post('ajustar')

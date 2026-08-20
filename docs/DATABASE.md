@@ -38,7 +38,7 @@ PostgreSQL 16 + Prisma. Schema completo en `backend/prisma/schema.prisma`.
 | Facturación | `ncf_asignados`, `facturas`, `linea_factura` |
 | Cotizaciones / Remisiones | `cotizaciones`, `linea_cotizacion`, `remisiones`, `linea_remision` |
 | Productos / precios | `productos`, `precios` (cuelga de `variantes_producto`, no de `productos`), `componentes_combo`, `categorias` (jerarquía real vía `categoriaPadreId`, self-relation — mismo patrón que `cuentas_contables.cuentaPadreId`), `listas_precio` (catálogo de niveles de precio, sin FK desde `precios.listaPrecio`), `variantes_producto`/`atributos`/`valores_atributo`/`valores_atributo_variante` (SKU real, Fase 3c — ver ARCHITECTURE.md), `ofertas` (descuentos automáticos por producto/categoría/carrito, Fase 4b — ver ARCHITECTURE.md) |
-| Inventario | `bodegas`, `stock` (cuelga de `variantes_producto`), `movimiento_inventario` (conserva `productoId` denormalizado + `varianteId` como FK real) |
+| Inventario | `bodegas`, `stock` (cuelga de `variantes_producto`), `movimiento_inventario` (conserva `productoId` denormalizado + `varianteId` como FK real), `lotes` (control de vencimiento por variante+bodega, opt-in vía `productos.controlaVencimiento`, Fase 5b — ver ARCHITECTURE.md) |
 | Compras | `proveedores`, `orden_compra`, `linea_oc`, `recepcion_compra`, `linea_recepcion` |
 | Clientes | `clientes`, `direccion_cliente` |
 | Webhooks | `webhooks`, `webhook_deliveries` |

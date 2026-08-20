@@ -12,6 +12,7 @@ export const EVENTOS = {
   PAGO_ORDEN_COMPRA_REGISTRADO: 'pagos.orden_compra_registrado',
   COTIZACION_ENVIADA: 'cotizaciones.enviada',
   GASTO_MENOR_CREADO: 'gastos_menores.creado',
+  LOTE_POR_VENCER: 'inventario.lote_por_vencer',
 } as const;
 
 export type NombreEvento = (typeof EVENTOS)[keyof typeof EVENTOS];
@@ -94,4 +95,14 @@ export interface CotizacionEnviadaPayload {
 export interface GastoMenorCreadoPayload {
   tenantId: string;
   gastoMenorId: string;
+}
+
+/** Emitido por LotesCronService (Fase 5b) — uno por lote con saldo próximo a vencer, mismo criterio que StockBajoPayload. */
+export interface LotePorVencerPayload {
+  tenantId: string;
+  loteId: string;
+  productoNombre: string;
+  numeroLote: string;
+  fechaVencimiento: string;
+  cantidadActual: string;
 }

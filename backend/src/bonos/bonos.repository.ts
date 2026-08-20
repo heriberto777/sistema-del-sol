@@ -1,14 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { TenantPrismaService } from '../prisma/tenant-prisma.service';
-import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class BonosRepository {
-  constructor(
-    private readonly tenantPrisma: TenantPrismaService,
-    private readonly prisma: PrismaService,
-  ) {}
+  constructor(private readonly tenantPrisma: TenantPrismaService) {}
 
   private get db() {
     return this.tenantPrisma.client;
@@ -46,10 +42,5 @@ export class BonosRepository {
 
   descontarSaldoEnTx(tx: Prisma.TransactionClient, id: string, saldoNuevo: number, estado: 'ACTIVO' | 'AGOTADO') {
     return tx.bono.update({ where: { id }, data: { saldoActual: saldoNuevo, estado } });
-  }
-
-  /** Cron fuera de contexto de tenant (ver RecordatoriosService/FacturasPlataformaCronService) — PrismaService global, cruza todos los tenants en una sola query. */
-  marcarVencidosGlobal(ahora: Date) {
-    return this.prisma.bono.updateMany({ where: { estado: 'ACTIVO', fechaVencimiento: { lt: ahora } }, data: { estado: 'VENCIDO' } });
   }
 }

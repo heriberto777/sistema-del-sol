@@ -34,6 +34,7 @@ interface Producto {
   unidadMedida: string;
   porcentajeItbis: string;
   tipo: TipoProducto;
+  controlaVencimiento: boolean;
 }
 
 interface ComponenteComboDetalle {
@@ -62,6 +63,7 @@ interface ProductoFormValues {
   porcentajeItbis: string;
   tipo: TipoProducto;
   imagen: string | null;
+  controlaVencimiento: boolean;
 }
 
 interface ComponenteComboForm {
@@ -77,6 +79,7 @@ const PRODUCTO_VACIO: ProductoFormValues = {
   porcentajeItbis: '18',
   tipo: 'PRODUCTO',
   imagen: null,
+  controlaVencimiento: false,
 };
 
 const ETIQUETA_TIPO: Record<TipoProducto, string> = { PRODUCTO: 'Producto', SERVICIO: 'Servicio', COMBO: 'Combo' };
@@ -300,6 +303,7 @@ function FormularioProducto({ producto, onGuardado }: { producto: Producto | nul
           porcentajeItbis: producto.porcentajeItbis,
           tipo: producto.tipo,
           imagen: null,
+          controlaVencimiento: producto.controlaVencimiento,
         }
       : PRODUCTO_VACIO,
   );
@@ -340,6 +344,7 @@ function FormularioProducto({ producto, onGuardado }: { producto: Producto | nul
       porcentajeItbis: valores.porcentajeItbis ? Number(valores.porcentajeItbis) : undefined,
       tipo: valores.tipo,
       imagen: valores.imagen,
+      controlaVencimiento: valores.tipo === 'PRODUCTO' ? valores.controlaVencimiento : false,
       componentes:
         valores.tipo === 'COMBO'
           ? componentes.filter((c) => c.productoId).map((c) => ({ productoId: c.productoId, cantidad: Number(c.cantidad) || 1 }))
@@ -423,6 +428,17 @@ function FormularioProducto({ producto, onGuardado }: { producto: Producto | nul
         value={valores.porcentajeItbis}
         onChange={(e) => setValores((v) => ({ ...v, porcentajeItbis: e.target.value }))}
       />
+
+      {valores.tipo === 'PRODUCTO' && (
+        <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
+          <input
+            type="checkbox"
+            checked={valores.controlaVencimiento}
+            onChange={(e) => setValores((v) => ({ ...v, controlaVencimiento: e.target.checked }))}
+          />
+          Controla vencimiento (lotes con fecha de vencimiento, consumo FEFO en ventas)
+        </label>
+      )}
 
       {valores.tipo === 'COMBO' && (
         <div className="space-y-2 rounded-md border border-slate-200 p-3 dark:border-slate-800">

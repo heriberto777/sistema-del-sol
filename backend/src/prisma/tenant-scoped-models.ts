@@ -45,4 +45,12 @@ export const TENANT_SCOPED_MODELS = new Set([
   'ListaPrecio',
   'VarianteProducto',
   'Atributo',
+  // `Oferta`/`Bono` quedaron afuera por descuido al implementarse (Fase 4b/
+  // 4c) — sin esto, `listar()`/`buscarPorId()`/`actualizar()`/`eliminar()`
+  // de ambos módulos no tenían NINGÚN filtro de tenant (bug real de
+  // aislamiento, encontrado mientras se agregaba `Lote` para Fase 5b —
+  // mismo patrón de columna `tenantId` propia que el resto de esta lista).
+  'Oferta',
+  'Bono',
+  'Lote',
 ]);

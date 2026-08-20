@@ -11,6 +11,11 @@ export class LineaDevolucionDto {
   @IsNumber()
   @IsPositive()
   cantidad: number;
+
+  @ApiProperty({ required: false, description: 'Obligatorio si el producto controla vencimiento (Fase 5b) — de qué lote sale, elegido a mano (nunca FEFO en una devolución a proveedor)' })
+  @IsOptional()
+  @IsUUID()
+  loteId?: string;
 }
 
 export class DevolverOrdenCompraDto {

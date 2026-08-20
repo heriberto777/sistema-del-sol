@@ -44,6 +44,7 @@ interface Producto {
   id: string;
   codigo: string;
   nombre: string;
+  controlaVencimiento: boolean;
 }
 
 interface Bodega {
@@ -53,10 +54,18 @@ interface Bodega {
 
 interface LineaOcDetalle {
   productoId: string;
+  varianteId: string;
   cantidad: string;
   cantidadRecibida: string;
   costoUnitario: string;
   producto: Producto;
+}
+
+interface Lote {
+  id: string;
+  numeroLote: string;
+  fechaVencimiento: string;
+  cantidadActual: string;
 }
 
 interface RecepcionDetalle {
@@ -76,7 +85,11 @@ interface OrdenCompraDetalle {
   recepciones: RecepcionDetalle[];
 }
 
-const ESTADOS_RECIBIBLES = ['PENDIENTE', 'RECIBIDA_PARCIAL'];
+// 'PENDIENTE' no existe en el enum EstadoOrdenCompra del backend (BORRADOR/
+// ENVIADA/RECIBIDA_PARCIAL/RECIBIDA_TOTAL/CANCELADA) — sin este fix ninguna
+// orden recién creada (siempre arranca en BORRADOR) podía recibirse nunca
+// desde la UI (bug real preexistente, encontrado al verificar Fase 5b).
+const ESTADOS_RECIBIBLES = ['BORRADOR', 'ENVIADA', 'RECIBIDA_PARCIAL'];
 const ESTADOS_CON_MERCANCIA_RECIBIDA = ['RECIBIDA_PARCIAL', 'RECIBIDA_TOTAL'];
 
 export function Compras() {
@@ -469,6 +482,8 @@ function ModalRecibirOrden({ orden, onClose }: { orden: OrdenCompra; onClose: ()
   const [facturaProveedorNumero, setFacturaProveedorNumero] = useState('');
   const [montoFacturaProveedor, setMontoFacturaProveedor] = useState('');
   const [cantidades, setCantidades] = useState<Record<string, string>>({});
+  const [numerosLote, setNumerosLote] = useState<Record<string, string>>({});
+  const [fechasVencimiento, setFechasVencimiento] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [resultado, setResultado] = useState<{ diferenciaVsFactura: number | null } | null>(null);
 
@@ -500,6 +515,9 @@ function ModalRecibirOrden({ orden, onClose }: { orden: OrdenCompra; onClose: ()
               productoId: l.productoId,
               cantidadRecibida: Number(cantidades[l.productoId]),
               costoUnitario: Number(l.costoUnitario),
+              ...(l.producto.controlaVencimiento
+                ? { numeroLote: numerosLote[l.productoId], fechaVencimiento: fechasVencimiento[l.productoId] || undefined }
+                : {}),
             })),
         })
       ).data,
@@ -563,18 +581,39 @@ function ModalRecibirOrden({ orden, onClose }: { orden: OrdenCompra; onClose: ()
           {lineasPendientes.map((linea) => {
             const pendiente = Number(linea.cantidad) - Number(linea.cantidadRecibida);
             return (
-              <div key={linea.productoId} className="flex items-center gap-2 text-sm">
-                <span className="flex-1">{nombreProducto(linea.productoId)}</span>
-                <span className="text-slate-400">pendiente {pendiente}</span>
-                <input
-                  type="number"
-                  min={0}
-                  max={pendiente}
-                  placeholder="Recibir"
-                  value={cantidades[linea.productoId] ?? ''}
-                  onChange={(e) => setCantidades((prev) => ({ ...prev, [linea.productoId]: e.target.value }))}
-                  className="w-24 rounded-md border border-slate-300 px-2 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-                />
+              <div key={linea.productoId} className="space-y-1">
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="flex-1">{nombreProducto(linea.productoId)}</span>
+                  <span className="text-slate-400">pendiente {pendiente}</span>
+                  <input
+                    type="number"
+                    min={0}
+                    max={pendiente}
+                    placeholder="Recibir"
+                    value={cantidades[linea.productoId] ?? ''}
+                    onChange={(e) => setCantidades((prev) => ({ ...prev, [linea.productoId]: e.target.value }))}
+                    className="w-24 rounded-md border border-slate-300 px-2 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                  />
+                </div>
+                {linea.producto.controlaVencimiento && Number(cantidades[linea.productoId] ?? 0) > 0 && (
+                  <div className="flex items-center gap-2 pl-2 text-xs">
+                    <input
+                      type="text"
+                      placeholder="Número de lote"
+                      value={numerosLote[linea.productoId] ?? ''}
+                      onChange={(e) => setNumerosLote((prev) => ({ ...prev, [linea.productoId]: e.target.value }))}
+                      className="flex-1 rounded-md border border-slate-300 px-2 py-1.5 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                      required
+                    />
+                    <input
+                      type="date"
+                      value={fechasVencimiento[linea.productoId] ?? ''}
+                      onChange={(e) => setFechasVencimiento((prev) => ({ ...prev, [linea.productoId]: e.target.value }))}
+                      className="rounded-md border border-slate-300 px-2 py-1.5 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                      required
+                    />
+                  </div>
+                )}
               </div>
             );
           })}
@@ -610,6 +649,7 @@ function ModalDevolverOrden({ orden, onClose }: { orden: OrdenCompra; onClose: (
   const [bodegaId, setBodegaId] = useState('');
   const [motivo, setMotivo] = useState('');
   const [cantidades, setCantidades] = useState<Record<string, string>>({});
+  const [lotesElegidos, setLotesElegidos] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
 
   const { data: detalle } = useQuery({
@@ -639,7 +679,11 @@ function ModalDevolverOrden({ orden, onClose }: { orden: OrdenCompra; onClose: (
         motivo: motivo || undefined,
         lineas: lineasDevolvibles
           .filter((l) => Number(cantidades[l.productoId] ?? 0) > 0)
-          .map((l) => ({ productoId: l.productoId, cantidad: Number(cantidades[l.productoId]) })),
+          .map((l) => ({
+            productoId: l.productoId,
+            cantidad: Number(cantidades[l.productoId]),
+            ...(l.producto.controlaVencimiento ? { loteId: lotesElegidos[l.productoId] } : {}),
+          })),
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ordenes-compra'] });
@@ -675,18 +719,28 @@ function ModalDevolverOrden({ orden, onClose }: { orden: OrdenCompra; onClose: (
           <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Líneas recibidas</p>
           {lineasDevolvibles.length === 0 && <p className="text-sm text-slate-400">No hay mercancía recibida por devolver.</p>}
           {lineasDevolvibles.map((linea) => (
-            <div key={linea.productoId} className="flex items-center gap-2 text-sm">
-              <span className="flex-1">{nombreProducto(linea.productoId)}</span>
-              <span className="text-slate-400">recibido {linea.cantidadRecibida}</span>
-              <input
-                type="number"
-                min={0}
-                max={Number(linea.cantidadRecibida)}
-                placeholder="Devolver"
-                value={cantidades[linea.productoId] ?? ''}
-                onChange={(e) => setCantidades((prev) => ({ ...prev, [linea.productoId]: e.target.value }))}
-                className="w-24 rounded-md border border-slate-300 px-2 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-              />
+            <div key={linea.productoId} className="space-y-1">
+              <div className="flex items-center gap-2 text-sm">
+                <span className="flex-1">{nombreProducto(linea.productoId)}</span>
+                <span className="text-slate-400">recibido {linea.cantidadRecibida}</span>
+                <input
+                  type="number"
+                  min={0}
+                  max={Number(linea.cantidadRecibida)}
+                  placeholder="Devolver"
+                  value={cantidades[linea.productoId] ?? ''}
+                  onChange={(e) => setCantidades((prev) => ({ ...prev, [linea.productoId]: e.target.value }))}
+                  className="w-24 rounded-md border border-slate-300 px-2 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                />
+              </div>
+              {linea.producto.controlaVencimiento && bodegaId && Number(cantidades[linea.productoId] ?? 0) > 0 && (
+                <SelectorLoteDevolucion
+                  varianteId={linea.varianteId}
+                  bodegaId={bodegaId}
+                  value={lotesElegidos[linea.productoId] ?? ''}
+                  onChange={(loteId) => setLotesElegidos((prev) => ({ ...prev, [linea.productoId]: loteId }))}
+                />
+              )}
             </div>
           ))}
         </div>
@@ -699,6 +753,37 @@ function ModalDevolverOrden({ orden, onClose }: { orden: OrdenCompra; onClose: (
         </Button>
       </form>
     </Modal>
+  );
+}
+
+/** Fase 5b — de qué lote sale la devolución a proveedor (siempre a mano, nunca FEFO: ver ARCHITECTURE.md). */
+function SelectorLoteDevolucion({
+  varianteId,
+  bodegaId,
+  value,
+  onChange,
+}: {
+  varianteId: string;
+  bodegaId: string;
+  value: string;
+  onChange: (loteId: string) => void;
+}) {
+  const { data: lotes } = useQuery({
+    queryKey: ['inventario-lotes', varianteId, bodegaId],
+    queryFn: async () => (await apiClient.get<Lote[]>('/inventario/lotes', { params: { varianteId, bodegaId } })).data,
+  });
+
+  return (
+    <div className="pl-2">
+      <Select value={value} onChange={(e) => onChange(e.target.value)} className="text-xs" required>
+        <option value="">De qué lote sale…</option>
+        {lotes?.map((l) => (
+          <option key={l.id} value={l.id}>
+            {l.numeroLote} — vence {new Date(l.fechaVencimiento).toLocaleDateString('es-DO', { timeZone: 'UTC' })} — saldo {Number(l.cantidadActual)}
+          </option>
+        ))}
+      </Select>
+    </div>
   );
 }
 

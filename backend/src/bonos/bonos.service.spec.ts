@@ -27,7 +27,6 @@ describe('BonosService', () => {
       anular: jest.fn(),
       buscarPorCodigoEnTx: jest.fn(),
       descontarSaldoEnTx: jest.fn(),
-      marcarVencidosGlobal: jest.fn(),
     } as unknown as jest.Mocked<BonosRepository>;
     service = new BonosService(repository);
   });

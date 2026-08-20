@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { FormatoImpresion, Prisma } from '@prisma/client';
-import { InventarioRepository } from './inventario.repository';
+import { InventarioRepository, LoteEntrada } from './inventario.repository';
 import { ProductosService } from '../productos/productos.service';
 import { VariantesService } from '../variantes/variantes.service';
 import { EventBusService } from '../event-bus/event-bus.service';
@@ -40,7 +40,7 @@ export class InventarioService {
    * detectado.
    */
   private async validarPertenencia(params: { productoId?: string; bodegaId?: string }, tx?: Prisma.TransactionClient) {
-    await Promise.all([
+    const [producto, bodega] = await Promise.all([
       params.productoId
         ? tx
           ? this.productosService.buscarPorIdEnTx(tx, params.productoId)
@@ -52,6 +52,7 @@ export class InventarioService {
           : this.inventarioRepository.buscarBodegaPorId(params.bodegaId)
         : undefined,
     ]);
+    return { producto, bodega };
   }
 
   /**
@@ -71,8 +72,10 @@ export class InventarioService {
     cantidad: number;
     userId: string;
     referencia: string;
+    /** Solo si el producto controla vencimiento — devolución a proveedor (elige explícito, no FEFO); si se omite, FEFO automático. */
+    loteId?: string;
   }) {
-    await this.validarPertenencia({ productoId: params.productoId, bodegaId: params.bodegaId });
+    const { producto } = await this.validarPertenencia({ productoId: params.productoId, bodegaId: params.bodegaId });
     const varianteId = await this.variantesService.resolverObligatoria(params.productoId, params.varianteId);
 
     const stock = await this.inventarioRepository.descontarStockCondicional({
@@ -84,6 +87,8 @@ export class InventarioService {
       tipo: 'SALIDA',
       userId: params.userId,
       motivo: params.referencia,
+      controlaVencimiento: producto!.controlaVencimiento,
+      loteId: params.loteId,
     });
 
     if (!stock) {
@@ -133,9 +138,20 @@ export class InventarioService {
    */
   async verificarYDescontarStockEnTx(
     tx: Prisma.TransactionClient,
-    params: { tenantId: string; productoId: string; varianteId?: string; bodegaId: string; cantidad: number; userId: string; referencia: string },
+    params: {
+      tenantId: string;
+      productoId: string;
+      varianteId?: string;
+      bodegaId: string;
+      cantidad: number;
+      userId: string;
+      referencia: string;
+      referenciaTipo?: string;
+      referenciaId?: string;
+      loteId?: string;
+    },
   ) {
-    await this.validarPertenencia({ productoId: params.productoId, bodegaId: params.bodegaId }, tx);
+    const { producto } = await this.validarPertenencia({ productoId: params.productoId, bodegaId: params.bodegaId }, tx);
     const varianteId = await this.variantesService.resolverObligatoria(params.productoId, params.varianteId);
 
     const stock = await this.inventarioRepository.descontarStockCondicionalEnTx(tx, {
@@ -147,6 +163,10 @@ export class InventarioService {
       tipo: 'SALIDA',
       userId: params.userId,
       motivo: params.referencia,
+      referenciaTipo: params.referenciaTipo,
+      referenciaId: params.referenciaId,
+      controlaVencimiento: producto!.controlaVencimiento,
+      loteId: params.loteId,
     });
 
     if (!stock) {
@@ -163,9 +183,21 @@ export class InventarioService {
   /** Ver el comentario de `verificarYDescontarStockEnTx` — misma razón, para el caso de entrada (nota de crédito, anulación). */
   async entradaStockEnTx(
     tx: Prisma.TransactionClient,
-    params: { tenantId: string; productoId: string; varianteId?: string; bodegaId: string; cantidad: number; userId: string; motivo: string },
+    params: {
+      tenantId: string;
+      productoId: string;
+      varianteId?: string;
+      bodegaId: string;
+      cantidad: number;
+      userId: string;
+      motivo: string;
+      referenciaTipo?: string;
+      referenciaId?: string;
+      /** Obligatorio si el producto controla vencimiento (salvo Nota de Crédito, que los reconstruye sola — ver FacturacionService.crear). */
+      lotes?: LoteEntrada[];
+    },
   ) {
-    await this.validarPertenencia({ productoId: params.productoId, bodegaId: params.bodegaId }, tx);
+    const { producto } = await this.validarPertenencia({ productoId: params.productoId, bodegaId: params.bodegaId }, tx);
     const varianteId = await this.variantesService.resolverObligatoria(params.productoId, params.varianteId);
     return this.inventarioRepository.ajustarCantidadEnTx(tx, {
       tenantId: params.tenantId,
@@ -176,6 +208,10 @@ export class InventarioService {
       tipo: 'ENTRADA',
       userId: params.userId,
       motivo: params.motivo,
+      referenciaTipo: params.referenciaTipo,
+      referenciaId: params.referenciaId,
+      controlaVencimiento: producto!.controlaVencimiento,
+      lotesEntrada: params.lotes,
     });
   }
 
@@ -187,8 +223,9 @@ export class InventarioService {
     cantidad: number;
     userId: string;
     motivo: string;
+    lotes?: LoteEntrada[];
   }) {
-    await this.validarPertenencia({ productoId: params.productoId, bodegaId: params.bodegaId });
+    const { producto } = await this.validarPertenencia({ productoId: params.productoId, bodegaId: params.bodegaId });
     const varianteId = await this.variantesService.resolverObligatoria(params.productoId, params.varianteId);
     return this.inventarioRepository.ajustarCantidad({
       tenantId: params.tenantId,
@@ -199,6 +236,8 @@ export class InventarioService {
       tipo: 'ENTRADA',
       userId: params.userId,
       motivo: params.motivo,
+      controlaVencimiento: producto!.controlaVencimiento,
+      lotesEntrada: params.lotes,
     });
   }
 
@@ -210,8 +249,13 @@ export class InventarioService {
     cantidad: number;
     userId: string;
     motivo: string;
+    /** Solo si el producto controla vencimiento — entrada (cantidad > 0): lote a acreditar. */
+    numeroLote?: string;
+    fechaVencimiento?: Date;
+    /** Solo si el producto controla vencimiento — salida (cantidad < 0): de qué lote sale (siempre explícito, nunca FEFO en un ajuste manual). */
+    loteId?: string;
   }) {
-    await this.validarPertenencia({ productoId: params.productoId, bodegaId: params.bodegaId });
+    const { producto } = await this.validarPertenencia({ productoId: params.productoId, bodegaId: params.bodegaId });
     const varianteId = await this.variantesService.resolverObligatoria(params.productoId, params.varianteId);
     return this.inventarioRepository.ajustarCantidad({
       tenantId: params.tenantId,
@@ -222,6 +266,12 @@ export class InventarioService {
       tipo: 'AJUSTE',
       userId: params.userId,
       motivo: params.motivo,
+      controlaVencimiento: producto!.controlaVencimiento,
+      lotesEntrada:
+        params.cantidad >= 0 && params.numeroLote && params.fechaVencimiento
+          ? [{ numeroLote: params.numeroLote, fechaVencimiento: params.fechaVencimiento, cantidad: params.cantidad }]
+          : undefined,
+      loteIdSalida: params.cantidad < 0 ? params.loteId : undefined,
     });
   }
 
@@ -234,12 +284,12 @@ export class InventarioService {
     cantidad: number;
     userId: string;
   }) {
-    await Promise.all([
+    const [{ producto }] = await Promise.all([
       this.validarPertenencia({ productoId: params.productoId, bodegaId: params.bodegaOrigenId }),
       this.validarPertenencia({ bodegaId: params.bodegaDestinoId }),
     ]);
     const varianteId = await this.variantesService.resolverObligatoria(params.productoId, params.varianteId);
-    return this.inventarioRepository.transferir({ ...params, varianteId });
+    return this.inventarioRepository.transferir({ ...params, varianteId, controlaVencimiento: producto!.controlaVencimiento });
   }
 
   /**
@@ -300,6 +350,28 @@ export class InventarioService {
       movimientos: filas,
       saldoFinal: filas.length > 0 ? filas[filas.length - 1].saldoAcumulado : saldoInicial,
     };
+  }
+
+  /** Lotes con saldo de una variante+bodega (Fase 5b) — para elegir "de qué lote sale" en devolución a proveedor / ajuste manual negativo. */
+  async listarLotes(varianteId: string, bodegaId: string) {
+    await this.validarPertenencia({ bodegaId });
+    return this.inventarioRepository.listarLotesConSaldo(varianteId, bodegaId);
+  }
+
+  /** Reporte de vencimientos próximos (Fase 5b) — todas las bodegas del tenant, sin paginar (Patrón A de reportes/). */
+  vencimientos(diasProximidad = 30) {
+    return this.inventarioRepository.lotesPorVencer(diasProximidad);
+  }
+
+  /**
+   * Ver FacturacionService.crear (NOTA_CREDITO) — reparte la cantidad
+   * devuelta entre los lotes que alimentaron la venta original, sin
+   * pedirle nada al usuario. Recibe el `tx` de esa misma transacción
+   * (nunca abre la suya propia) — ver comentario en
+   * InventarioRepository.reconstruirLotesDeVentaEnTx.
+   */
+  reconstruirLotesDeVentaEnTx(tx: Prisma.TransactionClient, facturaOrigenId: string, varianteId: string, cantidadADevolver: number) {
+    return this.inventarioRepository.reconstruirLotesDeVentaEnTx(tx, facturaOrigenId, varianteId, cantidadADevolver);
   }
 
   async listarStockPorBodega(bodegaId: string, query: ListadoQueryDto) {

@@ -58,6 +58,7 @@ model Tenant {
   plantillasNotificacion NotificacionPlantilla[]
   ofertas       Oferta[]
   bonos         Bono[]
+  lotes         Lote[]
   cotizaciones  Cotizacion[]
   remisiones    Remision[]
   cuentasContables  CuentaContable[]
@@ -1292,6 +1293,10 @@ model Producto {
   tipo             TipoProducto @default(PRODUCTO)
   activo           Boolean  @default(true)
   origenMssql      Boolean  @default(false)
+  // Opt-in (Fase 5b de adopción de Cuadre, mismo patrón que esEfectivo/
+  // esBono) — si está apagado, este producto sigue funcionando exactamente
+  // igual que hoy, sin exigir lote nunca. Ver ARCHITECTURE.md, "Vencimientos".
+  controlaVencimiento Boolean @default(false)
   // Data URI completa (data:image/jpeg;base64,...), comprimida en el
   // cliente antes de subir. `listar()` (el listado general de
   // Productos.tsx) NO la selecciona a propósito — solo `catalogo()`
@@ -1364,6 +1369,7 @@ model VarianteProducto {
   precios         Precio[]
   stock           Stock[]
   movimientos     MovimientoInventario[]
+  lotes           Lote[]
   lineasFactura   LineaFactura[]
   lineasCotizacion LineaCotizacion[]
   lineasRemision  LineaRemision[]
@@ -1448,6 +1454,7 @@ model Bodega {
 
   stock        Stock[]
   movimientos  MovimientoInventario[]
+  lotes        Lote[]
   facturas     Factura[]
   remisiones   Remision[]
   turnosCaja   TurnoCaja[]
@@ -1508,15 +1515,52 @@ model MovimientoInventario {
   direccion      DireccionMovimiento
   cantidad       Decimal                  @db.Decimal(14, 4)
   motivo         String?
+  // Ya existían, sin usar en ningún lado del código — Fase 5b los reusa
+  // para vincular un movimiento de lote a su origen ('FACTURA'+facturaId
+  // en ventas, 'RECEPCION_COMPRA'+recepcionId en compras), lo que le
+  // permite a una Nota de Crédito reconstruir sola de qué lote(s) salió
+  // la venta original, sin pedirle nada al usuario (ver ARCHITECTURE.md).
   referenciaTipo String?
   referenciaId   String?
+  // Solo se setea para movimientos de productos con `controlaVencimiento`
+  // (Fase 5b) — nullable, un producto sin ese flag nunca toca este campo.
+  loteId         String?
+  lote           Lote?                    @relation(fields: [loteId], references: [id])
   userId         String
   user           User                     @relation(fields: [userId], references: [id])
   createdAt      DateTime                 @default(now())
 
   @@index([tenantId, productoId, bodegaId])
   @@index([varianteId])
+  @@index([loteId])
   @@map("movimiento_inventario")
+}
+
+// Control de vencimientos por lote (Fase 5b de adopción de Cuadre) — solo
+// para productos con `controlaVencimiento: true`. Tenant-scoped con
+// `tenantId` propio (a diferencia de `Stock`, "hija" de Bodega/Variante):
+// se consulta directo muy seguido desde el consumo FEFO y el cron de
+// vencimientos, y así puede tener su propio índice sin depender de un
+// join. El mismo lote físico transferido a otra bodega es una fila nueva
+// ahí — misma granularidad que `Stock`, que también es por variante+bodega.
+model Lote {
+  id               String   @id @default(uuid())
+  tenantId         String
+  tenant           Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  varianteId       String
+  variante         VarianteProducto @relation(fields: [varianteId], references: [id], onDelete: Cascade)
+  bodegaId         String
+  bodega           Bodega   @relation(fields: [bodegaId], references: [id], onDelete: Cascade)
+  numeroLote       String
+  fechaVencimiento DateTime
+  cantidadActual   Decimal  @default(0) @db.Decimal(14, 4)
+  createdAt        DateTime @default(now())
+
+  movimientos MovimientoInventario[]
+
+  @@unique([tenantId, varianteId, bodegaId, numeroLote])
+  @@index([tenantId, fechaVencimiento])
+  @@map("lotes")
 }
 
 // ============================================================

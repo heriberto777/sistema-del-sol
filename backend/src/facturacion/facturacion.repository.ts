@@ -103,6 +103,12 @@ export class FacturacionRepository {
   crearFacturaEnTx(
     tx: Prisma.TransactionClient,
     params: {
+      // Fase 5b — pre-generado por FacturacionService.crear() ANTES de la
+      // transacción, para que el descuento/reintegro de stock (que corre
+      // antes de este create) pueda referenciar esta factura en cada
+      // movimiento de lote (`referenciaId`). Prisma acepta sobreescribir el
+      // `@default(uuid())` pasando el id explícito.
+      id?: string;
       tenantId: string;
       clienteId: string;
       vendedorId: string;
@@ -132,6 +138,7 @@ export class FacturacionRepository {
   ) {
     return tx.factura.create({
       data: {
+        id: params.id,
         tenantId: params.tenantId,
         clienteId: params.clienteId,
         vendedorId: params.vendedorId,

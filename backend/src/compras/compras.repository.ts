@@ -120,6 +120,11 @@ export class ComprasRepository {
       ordenCompraId: string;
       facturaProveedorNumero?: string;
       montoFacturaProveedor?: number;
+      // El caller (ComprasService.recibir) recibe cada línea con
+      // numeroLote?/fechaVencimiento? también (Fase 5b) — son datos para
+      // InventarioService.entradaStockEnTx, no columnas de LineaRecepcion,
+      // así que se pickean explícito acá (Prisma rechaza en runtime
+      // cualquier propiedad extra en `create`, no solo TS).
       lineas: { productoId: string; varianteId: string; cantidadRecibida: number; costoUnitario: number }[];
     },
   ) {
@@ -129,7 +134,14 @@ export class ComprasRepository {
         ordenCompraId: params.ordenCompraId,
         facturaProveedorNumero: params.facturaProveedorNumero,
         montoFacturaProveedor: params.montoFacturaProveedor,
-        lineas: { create: params.lineas },
+        lineas: {
+          create: params.lineas.map((l) => ({
+            productoId: l.productoId,
+            varianteId: l.varianteId,
+            cantidadRecibida: l.cantidadRecibida,
+            costoUnitario: l.costoUnitario,
+          })),
+        },
       },
       include: { lineas: true },
     });

@@ -217,8 +217,10 @@ Catálogo tenant-scoped con jerarquía real (mismo patrón de auto-relación que
 | PATCH | `/api/inventario/bodegas/:id` | `admin.configuracion` — solo `{ formatoImpresion? }` (`null` quita el override, hereda el default del tenant) |
 | GET | `/api/inventario/stock/:bodegaId` | `inventario.ver` — cada fila incluye `varianteId` y `valoresAtributo` (Fase 3c) además de `producto`: un producto con variantes reales tiene una fila de stock POR variante |
 | GET | `/api/inventario/kardex/:varianteId?bodegaId&desde&hasta` | `inventario.ver` — historial cronológico con saldo corriente (Fase 5a); sin `desde`/`hasta`, default mes actual (mismo criterio que `libro-mayor`); sin paginar — devuelve `{ variante, bodegaId, rango, saldoInicial, movimientos, saldoFinal }` |
-| POST | `/api/inventario/ajustar` | `inventario.ajustar` — `{ productoId, varianteId?, bodegaId, cantidad, motivo }` |
-| POST | `/api/inventario/transferir` | `inventario.transferir` — `{ productoId, varianteId?, bodegaOrigenId, bodegaDestinoId, cantidad }` |
+| GET | `/api/inventario/lotes?varianteId&bodegaId` | `inventario.ver` — lotes con saldo de esa variante+bodega (Fase 5b), para elegir "de qué lote sale" en devolución a proveedor / ajuste manual negativo |
+| GET | `/api/inventario/vencimientos?diasProximidad` | `inventario.ver` — lotes con saldo que vencen dentro de `diasProximidad` (default 30, Fase 5b), todas las bodegas del tenant; sin paginar |
+| POST | `/api/inventario/ajustar` | `inventario.ajustar` — `{ productoId, varianteId?, bodegaId, cantidad, motivo, numeroLote?, fechaVencimiento?, loteId? }`; `numeroLote`+`fechaVencimiento` obligatorios si el producto controla vencimiento y `cantidad > 0` (entrada); `loteId` obligatorio si controla vencimiento y `cantidad < 0` (salida, siempre explícito — nunca FEFO en una corrección manual) |
+| POST | `/api/inventario/transferir` | `inventario.transferir` — `{ productoId, varianteId?, bodegaOrigenId, bodegaDestinoId, cantidad }`; si el producto controla vencimiento, FEFO automático en origen y el lote (número+vencimiento) se preserva intacto en destino |
 
 ## Precios
 
@@ -240,8 +242,8 @@ saber a cuál de las variantes reales le corresponde el precio.
 | POST | `/api/compras` | `compras.crear` |
 | GET | `/api/compras?pagina&tamanoPagina&busqueda` | `compras.ver` — `busqueda` filtra por número de orden o nombre de proveedor |
 | GET | `/api/compras/:id` | `compras.ver` |
-| POST | `/api/compras/:id/recibir` | `compras.recibir` |
-| POST | `/api/compras/:id/devolver` | `compras.recibir` — devolución parcial de mercancía ya recibida |
+| POST | `/api/compras/:id/recibir` | `compras.recibir` — cada línea admite `numeroLote?`/`fechaVencimiento?` (Fase 5b), obligatorios si el producto controla vencimiento |
+| POST | `/api/compras/:id/devolver` | `compras.recibir` — devolución parcial de mercancía ya recibida; cada línea admite `loteId?` (Fase 5b), obligatorio si el producto controla vencimiento (elegido a mano, nunca FEFO) |
 | POST | `/api/compras/:id/pagos` | `compras.pagar` — `{ monto, formaPagoId, referencia?, retencionIsr?, retencionItbis?, fecha? }`; pagos parciales soportados, marca `pagada: true` al cubrir el total |
 | GET | `/api/compras/:id/pagos` | `compras.ver` — `{ pagos, totalPagado }` |
 

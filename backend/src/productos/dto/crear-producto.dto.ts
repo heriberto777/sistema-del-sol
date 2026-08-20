@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { ArrayMinSize, IsArray, IsEnum, IsNumber, IsOptional, IsPositive, IsString, IsUUID, Matches, MaxLength, Max, Min, ValidateNested } from 'class-validator';
+import { ArrayMinSize, IsArray, IsBoolean, IsEnum, IsNumber, IsOptional, IsPositive, IsString, IsUUID, Matches, MaxLength, Max, Min, ValidateNested } from 'class-validator';
 import { TipoProducto } from '@prisma/client';
 
 export class ComponenteComboDto {
@@ -56,6 +56,11 @@ export class CrearProductoDto {
   @IsOptional()
   @IsEnum(TipoProducto)
   tipo?: TipoProducto;
+
+  @ApiProperty({ required: false, default: false, description: 'Opt-in (Fase 5b) — habilita lotes con fecha de vencimiento y consumo FEFO en ventas para este producto' })
+  @IsOptional()
+  @IsBoolean()
+  controlaVencimiento?: boolean;
 
   @ApiProperty({
     type: [ComponenteComboDto],

@@ -63,6 +63,7 @@ describe('FacturacionService', () => {
     inventarioService = {
       verificarYDescontarStockEnTx: jest.fn().mockResolvedValue(undefined),
       entradaStockEnTx: jest.fn().mockResolvedValue(undefined),
+      reconstruirLotesDeVentaEnTx: jest.fn().mockResolvedValue([]),
     } as unknown as jest.Mocked<InventarioService>;
     tenantPrisma = { client: { $transaction: jest.fn((callback: (tx: unknown) => unknown) => callback(TX)) } };
     eventBus = { emit: jest.fn(), on: jest.fn() } as unknown as jest.Mocked<EventBusService>;
@@ -529,6 +530,54 @@ describe('FacturacionService', () => {
 
       expect(inventarioService.entradaStockEnTx).not.toHaveBeenCalled();
       expect(inventarioService.verificarYDescontarStockEnTx).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('vencimientos por lote (Fase 5b)', () => {
+    it('la venta pasa referenciaTipo/referenciaId — el mismo id con el que se crea la factura — al descuento de stock', async () => {
+      repository.obtenerProductoConPrecioVigente.mockResolvedValue(producto(18, 100) as never);
+      repository.crearFacturaEnTx.mockResolvedValue(facturaCreada() as never);
+
+      await service.crear(dto(), 'tenant-1', 'vendedor-1');
+
+      const argsDescuento = inventarioService.verificarYDescontarStockEnTx.mock.calls[0][1];
+      const argsCrearFactura = repository.crearFacturaEnTx.mock.calls[0][1];
+      expect(argsDescuento.referenciaTipo).toBe('FACTURA');
+      expect(argsCrearFactura.id).toEqual(expect.any(String));
+      expect(argsDescuento.referenciaId).toBe(argsCrearFactura.id);
+    });
+
+    it('NOTA_CREDITO de un producto que controla vencimiento reconstruye sola los lotes de la venta original', async () => {
+      repository.obtenerProductoConPrecioVigente.mockResolvedValue({ ...producto(18, 100), controlaVencimiento: true } as never);
+      repository.crearFacturaEnTx.mockResolvedValue(facturaCreada({ id: 'nc1' }) as never);
+      inventarioService.reconstruirLotesDeVentaEnTx.mockResolvedValue([
+        { numeroLote: 'L1', fechaVencimiento: new Date('2026-09-01'), cantidad: 2 },
+      ] as never);
+
+      await service.crear(
+        dto({ tipoFactura: 'NOTA_CREDITO', facturaOrigenId: 'f-original', lineas: [{ productoId: 'prod-1', cantidad: 2 }] }),
+        'tenant-1',
+        'vendedor-1',
+      );
+
+      expect(inventarioService.reconstruirLotesDeVentaEnTx).toHaveBeenCalledWith(TX, 'f-original', 'variante-1', 2);
+      expect(inventarioService.entradaStockEnTx).toHaveBeenCalledWith(
+        TX,
+        expect.objectContaining({
+          referenciaTipo: 'FACTURA',
+          lotes: [{ numeroLote: 'L1', fechaVencimiento: new Date('2026-09-01'), cantidad: 2 }],
+        }),
+      );
+    });
+
+    it('NOTA_CREDITO de un producto SIN controlaVencimiento no intenta reconstruir lotes', async () => {
+      repository.obtenerProductoConPrecioVigente.mockResolvedValue(producto(18, 100) as never);
+      repository.crearFacturaEnTx.mockResolvedValue(facturaCreada({ id: 'nc1' }) as never);
+
+      await service.crear(dto({ tipoFactura: 'NOTA_CREDITO', facturaOrigenId: 'f-original' }), 'tenant-1', 'vendedor-1');
+
+      expect(inventarioService.reconstruirLotesDeVentaEnTx).not.toHaveBeenCalled();
+      expect(inventarioService.entradaStockEnTx).toHaveBeenCalledWith(TX, expect.objectContaining({ lotes: undefined }));
     });
   });
 

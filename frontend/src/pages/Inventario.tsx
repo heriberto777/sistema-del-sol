@@ -12,6 +12,7 @@ import { EstadoVacio } from '../components/molecules/EstadoVacio/EstadoVacio';
 import { RequierePermiso } from '../components/organisms/RequierePermiso/RequierePermiso';
 import { RowActionsMenu } from '../components/molecules/RowActionsMenu/RowActionsMenu';
 import { KardexView } from '../components/organisms/KardexView/KardexView';
+import { VencimientosPanel } from '../components/organisms/VencimientosPanel/VencimientosPanel';
 import { SearchInput } from '../components/molecules/SearchInput/SearchInput';
 import { useAuth } from '../hooks/useAuth';
 import { Paginacion } from '../components/molecules/Paginacion/Paginacion';
@@ -30,6 +31,14 @@ interface Producto {
   id: string;
   codigo: string;
   nombre: string;
+  controlaVencimiento: boolean;
+}
+
+interface Lote {
+  id: string;
+  numeroLote: string;
+  fechaVencimiento: string;
+  cantidadActual: string;
 }
 
 interface Stock {
@@ -52,6 +61,7 @@ export function Inventario() {
   const [stockAjustando, setStockAjustando] = useState<Stock | null>(null);
   const [stockTransfiriendo, setStockTransfiriendo] = useState<Stock | null>(null);
   const [stockVerKardex, setStockVerKardex] = useState<Stock | null>(null);
+  const [modalVencimientos, setModalVencimientos] = useState(false);
   const [bodegaEditandoFormato, setBodegaEditandoFormato] = useState<Bodega | null>(null);
   const [busquedaStock, setBusquedaStock] = useState('');
   const [paginaStock, setPaginaStock] = useState(1);
@@ -96,9 +106,16 @@ export function Inventario() {
           <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Inventario</h1>
           <p className="text-sm text-slate-500 dark:text-slate-400">Bodegas y existencias por producto.</p>
         </div>
-        <RequierePermiso permiso="admin.configuracion">
-          <Button onClick={() => setModalNuevaBodega(true)}>Nueva bodega</Button>
-        </RequierePermiso>
+        <div className="flex items-center gap-2">
+          <RequierePermiso permiso="inventario.ver">
+            <Button variante="secundario" onClick={() => setModalVencimientos(true)}>
+              Vencimientos próximos
+            </Button>
+          </RequierePermiso>
+          <RequierePermiso permiso="admin.configuracion">
+            <Button onClick={() => setModalNuevaBodega(true)}>Nueva bodega</Button>
+          </RequierePermiso>
+        </div>
       </div>
 
       <RequierePermiso permiso="inventario.ver">
@@ -254,6 +271,11 @@ export function Inventario() {
           <KardexView varianteId={stockVerKardex.varianteId} bodegaId={bodegaSeleccionadaId} />
         </Modal>
       )}
+      {modalVencimientos && (
+        <Modal titulo="Vencimientos próximos (30 días)" ancho="xl" onClose={() => setModalVencimientos(false)}>
+          <VencimientosPanel />
+        </Modal>
+      )}
     </div>
   );
 }
@@ -337,7 +359,13 @@ function ModalAjustarStock({
   const queryClient = useQueryClient();
   const [cantidad, setCantidad] = useState('');
   const [motivo, setMotivo] = useState('');
+  const [numeroLote, setNumeroLote] = useState('');
+  const [fechaVencimiento, setFechaVencimiento] = useState('');
+  const [loteId, setLoteId] = useState('');
   const [error, setError] = useState<string | null>(null);
+
+  const controlaVencimiento = stockInicial.producto.controlaVencimiento;
+  const esEntrada = Number(cantidad) > 0;
 
   const ajustar = useMutation({
     mutationFn: async () =>
@@ -347,6 +375,8 @@ function ModalAjustarStock({
         bodegaId,
         cantidad: Number(cantidad),
         motivo,
+        ...(controlaVencimiento && esEntrada ? { numeroLote, fechaVencimiento } : {}),
+        ...(controlaVencimiento && !esEntrada ? { loteId } : {}),
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['stock', bodegaId] });
@@ -380,6 +410,22 @@ function ModalAjustarStock({
           onChange={(e) => setCantidad(e.target.value)}
           required
         />
+        {controlaVencimiento && esEntrada && (
+          <>
+            <FormField id="ajuste-lote-numero" label="Número de lote" value={numeroLote} onChange={(e) => setNumeroLote(e.target.value)} required />
+            <FormField
+              id="ajuste-lote-vencimiento"
+              label="Fecha de vencimiento"
+              type="date"
+              value={fechaVencimiento}
+              onChange={(e) => setFechaVencimiento(e.target.value)}
+              required
+            />
+          </>
+        )}
+        {controlaVencimiento && cantidad !== '' && !esEntrada && (
+          <SelectorLoteAjuste varianteId={stockInicial.varianteId} bodegaId={bodegaId} value={loteId} onChange={setLoteId} />
+        )}
         <FormField id="ajuste-motivo" label="Motivo" value={motivo} onChange={(e) => setMotivo(e.target.value)} required />
         {error && <p className="text-sm text-red-600">{error}</p>}
         <Button type="submit" disabled={ajustar.isPending} className="w-full">
@@ -387,6 +433,38 @@ function ModalAjustarStock({
         </Button>
       </form>
     </Modal>
+  );
+}
+
+/** Fase 5b — de qué lote sale un ajuste manual negativo (siempre a mano, nunca FEFO: una corrección apunta a un lote puntual). */
+function SelectorLoteAjuste({
+  varianteId,
+  bodegaId,
+  value,
+  onChange,
+}: {
+  varianteId: string;
+  bodegaId: string;
+  value: string;
+  onChange: (loteId: string) => void;
+}) {
+  const { data: lotes } = useQuery({
+    queryKey: ['inventario-lotes', varianteId, bodegaId],
+    queryFn: async () => (await apiClient.get<Lote[]>('/inventario/lotes', { params: { varianteId, bodegaId } })).data,
+  });
+
+  return (
+    <div className="flex flex-col gap-1">
+      <label className="text-sm font-medium text-slate-700 dark:text-slate-300">De qué lote sale</label>
+      <Select value={value} onChange={(e) => onChange(e.target.value)} required>
+        <option value="">Seleccionar…</option>
+        {lotes?.map((l) => (
+          <option key={l.id} value={l.id}>
+            {l.numeroLote} — vence {new Date(l.fechaVencimiento).toLocaleDateString('es-DO', { timeZone: 'UTC' })} — saldo {Number(l.cantidadActual)}
+          </option>
+        ))}
+      </Select>
+    </div>
   );
 }
 

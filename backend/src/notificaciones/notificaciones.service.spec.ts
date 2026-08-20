@@ -161,4 +161,28 @@ describe('NotificacionesService', () => {
       expect(repository.buscarPlantilla).not.toHaveBeenCalled();
     });
   });
+
+  describe('alVencerLote (Fase 5b)', () => {
+    it('notifica por email a los usuarios con rol Admin Total/Almacenero', async () => {
+      prisma.user.findMany.mockResolvedValue([{ id: 'u1', email: 'admin@x.com' }, { id: 'u2', email: 'almacen@x.com' }]);
+      repository.buscarPlantilla.mockResolvedValue({ activa: true, asunto: null, cuerpo: 'x' } as never);
+      repository.crearNotificacion.mockResolvedValue({ id: 'n1' } as never);
+      emailChannel.enviar.mockResolvedValue(true);
+
+      await service.alVencerLote({
+        tenantId: 't1',
+        loteId: 'lote-1',
+        productoNombre: 'Yogurt',
+        numeroLote: 'L1',
+        fechaVencimiento: '2026-09-01T00:00:00.000Z',
+        cantidadActual: '5',
+      });
+
+      expect(prisma.user.findMany).toHaveBeenCalledWith({
+        where: { tenantId: 't1', roles: { some: { role: { nombre: { in: ['Admin Total', 'Almacenero'] } } } } },
+      });
+      expect(repository.buscarPlantilla).toHaveBeenCalledWith('t1', 'EMAIL', 'lote_por_vencer');
+      expect(emailChannel.enviar).toHaveBeenCalledTimes(2);
+    });
+  });
 });

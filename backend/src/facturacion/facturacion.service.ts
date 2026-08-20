@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
 import { FormatoImpresion, Prisma, TipoFactura, TipoNcf, TipoProducto } from '@prisma/client';
 import { FacturacionRepository } from './facturacion.repository';
@@ -153,6 +154,9 @@ export class FacturacionService {
           // campos que sí son columnas propias).
           tipoProducto: producto.tipo,
           componentesCombo: producto.componentes,
+          // Fase 5b — solo se usa en la línea directa (no en componentes de
+          // combo, ver expandirParaInventario/NOTA_CREDITO en crear()).
+          controlaVencimiento: producto.controlaVencimiento,
         };
       }),
     );
@@ -261,6 +265,13 @@ export class FacturacionService {
 
     const modalidad = await this.facturacionRepository.obtenerModalidadFacturacion(tenantId);
     const tipoNcf = (modalidad === 'ECF' ? ECF_POR_TIPO : NCF_POR_TIPO)[dto.tipoFactura];
+    // Generado ANTES de la transacción: el descuento/reintegro de stock
+    // (abajo) necesita `referenciaId` para vincular cada movimiento de lote
+    // a ESTA factura (Fase 5b) — pero la factura recién se crea al final de
+    // la misma transacción. Prisma acepta un `id` explícito en `create`
+    // (en vez de dejarlo en `@default(uuid())`), así que se decide acá y se
+    // reusa en ambos lados.
+    const facturaId = randomUUID();
 
     const factura = await this.tenantPrisma.client.$transaction(async (tx) => {
       // Canje de Bono (Fase 4c) primero — fail-fast antes de tocar stock/
@@ -279,6 +290,15 @@ export class FacturacionService {
       if (dto.tipoFactura === 'NOTA_CREDITO') {
         for (const linea of lineasCalculadas) {
           for (const item of expandirParaInventario(linea, linea.productoId, linea.cantidad, linea.varianteId)) {
+            // Fase 5b — solo la línea directa (no un componente de combo,
+            // ver expandirParaInventario) reconstruye sola de qué lote(s)
+            // salió la venta original; un componente de combo con
+            // controlaVencimiento fallaría acá pidiendo el lote (límite
+            // conocido, ver ARCHITECTURE.md).
+            const lotes =
+              item.varianteId && linea.controlaVencimiento && dto.facturaOrigenId
+                ? await this.inventarioService.reconstruirLotesDeVentaEnTx(tx, dto.facturaOrigenId, item.varianteId, item.cantidad)
+                : undefined;
             await this.inventarioService.entradaStockEnTx(tx, {
               tenantId,
               productoId: item.productoId,
@@ -287,6 +307,9 @@ export class FacturacionService {
               cantidad: item.cantidad,
               userId: vendedorId,
               motivo: 'Devolución por nota de crédito',
+              referenciaTipo: 'FACTURA',
+              referenciaId: facturaId,
+              lotes,
             });
           }
         }
@@ -301,6 +324,8 @@ export class FacturacionService {
               cantidad: item.cantidad,
               userId: vendedorId,
               referencia: 'Venta por factura',
+              referenciaTipo: 'FACTURA',
+              referenciaId: facturaId,
             });
           }
         }
@@ -309,6 +334,7 @@ export class FacturacionService {
       const ncf = await this.facturacionRepository.siguienteNcfEnTx(tx, tipoNcf);
 
       return this.facturacionRepository.crearFacturaEnTx(tx, {
+        id: facturaId,
         tenantId,
         clienteId: dto.clienteId,
         vendedorId,

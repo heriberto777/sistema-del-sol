@@ -104,6 +104,15 @@ export class ComprasService {
             cantidad: linea.cantidadRecibida,
             userId,
             motivo: `Recepción de OC ${orden.numero}`,
+            referenciaTipo: 'RECEPCION_COMPRA',
+            referenciaId: recepcion.id,
+            // Fase 5b — si el producto controla vencimiento, InventarioService
+            // exige numeroLote/fechaVencimiento (400 si faltan); si no
+            // controla, este arreglo se ignora sin más.
+            lotes:
+              linea.numeroLote && linea.fechaVencimiento
+                ? [{ numeroLote: linea.numeroLote, fechaVencimiento: linea.fechaVencimiento, cantidad: linea.cantidadRecibida }]
+                : undefined,
           });
         }
       }
@@ -163,6 +172,7 @@ export class ComprasService {
         cantidad: linea.cantidad,
         costoUnitario: Number(lineaOc.costoUnitario),
         porcentajeItbis: itbisPorProducto.get(linea.productoId) ?? 0,
+        loteId: linea.loteId,
       };
     });
 
@@ -189,6 +199,11 @@ export class ComprasService {
             cantidad: linea.cantidad,
             userId,
             referencia: `Devolución a proveedor de OC ${orden.numero}`,
+            referenciaTipo: 'DEVOLUCION_COMPRA',
+            referenciaId: devolucion.id,
+            // Fase 5b — elegido a mano por quien devuelve, nunca FEFO: se
+            // está devolviendo un lote físico concreto al proveedor.
+            loteId: linea.loteId,
           });
         }
       }

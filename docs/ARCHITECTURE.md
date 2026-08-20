@@ -410,6 +410,148 @@ defecto, así que el saldo inicial de un Kardex que cruce esa frontera
 puede no ser exacto; desde esta fase en adelante el signo siempre es
 correcto.
 
+## Vencimientos — lotes con consumo FEFO (Fase 5b de adopción de Cuadre)
+
+Control de vencimientos por lote, **opt-in por producto**
+(`Producto.controlaVencimiento: Boolean`, mismo patrón que
+`esEfectivo`/`esBono`) — un producto sin el flag sigue funcionando
+exactamente igual que antes de esta fase, nunca exige lote. Nuevo
+modelo tenant-scoped `Lote` (`id, tenantId, varianteId, bodegaId,
+numeroLote, fechaVencimiento, cantidadActual`,
+`@@unique([tenantId, varianteId, bodegaId, numeroLote])`) — el mismo
+lote físico transferido a otra bodega es una fila nueva ahí, misma
+granularidad que `Stock` (también por variante+bodega).
+
+**FEFO ("first expired, first out") automático en la salida** — venta,
+transferencia-origen, devolución a proveedor sin `loteId` explícito:
+`InventarioRepository.consumirLotesFefoEnTx` recorre los `Lote` de esa
+variante+bodega con saldo, ordenados por `fechaVencimiento asc`, y
+descuenta hasta cubrir la cantidad, repartiendo entre varios lotes si
+el primero no alcanza — decisión explícita del usuario: la venta
+consume sola, sin que el cajero elija nada. Un caller puede pasar
+`loteId` explícito para saltarse FEFO (devolución a proveedor, ajuste
+manual negativo — ahí SÍ tiene sentido que el usuario elija, está
+devolviendo/dando de baja un lote físico concreto).
+
+**Un movimiento de `MovimientoInventario` POR LOTE tocado** (no uno
+agregado): cuando el producto controla vencimiento,
+`InventarioRepository.ajustarCantidadEnTx`/`descontarStockCondicionalEnTx`
+escriben una fila por cada lote consumido/acreditado (cada una con su
+`loteId` y su porción de `cantidad`) en vez de la fila única que
+escriben para productos sin el flag — la suma da el total, y el Kardex
+ya queda granular a nivel de lote sin tabla adicional. El
+`UPDATE`/`upsert` de `Stock.cantidadActual` (el agregado) sigue
+exactamente igual que antes de esta fase — misma garantía de
+atomicidad ya probada contra condiciones de carrera, no se toca.
+
+**`referenciaTipo`/`referenciaId` (ya existían en el schema, sin usar
+en ningún lado hasta esta fase)**: cada movimiento de lote por venta
+setea `referenciaTipo: 'FACTURA'`, `referenciaId: factura.id`; por
+recepción de compra, `'RECEPCION_COMPRA'` + `recepcion.id`. Esto es lo
+que le permite a una **Nota de Crédito reconstruir sola** (sin pedirle
+nada al usuario) de qué lote(s) salió la venta original —
+`InventarioRepository.reconstruirLotesDeVentaEnTx` consulta los
+`MovimientoInventario` de esa factura y reparte la cantidad devuelta
+proporcionalmente a como se consumió (ej. una venta de 5 que consumió
+4 de un lote + 1 de otro, y se devuelven 3 → 2.4 al primero + 0.6 al
+segundo). **Límite conocido**: no descuenta lo ya devuelto por notas de
+crédito PREVIAS contra la misma factura+producto, así que una tercera
+devolución parcial (rara) puede repartir levemente distinto de lo
+ideal — el total devuelto siempre es el correcto, solo cambia a qué
+lote se acredita. Un componente de COMBO con `controlaVencimiento`
+tampoco reconstruye solo (solo la línea directa lo hace) — fallaría
+pidiendo el lote, con un 400 claro en vez de corromper datos.
+
+**`facturaId` se pre-genera** (`randomUUID()`, antes de abrir la
+transacción) en `FacturacionService.crear()`: el descuento/reintegro de
+stock corre ANTES de crear la fila `Factura` (ver "Concurrencia y
+atomicidad" más arriba), pero necesita `referenciaId` para vincular sus
+movimientos — Prisma acepta pasar un `id` explícito en `create()`
+sobreescribiendo el `@default(uuid())`, así que se decide el id una
+vez y se reusa en ambos lados.
+
+**Bug real encontrado y corregido durante esta fase — RLS con el
+cliente equivocado dentro de una transacción**: la primera versión de
+`reconstruirLotesDeVenta` usaba `this.db` (el cliente top-level de
+`TenantPrismaService`) en vez del `tx` de la transacción ya abierta por
+`FacturacionService.crear()` — exactamente el bug ya documentado en
+"Multi-tenancy: single DB + tenantId + RLS" más arriba
+(`InventarioService.validarPertenencia`): la query cae en otra conexión
+sin el `SET LOCAL app.tenant_id` de esa transacción y RLS la bloquea (0
+filas), aunque los datos sí pertenezcan al tenant. Se corrigió
+agregando la variante `reconstruirLotesDeVentaEnTx(tx, ...)`, que
+recibe y reusa el mismo `tx` — encontrado manualmente (con RLS activo)
+al verificar una Nota de Crédito real, no algo que un test con mocks
+hubiera detectado.
+
+**Integración por módulo**:
+- `ComprasService.recibir()`: `LineaRecepcionDto` gana
+  `numeroLote?`/`fechaVencimiento?` (obligatorios si
+  `lineaOc.producto.controlaVencimiento` — mismo patrón ya usado hoy
+  para chequear `tipo !== 'SERVICIO'`, el `producto` completo ya viene
+  incluido).
+- `ComprasService.devolver()`: `LineaDevolucionDto` gana `loteId?`
+  (obligatorio si controla vencimiento, elegido a mano — nunca FEFO acá).
+  `GET /inventario/lotes?varianteId&bodegaId` (permiso `inventario.ver`)
+  lista lotes con saldo para ese selector.
+- `InventarioService.ajustarStock()`: `AjustarStockDto` gana
+  `numeroLote?`/`fechaVencimiento?` (si `cantidad > 0`, entrada) o
+  `loteId?` (si `cantidad < 0`, salida — siempre explícito, una
+  corrección manual apunta a un lote puntual, nunca FEFO).
+- `InventarioService.transferirStock()`: sin cambios de DTO — FEFO
+  automático en origen, mismo `numeroLote`/`fechaVencimiento`
+  preservados en la fila nueva de destino.
+- `FacturacionService.crear()`: sin cambios de DTO — la salida por
+  venta ya es FEFO automático; la entrada por `NOTA_CREDITO`
+  reconstruye lotes sola (ver arriba).
+
+**Reporte + alerta de vencimientos**:
+- `GET /inventario/vencimientos?diasProximidad` (default 30, permiso
+  `inventario.ver`) — lotes con `cantidadActual > 0` y vencimiento
+  dentro del rango, todas las bodegas del tenant (Patrón A de
+  `reportes/`: sin paginar). Frontend: `VencimientosPanel.tsx`, en un
+  modal desde `Inventario.tsx` ("Vencimientos próximos").
+- `LotesCronService.avisarLotesPorVencer()`
+  (`@Cron(CronExpression.EVERY_DAY_AT_8AM)`) recorre todos los tenants
+  y emite `EVENTOS.LOTE_POR_VENCER` por cada lote con saldo dentro de
+  30 días (fijo, no configurable por tenant en v1). Nuevo listener
+  `NotificacionesService.alVencerLote()` (`@OnEvent`), calcado de
+  `alBajarStock()`: notifica por EMAIL a `User` con rol
+  `Admin Total`/`Almacenero`, `clave: 'lote_por_vencer'` — como con
+  `stock_bajo`, si el tenant no creó su propia `NotificacionPlantilla`
+  para esa clave, es un no-op silencioso.
+
+**Bug real preexistente encontrado y corregido durante esta fase —
+crons que nunca corrían**: al agregar `LotesCronService`, NestJS logueó
+`"Cannot register cron job ... because it is defined in a non static
+provider"` — y el MISMO warning ya existía para `BonosCronService`
+desde que se implementó Bonos en Fase 4c (confirmado en los logs: el
+warning aparece en cada arranque anterior, nunca solo desde esta fase).
+Causa: `BonosCronService`/`LotesCronService` dependían de
+`BonosRepository`/`InventarioRepository`, que a su vez dependen de
+`TenantPrismaService` (`Scope.REQUEST`) — NestJS propaga el scope hacia
+arriba en TODO el grafo de dependencias (aunque el método que el cron
+realmente llama use `PrismaService` global, no `TenantPrismaService`),
+así que ambos servicios de cron terminaban siendo REQUEST-scoped
+también, y `@Cron` no puede registrar un provider sin una única
+instancia estática — **el cron de vencimiento de Bonos nunca había
+corrido desde que se implementó**. Se corrigió haciendo que ambos
+crons inyecten `PrismaService` DIRECTO (sin pasar por el repositorio
+respectivo) e inline su query, mismo patrón que
+`RecordatoriosService`/`FacturasPlataformaCronService` (que nunca
+tuvieron este problema, porque tampoco pasan por un repositorio
+request-scoped).
+
+**Bug real preexistente encontrado y corregido durante esta fase — una
+orden de compra recién creada no se podía recibir nunca desde la UI**:
+`frontend/src/pages/Compras.tsx` gateaba la acción "Recibir" con
+`ESTADOS_RECIBIBLES = ['PENDIENTE', 'RECIBIDA_PARCIAL']` — pero
+`'PENDIENTE'` no existe en el enum `EstadoOrdenCompra`
+(`BORRADOR`/`ENVIADA`/`RECIBIDA_PARCIAL`/`RECIBIDA_TOTAL`/`CANCELADA`),
+y toda orden nueva arranca en `BORRADOR` (default del schema) — sin
+ningún endpoint de "aprobar"/"enviar" que la mueva a otro estado. Se
+corrigió a `['BORRADOR', 'ENVIADA', 'RECIBIDA_PARCIAL']`.
+
 ## Cotizaciones y Remisiones
 
 Documentos sin efecto fiscal que preceden a una factura, cada uno en su

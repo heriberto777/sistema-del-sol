@@ -5,7 +5,7 @@ import { NotificacionesRepository } from './notificaciones.repository';
 import { EmailChannel } from './canales/email.channel';
 import { WhatsAppChannel } from './canales/whatsapp.channel';
 import { renderizarPlantilla } from './plantilla-renderer';
-import { CotizacionEnviadaPayload, EVENTOS, FacturaCreadaPayload, StockBajoPayload } from '../event-bus/events';
+import { CotizacionEnviadaPayload, EVENTOS, FacturaCreadaPayload, LotePorVencerPayload, StockBajoPayload } from '../event-bus/events';
 import { PrismaService } from '../prisma/prisma.service';
 import { CrearPlantillaDto } from './dto/crear-plantilla.dto';
 import { ListadoQueryDto } from '../common/dto/listado-query.dto';
@@ -124,6 +124,29 @@ export class NotificacionesService {
           producto_id: payload.productoId,
           cantidad_actual: payload.cantidadActual,
           stock_minimo: payload.stockMinimo,
+        },
+      });
+    }
+  }
+
+  /** Fase 5b — calcado de `alBajarStock`: mismo criterio de a quién avisar, distinta clave de plantilla. */
+  @OnEvent(EVENTOS.LOTE_POR_VENCER)
+  async alVencerLote(payload: LotePorVencerPayload) {
+    const admins = await this.prisma.user.findMany({
+      where: { tenantId: payload.tenantId, roles: { some: { role: { nombre: { in: ['Admin Total', 'Almacenero'] } } } } },
+    });
+
+    for (const admin of admins) {
+      await this.enviar({
+        tenantId: payload.tenantId,
+        canal: 'EMAIL',
+        clave: 'lote_por_vencer',
+        destinatario: admin.email,
+        variables: {
+          producto_nombre: payload.productoNombre,
+          numero_lote: payload.numeroLote,
+          fecha_vencimiento: payload.fechaVencimiento,
+          cantidad_actual: payload.cantidadActual,
         },
       });
     }
