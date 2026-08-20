@@ -5,12 +5,17 @@ import { CrearUsuarioDto } from './dto/crear-usuario.dto';
 import { ActualizarUsuarioDto } from './dto/actualizar-usuario.dto';
 import { CrearRolDto } from './dto/crear-rol.dto';
 import { ActualizarRolDto } from './dto/actualizar-rol.dto';
+import { ReemplazarSucursalesUsuarioDto } from './dto/reemplazar-sucursales-usuario.dto';
+import { SucursalesRepository } from '../sucursales/sucursales.repository';
 import { ListadoQueryDto } from '../common/dto/listado-query.dto';
 import { paginar } from '../common/types/pagina-resultado';
 
 @Injectable()
 export class UsuariosService {
-  constructor(private readonly usuariosRepository: UsuariosRepository) {}
+  constructor(
+    private readonly usuariosRepository: UsuariosRepository,
+    private readonly sucursalesRepository: SucursalesRepository,
+  ) {}
 
   async crear(dto: CrearUsuarioDto, tenantId: string) {
     const passwordHash = await bcrypt.hash(dto.password, 10);
@@ -35,6 +40,12 @@ export class UsuariosService {
       return this.usuariosRepository.reemplazarRoles(id, dto.rolIds);
     }
     return this.usuariosRepository.buscarPorId(id);
+  }
+
+  /** Valida cada sucursalId contra el tenant (mismo patrón IDOR-safe que InventarioService.crearBodega) antes de reemplazar el set. */
+  async reemplazarSucursales(id: string, dto: ReemplazarSucursalesUsuarioDto) {
+    await Promise.all(dto.sucursalIds.map((sucursalId) => this.sucursalesRepository.buscarPorId(sucursalId)));
+    return this.usuariosRepository.reemplazarSucursales(id, dto.sucursalIds);
   }
 
   listarRoles() {

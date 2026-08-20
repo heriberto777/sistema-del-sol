@@ -9,6 +9,7 @@ const SELECT_USUARIO = {
   activo: true,
   createdAt: true,
   roles: { select: { role: { select: { id: true, nombre: true } } } },
+  sucursales: { select: { sucursal: { select: { id: true, nombre: true } } } },
 } as const;
 
 @Injectable()
@@ -58,6 +59,14 @@ export class UsuariosRepository {
   async reemplazarRoles(id: string, rolIds: string[]) {
     await this.db.userRole.deleteMany({ where: { userId: id } });
     await this.db.userRole.createMany({ data: rolIds.map((roleId) => ({ userId: id, roleId })) });
+    return this.buscarPorId(id);
+  }
+
+  async reemplazarSucursales(id: string, sucursalIds: string[]) {
+    await this.db.usuarioSucursal.deleteMany({ where: { userId: id } });
+    if (sucursalIds.length) {
+      await this.db.usuarioSucursal.createMany({ data: sucursalIds.map((sucursalId) => ({ userId: id, sucursalId })) });
+    }
     return this.buscarPorId(id);
   }
 

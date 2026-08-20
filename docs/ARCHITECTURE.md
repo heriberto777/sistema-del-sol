@@ -1855,11 +1855,25 @@ en Fase 7) antes de colgarle una bodega — sin esto, cualquier
 `sucursalId` de otro tenant adivinado permitía crear una bodega
 "huérfana" apuntando a una sucursal ajena.
 
-**Siguientes sub-fases** (8b/8c/8d, pendientes): asignar a cada usuario
-las sucursales en las que trabaja (`UsuarioSucursal`, sin ningún
-enforcement de acceso todavía — eso es Fase 9), selector de "sucursal
-activa" persistido en la sesión del navegador, y filtros de sucursal en
-Dashboard/Reporte de inventario.
+**Asignación de sucursales a usuarios (8b, implementado)**:
+`UsuarioSucursal` (`userId, sucursalId`) es una copia exacta del patrón
+`UserRole` — tabla pivote sin `tenantId` propio (no entra en
+`TENANT_SCOPED_MODELS`, igual criterio que `UserRole`).
+`PUT /admin/usuarios/:id/sucursales` (`admin.usuarios`, mismo permiso
+que ya gatea edición de usuarios) reemplaza el set completo (borrar y
+recrear, mismo patrón que `PUT /nomina/empleados/:id/horario` de Fase
+7a), validando cada `sucursalId` contra el tenant antes de crear las
+filas (mismo patrón IDOR-safe que `InventarioService.crearBodega`).
+**Sin ninguna sucursal asignada = el usuario puede elegir/ve TODAS las
+del tenant** — default permisivo deliberado: esta fase no agrega ningún
+guard que restrinja acceso (eso es Fase 9, PIN + permisos por
+sucursal), así que un usuario recién creado no queda bloqueado de nada
+por no tener asignación explícita todavía.
+
+**Siguientes sub-fases** (8c/8d, pendientes): selector de "sucursal
+activa" persistido en la sesión del navegador (usa esta asignación
+para acotar las opciones), y filtros de sucursal en Dashboard/Reporte
+de inventario.
 
 ## POS (punto de venta)
 

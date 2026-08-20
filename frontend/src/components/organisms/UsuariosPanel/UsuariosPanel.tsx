@@ -17,12 +17,18 @@ interface Rol {
   nombre: string;
 }
 
+interface Sucursal {
+  id: string;
+  nombre: string;
+}
+
 interface Usuario {
   id: string;
   nombre: string;
   email: string;
   activo: boolean;
   roles: { role: Rol }[];
+  sucursales: { sucursal: Sucursal }[];
 }
 
 export function UsuariosPanel() {
@@ -31,6 +37,7 @@ export function UsuariosPanel() {
   const [pagina, setPagina] = useState(1);
   const busquedaDebounced = useDebouncedValue(busqueda);
   const [modalNuevoUsuario, setModalNuevoUsuario] = useState(false);
+  const [usuarioEditar, setUsuarioEditar] = useState<Usuario | null>(null);
 
   const { data: usuarios } = useQuery({
     queryKey: ['admin-usuarios', pagina, busquedaDebounced],
@@ -76,7 +83,9 @@ export function UsuariosPanel() {
                 <th className="px-5 py-3 font-medium">Nombre</th>
                 <th className="px-5 py-3 font-medium">Email</th>
                 <th className="px-5 py-3 font-medium">Roles</th>
+                <th className="px-5 py-3 font-medium">Sucursales</th>
                 <th className="px-5 py-3 font-medium">Activo</th>
+                <th className="px-5 py-3"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -92,10 +101,30 @@ export function UsuariosPanel() {
                     </div>
                   </td>
                   <td className="px-5 py-3">
+                    {usuario.sucursales.length === 0 ? (
+                      <span className="text-xs text-slate-400">Todas</span>
+                    ) : (
+                      <div className="flex flex-wrap gap-1">
+                        {usuario.sucursales.map(({ sucursal }) => (
+                          <Badge key={sucursal.id}>{sucursal.nombre}</Badge>
+                        ))}
+                      </div>
+                    )}
+                  </td>
+                  <td className="px-5 py-3">
                     <Switch
                       activo={usuario.activo}
                       onChange={(activo) => cambiarActivo.mutate({ id: usuario.id, activo })}
                     />
+                  </td>
+                  <td className="px-5 py-3 text-right">
+                    <button
+                      type="button"
+                      className="text-xs text-sol-600 hover:underline dark:text-sol-400"
+                      onClick={() => setUsuarioEditar(usuario)}
+                    >
+                      Editar
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -115,6 +144,7 @@ export function UsuariosPanel() {
       </Card>
 
       {modalNuevoUsuario && <ModalNuevoUsuario onClose={() => setModalNuevoUsuario(false)} />}
+      {usuarioEditar && <ModalEditarUsuario usuario={usuarioEditar} onClose={() => setUsuarioEditar(null)} />}
     </div>
   );
 }
@@ -177,6 +207,55 @@ function ModalNuevoUsuario({ onClose }: { onClose: () => void }) {
           {crearUsuario.isPending ? 'Creando…' : 'Crear usuario'}
         </Button>
       </form>
+    </Modal>
+  );
+}
+
+function ModalEditarUsuario({ usuario, onClose }: { usuario: Usuario; onClose: () => void }) {
+  const queryClient = useQueryClient();
+  const [sucursalIds, setSucursalIds] = useState<string[]>(usuario.sucursales.map((s) => s.sucursal.id));
+  const [error, setError] = useState<string | null>(null);
+
+  const { data: sucursales } = useQuery({
+    queryKey: ['sucursales'],
+    queryFn: async () => (await apiClient.get<Sucursal[]>('/sucursales')).data,
+  });
+
+  const guardar = useMutation({
+    mutationFn: async () => apiClient.put(`/admin/usuarios/${usuario.id}/sucursales`, { sucursalIds }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-usuarios'] });
+      onClose();
+    },
+    onError: () => setError('No se pudo guardar la asignación de sucursales.'),
+  });
+
+  function toggleSucursal(id: string) {
+    setSucursalIds((prev) => (prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]));
+  }
+
+  return (
+    <Modal titulo={`Editar usuario — ${usuario.nombre}`} onClose={onClose}>
+      <div className="space-y-3">
+        <div>
+          <p className="mb-1 text-sm font-medium text-slate-700 dark:text-slate-300">Sucursales en las que trabaja</p>
+          <p className="mb-2 text-xs text-slate-500 dark:text-slate-400">
+            Sin ninguna marcada, el usuario puede elegir cualquier sucursal del negocio.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {sucursales?.map((sucursal) => (
+              <label key={sucursal.id} className="flex items-center gap-1 text-sm text-slate-600 dark:text-slate-400">
+                <input type="checkbox" checked={sucursalIds.includes(sucursal.id)} onChange={() => toggleSucursal(sucursal.id)} />
+                {sucursal.nombre}
+              </label>
+            ))}
+          </div>
+        </div>
+        {error && <p className="text-sm text-red-600">{error}</p>}
+        <Button onClick={() => guardar.mutate()} disabled={guardar.isPending} className="w-full">
+          {guardar.isPending ? 'Guardando…' : 'Guardar'}
+        </Button>
+      </div>
     </Modal>
   );
 }

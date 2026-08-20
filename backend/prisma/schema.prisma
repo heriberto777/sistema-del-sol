@@ -421,6 +421,7 @@ model User {
   empleado      Empleado?
   ausenciasSolicitadas Ausencia[] @relation("AusenciaSolicitadaPor")
   ausenciasAprobadas   Ausencia[] @relation("AusenciaAprobadaPor")
+  sucursales    UsuarioSucursal[]
 
   @@unique([tenantId, email])
   @@map("users")
@@ -1590,9 +1591,25 @@ model Sucursal {
   createdAt       DateTime @default(now())
 
   bodegas  Bodega[]
+  usuarios UsuarioSucursal[]
 
   @@unique([tenantId, nombre])
   @@map("sucursales")
+}
+
+/// Sucursales en las que trabaja un usuario (Fase 8b) — copia exacta del
+/// patrón `UserRole`. Sin ninguna asignación = ve/puede elegir TODAS las
+/// del tenant (default permisivo, ver `SucursalesController.mias` en
+/// 8c) — esta fase NO agrega ningún guard que restrinja acceso, eso es
+/// Fase 9 (PIN + permisos por sucursal).
+model UsuarioSucursal {
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sucursalId String
+  sucursal   Sucursal @relation(fields: [sucursalId], references: [id], onDelete: Cascade)
+
+  @@id([userId, sucursalId])
+  @@map("usuario_sucursales")
 }
 
 model Bodega {

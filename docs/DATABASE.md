@@ -239,6 +239,12 @@ token, así que un token nunca puede reusarse.
   `20260819080000_categorias`): columna nullable → `INSERT` de una
   "Sucursal Principal" por tenant con ≥1 bodega + `UPDATE` de esas
   bodegas → `ALTER COLUMN ... SET NOT NULL`.
+- **`usuario_sucursales`** (Fase 8b, `@@id([userId, sucursalId])`) es
+  copia exacta del patrón `user_roles` — pivote sin `tenantId` propio,
+  ambos lados `ON DELETE CASCADE`. Sin ninguna fila para un usuario =
+  ve/puede elegir todas las sucursales del tenant (default permisivo,
+  ver ARCHITECTURE.md — Fase 9 es la que convierte esto en un límite
+  real de acceso).
 - **`cuentas_bancarias.cuentaContableId`, `gastos_menores.cuentaBancariaId`
   y `lineas_gasto_menor.cuentaContableId`** son `ON DELETE CASCADE` por el
   mismo patrón de ramas hermanas: `Tenant -> CuentaContable` y

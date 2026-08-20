@@ -1,10 +1,11 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Put, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { UsuariosService } from './usuarios.service';
 import { CrearUsuarioDto } from './dto/crear-usuario.dto';
 import { ActualizarUsuarioDto } from './dto/actualizar-usuario.dto';
 import { CrearRolDto } from './dto/crear-rol.dto';
 import { ActualizarRolDto } from './dto/actualizar-rol.dto';
+import { ReemplazarSucursalesUsuarioDto } from './dto/reemplazar-sucursales-usuario.dto';
 import { Permissions } from '../common/decorators/permissions.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtPayloadUser } from '../common/types/authenticated-request';
@@ -74,5 +75,11 @@ export class UsuariosController {
   @Permissions('admin.usuarios')
   actualizar(@Param('id') id: string, @Body() dto: ActualizarUsuarioDto) {
     return this.usuariosService.actualizar(id, dto);
+  }
+
+  @Put('usuarios/:id/sucursales')
+  @Permissions('admin.usuarios')
+  reemplazarSucursales(@Param('id') id: string, @Body() dto: ReemplazarSucursalesUsuarioDto) {
+    return this.usuariosService.reemplazarSucursales(id, dto);
   }
 }

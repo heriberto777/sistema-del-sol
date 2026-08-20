@@ -219,6 +219,7 @@ Catálogo tenant-scoped con jerarquía real (mismo patrón de auto-relación que
 | GET | `/api/sucursales` | `sucursales.ver` — sin paginar |
 | GET | `/api/sucursales/:id` | `sucursales.ver` |
 | PATCH | `/api/sucursales/:id` | `sucursales.editar` — cualquier campo de arriba + `activa` |
+| PUT | `/api/admin/usuarios/:id/sucursales` | `admin.usuarios` — reemplaza el set completo (`{ sucursalIds: string[] }`, `[]` = ve todas — RRHH/Sucursales, Fase 8b) |
 | GET | `/api/inventario/stock/:bodegaId` | `inventario.ver` — cada fila incluye `varianteId` y `valoresAtributo` (Fase 3c) además de `producto`: un producto con variantes reales tiene una fila de stock POR variante |
 | GET | `/api/inventario/kardex/:varianteId?bodegaId&desde&hasta` | `inventario.ver` — historial cronológico con saldo corriente (Fase 5a); sin `desde`/`hasta`, default mes actual (mismo criterio que `libro-mayor`); sin paginar — devuelve `{ variante, bodegaId, rango, saldoInicial, movimientos, saldoFinal }` |
 | GET | `/api/inventario/lotes?varianteId&bodegaId` | `inventario.ver` — lotes con saldo de esa variante+bodega (Fase 5b), para elegir "de qué lote sale" en devolución a proveedor / ajuste manual negativo |

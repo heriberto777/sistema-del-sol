@@ -1,10 +1,12 @@
 import { BadRequestException } from '@nestjs/common';
 import { UsuariosService } from './usuarios.service';
 import { UsuariosRepository } from './usuarios.repository';
+import { SucursalesRepository } from '../sucursales/sucursales.repository';
 
 describe('UsuariosService — roles', () => {
   let service: UsuariosService;
   let repository: jest.Mocked<UsuariosRepository>;
+  let sucursalesRepository: jest.Mocked<SucursalesRepository>;
 
   beforeEach(() => {
     repository = {
@@ -14,8 +16,10 @@ describe('UsuariosService — roles', () => {
       actualizarRol: jest.fn(),
       eliminarRol: jest.fn(),
       contarUsuariosConRol: jest.fn(),
+      reemplazarSucursales: jest.fn(),
     } as unknown as jest.Mocked<UsuariosRepository>;
-    service = new UsuariosService(repository);
+    sucursalesRepository = { buscarPorId: jest.fn().mockResolvedValue({ id: 's1' }) } as unknown as jest.Mocked<SucursalesRepository>;
+    service = new UsuariosService(repository, sucursalesRepository);
   });
 
   describe('crearRol', () => {
@@ -62,6 +66,33 @@ describe('UsuariosService — roles', () => {
       await service.eliminarRol('r1');
 
       expect(repository.eliminarRol).toHaveBeenCalledWith('r1');
+    });
+  });
+
+  describe('reemplazarSucursales', () => {
+    it('valida cada sucursalId contra el tenant antes de reemplazar el set', async () => {
+      repository.reemplazarSucursales.mockResolvedValue({ id: 'u1' } as never);
+
+      await service.reemplazarSucursales('u1', { sucursalIds: ['s1', 's2'] });
+
+      expect(sucursalesRepository.buscarPorId).toHaveBeenCalledWith('s1');
+      expect(sucursalesRepository.buscarPorId).toHaveBeenCalledWith('s2');
+      expect(repository.reemplazarSucursales).toHaveBeenCalledWith('u1', ['s1', 's2']);
+    });
+
+    it('propaga el 404 si alguna sucursal no pertenece al tenant (cross-tenant) y no reemplaza nada', async () => {
+      sucursalesRepository.buscarPorId.mockRejectedValue(new Error('not found'));
+
+      await expect(service.reemplazarSucursales('u1', { sucursalIds: ['s-otro-tenant'] })).rejects.toThrow('not found');
+      expect(repository.reemplazarSucursales).not.toHaveBeenCalled();
+    });
+
+    it('reemplazar con array vacío deja al usuario sin ninguna sucursal asignada', async () => {
+      repository.reemplazarSucursales.mockResolvedValue({ id: 'u1' } as never);
+
+      await service.reemplazarSucursales('u1', { sucursalIds: [] });
+
+      expect(repository.reemplazarSucursales).toHaveBeenCalledWith('u1', []);
     });
   });
 });
