@@ -62,6 +62,26 @@ describe('PeriodosNominaService', () => {
       expect(llamada.recibos[0].salarioBruto).toBe(17500);
     });
 
+    it('BIMENSUAL usa el mismo factor 0.5 que QUINCENAL (plan de integración Cuadre, G-7 — "dos veces al mes", no "cada dos meses")', async () => {
+      empleadosRepository.listarActivos.mockResolvedValue([{ id: 'e1', salarioBrutoMensual: 35000 }] as never);
+      periodosRepository.crear.mockResolvedValue({ id: 'p1' } as never);
+
+      await service.generarPeriodo({ tipo: 'BIMENSUAL', fechaInicio: '2026-01-01', fechaFin: '2026-01-15' }, 't1');
+
+      const [llamada] = periodosRepository.crear.mock.calls[0];
+      expect(llamada.recibos[0].salarioBruto).toBe(17500);
+    });
+
+    it('SEMANAL usa 7 días del divisor legal (23.83), no un genérico mes/4 (plan de integración Cuadre, G-7)', async () => {
+      empleadosRepository.listarActivos.mockResolvedValue([{ id: 'e1', salarioBrutoMensual: 35000 }] as never);
+      periodosRepository.crear.mockResolvedValue({ id: 'p1' } as never);
+
+      await service.generarPeriodo({ tipo: 'SEMANAL', fechaInicio: '2026-01-01', fechaFin: '2026-01-07' }, 't1');
+
+      const [llamada] = periodosRepository.crear.mock.calls[0];
+      expect(llamada.recibos[0].salarioBruto).toBeCloseTo(35000 * (7 / 23.83), 2);
+    });
+
     it('descuenta salario por ausencias APROBADAS sin goce que se solapan con el período, sin tocar TSS/ISR', async () => {
       empleadosRepository.listarActivos.mockResolvedValue([{ id: 'e1', salarioBrutoMensual: 23830 }] as never);
       periodosRepository.crear.mockResolvedValue({ id: 'p1' } as never);

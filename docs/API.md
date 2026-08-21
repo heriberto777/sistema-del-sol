@@ -205,7 +205,7 @@ Catálogo tenant-scoped con jerarquía real (mismo patrón de auto-relación que
 
 | Método | Ruta | Permiso |
 |---|---|---|
-| POST | `/api/categorias` | `precios.editar` — `{ nombre, categoriaPadreId? }` |
+| POST | `/api/categorias` | `precios.editar` — `{ nombre, categoriaPadreId?, color? }`; `color` (plan de integración Cuadre, ítem E-9) es puramente decorativo — un enum de 12 valores (`ColorCategoria`) sin ningún significado de negocio, solo para escaneo visual rápido en la grilla de categorías del POS |
 | GET | `/api/categorias` | `precios.ver` — listado plano con `categoriaPadreId`; el cliente arma el árbol (ver `frontend/src/lib/categorias-arbol.ts`) |
 | PATCH | `/api/categorias/:id` | `precios.editar` — rechaza auto-referencia y ciclos (`categoriaPadreId` no puede ser un descendiente propio) |
 | DELETE | `/api/categorias/:id` | `precios.editar` — rechaza (400) si tiene productos o subcategorías asignadas |
@@ -224,7 +224,7 @@ Catálogo tenant-scoped con jerarquía real (mismo patrón de auto-relación que
 | PUT | `/api/admin/usuarios/:id/sucursales` | `admin.usuarios` — reemplaza el set completo (`{ sucursalIds: string[] }`, `[]` = ve todas — RRHH/Sucursales, Fase 8b) |
 | GET | `/api/sucursales/mias` | Autoservicio, sin permiso — sucursales asignadas al usuario logueado, o todas si no tiene ninguna (Fase 8c) |
 | GET | `/api/inventario/stock/:bodegaId` | `inventario.ver` — cada fila incluye `varianteId` y `valoresAtributo` (Fase 3c) además de `producto`: un producto con variantes reales tiene una fila de stock POR variante |
-| GET | `/api/inventario/kardex/:varianteId?bodegaId&desde&hasta` | `inventario.ver` — historial cronológico con saldo corriente (Fase 5a); sin `desde`/`hasta`, default mes actual (mismo criterio que `libro-mayor`); sin paginar — devuelve `{ variante, bodegaId, rango, saldoInicial, movimientos, saldoFinal }` |
+| GET | `/api/inventario/kardex/:varianteId?bodegaId&desde&hasta` | `inventario.ver` — historial cronológico con saldo corriente (Fase 5a); sin `desde`/`hasta`, default mes actual (mismo criterio que `libro-mayor`); sin paginar — devuelve `{ variante, bodegaId, rango, saldoInicial, movimientos, saldoFinal }`; `bodegaId` es opcional (plan de integración Cuadre, ítem E-3) — omitido, agrega el movimiento de TODAS las bodegas del tenant (cada fila de `movimientos` incluye su `bodega`), el saldo corriente sigue siendo válido porque cada movimiento ya trae su propio signo ENTRADA/SALIDA |
 | GET | `/api/inventario/lotes?varianteId&bodegaId` | `inventario.ver` — lotes con saldo de esa variante+bodega (Fase 5b), para elegir "de qué lote sale" en devolución a proveedor / ajuste manual negativo |
 | GET | `/api/inventario/vencimientos?diasProximidad` | `inventario.ver` — lotes con saldo que vencen dentro de `diasProximidad` (default 30, Fase 5b), todas las bodegas del tenant; sin paginar |
 | POST | `/api/inventario/ajustar` | `inventario.ajustar` — `{ productoId, varianteId?, bodegaId, cantidad, motivoAjuste, motivo?, numeroLote?, fechaVencimiento?, loteId?, pin? }`; `motivoAjuste` (plan de integración Cuadre, ítem E-2) es un enum obligatorio — `MERMA`/`ROBO_PERDIDA`/`DANO`/`VENCIMIENTO`/`CORRECCION_CONTEO`/`OTRO` — y `motivo` (texto libre) pasó a opcional, solo detalle adicional; `numeroLote`+`fechaVencimiento` obligatorios si el producto controla vencimiento y `cantidad > 0` (entrada); `loteId` obligatorio si controla vencimiento y `cantidad < 0` (salida, siempre explícito — nunca FEFO en una corrección manual); `pin` (Fase 9) requerido solo si `cantidad < 0` y el usuario tiene uno configurado; 403 si la bodega es de una sucursal no asignada al usuario |
@@ -372,7 +372,7 @@ para asientos manuales (ajustes, apertura, etc.).
 | PATCH | `/api/nomina/empleados/:id` | `nomina.editar` — enviar `fechaSalida` desactiva al empleado automáticamente |
 | GET | `/api/nomina/periodos?pagina&tamanoPagina` | `nomina.ver` |
 | GET | `/api/nomina/periodos/:id` | `nomina.ver` — incluye los recibos con su empleado |
-| POST | `/api/nomina/periodos` | `nomina.editar` — genera recibos para todos los empleados activos (`{ tipo: QUINCENAL\|MENSUAL, fechaInicio, fechaFin }`) |
+| POST | `/api/nomina/periodos` | `nomina.editar` — genera recibos para todos los empleados activos (`{ tipo: SEMANAL\|QUINCENAL\|BIMENSUAL\|MENSUAL, fechaInicio, fechaFin }`); `SEMANAL`/`BIMENSUAL` (plan de integración Cuadre, ítem G-7) usan el factor de `FACTOR_PERIODO_NOMINA` (`nomina-config.ts`) — `SEMANAL` = 7 días del divisor legal 23.83 (no un genérico mes/4), `BIMENSUAL` = mismo factor 0.5 que `QUINCENAL` (RAE: "dos veces al mes", no "cada dos meses") |
 | POST | `/api/nomina/periodos/:id/procesar` | `nomina.editar` — `BORRADOR → PROCESADO`, 400 si ya no está en BORRADOR |
 | POST | `/api/nomina/periodos/:id/marcar-pagado` | `nomina.editar` — `PROCESADO → PAGADO`, dispara el asiento contable automático (ver ARCHITECTURE.md) |
 | GET | `/api/nomina/empleados/:empleadoId/horario` | `rrhh.ver` — horario semanal (RRHH, Fase 7a) |

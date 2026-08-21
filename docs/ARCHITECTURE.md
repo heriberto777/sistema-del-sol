@@ -410,6 +410,15 @@ defecto, así que el saldo inicial de un Kardex que cruce esa frontera
 puede no ser exacto; desde esta fase en adelante el signo siempre es
 correcto.
 
+**`bodegaId` opcional (plan de integración Cuadre, ítem E-3)**: omitido,
+`kardex()` agrega el movimiento de TODAS las bodegas del tenant — sin
+ningún cambio en el cálculo de saldo corriente, porque cada fila de
+`MovimientoInventario` ya trae su propio signo real vía `direccion`
+(ver arriba), independiente de en cuál bodega ocurrió; cada fila
+agregada incluye su `bodega` (`{id, nombre}`) para mostrarla en la
+columna extra que aparece en `KardexView.tsx` solo en este modo
+("Todas las bodegas").
+
 ## Vencimientos — lotes con consumo FEFO (Fase 5b de adopción de Cuadre)
 
 Control de vencimientos por lote, **opt-in por producto**
@@ -1686,6 +1695,15 @@ después los multiplica por `factorPeriodo` (0.5). Aplicar el tope al
 salario quincenal directamente daría un resultado distinto (e
 incorrecto) al de calcularlo sobre el salario mensual real, que es como
 lo hace la TSS.
+
+`TipoPeriodoNomina` tiene 4 valores (`SEMANAL`/`QUINCENAL`/`BIMENSUAL`/
+`MENSUAL`, plan de integración Cuadre, ítem G-7) resueltos vía
+`FACTOR_PERIODO_NOMINA` (`nomina-config.ts`): `SEMANAL` usa `7 /
+DIVISOR_SALARIO_DIARIO` (7 días del divisor legal 23.83), no un
+genérico "mes/4" (un mes no tiene exactamente 4 semanas); `BIMENSUAL`
+(RAE: "que se repite dos veces al mes") es sinónimo de frecuencia con
+`QUINCENAL` — mismo factor 0.5, la diferencia entre ambos es solo de
+nomenclatura que prefiera el negocio, nunca "cada dos meses".
 
 **Asiento automático** (`AsientosContablesService.generarDesdeNomina`,
 origen `NOMINA`): débito `Gastos de Nómina` (bruto + aportes

@@ -2,9 +2,9 @@ import { ApiProperty } from '@nestjs/swagger';
 import { IsDateString, IsIn } from 'class-validator';
 
 export class GenerarPeriodoDto {
-  @ApiProperty({ enum: ['QUINCENAL', 'MENSUAL'] })
-  @IsIn(['QUINCENAL', 'MENSUAL'])
-  tipo: 'QUINCENAL' | 'MENSUAL';
+  @ApiProperty({ enum: ['SEMANAL', 'QUINCENAL', 'BIMENSUAL', 'MENSUAL'] })
+  @IsIn(['SEMANAL', 'QUINCENAL', 'BIMENSUAL', 'MENSUAL'])
+  tipo: 'SEMANAL' | 'QUINCENAL' | 'BIMENSUAL' | 'MENSUAL';
 
   @ApiProperty()
   @IsDateString()

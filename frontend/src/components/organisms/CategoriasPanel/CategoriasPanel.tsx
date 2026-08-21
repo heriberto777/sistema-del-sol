@@ -2,8 +2,10 @@ import { FormEvent, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../../lib/api-client';
 import { aplanarArbolCategorias, type CategoriaPlana } from '../../../lib/categorias-arbol';
+import { COLORES_CATEGORIA, ETIQUETA_COLOR_CATEGORIA, CLASE_PUNTO_COLOR_CATEGORIA, type ColorCategoria } from '../../../lib/color-categoria';
 import { FormField } from '../../molecules/FormField/FormField';
 import { SelectCategoria } from '../../molecules/SelectCategoria/SelectCategoria';
+import { Select } from '../../atoms/Select/Select';
 import { Button } from '../../atoms/Button/Button';
 import { Badge } from '../../atoms/Badge/Badge';
 import { Card } from '../../atoms/Card/Card';
@@ -13,6 +15,7 @@ export function CategoriasPanel() {
   const [editandoId, setEditandoId] = useState<string | null>(null);
   const [nombre, setNombre] = useState('');
   const [categoriaPadreId, setCategoriaPadreId] = useState('');
+  const [color, setColor] = useState<ColorCategoria | ''>('');
   const [error, setError] = useState<string | null>(null);
 
   const { data: categorias } = useQuery({
@@ -28,12 +31,13 @@ export function CategoriasPanel() {
     setEditandoId(null);
     setNombre('');
     setCategoriaPadreId('');
+    setColor('');
     setError(null);
   }
 
   const guardar = useMutation({
     mutationFn: async () => {
-      const payload = { nombre, categoriaPadreId: categoriaPadreId || null };
+      const payload = { nombre, categoriaPadreId: categoriaPadreId || null, color: color || null };
       return editandoId ? apiClient.patch(`/categorias/${editandoId}`, payload) : apiClient.post('/categorias', payload);
     },
     onSuccess: () => {
@@ -59,6 +63,7 @@ export function CategoriasPanel() {
     setEditandoId(c.id);
     setNombre(c.nombre);
     setCategoriaPadreId(c.categoriaPadreId ?? '');
+    setColor(c.color ?? '');
   }
 
   const plano = aplanarArbolCategorias(categorias ?? []);
@@ -71,6 +76,17 @@ export function CategoriasPanel() {
           <div className="flex flex-col gap-1">
             <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Categoría padre (opcional)</label>
             <SelectCategoria value={categoriaPadreId} onChange={setCategoriaPadreId} excluirId={editandoId ?? undefined} />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Color (opcional, para el POS)</label>
+            <Select value={color} onChange={(e) => setColor(e.target.value as ColorCategoria | '')}>
+              <option value="">Sin color</option>
+              {COLORES_CATEGORIA.map((c) => (
+                <option key={c} value={c}>
+                  {ETIQUETA_COLOR_CATEGORIA[c]}
+                </option>
+              ))}
+            </Select>
           </div>
           {error && <p className="text-sm text-red-600">{error}</p>}
           <div className="flex gap-2">
@@ -99,8 +115,11 @@ export function CategoriasPanel() {
             {plano.map((c) => (
               <tr key={c.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
                 <td className="px-5 py-3">
-                  {'— '.repeat(c.profundidad)}
-                  {c.nombre}
+                  <span className="inline-flex items-center gap-2">
+                    {c.color && <span className={`h-2.5 w-2.5 rounded-full ${CLASE_PUNTO_COLOR_CATEGORIA[c.color]}`} />}
+                    {'— '.repeat(c.profundidad)}
+                    {c.nombre}
+                  </span>
                 </td>
                 <td className="px-5 py-3">
                   <Badge tono={c.activa ? 'exito' : 'neutro'}>{c.activa ? 'Activa' : 'Inactiva'}</Badge>

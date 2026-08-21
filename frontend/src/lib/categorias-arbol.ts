@@ -1,8 +1,11 @@
+import type { ColorCategoria } from './color-categoria';
+
 export interface CategoriaPlana {
   id: string;
   nombre: string;
   categoriaPadreId: string | null;
   activa: boolean;
+  color?: ColorCategoria | null;
 }
 
 export interface CategoriaConProfundidad extends CategoriaPlana {

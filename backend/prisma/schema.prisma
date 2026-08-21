@@ -995,7 +995,12 @@ enum TipoContrato {
 }
 
 enum TipoPeriodoNomina {
+  // SEMANAL/BIMENSUAL agregados en el plan de integración de brechas
+  // Cuadre, ítem G-7 — ver factorPeriodo en periodos-nomina.service.ts
+  // para cómo se prorratea cada uno contra el salario mensual.
+  SEMANAL
   QUINCENAL
+  BIMENSUAL
   MENSUAL
 }
 
@@ -1294,6 +1299,24 @@ enum EstadoTurnoCaja {
   CERRADO
 }
 
+/// Color decorativo de categoría, para escaneo visual rápido en la grilla
+/// del POS (plan de integración Cuadre, E-9) — sin significado de
+/// negocio, solo UX.
+enum ColorCategoria {
+  GRIS
+  ROJO
+  NARANJA
+  AMBAR
+  VERDE
+  TURQUESA
+  CIAN
+  AZUL
+  INDIGO
+  MORADO
+  ROSA
+  FUCSIA
+}
+
 enum TipoMovimientoCaja {
   ENTRADA
   SALIDA
@@ -1425,6 +1448,7 @@ model Categoria {
   categoriaPadre   Categoria?  @relation("JerarquiaCategoria", fields: [categoriaPadreId], references: [id])
   subcategorias    Categoria[] @relation("JerarquiaCategoria")
   activa           Boolean     @default(true)
+  color            ColorCategoria?
   createdAt        DateTime    @default(now())
 
   productos Producto[]

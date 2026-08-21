@@ -15,7 +15,7 @@ type EstadoPeriodo = 'BORRADOR' | 'PROCESADO' | 'PAGADO';
 
 interface PeriodoNomina {
   id: string;
-  tipo: 'QUINCENAL' | 'MENSUAL';
+  tipo: 'SEMANAL' | 'QUINCENAL' | 'BIMENSUAL' | 'MENSUAL';
   fechaInicio: string;
   fechaFin: string;
   estado: EstadoPeriodo;
@@ -221,7 +221,7 @@ export function PeriodosNominaTable() {
   const [expandidoId, setExpandidoId] = useState<string | null>(null);
   const [filtroEstado, setFiltroEstado] = useState('');
 
-  const [tipo, setTipo] = useState<'QUINCENAL' | 'MENSUAL'>('MENSUAL');
+  const [tipo, setTipo] = useState<'SEMANAL' | 'QUINCENAL' | 'BIMENSUAL' | 'MENSUAL'>('MENSUAL');
   const [fechaInicio, setFechaInicio] = useState('');
   const [fechaFin, setFechaFin] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -260,9 +260,11 @@ export function PeriodosNominaTable() {
           <form onSubmit={onSubmit} className="flex flex-wrap items-end gap-3">
             <div>
               <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Tipo</label>
-              <Select value={tipo} onChange={(e) => setTipo(e.target.value as 'QUINCENAL' | 'MENSUAL')} className="!w-auto">
+              <Select value={tipo} onChange={(e) => setTipo(e.target.value as 'SEMANAL' | 'QUINCENAL' | 'BIMENSUAL' | 'MENSUAL')} className="!w-auto">
                 <option value="MENSUAL">Mensual</option>
                 <option value="QUINCENAL">Quincenal</option>
+                <option value="BIMENSUAL">Bimensual</option>
+                <option value="SEMANAL">Semanal</option>
               </Select>
             </div>
             <FormField id="periodo-inicio" label="Fecha inicio" type="date" value={fechaInicio} onChange={(e) => setFechaInicio(e.target.value)} required />

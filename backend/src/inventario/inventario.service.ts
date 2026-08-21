@@ -370,7 +370,7 @@ export class InventarioService {
    * `InventarioRepository.ajustarCantidadEnTx` sobre por qué `tipo` solo
    * no alcanza (TRANSFERENCIA/AJUSTE no tienen signo fijo).
    */
-  async kardex(varianteId: string, bodegaId: string, desde?: string, hasta?: string) {
+  async kardex(varianteId: string, bodegaId?: string, desde?: string, hasta?: string) {
     await this.validarPertenencia({ bodegaId });
     const variante = await this.inventarioRepository.obtenerVarianteConProducto(varianteId);
 
@@ -388,6 +388,7 @@ export class InventarioService {
       cantidad: number;
       motivo: string | null;
       usuario: string;
+      bodega: { id: string; nombre: string };
       saldoAcumulado: number;
     }[] = [];
     let saldoAcumulado = 0;
@@ -407,13 +408,14 @@ export class InventarioService {
         cantidad: Number(m.cantidad),
         motivo: m.motivo,
         usuario: m.user.nombre,
+        bodega: m.bodega,
         saldoAcumulado,
       });
     }
 
     return {
       variante: { id: variante.id, sku: variante.sku, producto: { id: variante.producto.id, codigo: variante.producto.codigo, nombre: variante.producto.nombre } },
-      bodegaId,
+      bodegaId: bodegaId ?? null,
       rango: { desde: desdeFecha, hasta: hastaFecha },
       saldoInicial,
       movimientos: filas,

@@ -157,6 +157,12 @@ antes de esta fase (default permisivo) — ver ARCHITECTURE.md.
   candidato hasta encontrar la propia categoría (caso de rechazo) o la
   raíz (caso válido). Eliminar una categoría con productos o
   subcategorías asignadas se rechaza (400) — no hay cascada silenciosa.
+  `categorias.color` (plan de integración Cuadre, ítem E-9) es un enum
+  nullable (`ColorCategoria`, 12 valores) puramente decorativo — sin
+  columna análoga en ningún otro modelo, sin lógica de negocio que lo
+  lea; solo pinta un punto de color en el formulario de categorías y en
+  la grilla de filtro del catálogo del POS (`CatalogoProductosPos.tsx`),
+  para escanear categorías más rápido visualmente.
   `productos.categoriaId` (`onDelete: SetNull`) reemplazó el antiguo
   `productos.categoria` (texto libre); el filtro de listado/catálogo por
   categoría es exacto, no incluye descendientes.

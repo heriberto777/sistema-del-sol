@@ -455,10 +455,11 @@ export class InventarioRepository {
   }
 
   /** Kardex (Fase 5a) — molde calcado de AsientosContablesRepository.lineasPorCuenta: cronológico hasta `hasta`, el service separa "antes de desde" (saldo inicial) de "dentro del rango". */
-  movimientosPorVarianteBodega(varianteId: string, bodegaId: string, hasta: Date) {
+  /** `bodegaId` opcional (plan de integración Cuadre, ítem E-3) — sin él, agrega el kardex de la variante en TODAS las bodegas del tenant. */
+  movimientosPorVarianteBodega(varianteId: string, bodegaId: string | undefined, hasta: Date) {
     return this.db.movimientoInventario.findMany({
-      where: { varianteId, bodegaId, createdAt: { lte: hasta } },
-      include: { user: true },
+      where: { varianteId, ...(bodegaId ? { bodegaId } : {}), createdAt: { lte: hasta } },
+      include: { user: true, bodega: { select: { id: true, nombre: true } } },
       orderBy: { createdAt: 'asc' },
     });
   }

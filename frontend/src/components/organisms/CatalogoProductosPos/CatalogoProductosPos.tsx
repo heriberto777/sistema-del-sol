@@ -7,6 +7,7 @@ import { Modal } from '../../molecules/Modal/Modal';
 import { SearchInput } from '../../molecules/SearchInput/SearchInput';
 import { useDebouncedValue } from '../../../hooks/useDebouncedValue';
 import { aplanarArbolCategorias, type CategoriaPlana } from '../../../lib/categorias-arbol';
+import { CLASE_PUNTO_COLOR_CATEGORIA } from '../../../lib/color-categoria';
 import { etiquetaVariante, type VarianteProducto } from '../../../hooks/useVariantesProducto';
 import { PaginaResultado } from '../../../types/pagina-resultado';
 
@@ -140,8 +141,11 @@ export function CatalogoProductosPos({
                     : 'border-slate-200 text-slate-500 hover:border-slate-300 dark:border-slate-800 dark:text-slate-400'
                 }`}
               >
-                {'— '.repeat(c.profundidad)}
-                {c.nombre}
+                <span className="inline-flex items-center gap-1.5">
+                  {c.color && <span className={`h-2 w-2 rounded-full ${CLASE_PUNTO_COLOR_CATEGORIA[c.color]}`} />}
+                  {'— '.repeat(c.profundidad)}
+                  {c.nombre}
+                </span>
               </button>
             ))}
           </div>

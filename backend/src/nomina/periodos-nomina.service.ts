@@ -4,7 +4,7 @@ import { EmpleadosRepository } from './empleados.repository';
 import { AusenciasRepository } from './ausencias.repository';
 import { GenerarPeriodoDto } from './dto/generar-periodo.dto';
 import { calcularRecibo } from './calculo-nomina';
-import { DIVISOR_SALARIO_DIARIO } from './nomina-config';
+import { DIVISOR_SALARIO_DIARIO, FACTOR_PERIODO_NOMINA } from './nomina-config';
 import { contarDiasNoDomingo } from './vacaciones.util';
 import { EventBusService } from '../event-bus/event-bus.service';
 import { EVENTOS } from '../event-bus/events';
@@ -44,7 +44,7 @@ export class PeriodosNominaService {
       throw new BadRequestException('No hay empleados activos para generar la nómina');
     }
 
-    const factorPeriodo = dto.tipo === 'QUINCENAL' ? 0.5 : 1;
+    const factorPeriodo = FACTOR_PERIODO_NOMINA[dto.tipo];
     const fechaInicio = new Date(dto.fechaInicio);
     const fechaFin = new Date(dto.fechaFin);
 

@@ -1,4 +1,5 @@
-import { IsBoolean, IsOptional, IsString, IsUUID, MinLength } from 'class-validator';
+import { ColorCategoria } from '@prisma/client';
+import { IsBoolean, IsEnum, IsOptional, IsString, IsUUID, MinLength } from 'class-validator';
 
 export class CrearCategoriaDto {
   @IsString()
@@ -12,4 +13,8 @@ export class CrearCategoriaDto {
   @IsOptional()
   @IsBoolean()
   activa?: boolean;
+
+  @IsOptional()
+  @IsEnum(ColorCategoria)
+  color?: ColorCategoria;
 }

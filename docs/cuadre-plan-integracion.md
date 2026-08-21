@@ -156,9 +156,14 @@ Resumen de lo que cambió (detalle en cada ítem más abajo):
   libre (`motivo`) pasó a opcional y ahora es solo detalle adicional — si
   se omite, se guarda la etiqueta legible del motivo elegido. Migración
   `20260821120000_motivos_estructurados`. Entregado 2026-08-21.
-- [ ] **E-3** 🟨 — **Kardex agregado "todas las bodegas"**: hoy
-  `GET /inventario/kardex/:varianteId` exige una `bodegaId` puntual.
-  *Confirmado: brecha real, sin cambios.*
+- [x] **E-3** 🟨 — **Kardex agregado "todas las bodegas"**: `bodegaId`
+  pasó a opcional en `GET /inventario/kardex/:varianteId` — omitido,
+  agrega el movimiento de todas las bodegas del tenant (cada fila trae
+  su `bodega` para mostrarla). Sin bug de cálculo: el saldo corriente ya
+  dependía del signo real de cada movimiento (`direccion`), no de a qué
+  bodega pertenece, así que la agregación cruzada es correcta sin tocar
+  esa lógica. `KardexView.tsx` gana un checkbox "Todas las bodegas" y
+  una columna "Bodega" condicional. Entregado 2026-08-21.
 - [ ] **E-4** 🟧 — **Alertas de inventario segmentadas**: 4 categorías (Sin
   Stock / Stock Bajo / Por Vencer 7 días / Vencidos) con dashboard propio.
   *Confirmado: brecha real — el reporte hoy es un solo contador
@@ -185,8 +190,13 @@ Resumen de lo que cambió (detalle en cada ítem más abajo):
   ausente; alcanza con ampliarlo si se necesita una lista cerrada. El resto
   (comisión — ver A-1, OTP, precio variable, ingrediente, permite
   devolución, códigos alternos) sigue ausente.*
-- [ ] **E-9** 🟨 — **Color por categoría "para POS"**. *Confirmado:
-  `model Categoria` no tiene `color`/`icono`/`imagen` — brecha real.*
+- [x] **E-9** 🟨 — **Color por categoría "para POS"**: `Categoria.color`
+  nuevo, enum nullable `ColorCategoria` (12 valores, puramente
+  decorativo). Selector en `CategoriasPanel.tsx` (form + swatch en la
+  tabla) y punto de color en cada píldora de categoría del filtro de
+  `CatalogoProductosPos.tsx`, para escaneo visual rápido en el POS.
+  Migración `20260821150000_categoria_color`. Sin cambios de repositorio
+  (`crear`/`actualizar` ya hacían spread `...dto`). Entregado 2026-08-21.
 - [x] **E-10** ✅ *ya cubierto, no era una brecha real* — **Bonos en
   lote**: `EmitirLoteBonosDto` (`backend/src/bonos/dto/`) YA permite
   generar hasta 500 de una vez (tope de seguridad, no de negocio — subible
@@ -256,11 +266,15 @@ Resumen de lo que cambió (detalle en cada ítem más abajo):
   **mantener el ISR calculado en código** (`isr.util.ts`). *Confirmado: no
   existe ningún modelo de deducciones configurables — brecha real, sin
   cambios en la recomendación de no tocar el ISR.*
-- [ ] **G-7** 🟨 *(alcance reducido)* — **Nómina: lo que falta de
-  período/puesto**. *YA tenemos `TipoPeriodoNomina` con `QUINCENAL` y
-  `MENSUAL` (2 de los 4 tipos de Cuadre) — solo faltan `SEMANAL` y
-  `BIMENSUAL`, agregarlos al enum es trivial. El filtrado por Puesto sigue
-  faltando por completo (depende de G-8, que tampoco existe).*
+- [x] **G-7** 🟨 *(alcance reducido)* — **Nómina: lo que falta de
+  período/puesto**. `TipoPeriodoNomina` ganó `SEMANAL` y `BIMENSUAL`
+  (`FACTOR_PERIODO_NOMINA` en `nomina-config.ts`): `SEMANAL` = 7 días
+  del divisor legal 23.83 (no un genérico mes/4); `BIMENSUAL` = mismo
+  factor 0.5 que `QUINCENAL` (RAE: "dos veces al mes", no "cada dos
+  meses"). Migración `20260821140000_periodo_nomina_semanal_bimensual`.
+  Entregado 2026-08-21. El filtrado por Puesto sigue faltando por
+  completo (depende de G-8, que tampoco existe) — queda fuera de este
+  ítem.*
 - [ ] **G-8** 🟨 — **Catálogo de "Puestos"** estructurado. *Confirmado: no
   existe ningún modelo `Puesto` — brecha real, sin cambios.*
 - [ ] **G-9** 🟥 *diseño primero, depende de hardware del cliente* —
@@ -335,13 +349,18 @@ Resumen de lo que cambió (detalle en cada ítem más abajo):
 - **2026-08-21**: entregado B-1 — resultó ser más que "agregar tipos al
   enum": el hallazgo real fue que ningún flujo dejaba elegir el tipo de
   NCF al facturar. Ver el ítem B-1 arriba para el detalle.
+- **2026-08-21**: entregados E-3 (Kardex agregado "todas las bodegas"),
+  G-7 (períodos `SEMANAL`/`BIMENSUAL` con factor legal correcto) y E-9
+  (color decorativo por categoría, para escaneo visual en el POS). Los 3
+  pasaron tsc + suite completa (715 unitarios + 179 e2e) + lint + build
+  antes de este commit.
 
 ## Sugerencia de por dónde arrancar
 
-Con el catálogo ya corregido, los candidatos de mejor esfuerzo/impacto que
-quedan son los 🟨/🟧 de **E** (E-3, E-5, E-9, E-11 — todos con alcance
-reducido o chico) y **G** (G-7 quedó trivial: agregar 2 valores a un
-enum). Los 🟥 con "diseño primero" conviene agruparlos en su propia sesión
-de planeamiento cuando se prioricen, siguiendo la misma mecánica que
-Sucursales (Fase 8) y PIN (Fase 9): presentar el diseño, resolver casos
-límite, y recién después ejecutar.
+Con el catálogo ya corregido y E-3/E-9/G-7 entregados, los candidatos de
+mejor esfuerzo/impacto que quedan son **E-5** y **E-11** (ambos con
+alcance reducido — campos puntuales sobre modelos que ya existen, ver
+arriba). Los 🟥 con "diseño primero" conviene agruparlos en su propia
+sesión de planeamiento cuando se prioricen, siguiendo la misma mecánica
+que Sucursales (Fase 8) y PIN (Fase 9): presentar el diseño, resolver
+casos límite, y recién después ejecutar.

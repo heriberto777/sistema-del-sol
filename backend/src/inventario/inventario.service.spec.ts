@@ -368,5 +368,30 @@ describe('InventarioService', () => {
 
       expect(repository.buscarBodegaPorId).toHaveBeenCalledWith('b1');
     });
+
+    describe('bodegaId omitido — agregado en todas las bodegas (plan de integración Cuadre, E-3)', () => {
+      it('no valida ninguna bodega puntual (no hay ninguna bodega que validar)', async () => {
+        repository.movimientosPorVarianteBodega.mockResolvedValue([]);
+
+        await service.kardex('v1');
+
+        expect(repository.buscarBodegaPorId).not.toHaveBeenCalled();
+        expect(repository.movimientosPorVarianteBodega).toHaveBeenCalledWith('v1', undefined, expect.any(Date));
+      });
+
+      it('suma el saldo de movimientos de distintas bodegas en un solo saldo acumulado, con la bodega de origen por fila', async () => {
+        repository.movimientosPorVarianteBodega.mockResolvedValue([
+          movimiento({ direccion: 'ENTRADA', cantidad: 10, createdAt: new Date('2026-07-05'), bodega: { id: 'bA', nombre: 'Bodega A' } }),
+          movimiento({ direccion: 'ENTRADA', cantidad: 5, createdAt: new Date('2026-07-06'), bodega: { id: 'bB', nombre: 'Bodega B' } }),
+        ] as never);
+
+        const resultado = await service.kardex('v1', undefined, '2026-07-01', '2026-07-31');
+
+        expect(resultado.bodegaId).toBeNull();
+        expect(resultado.movimientos[0].bodega).toEqual({ id: 'bA', nombre: 'Bodega A' });
+        expect(resultado.movimientos[1].bodega).toEqual({ id: 'bB', nombre: 'Bodega B' });
+        expect(resultado.saldoFinal).toBe(15);
+      });
+    });
   });
 });

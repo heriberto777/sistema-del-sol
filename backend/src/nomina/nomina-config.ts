@@ -48,6 +48,25 @@ export const TRAMOS_ISR_ANUAL = [
 export const DIVISOR_SALARIO_DIARIO = 23.83;
 
 /**
+ * Qué fracción del salario BRUTO MENSUAL corresponde a un período de pago
+ * (plan de integración de brechas Cuadre, ítem G-7) — ver `calcularRecibo`
+ * en `calculo-nomina.ts`: los topes de TSS y la escala de ISR siempre se
+ * evalúan sobre el mensual, y el resultado se prorratea por este factor,
+ * nunca al revés. `SEMANAL` reusa `DIVISOR_SALARIO_DIARIO` (7 días de
+ * salario diario oficial) en vez de un genérico "mes/4", porque un mes no
+ * tiene exactamente 4 semanas. `BIMENSUAL` (RAE: "que se repite dos veces
+ * al mes") es sinónimo de frecuencia con `QUINCENAL` — mismo factor 0.5,
+ * la diferencia entre ambos es solo de nomenclatura que prefiera el
+ * negocio, no de cálculo.
+ */
+export const FACTOR_PERIODO_NOMINA = {
+  SEMANAL: 7 / DIVISOR_SALARIO_DIARIO,
+  QUINCENAL: 0.5,
+  BIMENSUAL: 0.5,
+  MENSUAL: 1,
+} as const;
+
+/**
  * Código de Trabajo (Ley 16-92, Art. 177-184): 14 días laborables de
  * descanso por año de servicio cumplido — siempre 14, sin importar
  * antigüedad. Lo que cambia con la antigüedad es el PAGO de esos días
