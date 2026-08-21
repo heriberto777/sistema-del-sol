@@ -71,16 +71,23 @@ Resumen de lo que cambió (detalle en cada ítem más abajo):
 
 ## B — Fiscal y DGII
 
-- [ ] **B-1** 🟨 *(antes 🟧 — alcance reducido)* — **Completar `TipoNcf`**:
-  **YA tenemos 12 de los ~20 tipos de Cuadre** — `B01/B02/B03/B04/B11/B14/
-  B15/E31/E32/E33/E34/E43` ya están en el enum de `schema.prisma`. Además
-  ya existe un módulo completo de gestión (`backend/src/ncf/`,
-  `NcfPanel.tsx` en el frontend, equivalente a "Comprobantes" de Cuadre) —
-  pero el dropdown del `NcfPanel` solo expone 10 de esos 12 (`B11`/`E43`
-  faltan ahí, aunque el backend ya los soporta). Lo que falta de verdad:
-  agregar `B11`/`E43` al dropdown del panel (trivial), y sumar al enum los
-  que realmente no existen — `B13`, `B16`, `B17`, `E41`, `E44`, `E45`,
-  `E46`, `E47` (8, no 16).
+- [x] **B-1** 🟨 — **NCF/e-CF seleccionable de verdad al facturar**. El
+  hallazgo real detrás de este ítem no era el enum (eso era cosmético) —
+  era que `FacturacionService.crear()` derivaba el `TipoNcf` siempre
+  automático desde `tipoFactura`, así que B14/B15 (que ya estaban en el
+  enum) nunca los podía producir ningún flujo real. Entregado: `CrearFacturaDto`
+  gana `tipoComprobanteEspecial?: 'REGIMEN_ESPECIAL' | 'GUBERNAMENTAL'`
+  (solo válido con CONTADO/CREDITO, se ignora en NC/ND) que sustituye el
+  NCF automático por B14/B15 o sus nuevos equivalentes e-CF `E44`/`E45`;
+  selector "Tipo de comprobante" agregado al formulario de Facturación
+  (default "Normal", sin fricción para el caso común); `NcfPanel` ya
+  también deja crear secuencia para `B11`/`E43`/`E44`/`E45` (antes el
+  backend los soportaba pero el dropdown no los mostraba). **Deliberadamente
+  fuera de alcance**: `B13`/`B16`/`B17`/`E41`/`E46`/`E47` — ninguno tiene
+  un proceso de negocio real del otro lado (exportaciones, pagos al
+  exterior) que los produciría; agregarlos al enum sin nada que los use
+  sería una brecha decorativa. Migración
+  `20260821130000_tipo_ncf_especial`. Entregado 2026-08-21.
 - [ ] **B-2** 🟧 — **Secuencias de NCF por sucursal** (hoy `NcfAsignado` es
   `@@unique([tenantId, tipoNcf])`, sin sucursal) + **umbral de alerta**
   configurable ("quedan pocos comprobantes"). *Confirmado: brecha real, sin
@@ -325,14 +332,16 @@ Resumen de lo que cambió (detalle en cada ítem más abajo):
   corregidos (6 ya construidos del todo, 5 parcialmente, quedaron con
   alcance reducido). Ver la sección "⚠️ Segunda pasada de verificación"
   arriba para el detalle completo.
+- **2026-08-21**: entregado B-1 — resultó ser más que "agregar tipos al
+  enum": el hallazgo real fue que ningún flujo dejaba elegir el tipo de
+  NCF al facturar. Ver el ítem B-1 arriba para el detalle.
 
 ## Sugerencia de por dónde arrancar
 
-Con el catálogo ya corregido, los candidatos de mejor esfuerzo/impacto son
-los 🟨/🟧 de **B** (B-1 quedó chico: solo agregar 8 tipos de NCF + arreglar
-el dropdown), **E** (E-3, E-5, E-9, E-11 — todos con alcance reducido o
-chico) y **G** (G-7 quedó trivial: agregar 2 valores a un enum). Los 🟥 con
-"diseño primero" conviene agruparlos en su propia sesión de planeamiento
-cuando se prioricen, siguiendo la misma mecánica que Sucursales (Fase 8) y
-PIN (Fase 9): presentar el diseño, resolver casos límite, y recién después
-ejecutar.
+Con el catálogo ya corregido, los candidatos de mejor esfuerzo/impacto que
+quedan son los 🟨/🟧 de **E** (E-3, E-5, E-9, E-11 — todos con alcance
+reducido o chico) y **G** (G-7 quedó trivial: agregar 2 valores a un
+enum). Los 🟥 con "diseño primero" conviene agruparlos en su propia sesión
+de planeamiento cuando se prioricen, siguiendo la misma mecánica que
+Sucursales (Fase 8) y PIN (Fase 9): presentar el diseño, resolver casos
+límite, y recién después ejecutar.

@@ -64,4 +64,14 @@ export class CrearFacturaDto {
   @IsOptional()
   @IsString()
   listaPrecio?: string;
+
+  @ApiProperty({
+    required: false,
+    enum: ['REGIMEN_ESPECIAL', 'GUBERNAMENTAL'],
+    description:
+      'Solo si tipoFactura es CONTADO/CREDITO — usa B14/B15 (o su e-CF) en vez del NCF normal (plan de integración Cuadre, ítem B-1). Una Nota de Crédito/Débito siempre usa B03/B04, sin importar este campo.',
+  })
+  @IsOptional()
+  @IsEnum(['REGIMEN_ESPECIAL', 'GUBERNAMENTAL'])
+  tipoComprobanteEspecial?: 'REGIMEN_ESPECIAL' | 'GUBERNAMENTAL';
 }

@@ -537,6 +537,13 @@ enum TipoNcf {
   E33 // Nota de Débito Electrónica
   B11 // Comprobante de Compras (mercado informal) — ver GastoMenor
   E43 // Gastos Menores Electrónico
+  // Equivalentes electrónicos de B14/B15 (plan de integración Cuadre,
+  // ítem B-1) — ver TIPO_NCF_ESPECIAL en facturacion.service.ts: hasta
+  // ahora B14/B15 estaban en el enum pero ningún flujo real los podía
+  // seleccionar (el NCF se derivaba siempre de tipoFactura, sin que el
+  // usuario elija el tipo de comprobante).
+  E44 // Régimen Especial Electrónico
+  E45 // Gubernamental Electrónico
 }
 
 // Decide, por tenant, si Facturación pide NCF tradicional (B0x) o e-CF (E3x)

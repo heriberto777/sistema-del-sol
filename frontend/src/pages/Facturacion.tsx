@@ -72,6 +72,7 @@ function ModalNuevaFactura({ onClose }: { onClose: () => void }) {
   const [clienteId, setClienteId] = useState('');
   const [bodegaId, setBodegaId] = useState('');
   const [tipoFactura, setTipoFactura] = useState<'CONTADO' | 'CREDITO'>('CONTADO');
+  const [tipoComprobanteEspecial, setTipoComprobanteEspecial] = useState('');
   const [lineas, setLineas] = useState([{ productoId: '', varianteId: '', cantidad: '1', precioUnitario: '' }]);
   const [mostrarNuevoCliente, setMostrarNuevoCliente] = useState(false);
   const [listaPrecioOverride, setListaPrecioOverride] = useState('');
@@ -98,6 +99,7 @@ function ModalNuevaFactura({ onClose }: { onClose: () => void }) {
         clienteId,
         bodegaId,
         tipoFactura,
+        tipoComprobanteEspecial: tipoComprobanteEspecial || undefined,
         listaPrecio: listaPrecioOverride || undefined,
         lineas: lineas
           .filter((l) => l.productoId)
@@ -177,6 +179,15 @@ function ModalNuevaFactura({ onClose }: { onClose: () => void }) {
           <Select value={tipoFactura} onChange={(e) => setTipoFactura(e.target.value as 'CONTADO' | 'CREDITO')}>
             <option value="CONTADO">Contado</option>
             <option value="CREDITO">Crédito</option>
+          </Select>
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Tipo de comprobante</label>
+          <Select value={tipoComprobanteEspecial} onChange={(e) => setTipoComprobanteEspecial(e.target.value)}>
+            <option value="">Normal</option>
+            <option value="REGIMEN_ESPECIAL">Régimen Especial (B14)</option>
+            <option value="GUBERNAMENTAL">Gubernamental (B15)</option>
           </Select>
         </div>
 

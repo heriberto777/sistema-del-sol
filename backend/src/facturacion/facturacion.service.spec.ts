@@ -308,6 +308,54 @@ describe('FacturacionService', () => {
     expect(repository.siguienteNcfEnTx).toHaveBeenCalledWith(TX, tipoEcfEsperado);
   });
 
+  describe('tipoComprobanteEspecial (plan de integración Cuadre, ítem B-1)', () => {
+    it.each([
+      ['REGIMEN_ESPECIAL', 'B14'],
+      ['GUBERNAMENTAL', 'B15'],
+    ])('%s en una venta CONTADO usa %s en vez del NCF normal', async (tipoComprobanteEspecial, tipoNcfEsperado) => {
+      repository.obtenerProductoConPrecioVigente.mockResolvedValue(producto(18, 100) as never);
+      repository.crearFacturaEnTx.mockResolvedValue(facturaCreada() as never);
+
+      await service.crear(
+        dto({ tipoFactura: 'CONTADO', tipoComprobanteEspecial: tipoComprobanteEspecial as never }),
+        'tenant-1',
+        'vendedor-1',
+      );
+
+      expect(repository.siguienteNcfEnTx).toHaveBeenCalledWith(TX, tipoNcfEsperado);
+    });
+
+    it.each([
+      ['REGIMEN_ESPECIAL', 'E44'],
+      ['GUBERNAMENTAL', 'E45'],
+    ])('%s en modalidad ECF usa %s en vez del e-NCF normal', async (tipoComprobanteEspecial, tipoEcfEsperado) => {
+      repository.obtenerProductoConPrecioVigente.mockResolvedValue(producto(18, 100) as never);
+      repository.obtenerModalidadFacturacion.mockResolvedValue('ECF' as never);
+      repository.crearFacturaEnTx.mockResolvedValue(facturaCreada() as never);
+
+      await service.crear(
+        dto({ tipoFactura: 'CREDITO', tipoComprobanteEspecial: tipoComprobanteEspecial as never }),
+        'tenant-1',
+        'vendedor-1',
+      );
+
+      expect(repository.siguienteNcfEnTx).toHaveBeenCalledWith(TX, tipoEcfEsperado);
+    });
+
+    it('se ignora en una Nota de Crédito — siempre usa B04, nunca un tipo especial', async () => {
+      repository.obtenerProductoConPrecioVigente.mockResolvedValue(producto(18, 100) as never);
+      repository.crearFacturaEnTx.mockResolvedValue(facturaCreada({ id: 'nc1', total: -118 }) as never);
+
+      await service.crear(
+        dto({ tipoFactura: 'NOTA_CREDITO', facturaOrigenId: 'f-original', tipoComprobanteEspecial: 'GUBERNAMENTAL' as never }),
+        'tenant-1',
+        'vendedor-1',
+      );
+
+      expect(repository.siguienteNcfEnTx).toHaveBeenCalledWith(TX, 'B04');
+    });
+  });
+
   it('verifica y descuenta stock de cada línea antes de crear la factura (venta normal)', async () => {
     repository.obtenerProductoConPrecioVigente.mockResolvedValue(producto(18, 100) as never);
     repository.crearFacturaEnTx.mockResolvedValue(facturaCreada() as never);

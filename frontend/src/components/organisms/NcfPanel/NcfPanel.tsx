@@ -14,9 +14,13 @@ interface NcfAsignado {
   activo: boolean;
 }
 
-// e-CF (E3x): mismo ambiente de numeración que B0x, ver docs/ARCHITECTURE.md
-// ("e-NCF propio") — la firma/envío a la DGII todavía no está implementada.
-const TIPOS_NCF = ['B01', 'B02', 'B03', 'B04', 'B14', 'B15', 'E31', 'E32', 'E33', 'E34'];
+// e-CF (E3x/E4x): mismo ambiente de numeración que B0x/B1x, ver
+// docs/ARCHITECTURE.md ("e-NCF propio") — la firma/envío a la DGII
+// todavía no está implementada. B11/E43 ya los usa Gastos Menores
+// automáticamente (no se elige en una factura) — igual se listan acá
+// para poder crearles secuencia. B14/B15/E44/E45 (plan de integración
+// Cuadre, ítem B-1) ya se pueden elegir al facturar (Contado/Crédito).
+const TIPOS_NCF = ['B01', 'B02', 'B03', 'B04', 'B11', 'B14', 'B15', 'E31', 'E32', 'E33', 'E34', 'E43', 'E44', 'E45'];
 
 export function NcfPanel() {
   const queryClient = useQueryClient();

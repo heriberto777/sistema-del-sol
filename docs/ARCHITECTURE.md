@@ -703,6 +703,23 @@ guarda saldo propio, no importa extractos ni concilia transacciones — el
 saldo real vive en el libro mayor de la `cuentaContable` que tiene
 vinculada (`GET /contabilidad/libro-mayor/:cuentaId`, ya existente).
 
+**Tipo de comprobante especial en Facturación** (plan de integración de
+brechas Cuadre, ítem B-1): `FacturacionService.crear()` resolvía el
+`TipoNcf` siempre de forma automática a partir de `tipoFactura`
+(`NCF_POR_TIPO`/`ECF_POR_TIPO`, ambos `Record<TipoFactura, TipoNcf>`) — B14
+(Régimen Especial) y B15 (Gubernamental) ya estaban en el enum `TipoNcf`
+desde antes, pero ningún flujo real los podía producir. `CrearFacturaDto`
+gana `tipoComprobanteEspecial?: 'REGIMEN_ESPECIAL' | 'GUBERNAMENTAL'` —
+solo válido con `tipoFactura` CONTADO/CREDITO (una Nota de Crédito/Débito
+sigue siendo siempre B03/B04, reversar un documento no cambia de
+"régimen") — que sustituye el NCF resuelto automáticamente por B14/B15 (o
+sus equivalentes electrónicos nuevos, `E44`/`E45`) vía el mapa
+`TIPO_NCF_ESPECIAL`. Deliberadamente fuera de alcance: `B16`
+(Exportaciones) y `B17` (Pagos al Exterior) — no tenemos ningún proceso de
+negocio (venta de exportación, pago al exterior) que los produciría, así
+que agregarlos al enum sin nada que los use sería una brecha decorativa,
+no una brecha cerrada.
+
 Al crear un gasto menor, `GastoMenorService` emite
 `EVENTOS.GASTO_MENOR_CREADO` (mismo patrón fire-and-forget del Event
 Bus) y `ContabilidadEventosService.alCrearGastoMenor` genera el asiento
