@@ -1,5 +1,5 @@
 import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
-import { FormatoImpresion, Prisma } from '@prisma/client';
+import { FormatoImpresion, MotivoAjusteInventario, Prisma } from '@prisma/client';
 import { InventarioRepository, LoteEntrada } from './inventario.repository';
 import { ProductosService } from '../productos/productos.service';
 import { VariantesService } from '../variantes/variantes.service';
@@ -9,6 +9,18 @@ import { EVENTOS } from '../event-bus/events';
 import { ListadoQueryDto } from '../common/dto/listado-query.dto';
 import { paginar } from '../common/types/pagina-resultado';
 import { AuthService } from '../auth/auth.service';
+
+// Plan de integración de brechas Cuadre, ítem E-2: etiqueta legible para
+// cuando el cajero deja "motivo" (detalle libre) en blanco — el Kardex/
+// historial nunca queda sin una descripción humana del ajuste.
+const ETIQUETA_MOTIVO_AJUSTE: Record<MotivoAjusteInventario, string> = {
+  MERMA: 'Merma',
+  ROBO_PERDIDA: 'Robo o pérdida',
+  DANO: 'Daño',
+  VENCIMIENTO: 'Vencimiento',
+  CORRECCION_CONTEO: 'Corrección de conteo',
+  OTRO: 'Otro',
+};
 
 @Injectable()
 export class InventarioService {
@@ -289,7 +301,9 @@ export class InventarioService {
     bodegaId: string;
     cantidad: number;
     userId: string;
-    motivo: string;
+    motivoAjuste: MotivoAjusteInventario;
+    /** Detalle libre opcional, además de la categoría estructurada — ver ETIQUETA_MOTIVO_AJUSTE. */
+    motivo?: string;
     /** Solo si el producto controla vencimiento — entrada (cantidad > 0): lote a acreditar. */
     numeroLote?: string;
     fechaVencimiento?: Date;
@@ -313,7 +327,8 @@ export class InventarioService {
       delta: params.cantidad,
       tipo: 'AJUSTE',
       userId: params.userId,
-      motivo: params.motivo,
+      motivo: params.motivo?.trim() || ETIQUETA_MOTIVO_AJUSTE[params.motivoAjuste],
+      motivoAjuste: params.motivoAjuste,
       controlaVencimiento: producto!.controlaVencimiento,
       lotesEntrada:
         params.cantidad >= 0 && params.numeroLote && params.fechaVencimiento

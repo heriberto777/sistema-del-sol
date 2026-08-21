@@ -1148,11 +1148,18 @@ function ModalCheckout({
 function ModalMovimiento({ turnoId, onClose, onRegistrado }: { turnoId: string; onClose: () => void; onRegistrado: () => void }) {
   const [tipoMovimiento, setTipoMovimiento] = useState<'ENTRADA' | 'SALIDA'>('SALIDA');
   const [monto, setMonto] = useState('');
+  const [motivoTipo, setMotivoTipo] = useState('');
   const [concepto, setConcepto] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   const registrar = useMutation({
-    mutationFn: async () => apiClient.post(`/pos/turnos/${turnoId}/movimientos`, { tipo: tipoMovimiento, monto: Number(monto), concepto }),
+    mutationFn: async () =>
+      apiClient.post(`/pos/turnos/${turnoId}/movimientos`, {
+        tipo: tipoMovimiento,
+        monto: Number(monto),
+        motivoTipo,
+        concepto: concepto || undefined,
+      }),
     onSuccess: () => {
       onRegistrado();
       onClose();
@@ -1180,7 +1187,27 @@ function ModalMovimiento({ turnoId, onClose, onRegistrado }: { turnoId: string; 
           </select>
         </div>
         <FormField id="turno-monto-movimiento" label="Monto" type="number" min={0.01} step="any" value={monto} onChange={(e) => setMonto(e.target.value)} required />
-        <FormField id="turno-concepto-movimiento" label="Concepto" value={concepto} onChange={(e) => setConcepto(e.target.value)} required />
+        <div className="flex flex-col gap-1">
+          <label htmlFor="turno-motivo-movimiento" className="text-sm font-medium text-slate-700 dark:text-slate-300">
+            Motivo
+          </label>
+          <select
+            id="turno-motivo-movimiento"
+            value={motivoTipo}
+            onChange={(e) => setMotivoTipo(e.target.value)}
+            required
+            className="rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+          >
+            <option value="" disabled>
+              Seleccioná un motivo…
+            </option>
+            <option value="FONDO_CAMBIO">Fondo de cambio</option>
+            <option value="DEPOSITO">Depósito</option>
+            <option value="CORRECCION">Corrección</option>
+            <option value="OTRO">Otro</option>
+          </select>
+        </div>
+        <FormField id="turno-concepto-movimiento" label="Concepto (opcional)" value={concepto} onChange={(e) => setConcepto(e.target.value)} />
         {error && <p className="text-sm text-red-600">{error}</p>}
         <Button type="submit" disabled={registrar.isPending} className="w-full">
           {registrar.isPending ? 'Registrando…' : 'Registrar'}

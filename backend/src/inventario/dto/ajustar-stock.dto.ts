@@ -1,6 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsDate, IsNumber, IsOptional, IsString, IsUUID } from 'class-validator';
+import { IsDate, IsEnum, IsNumber, IsOptional, IsString, IsUUID } from 'class-validator';
+import { MotivoAjusteInventario } from '@prisma/client';
 
 export class AjustarStockDto {
   @ApiProperty()
@@ -20,9 +21,14 @@ export class AjustarStockDto {
   @IsNumber()
   cantidad: number;
 
-  @ApiProperty()
+  @ApiProperty({ enum: MotivoAjusteInventario, description: 'Categoría estructurada del ajuste — filtrable/reportable (plan de integración Cuadre, ítem E-2)' })
+  @IsEnum(MotivoAjusteInventario)
+  motivoAjuste: MotivoAjusteInventario;
+
+  @ApiProperty({ required: false, description: 'Detalle libre opcional, además de la categoría estructurada' })
+  @IsOptional()
   @IsString()
-  motivo: string;
+  motivo?: string;
 
   @ApiProperty({ required: false, description: 'Solo si el producto controla vencimiento y cantidad > 0 (entrada): número de lote a acreditar' })
   @IsOptional()

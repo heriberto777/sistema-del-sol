@@ -149,7 +149,7 @@ describe('InventarioService', () => {
       sucursalesRepository.usuarioPuedeOperar.mockResolvedValue(false);
 
       await expect(
-        service.ajustarStock({ tenantId: 't1', productoId: 'p1', bodegaId: 'b1', cantidad: -3, userId: 'u1', motivo: 'merma' }),
+        service.ajustarStock({ tenantId: 't1', productoId: 'p1', bodegaId: 'b1', cantidad: -3, userId: 'u1', motivoAjuste: 'MERMA' }),
       ).rejects.toThrow(ForbiddenException);
       expect(repository.ajustarCantidad).not.toHaveBeenCalled();
     });
@@ -176,20 +176,36 @@ describe('InventarioService', () => {
   });
 
   it('ajustarStock permite delta negativo directo con tipo AJUSTE', async () => {
-    await service.ajustarStock({ tenantId: 't1', productoId: 'p1', bodegaId: 'b1', cantidad: -3, userId: 'u1', motivo: 'merma' });
+    await service.ajustarStock({ tenantId: 't1', productoId: 'p1', bodegaId: 'b1', cantidad: -3, userId: 'u1', motivoAjuste: 'MERMA' });
     expect(repository.ajustarCantidad).toHaveBeenCalledWith(
       expect.objectContaining({ delta: -3, tipo: 'AJUSTE' }),
     );
   });
 
+  describe('ajustarStock — motivo estructurado (plan de integración Cuadre, E-2)', () => {
+    it('usa el motivo libre cuando viene', async () => {
+      await service.ajustarStock({ tenantId: 't1', productoId: 'p1', bodegaId: 'b1', cantidad: -3, userId: 'u1', motivoAjuste: 'MERMA', motivo: 'Se rompieron 3 unidades' });
+      expect(repository.ajustarCantidad).toHaveBeenCalledWith(
+        expect.objectContaining({ motivo: 'Se rompieron 3 unidades', motivoAjuste: 'MERMA' }),
+      );
+    });
+
+    it('si no viene motivo libre, usa la etiqueta legible del motivoAjuste', async () => {
+      await service.ajustarStock({ tenantId: 't1', productoId: 'p1', bodegaId: 'b1', cantidad: -3, userId: 'u1', motivoAjuste: 'ROBO_PERDIDA' });
+      expect(repository.ajustarCantidad).toHaveBeenCalledWith(
+        expect.objectContaining({ motivo: 'Robo o pérdida', motivoAjuste: 'ROBO_PERDIDA' }),
+      );
+    });
+  });
+
   describe('ajustarStock — Fase 9, PIN de confirmación solo en salidas', () => {
     it('NO pide PIN en una entrada (cantidad positiva)', async () => {
-      await service.ajustarStock({ tenantId: 't1', productoId: 'p1', bodegaId: 'b1', cantidad: 5, userId: 'u1', motivo: 'conteo de más' });
+      await service.ajustarStock({ tenantId: 't1', productoId: 'p1', bodegaId: 'b1', cantidad: 5, userId: 'u1', motivoAjuste: 'CORRECCION_CONTEO' });
       expect(authService.verificarPin).not.toHaveBeenCalled();
     });
 
     it('pide y valida el PIN en una salida (cantidad negativa)', async () => {
-      await service.ajustarStock({ tenantId: 't1', productoId: 'p1', bodegaId: 'b1', cantidad: -3, userId: 'u1', motivo: 'merma', pin: '1234' });
+      await service.ajustarStock({ tenantId: 't1', productoId: 'p1', bodegaId: 'b1', cantidad: -3, userId: 'u1', motivoAjuste: 'MERMA', pin: '1234' });
       expect(authService.verificarPin).toHaveBeenCalledWith('u1', '1234');
     });
 
@@ -197,7 +213,7 @@ describe('InventarioService', () => {
       authService.verificarPin.mockRejectedValue(new Error('PIN incorrecto'));
 
       await expect(
-        service.ajustarStock({ tenantId: 't1', productoId: 'p1', bodegaId: 'b1', cantidad: -3, userId: 'u1', motivo: 'merma', pin: 'mal' }),
+        service.ajustarStock({ tenantId: 't1', productoId: 'p1', bodegaId: 'b1', cantidad: -3, userId: 'u1', motivoAjuste: 'MERMA', pin: 'mal' }),
       ).rejects.toThrow('PIN incorrecto');
       expect(repository.ajustarCantidad).not.toHaveBeenCalled();
     });

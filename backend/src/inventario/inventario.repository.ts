@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { TenantPrismaService } from '../prisma/tenant-prisma.service';
-import { FormatoImpresion, Prisma, TipoMovimientoInventario } from '@prisma/client';
+import { FormatoImpresion, MotivoAjusteInventario, Prisma, TipoMovimientoInventario } from '@prisma/client';
 
 /** Un lote a acreditar en una entrada (recepción de compra, ajuste positivo, o reconstruido por una Nota de Crédito — Fase 5b). */
 export interface LoteEntrada {
@@ -26,6 +26,8 @@ interface ParamsAjuste {
   tipo: TipoMovimientoInventario;
   userId: string;
   motivo?: string;
+  // Solo la seteamos en ajustes manuales (InventarioService.ajustarStock) — ver ParamsAjuste como el único consumidor real.
+  motivoAjuste?: MotivoAjusteInventario;
   referenciaTipo?: string;
   referenciaId?: string;
   // Fase 5b — solo si el producto de `varianteId` tiene `controlaVencimiento: true`.
@@ -266,7 +268,7 @@ export class InventarioRepository {
    * la factura compartan una sola transacción).
    */
   async ajustarCantidadEnTx(tx: Prisma.TransactionClient, params: ParamsAjuste) {
-    const { tenantId, productoId, varianteId, bodegaId, delta, tipo, userId, motivo, referenciaTipo, referenciaId, controlaVencimiento, lotesEntrada, loteIdSalida } = params;
+    const { tenantId, productoId, varianteId, bodegaId, delta, tipo, userId, motivo, motivoAjuste, referenciaTipo, referenciaId, controlaVencimiento, lotesEntrada, loteIdSalida } = params;
     const direccion = delta >= 0 ? 'ENTRADA' : 'SALIDA';
 
     const stock = await tx.stock.upsert({
@@ -290,6 +292,7 @@ export class InventarioRepository {
           direccion,
           cantidad: Math.abs(delta),
           motivo,
+          motivoAjuste,
           referenciaTipo,
           referenciaId,
           userId,
@@ -308,7 +311,7 @@ export class InventarioRepository {
       for (const l of lotesEntrada) {
         const lote = await this.upsertLoteEnTx(tx, tenantId, varianteId, bodegaId, l);
         await tx.movimientoInventario.create({
-          data: { tenantId, productoId, varianteId, bodegaId, tipo, direccion: 'ENTRADA', cantidad: l.cantidad, motivo, referenciaTipo, referenciaId, loteId: lote.id, userId },
+          data: { tenantId, productoId, varianteId, bodegaId, tipo, direccion: 'ENTRADA', cantidad: l.cantidad, motivo, motivoAjuste, referenciaTipo, referenciaId, loteId: lote.id, userId },
         });
       }
     } else {
@@ -317,7 +320,7 @@ export class InventarioRepository {
       }
       const [consumo] = await this.consumirLoteExplicitoEnTx(tx, loteIdSalida, Math.abs(delta));
       await tx.movimientoInventario.create({
-        data: { tenantId, productoId, varianteId, bodegaId, tipo, direccion: 'SALIDA', cantidad: consumo.cantidad, motivo, referenciaTipo, referenciaId, loteId: consumo.loteId, userId },
+        data: { tenantId, productoId, varianteId, bodegaId, tipo, direccion: 'SALIDA', cantidad: consumo.cantidad, motivo, motivoAjuste, referenciaTipo, referenciaId, loteId: consumo.loteId, userId },
       });
     }
 

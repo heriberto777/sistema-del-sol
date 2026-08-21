@@ -388,7 +388,7 @@ describe('App (e2e)', () => {
       await request(app.getHttpServer())
         .post('/api/inventario/ajustar')
         .set('Authorization', `Bearer ${token}`)
-        .send({ productoId: productoAId, bodegaId: bodegaAId, cantidad: 1000, motivo: 'Intento de corrupción cross-tenant' })
+        .send({ productoId: productoAId, bodegaId: bodegaAId, cantidad: 1000, motivoAjuste: 'OTRO', motivo: 'Intento de corrupción cross-tenant' })
         .expect(404);
     });
 
@@ -2277,7 +2277,7 @@ describe('App (e2e)', () => {
       await request(app.getHttpServer())
         .post(`/api/pos/turnos/${turnoId}/movimientos`)
         .set('Authorization', `Bearer ${token}`)
-        .send({ tipo: 'SALIDA', monto: 50, concepto: 'Compra de insumos de limpieza' })
+        .send({ tipo: 'SALIDA', monto: 50, motivoTipo: 'OTRO', concepto: 'Compra de insumos de limpieza' })
         .expect(201);
     });
 
@@ -3427,7 +3427,7 @@ describe('App (e2e)', () => {
       await request(app.getHttpServer())
         .post('/api/inventario/ajustar')
         .set('Authorization', `Bearer ${tokenRestringido}`)
-        .send({ productoId, bodegaId: bodegaAjenaId, cantidad: 5, motivo: 'Ajuste Fase 9 E2E' })
+        .send({ productoId, bodegaId: bodegaAjenaId, cantidad: 5, motivoAjuste: 'OTRO', motivo: 'Ajuste Fase 9 E2E' })
         .expect(403);
     });
 

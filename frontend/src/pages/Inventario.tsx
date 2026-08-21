@@ -378,6 +378,7 @@ function ModalAjustarStock({
 }) {
   const queryClient = useQueryClient();
   const [cantidad, setCantidad] = useState('');
+  const [motivoAjuste, setMotivoAjuste] = useState('');
   const [motivo, setMotivo] = useState('');
   const [numeroLote, setNumeroLote] = useState('');
   const [fechaVencimiento, setFechaVencimiento] = useState('');
@@ -395,7 +396,8 @@ function ModalAjustarStock({
         varianteId: stockInicial.varianteId,
         bodegaId,
         cantidad: Number(cantidad),
-        motivo,
+        motivoAjuste,
+        motivo: motivo || undefined,
         ...(controlaVencimiento && esEntrada ? { numeroLote, fechaVencimiento } : {}),
         ...(controlaVencimiento && !esEntrada ? { loteId } : {}),
         ...(!esEntrada ? { pin: pin || undefined } : {}),
@@ -454,7 +456,23 @@ function ModalAjustarStock({
         {controlaVencimiento && cantidad !== '' && !esEntrada && (
           <SelectorLoteAjuste varianteId={stockInicial.varianteId} bodegaId={bodegaId} value={loteId} onChange={setLoteId} />
         )}
-        <FormField id="ajuste-motivo" label="Motivo" value={motivo} onChange={(e) => setMotivo(e.target.value)} required />
+        <div className="flex flex-col gap-1">
+          <label htmlFor="ajuste-motivo-tipo" className="text-sm font-medium text-slate-700 dark:text-slate-300">
+            Motivo
+          </label>
+          <Select id="ajuste-motivo-tipo" value={motivoAjuste} onChange={(e) => setMotivoAjuste(e.target.value)} required>
+            <option value="" disabled>
+              Seleccioná un motivo…
+            </option>
+            <option value="MERMA">Merma</option>
+            <option value="ROBO_PERDIDA">Robo o pérdida</option>
+            <option value="DANO">Daño</option>
+            <option value="VENCIMIENTO">Vencimiento</option>
+            <option value="CORRECCION_CONTEO">Corrección de conteo</option>
+            <option value="OTRO">Otro</option>
+          </Select>
+        </div>
+        <FormField id="ajuste-motivo" label="Detalle (opcional)" value={motivo} onChange={(e) => setMotivo(e.target.value)} />
         {cantidad !== '' && !esEntrada && <CampoPin value={pin} onChange={setPin} id="ajuste-pin" />}
         {error && <p className="text-sm text-red-600">{error}</p>}
         <Button type="submit" disabled={ajustar.isPending} className="w-full">

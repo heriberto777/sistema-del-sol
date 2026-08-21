@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsIn, IsNumber, IsPositive, IsString, MinLength } from 'class-validator';
+import { IsEnum, IsIn, IsNumber, IsOptional, IsPositive, IsString } from 'class-validator';
+import { MotivoMovimientoCaja } from '@prisma/client';
 
 export class CrearMovimientoCajaDto {
   @ApiProperty({ enum: ['ENTRADA', 'SALIDA'] })
@@ -11,8 +12,12 @@ export class CrearMovimientoCajaDto {
   @IsPositive()
   monto: number;
 
-  @ApiProperty()
+  @ApiProperty({ enum: MotivoMovimientoCaja, description: 'Categoría estructurada del movimiento (plan de integración Cuadre, ítem F-5)' })
+  @IsEnum(MotivoMovimientoCaja)
+  motivoTipo: MotivoMovimientoCaja;
+
+  @ApiProperty({ required: false, description: 'Detalle libre opcional, además de la categoría estructurada' })
+  @IsOptional()
   @IsString()
-  @MinLength(1)
-  concepto: string;
+  concepto?: string;
 }

@@ -100,6 +100,13 @@ antes de esta fase (default permisivo) — ver ARCHITECTURE.md.
   signo real del movimiento — `cantidad` siempre se guarda en valor
   absoluto, y `tipo` solo no alcanza para saber el signo de
   `TRANSFERENCIA`/`AJUSTE` (ver ARCHITECTURE.md, "Kardex").
+  `movimiento_inventario.motivoAjuste` (plan de integración de brechas
+  Cuadre, ítem E-2) es un enum nullable — solo lo setea
+  `InventarioService.ajustarStock` — con la categoría estructurada del
+  ajuste (Merma/Robo-Pérdida/Daño/Vencimiento/Corrección de conteo/Otro);
+  coexiste con `motivo` (texto libre, ahora opcional) sin reemplazarlo.
+  Mismo patrón en `movimientos_caja.motivoTipo` (ítem F-5, enum nullable,
+  `concepto` texto libre ahora opcional).
 - **Variantes de producto (Fase 3c)**: `stock`/`precios` cuelgan de
   `variantes_producto`, no de `productos` directo — todo producto tiene
   siempre al menos una variante "por defecto" (sin valores de atributo),

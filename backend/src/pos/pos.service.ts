@@ -17,8 +17,18 @@ import { RegistrarDevolucionDto } from './dto/registrar-devolucion.dto';
 import { ListarTurnosQueryDto } from './dto/listar-turnos-query.dto';
 import { paginar } from '../common/types/pagina-resultado';
 import { CONFIGURACIONES_BASE } from '../tenants/roles-base';
+import { MotivoMovimientoCaja } from '@prisma/client';
 
 const CLAVE_TOLERANCIA_ARQUEO = 'POS_TOLERANCIA_ARQUEO';
+
+// Plan de integración de brechas Cuadre, ítem F-5: etiqueta legible para
+// cuando el cajero deja "concepto" (detalle libre) en blanco.
+const ETIQUETA_MOTIVO_MOVIMIENTO: Record<MotivoMovimientoCaja, string> = {
+  FONDO_CAMBIO: 'Fondo de cambio',
+  DEPOSITO: 'Depósito',
+  CORRECCION: 'Corrección',
+  OTRO: 'Otro',
+};
 
 @Injectable()
 export class PosService {
@@ -73,7 +83,13 @@ export class PosService {
   async registrarMovimiento(turnoId: string, dto: CrearMovimientoCajaDto) {
     const turno = await this.posRepository.buscarPorId(turnoId);
     this.validarAbierto(turno);
-    return this.posRepository.crearMovimiento({ turnoId, tipo: dto.tipo, monto: dto.monto, concepto: dto.concepto });
+    return this.posRepository.crearMovimiento({
+      turnoId,
+      tipo: dto.tipo,
+      monto: dto.monto,
+      concepto: dto.concepto?.trim() || ETIQUETA_MOTIVO_MOVIMIENTO[dto.motivoTipo],
+      motivoTipo: dto.motivoTipo,
+    });
   }
 
   /**

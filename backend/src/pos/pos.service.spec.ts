@@ -107,17 +107,33 @@ describe('PosService', () => {
     it('rechaza registrar un movimiento en un turno que no está abierto', async () => {
       posRepository.buscarPorId.mockResolvedValue({ id: 't1', estado: 'CERRADO' } as never);
 
-      await expect(service.registrarMovimiento('t1', { tipo: 'SALIDA', monto: 500, concepto: 'Compra de insumos' })).rejects.toThrow(
-        BadRequestException,
-      );
+      await expect(
+        service.registrarMovimiento('t1', { tipo: 'SALIDA', monto: 500, concepto: 'Compra de insumos', motivoTipo: 'OTRO' }),
+      ).rejects.toThrow(BadRequestException);
     });
 
     it('registra el movimiento si el turno está abierto', async () => {
       posRepository.buscarPorId.mockResolvedValue({ id: 't1', estado: 'ABIERTO' } as never);
 
-      await service.registrarMovimiento('t1', { tipo: 'SALIDA', monto: 500, concepto: 'Compra de insumos' });
+      await service.registrarMovimiento('t1', { tipo: 'SALIDA', monto: 500, concepto: 'Compra de insumos', motivoTipo: 'OTRO' });
 
-      expect(posRepository.crearMovimiento).toHaveBeenCalledWith({ turnoId: 't1', tipo: 'SALIDA', monto: 500, concepto: 'Compra de insumos' });
+      expect(posRepository.crearMovimiento).toHaveBeenCalledWith({
+        turnoId: 't1',
+        tipo: 'SALIDA',
+        monto: 500,
+        concepto: 'Compra de insumos',
+        motivoTipo: 'OTRO',
+      });
+    });
+
+    it('usa la etiqueta legible del motivoTipo si no viene concepto (plan de integración Cuadre, F-5)', async () => {
+      posRepository.buscarPorId.mockResolvedValue({ id: 't1', estado: 'ABIERTO' } as never);
+
+      await service.registrarMovimiento('t1', { tipo: 'ENTRADA', monto: 200, motivoTipo: 'FONDO_CAMBIO' } as never);
+
+      expect(posRepository.crearMovimiento).toHaveBeenCalledWith(
+        expect.objectContaining({ concepto: 'Fondo de cambio', motivoTipo: 'FONDO_CAMBIO' }),
+      );
     });
   });
 

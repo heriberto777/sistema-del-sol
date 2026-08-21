@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { TenantPrismaService } from '../prisma/tenant-prisma.service';
-import { EstadoTurnoCaja, TipoMovimientoCaja } from '@prisma/client';
+import { EstadoTurnoCaja, MotivoMovimientoCaja, TipoMovimientoCaja } from '@prisma/client';
 
 const INCLUDE_TURNO = {
   movimientos: true,
@@ -82,7 +82,7 @@ export class PosRepository {
     return turnos.map((t) => t.cajero);
   }
 
-  crearMovimiento(params: { turnoId: string; tipo: TipoMovimientoCaja; monto: number; concepto: string }) {
+  crearMovimiento(params: { turnoId: string; tipo: TipoMovimientoCaja; monto: number; concepto: string; motivoTipo?: MotivoMovimientoCaja }) {
     return this.db.movimientoCaja.create({ data: params });
   }
 

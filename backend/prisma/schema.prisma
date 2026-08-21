@@ -1292,6 +1292,16 @@ enum TipoMovimientoCaja {
   SALIDA
 }
 
+/// Motivo estructurado de un movimiento manual de caja (plan de
+/// integración de brechas Cuadre, ítem F-5) — opcional, coexiste con
+/// `concepto` (texto libre) sin reemplazarlo.
+enum MotivoMovimientoCaja {
+  FONDO_CAMBIO
+  DEPOSITO
+  CORRECCION
+  OTRO
+}
+
 /// Un turno de caja por bodega/cajero. Solo puede haber un ABIERTO a la
 /// vez por bodega (lo valida PosService, no una constraint de DB, porque
 /// "a la vez" depende del estado, no de una combinación de columnas fija).
@@ -1337,6 +1347,7 @@ model MovimientoCaja {
   tipo      TipoMovimientoCaja
   monto     Decimal            @db.Decimal(14, 2)
   concepto  String
+  motivoTipo MotivoMovimientoCaja?
   createdAt DateTime           @default(now())
 
   @@map("movimientos_caja")
@@ -1669,6 +1680,18 @@ enum TipoMovimientoInventario {
   AJUSTE
 }
 
+/// Motivo estructurado de un ajuste manual de stock (plan de integración
+/// de brechas Cuadre, ítem E-2) — solo lo setea `InventarioService.
+/// ajustarStock`; nullable porque ENTRADA/SALIDA/TRANSFERENCIA no lo usan.
+enum MotivoAjusteInventario {
+  MERMA
+  ROBO_PERDIDA
+  DANO
+  VENCIMIENTO
+  CORRECCION_CONTEO
+  OTRO
+}
+
 // `TRANSFERENCIA` se usa para AMBOS lados de una transferencia (origen y
 // destino, mismo valor de `tipo`) y `AJUSTE` puede ser positivo o negativo
 // — `cantidad` siempre se guarda en valor absoluto, así que sin esto no hay
@@ -1698,6 +1721,7 @@ model MovimientoInventario {
   direccion      DireccionMovimiento
   cantidad       Decimal                  @db.Decimal(14, 4)
   motivo         String?
+  motivoAjuste   MotivoAjusteInventario?
   // Ya existían, sin usar en ningún lado del código — Fase 5b los reusa
   // para vincular un movimiento de lote a su origen ('FACTURA'+facturaId
   // en ventas, 'RECEPCION_COMPRA'+recepcionId en compras), lo que le
