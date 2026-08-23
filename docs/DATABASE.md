@@ -48,7 +48,7 @@ PostgreSQL 16 + Prisma. Schema completo en `backend/prisma/schema.prisma`.
 | Bancos / Gastos menores | `cuentas_bancarias`, `gastos_menores`, `lineas_gasto_menor` |
 | Nómina | `empleados`, `periodos_nomina`, `recibos_nomina` |
 | POS | `turnos_caja`, `movimientos_caja`, `ventas_aparcadas`/`lineas_venta_aparcada`, `pagos_venta` (ledger de pago dividido, hija de `facturas` sin tenantId propio) (+ `facturas.formaPagoId`/`facturas.turnoCajaId`/`facturas.vendedorEmpleadoId`) |
-| Formas de pago | `formas_pago` (tenant-scoped, reemplaza el enum fijo `MetodoPago` para `facturas`/`pagos` — ese enum sigue existiendo solo para `PagoPlataforma`; `esBono: Boolean` identifica la forma "Bono" igual que `esEfectivo`, Fase 4c — ver ARCHITECTURE.md) |
+| Formas de pago | `formas_pago` (tenant-scoped, reemplaza el enum fijo `MetodoPago` para `facturas`/`pagos` — ese enum sigue existiendo solo para `PagoPlataforma`; `esBono: Boolean` identifica la forma "Bono" igual que `esEfectivo`, Fase 4c — ver ARCHITECTURE.md). `formas_pago.tipo` (plan de integración Cuadre, ítem E-11) es un enum nullable de 7 categorías, puramente informativo — `esEfectivo`/`esBono` siguen siendo los que gatillan comportamiento real (arqueo de caja, canje de Bono); "Crédito Cliente" YA existe como fila sembrada (`FORMAS_PAGO_BASE`) desde antes de este ítem, solo con el nombre — no descuenta contra `Cliente.limiteCredito`, eso queda fuera de alcance (candidato a su propia sesión de diseño, no un campo de catálogo chico). |
 | Bonos | `bonos` (tenant-scoped, gift cards; `saldoActual` es la única fuente de verdad, sin tabla de movimientos propia — `pagos_venta` filtrado por `formaPago.esBono` ya sirve de ledger, Fase 4c — ver ARCHITECTURE.md) |
 | Plataforma | `platform_admins`, `platform_audit_logs` |
 | RBAC de plataforma | `platform_permissions`, `platform_roles`, `platform_role_permissions` (catálogo global, sin `tenantId` — `platform_admins.roleId` es nullable) |
@@ -92,6 +92,15 @@ antes de esta fase (default permisivo) — ver ARCHITECTURE.md.
   actualizar()` rechaza renombrar la fila `"GENERAL"` — es el default
   hardcodeado en el schema y en varios services, renombrarla dejaría los
   precios ya creados con esa lista inalcanzables desde el catálogo.
+- **Categoría/segmentación de cliente y comprobante por defecto (plan de
+  integración Cuadre, ítem E-5)**: `categorias_cliente` es un catálogo
+  plano (sin jerarquía, a diferencia de `categorias` de producto) —
+  `clientes.categoriaId` (`onDelete: SetNull`), puramente informativo,
+  sin efecto en precios/permisos, a diferencia de `listaPrecioId`.
+  `clientes.comprobantePorDefecto` (enum `ComprobantePorDefecto`, 4
+  valores) autoselecciona `tipoFactura` + `tipoComprobanteEspecial`
+  (ítem B-1) en el formulario de Facturación al elegir ese cliente — es
+  solo un valor inicial, el usuario lo puede cambiar antes de guardar.
 - **Stock**: `stock.cantidadActual - stock.cantidadReservada` es el
   disponible; nunca se permite que una venta lo deje negativo
   (`InventarioService.verificarYDescontarStock`). Cada movimiento queda

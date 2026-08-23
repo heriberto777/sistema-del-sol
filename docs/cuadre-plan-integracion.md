@@ -168,12 +168,18 @@ Resumen de lo que cambió (detalle en cada ítem más abajo):
   Stock / Stock Bajo / Por Vencer 7 días / Vencidos) con dashboard propio.
   *Confirmado: brecha real — el reporte hoy es un solo contador
   (`stockBajoConteo`).*
-- [ ] **E-5** 🟧 *(alcance reducido)* — **Cliente: campos que faltan**.
+- [x] **E-5** 🟧 *(alcance reducido)* — **Cliente: campos que faltan**.
   *YA tenemos `limiteCredito` (Decimal) y `esConsumidorFinal` (que ES el
-  "cliente por defecto"/walk-in de Cuadre) en `model Cliente`. Lo que
-  realmente falta: categoría/segmentación (catálogo propio) y comprobante
-  fiscal por defecto (autoseleccionado al elegir el cliente en POS/
-  Facturación).*
+  "cliente por defecto"/walk-in de Cuadre) en `model Cliente`.* Entregado:
+  catálogo `CategoriaCliente` (plano, informativo, panel propio en
+  Admin → Catálogo → "Categorías de cliente") y `Cliente.
+  comprobantePorDefecto` (4 valores, autoselecciona tipoFactura +
+  tipoComprobanteEspecial al elegir el cliente en `ModalNuevaFactura`).
+  Nota: la autoselección se implementó solo en Facturación, no en POS —
+  el POS todavía no tiene ningún selector de tipoFactura/NCF (ver F-2,
+  brecha separada); cuando F-2 se implemente, debería reusar el mismo
+  campo. Migración `20260821170000_cliente_categoria_comprobante`.
+  Entregado 2026-08-21.
 - [ ] **E-6** 🟧 — **Cierres de caja como dashboard**: desglose de ventas
   por TODAS las formas de pago (no solo efectivo), estado "Pendiente
   revisión". *Confirmado: brecha real — `EstadoTurnoCaja` solo tiene
@@ -206,13 +212,20 @@ Resumen de lo que cambió (detalle en cada ítem más abajo):
   asociación opcional a un cliente específico — ninguno de los dos
   justifica un ítem propio, se pueden agregar como parte de cualquier
   trabajo futuro sobre Bonos si se necesitan.
-- [ ] **E-11** 🟨 *(alcance reducido)* — **Formas de pago: lo que falta**.
-  *YA tenemos `requiereReferencia` (Boolean) en `model FormaPago` — la
-  parte de "requiere referencia configurable" de la comparación original
-  estaba mal. Lo que realmente falta: la clasificación de "tipo"
-  estructurada (7 categorías en vez de los flags puntuales
-  `esBono`/`esEfectivo` actuales) y el concepto de "Crédito Cliente" (pagar
-  contra cuenta corriente).*
+- [x] **E-11** 🟨 *(alcance reducido, corrección adicional)* — **Formas de
+  pago: lo que falta**. *YA tenemos `requiereReferencia` (Boolean) en
+  `model FormaPago`. **Corrección**: "Crédito Cliente" también estaba
+  mal — ya existe como fila sembrada en `FORMAS_PAGO_BASE` desde antes de
+  este ítem (nombre únicamente, sin comportamiento de cuenta corriente
+  detrás, otro falso positivo del catálogo original).* Entregado:
+  `FormaPago.tipo` (enum `TipoFormaPago`, 7 categorías), nullable,
+  puramente informativo — `esEfectivo`/`esBono` siguen siendo los que
+  gatillan comportamiento real. Backfill por nombre exacto solo para las
+  7 filas de fábrica. Deliberadamente fuera de alcance: hacer que "Crédito
+  Cliente" descuente de verdad contra `Cliente.limiteCredito` — es una
+  funcionalidad de cuentas por cobrar más grande, candidata a su propia
+  sesión de diseño. Migración `20260821160000_forma_pago_tipo`. Entregado
+  2026-08-21.
 
 ## F — POS
 
@@ -354,13 +367,21 @@ Resumen de lo que cambió (detalle en cada ítem más abajo):
   (color decorativo por categoría, para escaneo visual en el POS). Los 3
   pasaron tsc + suite completa (715 unitarios + 179 e2e) + lint + build
   antes de este commit.
+- **2026-08-21**: entregados E-5 (categoría/segmentación de cliente +
+  comprobante fiscal por defecto) y E-11 (tipo estructurado de forma de
+  pago). Otra corrección encontrada al implementar E-11: "Crédito
+  Cliente" ya existía como fila sembrada — no era una brecha real, solo
+  le faltaba la clasificación de tipo. Pendiente correr la suite
+  completa sobre este lote (instrucción explícita del usuario: dejarla
+  para el final del lote de cambios, no después de cada ítem).
 
 ## Sugerencia de por dónde arrancar
 
-Con el catálogo ya corregido y E-3/E-9/G-7 entregados, los candidatos de
-mejor esfuerzo/impacto que quedan son **E-5** y **E-11** (ambos con
-alcance reducido — campos puntuales sobre modelos que ya existen, ver
-arriba). Los 🟥 con "diseño primero" conviene agruparlos en su propia
-sesión de planeamiento cuando se prioricen, siguiendo la misma mecánica
-que Sucursales (Fase 8) y PIN (Fase 9): presentar el diseño, resolver
-casos límite, y recién después ejecutar.
+Con el catálogo ya corregido y E-3/E-5/E-9/E-11/G-7 entregados, la
+sección **E** (Ventas/Clientes) y **G** (Nómina/RRHH) quedan sin más
+ítems 🟨/🟧 de alcance reducido — lo que queda ahí (E-4, E-6, E-7, E-8,
+G-3, G-4, G-5, G-6, G-8) son brechas reales de tamaño medio/grande sin
+ningún matiz "ya lo tenemos". Los 🟥 con "diseño primero" conviene
+agruparlos en su propia sesión de planeamiento cuando se prioricen,
+siguiendo la misma mecánica que Sucursales (Fase 8) y PIN (Fase 9):
+presentar el diseño, resolver casos límite, y recién después ejecutar.

@@ -13,10 +13,12 @@ import { EstadoVacio } from '../components/molecules/EstadoVacio/EstadoVacio';
 import { RowActionsMenu } from '../components/molecules/RowActionsMenu/RowActionsMenu';
 import { RequierePermiso } from '../components/organisms/RequierePermiso/RequierePermiso';
 import { SelectListaPrecio } from '../components/molecules/SelectListaPrecio/SelectListaPrecio';
+import { SelectCategoriaCliente } from '../components/molecules/SelectCategoriaCliente/SelectCategoriaCliente';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { PaginaResultado } from '../types/pagina-resultado';
 
 type TipoCliente = 'PERSONA_FISICA' | 'PERSONA_JURIDICA';
+type ComprobantePorDefecto = 'CONTADO' | 'CREDITO' | 'REGIMEN_ESPECIAL' | 'GUBERNAMENTAL';
 
 interface Cliente {
   id: string;
@@ -27,6 +29,8 @@ interface Cliente {
   telefono: string | null;
   limiteCredito: string | null;
   listaPrecioId: string | null;
+  categoriaId: string | null;
+  comprobantePorDefecto: ComprobantePorDefecto | null;
 }
 
 interface Proveedor {
@@ -45,6 +49,8 @@ interface ClienteFormValues {
   telefono: string;
   limiteCredito: string;
   listaPrecioId: string;
+  categoriaId: string;
+  comprobantePorDefecto: ComprobantePorDefecto | '';
 }
 
 interface ProveedorFormValues {
@@ -62,6 +68,8 @@ const CLIENTE_VACIO: ClienteFormValues = {
   telefono: '',
   limiteCredito: '',
   listaPrecioId: '',
+  categoriaId: '',
+  comprobantePorDefecto: '',
 };
 
 const PROVEEDOR_VACIO: ProveedorFormValues = { nombre: '', rnc: '', email: '', telefono: '' };
@@ -373,6 +381,8 @@ function FormularioCliente({ cliente, onGuardado }: { cliente: Cliente | null; o
           telefono: cliente.telefono ?? '',
           limiteCredito: cliente.limiteCredito ?? '',
           listaPrecioId: cliente.listaPrecioId ?? '',
+          categoriaId: cliente.categoriaId ?? '',
+          comprobantePorDefecto: cliente.comprobantePorDefecto ?? '',
         }
       : CLIENTE_VACIO,
   );
@@ -387,6 +397,8 @@ function FormularioCliente({ cliente, onGuardado }: { cliente: Cliente | null; o
       telefono: valores.telefono || undefined,
       limiteCredito: valores.limiteCredito ? Number(valores.limiteCredito) : undefined,
       listaPrecioId: valores.listaPrecioId || null,
+      categoriaId: valores.categoriaId || null,
+      comprobantePorDefecto: valores.comprobantePorDefecto || null,
     };
   }
 
@@ -461,6 +473,28 @@ function FormularioCliente({ cliente, onGuardado }: { cliente: Cliente | null; o
           onChange={(id) => setValores((v) => ({ ...v, listaPrecioId: id }))}
         />
       </div>
+      <div className="flex flex-col gap-1">
+        <label htmlFor="cliente-categoria" className="text-sm font-medium text-slate-700 dark:text-slate-300">
+          Categoría (segmentación, opcional)
+        </label>
+        <SelectCategoriaCliente
+          id="cliente-categoria"
+          value={valores.categoriaId}
+          onChange={(id) => setValores((v) => ({ ...v, categoriaId: id }))}
+        />
+      </div>
+      <SelectField
+        id="cliente-comprobante-defecto"
+        label="Comprobante fiscal por defecto (opcional)"
+        value={valores.comprobantePorDefecto}
+        onChange={(e) => setValores((v) => ({ ...v, comprobantePorDefecto: e.target.value as ComprobantePorDefecto | '' }))}
+      >
+        <option value="">Sin default — elegir cada vez al facturar</option>
+        <option value="CONTADO">Contado</option>
+        <option value="CREDITO">Crédito</option>
+        <option value="REGIMEN_ESPECIAL">Régimen Especial (B14)</option>
+        <option value="GUBERNAMENTAL">Gubernamental (B15)</option>
+      </SelectField>
       {error && <p className="text-sm text-red-600">{error}</p>}
       <Button type="submit" disabled={guardar.isPending} className="w-full">
         {guardar.isPending ? 'Guardando…' : 'Guardar'}

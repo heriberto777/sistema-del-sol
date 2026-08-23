@@ -57,4 +57,5 @@ export const TENANT_SCOPED_MODELS = new Set([
   'RegistroAsistencia',
   'Ausencia',
   'Sucursal',
+  'CategoriaCliente',
 ]);

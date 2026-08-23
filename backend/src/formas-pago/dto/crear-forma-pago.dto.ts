@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsBoolean, IsOptional, IsString, MinLength } from 'class-validator';
+import { TipoFormaPago } from '@prisma/client';
+import { IsBoolean, IsEnum, IsOptional, IsString, MinLength } from 'class-validator';
 
 export class CrearFormaPagoDto {
   @ApiProperty()
@@ -21,6 +22,16 @@ export class CrearFormaPagoDto {
   @IsOptional()
   @IsBoolean()
   esBono?: boolean;
+
+  @ApiProperty({
+    required: false,
+    enum: TipoFormaPago,
+    description:
+      'Clasificación estructurada (plan de integración Cuadre, ítem E-11) — puramente informativa, no reemplaza esEfectivo/esBono.',
+  })
+  @IsOptional()
+  @IsEnum(TipoFormaPago)
+  tipo?: TipoFormaPago;
 
   @ApiProperty({ required: false, default: true })
   @IsOptional()

@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { TipoCliente } from '@prisma/client';
+import { ComprobantePorDefecto, TipoCliente } from '@prisma/client';
 import { IsEmail, IsEnum, IsNumber, IsOptional, IsString, IsUUID, Min } from 'class-validator';
 
 export class CrearClienteDto {
@@ -36,4 +36,19 @@ export class CrearClienteDto {
   @IsOptional()
   @IsUUID()
   listaPrecioId?: string | null;
+
+  @ApiProperty({ required: false, description: 'Categoría/segmentación de cliente (plan de integración Cuadre, ítem E-5) — puramente informativa.' })
+  @IsOptional()
+  @IsUUID()
+  categoriaId?: string | null;
+
+  @ApiProperty({
+    required: false,
+    enum: ComprobantePorDefecto,
+    description:
+      'Comprobante fiscal por defecto (ítem E-5) — autoselecciona tipoFactura + tipoComprobanteEspecial al elegir este cliente en Facturación.',
+  })
+  @IsOptional()
+  @IsEnum(ComprobantePorDefecto)
+  comprobantePorDefecto?: ComprobantePorDefecto | null;
 }

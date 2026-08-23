@@ -52,6 +52,7 @@ model Tenant {
   sucursales    Sucursal[]
   movimientosInventario MovimientoInventario[]
   clientes      Cliente[]
+  categoriasCliente CategoriaCliente[]
   proveedores   Proveedor[]
   ordenesCompra OrdenCompra[]
   webhooks      Webhook[]
@@ -1232,6 +1233,13 @@ model FormaPago {
   // FacturacionService.crear() usa esto para tratar `PagoVenta.referencia`
   // como el código de un Bono a canjear, en vez de una referencia libre.
   esBono             Boolean  @default(false)
+  // Clasificación estructurada (plan de integración Cuadre, ítem E-11) —
+  // puramente informativa/de reporte, nullable (no reemplaza esEfectivo/
+  // esBono, que siguen gatillando comportamiento real: arqueo de caja y
+  // canje de Bono respectivamente). Sin valor confiable para clasificar
+  // automáticamente una fila con nombre personalizado ya existente — se
+  // deja null hasta que un admin la clasifique a mano.
+  tipo               TipoFormaPago?
   activa             Boolean  @default(true)
   createdAt          DateTime @default(now())
 
@@ -1241,6 +1249,24 @@ model FormaPago {
 
   @@unique([tenantId, nombre])
   @@map("formas_pago")
+}
+
+/// Clasificación estructurada de FormaPago (plan de integración Cuadre,
+/// ítem E-11) — 7 categorías, calcada del catálogo de Cuadre. "CREDITO"
+/// es la clasificación de "Crédito Cliente" (que YA existe como fila
+/// sembrada en FORMAS_PAGO_BASE, solo con el nombre, sin comportamiento
+/// de cuenta corriente detrás) — implementar el descuento real contra
+/// `Cliente.limiteCredito` queda deliberadamente fuera de este ítem: es
+/// una funcionalidad de cuentas por cobrar más grande, candidata a su
+/// propia sesión de diseño, no un campo de catálogo chico.
+enum TipoFormaPago {
+  EFECTIVO
+  TARJETA
+  TRANSFERENCIA
+  CREDITO
+  BONO_VOUCHER
+  NOTA_CREDITO
+  CHEQUE
 }
 
 /// Catálogo de niveles de precio por tenant (General, Mayorista,
@@ -2014,6 +2040,17 @@ model Cliente {
   // Se puede sobreescribir puntualmente al facturar/cotizar/vender en POS.
   listaPrecioId String?
   listaPrecio   ListaPrecio? @relation(fields: [listaPrecioId], references: [id], onDelete: SetNull)
+  // Categoría/segmentación de cliente (plan de integración Cuadre, ítem
+  // E-5) — catálogo propio, puramente informativo/de reporte (sin ningún
+  // efecto en precios/permisos, a diferencia de listaPrecioId).
+  categoriaId String?
+  categoria   CategoriaCliente? @relation(fields: [categoriaId], references: [id], onDelete: SetNull)
+  // Comprobante fiscal por defecto (ítem E-5) — autoselecciona tipoFactura
+  // + tipoComprobanteEspecial (ítem B-1) al elegir este cliente en el
+  // formulario de Facturación; el usuario puede cambiarlo igual antes de
+  // guardar, no es una restricción, solo un valor inicial. Ver
+  // ModalNuevaFactura (frontend) para el mapeo exacto.
+  comprobantePorDefecto ComprobantePorDefecto?
   createdAt     DateTime    @default(now())
 
   direcciones DireccionCliente[]
@@ -2023,6 +2060,34 @@ model Cliente {
   ventasAparcadas VentaAparcada[]
 
   @@map("clientes")
+}
+
+/// Catálogo de categorías/segmentación de cliente (plan de integración
+/// Cuadre, ítem E-5) — tenant-scoped, plano (sin jerarquía, a diferencia
+/// de Categoria de producto: el dropdown de segmentación de Cuadre no
+/// muestra ningún anidamiento).
+model CategoriaCliente {
+  id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  nombre    String
+  activa    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  clientes Cliente[]
+
+  @@unique([tenantId, nombre])
+  @@map("categorias_cliente")
+}
+
+/// Los 4 valores seleccionables hoy al facturar (tipoFactura CONTADO/
+/// CREDITO + tipoComprobanteEspecial REGIMEN_ESPECIAL/GUBERNAMENTAL del
+/// ítem B-1) — ver Cliente.comprobantePorDefecto.
+enum ComprobantePorDefecto {
+  CONTADO
+  CREDITO
+  REGIMEN_ESPECIAL
+  GUBERNAMENTAL
 }
 
 model DireccionCliente {

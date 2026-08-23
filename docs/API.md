@@ -92,7 +92,7 @@ pasa ninguna de ellas.
 | Método | Ruta | Permiso |
 |---|---|---|
 | GET | `/api/formas-pago?activa=true` | sin permiso — cualquier usuario autenticado (POS/Cobranza/Compras necesitan leer el catálogo) |
-| POST | `/api/formas-pago` | `admin.configuracion` — `{ nombre, requiereReferencia?, esEfectivo?, esBono?, activa? }` |
+| POST | `/api/formas-pago` | `admin.configuracion` — `{ nombre, requiereReferencia?, esEfectivo?, esBono?, tipo?, activa? }`; `tipo` (plan de integración Cuadre, ítem E-11) es un enum nullable de 7 categorías (`EFECTIVO`/`TARJETA`/`TRANSFERENCIA`/`CREDITO`/`BONO_VOUCHER`/`NOTA_CREDITO`/`CHEQUE`) puramente informativo — no reemplaza `esEfectivo`/`esBono`, que siguen gatillando el comportamiento real (arqueo de caja, canje de Bono) |
 | PATCH | `/api/formas-pago/:id` | `admin.configuracion` — parcial; `esEfectivo: true` desmarca automáticamente cualquier otra forma de pago del tenant |
 
 ## Facturación
@@ -259,8 +259,11 @@ saber a cuál de las variantes reales le corresponde el precio.
 
 | Método | Ruta | Permiso |
 |---|---|---|
-| POST / PATCH | `/api/clientes` | `clientes.*` — acepta `listaPrecioId` (FK a `ListaPrecio`, `null` explícito quita la asignación) |
+| POST / PATCH | `/api/clientes` | `clientes.*` — acepta `listaPrecioId` (FK a `ListaPrecio`, `null` explícito quita la asignación); `categoriaId` (FK a `CategoriaCliente`, ítem E-5, `null` quita la asignación) y `comprobantePorDefecto` (`CONTADO`\|`CREDITO`\|`REGIMEN_ESPECIAL`\|`GUBERNAMENTAL`, ítem E-5) — autoselecciona `tipoFactura`/`tipoComprobanteEspecial` al elegir el cliente en el formulario de Facturación, el usuario lo puede cambiar igual |
 | GET | `/api/clientes?pagina&tamanoPagina&busqueda` | `clientes.ver` — `busqueda` filtra por nombre, email o RNC/cédula |
+| POST | `/api/categorias-cliente` | `clientes.editar` — `{ nombre, activa? }` — catálogo de segmentación de cliente (ítem E-5), plano, puramente informativo |
+| GET | `/api/categorias-cliente?activa=true` | `clientes.ver` |
+| PATCH | `/api/categorias-cliente/:id` | `clientes.editar` |
 | POST | `/api/proveedores` | `compras.*` |
 | GET | `/api/proveedores?pagina&tamanoPagina&busqueda` | `compras.ver` — `busqueda` filtra por nombre o RNC |
 

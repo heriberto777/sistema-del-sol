@@ -729,6 +729,34 @@ negocio (venta de exportación, pago al exterior) que los produciría, así
 que agregarlos al enum sin nada que los use sería una brecha decorativa,
 no una brecha cerrada.
 
+**Categoría de cliente y comprobante por defecto** (ítem E-5): nuevo
+catálogo plano `CategoriaCliente` (`categorias-cliente/`, mismo molde que
+`ListasPrecioModule` — crear/listar/actualizar, sin `eliminar`, se
+desactiva) y `Cliente.comprobantePorDefecto` (enum `ComprobantePorDefecto`,
+los mismos 4 valores seleccionables al facturar: `CONTADO`/`CREDITO`/
+`REGIMEN_ESPECIAL`/`GUBERNAMENTAL`). El frontend (`ModalNuevaFactura` en
+`Facturacion.tsx`) autoselecciona `tipoFactura`+`tipoComprobanteEspecial`
+al elegir un cliente con este campo seteado — `CONTADO`/`CREDITO` fijan
+`tipoFactura` y limpian el especial; `REGIMEN_ESPECIAL`/`GUBERNAMENTAL`
+solo fijan el especial, dejando `tipoFactura` en lo que ya estuviera. Es
+puramente un valor inicial — el usuario lo puede cambiar antes de guardar,
+nunca bloquea.
+
+**Forma de pago: tipo estructurado** (ítem E-11): `FormaPago.tipo` (enum
+`TipoFormaPago`, 7 categorías calcadas del catálogo de Cuadre) es
+puramente informativo — `esEfectivo`/`esBono` siguen siendo los flags que
+gatillan comportamiento real (arqueo de caja del POS, canje de Bono) y no
+se tocaron. Nullable: no hay forma confiable de inferir el tipo de una
+fila con nombre personalizado ya existente, así que el backfill de la
+migración solo clasificó las 7 filas de fábrica (`FORMAS_PAGO_BASE`) por
+nombre exacto. "Crédito Cliente" ya existía como una de esas 7 filas de
+fábrica desde antes de este ítem (solo el nombre) — clasificarla como
+`CREDITO` no le agrega ningún comportamiento nuevo: sigue sin descontar
+contra `Cliente.limiteCredito`. Implementar eso (pagar contra el balance
+real de cuenta corriente del cliente) queda deliberadamente fuera de
+este ítem — es una funcionalidad de cuentas por cobrar más grande,
+candidata a su propia sesión de diseño, no un campo de catálogo chico.
+
 Al crear un gasto menor, `GastoMenorService` emite
 `EVENTOS.GASTO_MENOR_CREADO` (mismo patrón fire-and-forget del Event
 Bus) y `ContabilidadEventosService.alCrearGastoMenor` genera el asiento

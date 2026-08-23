@@ -33,7 +33,10 @@ export class ClientesRepository {
         orderBy: { nombre: 'asc' },
         skip: params.skip,
         take: params.take,
-        include: { listaPrecio: { select: { id: true, nombre: true } } },
+        include: {
+          listaPrecio: { select: { id: true, nombre: true } },
+          categoria: { select: { id: true, nombre: true } },
+        },
       }),
       this.db.cliente.count({ where }),
     ]);
@@ -42,7 +45,11 @@ export class ClientesRepository {
   buscarPorId(id: string) {
     return this.db.cliente.findUniqueOrThrow({
       where: { id },
-      include: { direcciones: true, listaPrecio: { select: { id: true, nombre: true } } },
+      include: {
+        direcciones: true,
+        listaPrecio: { select: { id: true, nombre: true } },
+        categoria: { select: { id: true, nombre: true } },
+      },
     });
   }
 

@@ -19,6 +19,7 @@ interface Cliente {
   id: string;
   nombre: string;
   listaPrecio: { id: string; nombre: string } | null;
+  comprobantePorDefecto: 'CONTADO' | 'CREDITO' | 'REGIMEN_ESPECIAL' | 'GUBERNAMENTAL' | null;
 }
 
 interface Producto {
@@ -85,6 +86,24 @@ function ModalNuevaFactura({ onClose }: { onClose: () => void }) {
   const { data: listasPrecio } = useListasPrecio();
   const clienteSeleccionado = clientes?.find((c) => c.id === clienteId);
   const listaPrecioResuelta = clienteSeleccionado?.listaPrecio?.nombre ?? 'GENERAL';
+
+  // Comprobante fiscal por defecto del cliente (plan de integración Cuadre,
+  // ítem E-5) — autoselecciona tipoFactura + tipoComprobanteEspecial al
+  // elegir el cliente; el usuario puede cambiarlo igual después, es solo un
+  // valor inicial. CONTADO/CREDITO fijan tipoFactura y limpian el especial;
+  // REGIMEN_ESPECIAL/GUBERNAMENTAL solo fijan el especial (tipoFactura queda
+  // en lo que ya estuviera — ver TIPO_NCF_ESPECIAL en facturacion.service.ts).
+  useEffect(() => {
+    const defecto = clienteSeleccionado?.comprobantePorDefecto;
+    if (!defecto) return;
+    if (defecto === 'CONTADO' || defecto === 'CREDITO') {
+      setTipoFactura(defecto);
+      setTipoComprobanteEspecial('');
+    } else {
+      setTipoComprobanteEspecial(defecto);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clienteId]);
   const { data: productos } = useQuery({
     queryKey: ['productos-select'],
     queryFn: async () => (await apiClient.get<PaginaResultado<Producto>>('/productos', { params: { tamanoPagina: 100 } })).data.datos,

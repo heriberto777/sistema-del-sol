@@ -11,6 +11,7 @@ import { ListasPrecioPanel } from '../components/organisms/ListasPrecioPanel/Lis
 import { AtributosPanel } from '../components/organisms/AtributosPanel/AtributosPanel';
 import { OfertasPanel } from '../components/organisms/OfertasPanel/OfertasPanel';
 import { BonosPanel } from '../components/organisms/BonosPanel/BonosPanel';
+import { CategoriasClientePanel } from '../components/organisms/CategoriasClientePanel/CategoriasClientePanel';
 import { useAuth } from '../hooks/useAuth';
 
 interface Pestana {
@@ -53,6 +54,7 @@ const CATEGORIAS: Categoria[] = [
     descripcion: 'Categorías de productos, niveles de precio, atributos de variantes y ofertas.',
     pestanas: [
       { id: 'categorias', etiqueta: 'Categorías', permiso: 'admin.configuracion', panel: CategoriasPanel },
+      { id: 'categorias-cliente', etiqueta: 'Categorías de cliente', permiso: 'admin.configuracion', panel: CategoriasClientePanel },
       { id: 'listas-precio', etiqueta: 'Niveles de precio', permiso: 'admin.configuracion', panel: ListasPrecioPanel },
       { id: 'atributos', etiqueta: 'Atributos', permiso: 'admin.configuracion', panel: AtributosPanel },
       { id: 'ofertas', etiqueta: 'Ofertas', permiso: 'admin.configuracion', panel: OfertasPanel },
