@@ -235,6 +235,20 @@ antes de esta fase (default permisivo) — ver ARCHITECTURE.md.
   `lineas_asiento` (`ON DELETE CASCADE` hacia `tenants` y hacia
   `empleados`) — la ausencia de una fila para un `diaSemana` dado
   significa que ese día no se trabaja, no hay columna booleana aparte.
+- **`plantillas_horario`/`plantilla_horario_dias`** (plan de integración
+  Cuadre, ítem G-1): mismo molde día-por-día que `horarios_empleado`,
+  pero definido UNA vez y asignado a varios empleados vía
+  `empleados.plantillaHorarioId` (`ON DELETE SET NULL`) como
+  **REFERENCIA VIVA** — decisión explícita del usuario, no una copia
+  que se independiza al asignarse. `plantilla_horario_dias` es hija sin
+  `tenantId` propio (como `componentes_combo`), aislada por la
+  `plantillaId` padre ya tenant-scoped. Cuando un empleado tiene
+  `plantillaHorarioId` seteado, sus filas de `horarios_empleado`
+  individuales (si las tiene, de antes de asignarle la plantilla) dejan
+  de ser el horario efectivo — ver `PlantillasHorarioRepository.
+  resolverDiasEfectivos` en ARCHITECTURE.md. `predeterminada` (a lo sumo
+  una por tenant) se auto-asigna a un `Empleado` nuevo que no reciba
+  `plantillaHorarioId` explícito.
 - **`registros_asistencia`** (RRHH, Fase 7b) sigue el mismo patrón de
   rama hermana `ON DELETE CASCADE` que `horarios_empleado`.
   `@@unique([tenantId, empleadoId, fecha])` — una fila por empleado por

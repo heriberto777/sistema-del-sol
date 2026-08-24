@@ -1836,6 +1836,29 @@ comparando la hora de marcaje contra el horario del día correspondiente
 — si el empleado no tiene horario configurado para ese día, no hay
 contra qué comparar y no se marca tardanza.
 
+**Plantillas de horario reutilizables** (plan de integración Cuadre,
+ítem G-1, diseño confirmado con el usuario vía `AskUserQuestion`):
+`PlantillaHorario`+`PlantillaHorarioDia` (`backend/src/plantillas-horario/`,
+módulo propio) son un catálogo de horarios definidos UNA vez y
+asignados a varios empleados vía `Empleado.plantillaHorarioId` como
+**REFERENCIA VIVA** — editar los días de la plantilla cambia
+automáticamente el horario efectivo de TODOS los empleados asignados
+(no una copia que se independiza al aplicarse). `PlantillasHorarioRepository.
+resolverDiasEfectivos(empleadoId)` es el ÚNICO punto que
+`AsistenciaService.calcularTardanza`/`calcularHorasExtraYSalidaAnticipada`
+(ítem G-4) consultan para el horario del día: si el empleado tiene
+`plantillaHorarioId`, gana por sobre cualquier `HorarioEmpleado`
+individual que pudiera tener de antes de asignarle la plantilla (que
+`GET/PUT /nomina/empleados/:id/horario` siguen leyendo/editando tal
+cual, pero deja de ser lo efectivo mientras la plantilla esté asignada
+— el frontend, `HorarioEmpleadoPanel.tsx`, oculta el editor individual
+y muestra un aviso + botón "usar horario individual" en su lugar).
+`predeterminada` (a lo sumo una por tenant, mismo patrón de
+`desmarcarDeOtras` que `FormaPago.esEfectivo`) se auto-asigna en
+`EmpleadosService.crear()` a un empleado nuevo que no reciba
+`plantillaHorarioId` explícito — cierra el "horario predeterminado para
+nuevos empleados" de la comparación original con Cuadre.
+
 `Empleado.userId` (nullable, único) vincula opcionalmente un empleado a
 su `User` de login — no todo empleado necesita acceso al sistema (ej.
 personal de bodega). Es la base para que la sub-fase de Asistencia

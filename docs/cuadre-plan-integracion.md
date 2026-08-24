@@ -309,16 +309,21 @@ Resumen de lo que cambió (detalle en cada ítem más abajo):
 
 ## G — RRHH
 
-- [ ] **G-1** 🟧 — **Horarios como plantilla reutilizable**. *Confirmado:
+- [x] **G-1** 🟧 — **Horarios como plantilla reutilizable**. *Confirmado:
   `HorarioEmpleado` sigue siendo una fila por `empleadoId` sin concepto de
   plantilla — brecha real.* **Diseño confirmado con el usuario
   (2026-08-24, `AskUserQuestion`): referencia viva** — un empleado apunta
   a una `PlantillaHorario`, editar la plantilla se propaga a TODOS los
   empleados asignados (no una copia que se independiza al aplicarse).
-  Listo para implementar; toca `AsistenciaService.calcularTardanza`/
-  `calcularHorasExtraYSalidaAnticipada` (G-4) para resolver el horario
-  vía la plantilla cuando el empleado tiene una asignada, con fallback a
-  `HorarioEmpleado` individual si no.
+  Entregado: módulo `plantillas-horario/` (catálogo + días, `PUT .../
+  dias`), `Empleado.plantillaHorarioId` (auto-asigna la `predeterminada`
+  del tenant si no viene explícita al crear), `PlantillasHorarioRepository.
+  resolverDiasEfectivos()` como único punto que `AsistenciaService`
+  (G-4) consulta para tardanza/horas extra — gana sobre `HorarioEmpleado`
+  individual cuando hay plantilla asignada. Frontend: pestaña "Plantillas
+  de horario" (RRHH) con editor de días; `HorarioEmpleadoPanel` oculta el
+  editor individual y avisa cuando el empleado usa una plantilla.
+  Migración `20260825100000_plantillas_horario`. Entregado 2026-08-24.
 - [ ] **G-2** 🟧 — **Tipos de Ausencia configurables por tenant**.
   *Confirmado: `TipoAusencia` sigue siendo un enum fijo de Prisma
   (VACACIONES/ENFERMEDAD/PERMISO/INJUSTIFICADA/MATERNIDAD_PATERNIDAD/OTRO)
@@ -489,25 +494,31 @@ Resumen de lo que cambió (detalle en cada ítem más abajo):
   real), lint sin errores, build limpio. Prisma regenerado y
   contenedores reiniciados. También se confirmó con el usuario (vía
   `AskUserQuestion`) el diseño de **G-1** (Horarios como plantilla
-  reutilizable): referencia viva, no copia al aplicar — pendiente de
-  implementar.
+  reutilizable): referencia viva, no copia al aplicar.
+- **2026-08-24**: entregado G-1 (Horarios como plantilla reutilizable,
+  referencia viva) — módulo `plantillas-horario/` completo (catálogo,
+  días, predeterminada auto-asignable), `AsistenciaService` (G-4)
+  migrado a resolver el horario efectivo vía `PlantillasHorarioRepository.
+  resolverDiasEfectivos()`. Verificado: tsc limpio, **745 unitarios + 179
+  e2e, todos verdes** (una corrida tuvo un OOM transitorio de un worker
+  de Jest en Windows, no relacionado al código — la repetición inmediata
+  dio exit 0 limpio), lint sin errores, build limpio. Con esto, la
+  sección **G** (RRHH) queda completa salvo G-2/G-6 (🟧) y G-9 (🟥,
+  hardware).
 
 ## Sugerencia de por dónde arrancar
 
-Con el catálogo ya corregido, el lote E-3/E-5/E-9/E-11/F-2/G-3/G-4/G-5/
-G-7/G-8/B-3/B-6/B-7/B-8 entregado y verificado (tsc + 740 unitarios +
-179 e2e + lint + build, todo verde), ya no quedan ítems con el matiz "ya
-lo teníamos parcial" original (los 5 que tenía esa nota — B-1, E-1, E-5,
-E-11, G-7 — están todos resueltos o, en el caso de E-1, siguen como
-brecha real confirmada sin cambios; B-6 se sumó como un nuevo falso
-positivo encontrado después). **G-1 ya tiene diseño confirmado**
-(referencia viva, ver arriba) — es el candidato más directo para seguir
-en la sección G, junto con G-2/G-6 (🟧, sin bloqueo) y G-9 (🟥, depende
-de hardware). De la sección **B** solo quedan B-2 (🟧) y B-5 (🟥, e-CF
-real) sin bloqueo — **B-9 está deliberadamente pausado** (el usuario
-pidió evaluarlo con más calma, no retomar sin avisar) y B-4 (🟧) no es
-bloqueante. Los 🟥 con "diseño primero" conviene agruparlos en su propia
-sesión de planeamiento cuando se prioricen, siguiendo la misma mecánica
-que Sucursales (Fase 8) y PIN (Fase 9): presentar el
-diseño, resolver
-casos límite, y recién después ejecutar.
+Con el catálogo ya corregido, el lote E-3/E-5/E-9/E-11/F-2/G-1/G-3/G-4/
+G-5/G-7/G-8/B-3/B-6/B-7/B-8 entregado y verificado en dos rondas (tsc +
+745 unitarios + 179 e2e + lint + build, todo verde), ya no quedan ítems
+con el matiz "ya lo teníamos parcial" original (los 5 que tenía esa
+nota — B-1, E-1, E-5, E-11, G-7 — están todos resueltos o, en el caso de
+E-1, siguen como brecha real confirmada sin cambios). La sección **G**
+(RRHH) queda con solo G-2/G-6 (🟧, sin bloqueo) y G-9 (🟥, depende de
+hardware) pendientes. De la sección **B** solo quedan B-2 (🟧) y B-5
+(🟥, e-CF real) sin bloqueo — **B-9 está deliberadamente pausado** (el
+usuario pidió evaluarlo con más calma, no retomar sin avisar) y B-4
+(🟧) no es bloqueante. Los 🟥 con "diseño primero" conviene agruparlos
+en su propia sesión de planeamiento cuando se prioricen, siguiendo la
+misma mecánica que Sucursales (Fase 8) y PIN (Fase 9): presentar el
+diseño, resolver casos límite, y recién después ejecutar.

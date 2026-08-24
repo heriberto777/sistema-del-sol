@@ -2,6 +2,11 @@ import { Injectable } from '@nestjs/common';
 import { TenantPrismaService } from '../prisma/tenant-prisma.service';
 import { TipoContrato } from '@prisma/client';
 
+const INCLUDE_EMPLEADO = {
+  puesto: { select: { id: true, nombre: true } },
+  plantillaHorario: { select: { id: true, nombre: true, codigo: true } },
+} as const;
+
 @Injectable()
 export class EmpleadosRepository {
   constructor(private readonly tenantPrisma: TenantPrismaService) {}
@@ -16,6 +21,7 @@ export class EmpleadosRepository {
     cedula: string;
     cargo: string;
     puestoId?: string;
+    plantillaHorarioId?: string;
     departamento?: string;
     fechaIngreso: Date;
     salarioBrutoMensual: number;
@@ -23,11 +29,11 @@ export class EmpleadosRepository {
     email?: string;
     telefono?: string;
   }) {
-    return this.db.empleado.create({ data: params, include: { puesto: { select: { id: true, nombre: true } } } });
+    return this.db.empleado.create({ data: params, include: INCLUDE_EMPLEADO });
   }
 
   buscarPorId(id: string) {
-    return this.db.empleado.findUniqueOrThrow({ where: { id }, include: { puesto: { select: { id: true, nombre: true } } } });
+    return this.db.empleado.findUniqueOrThrow({ where: { id }, include: INCLUDE_EMPLEADO });
   }
 
   /** Resuelve "quién soy" para el check-in/check-out de autoservicio (Asistencia) desde req.user.userId. */
@@ -75,7 +81,7 @@ export class EmpleadosRepository {
         orderBy: { nombre: 'asc' },
         skip: params.skip,
         take: params.take,
-        include: { puesto: { select: { id: true, nombre: true } } },
+        include: INCLUDE_EMPLEADO,
       }),
       this.db.empleado.count({ where }),
     ]);
@@ -88,6 +94,7 @@ export class EmpleadosRepository {
       cedula: string;
       cargo: string;
       puestoId: string | null;
+      plantillaHorarioId: string | null;
       departamento: string;
       fechaIngreso: Date;
       salarioBrutoMensual: number;
@@ -99,6 +106,6 @@ export class EmpleadosRepository {
       userId: string | null;
     }>,
   ) {
-    return this.db.empleado.update({ where: { id }, data, include: { puesto: { select: { id: true, nombre: true } } } });
+    return this.db.empleado.update({ where: { id }, data, include: INCLUDE_EMPLEADO });
   }
 }

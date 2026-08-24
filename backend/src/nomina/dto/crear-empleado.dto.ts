@@ -26,6 +26,15 @@ export class CrearEmpleadoDto {
   @IsUUID()
   puestoId?: string;
 
+  @ApiProperty({
+    required: false,
+    description:
+      'Plantilla de horario reutilizable (plan de integración Cuadre, ítem G-1) — referencia viva. Sin enviar, se auto-asigna la plantilla marcada `predeterminada` del tenant, si existe alguna.',
+  })
+  @IsOptional()
+  @IsUUID()
+  plantillaHorarioId?: string;
+
   @ApiProperty({ required: false })
   @IsOptional()
   @IsString()

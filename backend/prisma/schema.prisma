@@ -56,6 +56,7 @@ model Tenant {
   feriados      Feriado[]
   puestos       Puesto[]
   leyesFiscales LeyFiscal[]
+  plantillasHorario PlantillaHorario[]
   proveedores   Proveedor[]
   ordenesCompra OrdenCompra[]
   webhooks      Webhook[]
@@ -1030,6 +1031,15 @@ model Empleado {
   // clasificación adicional, opcional.
   puestoId            String?
   puesto              Puesto?       @relation(fields: [puestoId], references: [id], onDelete: SetNull)
+  // Plantilla de horario reutilizable (plan de integración Cuadre, ítem
+  // G-1) — referencia VIVA (decisión explícita del usuario): editar la
+  // plantilla se propaga automáticamente a todos los empleados
+  // asignados, no es una copia que se independiza al asignarse. Cuando
+  // está seteado, TIENE PRIORIDAD sobre `horarios` (HorarioEmpleado
+  // individual) al resolver tardanza/horas extra — ver
+  // HorariosRepository.resolverDiasEfectivos.
+  plantillaHorarioId  String?
+  plantillaHorario    PlantillaHorario? @relation(fields: [plantillaHorarioId], references: [id], onDelete: SetNull)
   departamento        String?
   fechaIngreso        DateTime
   fechaSalida         DateTime?
@@ -1056,6 +1066,49 @@ model Empleado {
 
   @@unique([tenantId, cedula])
   @@map("empleados")
+}
+
+/// Plantilla de horario reutilizable (plan de integración Cuadre, ítem
+/// G-1) — a diferencia de `HorarioEmpleado` (una fila por empleado por
+/// día, asignación directa e individual), esto se define UNA vez y se
+/// asigna a varios empleados vía `Empleado.plantillaHorarioId` como
+/// REFERENCIA VIVA: editar `dias` acá cambia automáticamente el horario
+/// efectivo de todos los empleados asignados. `predeterminada` (a lo
+/// sumo una activa por tenant, ver PlantillasHorarioRepository.
+/// desmarcarPredeterminadaDeOtras) se auto-asigna a un Empleado nuevo
+/// que no reciba `plantillaHorarioId`/`horario` explícito al crearse.
+model PlantillaHorario {
+  id             String   @id @default(uuid())
+  tenantId       String
+  tenant         Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  nombre         String
+  codigo         String
+  descripcion    String?
+  predeterminada Boolean  @default(false)
+  activa         Boolean  @default(true)
+  createdAt      DateTime @default(now())
+
+  dias      PlantillaHorarioDia[]
+  empleados Empleado[]
+
+  @@unique([tenantId, codigo])
+  @@map("plantillas_horario")
+}
+
+/// Fila día-por-día de una PlantillaHorario — misma forma que
+/// HorarioEmpleado, sin tenantId propio (hijo sin FK directa a Tenant,
+/// como ComponenteCombo/ValorAtributo — su aislamiento depende de
+/// validar primero la plantilla padre, ya tenant-scoped).
+model PlantillaHorarioDia {
+  id          String           @id @default(uuid())
+  plantillaId String
+  plantilla   PlantillaHorario @relation(fields: [plantillaId], references: [id], onDelete: Cascade)
+  diaSemana   DiaSemana
+  horaEntrada String
+  horaSalida  String
+
+  @@unique([plantillaId, diaSemana])
+  @@map("plantilla_horario_dias")
 }
 
 /// Catálogo de puestos por tenant (plan de integración Cuadre, ítem

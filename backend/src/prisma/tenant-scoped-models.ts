@@ -61,4 +61,5 @@ export const TENANT_SCOPED_MODELS = new Set([
   'Feriado',
   'Puesto',
   'LeyFiscal',
+  'PlantillaHorario',
 ]);

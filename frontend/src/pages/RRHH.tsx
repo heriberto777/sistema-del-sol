@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import clsx from 'clsx';
 import { HorarioEmpleadoPanel } from '../components/organisms/HorarioEmpleadoPanel/HorarioEmpleadoPanel';
+import { PlantillasHorarioPanel } from '../components/organisms/PlantillasHorarioPanel/PlantillasHorarioPanel';
 import { AsistenciaTable } from '../components/organisms/AsistenciaTable/AsistenciaTable';
 import { AusenciasTable } from '../components/organisms/AusenciasTable/AusenciasTable';
 import { FeriadosTable } from '../components/organisms/FeriadosTable/FeriadosTable';
@@ -9,6 +10,7 @@ import { RequierePermiso } from '../components/organisms/RequierePermiso/Requier
 
 const PESTANAS = [
   { id: 'horarios', etiqueta: 'Horarios' },
+  { id: 'plantillas-horario', etiqueta: 'Plantillas de horario' },
   { id: 'asistencia', etiqueta: 'Asistencia' },
   { id: 'ausencias', etiqueta: 'Ausencias' },
   { id: 'feriados', etiqueta: 'Feriados' },
@@ -46,6 +48,7 @@ export function RRHH() {
 
       <RequierePermiso permiso="rrhh.ver">
         {pestana === 'horarios' && <HorarioEmpleadoPanel />}
+        {pestana === 'plantillas-horario' && <PlantillasHorarioPanel />}
         {pestana === 'asistencia' && <AsistenciaTable />}
         {pestana === 'ausencias' && <AusenciasTable />}
         {pestana === 'feriados' && <FeriadosTable />}

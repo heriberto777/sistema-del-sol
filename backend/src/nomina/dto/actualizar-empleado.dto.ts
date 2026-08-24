@@ -24,6 +24,11 @@ export class ActualizarEmpleadoDto {
   @IsUUID()
   puestoId?: string | null;
 
+  @ApiProperty({ required: false, description: 'Plan de integración Cuadre, ítem G-1 — referencia viva a una plantilla de horario. Enviar null para desvincular (el empleado vuelve a su HorarioEmpleado individual).', nullable: true })
+  @IsOptional()
+  @IsUUID()
+  plantillaHorarioId?: string | null;
+
   @ApiProperty({ required: false })
   @IsOptional()
   @IsString()

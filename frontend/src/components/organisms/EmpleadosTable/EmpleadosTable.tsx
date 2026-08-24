@@ -9,6 +9,7 @@ import { Modal } from '../../molecules/Modal/Modal';
 import { SearchInput } from '../../molecules/SearchInput/SearchInput';
 import { Paginacion } from '../../molecules/Paginacion/Paginacion';
 import { SelectPuesto } from '../../molecules/SelectPuesto/SelectPuesto';
+import { SelectPlantillaHorario } from '../../molecules/SelectPlantillaHorario/SelectPlantillaHorario';
 import { useDebouncedValue } from '../../../hooks/useDebouncedValue';
 import { useAuth } from '../../../hooks/useAuth';
 import { PaginaResultado } from '../../../types/pagina-resultado';
@@ -141,6 +142,7 @@ function ModalNuevoEmpleado({ onClose }: { onClose: () => void }) {
   const [cedula, setCedula] = useState('');
   const [cargo, setCargo] = useState('');
   const [puestoId, setPuestoId] = useState('');
+  const [plantillaHorarioId, setPlantillaHorarioId] = useState('');
   const [fechaIngreso, setFechaIngreso] = useState('');
   const [salarioBrutoMensual, setSalarioBrutoMensual] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -152,6 +154,7 @@ function ModalNuevoEmpleado({ onClose }: { onClose: () => void }) {
         cedula,
         cargo,
         puestoId: puestoId || undefined,
+        plantillaHorarioId: plantillaHorarioId || undefined,
         fechaIngreso,
         salarioBrutoMensual: Number(salarioBrutoMensual),
       }),
@@ -179,6 +182,12 @@ function ModalNuevoEmpleado({ onClose }: { onClose: () => void }) {
             Puesto (opcional, para filtrar/reportar)
           </label>
           <SelectPuesto id="empleado-puesto" value={puestoId} onChange={setPuestoId} />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label htmlFor="empleado-plantilla-horario" className="text-sm font-medium text-slate-700 dark:text-slate-300">
+            Plantilla de horario (opcional — sin elegir, se auto-asigna la predeterminada si existe)
+          </label>
+          <SelectPlantillaHorario id="empleado-plantilla-horario" value={plantillaHorarioId} onChange={setPlantillaHorarioId} />
         </div>
         <FormField
           id="empleado-fecha-ingreso"

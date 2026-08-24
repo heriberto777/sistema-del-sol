@@ -2,7 +2,7 @@ import { BadRequestException } from '@nestjs/common';
 import { AsistenciaService } from './asistencia.service';
 import { AsistenciaRepository } from './asistencia.repository';
 import { EmpleadosRepository } from './empleados.repository';
-import { HorariosRepository } from './horarios.repository';
+import { PlantillasHorarioRepository } from '../plantillas-horario/plantillas-horario.repository';
 import { ConfiguracionesService } from '../configuraciones/configuraciones.service';
 import * as zonaHorariaRd from '../common/utils/zona-horaria-rd.util';
 
@@ -12,7 +12,7 @@ describe('AsistenciaService', () => {
   let service: AsistenciaService;
   let asistenciaRepository: jest.Mocked<AsistenciaRepository>;
   let empleadosRepository: jest.Mocked<EmpleadosRepository>;
-  let horariosRepository: jest.Mocked<HorariosRepository>;
+  let plantillasHorarioRepository: jest.Mocked<PlantillasHorarioRepository>;
   let configuracionesService: jest.Mocked<ConfiguracionesService>;
 
   beforeEach(() => {
@@ -25,9 +25,9 @@ describe('AsistenciaService', () => {
       listar: jest.fn(),
     } as unknown as jest.Mocked<AsistenciaRepository>;
     empleadosRepository = { buscarPorUserId: jest.fn(), buscarPorId: jest.fn() } as unknown as jest.Mocked<EmpleadosRepository>;
-    horariosRepository = { listarPorEmpleado: jest.fn().mockResolvedValue([]) } as unknown as jest.Mocked<HorariosRepository>;
+    plantillasHorarioRepository = { resolverDiasEfectivos: jest.fn().mockResolvedValue([]) } as unknown as jest.Mocked<PlantillasHorarioRepository>;
     configuracionesService = { buscarValor: jest.fn().mockImplementation((_c, _t, def) => Promise.resolve(def)) } as unknown as jest.Mocked<ConfiguracionesService>;
-    service = new AsistenciaService(asistenciaRepository, empleadosRepository, horariosRepository, configuracionesService);
+    service = new AsistenciaService(asistenciaRepository, empleadosRepository, plantillasHorarioRepository, configuracionesService);
 
     // Lunes 2026-08-24 (getUTCDay() === 1), 08:15 RD.
     (zonaHorariaRd.fechaHoyRD as jest.Mock).mockReturnValue('2026-08-24');
@@ -61,7 +61,7 @@ describe('AsistenciaService', () => {
   it('marcarEntrada crea el registro y marca tardanza si llega después de HorarioEmpleado', async () => {
     empleadosRepository.buscarPorUserId.mockResolvedValue({ id: 'e1' } as never);
     asistenciaRepository.buscarDelDia.mockResolvedValue(null);
-    horariosRepository.listarPorEmpleado.mockResolvedValue([{ diaSemana: 'LUNES', horaEntrada: '08:00', horaSalida: '17:00' }] as never);
+    plantillasHorarioRepository.resolverDiasEfectivos.mockResolvedValue([{ diaSemana: 'LUNES', horaEntrada: '08:00', horaSalida: '17:00' }] as never);
     asistenciaRepository.crear.mockResolvedValue({ id: 'r1' } as never);
 
     await service.marcarEntrada('u1', 't1');
@@ -78,7 +78,7 @@ describe('AsistenciaService', () => {
   it('marcarEntrada no marca tardanza si el empleado no tiene horario configurado ese día', async () => {
     empleadosRepository.buscarPorUserId.mockResolvedValue({ id: 'e1' } as never);
     asistenciaRepository.buscarDelDia.mockResolvedValue(null);
-    horariosRepository.listarPorEmpleado.mockResolvedValue([] as never);
+    plantillasHorarioRepository.resolverDiasEfectivos.mockResolvedValue([] as never);
     asistenciaRepository.crear.mockResolvedValue({ id: 'r1' } as never);
 
     await service.marcarEntrada('u1', 't1');
@@ -126,7 +126,7 @@ describe('AsistenciaService', () => {
     it('marca salidaAnticipada si sale antes de HorarioEmpleado menos la tolerancia configurada', async () => {
       empleadosRepository.buscarPorUserId.mockResolvedValue({ id: 'e1' } as never);
       asistenciaRepository.buscarDelDia.mockResolvedValue({ id: 'r1', horaEntrada: '08:00', horaSalida: null } as never);
-      horariosRepository.listarPorEmpleado.mockResolvedValue([{ diaSemana: 'LUNES', horaEntrada: '08:00', horaSalida: '17:00' }] as never);
+      plantillasHorarioRepository.resolverDiasEfectivos.mockResolvedValue([{ diaSemana: 'LUNES', horaEntrada: '08:00', horaSalida: '17:00' }] as never);
       (zonaHorariaRd.horaActualRD as jest.Mock).mockReturnValue('16:30'); // sale 30 min antes, tolerancia default 15
       asistenciaRepository.actualizar.mockResolvedValue({ id: 'r1' } as never);
 
@@ -138,7 +138,7 @@ describe('AsistenciaService', () => {
     it('no marca salidaAnticipada si sale dentro de la tolerancia configurada', async () => {
       empleadosRepository.buscarPorUserId.mockResolvedValue({ id: 'e1' } as never);
       asistenciaRepository.buscarDelDia.mockResolvedValue({ id: 'r1', horaEntrada: '08:00', horaSalida: null } as never);
-      horariosRepository.listarPorEmpleado.mockResolvedValue([{ diaSemana: 'LUNES', horaEntrada: '08:00', horaSalida: '17:00' }] as never);
+      plantillasHorarioRepository.resolverDiasEfectivos.mockResolvedValue([{ diaSemana: 'LUNES', horaEntrada: '08:00', horaSalida: '17:00' }] as never);
       (zonaHorariaRd.horaActualRD as jest.Mock).mockReturnValue('16:50'); // 10 min antes, tolerancia default 15
       asistenciaRepository.actualizar.mockResolvedValue({ id: 'r1' } as never);
 
@@ -172,7 +172,7 @@ describe('AsistenciaService', () => {
   it('registrarManual valida que el empleado pertenezca al tenant antes de crear', async () => {
     empleadosRepository.buscarPorId.mockResolvedValue({ id: 'e1' } as never);
     asistenciaRepository.buscarDelDia.mockResolvedValue(null);
-    horariosRepository.listarPorEmpleado.mockResolvedValue([] as never);
+    plantillasHorarioRepository.resolverDiasEfectivos.mockResolvedValue([] as never);
     asistenciaRepository.crear.mockResolvedValue({ id: 'r1' } as never);
 
     await service.registrarManual({ empleadoId: 'e1', fecha: '2026-08-24', horaEntrada: '08:05' }, 't1');

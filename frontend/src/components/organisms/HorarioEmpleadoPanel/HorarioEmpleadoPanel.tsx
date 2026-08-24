@@ -12,6 +12,7 @@ interface Empleado {
   nombre: string;
   cedula: string;
   cargo: string;
+  plantillaHorario: { id: string; nombre: string; codigo: string } | null;
 }
 
 interface FranjaHorario {
@@ -88,6 +89,20 @@ export function HorarioEmpleadoPanel() {
     guardar.mutate();
   }
 
+  // Plan de integración Cuadre, ítem G-1 — si el empleado usa una
+  // plantilla (referencia viva), no tiene sentido editar HorarioEmpleado
+  // individual acá: se editaría un horario que la plantilla ignora por
+  // completo mientras siga asignada.
+  const usaPlantilla = empleado?.plantillaHorario ?? null;
+
+  const desvincularPlantilla = useMutation({
+    mutationFn: async () => apiClient.patch(`/nomina/empleados/${empleado!.id}`, { plantillaHorarioId: null }),
+    onSuccess: () => {
+      setEmpleado((e) => (e ? { ...e, plantillaHorario: null } : e));
+      queryClient.invalidateQueries({ queryKey: ['nomina-empleados'] });
+    },
+  });
+
   return (
     <Card titulo="Horario semanal" descripcion="Días y horas en que trabaja cada empleado — usado para calcular tardanzas en Asistencia.">
       <div className="space-y-4">
@@ -105,9 +120,29 @@ export function HorarioEmpleadoPanel() {
           />
         </div>
 
-        {empleado && isLoading && <p className="text-sm text-slate-500">Cargando horario…</p>}
+        {empleado && usaPlantilla && (
+          <div className="rounded-md border border-sol-200 bg-sol-50 p-4 text-sm dark:border-sol-900 dark:bg-sol-900/20">
+            <p className="text-slate-700 dark:text-slate-300">
+              Este empleado usa la plantilla <strong>{usaPlantilla.nombre}</strong> ({usaPlantilla.codigo}) — para cambiar sus horarios,
+              editá la plantilla en la pestaña "Plantillas de horario". Un cambio ahí se aplica automáticamente a todos los empleados
+              que usan esa plantilla.
+            </p>
+            {puedeEditar && (
+              <Button
+                variante="secundario"
+                className="mt-3"
+                onClick={() => desvincularPlantilla.mutate()}
+                disabled={desvincularPlantilla.isPending}
+              >
+                {desvincularPlantilla.isPending ? 'Desvinculando…' : 'Usar horario individual en su lugar'}
+              </Button>
+            )}
+          </div>
+        )}
 
-        {empleado && !isLoading && (
+        {empleado && !usaPlantilla && isLoading && <p className="text-sm text-slate-500">Cargando horario…</p>}
+
+        {empleado && !usaPlantilla && !isLoading && (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead className="text-slate-500 dark:text-slate-400">

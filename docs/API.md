@@ -374,8 +374,8 @@ para asientos manuales (ajustes, apertura, etc.).
 |---|---|---|
 | GET | `/api/nomina/empleados?pagina&tamanoPagina&busqueda&puestoId` | `nomina.ver` — busca por nombre/cédula/cargo; `puestoId` (ítem G-8) filtra por el catálogo de puestos |
 | GET | `/api/nomina/empleados/:id` | `nomina.ver` |
-| POST | `/api/nomina/empleados` | `nomina.editar` — acepta `puestoId` (ítem G-8, FK a `Puesto`) además de `cargo` (texto libre, sin cambios — sigue siendo lo que resuelve "Vendedor" en `GET /pos/vendedores`) |
-| PATCH | `/api/nomina/empleados/:id` | `nomina.editar` — enviar `fechaSalida` desactiva al empleado automáticamente; `puestoId: null` desvincula el puesto |
+| POST | `/api/nomina/empleados` | `nomina.editar` — acepta `puestoId` (ítem G-8, FK a `Puesto`) además de `cargo` (texto libre, sin cambios — sigue siendo lo que resuelve "Vendedor" en `GET /pos/vendedores`); acepta `plantillaHorarioId` (ítem G-1) — sin enviarlo, se auto-asigna la plantilla marcada `predeterminada` del tenant, si existe alguna |
+| PATCH | `/api/nomina/empleados/:id` | `nomina.editar` — enviar `fechaSalida` desactiva al empleado automáticamente; `puestoId: null` desvincula el puesto; `plantillaHorarioId: null` desvincula la plantilla (el empleado vuelve a su `HorarioEmpleado` individual) |
 | POST | `/api/nomina/puestos` | `nomina.editar` — `{ nombre, activo? }` — catálogo de puestos (ítem G-8), plano |
 | GET | `/api/nomina/puestos?activo=true` | `nomina.ver` |
 | PATCH | `/api/nomina/puestos/:id` | `nomina.editar` |
@@ -384,8 +384,13 @@ para asientos manuales (ajustes, apertura, etc.).
 | POST | `/api/nomina/periodos` | `nomina.editar` — genera recibos para todos los empleados activos (`{ tipo: SEMANAL\|QUINCENAL\|BIMENSUAL\|MENSUAL, fechaInicio, fechaFin }`); `SEMANAL`/`BIMENSUAL` (plan de integración Cuadre, ítem G-7) usan el factor de `FACTOR_PERIODO_NOMINA` (`nomina-config.ts`) — `SEMANAL` = 7 días del divisor legal 23.83 (no un genérico mes/4), `BIMENSUAL` = mismo factor 0.5 que `QUINCENAL` (RAE: "dos veces al mes", no "cada dos meses") |
 | POST | `/api/nomina/periodos/:id/procesar` | `nomina.editar` — `BORRADOR → PROCESADO`, 400 si ya no está en BORRADOR |
 | POST | `/api/nomina/periodos/:id/marcar-pagado` | `nomina.editar` — `PROCESADO → PAGADO`, dispara el asiento contable automático (ver ARCHITECTURE.md) |
-| GET | `/api/nomina/empleados/:empleadoId/horario` | `rrhh.ver` — horario semanal (RRHH, Fase 7a) |
-| PUT | `/api/nomina/empleados/:empleadoId/horario` | `rrhh.editar` — reemplaza el horario completo (`{ dias: [{ diaSemana, horaEntrada, horaSalida }] }`, `dias: []` lo deja sin ningún día configurado) |
+| GET | `/api/nomina/empleados/:empleadoId/horario` | `rrhh.ver` — horario INDIVIDUAL semanal (RRHH, Fase 7a); si el empleado tiene una plantilla asignada (`plantillaHorarioId`, ítem G-1), este endpoint sigue devolviendo su horario individual guardado (si tiene) pero deja de ser el efectivo — ver `resolverDiasEfectivos` |
+| PUT | `/api/nomina/empleados/:empleadoId/horario` | `rrhh.editar` — reemplaza el horario INDIVIDUAL completo (`{ dias: [{ diaSemana, horaEntrada, horaSalida }] }`, `dias: []` lo deja sin ningún día configurado) — no tiene efecto en tardanza/horas extra mientras el empleado tenga una plantilla asignada |
+| POST | `/api/nomina/plantillas-horario` | `rrhh.editar` — `{ codigo, nombre, descripcion?, predeterminada?, activa? }` (ítem G-1) — catálogo de plantillas de horario reutilizables, **referencia viva**: editar sus `dias` cambia el horario efectivo de todos los empleados asignados |
+| GET | `/api/nomina/plantillas-horario?activa=true` | `rrhh.ver` — incluye `dias` |
+| GET | `/api/nomina/plantillas-horario/:id` | `rrhh.ver` |
+| PATCH | `/api/nomina/plantillas-horario/:id` | `rrhh.editar` — `predeterminada: true` desmarca automáticamente cualquier otra plantilla del tenant |
+| PUT | `/api/nomina/plantillas-horario/:id/dias` | `rrhh.editar` — reemplaza los días completos de la plantilla, mismo contrato que `PUT .../horario` individual |
 | GET | `/api/nomina/asistencia/mi-estado-hoy` | Autoservicio, sin permiso — `{ tieneEmpleado, registro }` del usuario logueado (RRHH, Fase 7b) |
 | POST | `/api/nomina/asistencia/marcar-entrada` | Autoservicio, sin permiso — 400 si el usuario no tiene `Empleado.userId` vinculado o si ya marcó entrada hoy |
 | POST | `/api/nomina/asistencia/marcar-salida` | Autoservicio, sin permiso — 400 si no marcó entrada hoy o si ya marcó salida; calcula `salidaAnticipada`/`horasExtra` (ítem G-4) contra `HorarioEmpleado` del día y `Configuracion.ASISTENCIA_UMBRAL_HORAS_EXTRA`/`ASISTENCIA_TOLERANCIA_SALIDA_ANTICIPADA_MIN` |

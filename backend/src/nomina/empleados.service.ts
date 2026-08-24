@@ -2,6 +2,7 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { EmpleadosRepository } from './empleados.repository';
 import { PuestosRepository } from '../puestos/puestos.repository';
+import { PlantillasHorarioRepository } from '../plantillas-horario/plantillas-horario.repository';
 import { CrearEmpleadoDto } from './dto/crear-empleado.dto';
 import { ActualizarEmpleadoDto } from './dto/actualizar-empleado.dto';
 import { ListarEmpleadosQueryDto } from './dto/listar-empleados-query.dto';
@@ -12,6 +13,7 @@ export class EmpleadosService {
   constructor(
     private readonly empleadosRepository: EmpleadosRepository,
     private readonly puestosRepository: PuestosRepository,
+    private readonly plantillasHorarioRepository: PlantillasHorarioRepository,
   ) {}
 
   async crear(dto: CrearEmpleadoDto, tenantId: string) {
@@ -20,12 +22,21 @@ export class EmpleadosService {
     if (dto.puestoId) {
       await this.puestosRepository.buscarPorId(dto.puestoId);
     }
+    if (dto.plantillaHorarioId) {
+      await this.plantillasHorarioRepository.buscarPorId(dto.plantillaHorarioId);
+    }
+    // Plan de integración Cuadre, ítem G-1 — "horario predeterminado para
+    // nuevos empleados": si no viene una plantilla explícita, auto-asigna
+    // la marcada `predeterminada` (si existe alguna) — referencia viva,
+    // igual que una asignación manual.
+    const plantillaHorarioId = dto.plantillaHorarioId ?? (await this.plantillasHorarioRepository.buscarPredeterminada())?.id;
     return this.empleadosRepository.crear({
       tenantId,
       nombre: dto.nombre,
       cedula: dto.cedula,
       cargo: dto.cargo,
       puestoId: dto.puestoId,
+      plantillaHorarioId,
       departamento: dto.departamento,
       fechaIngreso: new Date(dto.fechaIngreso),
       salarioBrutoMensual: dto.salarioBrutoMensual,
@@ -49,12 +60,16 @@ export class EmpleadosService {
     if (dto.puestoId) {
       await this.puestosRepository.buscarPorId(dto.puestoId);
     }
+    if (dto.plantillaHorarioId) {
+      await this.plantillasHorarioRepository.buscarPorId(dto.plantillaHorarioId);
+    }
     try {
       return await this.empleadosRepository.actualizar(id, {
         nombre: dto.nombre,
         cedula: dto.cedula,
         cargo: dto.cargo,
         puestoId: dto.puestoId,
+        plantillaHorarioId: dto.plantillaHorarioId,
         departamento: dto.departamento,
         fechaIngreso: dto.fechaIngreso ? new Date(dto.fechaIngreso) : undefined,
         salarioBrutoMensual: dto.salarioBrutoMensual,

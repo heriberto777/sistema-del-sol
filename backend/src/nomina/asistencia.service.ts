@@ -2,7 +2,7 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { DiaSemana } from '@prisma/client';
 import { AsistenciaRepository } from './asistencia.repository';
 import { EmpleadosRepository } from './empleados.repository';
-import { HorariosRepository } from './horarios.repository';
+import { PlantillasHorarioRepository } from '../plantillas-horario/plantillas-horario.repository';
 import { ConfiguracionesService } from '../configuraciones/configuraciones.service';
 import { CONFIGURACIONES_BASE } from '../tenants/roles-base';
 import { RegistrarAsistenciaManualDto } from './dto/registrar-asistencia-manual.dto';
@@ -26,7 +26,7 @@ export class AsistenciaService {
   constructor(
     private readonly asistenciaRepository: AsistenciaRepository,
     private readonly empleadosRepository: EmpleadosRepository,
-    private readonly horariosRepository: HorariosRepository,
+    private readonly plantillasHorarioRepository: PlantillasHorarioRepository,
     private readonly configuracionesService: ConfiguracionesService,
   ) {}
 
@@ -38,10 +38,17 @@ export class AsistenciaService {
     return empleado;
   }
 
-  /** `tardanza` se calcula UNA vez al marcar la entrada, comparando contra HorarioEmpleado del día — sin horario configurado ese día, no hay contra qué comparar. */
+  /**
+   * `tardanza` se calcula UNA vez al marcar la entrada, comparando contra
+   * el horario EFECTIVO del día — `PlantillasHorarioRepository.
+   * resolverDiasEfectivos` (ítem G-1) resuelve la plantilla asignada
+   * (referencia viva) si el empleado tiene una, o su `HorarioEmpleado`
+   * individual si no. Sin horario configurado ese día, no hay contra qué
+   * comparar y no se marca tardanza.
+   */
   private async calcularTardanza(empleadoId: string, fecha: Date, horaEntradaReal: string) {
     const diaSemana = DIAS_POR_INDICE_UTC[fecha.getUTCDay()];
-    const horarios = await this.horariosRepository.listarPorEmpleado(empleadoId);
+    const horarios = await this.plantillasHorarioRepository.resolverDiasEfectivos(empleadoId);
     const horarioDelDia = horarios.find((h) => h.diaSemana === diaSemana);
     return horarioDelDia ? horaEntradaReal > horarioDelDia.horaEntrada : false;
   }
@@ -64,7 +71,7 @@ export class AsistenciaService {
     horaSalida: string,
   ): Promise<{ salidaAnticipada: boolean; horasExtra: number | null }> {
     const diaSemana = DIAS_POR_INDICE_UTC[fecha.getUTCDay()];
-    const horarios = await this.horariosRepository.listarPorEmpleado(empleadoId);
+    const horarios = await this.plantillasHorarioRepository.resolverDiasEfectivos(empleadoId);
     const horarioDelDia = horarios.find((h) => h.diaSemana === diaSemana);
 
     let salidaAnticipada = false;
