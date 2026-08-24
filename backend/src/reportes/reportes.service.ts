@@ -194,6 +194,105 @@ export class ReportesService {
     return { buffer, nombreArchivo: 'reporte-inventario.pdf', mimeType: 'application/pdf' };
   }
 
+  /**
+   * Catálogo de reportes ampliado (plan de integración Cuadre, ítem
+   * J-2) — ventas agrupadas por una de 6 dimensiones (cubre "por
+   * Cliente/Categoría/Producto/Código Alterno/Tipo de Pago/Vendedor" de
+   * la comparación original; "Resumida/Detallada/por Fecha" ya existían
+   * en `reporteVentas`, y "Comisiones" queda fuera — ver ítem A-1).
+   * `categoria`/`producto`/`codigoAlterno` agregan por LÍNEA (una
+   * factura con productos de 2 categorías cuenta en ambas); el resto
+   * agrega por FACTURA completa. Sin paginar — mismo criterio que
+   * Kardex/libro mayor: se trae el rango completo y se agrega en Node.
+   */
+  async reporteVentasAgrupado(desde: string | undefined, hasta: string | undefined, dimension: string) {
+    const rango = rangoPorDefecto(desde, hasta);
+    const facturas = await this.reportesRepository.facturasEnRangoConLineas(rango.desde, rango.hasta);
+
+    const acumulado = new Map<string, { etiqueta: string; cantidad: number; subtotal: number; itbis: number; total: number }>();
+    const sumar = (clave: string, etiqueta: string, montos: { subtotal: number; itbis: number; total: number }) => {
+      const actual = acumulado.get(clave) ?? { etiqueta, cantidad: 0, subtotal: 0, itbis: 0, total: 0 };
+      actual.cantidad += 1;
+      actual.subtotal += montos.subtotal;
+      actual.itbis += montos.itbis;
+      actual.total += montos.total;
+      acumulado.set(clave, actual);
+    };
+
+    for (const f of facturas) {
+      const montosFactura = { subtotal: Number(f.subtotal), itbis: Number(f.itbis), total: Number(f.total) };
+      if (dimension === 'cliente') {
+        sumar(f.clienteId, f.cliente.nombre, montosFactura);
+      } else if (dimension === 'vendedor') {
+        sumar(f.vendedorEmpleadoId ?? 'sin-vendedor', f.vendedorEmpleado?.nombre ?? 'Sin vendedor', montosFactura);
+      } else if (dimension === 'formaPago') {
+        // La "principal" ya resuelta en la factura (mayor monto entre los pagos) — un
+        // pago dividido no se desglosa acá, mismo criterio que Factura.formaPagoId.
+        sumar(f.formaPagoId ?? 'sin-forma-pago', f.formaPago?.nombre ?? 'Sin forma de pago', montosFactura);
+      } else {
+        for (const l of f.lineas) {
+          const montosLinea = {
+            subtotal: Number(l.cantidad) * Number(l.precioUnitario) - Number(l.descuento),
+            itbis: Number(l.montoItbis),
+            total: Number(l.montoTotal),
+          };
+          if (dimension === 'producto') {
+            sumar(l.productoId, l.producto.nombre, montosLinea);
+          } else if (dimension === 'categoria') {
+            sumar(l.producto.categoria?.id ?? 'sin-categoria', l.producto.categoria?.nombre ?? 'Sin categoría', montosLinea);
+          } else if (dimension === 'codigoAlterno') {
+            if (!l.variante.codigoBarras) continue;
+            sumar(l.variante.codigoBarras, l.variante.codigoBarras, montosLinea);
+          }
+        }
+      }
+    }
+
+    const filas = [...acumulado.values()].sort((a, b) => b.total - a.total);
+    return { filas, rango };
+  }
+
+  /**
+   * Rentabilidad por producto (ítem J-2) — margen = ventas netas (sin
+   * ITBIS) menos costo vigente HOY de la variante (lista "GENERAL"). No
+   * es el costo real al momento de cada venta (`LineaFactura` no
+   * snapshotea costo, solo precio de venta) — limitación conocida,
+   * documentada, igual criterio que otros reportes de este proyecto que
+   * usan el dato vigente en vez de reconstruir historial.
+   */
+  async reporteRentabilidad(desde?: string, hasta?: string) {
+    const rango = rangoPorDefecto(desde, hasta);
+    const facturas = await this.reportesRepository.facturasEnRangoConLineas(rango.desde, rango.hasta);
+
+    const acumulado = new Map<string, { producto: string; cantidad: number; ventasNetas: number; costo: number }>();
+    for (const f of facturas) {
+      for (const l of f.lineas) {
+        const cantidad = Number(l.cantidad);
+        const ventaNeta = cantidad * Number(l.precioUnitario) - Number(l.descuento);
+        const costoUnitario = Number(l.variante.precios[0]?.costo ?? 0);
+        const actual = acumulado.get(l.productoId) ?? { producto: l.producto.nombre, cantidad: 0, ventasNetas: 0, costo: 0 };
+        actual.cantidad += cantidad;
+        actual.ventasNetas += ventaNeta;
+        actual.costo += cantidad * costoUnitario;
+        acumulado.set(l.productoId, actual);
+      }
+    }
+
+    const filas = [...acumulado.entries()]
+      .map(([productoId, v]) => ({
+        productoId,
+        producto: v.producto,
+        cantidad: v.cantidad,
+        ventasNetas: v.ventasNetas,
+        costo: v.costo,
+        margen: v.ventasNetas - v.costo,
+        margenPct: v.ventasNetas > 0 ? ((v.ventasNetas - v.costo) / v.ventasNetas) * 100 : 0,
+      }))
+      .sort((a, b) => b.margen - a.margen);
+
+    return { filas, rango };
+  }
+
   async reporteCompras(desde?: string, hasta?: string) {
     const rango = rangoPorDefecto(desde, hasta);
     const ordenes = await this.reportesRepository.ordenesCompraEnRango(rango.desde, rango.hasta);

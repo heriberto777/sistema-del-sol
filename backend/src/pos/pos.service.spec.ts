@@ -8,6 +8,7 @@ import { EmpleadosRepository } from '../nomina/empleados.repository';
 import { VariantesService } from '../variantes/variantes.service';
 import { InventarioService } from '../inventario/inventario.service';
 import { AuthService } from '../auth/auth.service';
+import { RedisService } from '../redis/redis.service';
 
 describe('PosService', () => {
   let service: PosService;
@@ -19,6 +20,7 @@ describe('PosService', () => {
   let variantesService: jest.Mocked<VariantesService>;
   let inventarioService: jest.Mocked<InventarioService>;
   let authService: jest.Mocked<AuthService>;
+  let redis: jest.Mocked<RedisService>;
 
   beforeEach(() => {
     posRepository = {
@@ -50,6 +52,11 @@ describe('PosService', () => {
     authService = {
       verificarPin: jest.fn().mockResolvedValue(undefined),
     } as unknown as jest.Mocked<AuthService>;
+    redis = {
+      obtenerJson: jest.fn(),
+      guardarJson: jest.fn(),
+      eliminar: jest.fn(),
+    } as unknown as jest.Mocked<RedisService>;
     service = new PosService(
       posRepository,
       facturacionService,
@@ -59,6 +66,7 @@ describe('PosService', () => {
       variantesService,
       inventarioService,
       authService,
+      redis,
     );
   });
 
@@ -595,6 +603,34 @@ describe('PosService', () => {
 
       expect(empleadosRepository.listarVendedores).toHaveBeenCalledWith('juan');
       expect(resultado).toEqual([{ id: 'emp1', nombre: 'Juan Pérez' }]);
+    });
+  });
+
+  describe('mensaje a cajas (plan de integración Cuadre, ítem J-3)', () => {
+    it('obtenerMensajeCajas devuelve null si no hay nada publicado', async () => {
+      redis.obtenerJson.mockResolvedValue(null);
+
+      const resultado = await service.obtenerMensajeCajas('tenant-1');
+
+      expect(redis.obtenerJson).toHaveBeenCalledWith('pos:mensaje-cajas:tenant-1');
+      expect(resultado).toBeNull();
+    });
+
+    it('publicarMensajeCajas guarda en Redis con TTL de 8 horas y devuelve el mensaje', async () => {
+      const resultado = await service.publicarMensajeCajas('tenant-1', 'Cierre anticipado hoy');
+
+      expect(redis.guardarJson).toHaveBeenCalledWith(
+        'pos:mensaje-cajas:tenant-1',
+        expect.objectContaining({ texto: 'Cierre anticipado hoy' }),
+        8 * 60 * 60,
+      );
+      expect(resultado.texto).toBe('Cierre anticipado hoy');
+    });
+
+    it('borrarMensajeCajas elimina la clave de Redis del tenant', async () => {
+      await service.borrarMensajeCajas('tenant-1');
+
+      expect(redis.eliminar).toHaveBeenCalledWith('pos:mensaje-cajas:tenant-1');
     });
   });
 });

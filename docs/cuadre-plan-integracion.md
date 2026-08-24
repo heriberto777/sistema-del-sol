@@ -301,8 +301,12 @@ Resumen de lo que cambió (detalle en cada ítem más abajo):
   F8/F9/F10/F12/⇧F12 wireados — el mismo set de 12 acciones que Cuadre
   (el único "faltante", F11 para facturas de la sesión, no hace falta:
   ver F-3, ya está siempre visible sin atajo).
-- [ ] **F-8** 🟨 — **PWA instalable**: manifest + service worker básico.
-  *Confirmado: no existe ningún manifest/service worker — brecha real.*
+- [x] **F-8** 🟨 — **PWA instalable**: manifest + service worker básico.
+  `frontend/public/manifest.webmanifest` + `sw.js` (sin caché a
+  propósito — el proyecto no tiene modo offline, cachear rompería esa
+  garantía) + íconos SVG con la paleta `sol` (placeholder hasta que el
+  tenant tenga un logo real). Registrado en `main.tsx`, enlazado en
+  `index.html`. Sin cambios de backend. Entregado 2026-08-24.
 - [ ] **F-9** 🟥 *diseño primero* — **Impresión local ESC/POS + apertura de
   gaveta**: agente descargable. *Confirmado: brecha real, ya documentada en
   ARCHITECTURE.md.*
@@ -402,16 +406,37 @@ Resumen de lo que cambió (detalle en cada ítem más abajo):
 
 ## J — Varios / bajo esfuerzo
 
-- [ ] **J-1** 🟨 — **Impresora de etiquetas ZPL/EPL**. *Confirmado: brecha
-  real, sin cambios.*
-- [ ] **J-2** 🟨 — **Catálogo de reportes ampliado** (por vendedor, código
-  alterno, rentabilidad). *Confirmado: brecha real, sin cambios.*
-- [ ] **J-3** 🟨 — **"Mensaje a cajas"** (broadcast a terminales POS). *No
-  re-verificado a fondo — de alcance tan chico que no cambia la
-  priorización; asumir brecha real hasta confirmar si se prioriza.*
-- [ ] **J-4** 🟨 — **API keys con scopes granulares**. *No re-verificado a
-  fondo (no aplica hasta que exista una API pública propia) — mismo
-  criterio que J-3.*
+- [x] **J-1** 🟨 — **Impresora de etiquetas ZPL/EPL**.
+  `generarZplEtiquetas()`/`generarEplEtiquetas()` (`etiquetas-codigo-
+  barras.ts`) generan el texto de comandos y lo descargan (`.zpl`/
+  `.epl`) — sin agente local, mismo criterio que la impresión térmica
+  existente y que la exclusión de F-9. Botones "ZPL"/"EPL" junto a
+  "Imprimir etiquetas" en `VariantesProductoPanel.tsx`. Sin cambios de
+  backend. Entregado 2026-08-24.
+- [x] **J-2** 🟨 — **Catálogo de reportes ampliado** (por vendedor, código
+  alterno, rentabilidad). `GET /reportes/ventas/agrupado?dimension=` (6
+  dimensiones: cliente/categoría/producto/vendedor/formaPago/código
+  alterno) + `GET /reportes/ventas/rentabilidad` (margen bruto, costo
+  VIGENTE hoy — no histórico, limitación documentada). 2 pestañas nuevas
+  en Reportes → Ventas. Comisiones queda fuera (ver A-1). Sin exportador
+  xlsx/pdf todavía. Sin migración. Entregado 2026-08-24.
+- [x] **J-3** 🟨 — **"Mensaje a cajas"** (broadcast a terminales POS). En
+  Redis (no Postgres, aviso efímero sin historial), TTL 8h.
+  `POST`/`DELETE /pos/mensaje-cajas` (`pos.supervisar`), `GET` con
+  `pos.ver`. Banner con polling cada 30s (`MensajeCajasBanner.tsx`) en
+  `PosCaja.tsx`; panel para publicar/borrar en `Pos.tsx` (solo
+  supervisores). Sin WebSockets — no hay esa infraestructura en el
+  proyecto. Sin migración. Entregado 2026-08-24.
+- [ ] **J-4** 🟨→🟥 *(corrección — diseño primero)* — **API keys con
+  scopes granulares**. *Confirmado: el propio catálogo ya lo marcaba
+  "no aplica hasta que exista una API pública propia" — verificado: no
+  existe ninguna. Implementar autenticación por API key sin decidir
+  primero SI/CÓMO se expone una API pública sería construir superficie
+  de autenticación real (riesgo de seguridad) para una feature que
+  nadie puede usar todavía — brecha decorativa en el mejor caso, hueco
+  de seguridad mal diseñado en el peor. Reclasificado a "diseño
+  primero", NO implementado — necesita decidir el alcance de una API
+  pública antes de poder diseñar sus scopes.*
 
 ---
 
@@ -505,20 +530,29 @@ Resumen de lo que cambió (detalle en cada ítem más abajo):
   dio exit 0 limpio), lint sin errores, build limpio. Con esto, la
   sección **G** (RRHH) queda completa salvo G-2/G-6 (🟧) y G-9 (🟥,
   hardware).
+- **2026-08-24**: entregados F-8 (PWA instalable), J-1 (etiquetas ZPL/
+  EPL), J-2 (catálogo de reportes ampliado) y J-3 (mensaje a cajas por
+  Redis). J-4 (API keys con scopes) reclasificado a "diseño primero" —
+  no existe API pública propia sobre la cual definir scopes. Sin
+  migraciones en este lote (los cuatro ítems son aditivos sobre módulos
+  existentes o infraestructura ya presente — Redis, service worker).
 
 ## Sugerencia de por dónde arrancar
 
-Con el catálogo ya corregido, el lote E-3/E-5/E-9/E-11/F-2/G-1/G-3/G-4/
-G-5/G-7/G-8/B-3/B-6/B-7/B-8 entregado y verificado en dos rondas (tsc +
-745 unitarios + 179 e2e + lint + build, todo verde), ya no quedan ítems
-con el matiz "ya lo teníamos parcial" original (los 5 que tenía esa
-nota — B-1, E-1, E-5, E-11, G-7 — están todos resueltos o, en el caso de
-E-1, siguen como brecha real confirmada sin cambios). La sección **G**
-(RRHH) queda con solo G-2/G-6 (🟧, sin bloqueo) y G-9 (🟥, depende de
-hardware) pendientes. De la sección **B** solo quedan B-2 (🟧) y B-5
-(🟥, e-CF real) sin bloqueo — **B-9 está deliberadamente pausado** (el
-usuario pidió evaluarlo con más calma, no retomar sin avisar) y B-4
-(🟧) no es bloqueante. Los 🟥 con "diseño primero" conviene agruparlos
-en su propia sesión de planeamiento cuando se prioricen, siguiendo la
-misma mecánica que Sucursales (Fase 8) y PIN (Fase 9): presentar el
-diseño, resolver casos límite, y recién después ejecutar.
+Con el catálogo ya corregido, el lote E-3/E-5/E-9/E-11/F-2/F-8/G-1/G-3/
+G-4/G-5/G-7/G-8/B-3/B-6/B-7/B-8/J-1/J-2/J-3 entregado y verificado (tsc +
+suite unitaria + e2e + lint + build, todo verde), ya no quedan ítems con
+el matiz "ya lo teníamos parcial" original (los 5 que tenía esa nota —
+B-1, E-1, E-5, E-11, G-7 — están todos resueltos o, en el caso de E-1,
+siguen como brecha real confirmada sin cambios). La sección **G** (RRHH)
+queda con solo G-2/G-6 (🟧, sin bloqueo) y G-9 (🟥, depende de hardware)
+pendientes. De la sección **B** solo quedan B-2 (🟧) y B-5 (🟥, e-CF
+real) sin bloqueo — **B-9 está deliberadamente pausado** (el usuario
+pidió evaluarlo con más calma, no retomar sin avisar) y B-4 (🟧) no es
+bloqueante. La sección **J** queda completa salvo J-4 (🟥, diseño
+primero). Quedan además C-2 (multi-moneda, 🟧), E-4/E-6/E-8 (🟧), F-4
+(🟧) y H-3 (🟧) sin verificar en detalle contra el código. Los 🟥 con
+"diseño primero" conviene agruparlos en su propia sesión de
+planeamiento cuando se prioricen, siguiendo la misma mecánica que
+Sucursales (Fase 8) y PIN (Fase 9): presentar el diseño, resolver casos
+límite, y recién después ejecutar.

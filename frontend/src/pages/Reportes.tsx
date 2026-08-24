@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import clsx from 'clsx';
 import { ReporteVentas } from '../components/organisms/ReporteVentas/ReporteVentas';
+import { ReporteVentasAgrupado } from '../components/organisms/ReporteVentasAgrupado/ReporteVentasAgrupado';
+import { ReporteRentabilidad } from '../components/organisms/ReporteRentabilidad/ReporteRentabilidad';
 import { ReporteInventario } from '../components/organisms/ReporteInventario/ReporteInventario';
 import { ReporteCompras } from '../components/organisms/ReporteCompras/ReporteCompras';
 import { ReporteFiscalDgii } from '../components/organisms/ReporteFiscalDgii/ReporteFiscalDgii';
@@ -8,6 +10,8 @@ import { RequierePermiso } from '../components/organisms/RequierePermiso/Requier
 
 const PESTANAS = [
   { id: 'ventas', etiqueta: 'Ventas' },
+  { id: 'ventas-agrupadas', etiqueta: 'Ventas agrupadas' },
+  { id: 'rentabilidad', etiqueta: 'Rentabilidad' },
   { id: 'inventario', etiqueta: 'Inventario' },
   { id: 'compras', etiqueta: 'Compras' },
   { id: 'dgii', etiqueta: 'DGII' },
@@ -44,6 +48,8 @@ export function Reportes() {
 
       <RequierePermiso permiso="reportes.ver">
         {pestana === 'ventas' && <ReporteVentas />}
+        {pestana === 'ventas-agrupadas' && <ReporteVentasAgrupado />}
+        {pestana === 'rentabilidad' && <ReporteRentabilidad />}
         {pestana === 'inventario' && <ReporteInventario />}
         {pestana === 'compras' && <ReporteCompras />}
         {pestana === 'dgii' && <ReporteFiscalDgii />}

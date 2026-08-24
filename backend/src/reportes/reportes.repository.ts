@@ -66,6 +66,37 @@ export class ReportesRepository {
     });
   }
 
+  /**
+   * Mismo universo que `facturasEnRango` (solo ventas normales, EMITIDA)
+   * pero con las líneas y sus relaciones — usado por los reportes
+   * agrupados y de rentabilidad (plan de integración Cuadre, ítem J-2).
+   * Solo `CONTADO`/`CREDITO`: una nota de crédito/débito no es una venta
+   * nueva, agregarla a "ventas por vendedor/producto" duplicaría el
+   * monto de la venta que ajusta.
+   */
+  facturasEnRangoConLineas(desde: Date, hasta: Date) {
+    return this.db.factura.findMany({
+      where: { estado: 'EMITIDA', tipoFactura: { in: ['CONTADO', 'CREDITO'] }, fecha: { gte: desde, lte: finDelDia(hasta) } },
+      include: {
+        cliente: { select: { id: true, nombre: true } },
+        vendedorEmpleado: { select: { id: true, nombre: true } },
+        formaPago: { select: { id: true, nombre: true } },
+        lineas: {
+          include: {
+            producto: { select: { id: true, nombre: true, categoria: { select: { id: true, nombre: true } } } },
+            variante: {
+              select: {
+                codigoBarras: true,
+                precios: { where: { listaPrecio: 'GENERAL', vigenteHasta: null }, select: { costo: true }, take: 1 },
+              },
+            },
+          },
+        },
+      },
+      orderBy: { fecha: 'asc' },
+    });
+  }
+
   /** Reaplana `variante.producto` a `producto` en cada fila, para que ReportesService no tenga que cambiar. */
   async stockActual(tenantId: string, bodegaIds?: string[]) {
     const filas = await this.db.stock.findMany({

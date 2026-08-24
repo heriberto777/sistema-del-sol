@@ -13,6 +13,7 @@ describe('ReportesService', () => {
       stockBajoConteo: jest.fn(),
       ordenesCompraPendientesConteo: jest.fn(),
       facturasEnRango: jest.fn(),
+      facturasEnRangoConLineas: jest.fn(),
       stockActual: jest.fn(),
       ordenesCompraEnRango: jest.fn(),
       bodegaIdsDeSucursal: jest.fn(),
@@ -194,6 +195,136 @@ describe('ReportesService', () => {
       expect(archivo.mimeType).toBe('application/pdf');
       // Firma binaria de un PDF real ("%PDF-")
       expect(archivo.buffer.subarray(0, 5).toString('ascii')).toBe('%PDF-');
+    });
+  });
+
+  describe('reporteVentasAgrupado (plan de integración Cuadre, ítem J-2)', () => {
+    const facturaBase = (overrides: Record<string, unknown> = {}) => ({
+      clienteId: 'cli-1',
+      cliente: { id: 'cli-1', nombre: 'Cliente A' },
+      vendedorEmpleadoId: 'emp-1',
+      vendedorEmpleado: { id: 'emp-1', nombre: 'Juan Vendedor' },
+      formaPagoId: 'fp-1',
+      formaPago: { id: 'fp-1', nombre: 'Efectivo' },
+      subtotal: 100,
+      itbis: 18,
+      total: 118,
+      lineas: [
+        {
+          productoId: 'prod-1',
+          producto: { id: 'prod-1', nombre: 'Producto A', categoria: { id: 'cat-1', nombre: 'Categoría A' } },
+          variante: { codigoBarras: '7501234567890', precios: [{ costo: 50 }] },
+          cantidad: 2,
+          precioUnitario: 50,
+          descuento: 0,
+          montoItbis: 18,
+          montoTotal: 118,
+        },
+      ],
+      ...overrides,
+    });
+
+    it('agrupa por cliente sumando cantidad/subtotal/itbis/total', async () => {
+      repository.facturasEnRangoConLineas.mockResolvedValue([facturaBase(), facturaBase()] as never);
+
+      const resultado = await service.reporteVentasAgrupado(undefined, undefined, 'cliente');
+
+      expect(resultado.filas).toEqual([{ etiqueta: 'Cliente A', cantidad: 2, subtotal: 200, itbis: 36, total: 236 }]);
+    });
+
+    it('agrupa por vendedor, usando "Sin vendedor" cuando la venta no tiene uno', async () => {
+      repository.facturasEnRangoConLineas.mockResolvedValue([facturaBase({ vendedorEmpleadoId: null, vendedorEmpleado: null })] as never);
+
+      const resultado = await service.reporteVentasAgrupado(undefined, undefined, 'vendedor');
+
+      expect(resultado.filas[0]).toEqual(expect.objectContaining({ etiqueta: 'Sin vendedor', cantidad: 1 }));
+    });
+
+    it('agrupa por producto sumando a nivel de LÍNEA, no de factura', async () => {
+      repository.facturasEnRangoConLineas.mockResolvedValue([facturaBase()] as never);
+
+      const resultado = await service.reporteVentasAgrupado(undefined, undefined, 'producto');
+
+      // subtotal de línea = 2*50 - 0 = 100 (no el subtotal de la factura completa)
+      expect(resultado.filas[0]).toEqual({ etiqueta: 'Producto A', cantidad: 1, subtotal: 100, itbis: 18, total: 118 });
+    });
+
+    it('agrupa por categoría usando la categoría del producto de la línea', async () => {
+      repository.facturasEnRangoConLineas.mockResolvedValue([facturaBase()] as never);
+
+      const resultado = await service.reporteVentasAgrupado(undefined, undefined, 'categoria');
+
+      expect(resultado.filas[0]).toEqual(expect.objectContaining({ etiqueta: 'Categoría A' }));
+    });
+
+    it('agrupa por código alterno y descarta líneas de variantes sin código de barras', async () => {
+      repository.facturasEnRangoConLineas.mockResolvedValue([
+        facturaBase(),
+        facturaBase({ lineas: [{ ...facturaBase().lineas[0], variante: { codigoBarras: null, precios: [{ costo: 50 }] } }] }),
+      ] as never);
+
+      const resultado = await service.reporteVentasAgrupado(undefined, undefined, 'codigoAlterno');
+
+      expect(resultado.filas).toHaveLength(1);
+      expect(resultado.filas[0].etiqueta).toBe('7501234567890');
+    });
+
+    it('ordena las filas de mayor a menor total', async () => {
+      repository.facturasEnRangoConLineas.mockResolvedValue([
+        facturaBase({ clienteId: 'cli-chico', cliente: { id: 'cli-chico', nombre: 'Chico' }, total: 50 }),
+        facturaBase({ clienteId: 'cli-grande', cliente: { id: 'cli-grande', nombre: 'Grande' }, total: 500 }),
+      ] as never);
+
+      const resultado = await service.reporteVentasAgrupado(undefined, undefined, 'cliente');
+
+      expect(resultado.filas.map((f) => f.etiqueta)).toEqual(['Grande', 'Chico']);
+    });
+  });
+
+  describe('reporteRentabilidad (plan de integración Cuadre, ítem J-2)', () => {
+    it('calcula margen bruto y % usando el costo vigente de la variante', async () => {
+      repository.facturasEnRangoConLineas.mockResolvedValue([
+        {
+          lineas: [
+            {
+              productoId: 'prod-1',
+              producto: { id: 'prod-1', nombre: 'Producto A' },
+              variante: { precios: [{ costo: 60 }] },
+              cantidad: 2,
+              precioUnitario: 100,
+              descuento: 0,
+            },
+          ],
+        },
+      ] as never);
+
+      const resultado = await service.reporteRentabilidad(undefined, undefined);
+
+      // ventaNeta = 2*100 = 200; costo = 2*60 = 120; margen = 80; margenPct = 40%
+      expect(resultado.filas[0]).toEqual(
+        expect.objectContaining({ producto: 'Producto A', cantidad: 2, ventasNetas: 200, costo: 120, margen: 80, margenPct: 40 }),
+      );
+    });
+
+    it('costo 0 si la variante no tiene un precio vigente en la lista GENERAL', async () => {
+      repository.facturasEnRangoConLineas.mockResolvedValue([
+        {
+          lineas: [
+            {
+              productoId: 'prod-1',
+              producto: { id: 'prod-1', nombre: 'Producto A' },
+              variante: { precios: [] },
+              cantidad: 1,
+              precioUnitario: 100,
+              descuento: 0,
+            },
+          ],
+        },
+      ] as never);
+
+      const resultado = await service.reporteRentabilidad(undefined, undefined);
+
+      expect(resultado.filas[0]).toEqual(expect.objectContaining({ costo: 0, margen: 100 }));
     });
   });
 });

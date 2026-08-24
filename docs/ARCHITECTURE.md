@@ -600,6 +600,40 @@ de "backfill" de permisos para tenants existentes — si se necesita,
 otorgarlos manualmente vía `rolePermission.create` o construir una
 migración de datos para ese propósito.
 
+## Reportes de ventas ampliados (plan de integración Cuadre, ítem J-2)
+
+`ReportesRepository.facturasEnRangoConLineas()` es la query compartida
+por dos endpoints nuevos — trae `Factura` (solo `CONTADO`/`CREDITO`
+`EMITIDA`, una nota de crédito/débito no es una venta nueva) con
+`lineas.producto.categoria`, `lineas.variante` (`codigoBarras` +
+`precios` vigente de la lista `GENERAL`), `vendedorEmpleado` y
+`formaPago` — todo en un solo `include`, sin N+1:
+
+- **`GET /reportes/ventas/agrupado?dimension=...`**
+  (`ReportesService.reporteVentasAgrupado`) agrega en Node (mismo
+  criterio sin paginar que Kardex/libro mayor) por una de 6 dimensiones
+  — `cliente`/`vendedor`/`formaPago` agregan a nivel de FACTURA
+  completa; `categoria`/`producto`/`codigoAlterno` agregan a nivel de
+  LÍNEA (una factura con productos de 2 categorías cuenta en ambas).
+  Cubre "por Cliente/Categoría/Producto/Código Alterno/Tipo de
+  Pago/Vendedor" de la comparación original — "Resumida/Detallada/por
+  Fecha" ya existían en `reporteVentas`, y "Comisiones" queda
+  deliberadamente fuera (ver ítem A-1, motor de comisiones completo).
+- **`GET /reportes/ventas/rentabilidad`**
+  (`ReportesService.reporteRentabilidad`) calcula margen bruto por
+  producto: ventas netas (sin ITBIS) menos costo. **Limitación
+  conocida**: usa el costo VIGENTE HOY de la variante (`Precio.costo`,
+  lista `GENERAL`), no el costo real al momento de cada venta —
+  `LineaFactura` no snapshotea costo (solo precio de venta), así que
+  reconstruir el costo histórico exacto exigiría un modelo distinto;
+  documentado en la UI (`ReporteRentabilidad.tsx`) para que no se lea
+  como un número contable exacto.
+
+Ninguno de los dos tiene exportador xlsx/pdf todavía (a diferencia de
+`reporteVentas`/`reporteInventario`/`reporteCompras`) — se dejó fuera
+para no duplicar el trabajo de armado de Excel/PDF por cada dimensión;
+agregarlo es la extensión natural si se prioriza.
+
 ## Reportes fiscales DGII (606/607/608)
 
 `backend/src/reportes-fiscales/` genera los tres formatos que exige la
@@ -1186,6 +1220,18 @@ se ofrecen para imprimir las variantes que ya tienen `codigoBarras`
 asignado. `jsbarcode` no trae sus propios tipos en el paquete (no
 declara `types`/`typings` en su `package.json`) — se instaló
 `@types/jsbarcode` aparte como devDependency.
+
+**ZPL/EPL para impresoras de etiquetas** (plan de integración Cuadre,
+ítem J-1): `generarZplEtiquetas()`/`generarEplEtiquetas()` (mismo
+archivo) generan el texto de comandos Zebra/Eltron y lo descargan como
+`.zpl`/`.epl` (`descargarZplEtiquetas()`/`descargarEplEtiquetas()`) —
+sin agente local ni driver propio, mismo criterio que la impresión
+térmica del backend y que la exclusión deliberada de F-9 (ESC/POS): el
+usuario manda el archivo a su impresora con lo que ya tenga configurado
+(spooler "Generic/Text Only", `copy /b archivo.zpl LPT1`, envío directo
+al puerto 9100). `escaparZpl()`/`escaparEpl()` sanean los caracteres de
+control de cada lenguaje (`^`/`~` en ZPL, `"` en EPL) para que un
+nombre de producto con esos caracteres no rompa el comando siguiente.
 
 ## Import/export de catálogo por Excel (Fase 3e)
 
@@ -2190,6 +2236,31 @@ Cotizaciones/Remisiones. **Sin modo offline en v1** — cada acción
 (abrir turno, vender, cerrar) es una llamada HTTP normal; no hay cola
 local ni sincronización diferida, así que el POS requiere conectividad
 para operar (ver "Fuera de alcance" abajo).
+
+**PWA instalable** (plan de integración Cuadre, ítem F-8):
+`frontend/public/manifest.webmanifest` + `sw.js` habilitan "instalar
+app" en el navegador (ícono en escritorio/pantalla de inicio, ventana
+sin barra de URL) — el Service Worker es deliberadamente SIN caché
+(`event.respondWith(fetch(event.request))`, siempre red) para no
+contradecir el "sin modo offline" de arriba: cachear respuestas
+serviría datos viejos al POS sin que el cajero lo note. Los íconos
+(`icon.svg`/`icon-maskable.svg`) son SVG, no PNG — un placeholder con
+la paleta `sol` del proyecto; reemplazarlos por assets de marca reales
+es la extensión natural cuando el tenant tenga un logo propio.
+
+**"Mensaje a cajas"** (plan de integración Cuadre, ítem J-3): broadcast
+de texto a todos los terminales POS del tenant — en **Redis, no
+Postgres** (`PosService.publicarMensajeCajas`/`obtenerMensajeCajas`/
+`borrarMensajeCajas`, clave `pos:mensaje-cajas:{tenantId}`, TTL de 8h)
+porque es un aviso efímero (turno a turno), no un dato de negocio que
+necesite historial ni aislamiento por sucursal — el TTL evita que quede
+"pegado" si un supervisor olvida borrarlo. Sin WebSockets/SSE (no hay
+esa infraestructura en el proyecto): `MensajeCajasBanner.tsx` hace
+polling cada 30s vía React Query (`refetchInterval`) — con un desfasaje
+de hasta 30s entre publicar y que lo vea el cajero, aceptable para un
+aviso no crítico. `POST`/`DELETE /pos/mensaje-cajas` piden
+`pos.supervisar`; `GET` solo pide `pos.ver` (cualquier cajero con turno
+activo debe poder verlo).
 
 - **`POST /pos/turnos` (abrir)**: solo puede haber **un turno `ABIERTO`
   por bodega a la vez** — `PosService.abrirTurno` lo valida en código

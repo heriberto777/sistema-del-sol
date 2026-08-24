@@ -39,3 +39,12 @@ export class FormatoConSucursalQueryDto extends FormatoQueryDto {
   @IsUUID()
   sucursalId?: string;
 }
+
+const DIMENSIONES_VENTAS = ['cliente', 'categoria', 'producto', 'vendedor', 'formaPago', 'codigoAlterno'] as const;
+
+/** Catálogo de reportes ampliado (plan de integración Cuadre, ítem J-2) — ventas agrupadas por una de estas dimensiones. */
+export class ReporteVentasAgrupadoQueryDto extends ReporteQueryDto {
+  @ApiProperty({ enum: DIMENSIONES_VENTAS })
+  @IsIn(DIMENSIONES_VENTAS)
+  dimension: (typeof DIMENSIONES_VENTAS)[number];
+}

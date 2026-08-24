@@ -341,6 +341,8 @@ Ver `plugins/inmobiliaria/src/inmobiliaria.controller.ts`.
 | GET | `/api/reportes/dashboard?sucursalId` | `reportes.ver` — `{ ventasHoyTotal, facturasHoyCantidad, productosStockBajo, ordenesCompraPendientes }`, cacheado en Redis 30s por tenant+sucursal. `sucursalId` opcional (Fase 8d) filtra los primeros 3 KPIs; `ordenesCompraPendientes` siempre tenant-wide (`OrdenCompra` no tiene `bodegaId` propio) |
 | GET | `/api/reportes/ventas?desde&hasta` | `reportes.ver` — facturas emitidas en el rango (default: últimos 30 días) + resumen |
 | GET | `/api/reportes/ventas/exportar?desde&hasta&formato=xlsx\|pdf` | `reportes.ver` — descarga binaria (`.xlsx` real vía exceljs, `.pdf` real vía pdfkit) |
+| GET | `/api/reportes/ventas/agrupado?desde&hasta&dimension=cliente\|categoria\|producto\|vendedor\|formaPago\|codigoAlterno` | `reportes.ver` — catálogo de reportes ampliado (ítem J-2), sin exportador xlsx/pdf todavía |
+| GET | `/api/reportes/ventas/rentabilidad?desde&hasta` | `reportes.ver` — margen bruto por producto (ítem J-2); usa el costo VIGENTE hoy, no el histórico al momento de la venta |
 | GET | `/api/reportes/inventario?sucursalId` | `reportes.ver` — snapshot de stock actual por producto/bodega + resumen, cacheado en Redis 30s por tenant+sucursal. `sucursalId` opcional (Fase 8d) |
 | GET | `/api/reportes/inventario/exportar?sucursalId&formato=xlsx\|pdf` | `reportes.ver` |
 | GET | `/api/reportes/compras?desde&hasta` | `reportes.ver` — órdenes de compra en el rango + resumen por estado |
@@ -425,6 +427,9 @@ para asientos manuales (ajustes, apertura, etc.).
 | POST | `/api/pos/turnos/:id/guardar` | `pos.editar` — aparca el carrito actual (`{ clienteId?, vendedorEmpleadoId?, nota?, lineas: [{productoId, cantidad, precioUnitario, porcentajeItbis, descuento?}] }`), snapshot de precio/ITBIS al momento de guardar |
 | GET | `/api/pos/turnos/:id/guardadas` | `pos.editar` — ventas aparcadas de este turno |
 | DELETE | `/api/pos/ventas-aparcadas/:id` | `pos.editar` — se llama al recuperar una (o para descartarla) |
+| GET | `/api/pos/mensaje-cajas` | `pos.ver` — "Mensaje a cajas" (ítem J-3), `{ texto, fecha } \| null`; en Redis, TTL 8h, sin historial |
+| POST | `/api/pos/mensaje-cajas` | `pos.supervisar` — `{ texto }` (máx. 280 caracteres) — publica/reemplaza el aviso |
+| DELETE | `/api/pos/mensaje-cajas` | `pos.supervisar` — borra el aviso activo |
 
 ## IA
 

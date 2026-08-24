@@ -4,6 +4,7 @@ import { apiClient } from '../lib/api-client';
 import { Badge } from '../components/atoms/Badge/Badge';
 import { ThemeToggle } from '../components/molecules/ThemeToggle/ThemeToggle';
 import { TurnoCajaDetalle } from '../components/organisms/TurnoCajaDetalle/TurnoCajaDetalle';
+import { MensajeCajasBanner } from '../components/molecules/MensajeCajasBanner/MensajeCajasBanner';
 import { useAuth } from '../hooks/useAuth';
 
 interface TurnoCajaResumen {
@@ -78,6 +79,8 @@ export function PosCaja() {
           <ThemeToggle />
         </div>
       </header>
+
+      <MensajeCajasBanner />
 
       <main className="flex-1 overflow-y-auto p-5">
         <TurnoCajaDetalle turnoId={turnoId} pantallaCompleta onCerrado={() => navigate('/pos')} />

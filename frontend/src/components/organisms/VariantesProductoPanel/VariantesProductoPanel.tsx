@@ -4,7 +4,7 @@ import { apiClient } from '../../../lib/api-client';
 import { Button } from '../../atoms/Button/Button';
 import { Badge } from '../../atoms/Badge/Badge';
 import { useVariantesProducto, etiquetaVariante, type VarianteProducto } from '../../../hooks/useVariantesProducto';
-import { imprimirEtiquetas } from '../../../lib/etiquetas-codigo-barras';
+import { imprimirEtiquetas, descargarZplEtiquetas, descargarEplEtiquetas } from '../../../lib/etiquetas-codigo-barras';
 
 interface ValorAtributo {
   id: string;
@@ -95,6 +95,12 @@ export function VariantesProductoPanel({ productoId, nombreProducto }: { product
   const combinacionesPrevistas = Object.values(seleccion).filter((v) => v.size > 0);
   const totalPrevisto = combinacionesPrevistas.reduce((acc, v) => acc * v.size, 1);
 
+  function etiquetasParaImprimir() {
+    return (variantes ?? [])
+      .filter((v): v is VarianteProducto & { codigoBarras: string } => !!v.codigoBarras)
+      .map((v) => ({ codigoBarras: v.codigoBarras, nombreProducto, variante: etiquetaVariante(v) || undefined }));
+  }
+
   return (
     <div className="space-y-3 rounded-lg border border-slate-200 p-3 dark:border-slate-800">
       <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Variantes (Talla, Color, etc.)</p>
@@ -148,20 +154,34 @@ export function VariantesProductoPanel({ productoId, nombreProducto }: { product
         <div className="space-y-2 border-t border-slate-200 pt-2 dark:border-slate-800">
           <div className="flex items-center justify-between">
             <p className="text-xs font-medium text-slate-600 dark:text-slate-400">Variantes actuales ({variantes.length})</p>
-            <Button
-              type="button"
-              variante="secundario"
-              disabled={!variantes.some((v) => v.codigoBarras)}
-              onClick={() =>
-                imprimirEtiquetas(
-                  variantes
-                    .filter((v): v is VarianteProducto & { codigoBarras: string } => !!v.codigoBarras)
-                    .map((v) => ({ codigoBarras: v.codigoBarras, nombreProducto, variante: etiquetaVariante(v) || undefined })),
-                )
-              }
-            >
-              Imprimir etiquetas
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variante="secundario"
+                disabled={!variantes.some((v) => v.codigoBarras)}
+                onClick={() => imprimirEtiquetas(etiquetasParaImprimir())}
+              >
+                Imprimir etiquetas
+              </Button>
+              <Button
+                type="button"
+                variante="secundario"
+                disabled={!variantes.some((v) => v.codigoBarras)}
+                onClick={() => descargarZplEtiquetas(etiquetasParaImprimir())}
+                title="Descarga un archivo .zpl para impresoras de etiquetas Zebra"
+              >
+                ZPL
+              </Button>
+              <Button
+                type="button"
+                variante="secundario"
+                disabled={!variantes.some((v) => v.codigoBarras)}
+                onClick={() => descargarEplEtiquetas(etiquetasParaImprimir())}
+                title="Descarga un archivo .epl para impresoras de etiquetas Eltron/Zebra"
+              >
+                EPL
+              </Button>
+            </div>
           </div>
           {variantes.map((v) => (
             <div key={v.id} className="flex items-center gap-2 text-xs">

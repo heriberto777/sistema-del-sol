@@ -9,6 +9,7 @@ import { CotizarVentaPosDto } from './dto/cotizar-venta.dto';
 import { GuardarVentaDto } from './dto/guardar-venta.dto';
 import { RegistrarDevolucionDto } from './dto/registrar-devolucion.dto';
 import { ListarTurnosQueryDto } from './dto/listar-turnos-query.dto';
+import { PublicarMensajeCajasDto } from './dto/publicar-mensaje-cajas.dto';
 import { Permissions } from '../common/decorators/permissions.decorator';
 import { RequiereModulo } from '../common/decorators/requiere-modulo.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -111,5 +112,26 @@ export class PosController {
   @Permissions('pos.editar')
   eliminarGuardada(@Param('id') id: string) {
     return this.posService.eliminarGuardada(id);
+  }
+
+  // "Mensaje a cajas" (ítem J-3) — GET sin permiso más restrictivo que
+  // pos.ver a propósito: cualquier cajero con un turno abierto necesita
+  // poder verlo, no solo quien lo publica.
+  @Get('mensaje-cajas')
+  @Permissions('pos.ver')
+  obtenerMensajeCajas(@CurrentUser() user: JwtPayloadUser) {
+    return this.posService.obtenerMensajeCajas(user.tenantId);
+  }
+
+  @Post('mensaje-cajas')
+  @Permissions('pos.supervisar')
+  publicarMensajeCajas(@Body() dto: PublicarMensajeCajasDto, @CurrentUser() user: JwtPayloadUser) {
+    return this.posService.publicarMensajeCajas(user.tenantId, dto.texto);
+  }
+
+  @Delete('mensaje-cajas')
+  @Permissions('pos.supervisar')
+  borrarMensajeCajas(@CurrentUser() user: JwtPayloadUser) {
+    return this.posService.borrarMensajeCajas(user.tenantId);
   }
 }

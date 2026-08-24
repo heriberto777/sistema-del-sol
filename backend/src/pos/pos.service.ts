@@ -7,6 +7,7 @@ import { EmpleadosRepository } from '../nomina/empleados.repository';
 import { VariantesService } from '../variantes/variantes.service';
 import { InventarioService } from '../inventario/inventario.service';
 import { AuthService } from '../auth/auth.service';
+import { RedisService } from '../redis/redis.service';
 import { AbrirTurnoDto } from './dto/abrir-turno.dto';
 import { CerrarTurnoDto } from './dto/cerrar-turno.dto';
 import { CrearMovimientoCajaDto } from './dto/crear-movimiento-caja.dto';
@@ -20,6 +21,14 @@ import { CONFIGURACIONES_BASE } from '../tenants/roles-base';
 import { MotivoMovimientoCaja } from '@prisma/client';
 
 const CLAVE_TOLERANCIA_ARQUEO = 'POS_TOLERANCIA_ARQUEO';
+
+// "Mensaje a cajas" (plan de integración Cuadre, ítem J-3) — broadcast de
+// texto a todos los terminales POS. En Redis, no en Postgres: es un aviso
+// efímero (turno a turno), no un dato de negocio que necesite historial ni
+// aislamiento por sucursal — un TTL largo (8h, una jornada laboral) evita
+// que quede "pegado" si alguien olvida borrarlo.
+const CLAVE_MENSAJE_CAJAS = (tenantId: string) => `pos:mensaje-cajas:${tenantId}`;
+const TTL_MENSAJE_CAJAS_SEGUNDOS = 8 * 60 * 60;
 
 // Plan de integración de brechas Cuadre, ítem F-5: etiqueta legible para
 // cuando el cajero deja "concepto" (detalle libre) en blanco.
@@ -41,10 +50,27 @@ export class PosService {
     private readonly variantesService: VariantesService,
     private readonly inventarioService: InventarioService,
     private readonly authService: AuthService,
+    private readonly redis: RedisService,
   ) {}
 
   listarVendedores(busqueda?: string) {
     return this.empleadosRepository.listarVendedores(busqueda);
+  }
+
+  /** "Mensaje a cajas" (ítem J-3) — cualquier POS con turno activo lo consulta por polling. */
+  async obtenerMensajeCajas(tenantId: string) {
+    const mensaje = await this.redis.obtenerJson<{ texto: string; fecha: string }>(CLAVE_MENSAJE_CAJAS(tenantId));
+    return mensaje ?? null;
+  }
+
+  async publicarMensajeCajas(tenantId: string, texto: string) {
+    const mensaje = { texto, fecha: new Date().toISOString() };
+    await this.redis.guardarJson(CLAVE_MENSAJE_CAJAS(tenantId), mensaje, TTL_MENSAJE_CAJAS_SEGUNDOS);
+    return mensaje;
+  }
+
+  async borrarMensajeCajas(tenantId: string) {
+    await this.redis.eliminar(CLAVE_MENSAJE_CAJAS(tenantId));
   }
 
   async abrirTurno(dto: AbrirTurnoDto, tenantId: string, cajeroId: string) {

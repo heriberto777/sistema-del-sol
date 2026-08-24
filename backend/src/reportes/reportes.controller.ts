@@ -2,7 +2,13 @@ import { Controller, Get, Query, Res } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
 import { ReportesService, ArchivoGenerado } from './reportes.service';
-import { ReporteQueryDto, ExportarReporteQueryDto, SucursalQueryDto, FormatoConSucursalQueryDto } from './dto/reporte-query.dto';
+import {
+  ReporteQueryDto,
+  ExportarReporteQueryDto,
+  SucursalQueryDto,
+  FormatoConSucursalQueryDto,
+  ReporteVentasAgrupadoQueryDto,
+} from './dto/reporte-query.dto';
 import { Permissions } from '../common/decorators/permissions.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtPayloadUser } from '../common/types/authenticated-request';
@@ -39,6 +45,18 @@ export class ReportesController {
   async exportarVentas(@Query() query: ExportarReporteQueryDto, @Res() res: Response) {
     const archivo = await this.reportesService.exportarVentas(query.desde, query.hasta, query.formato);
     this.enviarArchivo(res, archivo);
+  }
+
+  @Get('ventas/agrupado')
+  @Permissions('reportes.ver')
+  reporteVentasAgrupado(@Query() query: ReporteVentasAgrupadoQueryDto) {
+    return this.reportesService.reporteVentasAgrupado(query.desde, query.hasta, query.dimension);
+  }
+
+  @Get('ventas/rentabilidad')
+  @Permissions('reportes.ver')
+  reporteRentabilidad(@Query() query: ReporteQueryDto) {
+    return this.reportesService.reporteRentabilidad(query.desde, query.hasta);
   }
 
   @Get('inventario')
