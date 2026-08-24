@@ -117,10 +117,36 @@ en sí no es un endpoint propio.
 
 | Método | Ruta | Permiso |
 |---|---|---|
-| POST | `/api/ofertas` | `ofertas.editar` — `{ nombre, tipoDescuento: PORCENTAJE\|MONTO_FIJO\|BOGO, valor?, comprarCantidad?, llevarCantidad?, porcentajeDescuentoLlevar?, descuentoMaximoMonto?, acumulable?, prioridad?, pagaComision?, alcance: PRODUCTO\|CATEGORIA\|CARRITO, productoId?, categoriaId?, montoMinimoCarrito?, fechaInicio, fechaFin }`; `productoId`/`categoriaId`/`montoMinimoCarrito` son mutuamente exclusivos según `alcance` (400 si no corresponden); `fechaInicio`/`fechaFin` admiten hora exacta, no solo el día (ítem A-2, "vigencia por hora"). Ítem A-2 — `tipoDescuento: BOGO` ("Compra X Lleva Y" / "Segunda Unidad"): `valor` se ignora, en su lugar exige `comprarCantidad`/`llevarCantidad` (400 si faltan) y NO admite `alcance: CARRITO` (400 — no hay "unidad" que contar sobre un total); `porcentajeDescuentoLlevar` (0-100, default 100 = gratis; 50 = "segunda unidad a mitad de precio") es opcional incluso en BOGO. Para PORCENTAJE/MONTO_FIJO, `valor` sigue siendo obligatorio (400 si falta). `descuentoMaximoMonto` (RD$, cualquier tipo) topea el descuento resultante — sin esto, sin límite más allá del propio monto de la línea/carrito. `acumulable` (default `false`) y `prioridad` (default `0`, menor = mayor prioridad) controlan cómo se combina esta oferta con otras que matcheen la misma línea/carrito al mismo tiempo — ver ARCHITECTURE.md. `pagaComision` (default `true`) queda guardado sin efecto hasta que se implemente el ítem A-1 (comisiones de venta) |
+| POST | `/api/ofertas` | `ofertas.editar` — `{ nombre, tipoDescuento: PORCENTAJE\|MONTO_FIJO\|BOGO, valor?, comprarCantidad?, llevarCantidad?, porcentajeDescuentoLlevar?, descuentoMaximoMonto?, acumulable?, prioridad?, pagaComision?, alcance: PRODUCTO\|CATEGORIA\|CARRITO, productoId?, categoriaId?, montoMinimoCarrito?, fechaInicio, fechaFin }`; `productoId`/`categoriaId`/`montoMinimoCarrito` son mutuamente exclusivos según `alcance` (400 si no corresponden); `fechaInicio`/`fechaFin` admiten hora exacta, no solo el día (ítem A-2, "vigencia por hora"). Ítem A-2 — `tipoDescuento: BOGO` ("Compra X Lleva Y" / "Segunda Unidad"): `valor` se ignora, en su lugar exige `comprarCantidad`/`llevarCantidad` (400 si faltan) y NO admite `alcance: CARRITO` (400 — no hay "unidad" que contar sobre un total); `porcentajeDescuentoLlevar` (0-100, default 100 = gratis; 50 = "segunda unidad a mitad de precio") es opcional incluso en BOGO. Para PORCENTAJE/MONTO_FIJO, `valor` sigue siendo obligatorio (400 si falta). `descuentoMaximoMonto` (RD$, cualquier tipo) topea el descuento resultante — sin esto, sin límite más allá del propio monto de la línea/carrito. `acumulable` (default `false`) y `prioridad` (default `0`, menor = mayor prioridad) controlan cómo se combina esta oferta con otras que matcheen la misma línea/carrito al mismo tiempo — ver ARCHITECTURE.md. `pagaComision` (default `true`) — si es `false`, una línea descontada por ESTA oferta no genera comisión de venta (ítem A-1, "todo o nada" — ver ARCHITECTURE.md) |
 | GET | `/api/ofertas` | `ofertas.ver` |
 | PATCH | `/api/ofertas/:id` | `ofertas.editar` — mismas reglas de exclusividad que crear |
 | DELETE | `/api/ofertas/:id` | `ofertas.editar` |
+
+## Comisiones de venta (ítem A-1)
+
+Solo reportes de solo lectura — la comisión se calcula y persiste sola
+(`ComisionVenta`) al facturar, vía Event Bus (`ComisionesEventosService`
+reacciona a `factura.creada`/`factura.anulada`), no hay endpoint de
+escritura. `desde`/`hasta` (`ISO date`, opcionales) — default últimos 30
+días hasta hoy, mismo criterio que `/reportes/ventas`.
+
+| Método | Ruta | Permiso |
+|---|---|---|
+| GET | `/api/comisiones/por-venta` | `comisiones.ver` — una fila por factura con comisión generada: `{ facturaId, ncf, fecha, cliente, empleado, montoTotal, cantidadLineas }` |
+| GET | `/api/comisiones/por-vendedor` | `comisiones.ver` — agregado por Empleado: `{ empleadoId, empleado, montoTotal, cantidadVentas }` |
+| GET | `/api/comisiones/por-producto` | `comisiones.ver` — agregado por Producto: `{ productoId, producto, montoTotal, cantidadLineas }` |
+
+Una venta solo genera comisión si tiene `vendedorEmpleadoId` (ventas de
+POS que eligen un vendedor, ítem F-2 — `PosService.registrarVenta`) y es
+`CONTADO`/`CREDITO` (una Nota de Crédito/Débito no genera su propia
+comisión). Por línea: comisión = `Producto.porcentajeComision` (% sobre
+el monto neto sin ITBIS, después de descuento) o
+`Producto.montoComisionFijo` (RD$ fijos × cantidad) — mutuamente
+excluyentes, configurados en `POST`/`PATCH /api/productos` (400 si
+vienen ambos). Una línea con `pagaComision:false` (heredado de una
+Oferta que no paga comisión, ver arriba) no genera fila. Al anular la
+factura de origen, sus comisiones se marcan `anulada:true` (nunca se
+borran).
 
 ## Bonos (Fase 4c de adopción de Cuadre)
 
@@ -162,7 +188,7 @@ emisión/consulta/anulación, el canje en sí ocurre dentro de
 
 | Método | Ruta | Permiso |
 |---|---|---|
-| POST | `/api/productos` | `precios.editar` — acepta `imagen` (data URI, opcional), `leyFiscalId?` (FK a `LeyFiscal`, plan de integración Cuadre ítem B-3 — reduce el ITBIS efectivo del producto, `null` explícito quita la asignación) y, ítem E-8: `unidadMedida?` (lista cerrada — UND/KILOGRAMO/GRAMO/LIBRA/ONZA/LITRO/MILILITRO/GALON/PORCION/DOCENA), `precioVariable?` (habilita precio editable por línea en el carrito del POS), `esIngrediente?` (informativo), `permiteDevolucion?` (default `true` — si es `false`, el producto no puede incluirse en una Nota de Crédito) |
+| POST | `/api/productos` | `precios.editar` — acepta `imagen` (data URI, opcional), `leyFiscalId?` (FK a `LeyFiscal`, plan de integración Cuadre ítem B-3 — reduce el ITBIS efectivo del producto, `null` explícito quita la asignación) y, ítem E-8: `unidadMedida?` (lista cerrada — UND/KILOGRAMO/GRAMO/LIBRA/ONZA/LITRO/MILILITRO/GALON/PORCION/DOCENA), `precioVariable?` (habilita precio editable por línea en el carrito del POS), `esIngrediente?` (informativo), `permiteDevolucion?` (default `true` — si es `false`, el producto no puede incluirse en una Nota de Crédito); ítem A-1: `porcentajeComision?`/`montoComisionFijo?` (mutuamente excluyentes, 400 si vienen ambos, `null` explícito quita la asignación) — ver "Comisiones de venta" |
 | POST | `/api/leyes-fiscales` | `precios.editar` — `{ codigo, nombre, porcentajeItbisAPagar, descripcion?, activa? }` (ítem B-3) |
 | GET | `/api/leyes-fiscales?activa=true` | `precios.ver` |
 | PATCH | `/api/leyes-fiscales/:id` | `precios.editar` |

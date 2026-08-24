@@ -129,6 +129,40 @@ describe('ProductosService', () => {
     });
   });
 
+  describe('comisión de venta (ítem A-1)', () => {
+    it('crea un producto con solo porcentajeComision', async () => {
+      await service.crear({ codigo: 'P1', nombre: 'Producto 1', porcentajeComision: 5 }, 'tenant-1');
+      expect(repository.crear).toHaveBeenCalledWith(expect.objectContaining({ porcentajeComision: 5 }), 'tenant-1');
+    });
+
+    it('crea un producto con solo montoComisionFijo', async () => {
+      await service.crear({ codigo: 'P1', nombre: 'Producto 1', montoComisionFijo: 50 }, 'tenant-1');
+      expect(repository.crear).toHaveBeenCalledWith(expect.objectContaining({ montoComisionFijo: 50 }), 'tenant-1');
+    });
+
+    it('rechaza crear con porcentajeComision Y montoComisionFijo a la vez', async () => {
+      await expect(
+        service.crear({ codigo: 'P1', nombre: 'Producto 1', porcentajeComision: 5, montoComisionFijo: 50 }, 'tenant-1'),
+      ).rejects.toThrow(BadRequestException);
+      expect(repository.crear).not.toHaveBeenCalled();
+    });
+
+    it('actualizar rechaza montoComisionFijo si el producto ya tiene porcentajeComision configurado', async () => {
+      repository.buscarPorId.mockResolvedValue({ id: 'p1', porcentajeComision: 5, montoComisionFijo: null } as never);
+
+      await expect(service.actualizar('p1', { montoComisionFijo: 50 }, 'tenant-1')).rejects.toThrow(BadRequestException);
+      expect(repository.actualizar).not.toHaveBeenCalled();
+    });
+
+    it('actualizar permite reemplazar porcentajeComision por montoComisionFijo enviando ambos explícitos (uno null)', async () => {
+      repository.buscarPorId.mockResolvedValue({ id: 'p1', porcentajeComision: 5, montoComisionFijo: null } as never);
+
+      await service.actualizar('p1', { porcentajeComision: null, montoComisionFijo: 50 }, 'tenant-1');
+
+      expect(repository.actualizar).toHaveBeenCalledWith('p1', { porcentajeComision: null, montoComisionFijo: 50 });
+    });
+  });
+
   describe('catalogo', () => {
     it('aplana precios[0].precioVenta a precioVenta, y null si el producto no tiene precio vigente', async () => {
       repository.catalogo.mockResolvedValue([

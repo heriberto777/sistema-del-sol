@@ -20,6 +20,7 @@ describe('OfertasService', () => {
     descuentoMaximoMonto: null,
     acumulable: false,
     prioridad: 0,
+    pagaComision: true,
     ...overrides,
   });
 
@@ -280,6 +281,64 @@ describe('OfertasService', () => {
 
         expect(descuento).toBe(100); // 60+40, mayor que la no acumulable de 50
       });
+    });
+  });
+
+  describe('resolverDescuentoLineaConComision (ítem A-1)', () => {
+    it('sin ofertas vigentes, paga comisión normal', async () => {
+      const resultado = await service.resolverDescuentoLineaConComision('prod-1', null, 2, 100);
+      expect(resultado).toEqual({ monto: 0, pagaComision: true });
+    });
+
+    it('oferta única con pagaComision:false — la línea no paga comisión', async () => {
+      repository.buscarVigentesParaLinea.mockResolvedValue([
+        ofertaBase({ tipoDescuento: 'PORCENTAJE', valor: 10, pagaComision: false }),
+      ] as never);
+
+      const resultado = await service.resolverDescuentoLineaConComision('prod-1', null, 2, 100);
+
+      expect(resultado).toEqual({ monto: 20, pagaComision: false });
+    });
+
+    it('oferta única con pagaComision:true — la línea sí paga comisión', async () => {
+      repository.buscarVigentesParaLinea.mockResolvedValue([ofertaBase({ tipoDescuento: 'PORCENTAJE', valor: 10 })] as never);
+
+      const resultado = await service.resolverDescuentoLineaConComision('prod-1', null, 2, 100);
+
+      expect(resultado).toEqual({ monto: 20, pagaComision: true });
+    });
+
+    it('acumulables: si CUALQUIERA de las que efectivamente aportó descuento no paga comisión, la línea entera queda sin comisión', async () => {
+      repository.buscarVigentesParaLinea.mockResolvedValue([
+        ofertaBase({ id: 'o1', tipoDescuento: 'PORCENTAJE', valor: 10, acumulable: true, pagaComision: true }),
+        ofertaBase({ id: 'o2', tipoDescuento: 'MONTO_FIJO', valor: 15, acumulable: true, pagaComision: false }),
+      ] as never);
+
+      const resultado = await service.resolverDescuentoLineaConComision('prod-1', null, 2, 100);
+
+      expect(resultado).toEqual({ monto: 35, pagaComision: false });
+    });
+
+    it('acumulables, todas pagan comisión — la línea paga comisión', async () => {
+      repository.buscarVigentesParaLinea.mockResolvedValue([
+        ofertaBase({ id: 'o1', tipoDescuento: 'PORCENTAJE', valor: 10, acumulable: true, pagaComision: true }),
+        ofertaBase({ id: 'o2', tipoDescuento: 'MONTO_FIJO', valor: 15, acumulable: true, pagaComision: true }),
+      ] as never);
+
+      const resultado = await service.resolverDescuentoLineaConComision('prod-1', null, 2, 100);
+
+      expect(resultado).toEqual({ monto: 35, pagaComision: true });
+    });
+
+    it('no acumulables: gana la mejor, y su propio pagaComision es el que decide (no el de la que perdió)', async () => {
+      repository.buscarVigentesParaLinea.mockResolvedValue([
+        ofertaBase({ id: 'o1', tipoDescuento: 'PORCENTAJE', valor: 10, pagaComision: false }), // 20, pierde
+        ofertaBase({ id: 'o2', tipoDescuento: 'MONTO_FIJO', valor: 50, pagaComision: true }), // 50, gana
+      ] as never);
+
+      const resultado = await service.resolverDescuentoLineaConComision('prod-1', null, 2, 100);
+
+      expect(resultado).toEqual({ monto: 50, pagaComision: true });
     });
   });
 

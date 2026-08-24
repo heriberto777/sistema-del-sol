@@ -37,7 +37,7 @@ PostgreSQL 16 + Prisma. Schema completo en `backend/prisma/schema.prisma`.
 | Auditoría | `audit_logs` (tenant), `platform_audit_logs` (plataforma, sin `tenantId`) |
 | Facturación | `ncf_asignados`, `facturas`, `linea_factura` |
 | Cotizaciones / Remisiones | `cotizaciones`, `linea_cotizacion`, `remisiones`, `linea_remision` |
-| Productos / precios | `productos`, `precios` (cuelga de `variantes_producto`, no de `productos`), `componentes_combo`, `categorias` (jerarquía real vía `categoriaPadreId`, self-relation — mismo patrón que `cuentas_contables.cuentaPadreId`), `listas_precio` (catálogo de niveles de precio, sin FK desde `precios.listaPrecio`), `variantes_producto`/`atributos`/`valores_atributo`/`valores_atributo_variante` (SKU real, Fase 3c — ver ARCHITECTURE.md), `ofertas` (descuentos automáticos por producto/categoría/carrito, Fase 4b, ampliado en ítem A-2 con `TipoDescuentoOferta.BOGO`/`comprarCantidad`/`llevarCantidad`/`porcentajeDescuentoLlevar`/`descuentoMaximoMonto`/`acumulable`/`prioridad`/`pagaComision` y `valor` ahora nullable — ver ARCHITECTURE.md) |
+| Productos / precios | `productos`, `precios` (cuelga de `variantes_producto`, no de `productos`), `componentes_combo`, `categorias` (jerarquía real vía `categoriaPadreId`, self-relation — mismo patrón que `cuentas_contables.cuentaPadreId`), `listas_precio` (catálogo de niveles de precio, sin FK desde `precios.listaPrecio`), `variantes_producto`/`atributos`/`valores_atributo`/`valores_atributo_variante` (SKU real, Fase 3c — ver ARCHITECTURE.md), `ofertas` (descuentos automáticos por producto/categoría/carrito, Fase 4b, ampliado en ítem A-2 con `TipoDescuentoOferta.BOGO`/`comprarCantidad`/`llevarCantidad`/`porcentajeDescuentoLlevar`/`descuentoMaximoMonto`/`acumulable`/`prioridad`/`pagaComision` y `valor` ahora nullable — ver ARCHITECTURE.md). Ítem A-1: `productos` ganó `porcentajeComision`/`montoComisionFijo` (mutuamente excluyentes), `linea_factura` ganó `pagaComision` (default `true`), y nueva tabla `comisiones_venta` (una fila por línea con comisión generada, `anulada` en vez de borrado — ver ARCHITECTURE.md) |
 | Inventario | `bodegas` (cuelga de `sucursales`, Fase 8a), `stock` (cuelga de `variantes_producto`), `movimiento_inventario` (conserva `productoId` denormalizado + `varianteId` como FK real), `lotes` (control de vencimiento por variante+bodega, opt-in vía `productos.controlaVencimiento`, Fase 5b — ver ARCHITECTURE.md) |
 | Sucursales | `sucursales` (locales físicos, Fase 8 — ver ARCHITECTURE.md) |
 | Compras | `proveedores`, `orden_compra`, `linea_oc`, `recepcion_compra`, `linea_recepcion` |
@@ -76,6 +76,19 @@ original que se está devolviendo). Sin backfill/seed — las 2 claves de
 `Configuracion` que lo activan (`AUTORIZACION_2FA_ANULAR`/
 `_DEVOLUCION`) tampoco están en `CONFIGURACIONES_BASE`, default apagado
 vía `ConfiguracionesService.buscarValor`.
+
+`comisiones_venta` (plan de integración Cuadre, ítem A-1) es una fila
+por cada `LineaFactura` que generó comisión — FK real (no `referenciaId`
+libre) a `facturas`/`productos`/`empleados` porque siempre son esas tres
+tablas, sin ambigüedad de tipo. `lineaFacturaId` sí es un `String` sin
+FK propia (solo trazabilidad, no se usa para queries) porque
+`LineaFactura` no tiene `tenantId` propio (tabla "hija", ver arriba) y
+ya se llega a ella vía `facturaId`. Nunca se borra una fila: al anular
+la factura de origen, se marca `anulada: true` (`@@unique([facturaId,
+lineaFacturaId])` evita duplicar la comisión de la misma línea si el
+reactor de eventos se reintentara). Se genera sola vía Event Bus
+(`ComisionesEventosService`), nunca por un endpoint HTTP — ver
+ARCHITECTURE.md.
 
 ## Reglas de negocio relevantes al modelo
 

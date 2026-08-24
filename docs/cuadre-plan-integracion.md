@@ -46,10 +46,26 @@ Resumen de lo que cambió (detalle en cada ítem más abajo):
 
 ## A — Motores de negocio nuevos
 
-- [ ] **A-1** 🟥 *diseño primero* — **Comisiones de venta de punta a punta**:
+- [x] **A-1** 🟥 *diseño primero* — **Comisiones de venta de punta a punta**:
   % de comisión por producto y por oferta, cálculo al facturar, 3 reportes
-  (por venta/vendedor/producto). *Confirmado: no existe ningún campo de
-  comisión en `schema.prisma` — brecha real, sin cambios.*
+  (por venta/vendedor/producto). *Confirmado: no existía ningún campo de
+  comisión en `schema.prisma` — brecha real.* Decisiones confirmadas con
+  el usuario: (1) `Producto.porcentajeComision`/`montoComisionFijo`
+  mutuamente excluyentes; (2) base de cálculo = monto neto SIN ITBIS,
+  después de descuento; (3) se acredita solo si la factura tiene
+  `vendedorEmpleadoId` (ventas de POS con vendedor elegido, ítem F-2) —
+  sin fallback al `vendedorId` (User) de facturación normal; (4) al
+  anular la factura, sus comisiones se marcan `anulada:true` (nunca se
+  borran). Entregado: módulo `comisiones/` (`ComisionVenta`, generado
+  vía Event Bus — `ComisionesEventosService` reacciona a
+  `factura.creada`/`factura.anulada`, mismo patrón que Contabilidad),
+  `LineaFactura.pagaComision` conecta con el `pagaComision` de A-2
+  ("todo o nada" si la oferta ganadora no paga comisión), 3 reportes de
+  solo lectura (`GET /comisiones/por-venta`\|`por-vendedor`\|
+  `por-producto`, permiso nuevo `comisiones.ver`). Frontend: campos de
+  comisión en el formulario de Producto, pestaña "Comisiones" en
+  Reportes. Migración `20260828100000_comisiones_venta`. Entregado
+  2026-08-24.
 - [x] **A-2** 🟥 *diseño primero* — **Motor de Ofertas ampliado**: agregar
   tipos BOGO ("Compra X Lleva Y", "Segunda Unidad"), tope de descuento
   máximo, control de acumulabilidad, prioridad entre ofertas simultáneas.
@@ -716,6 +732,15 @@ Resumen de lo que cambió (detalle en cada ítem más abajo):
   `TipoDescuentoOferta.BOGO`, `descuentoMaximoMonto`, `acumulable`/
   `prioridad`, `pagaComision` (inerte hasta A-1). Migración
   `20260828090000_ofertas_bogo_acumulable`.
+- **2026-08-24**: entregado A-1 (Comisiones de venta de punta a punta),
+  tercer 🟥 atacado — diseño confirmado con el usuario vía
+  `AskUserQuestion` (comisión % o monto fijo mutuamente excluyentes por
+  producto; base = monto neto sin ITBIS; se acredita solo con
+  `vendedorEmpleadoId` asignado, sin fallback al `vendedorId`; se anula
+  junto con la factura). Módulo `comisiones/`, generado vía Event Bus
+  (`factura.creada`/`factura.anulada`, nunca bloquea la venta), conecta
+  con el `pagaComision` de A-2 ("todo o nada"). Migración
+  `20260828100000_comisiones_venta`.
 
 ## Sugerencia de por dónde arrancar
 
@@ -726,7 +751,7 @@ conversación de diseño antes de tocar código). Lote 🟨/🟧 completo:
 B-1/B-2/B-3/B-6/B-7/B-8, E-2/E-3/E-4/E-5/E-6/E-8/E-9/E-11, F-2/F-4/F-5/
 F-8, G-1/G-2/G-3/G-4/G-5/G-6/G-7/G-8, H-3, J-1/J-2/J-3 — todos
 verificados (tsc + suite unitaria + e2e + lint + build, todo verde) y
-commiteados uno por uno. De los 🟥, ya entregados: **D-1, A-2**.
+commiteados uno por uno. De los 🟥, ya entregados: **D-1, A-2, A-1**.
 
 Lo que queda, por categoría:
 - **Deliberadamente pausado a pedido del usuario**: B-9 (línea manual/
@@ -734,7 +759,7 @@ Lo que queda, por categoría:
 - **No bloqueante, sin implementar**: B-4 (Recargos de Factura, 🟨→🟧
   corrección de tamaño), E-1 (Patrón Borrador→Confirmado en Compras/
   Ajustes/Transferencias, matiz).
-- **🟥, pendientes de su propia conversación de diseño**: A-1, A-3, A-4,
+- **🟥, pendientes de su propia conversación de diseño**: A-3, A-4,
   B-5, C-1, C-2 (multi-moneda, reclasificado desde 🟧), E-7, F-9, G-9
   (hardware), H-2 (WhatsApp — con nota de decisión pendiente sobre n8n
   vs. backend propio), I-1, J-4 (API keys, reclasificado — no aplica

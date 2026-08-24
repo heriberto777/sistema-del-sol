@@ -26,6 +26,9 @@ export interface FacturaCreadaPayload {
   subtotal: string;
   itbis: string;
   tipoFactura: string;
+  // Ítem A-1 (Comisiones de venta) — solo lo llenan ventas de POS que
+  // eligen un vendedor (ítem F-2). null si no hay uno.
+  vendedorEmpleadoId?: string | null;
 }
 
 export interface OrdenCompraRecibidaPayload {

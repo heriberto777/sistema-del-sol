@@ -6,6 +6,7 @@ import { ReporteRentabilidad } from '../components/organisms/ReporteRentabilidad
 import { ReporteInventario } from '../components/organisms/ReporteInventario/ReporteInventario';
 import { ReporteCompras } from '../components/organisms/ReporteCompras/ReporteCompras';
 import { ReporteFiscalDgii } from '../components/organisms/ReporteFiscalDgii/ReporteFiscalDgii';
+import { ReporteComisiones } from '../components/organisms/ReporteComisiones/ReporteComisiones';
 import { RequierePermiso } from '../components/organisms/RequierePermiso/RequierePermiso';
 
 const PESTANAS = [
@@ -14,6 +15,7 @@ const PESTANAS = [
   { id: 'rentabilidad', etiqueta: 'Rentabilidad' },
   { id: 'inventario', etiqueta: 'Inventario' },
   { id: 'compras', etiqueta: 'Compras' },
+  { id: 'comisiones', etiqueta: 'Comisiones' },
   { id: 'dgii', etiqueta: 'DGII' },
 ] as const;
 
@@ -46,14 +48,20 @@ export function Reportes() {
         ))}
       </div>
 
-      <RequierePermiso permiso="reportes.ver">
-        {pestana === 'ventas' && <ReporteVentas />}
-        {pestana === 'ventas-agrupadas' && <ReporteVentasAgrupado />}
-        {pestana === 'rentabilidad' && <ReporteRentabilidad />}
-        {pestana === 'inventario' && <ReporteInventario />}
-        {pestana === 'compras' && <ReporteCompras />}
-        {pestana === 'dgii' && <ReporteFiscalDgii />}
-      </RequierePermiso>
+      {pestana === 'comisiones' ? (
+        <RequierePermiso permiso="comisiones.ver">
+          <ReporteComisiones />
+        </RequierePermiso>
+      ) : (
+        <RequierePermiso permiso="reportes.ver">
+          {pestana === 'ventas' && <ReporteVentas />}
+          {pestana === 'ventas-agrupadas' && <ReporteVentasAgrupado />}
+          {pestana === 'rentabilidad' && <ReporteRentabilidad />}
+          {pestana === 'inventario' && <ReporteInventario />}
+          {pestana === 'compras' && <ReporteCompras />}
+          {pestana === 'dgii' && <ReporteFiscalDgii />}
+        </RequierePermiso>
+      )}
     </div>
   );
 }

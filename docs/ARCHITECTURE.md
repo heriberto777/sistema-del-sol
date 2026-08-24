@@ -374,8 +374,9 @@ convenga más al cliente. El resultado sigue topado por la propia base
 (línea o carrito) al final, igual que antes de A-2.
 
 **`pagaComision`** (default `true`, columna en el mismo `Oferta` de
-Cuadre): guardado sin ningún efecto todavía — queda a la espera del
-ítem A-1 (comisiones de venta), que sí lo va a leer.
+Cuadre): consumido por el ítem A-1 (comisiones de venta, ver más abajo)
+— si es `false`, una línea descontada por ESTA oferta no genera
+comisión.
 
 **Vigencia por hora**: `fechaInicio`/`fechaFin` pasaron de fecha-only a
 timestamp completo (el schema ya los tenía como `DateTime`, el límite
@@ -388,6 +389,69 @@ desde el origen en vez de parcheado después con `timeZone: 'UTC'` en
 la visualización.
 
 Migración: `20260828090000_ofertas_bogo_acumulable`.
+
+### A-1 — Comisiones de venta de punta a punta
+
+`backend/src/comisiones/` (`ComisionVenta`, tenant-scoped) calcula y
+persiste una comisión por cada `LineaFactura` que corresponda — nunca
+un endpoint de escritura: se genera sola, vía Event Bus
+(`ComisionesEventosService` reacciona a `factura.creada`/
+`factura.anulada`, mismo patrón que `ContabilidadEventosService` —
+corre fuera de un request HTTP, usa `PrismaService` global + `tenantId`
+explícito, y un fallo nunca tumba la venta que ya se facturó, solo se
+loguea). El módulo solo expone 3 endpoints de lectura (los reportes).
+
+**Decisiones confirmadas con el usuario** (`AskUserQuestion`):
+
+1. **Configuración por producto**: `Producto.porcentajeComision`
+   (% sobre el monto neto) o `Producto.montoComisionFijo` (RD$ por
+   unidad) — mutuamente excluyentes (validado en `ProductosService.
+   validarComision`, igual criterio que `Oferta.valor`/
+   `comprarCantidad`). Sin ninguno de los dos configurado, el producto
+   simplemente no genera comisión.
+2. **Base de cálculo**: monto neto SIN ITBIS, después de descuento
+   (`cantidad × precioUnitario − descuento` de la `LineaFactura`) — el
+   ITBIS es del Estado, no ingreso del negocio.
+3. **Acreditación**: solo si la factura tiene `vendedorEmpleadoId`
+   (ventas de POS con vendedor elegido, ítem F-2 — `Factura.
+   vendedorEmpleadoId`, distinto de `vendedorId`/`User`, que solo
+   registra/cobra la venta). Sin eso, la venta no genera comisión —
+   facturación normal fuera de POS no tiene forma de elegir un
+   vendedor-empleado hoy.
+4. **Anulación**: al anular la factura de origen, sus `ComisionVenta`
+   se marcan `anulada: true` (nunca se borran, mismo criterio de rastro
+   permanente que Contabilidad, aunque esto no sea un registro fiscal).
+
+**Conexión con Ofertas (ítem A-2)**: `LineaFactura.pagaComision`
+(nueva columna, default `true`) se resuelve UNA vez en
+`FacturacionService.calcularLineasYTotales`, en el mismo punto donde ya
+se resolvía el descuento automático de línea — `OfertasService.
+resolverDescuentoLineaConComision` (variante de
+`resolverDescuentoLinea` que además informa si el grupo de ofertas que
+ganó incluye alguna con `pagaComision: false`, "todo o nada": una sola
+oferta que no paga comisión dentro de la combinación ganadora anula la
+comisión de TODA la línea, no se prorratea un "medio pago"). Un
+descuento manual explícito en la línea (que ya gana sobre cualquier
+oferta automática) deja `pagaComision: true` sin evaluar ninguna
+oferta. Esta resolución queda **acotada a la oferta automática de
+línea** — el descuento de carrito y el descuento general de documento
+(ítem B-8) no afectan `pagaComision` (alcance reducido a propósito: son
+descuentos repartidos, no atados a una oferta puntual con su propio
+flag). `ComisionesEventosService.generarDesdeFactura` excluye
+directamente en el `where` las líneas con `pagaComision: false`, así
+que ni siquiera calcula su monto.
+
+**Reportes** (`GET /comisiones/por-venta`\|`por-vendedor`\|
+`por-producto`, permiso `comisiones.ver`): una sola consulta base
+(`ComisionesRepository.listar`, tenant-scoped) y agregación en JS sobre
+el resultado — mismo criterio que `ReportesService.reporteVentas`
+(`reduce` en memoria, no `groupBy` de Prisma), suficiente para el
+volumen esperado (comisiones solo existen para ventas de POS con
+vendedor elegido, un subconjunto de las ventas totales).
+
+Migración: `20260828100000_comisiones_venta`. Permiso nuevo
+`comisiones.ver` (Admin Total, Gerente, Contador) — backfill con
+`pnpm --filter ./backend permisos:backfill`.
 
 ## Bonos — gift cards canjeables como forma de pago (Fase 4c de adopción de Cuadre)
 

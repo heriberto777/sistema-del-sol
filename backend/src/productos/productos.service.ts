@@ -31,6 +31,7 @@ export class ProductosService {
   async crear(dto: CrearProductoDto, tenantId: string) {
     const tipoEfectivo = dto.tipo ?? 'PRODUCTO';
     await this.validarComponentes(dto.componentes, tipoEfectivo);
+    this.validarComision(dto.porcentajeComision, dto.montoComisionFijo);
     if (dto.categoriaId) {
       // findUniqueOrThrow tenant-scoped: si categoriaId es de otro tenant, 404.
       await this.categoriasRepository.buscarPorId(dto.categoriaId);
@@ -78,6 +79,12 @@ export class ProductosService {
     }
     if (dto.leyFiscalId) {
       await this.leyesFiscalesRepository.buscarPorId(dto.leyFiscalId);
+    }
+    if (dto.porcentajeComision !== undefined || dto.montoComisionFijo !== undefined) {
+      const actual = await this.productosRepository.buscarPorId(id);
+      const porcentajeComision = dto.porcentajeComision !== undefined ? dto.porcentajeComision : Number(actual.porcentajeComision ?? 0) || null;
+      const montoComisionFijo = dto.montoComisionFijo !== undefined ? dto.montoComisionFijo : Number(actual.montoComisionFijo ?? 0) || null;
+      this.validarComision(porcentajeComision, montoComisionFijo);
     }
 
     if (dto.atributos !== undefined) {
@@ -261,6 +268,13 @@ export class ProductosService {
     const comboAnidado = productos.find((p) => p.tipo === 'COMBO');
     if (comboAnidado) {
       throw new BadRequestException(`El producto "${comboAnidado.nombre}" es un combo — no se pueden anidar combos`);
+    }
+  }
+
+  /** Ítem A-1 — porcentajeComision y montoComisionFijo son mutuamente excluyentes. */
+  private validarComision(porcentajeComision?: number | null, montoComisionFijo?: number | null) {
+    if (porcentajeComision != null && montoComisionFijo != null) {
+      throw new BadRequestException('Un producto no puede tener porcentajeComision y montoComisionFijo a la vez — elegí uno');
     }
   }
 }

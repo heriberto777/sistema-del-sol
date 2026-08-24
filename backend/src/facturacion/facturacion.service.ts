@@ -175,10 +175,23 @@ export class FacturacionService {
             ? 0
             : Number(producto.porcentajeItbis) * (producto.leyFiscal ? Number(producto.leyFiscal.porcentajeItbisAPagar) / 100 : 1);
         // Un descuento manual explícito (aunque sea 0) siempre gana sobre
-        // el automático — ver OfertasService, "no acumulable".
-        const descuento =
-          linea.descuento ??
-          (esVentaNormal ? await this.ofertasService.resolverDescuentoLinea(linea.productoId, producto.categoriaId, linea.cantidad, precioUnitario) : 0);
+        // el automático — ver OfertasService, "no acumulable". Sin
+        // descuento manual, además de resolver el monto se resuelve si
+        // la oferta automática que lo generó paga comisión (ítem A-1,
+        // "todo o nada" — ver OfertasService.combinarDescuentosConComision).
+        // Con descuento manual (o sin oferta), la línea paga comisión
+        // normalmente.
+        let pagaComision = true;
+        let descuento = linea.descuento;
+        if (descuento === undefined) {
+          if (esVentaNormal) {
+            const resuelto = await this.ofertasService.resolverDescuentoLineaConComision(linea.productoId, producto.categoriaId, linea.cantidad, precioUnitario);
+            descuento = resuelto.monto;
+            pagaComision = resuelto.pagaComision;
+          } else {
+            descuento = 0;
+          }
+        }
 
         const totalLinea = linea.cantidad * precioUnitario - descuento;
         const montoItbis = totalLinea * (porcentajeItbis / 100);
@@ -192,6 +205,10 @@ export class FacturacionService {
           porcentajeItbis,
           montoItbis,
           montoTotal: totalLinea + montoItbis,
+          // Ítem A-1 — persistido en LineaFactura; ComisionesEventosService
+          // relee la factura ya creada (join a Producto) y no necesita
+          // ningún otro dato transiente de este cálculo.
+          pagaComision,
           // Solo para decidir el efecto en inventario más abajo — no se
           // persisten en LineaFactura (crearFacturaEnTx solo toma los
           // campos que sí son columnas propias).
@@ -446,6 +463,9 @@ export class FacturacionService {
       subtotal: factura.subtotal.toString(),
       itbis: factura.itbis.toString(),
       tipoFactura: factura.tipoFactura,
+      // Ítem A-1 — sin esto, ComisionesEventosService no sabe a qué
+      // Empleado acreditar la comisión (ver ARCHITECTURE.md).
+      vendedorEmpleadoId: opciones?.vendedorEmpleadoId ?? null,
     });
 
     return factura;

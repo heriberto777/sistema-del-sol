@@ -94,6 +94,7 @@ describe('FacturacionService', () => {
     } as unknown as jest.Mocked<VariantesService>;
     ofertasService = {
       resolverDescuentoLinea: jest.fn().mockResolvedValue(0),
+      resolverDescuentoLineaConComision: jest.fn().mockResolvedValue({ monto: 0, pagaComision: true }),
       resolverDescuentoCarritoTotal: jest.fn().mockResolvedValue(0),
     } as unknown as jest.Mocked<OfertasService>;
     bonosService = {
@@ -357,7 +358,7 @@ describe('FacturacionService', () => {
   describe('ofertas automáticas (Fase 4b)', () => {
     it('aplica el descuento automático de línea que resuelve OfertasService cuando la línea no trae descuento manual', async () => {
       repository.obtenerProductoConPrecioVigente.mockResolvedValue(producto(18, 100) as never);
-      ofertasService.resolverDescuentoLinea.mockResolvedValue(20);
+      ofertasService.resolverDescuentoLineaConComision.mockResolvedValue({ monto: 20, pagaComision: true });
       repository.crearFacturaEnTx.mockResolvedValue(facturaCreada() as never);
 
       await service.crear(dto({ lineas: [{ productoId: 'prod-1', cantidad: 2 }] }), 'tenant-1', 'vendedor-1');
@@ -375,7 +376,7 @@ describe('FacturacionService', () => {
 
       await service.crear(dto({ lineas: [{ productoId: 'prod-1', cantidad: 2, descuento: 5 }] }), 'tenant-1', 'vendedor-1');
 
-      expect(ofertasService.resolverDescuentoLinea).not.toHaveBeenCalled();
+      expect(ofertasService.resolverDescuentoLineaConComision).not.toHaveBeenCalled();
       expect(repository.crearFacturaEnTx).toHaveBeenCalledWith(TX, expect.objectContaining({ descuento: 5 }));
     });
 
@@ -643,6 +644,63 @@ describe('FacturacionService', () => {
     });
   });
 
+  describe('ítem A-1 (comisiones de venta)', () => {
+    it('emite FACTURA_CREADA con vendedorEmpleadoId cuando la venta lo trae (ventas de POS, ítem F-2)', async () => {
+      repository.obtenerProductoConPrecioVigente.mockResolvedValue(producto(18, 100) as never);
+      repository.crearFacturaEnTx.mockResolvedValue(facturaCreada() as never);
+
+      await service.crear(dto(), 'tenant-1', 'vendedor-1', { vendedorEmpleadoId: 'empleado-1' });
+
+      expect(eventBus.emit).toHaveBeenCalledWith(EVENTOS.FACTURA_CREADA, expect.objectContaining({ vendedorEmpleadoId: 'empleado-1' }));
+    });
+
+    it('emite FACTURA_CREADA con vendedorEmpleadoId null cuando la venta no elige vendedor (facturación normal fuera de POS)', async () => {
+      repository.obtenerProductoConPrecioVigente.mockResolvedValue(producto(18, 100) as never);
+      repository.crearFacturaEnTx.mockResolvedValue(facturaCreada() as never);
+
+      await service.crear(dto(), 'tenant-1', 'vendedor-1');
+
+      expect(eventBus.emit).toHaveBeenCalledWith(EVENTOS.FACTURA_CREADA, expect.objectContaining({ vendedorEmpleadoId: null }));
+    });
+
+    it('una línea sin oferta persiste pagaComision:true', async () => {
+      repository.obtenerProductoConPrecioVigente.mockResolvedValue(producto(18, 100) as never);
+      repository.crearFacturaEnTx.mockResolvedValue(facturaCreada() as never);
+
+      await service.crear(dto({ lineas: [{ productoId: 'prod-1', cantidad: 2 }] }), 'tenant-1', 'vendedor-1');
+
+      expect(repository.crearFacturaEnTx).toHaveBeenCalledWith(
+        TX,
+        expect.objectContaining({ lineas: [expect.objectContaining({ pagaComision: true })] }),
+      );
+    });
+
+    it('una línea descontada por una oferta con pagaComision:false persiste pagaComision:false', async () => {
+      repository.obtenerProductoConPrecioVigente.mockResolvedValue(producto(18, 100) as never);
+      ofertasService.resolverDescuentoLineaConComision.mockResolvedValue({ monto: 20, pagaComision: false });
+      repository.crearFacturaEnTx.mockResolvedValue(facturaCreada() as never);
+
+      await service.crear(dto({ lineas: [{ productoId: 'prod-1', cantidad: 2 }] }), 'tenant-1', 'vendedor-1');
+
+      expect(repository.crearFacturaEnTx).toHaveBeenCalledWith(
+        TX,
+        expect.objectContaining({ lineas: [expect.objectContaining({ pagaComision: false })] }),
+      );
+    });
+
+    it('un descuento manual en la línea persiste pagaComision:true (no hay oferta involucrada)', async () => {
+      repository.obtenerProductoConPrecioVigente.mockResolvedValue(producto(18, 100) as never);
+      repository.crearFacturaEnTx.mockResolvedValue(facturaCreada() as never);
+
+      await service.crear(dto({ lineas: [{ productoId: 'prod-1', cantidad: 2, descuento: 5 }] }), 'tenant-1', 'vendedor-1');
+
+      expect(repository.crearFacturaEnTx).toHaveBeenCalledWith(
+        TX,
+        expect.objectContaining({ lineas: [expect.objectContaining({ pagaComision: true })] }),
+      );
+    });
+  });
+
   describe('pago dividido (opciones.pagos)', () => {
     it('sin formaPagoId ni pagos, no crea ningún PagoVenta', async () => {
       repository.obtenerProductoConPrecioVigente.mockResolvedValue(producto(18, 100) as never);
@@ -752,7 +810,7 @@ describe('FacturacionService', () => {
   describe('cotizar (Fase 4c, previsualización sin efectos secundarios — gap Ofertas+POS)', () => {
     it('resuelve el mismo total que crear() incluyendo el descuento automático de ofertas', async () => {
       repository.obtenerProductoConPrecioVigente.mockResolvedValue(producto(18, 100) as never);
-      ofertasService.resolverDescuentoLinea.mockResolvedValue(20);
+      ofertasService.resolverDescuentoLineaConComision.mockResolvedValue({ monto: 20, pagaComision: true });
 
       const resultado = await service.cotizar({ clienteId: 'cliente-1', lineas: [{ productoId: 'prod-1', cantidad: 2 }] });
 

@@ -40,6 +40,8 @@ interface Producto {
   precioVariable: boolean;
   esIngrediente: boolean;
   permiteDevolucion: boolean;
+  porcentajeComision: string | null;
+  montoComisionFijo: string | null;
 }
 
 interface ComponenteComboDetalle {
@@ -73,6 +75,8 @@ interface ProductoFormValues {
   precioVariable: boolean;
   esIngrediente: boolean;
   permiteDevolucion: boolean;
+  porcentajeComision: string;
+  montoComisionFijo: string;
 }
 
 /** Plan de integración Cuadre, ítem E-8 — lista cerrada (antes texto libre sin validar), igual orden que UNIDADES_MEDIDA en el backend. */
@@ -107,6 +111,8 @@ const PRODUCTO_VACIO: ProductoFormValues = {
   precioVariable: false,
   esIngrediente: false,
   permiteDevolucion: true,
+  porcentajeComision: '',
+  montoComisionFijo: '',
 };
 
 const ETIQUETA_TIPO: Record<TipoProducto, string> = { PRODUCTO: 'Producto', SERVICIO: 'Servicio', COMBO: 'Combo' };
@@ -335,6 +341,8 @@ function FormularioProducto({ producto, onGuardado }: { producto: Producto | nul
           precioVariable: producto.precioVariable,
           esIngrediente: producto.esIngrediente,
           permiteDevolucion: producto.permiteDevolucion,
+          porcentajeComision: producto.porcentajeComision ?? '',
+          montoComisionFijo: producto.montoComisionFijo ?? '',
         }
       : PRODUCTO_VACIO,
   );
@@ -380,6 +388,8 @@ function FormularioProducto({ producto, onGuardado }: { producto: Producto | nul
       precioVariable: valores.precioVariable,
       esIngrediente: valores.esIngrediente,
       permiteDevolucion: valores.permiteDevolucion,
+      porcentajeComision: valores.porcentajeComision ? Number(valores.porcentajeComision) : null,
+      montoComisionFijo: valores.montoComisionFijo ? Number(valores.montoComisionFijo) : null,
       componentes:
         valores.tipo === 'COMBO'
           ? componentes.filter((c) => c.productoId).map((c) => ({ productoId: c.productoId, cantidad: Number(c.cantidad) || 1 }))
@@ -402,6 +412,10 @@ function FormularioProducto({ producto, onGuardado }: { producto: Producto | nul
     setError(null);
     if (valores.tipo === 'COMBO' && componentes.filter((c) => c.productoId).length === 0) {
       setError('Un combo necesita al menos un componente.');
+      return;
+    }
+    if (valores.porcentajeComision && valores.montoComisionFijo) {
+      setError('Elegí % de comisión o monto fijo, no ambos.');
       return;
     }
     guardar.mutate();
@@ -519,6 +533,33 @@ function FormularioProducto({ producto, onGuardado }: { producto: Producto | nul
         />
         Permite devolución (Nota de Crédito)
       </label>
+
+      <div className="space-y-2 rounded-md border border-slate-200 p-3 dark:border-slate-800">
+        <p className="text-sm font-medium text-slate-700 dark:text-slate-300">
+          Comisión de venta (ítem A-1) — elegí % o monto fijo, no ambos
+        </p>
+        <div className="grid grid-cols-2 gap-2">
+          <FormField
+            id="producto-comision-pct"
+            label="% de comisión"
+            type="number"
+            min={0}
+            max={100}
+            step="0.01"
+            value={valores.porcentajeComision}
+            onChange={(e) => setValores((v) => ({ ...v, porcentajeComision: e.target.value, montoComisionFijo: e.target.value ? '' : v.montoComisionFijo }))}
+          />
+          <FormField
+            id="producto-comision-fija"
+            label="Monto fijo (RD$)"
+            type="number"
+            min={0}
+            step="0.01"
+            value={valores.montoComisionFijo}
+            onChange={(e) => setValores((v) => ({ ...v, montoComisionFijo: e.target.value, porcentajeComision: e.target.value ? '' : v.porcentajeComision }))}
+          />
+        </div>
+      </div>
 
       {valores.tipo === 'COMBO' && (
         <div className="space-y-2 rounded-md border border-slate-200 p-3 dark:border-slate-800">

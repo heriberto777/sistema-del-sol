@@ -59,6 +59,7 @@ model Tenant {
   plantillasHorario PlantillaHorario[]
   tiposAusenciaConfig TipoAusenciaConfig[]
   codigosAutorizacion CodigoAutorizacion[]
+  comisionesVenta ComisionVenta[]
   proveedores   Proveedor[]
   ordenesCompra OrdenCompra[]
   webhooks      Webhook[]
@@ -660,6 +661,7 @@ model Factura {
   remisionOrigen   Remision?
   pagos            Pago[]
   pagosVenta       PagoVenta[]
+  comisiones       ComisionVenta[]
 
   @@unique([tenantId, ncf])
   @@index([tenantId, clienteId])
@@ -684,6 +686,13 @@ model LineaFactura {
   descuento         Decimal @default(0) @db.Decimal(14, 2)
   montoItbis        Decimal @db.Decimal(14, 2)
   montoTotal        Decimal @db.Decimal(14, 2)
+  // Ítem A-1 — false solo cuando el descuento automático de esta línea
+  // vino de una Oferta con `pagaComision: false` (decisión "todo o nada":
+  // si alguna oferta ganadora no paga comisión, la línea entera no genera
+  // comisión). true por default: sin oferta, o con descuento manual, la
+  // línea sí genera comisión normalmente. Ver
+  // OfertasService.resolverDescuentoLineaConComision.
+  pagaComision      Boolean @default(true)
 
   @@map("linea_factura")
 }
@@ -1082,6 +1091,7 @@ model Empleado {
   horarios            HorarioEmpleado[]
   registrosAsistencia RegistroAsistencia[]
   ausencias           Ausencia[]
+  comisionesVenta     ComisionVenta[]
 
   @@unique([tenantId, cedula])
   @@map("empleados")
@@ -1762,6 +1772,15 @@ model Producto {
   precioVariable   Boolean  @default(false)
   esIngrediente    Boolean  @default(false)
   permiteDevolucion Boolean @default(true)
+  // Comisión de venta (plan de integración Cuadre, ítem A-1) — mutuamente
+  // excluyentes (validado en ProductosService, no en el schema, mismo
+  // criterio que Oferta.valor/comprarCantidad): `porcentajeComision` (%
+  // sobre el monto neto SIN ITBIS de cada línea vendida) o
+  // `montoComisionFijo` (RD$ fijos por unidad vendida). Sin ninguno de
+  // los dos, el producto simplemente no genera comisión — ver
+  // ComisionesService.generarDesdeFactura.
+  porcentajeComision Decimal? @db.Decimal(5, 2)
+  montoComisionFijo  Decimal? @db.Decimal(14, 2)
   // Data URI completa (data:image/jpeg;base64,...), comprimida en el
   // cliente antes de subir. `listar()` (el listado general de
   // Productos.tsx) NO la selecciona a propósito — solo `catalogo()`
@@ -1788,6 +1807,7 @@ model Producto {
   // Combos de los que este producto forma parte (como componente).
   partesDeCombos ComponenteCombo[] @relation("ComponenteDeCombos")
   ofertas        Oferta[]
+  comisionesVenta ComisionVenta[]
 
   @@unique([tenantId, codigo])
   @@map("productos")
@@ -2471,8 +2491,9 @@ enum AlcanceOferta {
 /// (default `false` = comportamiento histórico, nunca se apilan) y
 /// `prioridad` (desempate cuando hay más de una NO acumulable con el
 /// mismo descuento resultante — ver OfertasService.combinarDescuentos);
-/// `pagaComision` (inerte hasta que se implemente A-1 — Comisiones de
-/// venta — pero vive en el mismo registro de Oferta en Cuadre).
+/// `pagaComision` (ítem A-1 — Comisiones de venta: si es `false`, una
+/// línea descontada por ESTA oferta no genera comisión de venta, "todo o
+/// nada" — ver ComisionVenta/OfertasService.combinarDescuentos).
 model Oferta {
   id                 String              @id @default(uuid())
   tenantId           String
@@ -2502,6 +2523,39 @@ model Oferta {
   createdAt          DateTime            @default(now())
 
   @@map("ofertas")
+}
+
+/// Comisión de venta de punta a punta (plan de integración Cuadre, ítem
+/// A-1). Una fila por cada LineaFactura que genera comisión — nunca por
+/// producto SERVICIO/COMBO sin `porcentajeComision`/`montoComisionFijo`
+/// configurado, y nunca si la línea tiene `pagaComision: false` (Oferta
+/// que no paga comisión) o la factura no tiene `vendedorEmpleadoId`
+/// (solo ventas de POS con vendedor elegido, ítem F-2 — ver
+/// ComisionesEventosService, reactor de `factura.creada`/
+/// `factura.anulada`, corre fuera del request HTTP igual que
+/// ContabilidadEventosService). `anulada` se marca `true` (nunca se
+/// borra la fila) cuando la factura de origen se anula — igual criterio
+/// de nunca perder rastro que Contabilidad, aunque esto no sea un
+/// registro fiscal.
+model ComisionVenta {
+  id             String   @id @default(uuid())
+  tenantId       String
+  tenant         Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  facturaId      String
+  factura        Factura  @relation(fields: [facturaId], references: [id], onDelete: Cascade)
+  lineaFacturaId String
+  productoId     String
+  producto       Producto @relation(fields: [productoId], references: [id])
+  empleadoId     String
+  empleado       Empleado @relation(fields: [empleadoId], references: [id])
+  monto          Decimal  @db.Decimal(14, 2)
+  anulada        Boolean  @default(false)
+  createdAt      DateTime @default(now())
+
+  @@unique([facturaId, lineaFacturaId])
+  @@index([tenantId, empleadoId])
+  @@index([tenantId, productoId])
+  @@map("comisiones_venta")
 }
 
 enum EstadoBono {

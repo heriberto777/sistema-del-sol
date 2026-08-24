@@ -11,6 +11,8 @@ interface LineaCalculada {
   porcentajeItbis: number;
   montoItbis: number;
   montoTotal: number;
+  // Ítem A-1 — ver FacturacionService.calcularLineasYTotales.
+  pagaComision: boolean;
 }
 
 @Injectable()
@@ -193,6 +195,7 @@ export class FacturacionRepository {
             porcentajeItbis: linea.porcentajeItbis,
             montoItbis: linea.montoItbis,
             montoTotal: linea.montoTotal,
+            pagaComision: linea.pagaComision,
           })),
         },
         ...(params.pagos?.length

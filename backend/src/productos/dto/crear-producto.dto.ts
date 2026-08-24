@@ -91,6 +91,28 @@ export class CrearProductoDto {
   permiteDevolucion?: boolean;
 
   @ApiProperty({
+    required: false,
+    nullable: true,
+    description:
+      'Ítem A-1 — % de comisión de venta sobre el monto neto (sin ITBIS, después de descuento) de cada línea vendida de este producto. Mutuamente excluyente con montoComisionFijo (400 si vienen ambos). null explícito lo quita.',
+  })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Max(100)
+  porcentajeComision?: number | null;
+
+  @ApiProperty({
+    required: false,
+    nullable: true,
+    description: 'Ítem A-1 — comisión fija en RD$ por cada unidad vendida de este producto (alternativa a porcentajeComision). null explícito lo quita.',
+  })
+  @IsOptional()
+  @IsNumber()
+  @IsPositive()
+  montoComisionFijo?: number | null;
+
+  @ApiProperty({
     type: [ComponenteComboDto],
     required: false,
     description: 'Solo tiene efecto cuando tipo=COMBO — los productos (PRODUCTO o SERVICIO, nunca otro COMBO) que se descuentan al facturar este combo',

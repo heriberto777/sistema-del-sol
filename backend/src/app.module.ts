@@ -51,6 +51,7 @@ import { ListasPrecioModule } from './listas-precio/listas-precio.module';
 import { AtributosModule } from './atributos/atributos.module';
 import { VariantesModule } from './variantes/variantes.module';
 import { OfertasModule } from './ofertas/ofertas.module';
+import { ComisionesModule } from './comisiones/comisiones.module';
 import { BonosModule } from './bonos/bonos.module';
 import { SucursalesModule } from './sucursales/sucursales.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
@@ -118,6 +119,7 @@ import { TenantMiddleware } from './common/middleware/tenant.middleware';
     VariantesModule,
     GastosMenoresModule,
     OfertasModule,
+    ComisionesModule,
     BonosModule,
   ],
   providers: [

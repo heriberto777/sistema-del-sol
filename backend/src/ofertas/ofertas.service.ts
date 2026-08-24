@@ -113,16 +113,47 @@ export class OfertasService {
    * nunca se combinan ambos grupos entre sí.
    */
   private combinarDescuentos(ofertas: Oferta[], base: number, cantidad?: number, precioUnitario?: number): number {
-    const acumulables = ofertas.filter((o) => o.acumulable);
+    return this.combinarDescuentosConComision(ofertas, base, cantidad, precioUnitario).monto;
+  }
+
+  /**
+   * Igual que `combinarDescuentos`, pero además informa si el resultado
+   * "paga comisión" (ítem A-1) — decisión "todo o nada": si el grupo de
+   * ofertas que terminó ganando (los acumulables sumados, o la mejor no
+   * acumulable en solitario) incluye alguna con `pagaComision: false`,
+   * la línea entera queda sin comisión. En empate entre "sumar
+   * acumulables" y "la mejor no acumulable" gana el lado acumulable
+   * (mismo criterio arbitrario que ya tenía `Math.max` acá).
+   */
+  private combinarDescuentosConComision(
+    ofertas: Oferta[],
+    base: number,
+    cantidad?: number,
+    precioUnitario?: number,
+  ): { monto: number; pagaComision: boolean } {
+    const acumulablesConMonto = ofertas
+      .filter((o) => o.acumulable)
+      .map((oferta) => ({ oferta, monto: this.montoDescuentoOferta(oferta, base, cantidad, precioUnitario) }))
+      .filter((x) => x.monto > 0);
+    const totalAcumulables = acumulablesConMonto.reduce((acc, x) => acc + x.monto, 0);
+
     const noAcumulables = [...ofertas.filter((o) => !o.acumulable)].sort((a, b) => a.prioridad - b.prioridad);
+    let mejorNoAcumulable = 0;
+    let mejorOferta: Oferta | null = null;
+    for (const oferta of noAcumulables) {
+      const monto = this.montoDescuentoOferta(oferta, base, cantidad, precioUnitario);
+      if (monto > mejorNoAcumulable) {
+        mejorNoAcumulable = monto;
+        mejorOferta = oferta;
+      }
+    }
 
-    const totalAcumulables = acumulables.reduce((acc, o) => acc + this.montoDescuentoOferta(o, base, cantidad, precioUnitario), 0);
-    const mejorNoAcumulable = noAcumulables.reduce(
-      (mejor, o) => Math.max(mejor, this.montoDescuentoOferta(o, base, cantidad, precioUnitario)),
-      0,
-    );
-
-    return Math.min(Math.max(totalAcumulables, mejorNoAcumulable), base);
+    if (totalAcumulables >= mejorNoAcumulable) {
+      const monto = Math.min(totalAcumulables, base);
+      return { monto, pagaComision: monto === 0 || acumulablesConMonto.every((x) => x.oferta.pagaComision) };
+    }
+    const monto = Math.min(mejorNoAcumulable, base);
+    return { monto, pagaComision: mejorOferta ? mejorOferta.pagaComision : true };
   }
 
   /**
@@ -131,11 +162,26 @@ export class OfertasService {
    * `VariantesService.resolverObligatoria`.
    */
   async resolverDescuentoLinea(productoId: string, categoriaId: string | null, cantidad: number, precioUnitario: number): Promise<number> {
+    return (await this.resolverDescuentoLineaConComision(productoId, categoriaId, cantidad, precioUnitario)).monto;
+  }
+
+  /**
+   * Igual que `resolverDescuentoLinea`, pero además informa si la línea
+   * "paga comisión" (ítem A-1) — usada solo por `FacturacionService`
+   * (Cotizaciones no genera comisión, así que sigue usando la versión
+   * simple de arriba).
+   */
+  async resolverDescuentoLineaConComision(
+    productoId: string,
+    categoriaId: string | null,
+    cantidad: number,
+    precioUnitario: number,
+  ): Promise<{ monto: number; pagaComision: boolean }> {
     const monto = cantidad * precioUnitario;
-    if (monto <= 0) return 0;
+    if (monto <= 0) return { monto: 0, pagaComision: true };
     const ofertas = await this.ofertasRepository.buscarVigentesParaLinea(productoId, categoriaId, new Date());
-    if (ofertas.length === 0) return 0;
-    return this.combinarDescuentos(ofertas, monto, cantidad, precioUnitario);
+    if (ofertas.length === 0) return { monto: 0, pagaComision: true };
+    return this.combinarDescuentosConComision(ofertas, monto, cantidad, precioUnitario);
   }
 
   /**
