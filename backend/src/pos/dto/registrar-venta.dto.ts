@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { ArrayMinSize, IsArray, IsNumber, IsOptional, IsPositive, IsString, IsUUID, ValidateNested } from 'class-validator';
+import { ArrayMinSize, IsArray, IsEnum, IsIn, IsNumber, IsOptional, IsPositive, IsString, IsUUID, ValidateNested } from 'class-validator';
 import { LineaFacturaDto } from '../../facturacion/dto/crear-factura.dto';
 
 export class PagoVentaPosDto {
@@ -58,4 +58,24 @@ export class RegistrarVentaPosDto {
   @IsOptional()
   @IsString()
   listaPrecio?: string;
+
+  @ApiProperty({
+    required: false,
+    default: 'CONTADO',
+    enum: ['CONTADO', 'CREDITO'],
+    description:
+      'Tipo de comprobante de la venta (plan de integración Cuadre, ítem F-2) — antes siempre CONTADO. Solo CONTADO/CREDITO: una venta de POS nunca es NOTA_CREDITO/NOTA_DEBITO (eso es registrarDevolucion).',
+  })
+  @IsOptional()
+  @IsIn(['CONTADO', 'CREDITO'])
+  tipoFactura?: 'CONTADO' | 'CREDITO';
+
+  @ApiProperty({
+    required: false,
+    enum: ['REGIMEN_ESPECIAL', 'GUBERNAMENTAL'],
+    description: 'Igual que en Facturación (ítem B-1) — usa B14/B15 (o su e-CF) en vez del NCF normal.',
+  })
+  @IsOptional()
+  @IsEnum(['REGIMEN_ESPECIAL', 'GUBERNAMENTAL'])
+  tipoComprobanteEspecial?: 'REGIMEN_ESPECIAL' | 'GUBERNAMENTAL';
 }

@@ -74,9 +74,12 @@ function ModalNuevaFactura({ onClose }: { onClose: () => void }) {
   const [bodegaId, setBodegaId] = useState('');
   const [tipoFactura, setTipoFactura] = useState<'CONTADO' | 'CREDITO'>('CONTADO');
   const [tipoComprobanteEspecial, setTipoComprobanteEspecial] = useState('');
-  const [lineas, setLineas] = useState([{ productoId: '', varianteId: '', cantidad: '1', precioUnitario: '' }]);
+  const [plazoPagoDias, setPlazoPagoDias] = useState(30);
+  const [lineas, setLineas] = useState([{ productoId: '', varianteId: '', cantidad: '1', precioUnitario: '', aplicaItbis: true }]);
   const [mostrarNuevoCliente, setMostrarNuevoCliente] = useState(false);
   const [listaPrecioOverride, setListaPrecioOverride] = useState('');
+  const [descuentoGeneralTipo, setDescuentoGeneralTipo] = useState<'' | 'PCT' | 'MONTO'>('');
+  const [descuentoGeneralValor, setDescuentoGeneralValor] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   const { data: clientes } = useQuery({
@@ -120,6 +123,9 @@ function ModalNuevaFactura({ onClose }: { onClose: () => void }) {
         tipoFactura,
         tipoComprobanteEspecial: tipoComprobanteEspecial || undefined,
         listaPrecio: listaPrecioOverride || undefined,
+        plazoPagoDias: tipoFactura === 'CREDITO' ? plazoPagoDias : undefined,
+        descuentoGeneralPct: descuentoGeneralTipo === 'PCT' && descuentoGeneralValor ? Number(descuentoGeneralValor) : undefined,
+        descuentoGeneralMonto: descuentoGeneralTipo === 'MONTO' && descuentoGeneralValor ? Number(descuentoGeneralValor) : undefined,
         lineas: lineas
           .filter((l) => l.productoId)
           .map((l) => ({
@@ -127,6 +133,7 @@ function ModalNuevaFactura({ onClose }: { onClose: () => void }) {
             varianteId: l.varianteId || undefined,
             cantidad: Number(l.cantidad),
             precioUnitario: l.precioUnitario ? Number(l.precioUnitario) : undefined,
+            aplicaItbis: l.aplicaItbis,
           })),
       }),
     onSuccess: () => {
@@ -201,6 +208,31 @@ function ModalNuevaFactura({ onClose }: { onClose: () => void }) {
           </Select>
         </div>
 
+        {tipoFactura === 'CREDITO' && (
+          <div className="grid grid-cols-2 gap-2">
+            <div className="flex flex-col gap-1">
+              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                Condición de pago (plan de integración Cuadre, ítem B-6)
+              </label>
+              <Select value={plazoPagoDias} onChange={(e) => setPlazoPagoDias(Number(e.target.value))}>
+                <option value={15}>15 días</option>
+                <option value={30}>30 días</option>
+                <option value={45}>45 días</option>
+                <option value={60}>60 días</option>
+                <option value={90}>90 días</option>
+              </Select>
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Vencimiento</label>
+              <input
+                disabled
+                value={new Date(Date.now() + plazoPagoDias * 86400000).toLocaleDateString('es-DO', { timeZone: 'UTC' })}
+                className="rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400"
+              />
+            </div>
+          </div>
+        )}
+
         <div className="flex flex-col gap-1">
           <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Tipo de comprobante</label>
           <Select value={tipoComprobanteEspecial} onChange={(e) => setTipoComprobanteEspecial(e.target.value)}>
@@ -238,6 +270,14 @@ function ModalNuevaFactura({ onClose }: { onClose: () => void }) {
                 onChange={(e) => actualizarLinea(i, { precioUnitario: e.target.value })}
                 className="w-32 rounded-md border border-slate-300 px-2 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
               />
+              <label className="flex items-center gap-1 text-xs text-slate-600 dark:text-slate-400" title="Toggle de ITBIS por línea">
+                <input
+                  type="checkbox"
+                  checked={linea.aplicaItbis}
+                  onChange={(e) => actualizarLinea(i, { aplicaItbis: e.target.checked })}
+                />
+                ITBIS
+              </label>
               {lineas.length > 1 && (
                 <button
                   type="button"
@@ -252,11 +292,38 @@ function ModalNuevaFactura({ onClose }: { onClose: () => void }) {
           ))}
           <button
             type="button"
-            onClick={() => setLineas((prev) => [...prev, { productoId: '', varianteId: '', cantidad: '1', precioUnitario: '' }])}
+            onClick={() => setLineas((prev) => [...prev, { productoId: '', varianteId: '', cantidad: '1', precioUnitario: '', aplicaItbis: true }])}
             className="text-sm font-medium text-sol-600 hover:text-sol-700 dark:text-sol-400"
           >
             + Agregar línea
           </button>
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+            Descuento general de la factura (opcional, plan de integración Cuadre, ítem B-8)
+          </label>
+          <div className="flex gap-2">
+            <Select value={descuentoGeneralTipo} onChange={(e) => setDescuentoGeneralTipo(e.target.value as '' | 'PCT' | 'MONTO')}>
+              <option value="">Sin descuento general</option>
+              <option value="PCT">% sobre el subtotal</option>
+              <option value="MONTO">Monto fijo (RD$)</option>
+            </Select>
+            {descuentoGeneralTipo && (
+              <input
+                type="number"
+                min={0}
+                step="0.01"
+                placeholder={descuentoGeneralTipo === 'PCT' ? '% ej. 10' : 'RD$'}
+                value={descuentoGeneralValor}
+                onChange={(e) => setDescuentoGeneralValor(e.target.value)}
+                className="w-32 rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+              />
+            )}
+          </div>
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            Se reparte proporcionalmente entre todas las líneas (recalcula el ITBIS), además de cualquier descuento por línea u oferta automática.
+          </p>
         </div>
 
         {error && <p className="text-sm text-red-600">{error}</p>}

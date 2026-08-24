@@ -102,7 +102,12 @@ export class PosService {
     return this.facturacionService.cotizar(dto);
   }
 
-  /** Venta rápida de POS: siempre CONTADO, siempre contra la bodega del turno — reutiliza FacturacionService.crear() como Cotizaciones/Remisiones. */
+  /**
+   * Venta rápida de POS, siempre contra la bodega del turno — reutiliza
+   * FacturacionService.crear() como Cotizaciones/Remisiones.
+   * `tipoFactura` (plan de integración Cuadre, ítem F-2) default CONTADO
+   * si se omite — antes de este ítem era siempre CONTADO sin excepción.
+   */
   async registrarVenta(dto: RegistrarVentaPosDto, tenantId: string, cajeroId: string) {
     const turno = await this.posRepository.buscarPorId(dto.turnoCajaId);
     this.validarAbierto(turno);
@@ -114,7 +119,14 @@ export class PosService {
     }
 
     return this.facturacionService.crear(
-      { clienteId: dto.clienteId, bodegaId: turno.bodegaId, tipoFactura: 'CONTADO', lineas: dto.lineas, listaPrecio: dto.listaPrecio },
+      {
+        clienteId: dto.clienteId,
+        bodegaId: turno.bodegaId,
+        tipoFactura: dto.tipoFactura ?? 'CONTADO',
+        tipoComprobanteEspecial: dto.tipoComprobanteEspecial,
+        lineas: dto.lineas,
+        listaPrecio: dto.listaPrecio,
+      },
       tenantId,
       cajeroId,
       {

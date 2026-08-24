@@ -53,6 +53,9 @@ model Tenant {
   movimientosInventario MovimientoInventario[]
   clientes      Cliente[]
   categoriasCliente CategoriaCliente[]
+  feriados      Feriado[]
+  puestos       Puesto[]
+  leyesFiscales LeyFiscal[]
   proveedores   Proveedor[]
   ordenesCompra OrdenCompra[]
   webhooks      Webhook[]
@@ -430,6 +433,7 @@ model User {
   empleado      Empleado?
   ausenciasSolicitadas Ausencia[] @relation("AusenciaSolicitadaPor")
   ausenciasAprobadas   Ausencia[] @relation("AusenciaAprobadaPor")
+  asistenciasAprobadas RegistroAsistencia[] @relation("AsistenciaAprobadaPor")
   sucursales    UsuarioSucursal[]
 
   @@unique([tenantId, email])
@@ -1018,6 +1022,14 @@ model Empleado {
   nombre              String
   cedula              String
   cargo               String
+  // Catálogo de puestos estructurado (plan de integración Cuadre, ítem
+  // G-8) — puramente aditivo: `cargo` (texto libre) sigue existiendo tal
+  // cual y sigue siendo lo que resuelve "Vendedor" en
+  // `EmpleadosRepository.listarVendedores` (contains insensitive) — no
+  // se toca, para no romper esa búsqueda. `puestoId` es un filtro/
+  // clasificación adicional, opcional.
+  puestoId            String?
+  puesto              Puesto?       @relation(fields: [puestoId], references: [id], onDelete: SetNull)
   departamento        String?
   fechaIngreso        DateTime
   fechaSalida         DateTime?
@@ -1044,6 +1056,22 @@ model Empleado {
 
   @@unique([tenantId, cedula])
   @@map("empleados")
+}
+
+/// Catálogo de puestos por tenant (plan de integración Cuadre, ítem
+/// G-8) — tenant-scoped, plano (sin jerarquía). Ver Empleado.puestoId.
+model Puesto {
+  id        String     @id @default(uuid())
+  tenantId  String
+  tenant    Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  nombre    String
+  activo    Boolean    @default(true)
+  createdAt DateTime   @default(now())
+
+  empleados Empleado[]
+
+  @@unique([tenantId, nombre])
+  @@map("puestos")
 }
 
 enum DiaSemana {
@@ -1102,9 +1130,34 @@ model RegistroAsistencia {
   horaEntrada String?
   horaSalida  String?
   tardanza    Boolean   @default(false)
+  // Umbral de horas extra + tolerancia de salida anticipada (plan de
+  // integración Cuadre, ítem G-4), calculados una sola vez al marcar la
+  // salida (o en registrarManual si viene horaSalida) — mismo criterio
+  // que `tardanza`: contra `HorarioEmpleado` del día y los valores
+  // configurables `Configuracion.ASISTENCIA_UMBRAL_HORAS_EXTRA`/
+  // `ASISTENCIA_TOLERANCIA_SALIDA_ANTICIPADA_MIN`. `horasExtra` queda
+  // `null` si no se puede calcular (falta horaEntrada u horaSalida).
+  salidaAnticipada Boolean @default(false)
+  horasExtra       Decimal? @db.Decimal(5, 2)
+  // Flujo de aprobación (plan de integración Cuadre, ítem G-3) — mismo
+  // patrón que Ausencia.estado/aprobadoPorId/fechaResolucion. Puramente
+  // de revisión/auditoría de RRHH: a diferencia de Ausencia, ningún
+  // cálculo de nómina lee `estado` (RegistroAsistencia no alimenta
+  // PeriodosNominaService, solo Ausencia lo hace) — marcar/aprobar/
+  // rechazar no cambia ningún monto pagado.
+  estado          EstadoAsistencia @default(PENDIENTE)
+  aprobadoPorId   String?
+  aprobadoPor     User?            @relation("AsistenciaAprobadaPor", fields: [aprobadoPorId], references: [id], onDelete: Cascade)
+  fechaResolucion DateTime?
 
   @@unique([tenantId, empleadoId, fecha])
   @@map("registros_asistencia")
+}
+
+enum EstadoAsistencia {
+  PENDIENTE
+  APROBADO
+  RECHAZADO
 }
 
 enum TipoAusencia {
@@ -1131,6 +1184,26 @@ enum EstadoAusencia {
 /// rebajen el sueldo real, no que quede solo informativo. Solo una
 /// `APROBADA` afecta nómina/balance de vacaciones; `SOLICITADA`/
 /// `RECHAZADA` son historial sin efecto.
+/// Calendario de feriados por tenant (plan de integración Cuadre, ítem
+/// G-5) — catálogo puro, deliberadamente sin ningún efecto automático en
+/// tardanza/horas extra/nómina todavía (eso sería un ítem propio, más
+/// grande, si el negocio lo necesita). `recurrenteAnual` decide si
+/// `fecha` se compara ignorando el año (feriados fijos como Año Nuevo) o
+/// exacta (un feriado puntual de un año específico).
+model Feriado {
+  id              String   @id @default(uuid())
+  tenantId        String
+  tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  nombre          String
+  fecha           DateTime
+  recurrenteAnual Boolean  @default(true)
+  activo          Boolean  @default(true)
+  createdAt       DateTime @default(now())
+
+  @@unique([tenantId, nombre, fecha])
+  @@map("feriados")
+}
+
 model Ausencia {
   id              String         @id @default(uuid())
   tenantId        String
@@ -1289,6 +1362,31 @@ model ListaPrecio {
 
   @@unique([tenantId, nombre])
   @@map("listas_precio")
+}
+
+/// Catálogo de leyes fiscales (plan de integración Cuadre, ítem B-3) —
+/// reglas que reducen el ITBIS efectivo de un Producto para casos
+/// especiales (ej. Norma 07-2007 construcción: `porcentajeItbisAPagar:
+/// 10` significa que solo se paga 10% del ITBIS normal del producto —
+/// 18%→1.8% efectivo). Se ata al Producto, no al Cliente ni a la
+/// Factura — decisión del usuario: la reducción depende de QUÉ se
+/// vende. Sin endpoint de borrado — mismo criterio que FormaPago/
+/// ListaPrecio: se desactiva, no se elimina.
+model LeyFiscal {
+  id                    String   @id @default(uuid())
+  tenantId              String
+  tenant                Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  codigo                String
+  nombre                String
+  porcentajeItbisAPagar Decimal  @db.Decimal(5, 2)
+  descripcion           String?
+  activa                Boolean  @default(true)
+  createdAt             DateTime @default(now())
+
+  productos Producto[]
+
+  @@unique([tenantId, codigo])
+  @@map("leyes_fiscales")
 }
 
 /// Ledger de "con qué se pagó" una venta de POS — permite pagos divididos
@@ -1494,6 +1592,14 @@ model Producto {
   categoria        Categoria? @relation(fields: [categoriaId], references: [id], onDelete: SetNull)
   unidadMedida     String   @default("UND")
   porcentajeItbis  Decimal  @default(18) @db.Decimal(5, 2)
+  // Ley fiscal aplicable (plan de integración Cuadre, ítem B-3) — reduce
+  // el ITBIS efectivo de este producto (ej. Norma 07-2007 construcción:
+  // solo se paga 10% del ITBIS normal → 18%→1.8% efectivo). Se ata al
+  // Producto (decisión del usuario: la reducción depende de QUÉ se
+  // vende, no de quién compra) — ver FacturacionService.
+  // calcularLineasYTotales.
+  leyFiscalId      String?
+  leyFiscal        LeyFiscal? @relation(fields: [leyFiscalId], references: [id], onDelete: SetNull)
   // PRODUCTO mueve inventario normal; SERVICIO nunca toca Stock; COMBO
   // expande a sus `componentes` al facturarse (ver FacturacionService.
   // expandirParaInventario) — nunca tiene fila propia en Stock.

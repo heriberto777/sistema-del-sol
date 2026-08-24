@@ -99,7 +99,7 @@ pasa ninguna de ellas.
 
 | Método | Ruta | Permiso |
 |---|---|---|
-| POST | `/api/facturas` | `facturacion.crear` — `{ clienteId, bodegaId, tipoFactura, lineas[], facturaOrigenId?, listaPrecio?, tipoComprobanteEspecial? }`; `facturaOrigenId` requerido para `NOTA_CREDITO`/`NOTA_DEBITO`; `listaPrecio` (nombre de `ListaPrecio`, no id) sobreescribe el nivel de precio resuelto del cliente para esta venta puntual — ver ARCHITECTURE.md, "Precios multinivel"; `tipoComprobanteEspecial` (`REGIMEN_ESPECIAL`\|`GUBERNAMENTAL`, plan de integración Cuadre ítem B-1) usa B14/B15 (o su e-CF) en vez del NCF normal — solo válido con `tipoFactura` CONTADO/CREDITO, se ignora en notas de crédito/débito; 403 (Fase 9) si la bodega es de una sucursal no asignada al usuario (cubre también POS y conversión de Cotizaciones/Remisiones, que reusan este mismo endpoint internamente) |
+| POST | `/api/facturas` | `facturacion.crear` — `{ clienteId, bodegaId, tipoFactura, lineas[], facturaOrigenId?, listaPrecio?, tipoComprobanteEspecial?, descuentoGeneralPct?, descuentoGeneralMonto?, plazoPagoDias? }`; `plazoPagoDias` (ítem B-6, uno de `15`/`30`/`45`/`60`/`90`) sin enviar cae al `@default(30)` del schema — el campo YA existía y `RecordatoriosService` YA lo consumía para facturas vencidas, lo que faltaba era poder elegirlo al crear; `facturaOrigenId` requerido para `NOTA_CREDITO`/`NOTA_DEBITO`; `listaPrecio` (nombre de `ListaPrecio`, no id) sobreescribe el nivel de precio resuelto del cliente para esta venta puntual — ver ARCHITECTURE.md, "Precios multinivel"; `tipoComprobanteEspecial` (`REGIMEN_ESPECIAL`\|`GUBERNAMENTAL`, plan de integración Cuadre ítem B-1) usa B14/B15 (o su e-CF) en vez del NCF normal — solo válido con `tipoFactura` CONTADO/CREDITO, se ignora en notas de crédito/débito; cada línea acepta `aplicaItbis?` (ítem B-7, default `true` — `false` fuerza 0% en esa línea) y `descuento?` (manual, gana sobre Ofertas automáticas); `descuentoGeneralPct`/`descuentoGeneralMonto` (ítem B-8, excluyentes entre sí, 400 si vienen ambos) prorratean un descuento de documento completo entre todas las líneas (recalculando ITBIS), acumulable con Ofertas automáticas y descuentos por línea — solo aplica a CONTADO/CREDITO, se ignora en notas de crédito/débito; 403 (Fase 9) si la bodega es de una sucursal no asignada al usuario (cubre también POS y conversión de Cotizaciones/Remisiones, que reusan este mismo endpoint internamente) |
 | GET | `/api/facturas?pagina&tamanoPagina&busqueda&tipoFactura` | `facturacion.ver` — `busqueda` filtra por NCF o nombre de cliente; `tipoFactura` (repetible: `?tipoFactura=NOTA_CREDITO&tipoFactura=NOTA_DEBITO`) filtra por tipo — usado por la pantalla de Notas de Crédito/Débito (Fase 4a de adopción de Cuadre) |
 | GET | `/api/facturas/:id` | `facturacion.ver` |
 | POST | `/api/facturas/:id/anular` | `facturacion.anular` — `{ motivo, pin? }` (Fase 9, `pin` requerido solo si el usuario tiene uno configurado); reversa el efecto de inventario (ver ARCHITECTURE.md); 400 si ya estaba anulada; 403 si la bodega de la factura es de una sucursal no asignada al usuario; si la factura es de POS y quien pide la anulación no tiene `pos.supervisar`, 403 salvo que sea el mismo cajero del turno Y siga `ABIERTO` (ver "Roles de POS" en ARCHITECTURE.md) |
@@ -160,7 +160,10 @@ emisión/consulta/anulación, el canje en sí ocurre dentro de
 
 | Método | Ruta | Permiso |
 |---|---|---|
-| POST | `/api/productos` | `precios.editar` — acepta `imagen` (data URI, opcional) |
+| POST | `/api/productos` | `precios.editar` — acepta `imagen` (data URI, opcional) y `leyFiscalId?` (FK a `LeyFiscal`, plan de integración Cuadre ítem B-3 — reduce el ITBIS efectivo del producto, `null` explícito quita la asignación) |
+| POST | `/api/leyes-fiscales` | `precios.editar` — `{ codigo, nombre, porcentajeItbisAPagar, descripcion?, activa? }` (ítem B-3) |
+| GET | `/api/leyes-fiscales?activa=true` | `precios.ver` |
+| PATCH | `/api/leyes-fiscales/:id` | `precios.editar` |
 | GET | `/api/productos?pagina&tamanoPagina&busqueda&categoriaId` | `precios.ver` — `busqueda` filtra por nombre o código, `categoriaId` filtra exacto (no incluye descendientes); NUNCA incluye `imagen` (ver ARCHITECTURE.md) |
 | GET | `/api/productos/catalogo?pagina&tamanoPagina&busqueda&categoriaId` | `precios.ver` — para el catálogo de POS: incluye `imagen` y `precioVenta` (lista GENERAL vigente) en cada fila; `categoriaId` filtra exacto |
 | GET | `/api/productos/:id` | `precios.ver` — sí incluye `imagen` |
@@ -369,10 +372,13 @@ para asientos manuales (ajustes, apertura, etc.).
 
 | Método | Ruta | Permiso |
 |---|---|---|
-| GET | `/api/nomina/empleados?pagina&tamanoPagina&busqueda` | `nomina.ver` — busca por nombre/cédula/cargo |
+| GET | `/api/nomina/empleados?pagina&tamanoPagina&busqueda&puestoId` | `nomina.ver` — busca por nombre/cédula/cargo; `puestoId` (ítem G-8) filtra por el catálogo de puestos |
 | GET | `/api/nomina/empleados/:id` | `nomina.ver` |
-| POST | `/api/nomina/empleados` | `nomina.editar` |
-| PATCH | `/api/nomina/empleados/:id` | `nomina.editar` — enviar `fechaSalida` desactiva al empleado automáticamente |
+| POST | `/api/nomina/empleados` | `nomina.editar` — acepta `puestoId` (ítem G-8, FK a `Puesto`) además de `cargo` (texto libre, sin cambios — sigue siendo lo que resuelve "Vendedor" en `GET /pos/vendedores`) |
+| PATCH | `/api/nomina/empleados/:id` | `nomina.editar` — enviar `fechaSalida` desactiva al empleado automáticamente; `puestoId: null` desvincula el puesto |
+| POST | `/api/nomina/puestos` | `nomina.editar` — `{ nombre, activo? }` — catálogo de puestos (ítem G-8), plano |
+| GET | `/api/nomina/puestos?activo=true` | `nomina.ver` |
+| PATCH | `/api/nomina/puestos/:id` | `nomina.editar` |
 | GET | `/api/nomina/periodos?pagina&tamanoPagina` | `nomina.ver` |
 | GET | `/api/nomina/periodos/:id` | `nomina.ver` — incluye los recibos con su empleado |
 | POST | `/api/nomina/periodos` | `nomina.editar` — genera recibos para todos los empleados activos (`{ tipo: SEMANAL\|QUINCENAL\|BIMENSUAL\|MENSUAL, fechaInicio, fechaFin }`); `SEMANAL`/`BIMENSUAL` (plan de integración Cuadre, ítem G-7) usan el factor de `FACTOR_PERIODO_NOMINA` (`nomina-config.ts`) — `SEMANAL` = 7 días del divisor legal 23.83 (no un genérico mes/4), `BIMENSUAL` = mismo factor 0.5 que `QUINCENAL` (RAE: "dos veces al mes", no "cada dos meses") |
@@ -382,14 +388,19 @@ para asientos manuales (ajustes, apertura, etc.).
 | PUT | `/api/nomina/empleados/:empleadoId/horario` | `rrhh.editar` — reemplaza el horario completo (`{ dias: [{ diaSemana, horaEntrada, horaSalida }] }`, `dias: []` lo deja sin ningún día configurado) |
 | GET | `/api/nomina/asistencia/mi-estado-hoy` | Autoservicio, sin permiso — `{ tieneEmpleado, registro }` del usuario logueado (RRHH, Fase 7b) |
 | POST | `/api/nomina/asistencia/marcar-entrada` | Autoservicio, sin permiso — 400 si el usuario no tiene `Empleado.userId` vinculado o si ya marcó entrada hoy |
-| POST | `/api/nomina/asistencia/marcar-salida` | Autoservicio, sin permiso — 400 si no marcó entrada hoy o si ya marcó salida |
+| POST | `/api/nomina/asistencia/marcar-salida` | Autoservicio, sin permiso — 400 si no marcó entrada hoy o si ya marcó salida; calcula `salidaAnticipada`/`horasExtra` (ítem G-4) contra `HorarioEmpleado` del día y `Configuracion.ASISTENCIA_UMBRAL_HORAS_EXTRA`/`ASISTENCIA_TOLERANCIA_SALIDA_ANTICIPADA_MIN` |
 | POST | `/api/nomina/asistencia` | `rrhh.editar` — registro manual (`{ empleadoId, fecha, horaEntrada?, horaSalida? }`), para empleados sin login o corregir un olvido |
-| GET | `/api/nomina/asistencia?empleadoId&desde&hasta&pagina&tamanoPagina` | `rrhh.ver` |
+| GET | `/api/nomina/asistencia?empleadoId&desde&hasta&estado&pagina&tamanoPagina` | `rrhh.ver` — `estado` (ítem G-3) filtra `PENDIENTE`/`APROBADO`/`RECHAZADO` |
+| PATCH | `/api/nomina/asistencia/:id/estado` | `rrhh.aprobar` — `{ estado: APROBADO\|RECHAZADO }` (ítem G-3), 400 si no está en `PENDIENTE`; puramente de revisión/auditoría — no afecta nómina |
 | POST | `/api/nomina/ausencias` | `rrhh.editar` — crea en `SOLICITADA` (`{ empleadoId, tipo, fechaDesde, fechaHasta, conGoceDeSueldo?, motivo? }`, RRHH Fase 7c) |
 | GET | `/api/nomina/ausencias?empleadoId&estado&pagina&tamanoPagina` | `rrhh.ver` |
 | GET | `/api/nomina/ausencias/:id` | `rrhh.ver` |
 | PATCH | `/api/nomina/ausencias/:id/estado` | `rrhh.aprobar` — `{ estado: APROBADA\|RECHAZADA }`, 400 si no está en SOLICITADA |
 | GET | `/api/nomina/empleados/:id/balance-vacaciones` | `rrhh.ver` — `{ aniosCompletos, diasAcumulados, diasDisponibles, diasPagoPorAntiguedad }` (RRHH, Fase 7d) |
+| POST | `/api/nomina/feriados` | `rrhh.editar` — `{ nombre, fecha, recurrenteAnual?, activo? }` — calendario de feriados (ítem G-5), catálogo puro sin efecto automático en tardanza/horas extra/nómina todavía |
+| GET | `/api/nomina/feriados?activo=true` | `rrhh.ver` |
+| PATCH | `/api/nomina/feriados/:id` | `rrhh.editar` |
+| DELETE | `/api/nomina/feriados/:id` | `rrhh.editar` |
 
 ## POS
 
@@ -403,7 +414,7 @@ para asientos manuales (ajustes, apertura, etc.).
 | POST | `/api/pos/turnos/:id/movimientos` | `pos.editar` — entrada/salida de efectivo que no es una venta (`{ tipo: ENTRADA\|SALIDA, monto, motivoTipo, concepto? }`); `motivoTipo` (plan de integración Cuadre, ítem F-5) es un enum obligatorio — `FONDO_CAMBIO`/`DEPOSITO`/`CORRECCION`/`OTRO` — y `concepto` (texto libre) pasó a opcional, se completa con la etiqueta legible del motivo si se omite |
 | POST | `/api/pos/turnos/:id/cerrar` | `pos.editar` — `{ montoFinalContado, justificacionDiferencia?, pin? }`, calcula `montoEsperado`/`diferencia`; `pin` (Fase 9) requerido solo si el usuario tiene uno configurado Y (la diferencia supera la tolerancia O se cierra el turno de otro cajero) |
 | POST | `/api/pos/cotizar` | `pos.editar` — previsualización de solo lectura (`{ clienteId, lineas, listaPrecio? }`, mismo shape de líneas que `/pos/ventas`), sin `turnoCajaId` ni `pagos`: devuelve `{ lineas, subtotal, descuento, itbis, total }` ya con ofertas/nivel de precio resueltos, sin tocar stock/NCF/pagos. El checkout del POS la llama antes de armar los pagos para no cobrar sobre un estimado del navegador que ignora ofertas (Fase 4c — ver ARCHITECTURE.md) |
-| POST | `/api/pos/ventas` | `pos.editar` — venta CONTADO contra la bodega del turno (`{ turnoCajaId, clienteId, vendedorEmpleadoId?, listaPrecio?, pagos: [{formaPagoId, monto, referencia?}], lineas }`); soporta pago dividido (uno o más pagos que sumen exacto el total); `listaPrecio` sobreescribe el nivel de precio resuelto del cliente para esta venta puntual; genera su asiento contable automático igual que cualquier factura |
+| POST | `/api/pos/ventas` | `pos.editar` — venta contra la bodega del turno (`{ turnoCajaId, clienteId, vendedorEmpleadoId?, listaPrecio?, tipoFactura?, tipoComprobanteEspecial?, pagos: [{formaPagoId, monto, referencia?}], lineas }`); soporta pago dividido (uno o más pagos que sumen exacto el total); `listaPrecio` sobreescribe el nivel de precio resuelto del cliente para esta venta puntual; `tipoFactura` (plan de integración Cuadre, ítem F-2) default `CONTADO` si se omite — solo `CONTADO`/`CREDITO`, nunca `NOTA_CREDITO`/`NOTA_DEBITO` (eso es `registrarDevolucion`); `tipoComprobanteEspecial` igual que en Facturación (ítem B-1); genera su asiento contable automático igual que cualquier factura |
 | POST | `/api/pos/devoluciones` | `facturacion.anular` — devolución parcial (`{ facturaOrigenId, turnoCajaId, formaPagoId, referenciaPago?, lineas: [{productoId, cantidad}] }`); emite una NOTA_CREDITO, 400 si la cantidad excede lo disponible |
 | GET | `/api/pos/facturas/:id/devolucion` | `facturacion.anular` (no `facturacion.ver` — Cajero/Vendedor no lo tienen) — detalle de una factura con lo disponible por producto, para armar la Devolución |
 | POST | `/api/pos/turnos/:id/guardar` | `pos.editar` — aparca el carrito actual (`{ clienteId?, vendedorEmpleadoId?, nota?, lineas: [{productoId, cantidad, precioUnitario, porcentajeItbis, descuento?}] }`), snapshot de precio/ITBIS al momento de guardar |

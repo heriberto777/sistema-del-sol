@@ -6,6 +6,7 @@ import { CatalogoQueryDto } from './dto/catalogo-query.dto';
 import { ImportarProductosDto, FilaImportarProductoDto } from './dto/importar-productos.dto';
 import { paginar } from '../common/types/pagina-resultado';
 import { CategoriasRepository } from '../categorias/categorias.repository';
+import { LeyesFiscalesRepository } from '../leyes-fiscales/leyes-fiscales.repository';
 import { VariantesService } from '../variantes/variantes.service';
 import { PreciosRepository } from '../precios/precios.repository';
 import { generarExcel } from '../reportes/exportadores/excel-exportador';
@@ -22,6 +23,7 @@ export class ProductosService {
   constructor(
     private readonly productosRepository: ProductosRepository,
     private readonly categoriasRepository: CategoriasRepository,
+    private readonly leyesFiscalesRepository: LeyesFiscalesRepository,
     private readonly variantesService: VariantesService,
     private readonly preciosRepository: PreciosRepository,
   ) {}
@@ -32,6 +34,9 @@ export class ProductosService {
     if (dto.categoriaId) {
       // findUniqueOrThrow tenant-scoped: si categoriaId es de otro tenant, 404.
       await this.categoriasRepository.buscarPorId(dto.categoriaId);
+    }
+    if (dto.leyFiscalId) {
+      await this.leyesFiscalesRepository.buscarPorId(dto.leyFiscalId);
     }
     return this.productosRepository.crear(dto, tenantId);
   }
@@ -70,6 +75,9 @@ export class ProductosService {
   async actualizar(id: string, dto: Partial<CrearProductoDto>, tenantId: string) {
     if (dto.categoriaId) {
       await this.categoriasRepository.buscarPorId(dto.categoriaId);
+    }
+    if (dto.leyFiscalId) {
+      await this.leyesFiscalesRepository.buscarPorId(dto.leyFiscalId);
     }
 
     if (dto.atributos !== undefined) {

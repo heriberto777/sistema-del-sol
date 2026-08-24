@@ -83,4 +83,9 @@ export const CONFIGURACIONES_BASE: Record<string, string> = {
   // Remisiones/POS (ver resolver-formato-impresion.ts) — un valor del
   // enum FormatoImpresion. Una Bodega puede anularlo puntualmente.
   FORMATO_IMPRESION_DEFAULT: 'CARTA',
+  // Plan de integración Cuadre, ítem G-4 — leídas por AsistenciaService
+  // al marcar la salida, para calcular `horasExtra`/`salidaAnticipada`
+  // de RegistroAsistencia (ver el comentario en el schema).
+  ASISTENCIA_UMBRAL_HORAS_EXTRA: '8',
+  ASISTENCIA_TOLERANCIA_SALIDA_ANTICIPADA_MIN: '15',
 };

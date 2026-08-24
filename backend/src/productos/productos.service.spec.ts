@@ -2,6 +2,7 @@ import { BadRequestException } from '@nestjs/common';
 import { ProductosService } from './productos.service';
 import { ProductosRepository } from './productos.repository';
 import { CategoriasRepository } from '../categorias/categorias.repository';
+import { LeyesFiscalesRepository } from '../leyes-fiscales/leyes-fiscales.repository';
 import { VariantesService } from '../variantes/variantes.service';
 import { PreciosRepository } from '../precios/precios.repository';
 
@@ -9,6 +10,7 @@ describe('ProductosService', () => {
   let service: ProductosService;
   let repository: jest.Mocked<ProductosRepository>;
   let categoriasRepository: jest.Mocked<CategoriasRepository>;
+  let leyesFiscalesRepository: jest.Mocked<LeyesFiscalesRepository>;
   let variantesService: jest.Mocked<VariantesService>;
   let preciosRepository: jest.Mocked<PreciosRepository>;
 
@@ -37,7 +39,8 @@ describe('ProductosService', () => {
     preciosRepository = {
       crear: jest.fn(),
     } as unknown as jest.Mocked<PreciosRepository>;
-    service = new ProductosService(repository, categoriasRepository, variantesService, preciosRepository);
+    leyesFiscalesRepository = { buscarPorId: jest.fn() } as unknown as jest.Mocked<LeyesFiscalesRepository>;
+    service = new ProductosService(repository, categoriasRepository, leyesFiscalesRepository, variantesService, preciosRepository);
   });
 
   describe('crear', () => {
@@ -175,6 +178,28 @@ describe('ProductosService', () => {
 
       expect(categoriasRepository.buscarPorId).toHaveBeenCalledWith('cat-1');
       expect(repository.actualizar).toHaveBeenCalledWith('p1', { categoriaId: 'cat-1' });
+    });
+  });
+
+  describe('leyFiscalId (plan de integración Cuadre, ítem B-3)', () => {
+    it('valida que leyFiscalId pertenezca al tenant antes de crear', async () => {
+      await service.crear({ codigo: 'P1', nombre: 'Producto 1', leyFiscalId: 'ley-1' }, 'tenant-1');
+
+      expect(leyesFiscalesRepository.buscarPorId).toHaveBeenCalledWith('ley-1');
+      expect(repository.crear).toHaveBeenCalled();
+    });
+
+    it('no valida leyFiscalId si no viene en el DTO', async () => {
+      await service.crear({ codigo: 'P1', nombre: 'Producto 1' }, 'tenant-1');
+
+      expect(leyesFiscalesRepository.buscarPorId).not.toHaveBeenCalled();
+    });
+
+    it('valida leyFiscalId al actualizar', async () => {
+      await service.actualizar('p1', { leyFiscalId: 'ley-1' }, 'tenant-1');
+
+      expect(leyesFiscalesRepository.buscarPorId).toHaveBeenCalledWith('ley-1');
+      expect(repository.actualizar).toHaveBeenCalledWith('p1', { leyFiscalId: 'ley-1' });
     });
   });
 

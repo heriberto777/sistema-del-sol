@@ -3,12 +3,16 @@ import clsx from 'clsx';
 import { HorarioEmpleadoPanel } from '../components/organisms/HorarioEmpleadoPanel/HorarioEmpleadoPanel';
 import { AsistenciaTable } from '../components/organisms/AsistenciaTable/AsistenciaTable';
 import { AusenciasTable } from '../components/organisms/AusenciasTable/AusenciasTable';
+import { FeriadosTable } from '../components/organisms/FeriadosTable/FeriadosTable';
+import { PuestosPanel } from '../components/organisms/PuestosPanel/PuestosPanel';
 import { RequierePermiso } from '../components/organisms/RequierePermiso/RequierePermiso';
 
 const PESTANAS = [
   { id: 'horarios', etiqueta: 'Horarios' },
   { id: 'asistencia', etiqueta: 'Asistencia' },
   { id: 'ausencias', etiqueta: 'Ausencias' },
+  { id: 'feriados', etiqueta: 'Feriados' },
+  { id: 'puestos', etiqueta: 'Puestos' },
 ] as const;
 
 type PestanaId = (typeof PESTANAS)[number]['id'];
@@ -44,6 +48,8 @@ export function RRHH() {
         {pestana === 'horarios' && <HorarioEmpleadoPanel />}
         {pestana === 'asistencia' && <AsistenciaTable />}
         {pestana === 'ausencias' && <AusenciasTable />}
+        {pestana === 'feriados' && <FeriadosTable />}
+        {pestana === 'puestos' && <PuestosPanel />}
       </RequierePermiso>
     </div>
   );

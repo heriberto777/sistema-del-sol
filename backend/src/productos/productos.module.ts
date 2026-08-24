@@ -3,6 +3,7 @@ import { ProductosService } from './productos.service';
 import { ProductosController } from './productos.controller';
 import { ProductosRepository } from './productos.repository';
 import { CategoriasModule } from '../categorias/categorias.module';
+import { LeyesFiscalesModule } from '../leyes-fiscales/leyes-fiscales.module';
 import { VariantesModule } from '../variantes/variantes.module';
 import { PreciosRepository } from '../precios/precios.repository';
 
@@ -13,7 +14,7 @@ import { PreciosRepository } from '../precios/precios.repository';
 // circular. PreciosRepository no depende de nada de Productos, así que
 // darle su propia instancia acá es seguro.
 @Module({
-  imports: [CategoriasModule, VariantesModule],
+  imports: [CategoriasModule, LeyesFiscalesModule, VariantesModule],
   controllers: [ProductosController],
   providers: [ProductosService, ProductosRepository, PreciosRepository],
   exports: [ProductosService],

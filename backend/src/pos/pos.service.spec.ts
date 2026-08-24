@@ -168,6 +168,31 @@ describe('PosService', () => {
       );
     });
 
+    it('propaga tipoFactura y tipoComprobanteEspecial cuando vienen en el DTO (plan de integración Cuadre, ítem F-2)', async () => {
+      posRepository.buscarPorId.mockResolvedValue({ id: 't1', estado: 'ABIERTO', bodegaId: 'b1' } as never);
+      facturacionService.crear.mockResolvedValue({ id: 'f1' } as never);
+
+      await service.registrarVenta(
+        {
+          turnoCajaId: 't1',
+          clienteId: 'c1',
+          pagos: [{ formaPagoId: 'fp1', monto: 177 }],
+          lineas: [{ productoId: 'p1', cantidad: 1 }],
+          tipoFactura: 'CREDITO',
+          tipoComprobanteEspecial: 'GUBERNAMENTAL',
+        },
+        'tenant-1',
+        'cajero-1',
+      );
+
+      expect(facturacionService.crear).toHaveBeenCalledWith(
+        expect.objectContaining({ tipoFactura: 'CREDITO', tipoComprobanteEspecial: 'GUBERNAMENTAL' }),
+        'tenant-1',
+        'cajero-1',
+        expect.anything(),
+      );
+    });
+
     it('valida vendedorEmpleadoId contra el tenant cuando viene en el DTO y lo propaga a FacturacionService.crear', async () => {
       posRepository.buscarPorId.mockResolvedValue({ id: 't1', estado: 'ABIERTO', bodegaId: 'b1' } as never);
       facturacionService.crear.mockResolvedValue({ id: 'f1' } as never);

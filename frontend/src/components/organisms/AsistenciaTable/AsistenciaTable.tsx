@@ -17,12 +17,23 @@ interface Empleado {
   cedula: string;
 }
 
+type EstadoAsistencia = 'PENDIENTE' | 'APROBADO' | 'RECHAZADO';
+
+const TONOS_ESTADO_ASISTENCIA: Record<EstadoAsistencia, 'neutro' | 'exito' | 'peligro'> = {
+  PENDIENTE: 'neutro',
+  APROBADO: 'exito',
+  RECHAZADO: 'peligro',
+};
+
 interface RegistroAsistencia {
   id: string;
   fecha: string;
   horaEntrada: string | null;
   horaSalida: string | null;
   tardanza: boolean;
+  salidaAnticipada: boolean;
+  horasExtra: string | null;
+  estado: EstadoAsistencia;
   empleado: { id: string; nombre: string; cedula: string };
 }
 
@@ -45,6 +56,12 @@ export function AsistenciaTable() {
           params: { empleadoId: empleadoFiltro?.id, pagina },
         })
       ).data,
+  });
+
+  const cambiarEstado = useMutation({
+    mutationFn: async ({ id, estado }: { id: string; estado: 'APROBADO' | 'RECHAZADO' }) =>
+      apiClient.patch(`/nomina/asistencia/${id}/estado`, { estado }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['rrhh-asistencia'] }),
   });
 
   return (
@@ -81,7 +98,9 @@ export function AsistenciaTable() {
                   <th className="px-5 py-3 font-medium">Fecha</th>
                   <th className="px-5 py-3 font-medium">Entrada</th>
                   <th className="px-5 py-3 font-medium">Salida</th>
-                  <th className="px-5 py-3 font-medium">Tardanza</th>
+                  <th className="px-5 py-3 font-medium">Novedades</th>
+                  <th className="px-5 py-3 font-medium">Estado</th>
+                  <th className="px-5 py-3"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -91,12 +110,37 @@ export function AsistenciaTable() {
                     <td className="px-5 py-3">{formatearFecha(r.fecha)}</td>
                     <td className="px-5 py-3 font-mono text-xs">{r.horaEntrada ?? '—'}</td>
                     <td className="px-5 py-3 font-mono text-xs">{r.horaSalida ?? '—'}</td>
-                    <td className="px-5 py-3">{r.tardanza && <Badge tono="advertencia">Tardanza</Badge>}</td>
+                    <td className="px-5 py-3">
+                      <div className="flex flex-wrap gap-1">
+                        {r.tardanza && <Badge tono="advertencia">Tardanza</Badge>}
+                        {r.salidaAnticipada && <Badge tono="advertencia">Salida anticipada</Badge>}
+                        {!!r.horasExtra && Number(r.horasExtra) > 0 && <Badge tono="exito">+{r.horasExtra}h extra</Badge>}
+                      </div>
+                    </td>
+                    <td className="px-5 py-3">
+                      <Badge tono={TONOS_ESTADO_ASISTENCIA[r.estado]}>{r.estado}</Badge>
+                    </td>
+                    <td className="px-5 py-3">
+                      {r.estado === 'PENDIENTE' && tienePermiso('rrhh.aprobar') && (
+                        <div className="flex gap-2">
+                          <Button onClick={() => cambiarEstado.mutate({ id: r.id, estado: 'APROBADO' })} disabled={cambiarEstado.isPending}>
+                            Aprobar
+                          </Button>
+                          <Button
+                            variante="peligro"
+                            onClick={() => cambiarEstado.mutate({ id: r.id, estado: 'RECHAZADO' })}
+                            disabled={cambiarEstado.isPending}
+                          >
+                            Rechazar
+                          </Button>
+                        </div>
+                      )}
+                    </td>
                   </tr>
                 ))}
                 {data.datos.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="px-5 py-6 text-center text-slate-500">
+                    <td colSpan={7} className="px-5 py-6 text-center text-slate-500">
                       Sin registros de asistencia.
                     </td>
                   </tr>

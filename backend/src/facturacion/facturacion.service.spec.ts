@@ -184,6 +184,160 @@ describe('FacturacionService', () => {
     );
   });
 
+  describe('aplicaItbis (plan de integración Cuadre, ítem B-7)', () => {
+    it('aplicaItbis: false fuerza 0% en esa línea sin importar producto.porcentajeItbis', async () => {
+      repository.obtenerProductoConPrecioVigente.mockResolvedValue(producto(18, 100) as never);
+      repository.crearFacturaEnTx.mockResolvedValue(facturaCreada() as never);
+
+      await service.crear(dto({ lineas: [{ productoId: 'prod-1', cantidad: 2, aplicaItbis: false }] }), 'tenant-1', 'vendedor-1');
+
+      // 2*100=200 subtotal; itbis 0 porque aplicaItbis: false; total = 200
+      expect(repository.crearFacturaEnTx).toHaveBeenCalledWith(
+        TX,
+        expect.objectContaining({ subtotal: 200, itbis: 0, total: 200 }),
+      );
+    });
+
+    it('sin aplicaItbis (u omitido) usa el porcentajeItbis normal del producto', async () => {
+      repository.obtenerProductoConPrecioVigente.mockResolvedValue(producto(18, 100) as never);
+      repository.crearFacturaEnTx.mockResolvedValue(facturaCreada() as never);
+
+      await service.crear(dto({ lineas: [{ productoId: 'prod-1', cantidad: 2 }] }), 'tenant-1', 'vendedor-1');
+
+      expect(repository.crearFacturaEnTx).toHaveBeenCalledWith(TX, expect.objectContaining({ itbis: 36 }));
+    });
+  });
+
+  describe('plazoPagoDias (plan de integración Cuadre, ítem B-6)', () => {
+    it('propaga plazoPagoDias a crearFacturaEnTx cuando viene en el DTO', async () => {
+      repository.obtenerProductoConPrecioVigente.mockResolvedValue(producto(18, 100) as never);
+      repository.crearFacturaEnTx.mockResolvedValue(facturaCreada() as never);
+
+      await service.crear(dto({ tipoFactura: 'CREDITO', plazoPagoDias: 60 }), 'tenant-1', 'vendedor-1');
+
+      expect(repository.crearFacturaEnTx).toHaveBeenCalledWith(TX, expect.objectContaining({ plazoPagoDias: 60 }));
+    });
+
+    it('sin plazoPagoDias en el DTO, lo manda undefined (Prisma cae al @default(30) del schema)', async () => {
+      repository.obtenerProductoConPrecioVigente.mockResolvedValue(producto(18, 100) as never);
+      repository.crearFacturaEnTx.mockResolvedValue(facturaCreada() as never);
+
+      await service.crear(dto(), 'tenant-1', 'vendedor-1');
+
+      expect(repository.crearFacturaEnTx).toHaveBeenCalledWith(TX, expect.objectContaining({ plazoPagoDias: undefined }));
+    });
+  });
+
+  describe('leyFiscal (plan de integración Cuadre, ítem B-3)', () => {
+    it('reduce el ITBIS efectivo del producto según porcentajeItbisAPagar (18%→1.8% con ley al 10%)', async () => {
+      repository.obtenerProductoConPrecioVigente.mockResolvedValue({
+        ...producto(18, 100),
+        leyFiscal: { porcentajeItbisAPagar: 10 },
+      } as never);
+      repository.crearFacturaEnTx.mockResolvedValue(facturaCreada() as never);
+
+      await service.crear(dto({ lineas: [{ productoId: 'prod-1', cantidad: 2 }] }), 'tenant-1', 'vendedor-1');
+
+      // 2*100=200 subtotal; itbis efectivo 1.8% de 200 = 3.6
+      const llamada = repository.crearFacturaEnTx.mock.calls[0][1] as { subtotal: number; itbis: number };
+      expect(llamada.subtotal).toBe(200);
+      expect(llamada.itbis).toBeCloseTo(3.6);
+    });
+
+    it('sin leyFiscal usa el porcentajeItbis normal del producto', async () => {
+      repository.obtenerProductoConPrecioVigente.mockResolvedValue({ ...producto(18, 100), leyFiscal: null } as never);
+      repository.crearFacturaEnTx.mockResolvedValue(facturaCreada() as never);
+
+      await service.crear(dto({ lineas: [{ productoId: 'prod-1', cantidad: 2 }] }), 'tenant-1', 'vendedor-1');
+
+      expect(repository.crearFacturaEnTx).toHaveBeenCalledWith(TX, expect.objectContaining({ itbis: 36 }));
+    });
+
+    it('aplicaItbis: false sigue ganando sobre la ley fiscal (0% se queda en 0%)', async () => {
+      repository.obtenerProductoConPrecioVigente.mockResolvedValue({
+        ...producto(18, 100),
+        leyFiscal: { porcentajeItbisAPagar: 10 },
+      } as never);
+      repository.crearFacturaEnTx.mockResolvedValue(facturaCreada() as never);
+
+      await service.crear(dto({ lineas: [{ productoId: 'prod-1', cantidad: 2, aplicaItbis: false }] }), 'tenant-1', 'vendedor-1');
+
+      expect(repository.crearFacturaEnTx).toHaveBeenCalledWith(TX, expect.objectContaining({ itbis: 0 }));
+    });
+  });
+
+  describe('descuentoGeneral (plan de integración Cuadre, ítem B-8)', () => {
+    it('descuentoGeneralPct se reparte proporcionalmente entre las líneas (recalcula ITBIS)', async () => {
+      repository.obtenerProductoConPrecioVigente
+        .mockResolvedValueOnce(producto(18, 150) as never) // línea 1: 2*150=300
+        .mockResolvedValueOnce(producto(18, 100) as never); // línea 2: 1*100=100
+      repository.crearFacturaEnTx.mockResolvedValue(facturaCreada() as never);
+
+      await service.crear(
+        dto({
+          descuentoGeneralPct: 10, // 10% de 400 = 40
+          lineas: [
+            { productoId: 'prod-1', cantidad: 2 },
+            { productoId: 'prod-2', cantidad: 1 },
+          ],
+        }),
+        'tenant-1',
+        'vendedor-1',
+      );
+
+      const llamada = repository.crearFacturaEnTx.mock.calls[0][1] as { lineas: { descuento: number }[]; subtotal: number };
+      expect(llamada.lineas[0].descuento).toBeCloseTo(30); // 300/400 * 40
+      expect(llamada.lineas[1].descuento).toBeCloseTo(10); // 100/400 * 40
+      expect(llamada.subtotal).toBeCloseTo(360); // 400 - 40
+    });
+
+    it('descuentoGeneralMonto aplica el monto fijo prorrateado', async () => {
+      repository.obtenerProductoConPrecioVigente.mockResolvedValue(producto(18, 100) as never);
+      repository.crearFacturaEnTx.mockResolvedValue(facturaCreada() as never);
+
+      await service.crear(dto({ descuentoGeneralMonto: 20, lineas: [{ productoId: 'prod-1', cantidad: 2 }] }), 'tenant-1', 'vendedor-1');
+
+      // 2*100=200 - 20 = 180 subtotal; itbis 18% de 180 = 32.4
+      expect(repository.crearFacturaEnTx).toHaveBeenCalledWith(TX, expect.objectContaining({ subtotal: 180, itbis: 32.4 }));
+    });
+
+    it('se acumula con un descuento por línea existente, no lo reemplaza', async () => {
+      repository.obtenerProductoConPrecioVigente.mockResolvedValue(producto(18, 100) as never);
+      repository.crearFacturaEnTx.mockResolvedValue(facturaCreada() as never);
+
+      await service.crear(
+        dto({ descuentoGeneralMonto: 10, lineas: [{ productoId: 'prod-1', cantidad: 2, descuento: 5 }] }),
+        'tenant-1',
+        'vendedor-1',
+      );
+
+      const llamada = repository.crearFacturaEnTx.mock.calls[0][1] as { lineas: { descuento: number }[] };
+      expect(llamada.lineas[0].descuento).toBeCloseTo(15); // 5 manual + 10 general
+    });
+
+    it('rechaza con 400 si vienen descuentoGeneralPct y descuentoGeneralMonto juntos', async () => {
+      repository.obtenerProductoConPrecioVigente.mockResolvedValue(producto(18, 100) as never);
+
+      await expect(
+        service.crear(dto({ descuentoGeneralPct: 10, descuentoGeneralMonto: 20 }), 'tenant-1', 'vendedor-1'),
+      ).rejects.toThrow(BadRequestException);
+      expect(repository.crearFacturaEnTx).not.toHaveBeenCalled();
+    });
+
+    it('una NOTA_CREDITO/NOTA_DEBITO nunca aplica descuento general (ajustan un monto ya facturado)', async () => {
+      repository.obtenerProductoConPrecioVigente.mockResolvedValue(producto(18, 100) as never);
+      repository.crearFacturaEnTx.mockResolvedValue(facturaCreada() as never);
+
+      await service.crear(
+        dto({ tipoFactura: 'NOTA_CREDITO', facturaOrigenId: 'f-orig', descuentoGeneralPct: 10, lineas: [{ productoId: 'prod-1', cantidad: 1 }] }),
+        'tenant-1',
+        'vendedor-1',
+      );
+
+      expect(repository.crearFacturaEnTx).toHaveBeenCalledWith(TX, expect.objectContaining({ subtotal: -100 }));
+    });
+  });
+
   describe('ofertas automáticas (Fase 4b)', () => {
     it('aplica el descuento automático de línea que resuelve OfertasService cuando la línea no trae descuento manual', async () => {
       repository.obtenerProductoConPrecioVigente.mockResolvedValue(producto(18, 100) as never);

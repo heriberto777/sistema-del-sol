@@ -22,10 +22,13 @@ const ID_COMBOBOX_VENDEDOR = 'turno-vendedor-combobox';
 
 type EstadoTurno = 'ABIERTO' | 'CERRADO';
 
+type ComprobantePorDefecto = 'CONTADO' | 'CREDITO' | 'REGIMEN_ESPECIAL' | 'GUBERNAMENTAL';
+
 interface Cliente {
   id: string;
   nombre: string;
   listaPrecio: { id: string; nombre: string } | null;
+  comprobantePorDefecto?: ComprobantePorDefecto | null;
 }
 
 interface Vendedor {
@@ -152,6 +155,9 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
   const [cliente, setCliente] = useState<Cliente | null>(null);
   const [vendedor, setVendedor] = useState<Vendedor | null>(null);
   const [listaPrecioOverride, setListaPrecioOverride] = useState('');
+  const [tipoFactura, setTipoFactura] = useState<'CONTADO' | 'CREDITO'>('CONTADO');
+  const [tipoComprobanteEspecial, setTipoComprobanteEspecial] = useState('');
+  const [mostrarNuevoCliente, setMostrarNuevoCliente] = useState(false);
   const { data: listasPrecio } = useListasPrecio();
   const listaPrecioResuelta = cliente?.listaPrecio?.nombre ?? 'GENERAL';
   const [modalMovimiento, setModalMovimiento] = useState(false);
@@ -167,6 +173,21 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
   const [facturaAnulando, setFacturaAnulando] = useState<FacturaTurno | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [facturaImprimiendo, setFacturaImprimiendo] = useState<string | null>(null);
+
+  // Comprobante fiscal por defecto del cliente (plan de integración Cuadre,
+  // ítem E-5) — mismo criterio que ModalNuevaFactura en Facturacion.tsx:
+  // autoselecciona al elegir cliente, el cajero lo puede cambiar después.
+  useEffect(() => {
+    const defecto = cliente?.comprobantePorDefecto;
+    if (!defecto) return;
+    if (defecto === 'CONTADO' || defecto === 'CREDITO') {
+      setTipoFactura(defecto);
+      setTipoComprobanteEspecial('');
+    } else {
+      setTipoComprobanteEspecial(defecto);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cliente?.id]);
 
   const { data, isLoading } = useQuery({
     queryKey: ['pos-turno', turnoId],
@@ -194,6 +215,8 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
         clienteId: cliente?.id,
         vendedorEmpleadoId: vendedor?.id,
         listaPrecio: listaPrecioOverride || undefined,
+        tipoFactura,
+        tipoComprobanteEspecial: tipoComprobanteEspecial || undefined,
         pagos,
         // `descuento` solo se manda si el cajero realmente lo tocó con F8
         // (Descuento) — mandar siempre 0 por defecto bloqueaba las ofertas
@@ -214,6 +237,8 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
       setCarrito([]);
       setVendedor(null);
       setListaPrecioOverride('');
+      setTipoFactura('CONTADO');
+      setTipoComprobanteEspecial('');
       setError(null);
       setModalCheckout(false);
       setCotizacion(null);
@@ -428,6 +453,21 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
                     (await apiClient.get<PaginaResultado<Cliente>>('/clientes', { params: { busqueda: texto, tamanoPagina: 10 } })).data.datos
                   }
                 />
+                <button
+                  type="button"
+                  onClick={() => setMostrarNuevoCliente((v) => !v)}
+                  className="self-start text-xs font-medium text-sol-600 hover:text-sol-700 dark:text-sol-400"
+                >
+                  + Nuevo cliente
+                </button>
+                {mostrarNuevoCliente && (
+                  <NuevoClienteInlinePos
+                    onCreado={(c) => {
+                      setCliente(c);
+                      setMostrarNuevoCliente(false);
+                    }}
+                  />
+                )}
               </div>
 
               <div className="flex flex-col gap-1">
@@ -440,6 +480,24 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
                     </option>
                   ))}
                 </Select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Tipo</label>
+                  <Select value={tipoFactura} onChange={(e) => setTipoFactura(e.target.value as 'CONTADO' | 'CREDITO')}>
+                    <option value="CONTADO">Contado</option>
+                    <option value="CREDITO">Crédito</option>
+                  </Select>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Comprobante</label>
+                  <Select value={tipoComprobanteEspecial} onChange={(e) => setTipoComprobanteEspecial(e.target.value)}>
+                    <option value="">Normal</option>
+                    <option value="REGIMEN_ESPECIAL">Régimen Especial (B14)</option>
+                    <option value="GUBERNAMENTAL">Gubernamental (B15)</option>
+                  </Select>
+                </div>
               </div>
 
               <div className="flex flex-col gap-1">
@@ -704,6 +762,34 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
       )}
       </div>
     </Card>
+  );
+}
+
+/** Alta rápida de cliente sin salir de la venta (plan de integración Cuadre, ítem F-2) — mismo criterio que NuevoClienteInline en Facturacion.tsx. */
+function NuevoClienteInlinePos({ onCreado }: { onCreado: (c: Cliente) => void }) {
+  const queryClient = useQueryClient();
+  const [nombre, setNombre] = useState('');
+  const [error, setError] = useState<string | null>(null);
+
+  const crear = useMutation({
+    mutationFn: async () => (await apiClient.post<Cliente>('/clientes', { nombre, tipo: 'PERSONA_FISICA' })).data,
+    onSuccess: (cliente) => {
+      queryClient.invalidateQueries({ queryKey: ['clientes-consumidor-final'] });
+      onCreado(cliente);
+    },
+    onError: () => setError('No se pudo crear el cliente.'),
+  });
+
+  return (
+    <div className="mt-1 flex items-end gap-2 rounded-md border border-slate-200 p-2 dark:border-slate-800">
+      <div className="flex-1">
+        <FormField id="pos-nuevo-cliente-nombre" label="Nombre del cliente" value={nombre} onChange={(e) => setNombre(e.target.value)} />
+        {error && <p className="text-xs text-red-600">{error}</p>}
+      </div>
+      <Button type="button" disabled={!nombre || crear.isPending} onClick={() => crear.mutate()}>
+        {crear.isPending ? 'Creando…' : 'Crear'}
+      </Button>
+    </div>
   );
 }
 

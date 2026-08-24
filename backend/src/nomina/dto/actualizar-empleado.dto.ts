@@ -19,6 +19,11 @@ export class ActualizarEmpleadoDto {
   @IsString()
   cargo?: string;
 
+  @ApiProperty({ required: false, description: 'Plan de integración Cuadre, ítem G-8 — enviar null para desvincular.', nullable: true })
+  @IsOptional()
+  @IsUUID()
+  puestoId?: string | null;
+
   @ApiProperty({ required: false })
   @IsOptional()
   @IsString()

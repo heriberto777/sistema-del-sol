@@ -58,4 +58,7 @@ export const TENANT_SCOPED_MODELS = new Set([
   'Ausencia',
   'Sucursal',
   'CategoriaCliente',
+  'Feriado',
+  'Puesto',
+  'LeyFiscal',
 ]);

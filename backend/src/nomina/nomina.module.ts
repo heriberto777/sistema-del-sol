@@ -1,4 +1,6 @@
 import { Module } from '@nestjs/common';
+import { ConfiguracionesModule } from '../configuraciones/configuraciones.module';
+import { PuestosModule } from '../puestos/puestos.module';
 import { EmpleadosService } from './empleados.service';
 import { EmpleadosController } from './empleados.controller';
 import { EmpleadosRepository } from './empleados.repository';
@@ -16,6 +18,7 @@ import { AusenciasController } from './ausencias.controller';
 import { AusenciasRepository } from './ausencias.repository';
 
 @Module({
+  imports: [ConfiguracionesModule, PuestosModule],
   controllers: [EmpleadosController, PeriodosNominaController, HorariosController, AsistenciaController, AusenciasController],
   providers: [
     EmpleadosService,

@@ -92,27 +92,67 @@ Resumen de lo que cambió (detalle en cada ítem más abajo):
   `@@unique([tenantId, tipoNcf])`, sin sucursal) + **umbral de alerta**
   configurable ("quedan pocos comprobantes"). *Confirmado: brecha real, sin
   cambios — el módulo `ncf/` existe pero no tiene ninguno de los dos.*
-- [ ] **B-3** 🟨 — **Leyes Fiscales**: % del ITBIS a pagar por norma/sector
-  (ej. construcción). *Confirmado: brecha real, sin cambios.*
-- [ ] **B-4** 🟨 — **Recargos de Factura**: cargos post-subtotal
-  (Imprevistos, Viáticos, etc.). *Confirmado: brecha real, sin cambios.*
+- [x] **B-3** 🟨 — **Leyes Fiscales**: % del ITBIS a pagar por norma/sector
+  (ej. construcción). Decisión del usuario: se ata al **Producto** (no al
+  Cliente ni a la Factura) — la reducción depende de QUÉ se vende.
+  Catálogo `LeyFiscal` (código, nombre, % ITBIS a pagar, descripción) +
+  `Producto.leyFiscalId`; ITBIS efectivo = `porcentajeItbis *
+  (porcentajeItbisAPagar/100)` en `calcularLineasYTotales()`, evaluado
+  después del toggle B-7 (`aplicaItbis: false` sigue ganando). Panel
+  propio en Admin → Catálogo → "Leyes fiscales". Migración
+  `20260824140000_leyes_fiscales`. Entregado 2026-08-24.
+- [ ] **B-4** 🟨→🟧 *(corrección de tamaño)* — **Recargos de Factura**:
+  cargos post-subtotal (Imprevistos, Viáticos, etc.), con "% gravado con
+  ITBIS" opcional y orden configurable. *Confirmado: brecha real, pero
+  más grande de lo catalogado: necesita un catálogo (`RecargoFactura`)
+  MÁS una tabla hija nueva para los recargos aplicados a cada factura
+  (`FacturaRecargo`, patrón `FacturaPlataformaLinea`) MÁS cambios en
+  `calcularLineasYTotales()` MÁS actualizar impresión/PDF para mostrarlos
+  — no es un campo suelto como B-7/B-8, es una entidad nueva. Candidato a
+  su propia sesión (no bloqueante, pero no se apuró para no arriesgar un
+  bug de cálculo fiscal sin poder correr tests en esta tanda).*
 - [ ] **B-5** 🟥 *diseño primero* — **e-CF real (firma y envío a la DGII)**:
   Cuadre integra un proveedor certificado ("Pascal ECF") en vez de construir
   el firmador propio. *Confirmado: brecha real, ya documentada en
   ARCHITECTURE.md ("e-NCF propio... la firma/envío quedan fuera de esta
   fase a propósito").*
-- [ ] **B-6** 🟧 — **Condición de pago con plazo explícito** (15/30/45/60/90
-  días) con vencimiento auto-calculado. *Confirmado: brecha real — no hay
-  ningún campo de plazo en `Factura`/`CrearFacturaDto`.*
-- [ ] **B-7** 🟨 — **Toggle de ITBIS por línea** de factura. *Confirmado:
-  brecha real, sin cambios.*
-- [ ] **B-8** 🟨 — **Descuento general de documento** (% o $) sobre el
-  subtotal completo. *Confirmado: brecha real — lo que existe (Ofertas de
-  carrito) es automático, no un campo manual "aplicar X% a toda la
-  factura".*
-- [ ] **B-9** 🟨 — **Línea manual/libre en factura**, no ligada a un
-  producto del catálogo. *Confirmado: `LineaFacturaDto.productoId` sigue
-  siendo `@IsUUID()` obligatorio — brecha real.*
+- [x] **B-6** 🟧→🟨 *(alcance reducido — falso positivo)* — **Condición de
+  pago con plazo explícito** (15/30/45/60/90 días) con vencimiento
+  auto-calculado. *Corrección: `Factura.plazoPagoDias` YA existía
+  (`@default(30)`) y `RecordatoriosService` YA lo usaba para detectar
+  facturas vencidas — el gap real era que `CrearFacturaDto` no lo
+  exponía, ninguna factura podía elegir otro plazo que no fuera el
+  default silencioso.* Entregado: `CrearFacturaDto.plazoPagoDias?`
+  (15/30/45/60/90) se propaga a `crearFacturaEnTx`; selector +
+  "Vencimiento" auto-calculado (cliente, sin columna nueva) en
+  `ModalNuevaFactura`, visible solo con `tipoFactura: CREDITO`. Sin
+  migración. Entregado 2026-08-24.
+- [x] **B-7** 🟨 — **Toggle de ITBIS por línea** de factura.
+  `LineaFacturaDto.aplicaItbis` (default `true`) fuerza 0% en la línea
+  sin tocar `producto.porcentajeItbis` — para una venta puntual exenta.
+  Sin migración (no toca schema). Entregado 2026-08-24.
+- [x] **B-8** 🟨 — **Descuento general de documento** (% o $) sobre el
+  subtotal completo. `CrearFacturaDto.descuentoGeneralPct`/
+  `descuentoGeneralMonto` (excluyentes, 400 si ambos), reutiliza
+  `prorratearDescuentoCarrito()` — se acumula con Ofertas automáticas y
+  descuentos por línea, no aplica a NOTA_CREDITO/NOTA_DEBITO. UI en
+  `ModalNuevaFactura`; el POS no necesitó cambios (F-1/`ModalDescuento`
+  "seleccionar todos" ya logra el mismo efecto). Sin migración. Entregado
+  2026-08-24.
+- [ ] **B-9** 🟨→🟥 *(corrección de tamaño — ver nota)* — **Línea manual/
+  libre en factura**, no ligada a un producto del catálogo. *Confirmado:
+  `LineaFacturaDto.productoId` sigue siendo `@IsUUID()` obligatorio —
+  brecha real, pero MÁS GRANDE de lo catalogado: `LineaFactura.productoId`/
+  `varianteId` son columnas `NOT NULL` con FK `RESTRICT` en el schema, un
+  invariante documentado a propósito en ARCHITECTURE.md/CLAUDE.md
+  ("perder a qué variante corresponde una línea ya emitida sería perder
+  historial real"). Soportar una línea de verdad libre exige volverlas
+  nullable — con impacto en impresión/PDF, reportes y exportador fiscal
+  606/607/608 (todos asumen hoy que toda línea tiene producto/variante).
+  **Decisión del usuario (2026-08-24): dejar pendiente** — evaluar bien
+  cómo manejar el proceso de insertar líneas de producto sin que exista
+  un producto real, antes de decidir el diseño. No retomar sin volver a
+  traer el tema.*
 
 ## C — Pagos
 
@@ -232,9 +272,17 @@ Resumen de lo que cambió (detalle en cada ítem más abajo):
 - [x] **F-1** ✅ *ya cubierto, no era una brecha real* — **Modal de descuento
   dedicado**: `ModalDescuento` en `TurnoCajaDetalle.tsx` ya tiene % o monto
   fijo, checkbox por línea del carrito + "seleccionar todos".
-- [ ] **F-2** 🟨 — **Tipo de NCF integrado al selector de cliente**, con
+- [x] **F-2** 🟨 — **Tipo de NCF integrado al selector de cliente**, con
   botón "Nuevo cliente" inline sin salir de la venta. *Confirmado: brecha
-  real — no hay ninguna selección de `tipoFactura` en el flujo del POS.*
+  real — no había ninguna selección de `tipoFactura` en el flujo del
+  POS (`registrarVenta` forzaba `CONTADO` siempre).* Entregado:
+  `RegistrarVentaPosDto` gana `tipoFactura?`/`tipoComprobanteEspecial?`
+  (mismo vocabulario que Facturación, ítem B-1), default `CONTADO` si se
+  omite; selector "Tipo"/"Comprobante" junto al combobox de cliente en
+  `TurnoCajaDetalle.tsx`, con autoselección desde `Cliente.
+  comprobantePorDefecto` (ítem E-5) igual que en Facturación; botón
+  "+ Nuevo cliente" inline (`NuevoClienteInlinePos`) sin salir de la
+  venta. Entregado 2026-08-24.
 - [x] **F-3** ✅ *ya cubierto, no era una brecha real* — **Panel "Facturas de
   la sesión"**: la sección "Ventas del turno" en `TurnoCajaDetalle.tsx` ya
   lista todo lo vendido en el turno actual, inline, con imprimir/anular por
@@ -263,18 +311,36 @@ Resumen de lo que cambió (detalle en cada ítem más abajo):
 
 - [ ] **G-1** 🟧 — **Horarios como plantilla reutilizable**. *Confirmado:
   `HorarioEmpleado` sigue siendo una fila por `empleadoId` sin concepto de
-  plantilla — brecha real.*
+  plantilla — brecha real.* **Diseño confirmado con el usuario
+  (2026-08-24, `AskUserQuestion`): referencia viva** — un empleado apunta
+  a una `PlantillaHorario`, editar la plantilla se propaga a TODOS los
+  empleados asignados (no una copia que se independiza al aplicarse).
+  Listo para implementar; toca `AsistenciaService.calcularTardanza`/
+  `calcularHorasExtraYSalidaAnticipada` (G-4) para resolver el horario
+  vía la plantilla cuando el empleado tiene una asignada, con fallback a
+  `HorarioEmpleado` individual si no.
 - [ ] **G-2** 🟧 — **Tipos de Ausencia configurables por tenant**.
   *Confirmado: `TipoAusencia` sigue siendo un enum fijo de Prisma
   (VACACIONES/ENFERMEDAD/PERMISO/INJUSTIFICADA/MATERNIDAD_PATERNIDAD/OTRO)
   — brecha real.*
-- [ ] **G-3** 🟨 — **Aprobación de registros de asistencia**. *Confirmado:
-  `RegistroAsistencia` solo tiene `tardanza` (Boolean), sin estado de
-  aprobación — brecha real.*
-- [ ] **G-4** 🟨 — **Umbral de horas extra + tolerancia de salida
-  anticipada** configurables. *Confirmado: brecha real, sin cambios.*
-- [ ] **G-5** 🟨 — **Calendario de feriados**. *Confirmado: no existe
-  ningún modelo `Feriado` — brecha real.*
+- [x] **G-3** 🟨 — **Aprobación de registros de asistencia**. Flujo
+  `PENDIENTE → APROBADO/RECHAZADO` en `RegistroAsistencia` (`estado`/
+  `aprobadoPorId`/`fechaResolucion`), calcado de `Ausencia.estado` —
+  puramente de revisión/auditoría, ningún cálculo de nómina lo lee.
+  `PATCH /nomina/asistencia/:id/estado` (`rrhh.aprobar`). Migración
+  `20260824100000_asistencia_aprobacion`. Entregado 2026-08-24.
+- [x] **G-4** 🟨 — **Umbral de horas extra + tolerancia de salida
+  anticipada** configurables. `Configuracion.ASISTENCIA_UMBRAL_HORAS_EXTRA`
+  (default 8h/día) y `ASISTENCIA_TOLERANCIA_SALIDA_ANTICIPADA_MIN`
+  (default 15 min), calculados una sola vez al marcar la salida
+  (`RegistroAsistencia.salidaAnticipada`/`horasExtra`), mismo criterio
+  que `tardanza`. Migración `20260824110000_asistencia_horas_extra`.
+  Entregado 2026-08-24.
+- [x] **G-5** 🟨 — **Calendario de feriados**. Modelo `Feriado` (catálogo
+  plano tenant-scoped: nombre, fecha, recurrenteAnual, activo), módulo y
+  panel propios (RRHH → Feriados). Deliberadamente sin efecto automático
+  en tardanza/horas extra/nómina todavía — es solo el catálogo.
+  Migración `20260824120000_feriados`. Entregado 2026-08-24.
 - [ ] **G-6** 🟧 — **Deducciones de nómina configurables** (AFP/SFS) —
   **mantener el ISR calculado en código** (`isr.util.ts`). *Confirmado: no
   existe ningún modelo de deducciones configurables — brecha real, sin
@@ -285,11 +351,16 @@ Resumen de lo que cambió (detalle en cada ítem más abajo):
   del divisor legal 23.83 (no un genérico mes/4); `BIMENSUAL` = mismo
   factor 0.5 que `QUINCENAL` (RAE: "dos veces al mes", no "cada dos
   meses"). Migración `20260821140000_periodo_nomina_semanal_bimensual`.
-  Entregado 2026-08-21. El filtrado por Puesto sigue faltando por
-  completo (depende de G-8, que tampoco existe) — queda fuera de este
-  ítem.*
-- [ ] **G-8** 🟨 — **Catálogo de "Puestos"** estructurado. *Confirmado: no
-  existe ningún modelo `Puesto` — brecha real, sin cambios.*
+  Entregado 2026-08-21. El filtrado por Puesto queda cubierto por G-8
+  (catálogo `Puesto` + filtro en `GET /nomina/empleados`, entregado
+  2026-08-24) — filtrar la generación de NÓMINA en sí por puesto sigue
+  sin implementarse, no hubo caso de uso concreto que lo pidiera.*
+- [x] **G-8** 🟨 — **Catálogo de "Puestos"** estructurado. Modelo `Puesto`
+  (catálogo plano), `Empleado.puestoId` (FK opcional, puramente aditivo —
+  `Empleado.cargo` texto libre NO se tocó, sigue resolviendo "Vendedor"
+  vía `contains` insensitive en `listarVendedores`). Filtro
+  `GET /nomina/empleados?puestoId=` + panel propio (RRHH → Puestos).
+  Migración `20260824130000_puestos`. Entregado 2026-08-24.
 - [ ] **G-9** 🟥 *diseño primero, depende de hardware del cliente* —
   **Integración con relojes biométricos** (ANVIZ/CrossChex Cloud).
   *Confirmado: brecha real, sin cambios.*
@@ -371,17 +442,72 @@ Resumen de lo que cambió (detalle en cada ítem más abajo):
   comprobante fiscal por defecto) y E-11 (tipo estructurado de forma de
   pago). Otra corrección encontrada al implementar E-11: "Crédito
   Cliente" ya existía como fila sembrada — no era una brecha real, solo
-  le faltaba la clasificación de tipo. Pendiente correr la suite
-  completa sobre este lote (instrucción explícita del usuario: dejarla
-  para el final del lote de cambios, no después de cada ítem).
+  le faltaba la clasificación de tipo.
+- **2026-08-24**: entregado F-2 (tipo de NCF en el selector de cliente
+  del POS + botón "Nuevo cliente" inline) — reutiliza directo el
+  vocabulario de B-1/E-5 (`tipoFactura`/`tipoComprobanteEspecial`,
+  autoselección desde `Cliente.comprobantePorDefecto`). Confirmado antes
+  de tocar código que `PosService.registrarVenta` forzaba `tipoFactura:
+  'CONTADO'` sin ninguna forma de cambiarlo.
+- **2026-08-24**: entregados los 4 ítems 🟨 de RRHH — **G-3** (aprobación
+  de asistencia, `PENDIENTE→APROBADO/RECHAZADO`, sin efecto en nómina),
+  **G-4** (umbral de horas extra + tolerancia de salida anticipada,
+  configurables vía `Configuracion`), **G-5** (calendario de feriados,
+  catálogo puro) y **G-8** (catálogo de Puestos, aditivo — `Empleado.cargo`
+  no se tocó). Los 4 son independientes entre sí, implementados en la
+  misma tanda.
+- **2026-08-24**: entregados B-7 (toggle de ITBIS por línea) y B-8
+  (descuento general de documento, % o $, prorrateado con
+  `prorratearDescuentoCarrito()`) en `FacturacionService.
+  calcularLineasYTotales()` — por tocar el cálculo fiscal compartido por
+  Facturación/Cotizaciones/Remisiones/POS. **Corrección de
+  tamaño encontrada al verificar B-3/B-4/B-9 antes de implementarlos**:
+  los 3 resultaron más grandes de lo catalogado — se le preguntó al
+  usuario cómo seguir con B-3/B-9 (`AskUserQuestion`). Decisión: **B-3
+  se ata al Producto** (implementado, ver arriba) — **B-9 queda
+  pendiente**, el usuario quiere evaluar bien el proceso de insertar
+  líneas de producto sin un producto real antes de decidir el diseño, no
+  retomar sin volver a traer el tema. B-4 (Recargos) se reclasificó a
+  🟧 sin implementar (catálogo + tabla hija + cambios de impresión, más
+  grande que un campo suelto) — no bloqueante, candidato a su propia
+  sesión cuando se priorice.
+- **2026-08-24**: entregado B-3 (Leyes Fiscales) — catálogo `LeyFiscal` +
+  `Producto.leyFiscalId`, ITBIS efectivo = `porcentajeItbis *
+  (porcentajeItbisAPagar/100)`, evaluado después del toggle B-7.
+- **2026-08-24**: entregado B-6 — otro falso positivo encontrado al
+  verificar antes de implementar: `Factura.plazoPagoDias` YA existía
+  (`@default(30)`) y `RecordatoriosService` YA lo usaba para detectar
+  vencidas; el gap real era que `CrearFacturaDto` no lo exponía. Alcance
+  reducido de 🟧 a 🟨 — solo hizo falta un campo + selector, no un
+  modelo nuevo.
+- **2026-08-24**: verificación completa del lote acumulado (F-2, G-3,
+  G-4, G-5, G-8, B-3, B-6, B-7, B-8 — 9 migraciones, 6 módulos backend
+  nuevos, cambios en el núcleo de cálculo de Facturación y de
+  Asistencia): `tsc --noEmit` limpio (back y front), **740 tests
+  unitarios + 179 e2e, todos verdes** (1 falla de precisión de punto
+  flotante en el test de B-3 corregida con `toBeCloseTo`, no era un bug
+  real), lint sin errores, build limpio. Prisma regenerado y
+  contenedores reiniciados. También se confirmó con el usuario (vía
+  `AskUserQuestion`) el diseño de **G-1** (Horarios como plantilla
+  reutilizable): referencia viva, no copia al aplicar — pendiente de
+  implementar.
 
 ## Sugerencia de por dónde arrancar
 
-Con el catálogo ya corregido y E-3/E-5/E-9/E-11/G-7 entregados, la
-sección **E** (Ventas/Clientes) y **G** (Nómina/RRHH) quedan sin más
-ítems 🟨/🟧 de alcance reducido — lo que queda ahí (E-4, E-6, E-7, E-8,
-G-3, G-4, G-5, G-6, G-8) son brechas reales de tamaño medio/grande sin
-ningún matiz "ya lo tenemos". Los 🟥 con "diseño primero" conviene
-agruparlos en su propia sesión de planeamiento cuando se prioricen,
-siguiendo la misma mecánica que Sucursales (Fase 8) y PIN (Fase 9):
-presentar el diseño, resolver casos límite, y recién después ejecutar.
+Con el catálogo ya corregido, el lote E-3/E-5/E-9/E-11/F-2/G-3/G-4/G-5/
+G-7/G-8/B-3/B-6/B-7/B-8 entregado y verificado (tsc + 740 unitarios +
+179 e2e + lint + build, todo verde), ya no quedan ítems con el matiz "ya
+lo teníamos parcial" original (los 5 que tenía esa nota — B-1, E-1, E-5,
+E-11, G-7 — están todos resueltos o, en el caso de E-1, siguen como
+brecha real confirmada sin cambios; B-6 se sumó como un nuevo falso
+positivo encontrado después). **G-1 ya tiene diseño confirmado**
+(referencia viva, ver arriba) — es el candidato más directo para seguir
+en la sección G, junto con G-2/G-6 (🟧, sin bloqueo) y G-9 (🟥, depende
+de hardware). De la sección **B** solo quedan B-2 (🟧) y B-5 (🟥, e-CF
+real) sin bloqueo — **B-9 está deliberadamente pausado** (el usuario
+pidió evaluarlo con más calma, no retomar sin avisar) y B-4 (🟧) no es
+bloqueante. Los 🟥 con "diseño primero" conviene agruparlos en su propia
+sesión de planeamiento cuando se prioricen, siguiendo la misma mecánica
+que Sucursales (Fase 8) y PIN (Fase 9): presentar el
+diseño, resolver
+casos límite, y recién después ejecutar.

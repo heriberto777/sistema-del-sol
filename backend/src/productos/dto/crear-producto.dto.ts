@@ -52,6 +52,16 @@ export class CrearProductoDto {
   @Max(100)
   porcentajeItbis?: number;
 
+  @ApiProperty({
+    required: false,
+    nullable: true,
+    description:
+      'Ley fiscal aplicable (plan de integración Cuadre, ítem B-3) — reduce el ITBIS efectivo de este producto. null explícito quita la asignación.',
+  })
+  @IsOptional()
+  @IsUUID()
+  leyFiscalId?: string | null;
+
   @ApiProperty({ enum: TipoProducto, required: false, default: 'PRODUCTO' })
   @IsOptional()
   @IsEnum(TipoProducto)

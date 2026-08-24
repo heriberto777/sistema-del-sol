@@ -1,21 +1,31 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { EmpleadosRepository } from './empleados.repository';
+import { PuestosRepository } from '../puestos/puestos.repository';
 import { CrearEmpleadoDto } from './dto/crear-empleado.dto';
 import { ActualizarEmpleadoDto } from './dto/actualizar-empleado.dto';
-import { ListadoQueryDto } from '../common/dto/listado-query.dto';
+import { ListarEmpleadosQueryDto } from './dto/listar-empleados-query.dto';
 import { paginar } from '../common/types/pagina-resultado';
 
 @Injectable()
 export class EmpleadosService {
-  constructor(private readonly empleadosRepository: EmpleadosRepository) {}
+  constructor(
+    private readonly empleadosRepository: EmpleadosRepository,
+    private readonly puestosRepository: PuestosRepository,
+  ) {}
 
-  crear(dto: CrearEmpleadoDto, tenantId: string) {
+  async crear(dto: CrearEmpleadoDto, tenantId: string) {
+    // findUniqueOrThrow tenant-scoped: si puestoId es de otro tenant, 404 —
+    // mismo patrón de prevención de IDOR ya documentado para FKs cliente-suministradas.
+    if (dto.puestoId) {
+      await this.puestosRepository.buscarPorId(dto.puestoId);
+    }
     return this.empleadosRepository.crear({
       tenantId,
       nombre: dto.nombre,
       cedula: dto.cedula,
       cargo: dto.cargo,
+      puestoId: dto.puestoId,
       departamento: dto.departamento,
       fechaIngreso: new Date(dto.fechaIngreso),
       salarioBrutoMensual: dto.salarioBrutoMensual,
@@ -29,18 +39,22 @@ export class EmpleadosService {
     return this.empleadosRepository.buscarPorId(id);
   }
 
-  async listar(query: ListadoQueryDto) {
+  async listar(query: ListarEmpleadosQueryDto) {
     const { pagina, tamanoPagina, skip, take } = paginar(query.pagina, query.tamanoPagina);
-    const [datos, total] = await this.empleadosRepository.listar({ skip, take, busqueda: query.busqueda });
+    const [datos, total] = await this.empleadosRepository.listar({ skip, take, busqueda: query.busqueda, puestoId: query.puestoId });
     return { datos, total, pagina, tamanoPagina };
   }
 
   async actualizar(id: string, dto: ActualizarEmpleadoDto) {
+    if (dto.puestoId) {
+      await this.puestosRepository.buscarPorId(dto.puestoId);
+    }
     try {
       return await this.empleadosRepository.actualizar(id, {
         nombre: dto.nombre,
         cedula: dto.cedula,
         cargo: dto.cargo,
+        puestoId: dto.puestoId,
         departamento: dto.departamento,
         fechaIngreso: dto.fechaIngreso ? new Date(dto.fechaIngreso) : undefined,
         salarioBrutoMensual: dto.salarioBrutoMensual,

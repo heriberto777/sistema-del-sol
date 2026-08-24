@@ -8,6 +8,7 @@ import { FormField } from '../../molecules/FormField/FormField';
 import { Modal } from '../../molecules/Modal/Modal';
 import { SearchInput } from '../../molecules/SearchInput/SearchInput';
 import { Paginacion } from '../../molecules/Paginacion/Paginacion';
+import { SelectPuesto } from '../../molecules/SelectPuesto/SelectPuesto';
 import { useDebouncedValue } from '../../../hooks/useDebouncedValue';
 import { useAuth } from '../../../hooks/useAuth';
 import { PaginaResultado } from '../../../types/pagina-resultado';
@@ -17,6 +18,7 @@ interface Empleado {
   nombre: string;
   cedula: string;
   cargo: string;
+  puesto: { id: string; nombre: string } | null;
   salarioBrutoMensual: string;
   activo: boolean;
   fechaIngreso: string;
@@ -26,16 +28,17 @@ export function EmpleadosTable() {
   const queryClient = useQueryClient();
   const { tienePermiso } = useAuth();
   const [busqueda, setBusqueda] = useState('');
+  const [puestoFiltro, setPuestoFiltro] = useState('');
   const [pagina, setPagina] = useState(1);
   const busquedaDebounced = useDebouncedValue(busqueda);
   const [modalNuevoEmpleado, setModalNuevoEmpleado] = useState(false);
 
   const { data, isLoading, error: errorCarga } = useQuery({
-    queryKey: ['nomina-empleados', pagina, busquedaDebounced],
+    queryKey: ['nomina-empleados', pagina, busquedaDebounced, puestoFiltro],
     queryFn: async () =>
       (
         await apiClient.get<PaginaResultado<Empleado>>('/nomina/empleados', {
-          params: { pagina, busqueda: busquedaDebounced || undefined },
+          params: { pagina, busqueda: busquedaDebounced || undefined, puestoId: puestoFiltro || undefined },
         })
       ).data,
   });
@@ -58,14 +61,26 @@ export function EmpleadosTable() {
         titulo="Empleados"
         descripcion={data ? `${data.total} empleado(s)` : undefined}
         acciones={
-          <SearchInput
-            value={busqueda}
-            onChange={(v) => {
-              setBusqueda(v);
-              setPagina(1);
-            }}
-            placeholder="Buscar por nombre, cédula o cargo…"
-          />
+          <div className="flex gap-2">
+            <SearchInput
+              value={busqueda}
+              onChange={(v) => {
+                setBusqueda(v);
+                setPagina(1);
+              }}
+              placeholder="Buscar por nombre, cédula o cargo…"
+            />
+            <div className="w-48">
+              <SelectPuesto
+                value={puestoFiltro}
+                onChange={(id) => {
+                  setPuestoFiltro(id);
+                  setPagina(1);
+                }}
+                etiquetaVacio="Todos los puestos"
+              />
+            </div>
+          </div>
         }
       >
         {isLoading && <p className="p-5 text-sm text-slate-500">Cargando empleados…</p>}
@@ -78,6 +93,7 @@ export function EmpleadosTable() {
                   <th className="px-5 py-3 font-medium">Nombre</th>
                   <th className="px-5 py-3 font-medium">Cédula</th>
                   <th className="px-5 py-3 font-medium">Cargo</th>
+                  <th className="px-5 py-3 font-medium">Puesto</th>
                   <th className="px-5 py-3 font-medium">Salario bruto</th>
                   <th className="px-5 py-3 font-medium">Estado</th>
                   <th className="px-5 py-3"></th>
@@ -89,6 +105,7 @@ export function EmpleadosTable() {
                     <td className="px-5 py-3">{empleado.nombre}</td>
                     <td className="px-5 py-3 font-mono text-xs">{empleado.cedula}</td>
                     <td className="px-5 py-3">{empleado.cargo}</td>
+                    <td className="px-5 py-3">{empleado.puesto?.nombre ?? <span className="text-slate-400">—</span>}</td>
                     <td className="px-5 py-3">RD$ {Number(empleado.salarioBrutoMensual).toLocaleString('es-DO')}</td>
                     <td className="px-5 py-3">
                       <Badge tono={empleado.activo ? 'exito' : 'neutro'}>{empleado.activo ? 'Activo' : 'Inactivo'}</Badge>
@@ -123,6 +140,7 @@ function ModalNuevoEmpleado({ onClose }: { onClose: () => void }) {
   const [nombre, setNombre] = useState('');
   const [cedula, setCedula] = useState('');
   const [cargo, setCargo] = useState('');
+  const [puestoId, setPuestoId] = useState('');
   const [fechaIngreso, setFechaIngreso] = useState('');
   const [salarioBrutoMensual, setSalarioBrutoMensual] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -133,6 +151,7 @@ function ModalNuevoEmpleado({ onClose }: { onClose: () => void }) {
         nombre,
         cedula,
         cargo,
+        puestoId: puestoId || undefined,
         fechaIngreso,
         salarioBrutoMensual: Number(salarioBrutoMensual),
       }),
@@ -155,6 +174,12 @@ function ModalNuevoEmpleado({ onClose }: { onClose: () => void }) {
         <FormField id="empleado-nombre" label="Nombre" value={nombre} onChange={(e) => setNombre(e.target.value)} required />
         <FormField id="empleado-cedula" label="Cédula" value={cedula} onChange={(e) => setCedula(e.target.value)} required />
         <FormField id="empleado-cargo" label="Cargo" value={cargo} onChange={(e) => setCargo(e.target.value)} required />
+        <div className="flex flex-col gap-1">
+          <label htmlFor="empleado-puesto" className="text-sm font-medium text-slate-700 dark:text-slate-300">
+            Puesto (opcional, para filtrar/reportar)
+          </label>
+          <SelectPuesto id="empleado-puesto" value={puestoId} onChange={setPuestoId} />
+        </div>
         <FormField
           id="empleado-fecha-ingreso"
           label="Fecha de ingreso"

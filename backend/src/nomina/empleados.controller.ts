@@ -8,7 +8,7 @@ import { Permissions } from '../common/decorators/permissions.decorator';
 import { RequiereModulo } from '../common/decorators/requiere-modulo.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtPayloadUser } from '../common/types/authenticated-request';
-import { ListadoQueryDto } from '../common/dto/listado-query.dto';
+import { ListarEmpleadosQueryDto } from './dto/listar-empleados-query.dto';
 
 @ApiBearerAuth()
 @ApiTags('nomina')
@@ -28,7 +28,7 @@ export class EmpleadosController {
 
   @Get()
   @Permissions('nomina.ver')
-  listar(@Query() query: ListadoQueryDto) {
+  listar(@Query() query: ListarEmpleadosQueryDto) {
     return this.empleadosService.listar(query);
   }
 

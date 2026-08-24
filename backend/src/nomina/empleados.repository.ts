@@ -15,6 +15,7 @@ export class EmpleadosRepository {
     nombre: string;
     cedula: string;
     cargo: string;
+    puestoId?: string;
     departamento?: string;
     fechaIngreso: Date;
     salarioBrutoMensual: number;
@@ -22,11 +23,11 @@ export class EmpleadosRepository {
     email?: string;
     telefono?: string;
   }) {
-    return this.db.empleado.create({ data: params });
+    return this.db.empleado.create({ data: params, include: { puesto: { select: { id: true, nombre: true } } } });
   }
 
   buscarPorId(id: string) {
-    return this.db.empleado.findUniqueOrThrow({ where: { id } });
+    return this.db.empleado.findUniqueOrThrow({ where: { id }, include: { puesto: { select: { id: true, nombre: true } } } });
   }
 
   /** Resuelve "quién soy" para el check-in/check-out de autoservicio (Asistencia) desde req.user.userId. */
@@ -55,18 +56,27 @@ export class EmpleadosRepository {
     });
   }
 
-  listar(params: { skip: number; take: number; busqueda?: string }) {
-    const where = params.busqueda
-      ? {
-          OR: [
-            { nombre: { contains: params.busqueda, mode: 'insensitive' as const } },
-            { cedula: { contains: params.busqueda, mode: 'insensitive' as const } },
-            { cargo: { contains: params.busqueda, mode: 'insensitive' as const } },
-          ],
-        }
-      : {};
+  listar(params: { skip: number; take: number; busqueda?: string; puestoId?: string }) {
+    const where = {
+      puestoId: params.puestoId,
+      ...(params.busqueda
+        ? {
+            OR: [
+              { nombre: { contains: params.busqueda, mode: 'insensitive' as const } },
+              { cedula: { contains: params.busqueda, mode: 'insensitive' as const } },
+              { cargo: { contains: params.busqueda, mode: 'insensitive' as const } },
+            ],
+          }
+        : {}),
+    };
     return Promise.all([
-      this.db.empleado.findMany({ where, orderBy: { nombre: 'asc' }, skip: params.skip, take: params.take }),
+      this.db.empleado.findMany({
+        where,
+        orderBy: { nombre: 'asc' },
+        skip: params.skip,
+        take: params.take,
+        include: { puesto: { select: { id: true, nombre: true } } },
+      }),
       this.db.empleado.count({ where }),
     ]);
   }
@@ -77,6 +87,7 @@ export class EmpleadosRepository {
       nombre: string;
       cedula: string;
       cargo: string;
+      puestoId: string | null;
       departamento: string;
       fechaIngreso: Date;
       salarioBrutoMensual: number;
@@ -88,6 +99,6 @@ export class EmpleadosRepository {
       userId: string | null;
     }>,
   ) {
-    return this.db.empleado.update({ where: { id }, data });
+    return this.db.empleado.update({ where: { id }, data, include: { puesto: { select: { id: true, nombre: true } } } });
   }
 }

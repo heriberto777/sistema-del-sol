@@ -757,6 +757,63 @@ real de cuenta corriente del cliente) queda deliberadamente fuera de
 este ítem — es una funcionalidad de cuentas por cobrar más grande,
 candidata a su propia sesión de diseño, no un campo de catálogo chico.
 
+**Toggle de ITBIS por línea y descuento general de documento** (plan de
+integración Cuadre, ítems B-7/B-8): ambos viven en
+`FacturacionService.calcularLineasYTotales()`, el único punto de cálculo
+de líneas/totales (compartido por Facturación directa, Cotizaciones,
+Remisiones y POS). `LineaFacturaDto.aplicaItbis` (default `true`, B-7)
+fuerza 0% en esa línea sin tocar `producto.porcentajeItbis` — para una
+venta puntual exenta. `CrearFacturaDto.descuentoGeneralPct`/
+`descuentoGeneralMonto` (B-8, mutuamente excluyentes, 400 si vienen
+ambos) reutilizan `prorratearDescuentoCarrito()` — la misma función pura
+que ya reparte el descuento automático de Ofertas de carrito (Fase 4b)
+— para repartir un descuento manual de documento completo entre las
+líneas y recalcular el ITBIS de cada una. Se aplica DESPUÉS del
+prorrateo de Ofertas (sobre lo que ya quedó tras ese descuento), así que
+ambos se acumulan en vez de pisarse — mismo criterio de acumulación que
+ya usa el descuento manual por línea sobre Ofertas automáticas. Ninguno
+de los dos aplica a `NOTA_CREDITO`/`NOTA_DEBITO` (mismo guard
+`esVentaNormal` que ya protegía el bloque de Ofertas: un ajuste sobre un
+monto ya facturado no recalcula descuentos frescos). Implementado solo
+en el formulario de Facturación (`ModalNuevaFactura`) — el POS no
+necesitó UI nueva para B-8 porque `ModalDescuento` (F-1, "seleccionar
+todos" + %/monto) ya logra el mismo efecto aplicando el mismo descuento
+línea por línea.
+
+**Condición de pago explícita** (plan de integración Cuadre, ítem B-6):
+`Factura.plazoPagoDias` (`Int @default(30)`) YA existía en el schema
+desde antes de este ítem y `RecordatoriosService` YA lo consumía
+(`fecha + plazoPagoDias` para detectar facturas vencidas) — el gap real
+no era el modelo, era que ningún flujo dejaba ELEGIRLO: `CrearFacturaDto`
+no lo exponía, así que toda factura quedaba silenciosamente en el
+default de 30 días. `CrearFacturaDto.plazoPagoDias?` (uno de
+`15`/`30`/`45`/`60`/`90`, mismas opciones que el "Condición de Pago" de
+Cuadre) se propaga a `crearFacturaEnTx` sin tocar el resto del cálculo
+— sin enviarlo, se comporta exactamente igual que antes (Prisma cae al
+default del schema). El frontend (`ModalNuevaFactura`) solo muestra el
+selector cuando `tipoFactura === 'CREDITO'` (un `CONTADO` se paga ahora,
+el plazo no tiene sentido) y calcula el "Vencimiento" mostrado como
+`hoy + plazoPagoDias` en el navegador — mismo cálculo que
+`RecordatoriosService`, sin persistir una columna redundante.
+
+**Leyes Fiscales — reducción de ITBIS por producto** (plan de
+integración Cuadre, ítem B-3): `LeyFiscal` (catálogo plano, `codigo`/
+`nombre`/`porcentajeItbisAPagar`/`descripcion`/`activa`) se ata a
+`Producto.leyFiscalId` — decisión explícita del usuario (no al Cliente
+ni a la Factura): la reducción depende de QUÉ se vende (ej. materiales
+de construcción bajo la Norma 07-2007), no de quién compra. En
+`calcularLineasYTotales()`, el ITBIS efectivo de la línea es
+`producto.porcentajeItbis * (leyFiscal.porcentajeItbisAPagar / 100)` —
+ej. 18% normal con una ley al 10% da 1.8% efectivo. Se evalúa DESPUÉS
+del toggle de ITBIS por línea (B-7): si `aplicaItbis: false`, el 0%
+gana y la ley fiscal no tiene nada que reducir. `FacturacionRepository.
+obtenerProductoConPrecioVigente` trae `leyFiscal.porcentajeItbisAPagar`
+en el mismo `include` que ya resuelve precio/componentes — sin query
+adicional. `LeyesFiscalesModule` es un catálogo standalone (mismo molde
+que `CategoriasClienteModule`/`PuestosModule`), importado por
+`ProductosModule` para validar el FK; `FacturacionModule` no lo importa
+como servicio — solo lee el campo ya incluido en la query existente.
+
 Al crear un gasto menor, `GastoMenorService` emite
 `EVENTOS.GASTO_MENOR_CREADO` (mismo patrón fire-and-forget del Event
 Bus) y `ContabilidadEventosService.alCrearGastoMenor` genera el asiento
@@ -1812,6 +1869,27 @@ Node corre en la zona horaria del contenedor Docker (típicamente UTC),
 así que usar `new Date()`/`toLocaleTimeString()` sin especificar esa
 zona habría registrado la hora equivocada para el empleado.
 
+**Aprobación de asistencia + horas extra/salida anticipada (plan de
+integración Cuadre, ítems G-3/G-4)**: `RegistroAsistencia.estado`
+(`PENDIENTE → APROBADO/RECHAZADO`, `PATCH /nomina/asistencia/:id/estado`,
+`rrhh.aprobar`) es un flujo calcado de `Ausencia.estado` — puramente de
+revisión/auditoría, a diferencia de `Ausencia` **ningún cálculo de
+nómina lee este `estado`** (`PeriodosNominaService` nunca consulta
+`RegistroAsistencia`, solo `Ausencia`), así que aprobar/rechazar un
+marcaje no cambia ningún monto pagado. `salidaAnticipada`/`horasExtra`
+se calculan una sola vez al marcar la salida (o en `registrarManual` si
+trae `horaSalida`), mismo criterio que `tardanza`: `salidaAnticipada`
+compara contra `HorarioEmpleado` del día (sin horario, no hay contra qué
+comparar); `horasExtra` es el excedente sobre
+`Configuracion.ASISTENCIA_UMBRAL_HORAS_EXTRA` (default 8h/día) sobre las
+horas trabajadas ese día — `null` si falta `horaEntrada` (no se puede
+calcular), `0` si se calculó y no hubo excedente. Los valores
+configurables (`ASISTENCIA_UMBRAL_HORAS_EXTRA`,
+`ASISTENCIA_TOLERANCIA_SALIDA_ANTICIPADA_MIN`) siguen el mismo patrón
+`CONFIGURACIONES_BASE` + `ConfiguracionesService.buscarValor` que
+`POS_TOLERANCIA_ARQUEO` — un tenant ya existente sin la fila sembrada
+cae al default hardcodeado, sin necesidad de backfill.
+
 **Ausencias (7c, implementado)**: `Ausencia` — solicitud con flujo de
 aprobación `SOLICITADA → APROBADA/RECHAZADA` (mismo patrón que
 `EstadoCotizacion`), dos relaciones nombradas a `User`
@@ -1876,6 +1954,28 @@ decisión editable por quien registra la ausencia, no una regla legal.
 Con esto, Fase 7 (RRHH) de la adopción de Cuadre queda completa:
 Horarios (7a) → Asistencia (7b) → Ausencias (7c) → integración con
 Nómina + vacaciones (7d).
+
+**Catálogo de Puestos (plan de integración Cuadre, ítem G-8)**: `Puesto`
+(`backend/src/puestos/`, módulo propio) es un catálogo plano tenant-
+scoped, mismo molde que `ListasPrecioModule`/`CategoriasClienteModule`
+(crear/listar/actualizar, sin `eliminar` — se desactiva). `Empleado.
+puestoId` es puramente aditivo: `Empleado.cargo` (texto libre) NO se
+tocó, sigue siendo lo que `EmpleadosRepository.listarVendedores`
+resuelve como "Vendedor" (`contains`, insensitive) para `GET /pos/
+vendedores` — reemplazarlo por una FK habría roto esa búsqueda sin
+ningún beneficio real. `GET /nomina/empleados?puestoId=...` filtra el
+listado; el filtrado de nómina por puesto que mencionaba originalmente
+este ítem queda fuera de alcance (no hay ningún caso de uso concreto
+todavía que lo pida).
+
+**Calendario de feriados (ítem G-5)**: `Feriado` (`backend/src/
+feriados/`) es otro catálogo plano tenant-scoped — `nombre`, `fecha`,
+`recurrenteAnual` (si se repite cada año, ignorando el año al comparar,
+o es puntual de esa fecha exacta), `activo`. Deliberadamente **sin
+ningún efecto automático todavía** en tardanza/horas extra/nómina — es
+el catálogo puro que describía la comparación original con Cuadre;
+usarlo para, por ejemplo, no contar tardanza en un día feriado, sería
+una funcionalidad nueva que amerita su propia decisión de alcance.
 
 ## Sucursales
 
@@ -2072,15 +2172,26 @@ para operar (ver "Fuera de alcance" abajo).
   por bodega a la vez** — `PosService.abrirTurno` lo valida en código
   (no hay una constraint de DB para "a lo sumo un ABIERTO", porque eso
   depende del `estado`, no de una combinación fija de columnas).
-- **`POST /pos/ventas`**: fuerza `tipoFactura: 'CONTADO'` (el POS no
-  vende a crédito en v1) y toma la `bodegaId` **del turno**, no del
+- **`POST /pos/ventas`**: toma la `bodegaId` **del turno**, no del
   request — evita que una venta se registre contra una bodega distinta
   a la de la caja que la cobra. Como reutiliza
   `FacturacionService.crear()` tal cual, la venta **ya emite
   `factura.creada`** y por lo tanto **ya genera su asiento contable
   automático** (ver la sección de Contabilidad) sin ningún código
   adicional — es el mismo beneficio que ya tenían Cotizaciones/
-  Remisiones al convertir.
+  Remisiones al convertir. `tipoFactura` (plan de integración Cuadre,
+  ítem F-2) default `CONTADO` si se omite — antes de este ítem era
+  siempre `CONTADO` sin excepción ("el POS no vende a crédito"); ahora
+  el cajero puede elegir `CREDITO` (produce B01/Crédito Fiscal en vez de
+  B02/Consumo, vía `NCF_POR_TIPO`) igual que en Facturación — la suma de
+  `pagos` sigue teniendo que cubrir el total exacto sin importar cuál
+  se elija, así que una venta de POS con `tipoFactura: 'CREDITO'`
+  termina igual `PAGADA` de inmediato, la diferencia es solo el tipo de
+  NCF emitido, no si se cobra ahora o después (ver B-1 para
+  `tipoComprobanteEspecial`, también soportado acá). El selector vive
+  junto al de cliente en `TurnoCajaDetalle.tsx`, que también ahora tiene
+  un botón "+ Nuevo cliente" inline (alta rápida sin salir de la venta,
+  mismo criterio que `NuevoClienteInline` de Facturación).
 - **`Factura.formaPagoId`/`Factura.turnoCajaId`** son nullable y
   **solo los llena una venta de POS** — el resto de la facturación
   (venta normal desde el módulo de Facturación, conversión de

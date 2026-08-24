@@ -2,10 +2,12 @@ import { BadRequestException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { EmpleadosService } from './empleados.service';
 import { EmpleadosRepository } from './empleados.repository';
+import { PuestosRepository } from '../puestos/puestos.repository';
 
 describe('EmpleadosService', () => {
   let service: EmpleadosService;
   let repository: jest.Mocked<EmpleadosRepository>;
+  let puestosRepository: jest.Mocked<PuestosRepository>;
 
   beforeEach(() => {
     repository = {
@@ -15,7 +17,8 @@ describe('EmpleadosService', () => {
       listarActivos: jest.fn(),
       actualizar: jest.fn(),
     } as unknown as jest.Mocked<EmpleadosRepository>;
-    service = new EmpleadosService(repository);
+    puestosRepository = { buscarPorId: jest.fn() } as unknown as jest.Mocked<PuestosRepository>;
+    service = new EmpleadosService(repository, puestosRepository);
   });
 
   it('crear pasa fechaIngreso como Date y el tenantId', async () => {
@@ -72,5 +75,38 @@ describe('EmpleadosService', () => {
     const resultado = await service.listar({});
 
     expect(resultado).toEqual({ datos: [{ id: 'e1' }], total: 1, pagina: 1, tamanoPagina: 20 });
+  });
+
+  describe('puestoId (plan de integración Cuadre, ítem G-8)', () => {
+    it('crear valida que puestoId pertenezca al tenant antes de crear (404 si no, vía findUniqueOrThrow tenant-scoped)', async () => {
+      puestosRepository.buscarPorId.mockResolvedValue({ id: 'puesto-1' } as never);
+      repository.crear.mockResolvedValue({ id: 'e1' } as never);
+
+      await service.crear(
+        { nombre: 'Juan Pérez', cedula: '001-1', cargo: 'Vendedor', puestoId: 'puesto-1', fechaIngreso: '2024-01-01', salarioBrutoMensual: 30000 },
+        't1',
+      );
+
+      expect(puestosRepository.buscarPorId).toHaveBeenCalledWith('puesto-1');
+      expect(repository.crear).toHaveBeenCalledWith(expect.objectContaining({ puestoId: 'puesto-1' }));
+    });
+
+    it('actualizar valida puestoId antes de guardar', async () => {
+      puestosRepository.buscarPorId.mockResolvedValue({ id: 'puesto-1' } as never);
+      repository.actualizar.mockResolvedValue({ id: 'e1' } as never);
+
+      await service.actualizar('e1', { puestoId: 'puesto-1' });
+
+      expect(puestosRepository.buscarPorId).toHaveBeenCalledWith('puesto-1');
+      expect(repository.actualizar).toHaveBeenCalledWith('e1', expect.objectContaining({ puestoId: 'puesto-1' }));
+    });
+
+    it('listar propaga el filtro puestoId al repositorio', async () => {
+      repository.listar.mockResolvedValue([[], 0] as never);
+
+      await service.listar({ puestoId: 'puesto-1' });
+
+      expect(repository.listar).toHaveBeenCalledWith(expect.objectContaining({ puestoId: 'puesto-1' }));
+    });
   });
 });

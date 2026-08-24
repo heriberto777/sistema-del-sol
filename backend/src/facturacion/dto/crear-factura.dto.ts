@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { ArrayMinSize, IsArray, IsEnum, IsNumber, IsOptional, IsPositive, IsString, IsUUID, Min, ValidateNested } from 'class-validator';
+import { ArrayMinSize, IsArray, IsBoolean, IsEnum, IsIn, IsNumber, IsOptional, IsPositive, IsString, IsUUID, Min, ValidateNested } from 'class-validator';
 import { TipoFactura } from '@prisma/client';
 
 export class LineaFacturaDto {
@@ -29,6 +29,16 @@ export class LineaFacturaDto {
   @IsNumber()
   @Min(0)
   descuento?: number;
+
+  @ApiProperty({
+    required: false,
+    default: true,
+    description:
+      'Toggle de ITBIS por línea (plan de integración Cuadre, ítem B-7) — false fuerza 0% en esta línea sin importar producto.porcentajeItbis (ej. venta exenta puntual).',
+  })
+  @IsOptional()
+  @IsBoolean()
+  aplicaItbis?: boolean;
 }
 
 export class CrearFacturaDto {
@@ -74,4 +84,34 @@ export class CrearFacturaDto {
   @IsOptional()
   @IsEnum(['REGIMEN_ESPECIAL', 'GUBERNAMENTAL'])
   tipoComprobanteEspecial?: 'REGIMEN_ESPECIAL' | 'GUBERNAMENTAL';
+
+  @ApiProperty({
+    required: false,
+    description:
+      'Descuento general de documento en % (0-100, plan de integración Cuadre, ítem B-8) — se prorratea entre las líneas (recalcula ITBIS por línea), además de cualquier descuento por línea/oferta. Excluyente con descuentoGeneralMonto.',
+  })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  descuentoGeneralPct?: number;
+
+  @ApiProperty({
+    required: false,
+    description: 'Descuento general de documento en RD$ (ítem B-8), mismo criterio que descuentoGeneralPct. Excluyente con descuentoGeneralPct.',
+  })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  descuentoGeneralMonto?: number;
+
+  @ApiProperty({
+    required: false,
+    default: 30,
+    enum: [15, 30, 45, 60, 90],
+    description:
+      'Condición de pago en días (plan de integración Cuadre, ítem B-6) — el vencimiento se calcula como fecha + este plazo (ya usado por RecordatoriosService para facturas vencidas). Sin enviar, cae al default del schema (30).',
+  })
+  @IsOptional()
+  @IsIn([15, 30, 45, 60, 90])
+  plazoPagoDias?: number;
 }

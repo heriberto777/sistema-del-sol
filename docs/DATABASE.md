@@ -156,6 +156,13 @@ antes de esta fase (default permisivo) — ver ARCHITECTURE.md.
   Remisiones/POS lo heredan al convertir vía `FacturacionService.crear()`).
   `ComprasService` rechaza comprar un `COMBO` directamente y no mueve
   stock al recibir/devolver una línea `SERVICIO`.
+- **`leyes_fiscales`** (plan de integración Cuadre, ítem B-3) es un
+  catálogo plano igual que `listas_precio`/`puestos` — `productos.
+  leyFiscalId` (`ON DELETE SET NULL`) reduce el ITBIS efectivo del
+  producto (`porcentajeItbisAPagar`, ej. 10 = 18%→1.8%). Se ata al
+  `Producto` (decisión explícita del usuario, no al Cliente ni a la
+  Factura) porque la reducción depende de QUÉ se vende, no de quién
+  compra — ver `FacturacionService.calcularLineasYTotales`.
 - **Categorías**: `categorias.categoriaPadreId` es una self-relation real
   (`@relation("JerarquiaCategoria")`, mismo patrón que
   `cuentas_contables.cuentaPadreId`, hasta ahora sembrado pero sin
@@ -235,6 +242,21 @@ antes de esta fase (default permisivo) — ver ARCHITECTURE.md.
   entrada, `horaSalida` después). `fecha` se guarda a medianoche UTC
   del día calendario de RD (no del servidor) — ver
   `zona-horaria-rd.util.ts` en ARCHITECTURE.md.
+  `estado`/`aprobadoPorId`/`fechaResolucion` (ítem G-3) son un flujo de
+  aprobación calcado de `ausencias.estado`/`aprobadoPorId` — puramente
+  de revisión/auditoría, ningún cálculo de nómina lee `estado`.
+  `salidaAnticipada`/`horasExtra` (ítem G-4, nullable el segundo) se
+  calculan una sola vez al marcar la salida, igual criterio que
+  `tardanza` al marcar la entrada — ver ARCHITECTURE.md.
+- **`puestos`** (ítem G-8) es un catálogo plano igual que
+  `categorias_cliente`/`listas_precio` — `empleados.puestoId`
+  (`ON DELETE SET NULL`) es puramente aditivo, `empleados.cargo` (texto
+  libre) no se tocó porque `EmpleadosRepository.listarVendedores` sigue
+  resolviendo "Vendedor" contra ese campo (`contains`, insensitive).
+- **`feriados`** (ítem G-5) es un catálogo plano tenant-scoped — sin
+  ninguna FK desde otra tabla todavía (a diferencia de `puestos`/
+  `categorias_cliente`), deliberadamente sin efecto automático en
+  tardanza/horas extra/nómina.
 - **`ausencias.solicitadoPorId`/`aprobadoPorId`** (RRHH, Fase 7c) son
   `ON DELETE CASCADE` hacia `users` — mismo patrón de rama hermana que
   `turnos_caja.cajeroId`/`cerradoPorId`; `aprobadoPorId` es nullable y

@@ -125,9 +125,18 @@ export class FacturacionService {
    * ve YA incluye cualquier oferta que vaya a aplicar `crear()` después.
    */
   private async calcularLineasYTotales(
-    dto: { tipoFactura: TipoFactura; listaPrecio?: string; lineas: LineaFacturaDto[] },
+    dto: {
+      tipoFactura: TipoFactura;
+      listaPrecio?: string;
+      lineas: LineaFacturaDto[];
+      descuentoGeneralPct?: number;
+      descuentoGeneralMonto?: number;
+    },
     cliente: { listaPrecio?: { nombre: string } | null },
   ) {
+    if (dto.descuentoGeneralPct && dto.descuentoGeneralMonto) {
+      throw new BadRequestException('Enviá descuentoGeneralPct o descuentoGeneralMonto, no ambos');
+    }
     const listaPrecio = dto.listaPrecio ?? cliente.listaPrecio?.nombre ?? 'GENERAL';
     // Ofertas (Fase 4b) solo aplican a una venta nueva — una nota de
     // crédito/débito ajusta un monto YA facturado, nunca recalcula un
@@ -143,7 +152,16 @@ export class FacturacionService {
         const varianteId = await this.variantesService.resolverObligatoria(linea.productoId, linea.varianteId);
         const producto = await this.facturacionRepository.obtenerProductoConPrecioVigente(linea.productoId, varianteId, listaPrecio);
         const precioUnitario = linea.precioUnitario ?? Number(producto.precios[0]?.precioVenta ?? 0);
-        const porcentajeItbis = Number(producto.porcentajeItbis);
+        // Toggle de ITBIS por línea (plan de integración Cuadre, ítem B-7) —
+        // `aplicaItbis: false` fuerza 0% sin importar producto.porcentajeItbis,
+        // para una venta exenta puntual (ej. cliente exonerado en esa factura).
+        // Ley fiscal (ítem B-3, atada al Producto): reduce el ITBIS efectivo
+        // — ej. `porcentajeItbisAPagar: 10` sobre un 18% normal da 1.8%
+        // efectivo. Se aplica DESPUÉS del toggle (0% sigue siendo 0%).
+        const porcentajeItbis =
+          linea.aplicaItbis === false
+            ? 0
+            : Number(producto.porcentajeItbis) * (producto.leyFiscal ? Number(producto.leyFiscal.porcentajeItbisAPagar) / 100 : 1);
         // Un descuento manual explícito (aunque sea 0) siempre gana sobre
         // el automático — ver OfertasService, "no acumulable".
         const descuento =
@@ -182,6 +200,28 @@ export class FacturacionService {
           subtotalPreCarrito,
           lineasCalculadas.map((l) => l.cantidad * l.precioUnitario - l.descuento),
           descuentoCarritoTotal,
+        );
+        lineasCalculadas.forEach((l, i) => {
+          l.descuento += extras[i];
+          const totalLinea = l.cantidad * l.precioUnitario - l.descuento;
+          l.montoItbis = totalLinea * (l.porcentajeItbis / 100);
+          l.montoTotal = totalLinea + l.montoItbis;
+        });
+      }
+
+      // Descuento general de documento (plan de integración Cuadre, ítem
+      // B-8) — manual, distinto de las Ofertas automáticas de arriba;
+      // se prorratea igual (mismo util) SOBRE lo que quedó después de
+      // ofertas, así que ambos se acumulan en vez de pisarse.
+      if (dto.descuentoGeneralPct || dto.descuentoGeneralMonto) {
+        const subtotalPreGeneral = lineasCalculadas.reduce((acc, l) => acc + (l.cantidad * l.precioUnitario - l.descuento), 0);
+        const descuentoGeneralTotal = dto.descuentoGeneralPct
+          ? subtotalPreGeneral * (dto.descuentoGeneralPct / 100)
+          : (dto.descuentoGeneralMonto ?? 0);
+        const extras = prorratearDescuentoCarrito(
+          subtotalPreGeneral,
+          lineasCalculadas.map((l) => l.cantidad * l.precioUnitario - l.descuento),
+          descuentoGeneralTotal,
         );
         lineasCalculadas.forEach((l, i) => {
           l.descuento += extras[i];
@@ -367,6 +407,7 @@ export class FacturacionService {
         referenciaPago: formaPagoPrincipal?.referencia,
         turnoCajaId: opciones?.turnoCajaId,
         vendedorEmpleadoId: opciones?.vendedorEmpleadoId,
+        plazoPagoDias: dto.plazoPagoDias,
         pagos: pagosResueltos,
         subtotal,
         descuento: descuentoTotal,

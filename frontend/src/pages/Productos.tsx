@@ -15,6 +15,7 @@ import { EstadoVacio } from '../components/molecules/EstadoVacio/EstadoVacio';
 import { RowActionsMenu } from '../components/molecules/RowActionsMenu/RowActionsMenu';
 import { RequierePermiso } from '../components/organisms/RequierePermiso/RequierePermiso';
 import { SelectCategoria } from '../components/molecules/SelectCategoria/SelectCategoria';
+import { SelectLeyFiscal } from '../components/molecules/SelectLeyFiscal/SelectLeyFiscal';
 import { VariantesProductoPanel } from '../components/organisms/VariantesProductoPanel/VariantesProductoPanel';
 import { ImportarProductosModal } from '../components/organisms/ImportarProductosModal/ImportarProductosModal';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
@@ -33,6 +34,7 @@ interface Producto {
   categoria: { id: string; nombre: string } | null;
   unidadMedida: string;
   porcentajeItbis: string;
+  leyFiscalId: string | null;
   tipo: TipoProducto;
   controlaVencimiento: boolean;
 }
@@ -61,6 +63,7 @@ interface ProductoFormValues {
   categoriaId: string;
   unidadMedida: string;
   porcentajeItbis: string;
+  leyFiscalId: string;
   tipo: TipoProducto;
   imagen: string | null;
   controlaVencimiento: boolean;
@@ -77,6 +80,7 @@ const PRODUCTO_VACIO: ProductoFormValues = {
   categoriaId: '',
   unidadMedida: 'UND',
   porcentajeItbis: '18',
+  leyFiscalId: '',
   tipo: 'PRODUCTO',
   imagen: null,
   controlaVencimiento: false,
@@ -301,6 +305,7 @@ function FormularioProducto({ producto, onGuardado }: { producto: Producto | nul
           categoriaId: producto.categoriaId ?? '',
           unidadMedida: producto.unidadMedida,
           porcentajeItbis: producto.porcentajeItbis,
+          leyFiscalId: producto.leyFiscalId ?? '',
           tipo: producto.tipo,
           imagen: null,
           controlaVencimiento: producto.controlaVencimiento,
@@ -342,6 +347,7 @@ function FormularioProducto({ producto, onGuardado }: { producto: Producto | nul
       categoriaId: valores.categoriaId || null,
       unidadMedida: valores.unidadMedida || undefined,
       porcentajeItbis: valores.porcentajeItbis ? Number(valores.porcentajeItbis) : undefined,
+      leyFiscalId: valores.leyFiscalId || null,
       tipo: valores.tipo,
       imagen: valores.imagen,
       controlaVencimiento: valores.tipo === 'PRODUCTO' ? valores.controlaVencimiento : false,
@@ -428,6 +434,16 @@ function FormularioProducto({ producto, onGuardado }: { producto: Producto | nul
         value={valores.porcentajeItbis}
         onChange={(e) => setValores((v) => ({ ...v, porcentajeItbis: e.target.value }))}
       />
+      <div className="flex flex-col gap-1">
+        <label htmlFor="producto-ley-fiscal" className="text-sm font-medium text-slate-700 dark:text-slate-300">
+          Ley fiscal (opcional, plan de integración Cuadre, ítem B-3)
+        </label>
+        <SelectLeyFiscal
+          id="producto-ley-fiscal"
+          value={valores.leyFiscalId}
+          onChange={(id) => setValores((v) => ({ ...v, leyFiscalId: id }))}
+        />
+      </div>
 
       {valores.tipo === 'PRODUCTO' && (
         <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">

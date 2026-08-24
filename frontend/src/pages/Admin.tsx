@@ -12,6 +12,7 @@ import { AtributosPanel } from '../components/organisms/AtributosPanel/Atributos
 import { OfertasPanel } from '../components/organisms/OfertasPanel/OfertasPanel';
 import { BonosPanel } from '../components/organisms/BonosPanel/BonosPanel';
 import { CategoriasClientePanel } from '../components/organisms/CategoriasClientePanel/CategoriasClientePanel';
+import { LeyesFiscalesPanel } from '../components/organisms/LeyesFiscalesPanel/LeyesFiscalesPanel';
 import { useAuth } from '../hooks/useAuth';
 
 interface Pestana {
@@ -58,6 +59,7 @@ const CATEGORIAS: Categoria[] = [
       { id: 'listas-precio', etiqueta: 'Niveles de precio', permiso: 'admin.configuracion', panel: ListasPrecioPanel },
       { id: 'atributos', etiqueta: 'Atributos', permiso: 'admin.configuracion', panel: AtributosPanel },
       { id: 'ofertas', etiqueta: 'Ofertas', permiso: 'admin.configuracion', panel: OfertasPanel },
+      { id: 'leyes-fiscales', etiqueta: 'Leyes fiscales', permiso: 'admin.configuracion', panel: LeyesFiscalesPanel },
     ],
   },
   {

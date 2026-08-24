@@ -47,6 +47,9 @@ export class FacturacionRepository {
         // Solo tiene filas si el producto es COMBO — ver
         // FacturacionService.expandirParaInventario.
         componentes: { include: { componente: true } },
+        // Ley fiscal aplicable (plan de integración Cuadre, ítem B-3) —
+        // reduce el ITBIS efectivo, ver FacturacionService.calcularLineasYTotales.
+        leyFiscal: { select: { porcentajeItbisAPagar: true } },
       },
     });
     const { variantes, ...resto } = producto;
@@ -129,6 +132,11 @@ export class FacturacionRepository {
       // dividido (varias formas de pago en una misma venta). Vacío/omitido
       // para facturación que no es de POS (crédito sin pago inmediato).
       pagos?: { formaPagoId: string; monto: number; referencia?: string }[];
+      // Condición de pago (plan de integración Cuadre, ítem B-6) — sin
+      // enviar, cae al @default(30) del schema. Ya consumido por
+      // RecordatoriosService (fecha + plazoPagoDias) desde antes de este
+      // ítem; lo que faltaba era poder ELEGIRLO al crear la factura.
+      plazoPagoDias?: number;
       subtotal: number;
       descuento: number;
       itbis: number;
@@ -151,6 +159,7 @@ export class FacturacionRepository {
         referenciaPago: params.referenciaPago,
         turnoCajaId: params.turnoCajaId,
         vendedorEmpleadoId: params.vendedorEmpleadoId,
+        plazoPagoDias: params.plazoPagoDias,
         estado: 'EMITIDA',
         subtotal: params.subtotal,
         descuento: params.descuento,

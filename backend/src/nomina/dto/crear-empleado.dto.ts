@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsDateString, IsEmail, IsIn, IsNumber, IsOptional, IsPositive, IsString, MinLength } from 'class-validator';
+import { IsDateString, IsEmail, IsIn, IsNumber, IsOptional, IsPositive, IsString, IsUUID, MinLength } from 'class-validator';
 
 export class CrearEmpleadoDto {
   @ApiProperty()
@@ -16,6 +16,15 @@ export class CrearEmpleadoDto {
   @IsString()
   @MinLength(1)
   cargo: string;
+
+  @ApiProperty({
+    required: false,
+    description:
+      'Catálogo de puestos (plan de integración Cuadre, ítem G-8) — puramente clasificatorio, no reemplaza `cargo` (texto libre, sigue siendo lo que resuelve "Vendedor").',
+  })
+  @IsOptional()
+  @IsUUID()
+  puestoId?: string;
 
   @ApiProperty({ required: false })
   @IsOptional()

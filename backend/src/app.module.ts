@@ -36,6 +36,9 @@ import { RemisionesModule } from './remisiones/remisiones.module';
 import { RecordatoriosModule } from './recordatorios/recordatorios.module';
 import { ContabilidadModule } from './contabilidad/contabilidad.module';
 import { NominaModule } from './nomina/nomina.module';
+import { FeriadosModule } from './feriados/feriados.module';
+import { PuestosModule } from './puestos/puestos.module';
+import { LeyesFiscalesModule } from './leyes-fiscales/leyes-fiscales.module';
 import { PosModule } from './pos/pos.module';
 import { IaModule } from './ia/ia.module';
 import { BancosModule } from './bancos/bancos.module';
@@ -99,6 +102,9 @@ import { TenantMiddleware } from './common/middleware/tenant.middleware';
     RecordatoriosModule,
     ContabilidadModule,
     NominaModule,
+    FeriadosModule,
+    PuestosModule,
+    LeyesFiscalesModule,
     PosModule,
     IaModule,
     BancosModule,

@@ -1,8 +1,9 @@
-import { Body, Controller, Get, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { AsistenciaService } from './asistencia.service';
 import { RegistrarAsistenciaManualDto } from './dto/registrar-asistencia-manual.dto';
 import { ListarAsistenciaQueryDto } from './dto/listar-asistencia-query.dto';
+import { CambiarEstadoAsistenciaDto } from './dto/cambiar-estado-asistencia.dto';
 import { Permissions } from '../common/decorators/permissions.decorator';
 import { RequiereModulo } from '../common/decorators/requiere-modulo.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -43,5 +44,11 @@ export class AsistenciaController {
   @Permissions('rrhh.ver')
   listar(@Query() query: ListarAsistenciaQueryDto) {
     return this.asistenciaService.listar(query);
+  }
+
+  @Patch(':id/estado')
+  @Permissions('rrhh.aprobar')
+  cambiarEstado(@Param('id') id: string, @Body() dto: CambiarEstadoAsistenciaDto, @CurrentUser() user: JwtPayloadUser) {
+    return this.asistenciaService.cambiarEstado(id, dto.estado, user.userId);
   }
 }
