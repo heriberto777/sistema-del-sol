@@ -14,6 +14,7 @@ import { BonosPanel } from '../components/organisms/BonosPanel/BonosPanel';
 import { CategoriasClientePanel } from '../components/organisms/CategoriasClientePanel/CategoriasClientePanel';
 import { LeyesFiscalesPanel } from '../components/organisms/LeyesFiscalesPanel/LeyesFiscalesPanel';
 import { PersonalizacionDocumentosPanel } from '../components/organisms/PersonalizacionDocumentosPanel/PersonalizacionDocumentosPanel';
+import { AutorizacionesPanel } from '../components/organisms/AutorizacionesPanel/AutorizacionesPanel';
 import { useAuth } from '../hooks/useAuth';
 
 interface Pestana {
@@ -48,6 +49,7 @@ const CATEGORIAS: Categoria[] = [
       { id: 'ncf', etiqueta: 'NCF', permiso: 'admin.configuracion', panel: NcfPanel },
       { id: 'formas-pago', etiqueta: 'Formas de pago', permiso: 'admin.configuracion', panel: FormasPagoPanel },
       { id: 'bonos', etiqueta: 'Bonos', permiso: 'admin.configuracion', panel: BonosPanel },
+      { id: 'autorizaciones', etiqueta: 'Autorizaciones', permiso: 'admin.configuracion', panel: AutorizacionesPanel },
     ],
   },
   {

@@ -9,9 +9,19 @@ import { NominaModule } from '../nomina/nomina.module';
 import { VariantesModule } from '../variantes/variantes.module';
 import { InventarioModule } from '../inventario/inventario.module';
 import { AuthModule } from '../auth/auth.module';
+import { AutorizacionesModule } from '../autorizaciones/autorizaciones.module';
 
 @Module({
-  imports: [FacturacionModule, ConfiguracionesModule, FormasPagoModule, NominaModule, VariantesModule, InventarioModule, AuthModule],
+  imports: [
+    FacturacionModule,
+    ConfiguracionesModule,
+    FormasPagoModule,
+    NominaModule,
+    VariantesModule,
+    InventarioModule,
+    AuthModule,
+    AutorizacionesModule,
+  ],
   controllers: [PosController],
   providers: [PosService, PosRepository],
 })

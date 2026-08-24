@@ -70,10 +70,27 @@ export class FacturacionController {
     return this.facturacionService.enviarRecibo(id, dto, user.tenantId);
   }
 
+  // Ítem D-1 — dispara el envío del código de un solo uso; el propio
+  // permiso facturacion.anular ya es el gate correcto (solo quien podría
+  // llegar a anular puede pedir el código).
+  @Post(':id/solicitar-autorizacion')
+  @Permissions('facturacion.anular')
+  solicitarAutorizacion(@Param('id') id: string, @CurrentUser() user: JwtPayloadUser) {
+    return this.facturacionService.solicitarAutorizacionAnulacion(id, user.userId, user.tenantId);
+  }
+
   @Post(':id/anular')
   @Permissions('facturacion.anular')
   anular(@Param('id') id: string, @Body() dto: AnularFacturaDto, @CurrentUser() user: JwtPayloadUser) {
-    return this.facturacionService.anular(id, dto.motivo, user.tenantId, user.userId, user.permisos.includes('pos.supervisar'), dto.pin);
+    return this.facturacionService.anular(
+      id,
+      dto.motivo,
+      user.tenantId,
+      user.userId,
+      user.permisos.includes('pos.supervisar'),
+      dto.pin,
+      dto.codigoAutorizacion,
+    );
   }
 
   @Post(':id/pagos')

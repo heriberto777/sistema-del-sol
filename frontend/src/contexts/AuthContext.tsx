@@ -10,6 +10,9 @@ export interface UsuarioAutenticado {
   modulosActivos: string[];
   /** Fase 9 — solo para decidir si el frontend muestra el modal de PIN en acciones sensibles; la validación real es 100% del backend. */
   tienePin?: boolean;
+  /** Ítem D-1 — solo para decidir si el frontend muestra el flujo de "solicitar código de autorización" en anular/devolver; la validación real es 100% del backend. */
+  requiereAutorizacionAnular?: boolean;
+  requiereAutorizacionDevolucion?: boolean;
   tenant?: { subdominio: string; nombre: string };
 }
 

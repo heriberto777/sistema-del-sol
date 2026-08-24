@@ -9,6 +9,7 @@ import { VariantesService } from '../variantes/variantes.service';
 import { InventarioService } from '../inventario/inventario.service';
 import { AuthService } from '../auth/auth.service';
 import { RedisService } from '../redis/redis.service';
+import { AutorizacionesService } from '../autorizaciones/autorizaciones.service';
 
 describe('PosService', () => {
   let service: PosService;
@@ -21,6 +22,7 @@ describe('PosService', () => {
   let inventarioService: jest.Mocked<InventarioService>;
   let authService: jest.Mocked<AuthService>;
   let redis: jest.Mocked<RedisService>;
+  let autorizacionesService: jest.Mocked<AutorizacionesService>;
 
   beforeEach(() => {
     posRepository = {
@@ -59,6 +61,11 @@ describe('PosService', () => {
       guardarJson: jest.fn(),
       eliminar: jest.fn(),
     } as unknown as jest.Mocked<RedisService>;
+    autorizacionesService = {
+      estaHabilitada: jest.fn().mockResolvedValue(false),
+      verificar: jest.fn().mockResolvedValue(undefined),
+      solicitar: jest.fn(),
+    } as unknown as jest.Mocked<AutorizacionesService>;
     service = new PosService(
       posRepository,
       facturacionService,
@@ -69,6 +76,7 @@ describe('PosService', () => {
       inventarioService,
       authService,
       redis,
+      autorizacionesService,
     );
   });
 
@@ -376,6 +384,65 @@ describe('PosService', () => {
         'tenant-1',
         'cajero-1',
         { formaPagoId: 'fp1', referenciaPago: 'ref', turnoCajaId: 't1' },
+      );
+    });
+
+    it('D-1: no exige código de autorización si el tenant no activó la segunda capa', async () => {
+      posRepository.buscarPorId.mockResolvedValue(turno as never);
+      facturacionService.buscarPorId.mockResolvedValue(facturaOrigenBase as never);
+      facturacionService.crear.mockResolvedValue({ id: 'nc1' } as never);
+      autorizacionesService.estaHabilitada.mockResolvedValue(false);
+
+      await service.registrarDevolucion(
+        { facturaOrigenId: 'f1', turnoCajaId: 't1', formaPagoId: 'fp1', lineas: [{ productoId: 'p1', cantidad: 1 }] },
+        'tenant-1',
+        'cajero-1',
+      );
+
+      expect(autorizacionesService.verificar).not.toHaveBeenCalled();
+    });
+
+    it('D-1: exige y valida el código de autorización cuando el tenant activó AUTORIZACION_2FA_DEVOLUCION', async () => {
+      posRepository.buscarPorId.mockResolvedValue(turno as never);
+      facturacionService.buscarPorId.mockResolvedValue(facturaOrigenBase as never);
+      facturacionService.crear.mockResolvedValue({ id: 'nc1' } as never);
+      autorizacionesService.estaHabilitada.mockResolvedValue(true);
+
+      await service.registrarDevolucion(
+        { facturaOrigenId: 'f1', turnoCajaId: 't1', formaPagoId: 'fp1', lineas: [{ productoId: 'p1', cantidad: 1 }], codigoAutorizacion: '654321' },
+        'tenant-1',
+        'cajero-1',
+      );
+
+      expect(autorizacionesService.verificar).toHaveBeenCalledWith('DEVOLUCION_POS', 'f1', '654321');
+    });
+
+    it('D-1: propaga el código de autorización incorrecto sin llegar a crear la nota de crédito', async () => {
+      autorizacionesService.estaHabilitada.mockResolvedValue(true);
+      autorizacionesService.verificar.mockRejectedValue(new ForbiddenException('Código de autorización incorrecto'));
+
+      await expect(
+        service.registrarDevolucion(
+          { facturaOrigenId: 'f1', turnoCajaId: 't1', formaPagoId: 'fp1', lineas: [{ productoId: 'p1', cantidad: 1 }] },
+          'tenant-1',
+          'cajero-1',
+        ),
+      ).rejects.toThrow(ForbiddenException);
+      expect(posRepository.buscarPorId).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('solicitarAutorizacionDevolucion (plan de integración Cuadre, ítem D-1)', () => {
+    it('resuelve la sucursal de la bodega del turno y delega en AutorizacionesService.solicitar', async () => {
+      posRepository.buscarPorId.mockResolvedValue({ id: 't1', bodegaId: 'b1' } as never);
+      facturacionService.buscarPorId.mockResolvedValue({ id: 'f1', ncf: 'B0200000001', total: 236 } as never);
+      autorizacionesService.solicitar.mockResolvedValue({ expiraEn: new Date(), enviadoA: [] });
+
+      await service.solicitarAutorizacionDevolucion({ facturaOrigenId: 'f1', turnoCajaId: 't1' }, 'cajero-1', 'tenant-1');
+
+      expect(inventarioService.validarAccesoBodega).toHaveBeenCalledWith('b1', 'cajero-1');
+      expect(autorizacionesService.solicitar).toHaveBeenCalledWith(
+        expect.objectContaining({ tenantId: 'tenant-1', tipo: 'DEVOLUCION_POS', referenciaId: 'f1', sucursalId: 's1', monto: 236 }),
       );
     });
   });

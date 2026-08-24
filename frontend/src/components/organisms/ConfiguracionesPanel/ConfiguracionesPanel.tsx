@@ -17,7 +17,15 @@ const CLAVE_FORMATO_IMPRESION_DEFAULT = 'FORMATO_IMPRESION_DEFAULT';
 // Ítem H-3 — logo/nota de pie tienen su propio panel con widgets adecuados
 // (CampoImagen, textarea) en vez de este input de una línea; un data URI de
 // logo acá sería ilegible y fácil de corromper por accidente al editarlo.
-const CLAVES_CON_PANEL_PROPIO = new Set(['DOCUMENTO_LOGO', 'DOCUMENTO_NOTA_PIE']);
+// Ítem D-1 — las 2 claves de segunda capa de autorización son booleanas
+// ('true'/'false'); un checkbox propio es más claro que un input de texto
+// libre donde alguien podría tipear "verdadero" por error.
+const CLAVES_CON_PANEL_PROPIO = new Set([
+  'DOCUMENTO_LOGO',
+  'DOCUMENTO_NOTA_PIE',
+  'AUTORIZACION_2FA_ANULAR',
+  'AUTORIZACION_2FA_DEVOLUCION',
+]);
 
 function FilaConfiguracion({ configuracion }: { configuracion: Configuracion }) {
   const queryClient = useQueryClient();

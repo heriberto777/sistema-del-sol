@@ -8,6 +8,7 @@ import { RegistrarVentaPosDto } from './dto/registrar-venta.dto';
 import { CotizarVentaPosDto } from './dto/cotizar-venta.dto';
 import { GuardarVentaDto } from './dto/guardar-venta.dto';
 import { RegistrarDevolucionDto } from './dto/registrar-devolucion.dto';
+import { SolicitarAutorizacionDevolucionDto } from './dto/solicitar-autorizacion-devolucion.dto';
 import { ListarTurnosQueryDto } from './dto/listar-turnos-query.dto';
 import { ReporteCierresQueryDto } from './dto/reporte-cierres-query.dto';
 import { PublicarMensajeCajasDto } from './dto/publicar-mensaje-cajas.dto';
@@ -97,6 +98,14 @@ export class PosController {
   @Permissions('pos.editar')
   registrarVenta(@Body() dto: RegistrarVentaPosDto, @CurrentUser() user: JwtPayloadUser) {
     return this.posService.registrarVenta(dto, user.tenantId, user.userId);
+  }
+
+  // Ítem D-1 — dispara el envío del código de un solo uso, mismo permiso
+  // que registrarDevolucion (quien podría llegar a devolver puede pedirlo).
+  @Post('devoluciones/solicitar-autorizacion')
+  @Permissions('facturacion.anular')
+  solicitarAutorizacionDevolucion(@Body() dto: SolicitarAutorizacionDevolucionDto, @CurrentUser() user: JwtPayloadUser) {
+    return this.posService.solicitarAutorizacionDevolucion(dto, user.userId, user.tenantId);
   }
 
   @Post('devoluciones')

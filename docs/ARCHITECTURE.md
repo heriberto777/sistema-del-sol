@@ -2379,6 +2379,80 @@ siempre son calculables de antemano en el formulario (ej. si el turno
 es ajeno). `ModalMiPin` (`frontend/src/components/organisms/`, acción
 "Mi PIN" en el header) es la pantalla de autoservicio.
 
+### D-1 — Segunda capa de autorización (opcional, complementa el PIN)
+
+Plan de integración Cuadre, ítem D-1: el PIN de Fase 9 es 100%
+autoservicio — cualquiera que conozca el PIN de un usuario puede
+reconfirmar sin que un tercero real se entere. Cuadre resuelve esto con
+un código de un solo uso enviado por EMAIL a un SUPERVISOR real (no el
+mismo cajero) — decisión confirmada con el usuario: toggle simple por
+tenant, sin umbral de monto (a diferencia de un modelo con "solo si la
+operación supera RD$X"), y se SUMA al PIN, no lo reemplaza (capa 1 =
+PIN autoservicio, capa 2 = este código de un tercero).
+
+**Modelo** (`backend/src/autorizaciones/`, módulo propio):
+`CodigoAutorizacion` (tenant-scoped) — `tipo`
+(`ANULACION_FACTURA`/`DEVOLUCION_POS`), `referenciaId` (la Factura a
+anular, o la Factura original a devolver — sin FK propia porque el
+`tipo` decide de qué tabla es el id, mismo criterio que
+`referenciaTipo`/`referenciaId` de `MovimientoInventario`), `codigoHash`
+(bcrypt, igual que el PIN), `expiraEn` (5 minutos), `intentosFallidos`
+(máx. 5, después hay que pedir uno nuevo — a diferencia del PIN, que
+bloquea 15 minutos, acá el código en sí queda inválido porque está
+atado a una operación puntual, no a una sesión de login).
+
+**Resolución del destinatario**
+(`AutorizacionesRepository.resolverDestinatarios`, decisión confirmada
+con el usuario): primero los usuarios ASIGNADOS a la sucursal de la
+operación (`UsuarioSucursal`, Fase 8) que además tengan `pos.supervisar`
+— si ese conjunto está vacío (sucursal sin encargado asignado, u
+operación sin sucursal resoluble), cae a TODOS los `Admin Total` del
+tenant. El código se manda por email a TODOS los del conjunto elegido
+(no solo al primero) — como el sistema no puede detectar si un
+encargado físicamente "no está en el lugar", mandarle a todos los
+elegibles es el equivalente práctico: cualquiera que esté disponible
+puede usar el mismo código.
+
+**Flujo** (mismo patrón en Facturación y POS): `POST .../solicitar-autorizacion`
+invalida cualquier código pendiente anterior para esa misma
+referencia (`AutorizacionesRepository.invalidarPendientes` — evita que
+queden dos códigos "vigentes" a la vez y no quede claro cuál vale),
+genera uno nuevo, lo manda por email (`EmailChannel.enviar()`
+DIRECTO, no vía `NotificacionesService`/`NotificacionPlantilla` — mismo
+criterio que `AuthService.olvidePassword`: un código de seguridad no
+puede depender de que el tenant haya configurado una plantilla
+personalizable) y responde `{ expiraEn, enviadoA }` con los emails
+OFUSCADOS (`he***@ejemplo.com`, nunca el email completo en la
+respuesta HTTP — mismo criterio de no filtrar información que
+`olvidePassword`). El endpoint de la acción real
+(`POST /facturas/:id/anular`, `POST /pos/devoluciones`) gana
+`codigoAutorizacion?` opcional; `FacturacionService.anular()`/
+`PosService.registrarDevolucion()` llaman a
+`AutorizacionesService.verificar()` DESPUÉS del PIN (si el tenant
+activó `Configuracion.AUTORIZACION_2FA_ANULAR`/`_DEVOLUCION` —
+`ConfiguracionesService.buscarValor(..., 'false')`, sin sembrar en
+`CONFIGURACIONES_BASE`, default apagado — no rompe a ningún tenant
+existente el día del deploy).
+
+**Frontend**: `usuario.requiereAutorizacionAnular`/
+`requiereAutorizacionDevolucion` viajan en el login (mismo criterio que
+`tienePin`/`modulosActivos` — solo UX, la validación real es 100% del
+backend). Molecule `CampoCodigoAutorizacion`
+(`frontend/src/components/molecules/`) encapsula el flujo completo
+("Solicitar código" → countdown de expiración → input de 6 dígitos,
+mismo patrón que la pantalla real de Cuadre confirmada en la
+auditoría) y se reusa en `ModalAnularFactura` (`FacturasTable.tsx`),
+`ModalAnularVenta` y `ModalDevolucion` (`TurnoCajaDetalle.tsx`). **Bug
+preexistente encontrado y corregido de paso**: `ModalAnularVenta` (POS)
+nunca mandaba `pin` al backend — un cajero con PIN configurado no podía
+anular ventas desde el POS sin que el backend rechazara con 403 "PIN
+incorrecto" (`pin` llegaba siempre `undefined`); se agregó `CampoPin`
+ahí también, igual que ya tenía `ModalAnularFactura` (Facturación
+general). Panel `AutorizacionesPanel.tsx` (Admin → Facturación →
+Autorizaciones) con los 2 toggles, excluidos de la tabla genérica
+`ConfiguracionesPanel.tsx` por ser booleanos con checkbox propio (mismo
+criterio que `DOCUMENTO_LOGO`/`DOCUMENTO_NOTA_PIE` del ítem H-3).
+
 ## POS (punto de venta)
 
 `backend/src/pos/` es una capa delgada sobre Facturación: no duplica

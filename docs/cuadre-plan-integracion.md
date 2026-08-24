@@ -194,10 +194,25 @@ Resumen de lo que cambió (detalle en cada ítem más abajo):
 
 ## D — Autorización de acciones sensibles
 
-- [ ] **D-1** 🟧 *diseño primero* — **Capa 2 de autorización (opcional) por
+- [x] **D-1** 🟧 *diseño primero* — **Capa 2 de autorización (opcional) por
   un segundo usuario real** (email con código de un solo uso) para
-  anulaciones/devoluciones grandes. *Confirmado: brecha real, sin
-  cambios — nuestro PIN de Fase 9 sigue siendo 100% autoservicio.*
+  anulaciones/devoluciones grandes. *Confirmado: brecha real — nuestro
+  PIN de Fase 9 seguía siendo 100% autoservicio.* Decisiones confirmadas
+  con el usuario: (1) toggle simple por tenant, SIN umbral de monto —
+  igual que Cuadre; (2) destinatario del código: encargado de la
+  sucursal (asignado vía `UsuarioSucursal` + `pos.supervisar`) o, si no
+  hay ninguno, el/los Admin Total — se manda a TODOS los elegibles
+  (el sistema no puede detectar "no está en el lugar", mandar a todos
+  es el equivalente práctico). Entregado: módulo `autorizaciones/`
+  (`CodigoAutorizacion`, bcrypt + expiración de 5 min + máx. 5
+  intentos), `POST /facturas/:id/solicitar-autorizacion` y
+  `POST /pos/devoluciones/solicitar-autorizacion`, `codigoAutorizacion?`
+  en `anular()`/`registrarDevolucion()` — se SUMA al PIN de Fase 9, no
+  lo reemplaza. Toggles `AUTORIZACION_2FA_ANULAR`/`_DEVOLUCION`
+  (Admin → Facturación → Autorizaciones). De paso, se corrigió un bug
+  preexistente: `ModalAnularVenta` (POS) nunca mandaba el PIN al
+  backend. Migración `20260827090000_codigos_autorizacion`. Entregado
+  2026-08-24.
 
 ## E — Operación diaria / Inventario
 
@@ -671,17 +686,27 @@ Resumen de lo que cambió (detalle en cada ítem más abajo):
   queda entregado** — lo único pendiente son los 🟥 (requieren diseño
   primero) y B-9/B-4/E-1 (pausados o no bloqueantes, ver "Sugerencia de
   por dónde arrancar").
+- **2026-08-24**: entregado D-1 (Capa 2 de autorización), el primer 🟥
+  atacado tras cerrar el catálogo 🟨/🟧 — diseño confirmado con el
+  usuario vía `AskUserQuestion` (toggle simple sin umbral de monto;
+  destinatario: encargado de sucursal con `pos.supervisar`, o Admin
+  Total si no hay uno asignado, mandado a TODOS los elegibles). Módulo
+  `autorizaciones/` (`CodigoAutorizacion`, bcrypt, expira en 5 min, máx.
+  5 intentos), nuevos endpoints `solicitar-autorizacion` en Facturación
+  y POS, se SUMA al PIN de Fase 9 (no lo reemplaza). De paso, corregido
+  un bug preexistente: `ModalAnularVenta` (POS) nunca mandaba el PIN al
+  backend. Migración `20260827090000_codigos_autorizacion`.
 
 ## Sugerencia de por dónde arrancar
 
 **Estado actual: todo el catálogo 🟨/🟧 sin "diseño primero" está
-entregado.** Lote completo: B-1/B-2/B-3/B-6/B-7/B-8, E-2/E-3/E-4/E-5/
-E-6/E-8/E-9/E-11, F-2/F-4/F-5/F-8, G-1/G-2/G-3/G-4/G-5/G-6/G-7/G-8,
-H-3, J-1/J-2/J-3 — todos verificados (tsc + suite unitaria + e2e + lint
-+ build, todo verde) y commiteados uno por uno. Los 5 ítems que tenían
-el matiz "ya lo teníamos parcial" original (B-1, E-1, E-5, E-11, G-7)
-están todos resueltos o, en el caso de E-1, confirmados como brecha
-real sin cambios de alcance.
+entregado, y arrancó la ronda de ítems 🟥** (el usuario pidió seguir con
+"todos, no parar hasta finalizar todo" — cada uno con su propia
+conversación de diseño antes de tocar código). Lote 🟨/🟧 completo:
+B-1/B-2/B-3/B-6/B-7/B-8, E-2/E-3/E-4/E-5/E-6/E-8/E-9/E-11, F-2/F-4/F-5/
+F-8, G-1/G-2/G-3/G-4/G-5/G-6/G-7/G-8, H-3, J-1/J-2/J-3 — todos
+verificados (tsc + suite unitaria + e2e + lint + build, todo verde) y
+commiteados uno por uno. De los 🟥, ya entregado: **D-1**.
 
 Lo que queda, por categoría:
 - **Deliberadamente pausado a pedido del usuario**: B-9 (línea manual/
@@ -689,14 +714,15 @@ Lo que queda, por categoría:
 - **No bloqueante, sin implementar**: B-4 (Recargos de Factura, 🟨→🟧
   corrección de tamaño), E-1 (Patrón Borrador→Confirmado en Compras/
   Ajustes/Transferencias, matiz).
-- **Reclasificados a "diseño primero" al verificar el alcance real**
-  (mismo criterio que los 🟥 originales — no son campos sueltos):
-  C-2 (multi-moneda de punta a punta, 🟧→🟥) y J-4 (API keys, ya no
-  aplica sin una API pública) se sumaron a la lista original de 🟥:
-  A-1 a A-4, B-5, C-1, D-1, E-7, F-9, G-9 (hardware), H-2, I-1.
+- **🟥, pendientes de su propia conversación de diseño**: A-1 a A-4,
+  B-5, C-1, C-2 (multi-moneda, reclasificado desde 🟧), E-7, F-9, G-9
+  (hardware), H-2 (WhatsApp — con nota de decisión pendiente sobre n8n
+  vs. backend propio), I-1, J-4 (API keys, reclasificado — no aplica
+  sin una API pública).
 
 Todos los 🟥 restantes necesitan una conversación de alcance ANTES de
-tocar código — mismo criterio que Sucursales (Fase 8) y PIN (Fase 9):
+tocar código — mismo criterio que Sucursales (Fase 8), PIN (Fase 9) y
+D-1:
 presentar el diseño, resolver casos límite con el usuario, y recién
 después ejecutar. Ninguno se debe empezar a implementar directo desde
 este documento.

@@ -19,6 +19,7 @@ import { ListarTurnosQueryDto } from './dto/listar-turnos-query.dto';
 import { paginar } from '../common/types/pagina-resultado';
 import { CONFIGURACIONES_BASE } from '../tenants/roles-base';
 import { MotivoMovimientoCaja } from '@prisma/client';
+import { AutorizacionesService } from '../autorizaciones/autorizaciones.service';
 
 const CLAVE_TOLERANCIA_ARQUEO = 'POS_TOLERANCIA_ARQUEO';
 
@@ -51,6 +52,7 @@ export class PosService {
     private readonly inventarioService: InventarioService,
     private readonly authService: AuthService,
     private readonly redis: RedisService,
+    private readonly autorizacionesService: AutorizacionesService,
   ) {}
 
   listarVendedores(busqueda?: string) {
@@ -239,7 +241,27 @@ export class PosService {
    * siempre la del turno actual (igual criterio que registrarVenta), no la
    * de la factura original — el reintegro físico ocurre donde está el cajero.
    */
+  /** Ítem D-1 — capa 2 de autorización para devoluciones, mismo mecanismo que FacturacionService.solicitarAutorizacionAnulacion. */
+  async solicitarAutorizacionDevolucion(dto: { facturaOrigenId: string; turnoCajaId: string }, userId: string, tenantId: string) {
+    const turno = await this.posRepository.buscarPorId(dto.turnoCajaId);
+    const bodega = await this.inventarioService.validarAccesoBodega(turno.bodegaId, userId);
+    const facturaOrigen = await this.facturacionService.buscarPorId(dto.facturaOrigenId);
+    return this.autorizacionesService.solicitar({
+      tenantId,
+      tipo: 'DEVOLUCION_POS',
+      referenciaId: dto.facturaOrigenId,
+      sucursalId: bodega.sucursalId,
+      solicitadoPorId: userId,
+      monto: Number(facturaOrigen.total),
+      descripcion: `Devolución de factura ${facturaOrigen.ncf ?? facturaOrigen.id}`,
+    });
+  }
+
   async registrarDevolucion(dto: RegistrarDevolucionDto, tenantId: string, cajeroId: string) {
+    if (await this.autorizacionesService.estaHabilitada('DEVOLUCION_POS', tenantId)) {
+      await this.autorizacionesService.verificar('DEVOLUCION_POS', dto.facturaOrigenId, dto.codigoAutorizacion);
+    }
+
     const turno = await this.posRepository.buscarPorId(dto.turnoCajaId);
     this.validarAbierto(turno);
     await this.formasPagoRepository.buscarPorId(dto.formaPagoId);

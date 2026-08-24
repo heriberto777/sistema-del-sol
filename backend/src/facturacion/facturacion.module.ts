@@ -10,6 +10,7 @@ import { OfertasModule } from '../ofertas/ofertas.module';
 import { BonosModule } from '../bonos/bonos.module';
 import { AuthModule } from '../auth/auth.module';
 import { NotificacionesModule } from '../notificaciones/notificaciones.module';
+import { AutorizacionesModule } from '../autorizaciones/autorizaciones.module';
 
 @Module({
   // AuthModule: FacturacionService llama a authService.verificarPin() en
@@ -17,7 +18,18 @@ import { NotificacionesModule } from '../notificaciones/notificaciones.module';
   // InventarioService.validarAccesoBodega (ya importado abajo), sin
   // necesitar SucursalesModule acá directamente. NotificacionesModule:
   // enviarRecibo() (ítem F-4) reusa NotificacionesService.enviar().
-  imports: [InventarioModule, PagosModule, ClientesModule, VariantesModule, OfertasModule, BonosModule, AuthModule, NotificacionesModule],
+  // AutorizacionesModule: segunda capa de autorización (ítem D-1).
+  imports: [
+    InventarioModule,
+    PagosModule,
+    ClientesModule,
+    VariantesModule,
+    OfertasModule,
+    BonosModule,
+    AuthModule,
+    NotificacionesModule,
+    AutorizacionesModule,
+  ],
   controllers: [FacturacionController],
   providers: [FacturacionService, FacturacionRepository],
   exports: [FacturacionService],

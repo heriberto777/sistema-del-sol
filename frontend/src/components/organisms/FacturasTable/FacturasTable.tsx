@@ -9,6 +9,7 @@ import { FormField } from '../../molecules/FormField/FormField';
 import { SelectFormaPago } from '../../molecules/SelectFormaPago/SelectFormaPago';
 import { Modal } from '../../molecules/Modal/Modal';
 import { CampoPin } from '../../molecules/CampoPin/CampoPin';
+import { CampoCodigoAutorizacion } from '../../molecules/CampoCodigoAutorizacion/CampoCodigoAutorizacion';
 import { SearchInput } from '../../molecules/SearchInput/SearchInput';
 import { Paginacion } from '../../molecules/Paginacion/Paginacion';
 import { RowActionsMenu } from '../../molecules/RowActionsMenu/RowActionsMenu';
@@ -158,13 +159,16 @@ export function FacturasTable({ tiposFactura, titulo = 'Facturas', busquedaPlace
 
 function ModalAnularFactura({ factura, onClose }: { factura: Factura; onClose: () => void }) {
   const queryClient = useQueryClient();
+  const { usuario } = useAuth();
   const [motivo, setMotivo] = useState('');
   const [confirmado, setConfirmado] = useState(false);
   const [pin, setPin] = useState('');
+  const [codigoAutorizacion, setCodigoAutorizacion] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   const anular = useMutation({
-    mutationFn: async () => apiClient.post(`/facturas/${factura.id}/anular`, { motivo, pin: pin || undefined }),
+    mutationFn: async () =>
+      apiClient.post(`/facturas/${factura.id}/anular`, { motivo, pin: pin || undefined, codigoAutorizacion: codigoAutorizacion || undefined }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['facturas'] });
       onClose();
@@ -204,6 +208,13 @@ function ModalAnularFactura({ factura, onClose }: { factura: Factura; onClose: (
           Confirmo que quiero anular esta factura.
         </label>
         <CampoPin value={pin} onChange={setPin} id="anular-pin" />
+        <CampoCodigoAutorizacion
+          requerido={usuario?.requiereAutorizacionAnular}
+          solicitarUrl={`/facturas/${factura.id}/solicitar-autorizacion`}
+          value={codigoAutorizacion}
+          onChange={setCodigoAutorizacion}
+          id="anular-codigo-autorizacion"
+        />
         {error && <p className="text-sm text-red-600">{error}</p>}
         <Button type="submit" variante="peligro" disabled={anular.isPending} className="w-full">
           {anular.isPending ? 'Anulando…' : 'Anular factura'}

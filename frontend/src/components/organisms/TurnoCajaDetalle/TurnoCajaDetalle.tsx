@@ -10,6 +10,7 @@ import { ComboboxBusqueda } from '../../molecules/ComboboxBusqueda/ComboboxBusqu
 import { FormField } from '../../molecules/FormField/FormField';
 import { Modal } from '../../molecules/Modal/Modal';
 import { CampoPin } from '../../molecules/CampoPin/CampoPin';
+import { CampoCodigoAutorizacion } from '../../molecules/CampoCodigoAutorizacion/CampoCodigoAutorizacion';
 import { SelectFormaPago, type FormaPago } from '../../molecules/SelectFormaPago/SelectFormaPago';
 import { Select } from '../../atoms/Select/Select';
 import { useAuth } from '../../../hooks/useAuth';
@@ -1033,9 +1034,11 @@ function ModalDevolucion({
   onDevuelta: () => void;
   onClose: () => void;
 }) {
+  const { usuario } = useAuth();
   const [facturaId, setFacturaId] = useState('');
   const [cantidades, setCantidades] = useState<Record<string, string>>({});
   const [formaPagoId, setFormaPagoId] = useState('');
+  const [codigoAutorizacion, setCodigoAutorizacion] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   const { data: factura, isLoading } = useQuery({
@@ -1049,10 +1052,16 @@ function ModalDevolucion({
       const lineas = Object.entries(cantidades)
         .map(([productoId, cantidad]) => ({ productoId, cantidad: Number(cantidad) }))
         .filter((l) => l.cantidad > 0);
-      return apiClient.post('/pos/devoluciones', { facturaOrigenId: facturaId, turnoCajaId, formaPagoId, lineas });
+      return apiClient.post('/pos/devoluciones', {
+        facturaOrigenId: facturaId,
+        turnoCajaId,
+        formaPagoId,
+        lineas,
+        codigoAutorizacion: codigoAutorizacion || undefined,
+      });
     },
     onSuccess: onDevuelta,
-    onError: () => setError('No se pudo registrar la devolución — revisá las cantidades.'),
+    onError: (err: unknown) => setError(mensajeErrorApi(err, 'No se pudo registrar la devolución — revisá las cantidades.')),
   });
 
   function onSubmit(e: FormEvent) {
@@ -1118,6 +1127,14 @@ function ModalDevolucion({
               <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Forma de pago del reintegro</label>
               <SelectFormaPago value={formaPagoId} onChange={setFormaPagoId} />
             </div>
+            <CampoCodigoAutorizacion
+              requerido={usuario?.requiereAutorizacionDevolucion}
+              solicitarUrl="/pos/devoluciones/solicitar-autorizacion"
+              solicitarBody={{ facturaOrigenId: facturaId, turnoCajaId }}
+              value={codigoAutorizacion}
+              onChange={setCodigoAutorizacion}
+              id="devolucion-codigo-autorizacion"
+            />
             {error && <p className="text-sm text-red-600">{error}</p>}
             <Button type="submit" variante="peligro" disabled={devolver.isPending} className="w-full">
               {devolver.isPending ? 'Procesando…' : 'Confirmar devolución'}
@@ -1497,14 +1514,18 @@ function ModalCerrarTurno({
 }
 
 function ModalAnularVenta({ factura, onClose, onAnulada }: { factura: FacturaTurno; onClose: () => void; onAnulada: () => void }) {
+  const { usuario } = useAuth();
   const [motivo, setMotivo] = useState('');
   const [confirmado, setConfirmado] = useState(false);
+  const [pin, setPin] = useState('');
+  const [codigoAutorizacion, setCodigoAutorizacion] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   const anular = useMutation({
-    mutationFn: async () => apiClient.post(`/facturas/${factura.id}/anular`, { motivo }),
+    mutationFn: async () =>
+      apiClient.post(`/facturas/${factura.id}/anular`, { motivo, pin: pin || undefined, codigoAutorizacion: codigoAutorizacion || undefined }),
     onSuccess: () => onAnulada(),
-    onError: () => setError('No se pudo anular la venta.'),
+    onError: (err: unknown) => setError(mensajeErrorApi(err, 'No se pudo anular la venta.')),
   });
 
   function onSubmit(e: FormEvent) {
@@ -1532,6 +1553,14 @@ function ModalAnularVenta({ factura, onClose, onAnulada }: { factura: FacturaTur
           <input type="checkbox" checked={confirmado} onChange={(e) => setConfirmado(e.target.checked)} />
           Confirmo que quiero anular esta venta.
         </label>
+        <CampoPin value={pin} onChange={setPin} id="anular-venta-pin" />
+        <CampoCodigoAutorizacion
+          requerido={usuario?.requiereAutorizacionAnular}
+          solicitarUrl={`/facturas/${factura.id}/solicitar-autorizacion`}
+          value={codigoAutorizacion}
+          onChange={setCodigoAutorizacion}
+          id="anular-venta-codigo-autorizacion"
+        />
         {error && <p className="text-sm text-red-600">{error}</p>}
         <Button type="submit" variante="peligro" disabled={anular.isPending} className="w-full">
           {anular.isPending ? 'Anulando…' : 'Anular venta'}

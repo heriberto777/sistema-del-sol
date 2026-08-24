@@ -58,6 +58,7 @@ model Tenant {
   leyesFiscales LeyFiscal[]
   plantillasHorario PlantillaHorario[]
   tiposAusenciaConfig TipoAusenciaConfig[]
+  codigosAutorizacion CodigoAutorizacion[]
   proveedores   Proveedor[]
   ordenesCompra OrdenCompra[]
   webhooks      Webhook[]
@@ -438,6 +439,7 @@ model User {
   ausenciasAprobadas   Ausencia[] @relation("AusenciaAprobadaPor")
   asistenciasAprobadas RegistroAsistencia[] @relation("AsistenciaAprobadaPor")
   sucursales    UsuarioSucursal[]
+  codigosAutorizacionSolicitados CodigoAutorizacion[]
 
   @@unique([tenantId, email])
   @@map("users")
@@ -1595,6 +1597,39 @@ model TurnoCaja {
   ventasAparcadas VentaAparcada[]
 
   @@map("turnos_caja")
+}
+
+enum TipoCodigoAutorizacion {
+  ANULACION_FACTURA
+  DEVOLUCION_POS
+}
+
+/// Segunda capa de autorización (plan de integración Cuadre, ítem D-1) —
+/// opcional por tenant vía Configuracion (`AUTORIZACION_2FA_ANULAR`/
+/// `AUTORIZACION_2FA_DEVOLUCION`), complementa el PIN autoservicio de
+/// Fase 9: un código de un solo uso enviado por EMAIL a un tercero real
+/// (encargado de la sucursal, o Admin Total si no hay uno asignado — ver
+/// AutorizacionesService.resolverDestinatarios), no algo que el mismo
+/// cajero pueda autoaprobar. `referenciaId` es la Factura a anular
+/// (ANULACION_FACTURA) o la Factura original a devolver (DEVOLUCION_POS)
+/// — sin FK propia porque el tipo decide de qué tabla es el id, mismo
+/// criterio que `referenciaTipo`/`referenciaId` en MovimientoInventario.
+model CodigoAutorizacion {
+  id               String                 @id @default(uuid())
+  tenantId         String
+  tenant           Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tipo             TipoCodigoAutorizacion
+  referenciaId     String
+  codigoHash       String
+  expiraEn         DateTime
+  intentosFallidos Int                    @default(0)
+  usadoEn          DateTime?
+  solicitadoPorId  String
+  solicitadoPor    User                   @relation(fields: [solicitadoPorId], references: [id], onDelete: Cascade)
+  createdAt        DateTime               @default(now())
+
+  @@index([tenantId, tipo, referenciaId])
+  @@map("codigos_autorizacion")
 }
 
 /// Entradas/salidas de efectivo dentro de un turno abierto que NO son una

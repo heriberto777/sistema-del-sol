@@ -10,6 +10,7 @@ import { OlvidePasswordDto } from './dto/olvide-password.dto';
 import { RestablecerPasswordDto } from './dto/restablecer-password.dto';
 import { generarTokenReset, hashearTokenReset, RESET_PASSWORD_TTL_MS } from '../common/utils/password-reset-token';
 import { EmailChannel } from '../notificaciones/canales/email.channel';
+import { CLAVE_2FA_ANULAR, CLAVE_2FA_DEVOLUCION } from '../autorizaciones/autorizaciones.service';
 import { resolverModulosActivos } from '../planes/resolver-modulos-activos';
 
 const RESPUESTA_GENERICA_OLVIDE = {
@@ -77,6 +78,14 @@ export class AuthService {
     };
 
     const modulosActivos = await resolverModulosActivos(this.prisma, tenant.id);
+    // Ítem D-1 — solo para que el frontend decida si muestra el flujo de
+    // "solicitar código de autorización" en anular/devolver; la validación
+    // real sigue siendo 100% del backend (AutorizacionesService.verificar).
+    const config2fa = await this.prisma.configuracion.findMany({
+      where: { tenantId: tenant.id, clave: { in: [CLAVE_2FA_ANULAR, CLAVE_2FA_DEVOLUCION] } },
+    });
+    const requiereAutorizacionAnular = config2fa.find((c) => c.clave === CLAVE_2FA_ANULAR)?.valor === 'true';
+    const requiereAutorizacionDevolucion = config2fa.find((c) => c.clave === CLAVE_2FA_DEVOLUCION)?.valor === 'true';
 
     return {
       accessToken: this.jwtService.sign(payload),
@@ -98,6 +107,8 @@ export class AuthService {
         // acciones sensibles (Fase 9) — la validación real es 100% del
         // backend (verificarPin), igual criterio que modulosActivos.
         tienePin: !!user.pinHash,
+        requiereAutorizacionAnular,
+        requiereAutorizacionDevolucion,
         tenant: { subdominio: tenant.subdominio, nombre: tenant.nombre },
       },
     };

@@ -11,4 +11,12 @@ export class AnularFacturaDto {
   @IsOptional()
   @IsString()
   pin?: string;
+
+  @ApiProperty({
+    required: false,
+    description: 'Código de un solo uso enviado por email a un tercero — requerido solo si el tenant activó la segunda capa de autorización (ítem D-1)',
+  })
+  @IsOptional()
+  @IsString()
+  codigoAutorizacion?: string;
 }

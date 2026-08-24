@@ -20,6 +20,7 @@ import { DocumentoPdfParams, generarDocumentoPdf } from '../common/pdf/documento
 import { generarDocumentoTicketHtml } from '../common/pdf/documento-ticket';
 import { NotificacionesService } from '../notificaciones/notificaciones.service';
 import { EnviarReciboDto } from './dto/enviar-recibo.dto';
+import { AutorizacionesService } from '../autorizaciones/autorizaciones.service';
 import { resolverFormatoImpresion } from '../common/impresion/resolver-formato-impresion';
 import { resolverPersonalizacionDocumento } from '../common/impresion/resolver-personalizacion-documento';
 import { PrismaService } from '../prisma/prisma.service';
@@ -108,6 +109,7 @@ export class FacturacionService {
     private readonly bonosService: BonosService,
     private readonly authService: AuthService,
     private readonly notificacionesService: NotificacionesService,
+    private readonly autorizacionesService: AutorizacionesService,
   ) {}
 
   /**
@@ -505,11 +507,48 @@ export class FacturacionService {
   }
 
   /** Misma razón que en `crear()`: la reintegración/re-descuento de stock y el cambio de estado de la factura corren en una sola transacción. */
-  async anular(id: string, motivo: string, tenantId: string, userId: string, puedeSupervisarCaja: boolean, pin?: string) {
+  /**
+   * Segunda capa de autorización (ítem D-1) — opcional por tenant, previo
+   * a `anular()`: genera un código de un solo uso y lo manda por email a
+   * un tercero real (encargado de la sucursal, o Admin Total si no hay
+   * uno asignado). El endpoint que llama a esto exige el mismo permiso
+   * `facturacion.anular` que `anular()`, así que reusar
+   * `validarAccesoBodega` acá cubre el mismo chequeo de sucursal (Fase 9)
+   * sin duplicar la regla.
+   */
+  async solicitarAutorizacionAnulacion(id: string, userId: string, tenantId: string) {
+    const factura = await this.facturacionRepository.buscarPorId(id);
+    const bodega = factura.bodegaId ? await this.inventarioService.validarAccesoBodega(factura.bodegaId, userId) : null;
+    return this.autorizacionesService.solicitar({
+      tenantId,
+      tipo: 'ANULACION_FACTURA',
+      referenciaId: id,
+      sucursalId: bodega?.sucursalId ?? null,
+      solicitadoPorId: userId,
+      monto: Number(factura.total),
+      descripcion: `Anulación de factura ${factura.ncf ?? factura.id}`,
+    });
+  }
+
+  async anular(
+    id: string,
+    motivo: string,
+    tenantId: string,
+    userId: string,
+    puedeSupervisarCaja: boolean,
+    pin?: string,
+    codigoAutorizacion?: string,
+  ) {
     // Fase 9: anular es una acción sensible — confirmación de PIN además
     // del permiso `facturacion.anular` que ya gatea el endpoint. No-op si
     // el usuario no tiene PIN configurado (default permisivo).
     await this.authService.verificarPin(userId, pin);
+    // Ítem D-1: capa 2, opcional por tenant — se SUMA al PIN de arriba, no
+    // lo reemplaza. No-op si el tenant no activó
+    // AUTORIZACION_2FA_ANULAR (default permisivo).
+    if (await this.autorizacionesService.estaHabilitada('ANULACION_FACTURA', tenantId)) {
+      await this.autorizacionesService.verificar('ANULACION_FACTURA', id, codigoAutorizacion);
+    }
 
     const factura = await this.facturacionRepository.buscarPorId(id);
     if (factura.estado === 'ANULADA') {

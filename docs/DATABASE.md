@@ -65,6 +65,18 @@ confirmación para acciones sensibles, todos nullable/con default, sin
 backfill). Sin `pinHash`, las acciones que lo piden funcionan igual que
 antes de esta fase (default permisivo) — ver ARCHITECTURE.md.
 
+`codigos_autorizacion` (plan de integración Cuadre, ítem D-1) es la
+segunda capa de autorización, opcional por tenant — complementa
+`pinHash` de arriba, no lo reemplaza. `referenciaId` es `String` libre
+sin FK propia (el `tipo` decide de qué tabla es el id, mismo criterio
+que `referenciaTipo`/`referenciaId` de `movimientos_inventario`) porque
+puede apuntar a una `Factura` de dos maneras distintas según el `tipo`
+(`ANULACION_FACTURA`: la factura misma; `DEVOLUCION_POS`: la factura
+original que se está devolviendo). Sin backfill/seed — las 2 claves de
+`Configuracion` que lo activan (`AUTORIZACION_2FA_ANULAR`/
+`_DEVOLUCION`) tampoco están en `CONFIGURACIONES_BASE`, default apagado
+vía `ConfiguracionesService.buscarValor`.
+
 ## Reglas de negocio relevantes al modelo
 
 - **NCF**: `ncf_asignados` guarda, por tenant y tipo (`B01` Crédito Fiscal,

@@ -14,6 +14,7 @@ import { OfertasService } from '../ofertas/ofertas.service';
 import { BonosService } from '../bonos/bonos.service';
 import { AuthService } from '../auth/auth.service';
 import { NotificacionesService } from '../notificaciones/notificaciones.service';
+import { AutorizacionesService } from '../autorizaciones/autorizaciones.service';
 
 describe('FacturacionService', () => {
   let service: FacturacionService;
@@ -29,6 +30,7 @@ describe('FacturacionService', () => {
   let bonosService: jest.Mocked<BonosService>;
   let authService: jest.Mocked<AuthService>;
   let notificacionesService: jest.Mocked<NotificacionesService>;
+  let autorizacionesService: jest.Mocked<AutorizacionesService>;
 
   // Un tx opaco: crear()/anular() abren la transacción con tenantPrisma.client.$transaction
   // y pasan este objeto a los métodos *EnTx — para las pruebas basta con que sea el mismo
@@ -103,6 +105,11 @@ describe('FacturacionService', () => {
     notificacionesService = {
       enviar: jest.fn().mockResolvedValue({ id: 'n1' }),
     } as unknown as jest.Mocked<NotificacionesService>;
+    autorizacionesService = {
+      estaHabilitada: jest.fn().mockResolvedValue(false),
+      verificar: jest.fn().mockResolvedValue(undefined),
+      solicitar: jest.fn(),
+    } as unknown as jest.Mocked<AutorizacionesService>;
     service = new FacturacionService(
       repository,
       inventarioService,
@@ -116,6 +123,7 @@ describe('FacturacionService', () => {
       bonosService,
       authService,
       notificacionesService,
+      autorizacionesService,
     );
   });
 
@@ -871,6 +879,30 @@ describe('FacturacionService', () => {
     });
   });
 
+  describe('solicitarAutorizacionAnulacion (plan de integración Cuadre, ítem D-1)', () => {
+    it('resuelve la sucursal de la bodega de la factura y delega en AutorizacionesService.solicitar', async () => {
+      repository.buscarPorId.mockResolvedValue({ id: 'f1', ncf: 'B0200000001', total: 236, bodegaId: 'bodega-1' } as never);
+      autorizacionesService.solicitar.mockResolvedValue({ expiraEn: new Date(), enviadoA: ['su***@ejemplo.com'] });
+
+      await service.solicitarAutorizacionAnulacion('f1', 'user-1', 'tenant-1');
+
+      expect(inventarioService.validarAccesoBodega).toHaveBeenCalledWith('bodega-1', 'user-1');
+      expect(autorizacionesService.solicitar).toHaveBeenCalledWith(
+        expect.objectContaining({ tenantId: 'tenant-1', tipo: 'ANULACION_FACTURA', referenciaId: 'f1', sucursalId: 's1', monto: 236 }),
+      );
+    });
+
+    it('sin bodegaId (dato legado), pide el código con sucursalId null', async () => {
+      repository.buscarPorId.mockResolvedValue({ id: 'f1', ncf: 'B0200000001', total: 236, bodegaId: null } as never);
+      autorizacionesService.solicitar.mockResolvedValue({ expiraEn: new Date(), enviadoA: [] });
+
+      await service.solicitarAutorizacionAnulacion('f1', 'user-1', 'tenant-1');
+
+      expect(inventarioService.validarAccesoBodega).not.toHaveBeenCalled();
+      expect(autorizacionesService.solicitar).toHaveBeenCalledWith(expect.objectContaining({ sucursalId: null }));
+    });
+  });
+
   describe('anular', () => {
     function facturaExistente(overrides: Record<string, unknown> = {}) {
       return {
@@ -901,6 +933,36 @@ describe('FacturacionService', () => {
         expect.objectContaining({ tenantId: 'tenant-1', facturaId: 'f1', clienteId: 'cliente-1', total: '200' }),
       );
       expect(resultado).toEqual(expect.objectContaining({ id: 'f1' }));
+    });
+
+    it('D-1: no exige código de autorización si el tenant no activó la segunda capa', async () => {
+      repository.buscarPorId.mockResolvedValue(facturaExistente() as never);
+      repository.anularEnTx.mockResolvedValue(facturaCreada({ total: 200, subtotal: 200 }) as never);
+      autorizacionesService.estaHabilitada.mockResolvedValue(false);
+
+      await service.anular('f1', 'Motivo de prueba', 'tenant-1', 'user-1', true);
+
+      expect(autorizacionesService.verificar).not.toHaveBeenCalled();
+    });
+
+    it('D-1: exige y valida el código de autorización cuando el tenant activó AUTORIZACION_2FA_ANULAR', async () => {
+      repository.buscarPorId.mockResolvedValue(facturaExistente() as never);
+      repository.anularEnTx.mockResolvedValue(facturaCreada({ total: 200, subtotal: 200 }) as never);
+      autorizacionesService.estaHabilitada.mockResolvedValue(true);
+
+      await service.anular('f1', 'Motivo de prueba', 'tenant-1', 'user-1', true, undefined, '654321');
+
+      expect(autorizacionesService.verificar).toHaveBeenCalledWith('ANULACION_FACTURA', 'f1', '654321');
+    });
+
+    it('D-1: propaga el código de autorización incorrecto sin llegar a tocar la factura', async () => {
+      autorizacionesService.estaHabilitada.mockResolvedValue(true);
+      autorizacionesService.verificar.mockRejectedValue(new Error('Código de autorización incorrecto'));
+
+      await expect(service.anular('f1', 'Motivo de prueba', 'tenant-1', 'user-1', true)).rejects.toThrow(
+        'Código de autorización incorrecto',
+      );
+      expect(repository.buscarPorId).not.toHaveBeenCalled();
     });
 
     it('Fase 9: propaga el PIN incorrecto/faltante sin llegar a tocar la factura', async () => {
