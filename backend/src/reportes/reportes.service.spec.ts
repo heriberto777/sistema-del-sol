@@ -12,6 +12,7 @@ describe('ReportesService', () => {
       ventasDeHoy: jest.fn(),
       stockBajoConteo: jest.fn(),
       ordenesCompraPendientesConteo: jest.fn(),
+      alertasInventarioSegmentadas: jest.fn().mockResolvedValue({ sinStock: 0, stockBajo: 0, porVencer7Dias: 0, vencidos: 0 }),
       facturasEnRango: jest.fn(),
       facturasEnRangoConLineas: jest.fn(),
       stockActual: jest.fn(),
@@ -27,10 +28,11 @@ describe('ReportesService', () => {
   });
 
   describe('dashboard', () => {
-    it('combina ventas de hoy, stock bajo y órdenes pendientes en un solo objeto', async () => {
+    it('combina ventas de hoy, stock bajo, órdenes pendientes y alertas de inventario segmentadas en un solo objeto', async () => {
       repository.ventasDeHoy.mockResolvedValue({ total: 1500, cantidad: 3 });
       repository.stockBajoConteo.mockResolvedValue(2);
       repository.ordenesCompraPendientesConteo.mockResolvedValue(1);
+      repository.alertasInventarioSegmentadas.mockResolvedValue({ sinStock: 1, stockBajo: 2, porVencer7Dias: 3, vencidos: 4 });
 
       const resultado = await service.dashboard('tenant-1');
 
@@ -39,8 +41,10 @@ describe('ReportesService', () => {
         facturasHoyCantidad: 3,
         productosStockBajo: 2,
         ordenesCompraPendientes: 1,
+        alertasInventario: { sinStock: 1, stockBajo: 2, porVencer7Dias: 3, vencidos: 4 },
       });
       expect(repository.stockBajoConteo).toHaveBeenCalledWith('tenant-1', undefined);
+      expect(repository.alertasInventarioSegmentadas).toHaveBeenCalledWith('tenant-1', undefined);
     });
 
     it('guarda el resultado en Redis con clave por tenant tras calcularlo', async () => {

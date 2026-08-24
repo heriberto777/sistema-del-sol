@@ -18,6 +18,7 @@ interface DashboardResultado {
   facturasHoyCantidad: number;
   productosStockBajo: number;
   ordenesCompraPendientes: number;
+  alertasInventario: { sinStock: number; stockBajo: number; porVencer7Dias: number; vencidos: number };
 }
 
 function rangoPorDefecto(desde?: string, hasta?: string): { desde: Date; hasta: Date } {
@@ -51,10 +52,11 @@ export class ReportesService {
   }
 
   private async calcularDashboard(tenantId: string, bodegaIds?: string[]): Promise<DashboardResultado> {
-    const [ventasHoy, productosStockBajo, ordenesCompraPendientes] = await Promise.all([
+    const [ventasHoy, productosStockBajo, ordenesCompraPendientes, alertasInventario] = await Promise.all([
       this.reportesRepository.ventasDeHoy(bodegaIds),
       this.reportesRepository.stockBajoConteo(tenantId, bodegaIds),
       this.reportesRepository.ordenesCompraPendientesConteo(),
+      this.reportesRepository.alertasInventarioSegmentadas(tenantId, bodegaIds),
     ]);
 
     return {
@@ -62,6 +64,7 @@ export class ReportesService {
       facturasHoyCantidad: ventasHoy.cantidad,
       productosStockBajo,
       ordenesCompraPendientes,
+      alertasInventario,
     };
   }
 

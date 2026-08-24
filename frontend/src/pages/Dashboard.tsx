@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { AlertTriangle, Banknote, Receipt, ShoppingCart } from 'lucide-react';
+import { AlertTriangle, Banknote, CalendarClock, PackageX, Receipt, ShoppingCart, XOctagon } from 'lucide-react';
 import { StatCard } from '../components/molecules/StatCard/StatCard';
 import { RequierePermiso } from '../components/organisms/RequierePermiso/RequierePermiso';
 import { Select } from '../components/atoms/Select/Select';
@@ -12,6 +12,7 @@ interface DashboardStats {
   facturasHoyCantidad: number;
   productosStockBajo: number;
   ordenesCompraPendientes: number;
+  alertasInventario: { sinStock: number; stockBajo: number; porVencer7Dias: number; vencidos: number };
 }
 
 export function Dashboard() {
@@ -73,6 +74,32 @@ export function Dashboard() {
             "Órdenes de compra pendientes" siempre muestra el total de la empresa — todavía no se puede filtrar por sucursal.
           </p>
         )}
+
+        <div>
+          <h2 className="mb-3 text-sm font-semibold text-slate-700 dark:text-slate-300">Alertas de inventario</h2>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <StatCard
+              etiqueta="Sin stock"
+              valor={isLoading ? '…' : String(data?.alertasInventario.sinStock ?? 0)}
+              icono={PackageX}
+            />
+            <StatCard
+              etiqueta="Stock bajo"
+              valor={isLoading ? '…' : String(data?.alertasInventario.stockBajo ?? 0)}
+              icono={AlertTriangle}
+            />
+            <StatCard
+              etiqueta="Por vencer (7 días)"
+              valor={isLoading ? '…' : String(data?.alertasInventario.porVencer7Dias ?? 0)}
+              icono={CalendarClock}
+            />
+            <StatCard
+              etiqueta="Vencidos"
+              valor={isLoading ? '…' : String(data?.alertasInventario.vencidos ?? 0)}
+              icono={XOctagon}
+            />
+          </div>
+        </div>
       </RequierePermiso>
     </div>
   );

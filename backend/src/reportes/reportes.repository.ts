@@ -51,6 +51,38 @@ export class ReportesRepository {
     return stock.filter((s) => Number(s.cantidadActual) < Number(s.stockMinimo)).length;
   }
 
+  /**
+   * 4 categorías del dashboard de inventario (plan de integración
+   * Cuadre, ítem E-4) — antes un solo contador (`stockBajoConteo`, que
+   * mezclaba "sin stock" y "stock bajo pero > 0"). `porVencer`/`vencidos`
+   * son independientes del umbral de 30 días del cron de avisos
+   * (`LotesCronService`) — acá es puramente informativo para el
+   * dashboard, con un umbral fijo de 7 días.
+   */
+  async alertasInventarioSegmentadas(tenantId: string, bodegaIds?: string[]) {
+    const stock = await this.db.stock.findMany({
+      where: { variante: { producto: { tenantId } }, ...(bodegaIds ? { bodegaId: { in: bodegaIds } } : {}) },
+      select: { cantidadActual: true, stockMinimo: true },
+    });
+    const sinStock = stock.filter((s) => Number(s.cantidadActual) <= 0).length;
+    const stockBajo = stock.filter((s) => Number(s.cantidadActual) > 0 && Number(s.cantidadActual) < Number(s.stockMinimo)).length;
+
+    const hoy = new Date();
+    const enSieteDias = new Date(hoy.getTime() + 7 * 24 * 60 * 60 * 1000);
+    // `Lote` SÍ tiene tenantId propio (TENANT_SCOPED_MODELS lo inyecta solo)
+    // — a diferencia de `Stock` arriba, que es hijo sin esa columna.
+    const [porVencer7Dias, vencidos] = await Promise.all([
+      this.db.lote.count({
+        where: { cantidadActual: { gt: 0 }, fechaVencimiento: { gte: hoy, lte: enSieteDias }, ...(bodegaIds ? { bodegaId: { in: bodegaIds } } : {}) },
+      }),
+      this.db.lote.count({
+        where: { cantidadActual: { gt: 0 }, fechaVencimiento: { lt: hoy }, ...(bodegaIds ? { bodegaId: { in: bodegaIds } } : {}) },
+      }),
+    ]);
+
+    return { sinStock, stockBajo, porVencer7Dias, vencidos };
+  }
+
   /** Sin bodegaId en OrdenCompra (solo su RecepcionCompra lo tiene) — no se puede filtrar por sucursal sin un cambio estructural, ver ARCHITECTURE.md. */
   ordenesCompraPendientesConteo() {
     return this.db.ordenCompra.count({

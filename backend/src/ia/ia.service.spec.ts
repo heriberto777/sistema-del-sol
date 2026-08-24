@@ -18,7 +18,7 @@ describe('IaService', () => {
 
   describe('preguntarAsistente', () => {
     it('sin IA habilitada, devuelve el resumen numérico crudo (modo básico)', async () => {
-      reportesService.dashboard.mockResolvedValue({ ventasHoyTotal: 5000, facturasHoyCantidad: 3, productosStockBajo: 2, ordenesCompraPendientes: 1 });
+      reportesService.dashboard.mockResolvedValue({ ventasHoyTotal: 5000, facturasHoyCantidad: 3, productosStockBajo: 2, ordenesCompraPendientes: 1, alertasInventario: { sinStock: 0, stockBajo: 2, porVencer7Dias: 0, vencidos: 0 } });
 
       const resultado = await service.preguntarAsistente('¿cómo van las ventas?', 't1');
 
@@ -29,7 +29,7 @@ describe('IaService', () => {
 
     it('con IA habilitada, usa la respuesta generada', async () => {
       Object.defineProperty(iaClient, 'habilitado', { value: true });
-      reportesService.dashboard.mockResolvedValue({ ventasHoyTotal: 5000, facturasHoyCantidad: 3, productosStockBajo: 2, ordenesCompraPendientes: 1 });
+      reportesService.dashboard.mockResolvedValue({ ventasHoyTotal: 5000, facturasHoyCantidad: 3, productosStockBajo: 2, ordenesCompraPendientes: 1, alertasInventario: { sinStock: 0, stockBajo: 2, porVencer7Dias: 0, vencidos: 0 } });
       iaClient.completar.mockResolvedValue('Las ventas van bien hoy.');
 
       const resultado = await service.preguntarAsistente('¿cómo van las ventas?', 't1');
@@ -39,7 +39,7 @@ describe('IaService', () => {
 
     it('con IA habilitada pero que falla la llamada, cae al resumen crudo', async () => {
       Object.defineProperty(iaClient, 'habilitado', { value: true });
-      reportesService.dashboard.mockResolvedValue({ ventasHoyTotal: 5000, facturasHoyCantidad: 3, productosStockBajo: 2, ordenesCompraPendientes: 1 });
+      reportesService.dashboard.mockResolvedValue({ ventasHoyTotal: 5000, facturasHoyCantidad: 3, productosStockBajo: 2, ordenesCompraPendientes: 1, alertasInventario: { sinStock: 0, stockBajo: 2, porVencer7Dias: 0, vencidos: 0 } });
       iaClient.completar.mockResolvedValue(null);
 
       const resultado = await service.preguntarAsistente('¿cómo van las ventas?', 't1');

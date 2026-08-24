@@ -530,6 +530,22 @@ hubiera detectado.
   `stock_bajo`, si el tenant no creó su propia `NotificacionPlantilla`
   para esa clave, es un no-op silencioso.
 
+**Alertas de inventario segmentadas en el Dashboard** (plan de
+integración Cuadre, ítem E-4): antes, `GET /reportes/dashboard`
+exponía un solo contador `productosStockBajo` (mezclaba "sin stock" y
+"stock bajo pero > 0") y nada sobre vencimientos. `ReportesRepository.
+alertasInventarioSegmentadas()` agrega 4 categorías —
+`sinStock`/`stockBajo` (mismo `Stock` que `stockBajoConteo`, ahora
+partido por `cantidadActual <= 0` vs. `0 < cantidadActual <
+stockMinimo`) y `porVencer7Dias`/`vencidos` (`Lote`, umbral fijo de 7
+días — **deliberadamente independiente** del umbral de 30 días del cron
+de avisos de arriba: acá es solo lectura para un panel, no dispara
+ninguna notificación). `productosStockBajo` (el contador viejo) se dejó
+intacto para no romper a nadie que ya lo lea — `alertasInventario` es
+un objeto nuevo, aditivo. Frontend: segunda fila de `StatCard` en
+`Dashboard.tsx`, filtrada por la misma `sucursalId` que el resto del
+dashboard.
+
 **Bug real preexistente encontrado y corregido durante esta fase —
 crons que nunca corrían**: al agregar `LotesCronService`, NestJS logueó
 `"Cannot register cron job ... because it is defined in a non static

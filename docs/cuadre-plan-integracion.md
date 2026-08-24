@@ -213,10 +213,16 @@ Resumen de lo que cambió (detalle en cada ítem más abajo):
   bodega pertenece, así que la agregación cruzada es correcta sin tocar
   esa lógica. `KardexView.tsx` gana un checkbox "Todas las bodegas" y
   una columna "Bodega" condicional. Entregado 2026-08-21.
-- [ ] **E-4** 🟧 — **Alertas de inventario segmentadas**: 4 categorías (Sin
+- [x] **E-4** 🟧 — **Alertas de inventario segmentadas**: 4 categorías (Sin
   Stock / Stock Bajo / Por Vencer 7 días / Vencidos) con dashboard propio.
-  *Confirmado: brecha real — el reporte hoy es un solo contador
-  (`stockBajoConteo`).*
+  *Confirmado: brecha real — el reporte hoy era un solo contador
+  (`stockBajoConteo`), mezclando "sin stock" y "stock bajo pero > 0", sin
+  nada sobre vencimientos.* Entregado: `GET /reportes/dashboard` gana
+  `alertasInventario: {sinStock, stockBajo, porVencer7Dias, vencidos}`
+  (aditivo, `productosStockBajo` intacto) — umbral fijo de 7 días para
+  vencimientos, independiente del umbral de 30 días del cron de avisos
+  existente. Segunda fila de tarjetas en `Dashboard.tsx`, filtrable por
+  sucursal igual que el resto. Sin migración. Entregado 2026-08-24.
 - [x] **E-5** 🟧 *(alcance reducido)* — **Cliente: campos que faltan**.
   *YA tenemos `limiteCredito` (Decimal) y `esConsumidorFinal` (que ES el
   "cliente por defecto"/walk-in de Cuadre) en `model Cliente`.* Entregado:
@@ -604,7 +610,7 @@ bloqueo — **B-9 está deliberadamente pausado** (el usuario
 pidió evaluarlo con más calma, no retomar sin avisar) y B-4 (🟧) no es
 bloqueante. La sección **J** queda completa salvo J-4 (🟥, diseño
 primero). La sección **F** queda completa salvo F-9 (🟥, diseño
-primero). Quedan además C-2 (multi-moneda, 🟧), E-4/E-6/E-8 (🟧) y H-3
+primero). Quedan además C-2 (multi-moneda, 🟧), E-6/E-8 (🟧) y H-3
 (🟧) sin verificar en detalle contra el código. Los 🟥 con "diseño
 primero" conviene agruparlos en su propia sesión de planeamiento cuando
 se prioricen, siguiendo la misma mecánica que Sucursales (Fase 8) y PIN

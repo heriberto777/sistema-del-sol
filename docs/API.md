@@ -339,7 +339,7 @@ Ver `plugins/inmobiliaria/src/inmobiliaria.controller.ts`.
 
 | Método | Ruta | Permiso |
 |---|---|---|
-| GET | `/api/reportes/dashboard?sucursalId` | `reportes.ver` — `{ ventasHoyTotal, facturasHoyCantidad, productosStockBajo, ordenesCompraPendientes }`, cacheado en Redis 30s por tenant+sucursal. `sucursalId` opcional (Fase 8d) filtra los primeros 3 KPIs; `ordenesCompraPendientes` siempre tenant-wide (`OrdenCompra` no tiene `bodegaId` propio) |
+| GET | `/api/reportes/dashboard?sucursalId` | `reportes.ver` — `{ ventasHoyTotal, facturasHoyCantidad, productosStockBajo, ordenesCompraPendientes, alertasInventario: {sinStock, stockBajo, porVencer7Dias, vencidos} }` (ítem E-4), cacheado en Redis 30s por tenant+sucursal. `sucursalId` opcional (Fase 8d) filtra los primeros 3 KPIs y `alertasInventario`; `ordenesCompraPendientes` siempre tenant-wide (`OrdenCompra` no tiene `bodegaId` propio). `porVencer7Dias`/`vencidos` usan un umbral fijo de 7 días, independiente del umbral de 30 días del cron de avisos (`LotesCronService`) |
 | GET | `/api/reportes/ventas?desde&hasta` | `reportes.ver` — facturas emitidas en el rango (default: últimos 30 días) + resumen |
 | GET | `/api/reportes/ventas/exportar?desde&hasta&formato=xlsx\|pdf` | `reportes.ver` — descarga binaria (`.xlsx` real vía exceljs, `.pdf` real vía pdfkit) |
 | GET | `/api/reportes/ventas/agrupado?desde&hasta&dimension=cliente\|categoria\|producto\|vendedor\|formaPago\|codigoAlterno` | `reportes.ver` — catálogo de reportes ampliado (ítem J-2), sin exportador xlsx/pdf todavía |
