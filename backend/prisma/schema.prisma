@@ -2439,9 +2439,13 @@ model Notificacion {
   @@map("notificaciones")
 }
 
+/// BOGO agregado en el plan de integración Cuadre, ítem A-2 — cubre tanto
+/// "Compra X Lleva Y" como "Segunda Unidad" (caso particular con
+/// comprarCantidad=1, llevarCantidad=1) con un solo mecanismo genérico.
 enum TipoDescuentoOferta {
   PORCENTAJE
   MONTO_FIJO
+  BOGO
 }
 
 enum AlcanceOferta {
@@ -2458,14 +2462,33 @@ enum AlcanceOferta {
 /// monto ya facturado, no una venta nueva. `productoId`/`categoriaId`/
 /// `montoMinimoCarrito` son mutuamente exclusivos según `alcance`,
 /// validado en OfertasService, no en el schema.
+///
+/// Plan de integración Cuadre, ítem A-2 — campos agregados:
+/// `comprarCantidad`/`llevarCantidad`/`porcentajeDescuentoLlevar` (solo
+/// BOGO, alcance PRODUCTO/CATEGORIA — nunca CARRITO, un "compra X lleva
+/// Y" no tiene sentido sobre el total del carrito);
+/// `descuentoMaximoMonto` (tope RD$, cualquier tipo); `acumulable`
+/// (default `false` = comportamiento histórico, nunca se apilan) y
+/// `prioridad` (desempate cuando hay más de una NO acumulable con el
+/// mismo descuento resultante — ver OfertasService.combinarDescuentos);
+/// `pagaComision` (inerte hasta que se implemente A-1 — Comisiones de
+/// venta — pero vive en el mismo registro de Oferta en Cuadre).
 model Oferta {
   id                 String              @id @default(uuid())
   tenantId           String
   tenant             Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   nombre             String
   tipoDescuento      TipoDescuentoOferta
-  // % (0-100) si PORCENTAJE, monto RD$ si MONTO_FIJO.
-  valor              Decimal             @db.Decimal(14, 4)
+  // % (0-100) si PORCENTAJE, monto RD$ si MONTO_FIJO — null si BOGO.
+  valor              Decimal?            @db.Decimal(14, 4)
+  comprarCantidad    Int?
+  llevarCantidad     Int?
+  // % de descuento sobre las unidades "llevadas" — 100 = gratis (BOGO clásico), 50 = "segunda unidad a mitad de precio".
+  porcentajeDescuentoLlevar Decimal?     @db.Decimal(5, 2)
+  descuentoMaximoMonto Decimal?          @db.Decimal(14, 2)
+  acumulable         Boolean             @default(false)
+  prioridad          Int                 @default(0)
+  pagaComision       Boolean             @default(true)
   alcance            AlcanceOferta
   productoId         String?
   producto           Producto?           @relation(fields: [productoId], references: [id], onDelete: Cascade)

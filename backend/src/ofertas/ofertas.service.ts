@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
+import { Oferta } from '@prisma/client';
 import { OfertasRepository } from './ofertas.repository';
 import { CrearOfertaDto } from './dto/crear-oferta.dto';
 
@@ -12,6 +13,7 @@ export class OfertasService {
 
   async crear(dto: CrearOfertaDto, tenantId: string) {
     this.validarAlcance(dto);
+    this.validarTipoDescuento(dto);
     return this.ofertasRepository.crear(dto, tenantId);
   }
 
@@ -19,6 +21,7 @@ export class OfertasService {
     const actual = await this.ofertasRepository.buscarPorId(id);
     const combinado = { ...actual, ...dto } as CrearOfertaDto;
     this.validarAlcance(combinado);
+    this.validarTipoDescuento(combinado);
     return this.ofertasRepository.actualizar(id, dto);
   }
 
@@ -46,33 +49,93 @@ export class OfertasService {
       if (dto.productoId || dto.montoMinimoCarrito) {
         throw new BadRequestException('Una oferta de alcance CATEGORIA no acepta productoId ni montoMinimoCarrito');
       }
-    } else if (dto.productoId || dto.categoriaId) {
-      throw new BadRequestException('Una oferta de alcance CARRITO no acepta productoId ni categoriaId');
+    } else {
+      if (dto.productoId || dto.categoriaId) {
+        throw new BadRequestException('Una oferta de alcance CARRITO no acepta productoId ni categoriaId');
+      }
+      // Ítem A-2: "compra X lleva Y" no tiene sentido sobre el total del
+      // carrito (no hay una "unidad" a contar) — solo PRODUCTO/CATEGORIA.
+      if (dto.tipoDescuento === 'BOGO') {
+        throw new BadRequestException('BOGO no aplica a ofertas de alcance CARRITO — usá PRODUCTO o CATEGORIA');
+      }
     }
   }
 
-  private montoDescuento(tipoDescuento: string, valor: number, base: number): number {
-    const bruto = tipoDescuento === 'PORCENTAJE' ? base * (Number(valor) / 100) : Number(valor);
+  /** Ítem A-2 — BOGO usa comprarCantidad/llevarCantidad en vez de `valor`. */
+  private validarTipoDescuento(dto: CrearOfertaDto) {
+    if (dto.tipoDescuento === 'BOGO') {
+      if (!dto.comprarCantidad || !dto.llevarCantidad) {
+        throw new BadRequestException('Una oferta BOGO necesita comprarCantidad y llevarCantidad');
+      }
+    } else if (dto.valor === undefined || dto.valor === null) {
+      throw new BadRequestException('valor es obligatorio para ofertas PORCENTAJE/MONTO_FIJO');
+    }
+  }
+
+  /**
+   * Monto de descuento de UNA oferta sobre una base dada — `cantidad`/
+   * `precioUnitario` solo se usan para BOGO (necesita contar unidades,
+   * no solo un monto). Siempre respeta `descuentoMaximoMonto` (ítem A-2)
+   * y nunca supera la propia `base` que descuenta.
+   */
+  private montoDescuentoOferta(oferta: Oferta, base: number, cantidad?: number, precioUnitario?: number): number {
+    let bruto: number;
+    if (oferta.tipoDescuento === 'PORCENTAJE') {
+      bruto = base * (Number(oferta.valor) / 100);
+    } else if (oferta.tipoDescuento === 'MONTO_FIJO') {
+      bruto = Number(oferta.valor);
+    } else {
+      // BOGO: por cada grupo COMPLETO de (comprarCantidad + llevarCantidad)
+      // unidades, `llevarCantidad` de ellas llevan el % de descuento — las
+      // unidades sueltas de un grupo incompleto no llevan nada (mismo
+      // criterio que cualquier promoción real: hay que completar la compra).
+      if (!cantidad || !precioUnitario || !oferta.comprarCantidad || !oferta.llevarCantidad) return 0;
+      const tamanoGrupo = oferta.comprarCantidad + oferta.llevarCantidad;
+      const gruposCompletos = Math.floor(cantidad / tamanoGrupo);
+      const unidadesConDescuento = gruposCompletos * oferta.llevarCantidad;
+      bruto = unidadesConDescuento * precioUnitario * (Number(oferta.porcentajeDescuentoLlevar ?? 100) / 100);
+    }
+    if (oferta.descuentoMaximoMonto != null) {
+      bruto = Math.min(bruto, Number(oferta.descuentoMaximoMonto));
+    }
     // El descuento nunca puede superar el monto que descuenta — un
     // MONTO_FIJO más grande que la línea/carrito dejaría un total negativo.
     return Math.min(bruto, base);
   }
 
   /**
+   * Combina varias ofertas vigentes que matchean la misma línea/carrito
+   * (ítem A-2, decisión confirmada con el usuario): se SUMAN todas las
+   * marcadas `acumulable`, se toma la MEJOR entre las no acumulables por
+   * separado (desempatada por `prioridad` — menor número gana), y el
+   * resultado final es el que le dé MÁS descuento al cliente entre "sumar
+   * los acumulables" o "aplicar la mejor no acumulable en exclusiva" —
+   * nunca se combinan ambos grupos entre sí.
+   */
+  private combinarDescuentos(ofertas: Oferta[], base: number, cantidad?: number, precioUnitario?: number): number {
+    const acumulables = ofertas.filter((o) => o.acumulable);
+    const noAcumulables = [...ofertas.filter((o) => !o.acumulable)].sort((a, b) => a.prioridad - b.prioridad);
+
+    const totalAcumulables = acumulables.reduce((acc, o) => acc + this.montoDescuentoOferta(o, base, cantidad, precioUnitario), 0);
+    const mejorNoAcumulable = noAcumulables.reduce(
+      (mejor, o) => Math.max(mejor, this.montoDescuentoOferta(o, base, cantidad, precioUnitario)),
+      0,
+    );
+
+    return Math.min(Math.max(totalAcumulables, mejorNoAcumulable), base);
+  }
+
+  /**
    * Único punto de resolución de descuento automático por línea (Fase 4b)
    * — reusado por Facturación/Cotizaciones, igual patrón que
-   * `VariantesService.resolverObligatoria`. Si varias ofertas matchean la
-   * misma línea (una de PRODUCTO y otra de su CATEGORIA), se aplica la de
-   * MAYOR descuento resultante — nunca se apilan (decisión explícita del
-   * usuario, ver ARCHITECTURE.md).
+   * `VariantesService.resolverObligatoria`.
    */
   async resolverDescuentoLinea(productoId: string, categoriaId: string | null, cantidad: number, precioUnitario: number): Promise<number> {
     const monto = cantidad * precioUnitario;
     if (monto <= 0) return 0;
     const ofertas = await this.ofertasRepository.buscarVigentesParaLinea(productoId, categoriaId, new Date());
     if (ofertas.length === 0) return 0;
-    const descuentos = ofertas.map((o) => this.montoDescuento(o.tipoDescuento, Number(o.valor), monto));
-    return Math.max(...descuentos);
+    return this.combinarDescuentos(ofertas, monto, cantidad, precioUnitario);
   }
 
   /**
@@ -87,7 +150,6 @@ export class OfertasService {
       (o) => o.montoMinimoCarrito === null || subtotalLineas >= Number(o.montoMinimoCarrito),
     );
     if (ofertas.length === 0) return 0;
-    const descuentos = ofertas.map((o) => this.montoDescuento(o.tipoDescuento, Number(o.valor), subtotalLineas));
-    return Math.max(...descuentos);
+    return this.combinarDescuentos(ofertas, subtotalLineas);
   }
 }

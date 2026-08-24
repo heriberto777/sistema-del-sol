@@ -9,7 +9,7 @@ import { SelectCategoria } from '../../molecules/SelectCategoria/SelectCategoria
 import { ComboboxBusqueda } from '../../molecules/ComboboxBusqueda/ComboboxBusqueda';
 import { PaginaResultado } from '../../../types/pagina-resultado';
 
-type TipoDescuento = 'PORCENTAJE' | 'MONTO_FIJO';
+type TipoDescuento = 'PORCENTAJE' | 'MONTO_FIJO' | 'BOGO';
 type Alcance = 'PRODUCTO' | 'CATEGORIA' | 'CARRITO';
 
 interface Producto {
@@ -22,7 +22,14 @@ interface Oferta {
   id: string;
   nombre: string;
   tipoDescuento: TipoDescuento;
-  valor: string;
+  valor: string | null;
+  comprarCantidad: number | null;
+  llevarCantidad: number | null;
+  porcentajeDescuentoLlevar: string | null;
+  descuentoMaximoMonto: string | null;
+  acumulable: boolean;
+  prioridad: number;
+  pagaComision: boolean;
   alcance: Alcance;
   producto: { id: string; codigo: string; nombre: string } | null;
   categoria: { id: string; nombre: string } | null;
@@ -46,17 +53,30 @@ function etiquetaAlcance(o: Oferta): string {
   return o.montoMinimoCarrito ? `Carrito ≥ RD$ ${Number(o.montoMinimoCarrito).toLocaleString('es-DO')}` : 'Carrito (sin mínimo)';
 }
 
+function etiquetaDescuento(o: Oferta): string {
+  if (o.tipoDescuento === 'PORCENTAJE') return `${Number(o.valor)}%`;
+  if (o.tipoDescuento === 'MONTO_FIJO') return `RD$ ${Number(o.valor).toLocaleString('es-DO')}`;
+  const pct = o.porcentajeDescuentoLlevar == null ? 100 : Number(o.porcentajeDescuentoLlevar);
+  return `Compra ${o.comprarCantidad} Lleva ${o.llevarCantidad}${pct < 100 ? ` (${pct}% off)` : ''}`;
+}
+
 function estaVencida(o: Oferta): boolean {
   return new Date(o.fechaFin) < new Date();
 }
 
-// `fechaInicio`/`fechaFin` son fechas "de calendario" (sin hora) — llegan
-// como medianoche UTC. Formatear con la zona horaria local del navegador
-// las corre un día para atrás en cualquier huso detrás de UTC (bug real,
-// encontrado en la verificación manual de esta fase): forzar 'UTC' en el
-// formateo hace que el día mostrado sea siempre el mismo que se guardó.
-function formatearFecha(fecha: string): string {
-  return new Date(fecha).toLocaleDateString('es-DO', { timeZone: 'UTC' });
+// Ítem A-2 — `fechaInicio`/`fechaFin` ahora admiten hora exacta
+// (`datetime-local`, sin timezone propio). Formatear con la zona horaria
+// local del navegador es correcto porque el valor se guardó como el
+// instante UTC exacto que representaba esa hora local al crearla (ver
+// `aFechaHoraUtc`) — a diferencia del viejo date-only, que se guardaba a
+// medianoche UTC y por eso necesitaba forzar 'UTC' al mostrarlo.
+function formatearFechaHora(fecha: string): string {
+  return new Date(fecha).toLocaleString('es-DO', { dateStyle: 'short', timeStyle: 'short' });
+}
+
+/** input[type=datetime-local] no lleva timezone — Date lo interpreta en la hora LOCAL del navegador, que es la intención real del usuario; toISOString() lo fija a un instante UTC preciso antes de mandarlo. */
+function aFechaHoraUtc(valorLocal: string): string {
+  return new Date(valorLocal).toISOString();
 }
 
 /**
@@ -70,6 +90,13 @@ export function OfertasPanel() {
   const [nombre, setNombre] = useState('');
   const [tipoDescuento, setTipoDescuento] = useState<TipoDescuento>('PORCENTAJE');
   const [valor, setValor] = useState('');
+  const [comprarCantidad, setComprarCantidad] = useState('');
+  const [llevarCantidad, setLlevarCantidad] = useState('');
+  const [porcentajeDescuentoLlevar, setPorcentajeDescuentoLlevar] = useState('100');
+  const [descuentoMaximoMonto, setDescuentoMaximoMonto] = useState('');
+  const [acumulable, setAcumulable] = useState(false);
+  const [prioridad, setPrioridad] = useState('0');
+  const [pagaComision, setPagaComision] = useState(true);
   const [alcance, setAlcance] = useState<Alcance>('PRODUCTO');
   const [producto, setProducto] = useState<Producto | null>(null);
   const [categoriaId, setCategoriaId] = useState('');
@@ -90,6 +117,13 @@ export function OfertasPanel() {
   function limpiar() {
     setNombre('');
     setValor('');
+    setComprarCantidad('');
+    setLlevarCantidad('');
+    setPorcentajeDescuentoLlevar('100');
+    setDescuentoMaximoMonto('');
+    setAcumulable(false);
+    setPrioridad('0');
+    setPagaComision(true);
     setProducto(null);
     setCategoriaId('');
     setMontoMinimoCarrito('');
@@ -103,13 +137,20 @@ export function OfertasPanel() {
       apiClient.post('/ofertas', {
         nombre,
         tipoDescuento,
-        valor: Number(valor),
+        valor: tipoDescuento === 'BOGO' ? undefined : Number(valor),
+        comprarCantidad: tipoDescuento === 'BOGO' ? Number(comprarCantidad) : undefined,
+        llevarCantidad: tipoDescuento === 'BOGO' ? Number(llevarCantidad) : undefined,
+        porcentajeDescuentoLlevar: tipoDescuento === 'BOGO' ? Number(porcentajeDescuentoLlevar) : undefined,
+        descuentoMaximoMonto: descuentoMaximoMonto ? Number(descuentoMaximoMonto) : undefined,
+        acumulable,
+        prioridad: Number(prioridad) || 0,
+        pagaComision,
         alcance,
         productoId: alcance === 'PRODUCTO' ? producto?.id : undefined,
         categoriaId: alcance === 'CATEGORIA' ? categoriaId : undefined,
         montoMinimoCarrito: alcance === 'CARRITO' && montoMinimoCarrito ? Number(montoMinimoCarrito) : undefined,
-        fechaInicio,
-        fechaFin,
+        fechaInicio: aFechaHoraUtc(fechaInicio),
+        fechaFin: aFechaHoraUtc(fechaFin),
       }),
     onSuccess: () => {
       invalidar();
@@ -137,6 +178,14 @@ export function OfertasPanel() {
     }
     if (alcance === 'CATEGORIA' && !categoriaId) {
       setError('Elegí una categoría.');
+      return;
+    }
+    if (tipoDescuento === 'BOGO' && (!comprarCantidad || !llevarCantidad)) {
+      setError('Indicá cuántas unidades hay que comprar y cuántas se llevan con descuento.');
+      return;
+    }
+    if (tipoDescuento === 'BOGO' && alcance === 'CARRITO') {
+      setError('BOGO no aplica a ofertas de carrito completo — elegí un producto o categoría.');
       return;
     }
     crear.mutate();
@@ -207,24 +256,70 @@ export function OfertasPanel() {
               >
                 <option value="PORCENTAJE">% Porcentaje</option>
                 <option value="MONTO_FIJO">RD$ Monto fijo</option>
+                <option value="BOGO">Compra X Lleva Y / Segunda unidad</option>
               </select>
             </div>
-            <FormField
-              id="oferta-valor"
-              label={tipoDescuento === 'PORCENTAJE' ? 'Descuento %' : 'Descuento RD$'}
-              type="number"
-              min={0}
-              max={tipoDescuento === 'PORCENTAJE' ? 100 : undefined}
-              step="0.01"
-              value={valor}
-              onChange={(e) => setValor(e.target.value)}
-              required
-            />
+            {tipoDescuento !== 'BOGO' && (
+              <FormField
+                id="oferta-valor"
+                label={tipoDescuento === 'PORCENTAJE' ? 'Descuento %' : 'Descuento RD$'}
+                type="number"
+                min={0}
+                max={tipoDescuento === 'PORCENTAJE' ? 100 : undefined}
+                step="0.01"
+                value={valor}
+                onChange={(e) => setValor(e.target.value)}
+                required
+              />
+            )}
           </div>
 
+          {tipoDescuento === 'BOGO' && (
+            <div className="grid grid-cols-3 gap-2 rounded-md border border-slate-200 p-3 dark:border-slate-800">
+              <FormField id="oferta-comprar" label="Compra (unidades)" type="number" min={1} value={comprarCantidad} onChange={(e) => setComprarCantidad(e.target.value)} required />
+              <FormField id="oferta-llevar" label="Lleva (unidades)" type="number" min={1} value={llevarCantidad} onChange={(e) => setLlevarCantidad(e.target.value)} required />
+              <FormField
+                id="oferta-pct-llevar"
+                label="% desc. en llevadas"
+                type="number"
+                min={0}
+                max={100}
+                value={porcentajeDescuentoLlevar}
+                onChange={(e) => setPorcentajeDescuentoLlevar(e.target.value)}
+                required
+              />
+              <p className="col-span-3 text-xs text-slate-500 dark:text-slate-400">
+                100% = gratis (BOGO clásico); 50% = "segunda unidad a mitad de precio" (comprar 1, llevar 1).
+              </p>
+            </div>
+          )}
+
+          <FormField
+            id="oferta-tope"
+            label="Tope de descuento en RD$ (opcional)"
+            type="number"
+            min={0}
+            step="0.01"
+            value={descuentoMaximoMonto}
+            onChange={(e) => setDescuentoMaximoMonto(e.target.value)}
+            placeholder="Sin tope"
+          />
+
           <div className="grid grid-cols-2 gap-2">
-            <FormField id="oferta-inicio" label="Vigente desde" type="date" value={fechaInicio} onChange={(e) => setFechaInicio(e.target.value)} required />
-            <FormField id="oferta-fin" label="Vigente hasta" type="date" value={fechaFin} onChange={(e) => setFechaFin(e.target.value)} required />
+            <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
+              <input type="checkbox" checked={acumulable} onChange={(e) => setAcumulable(e.target.checked)} />
+              Acumulable con otras ofertas
+            </label>
+            <FormField id="oferta-prioridad" label="Prioridad (menor = primero)" type="number" value={prioridad} onChange={(e) => setPrioridad(e.target.value)} />
+          </div>
+          <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
+            <input type="checkbox" checked={pagaComision} onChange={(e) => setPagaComision(e.target.checked)} />
+            Cuenta para la comisión del vendedor
+          </label>
+
+          <div className="grid grid-cols-2 gap-2">
+            <FormField id="oferta-inicio" label="Vigente desde" type="datetime-local" value={fechaInicio} onChange={(e) => setFechaInicio(e.target.value)} required />
+            <FormField id="oferta-fin" label="Vigente hasta" type="datetime-local" value={fechaFin} onChange={(e) => setFechaFin(e.target.value)} required />
           </div>
 
           {error && <p className="text-sm text-red-600">{error}</p>}
@@ -249,11 +344,14 @@ export function OfertasPanel() {
           <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
             {ofertas?.map((o) => (
               <tr key={o.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                <td className="px-5 py-3">{o.nombre}</td>
+                <td className="px-5 py-3">
+                  {o.nombre}
+                  {o.acumulable && <span className="ml-1 text-xs text-slate-400">(acumulable)</span>}
+                </td>
                 <td className="px-5 py-3">{etiquetaAlcance(o)}</td>
-                <td className="px-5 py-3">{o.tipoDescuento === 'PORCENTAJE' ? `${Number(o.valor)}%` : `RD$ ${Number(o.valor).toLocaleString('es-DO')}`}</td>
+                <td className="px-5 py-3">{etiquetaDescuento(o)}</td>
                 <td className="px-5 py-3 text-xs text-slate-500 dark:text-slate-400">
-                  {formatearFecha(o.fechaInicio)} – {formatearFecha(o.fechaFin)}
+                  {formatearFechaHora(o.fechaInicio)} – {formatearFechaHora(o.fechaFin)}
                 </td>
                 <td className="px-5 py-3">
                   {!o.activa ? (

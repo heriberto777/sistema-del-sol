@@ -14,6 +14,12 @@ describe('OfertasService', () => {
     productoId: 'prod-1',
     categoriaId: null,
     montoMinimoCarrito: null,
+    comprarCantidad: null,
+    llevarCantidad: null,
+    porcentajeDescuentoLlevar: null,
+    descuentoMaximoMonto: null,
+    acumulable: false,
+    prioridad: 0,
     ...overrides,
   });
 
@@ -101,6 +107,58 @@ describe('OfertasService', () => {
       );
       expect(repository.crear).toHaveBeenCalled();
     });
+
+    it('BOGO de alcance CARRITO se rechaza (ítem A-2 — no tiene sentido sobre el total del carrito)', async () => {
+      await expect(
+        service.crear(
+          {
+            nombre: 'x',
+            tipoDescuento: 'BOGO',
+            alcance: 'CARRITO',
+            comprarCantidad: 2,
+            llevarCantidad: 1,
+            fechaInicio: new Date('2026-01-01'),
+            fechaFin: new Date('2026-02-01'),
+          } as never,
+          'tenant-1',
+        ),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('BOGO sin comprarCantidad/llevarCantidad se rechaza', async () => {
+      await expect(
+        service.crear(
+          { nombre: 'x', tipoDescuento: 'BOGO', alcance: 'PRODUCTO', productoId: 'p1', fechaInicio: new Date('2026-01-01'), fechaFin: new Date('2026-02-01') } as never,
+          'tenant-1',
+        ),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('PORCENTAJE/MONTO_FIJO sin valor se rechaza', async () => {
+      await expect(
+        service.crear(
+          { nombre: 'x', tipoDescuento: 'PORCENTAJE', alcance: 'PRODUCTO', productoId: 'p1', fechaInicio: new Date('2026-01-01'), fechaFin: new Date('2026-02-01') } as never,
+          'tenant-1',
+        ),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('BOGO válido (PRODUCTO, con comprarCantidad/llevarCantidad) se acepta', async () => {
+      await service.crear(
+        {
+          nombre: 'x',
+          tipoDescuento: 'BOGO',
+          alcance: 'PRODUCTO',
+          productoId: 'p1',
+          comprarCantidad: 2,
+          llevarCantidad: 1,
+          fechaInicio: new Date('2026-01-01'),
+          fechaFin: new Date('2026-02-01'),
+        } as never,
+        'tenant-1',
+      );
+      expect(repository.crear).toHaveBeenCalled();
+    });
   });
 
   describe('resolverDescuentoLinea', () => {
@@ -134,6 +192,94 @@ describe('OfertasService', () => {
       const descuento = await service.resolverDescuentoLinea('prod-1', null, 1, 100);
 
       expect(descuento).toBe(100);
+    });
+
+    describe('BOGO (ítem A-2)', () => {
+      it('"Compra 2 Lleva 1" (100% gratis): 6 unidades = 2 grupos completos = 2 gratis', async () => {
+        repository.buscarVigentesParaLinea.mockResolvedValue([
+          ofertaBase({ tipoDescuento: 'BOGO', valor: null, comprarCantidad: 2, llevarCantidad: 1, porcentajeDescuentoLlevar: 100 }),
+        ] as never);
+
+        const descuento = await service.resolverDescuentoLinea('prod-1', null, 6, 100);
+
+        expect(descuento).toBe(200); // 2 unidades gratis * 100
+      });
+
+      it('"Segunda Unidad al 50%": comprarCantidad=1, llevarCantidad=1, 50% — 4 unidades = 2 grupos, 2 al 50%', async () => {
+        repository.buscarVigentesParaLinea.mockResolvedValue([
+          ofertaBase({ tipoDescuento: 'BOGO', valor: null, comprarCantidad: 1, llevarCantidad: 1, porcentajeDescuentoLlevar: 50 }),
+        ] as never);
+
+        const descuento = await service.resolverDescuentoLinea('prod-1', null, 4, 100);
+
+        expect(descuento).toBe(100); // 2 unidades al 50% de 100 c/u = 100
+      });
+
+      it('un grupo incompleto no lleva descuento (hay que completar la compra)', async () => {
+        repository.buscarVigentesParaLinea.mockResolvedValue([
+          ofertaBase({ tipoDescuento: 'BOGO', valor: null, comprarCantidad: 2, llevarCantidad: 1, porcentajeDescuentoLlevar: 100 }),
+        ] as never);
+
+        const descuento = await service.resolverDescuentoLinea('prod-1', null, 2, 100); // solo 2, no completa el grupo de 3
+
+        expect(descuento).toBe(0);
+      });
+
+      it('porcentajeDescuentoLlevar por defecto (no enviado) es 100% — gratis', async () => {
+        repository.buscarVigentesParaLinea.mockResolvedValue([
+          ofertaBase({ tipoDescuento: 'BOGO', valor: null, comprarCantidad: 2, llevarCantidad: 1, porcentajeDescuentoLlevar: null }),
+        ] as never);
+
+        const descuento = await service.resolverDescuentoLinea('prod-1', null, 3, 100);
+
+        expect(descuento).toBe(100);
+      });
+    });
+
+    it('descuentoMaximoMonto topa el descuento aunque el % calculado sea mayor', async () => {
+      repository.buscarVigentesParaLinea.mockResolvedValue([
+        ofertaBase({ tipoDescuento: 'PORCENTAJE', valor: 50, descuentoMaximoMonto: 30 }),
+      ] as never);
+
+      const descuento = await service.resolverDescuentoLinea('prod-1', null, 2, 100); // 50% de 200 = 100, pero topado a 30
+
+      expect(descuento).toBe(30);
+    });
+
+    describe('acumulabilidad y prioridad (ítem A-2)', () => {
+      it('suma varias ofertas acumulables entre sí', async () => {
+        repository.buscarVigentesParaLinea.mockResolvedValue([
+          ofertaBase({ id: 'o1', tipoDescuento: 'PORCENTAJE', valor: 10, acumulable: true }), // 10% de 200 = 20
+          ofertaBase({ id: 'o2', tipoDescuento: 'MONTO_FIJO', valor: 15, acumulable: true }), // 15
+        ] as never);
+
+        const descuento = await service.resolverDescuentoLinea('prod-1', null, 2, 100);
+
+        expect(descuento).toBe(35); // 20 + 15, no el máximo de los dos
+      });
+
+      it('si la suma de acumulables es menor que la mejor no acumulable, gana la no acumulable', async () => {
+        repository.buscarVigentesParaLinea.mockResolvedValue([
+          ofertaBase({ id: 'o1', tipoDescuento: 'MONTO_FIJO', valor: 5, acumulable: true }),
+          ofertaBase({ id: 'o2', tipoDescuento: 'PORCENTAJE', valor: 50, acumulable: false }), // 50% de 200 = 100
+        ] as never);
+
+        const descuento = await service.resolverDescuentoLinea('prod-1', null, 2, 100);
+
+        expect(descuento).toBe(100);
+      });
+
+      it('si la suma de acumulables es mayor que la mejor no acumulable, gana la suma', async () => {
+        repository.buscarVigentesParaLinea.mockResolvedValue([
+          ofertaBase({ id: 'o1', tipoDescuento: 'PORCENTAJE', valor: 30, acumulable: true }), // 60
+          ofertaBase({ id: 'o2', tipoDescuento: 'PORCENTAJE', valor: 20, acumulable: true }), // 40
+          ofertaBase({ id: 'o3', tipoDescuento: 'MONTO_FIJO', valor: 50, acumulable: false }),
+        ] as never);
+
+        const descuento = await service.resolverDescuentoLinea('prod-1', null, 2, 100);
+
+        expect(descuento).toBe(100); // 60+40, mayor que la no acumulable de 50
+      });
     });
   });
 

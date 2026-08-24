@@ -259,13 +259,13 @@ la venta, con `montoMinimoCarrito` opcional). `productoId`/
 lo puede exigir, son todas columnas nullable), mismo criterio que
 `ProductosService.validarComponentes` para las reglas de COMBO.
 
-**No acumulable — decisión explícita del usuario**: si una línea
-matchea más de una oferta (ej. una de su producto y otra de su
-categoría), se aplica la de MAYOR descuento resultante, nunca la suma
-de ambas (`OfertasService.resolverDescuentoLinea`, `Math.max` sobre
-los descuentos de todas las ofertas vigentes que matchean). Mismo
-criterio para ofertas de `CARRITO`: si varias aplican a la vez, gana
-la de mayor descuento, no se suman.
+**Combinación de ofertas simultáneas — ampliado en ítem A-2** (ver
+subsección "A-2" más abajo para el mecanismo completo): originalmente,
+si una línea matcheaba más de una oferta se aplicaba siempre la de
+mayor descuento (`Math.max`), nunca la suma. Con A-2 esto pasó a
+depender de la columna `acumulable` de cada oferta — el criterio base
+("gana la de mayor descuento entre las que compiten") se mantiene para
+las no acumulables, y se suma aparte a las marcadas `acumulable`.
 
 **Solo aplica a ventas nuevas** (`CONTADO`/`CREDITO`) — nunca a
 `NOTA_CREDITO`/`NOTA_DEBITO`, que ajustan un monto YA facturado, no
@@ -320,6 +320,74 @@ pagos. `PosService.cotizar()`/`POST /pos/cotizar` (`pos.editar`) lo
 exponen al POS: `TurnoCajaDetalle.onAbrirCheckout()` lo llama al armar
 el carrito, ANTES de abrir el modal de pago, y el checkout se arma
 sobre ESE total ya resuelto — no sobre el estimado del navegador.
+
+### A-2 — Motor de ofertas ampliado: BOGO, tope, acumulabilidad y prioridad
+
+Amplía el motor de la sección anterior sin tocar sus dos puntos de
+conexión (`FacturacionService.crear()`/`CotizacionesService.
+calcularLineas()`) ni el prorrateo de carrito — todo el cambio vive
+dentro de `OfertasService`.
+
+**`TipoDescuentoOferta.BOGO`** ("Compra X Lleva Y" / "Segunda Unidad",
+`Oferta.valor` ahora nullable porque BOGO no lo usa):
+`comprarCantidad`/`llevarCantidad` (la "X"/"Y") son obligatorios solo
+para este tipo (`OfertasService.validarTipoDescuento`), y
+`porcentajeDescuentoLlevar` (0-100, default 100) define qué tan
+"gratis" es la unidad llevada (50 = "segunda unidad a mitad de
+precio"). Cálculo (`montoDescuentoOferta`):
+
+```
+tamanoGrupo = comprarCantidad + llevarCantidad
+gruposCompletos = Math.floor(cantidad / tamanoGrupo)
+unidadesConDescuento = gruposCompletos * llevarCantidad
+descuento = unidadesConDescuento * precioUnitario * (porcentajeDescuentoLlevar / 100)
+```
+
+Un grupo incompleto no aporta descuento — hay que completar la compra
+(mismo criterio que cualquier promoción real). BOGO se restringe a
+`alcance PRODUCTO`/`CATEGORIA` (400 si se intenta con `CARRITO` —
+"comprar X unidades" no tiene sentido sobre un total sin unidad que
+contar).
+
+**`descuentoMaximoMonto`** (cualquier tipo): topa el descuento bruto de
+UNA oferta antes de compararla con otras — sin esto, sin límite más
+allá del propio monto de la línea/carrito que descuenta (el resultado
+final tampoco puede superarlo, ya evitaba montos negativos desde
+antes de A-2).
+
+**Acumulabilidad y prioridad — decisión confirmada con el usuario**:
+cada oferta pasa a tener `acumulable` (default `false`) y `prioridad`
+(default `0`, menor = mayor prioridad). Cuando varias ofertas vigentes
+matchean la misma línea/carrito, `OfertasService.combinarDescuentos`
+las separa en dos grupos y calcula el descuento final como el MAYOR
+entre:
+
+- la SUMA de todas las marcadas `acumulable`, y
+- la MEJOR (mayor descuento resultante) entre las NO acumulables —
+  `prioridad` solo desempata si dos no acumulables devuelven el mismo
+  monto, no cambia el número calculado.
+
+Los dos grupos nunca se combinan entre sí (no se suma "el total
+acumulable" + "la mejor no acumulable") — es una elección entre "sumar
+lo acumulable" o "aplicar la mejor exclusiva en solitario", la que le
+convenga más al cliente. El resultado sigue topado por la propia base
+(línea o carrito) al final, igual que antes de A-2.
+
+**`pagaComision`** (default `true`, columna en el mismo `Oferta` de
+Cuadre): guardado sin ningún efecto todavía — queda a la espera del
+ítem A-1 (comisiones de venta), que sí lo va a leer.
+
+**Vigencia por hora**: `fechaInicio`/`fechaFin` pasaron de fecha-only a
+timestamp completo (el schema ya los tenía como `DateTime`, el límite
+era solo de UI). El frontend usa `<input type="datetime-local">` +
+`aFechaHoraUtc(valorLocal) = new Date(valorLocal).toISOString()` para
+convertir el string sin zona horaria del input a un instante UTC
+preciso antes de mandarlo a la API — mismo tipo de bug de zona horaria
+ya documentado en otros campos de fecha de este proyecto, evitado acá
+desde el origen en vez de parcheado después con `timeZone: 'UTC'` en
+la visualización.
+
+Migración: `20260828090000_ofertas_bogo_acumulable`.
 
 ## Bonos — gift cards canjeables como forma de pago (Fase 4c de adopción de Cuadre)
 

@@ -109,7 +109,7 @@ pasa ninguna de ellas.
 | GET | `/api/facturas/:id/imprimir?formato=CARTA\|A4\|TERMICA_80MM\|TERMICA_58MM` | `facturacion.imprimir` — sin `formato`, resuelve el default (override de bodega > default de tenant > CARTA, ver ARCHITECTURE.md); devuelve PDF o HTML según formato. Separado de `facturacion.ver` para que Vendedor pueda imprimir un recibo de POS sin ver la pantalla general de Facturación. Ítem H-3: incluye el logo/nota de pie configurados en Admin → Configuración general → Documentos, si el tenant los configuró (mismos en las 3 impresiones — Facturación/Cotizaciones/Remisiones) |
 | POST | `/api/facturas/:id/enviar-recibo` | `facturacion.imprimir` (ítem F-4) — `{ canal: EMAIL\|WHATSAPP, destinatario }`. `destinatario` NO depende de `Cliente.email`/`telefono` guardado — se escribe en el momento (caso real: POS con Consumidor Final). Responde `{ enviado: boolean }` — `false` si el tenant no tiene una plantilla `factura_recibo` activa para ese canal (Admin → Notificaciones) |
 
-## Ofertas (Fase 4b de adopción de Cuadre)
+## Ofertas (Fase 4b de adopción de Cuadre, ampliado en ítem A-2)
 
 Descuentos automáticos, resueltos al facturar/cotizar (ver
 ARCHITECTURE.md) — este CRUD solo administra el catálogo, la resolución
@@ -117,7 +117,7 @@ en sí no es un endpoint propio.
 
 | Método | Ruta | Permiso |
 |---|---|---|
-| POST | `/api/ofertas` | `ofertas.editar` — `{ nombre, tipoDescuento: PORCENTAJE\|MONTO_FIJO, valor, alcance: PRODUCTO\|CATEGORIA\|CARRITO, productoId?, categoriaId?, montoMinimoCarrito?, fechaInicio, fechaFin }`; `productoId`/`categoriaId`/`montoMinimoCarrito` son mutuamente exclusivos según `alcance` (400 si no corresponden) |
+| POST | `/api/ofertas` | `ofertas.editar` — `{ nombre, tipoDescuento: PORCENTAJE\|MONTO_FIJO\|BOGO, valor?, comprarCantidad?, llevarCantidad?, porcentajeDescuentoLlevar?, descuentoMaximoMonto?, acumulable?, prioridad?, pagaComision?, alcance: PRODUCTO\|CATEGORIA\|CARRITO, productoId?, categoriaId?, montoMinimoCarrito?, fechaInicio, fechaFin }`; `productoId`/`categoriaId`/`montoMinimoCarrito` son mutuamente exclusivos según `alcance` (400 si no corresponden); `fechaInicio`/`fechaFin` admiten hora exacta, no solo el día (ítem A-2, "vigencia por hora"). Ítem A-2 — `tipoDescuento: BOGO` ("Compra X Lleva Y" / "Segunda Unidad"): `valor` se ignora, en su lugar exige `comprarCantidad`/`llevarCantidad` (400 si faltan) y NO admite `alcance: CARRITO` (400 — no hay "unidad" que contar sobre un total); `porcentajeDescuentoLlevar` (0-100, default 100 = gratis; 50 = "segunda unidad a mitad de precio") es opcional incluso en BOGO. Para PORCENTAJE/MONTO_FIJO, `valor` sigue siendo obligatorio (400 si falta). `descuentoMaximoMonto` (RD$, cualquier tipo) topea el descuento resultante — sin esto, sin límite más allá del propio monto de la línea/carrito. `acumulable` (default `false`) y `prioridad` (default `0`, menor = mayor prioridad) controlan cómo se combina esta oferta con otras que matcheen la misma línea/carrito al mismo tiempo — ver ARCHITECTURE.md. `pagaComision` (default `true`) queda guardado sin efecto hasta que se implemente el ítem A-1 (comisiones de venta) |
 | GET | `/api/ofertas` | `ofertas.ver` |
 | PATCH | `/api/ofertas/:id` | `ofertas.editar` — mismas reglas de exclusividad que crear |
 | DELETE | `/api/ofertas/:id` | `ofertas.editar` |

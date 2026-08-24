@@ -50,16 +50,28 @@ Resumen de lo que cambió (detalle en cada ítem más abajo):
   % de comisión por producto y por oferta, cálculo al facturar, 3 reportes
   (por venta/vendedor/producto). *Confirmado: no existe ningún campo de
   comisión en `schema.prisma` — brecha real, sin cambios.*
-- [ ] **A-2** 🟥 *diseño primero* — **Motor de Ofertas ampliado**: agregar
+- [x] **A-2** 🟥 *diseño primero* — **Motor de Ofertas ampliado**: agregar
   tipos BOGO ("Compra X Lleva Y", "Segunda Unidad"), tope de descuento
   máximo, control de acumulabilidad, prioridad entre ofertas simultáneas.
   Extiende `OfertasService`/`model Oferta` existente (Fase 4b), no es un
-  módulo nuevo desde cero. *Confirmado: `Oferta` solo tiene
+  módulo nuevo desde cero. *Confirmado: `Oferta` solo tenía
   `TipoDescuentoOferta` (Porcentual/Fijo), sin `descuentoMaximo`,
-  `acumulable`, `prioridad` ni `pagaComision` — brecha real. Matiz: sí
-  usamos `DateTime` para `fechaInicio`/`fechaFin`, así que "vigencia con
-  hora exacta" no necesita cambio de esquema, solo que el formulario deje
-  elegir hora además de fecha.*
+  `acumulable`, `prioridad` ni `pagaComision` — brecha real.* Decisiones
+  confirmadas con el usuario: (1) `porcentajeDescuentoLlevar` de BOGO
+  configurable (0-100, no fijo en "gratis"), para cubrir tanto "Compra 2
+  Lleva 1 Gratis" como "Segunda Unidad al 50%"; (2) combinación de
+  ofertas simultáneas: se SUMAN las marcadas `acumulable`, se toma la
+  MEJOR entre las no acumulables (desempate por `prioridad`), y el
+  resultado final es el mayor entre ambos totales — nunca se combinan
+  entre sí. Entregado: `TipoDescuentoOferta.BOGO` +
+  `comprarCantidad`/`llevarCantidad`/`porcentajeDescuentoLlevar` (`Oferta.
+  valor` ahora nullable, BOGO no lo usa; rechaza `alcance: CARRITO`),
+  `descuentoMaximoMonto`, `acumulable`/`prioridad` con el algoritmo de
+  combinación en `OfertasService.combinarDescuentos`, `pagaComision`
+  (guardado sin efecto hasta el ítem A-1). Frontend: `<input
+  type="datetime-local">` + conversión a UTC (`aFechaHoraUtc`) para
+  "vigencia por hora". Migración `20260828090000_ofertas_bogo_acumulable`.
+  Entregado 2026-08-24.
 - [ ] **A-3** 🟥 *diseño primero* — **Lealtad / puntos / recompensas**:
   acumulación (por monto o unidad), canje, expiración opcional. Apple/Google
   Wallet queda fuera de un primer corte. *Confirmado: cero mención de
@@ -696,6 +708,14 @@ Resumen de lo que cambió (detalle en cada ítem más abajo):
   y POS, se SUMA al PIN de Fase 9 (no lo reemplaza). De paso, corregido
   un bug preexistente: `ModalAnularVenta` (POS) nunca mandaba el PIN al
   backend. Migración `20260827090000_codigos_autorizacion`.
+- **2026-08-24**: entregado A-2 (Motor de Ofertas ampliado), segundo 🟥
+  atacado — diseño confirmado con el usuario vía `AskUserQuestion`
+  (`porcentajeDescuentoLlevar` de BOGO configurable en vez de fijo en
+  "gratis"; combinación de ofertas simultáneas = mayor entre "suma de
+  acumulables" y "mejor no acumulable", nunca ambas sumadas).
+  `TipoDescuentoOferta.BOGO`, `descuentoMaximoMonto`, `acumulable`/
+  `prioridad`, `pagaComision` (inerte hasta A-1). Migración
+  `20260828090000_ofertas_bogo_acumulable`.
 
 ## Sugerencia de por dónde arrancar
 
@@ -706,7 +726,7 @@ conversación de diseño antes de tocar código). Lote 🟨/🟧 completo:
 B-1/B-2/B-3/B-6/B-7/B-8, E-2/E-3/E-4/E-5/E-6/E-8/E-9/E-11, F-2/F-4/F-5/
 F-8, G-1/G-2/G-3/G-4/G-5/G-6/G-7/G-8, H-3, J-1/J-2/J-3 — todos
 verificados (tsc + suite unitaria + e2e + lint + build, todo verde) y
-commiteados uno por uno. De los 🟥, ya entregado: **D-1**.
+commiteados uno por uno. De los 🟥, ya entregados: **D-1, A-2**.
 
 Lo que queda, por categoría:
 - **Deliberadamente pausado a pedido del usuario**: B-9 (línea manual/
@@ -714,7 +734,7 @@ Lo que queda, por categoría:
 - **No bloqueante, sin implementar**: B-4 (Recargos de Factura, 🟨→🟧
   corrección de tamaño), E-1 (Patrón Borrador→Confirmado en Compras/
   Ajustes/Transferencias, matiz).
-- **🟥, pendientes de su propia conversación de diseño**: A-1 a A-4,
+- **🟥, pendientes de su propia conversación de diseño**: A-1, A-3, A-4,
   B-5, C-1, C-2 (multi-moneda, reclasificado desde 🟧), E-7, F-9, G-9
   (hardware), H-2 (WhatsApp — con nota de decisión pendiente sobre n8n
   vs. backend propio), I-1, J-4 (API keys, reclasificado — no aplica
