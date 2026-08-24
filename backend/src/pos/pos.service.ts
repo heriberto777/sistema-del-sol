@@ -106,6 +106,16 @@ export class PosService {
     return this.posRepository.listarCajeros();
   }
 
+  /** Reporte-dashboard de cierres de caja (ítem E-6) — 4 tiles: total ventas, sobrantes, faltantes, exactas. */
+  reporteCierres(query: { desde?: string; hasta?: string; cajeroId?: string; bodegaId?: string }) {
+    return this.posRepository.reporteCierres({
+      desde: query.desde ? new Date(query.desde) : undefined,
+      hasta: query.hasta ? new Date(query.hasta) : undefined,
+      cajeroId: query.cajeroId,
+      bodegaId: query.bodegaId,
+    });
+  }
+
   async registrarMovimiento(turnoId: string, dto: CrearMovimientoCajaDto) {
     const turno = await this.posRepository.buscarPorId(turnoId);
     this.validarAbierto(turno);
@@ -206,7 +216,20 @@ export class PosService {
       diferencia,
       cerradoPorId: userId,
       justificacionDiferencia: dto.justificacionDiferencia,
+      // Ítem E-6: una diferencia fuera de tolerancia no cierra directo —
+      // queda PENDIENTE_REVISION hasta que un supervisor la revise
+      // (ver revisarTurno). Dentro de tolerancia, cierra normal como antes.
+      estado: diferenciaExcedeTolerancia ? 'PENDIENTE_REVISION' : 'CERRADO',
     });
+  }
+
+  /** PENDIENTE_REVISION -> CERRADO (ítem E-6) — un supervisor confirma que ya revisó la diferencia de arqueo. */
+  async revisarTurno(id: string, userId: string) {
+    const turno = await this.posRepository.buscarPorId(id);
+    if (turno.estado !== 'PENDIENTE_REVISION') {
+      throw new BadRequestException('Solo un turno PENDIENTE_REVISION puede marcarse como revisado');
+    }
+    return this.posRepository.marcarRevisado(id, userId);
   }
 
   /**

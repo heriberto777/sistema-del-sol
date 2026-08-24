@@ -14,8 +14,10 @@ const INCLUDE_TURNO = {
       vendedorEmpleado: { select: { nombre: true } },
       // Ledger real de pago dividido — para que el frontend pueda previsualizar
       // el efectivo esperado exacto (una venta con pago mixto solo cuenta su
-      // porción efectivo, no todo el total). Ver calcularMovimientoEfectivo.
-      pagosVenta: { select: { monto: true, formaPago: { select: { esEfectivo: true } } } },
+      // porción efectivo, no todo el total) y armar el desglose por TODAS
+      // las formas de pago (ítem E-6, antes solo se distinguía efectivo).
+      // Ver calcularMovimientoEfectivo.
+      pagosVenta: { select: { monto: true, formaPago: { select: { id: true, nombre: true, esEfectivo: true } } } },
     },
   },
   cajero: { select: { id: true, nombre: true } },
@@ -82,6 +84,43 @@ export class PosRepository {
     return turnos.map((t) => t.cajero);
   }
 
+  /**
+   * Reporte-dashboard de cierres (ítem E-6) — solo turnos ya resueltos
+   * (`CERRADO`/`PENDIENTE_REVISION`, que son los únicos con `diferencia`
+   * calculada; `ABIERTO` queda fuera). "Total ventas" suma `Factura.total`
+   * de esos turnos (todas las formas de pago, no solo lo que afecta el
+   * arqueo de efectivo) — distinto de `montoEsperado`, que es específico
+   * de efectivo.
+   */
+  async reporteCierres(params: { desde?: Date; hasta?: Date; cajeroId?: string; bodegaId?: string }) {
+    const EPSILON = 0.01;
+    const where = {
+      estado: { in: ['CERRADO', 'PENDIENTE_REVISION'] as EstadoTurnoCaja[] },
+      ...(params.desde || params.hasta ? { cerradoEn: { gte: params.desde, lte: params.hasta } } : {}),
+      ...(params.cajeroId ? { cajeroId: params.cajeroId } : {}),
+      ...(params.bodegaId ? { bodegaId: params.bodegaId } : {}),
+    };
+    const turnos = await this.db.turnoCaja.findMany({ where, select: { id: true, diferencia: true } });
+    const ids = turnos.map((t) => t.id);
+    const diferencias = turnos.map((t) => Number(t.diferencia ?? 0));
+    const sobrantes = diferencias.filter((d) => d > EPSILON);
+    const faltantes = diferencias.filter((d) => d < -EPSILON);
+    const exactas = diferencias.filter((d) => Math.abs(d) <= EPSILON);
+
+    const ventasAgg = ids.length
+      ? await this.db.factura.aggregate({ where: { turnoCajaId: { in: ids }, estado: 'EMITIDA' }, _sum: { total: true } })
+      : { _sum: { total: null } };
+
+    return {
+      totalVentas: Number(ventasAgg._sum.total ?? 0),
+      cantidadSesiones: turnos.length,
+      sobrantes: { cantidad: sobrantes.length, monto: sobrantes.reduce((acc, d) => acc + d, 0) },
+      faltantes: { cantidad: faltantes.length, monto: faltantes.reduce((acc, d) => acc + d, 0) },
+      exactas: exactas.length,
+      diferenciaTotal: diferencias.reduce((acc, d) => acc + d, 0),
+    };
+  }
+
   crearMovimiento(params: { turnoId: string; tipo: TipoMovimientoCaja; monto: number; concepto: string; motivoTipo?: MotivoMovimientoCaja }) {
     return this.db.movimientoCaja.create({ data: params });
   }
@@ -112,11 +151,27 @@ export class PosRepository {
 
   cerrarTurno(
     id: string,
-    params: { montoFinalContado: number; montoEsperado: number; diferencia: number; cerradoPorId: string; justificacionDiferencia?: string },
+    params: {
+      montoFinalContado: number;
+      montoEsperado: number;
+      diferencia: number;
+      cerradoPorId: string;
+      justificacionDiferencia?: string;
+      estado: EstadoTurnoCaja;
+    },
   ) {
     return this.db.turnoCaja.update({
       where: { id },
-      data: { ...params, estado: 'CERRADO' as EstadoTurnoCaja, cerradoEn: new Date() },
+      data: { ...params, cerradoEn: new Date() },
+      include: INCLUDE_TURNO,
+    });
+  }
+
+  /** PENDIENTE_REVISION -> CERRADO (ítem E-6). */
+  marcarRevisado(id: string, revisadoPorId: string) {
+    return this.db.turnoCaja.update({
+      where: { id },
+      data: { estado: 'CERRADO' as EstadoTurnoCaja, revisadoPorId, revisadoEn: new Date() },
       include: INCLUDE_TURNO,
     });
   }

@@ -32,6 +32,8 @@ describe('PosService', () => {
       crearMovimiento: jest.fn(),
       calcularMovimientoEfectivo: jest.fn(),
       cerrarTurno: jest.fn(),
+      marcarRevisado: jest.fn(),
+      reporteCierres: jest.fn(),
       guardarVenta: jest.fn(),
       listarGuardadas: jest.fn(),
       eliminarGuardada: jest.fn(),
@@ -422,6 +424,7 @@ describe('PosService', () => {
         diferencia: -50,
         cerradoPorId: 'cajero-1',
         justificacionDiferencia: undefined,
+        estado: 'CERRADO',
       });
     });
 
@@ -481,6 +484,22 @@ describe('PosService', () => {
         't1',
         expect.objectContaining({ justificacionDiferencia: 'Error al dar cambio en una venta' }),
       );
+    });
+
+    it('una diferencia fuera de tolerancia cierra en PENDIENTE_REVISION, no directo en CERRADO (ítem E-6)', async () => {
+      posRepository.buscarPorId.mockResolvedValue({ id: 't1', estado: 'ABIERTO', montoInicial: 1000, cajeroId: 'cajero-1' } as never);
+      posRepository.calcularMovimientoEfectivo.mockResolvedValue({ ventasEfectivo: 0, entradas: 0, salidas: 0 });
+      posRepository.cerrarTurno.mockResolvedValue({ id: 't1', estado: 'PENDIENTE_REVISION' } as never);
+
+      await service.cerrarTurno(
+        't1',
+        { montoFinalContado: 900, justificacionDiferencia: 'Error al dar cambio en una venta' },
+        'cajero-1',
+        'tenant-1',
+        false,
+      );
+
+      expect(posRepository.cerrarTurno).toHaveBeenCalledWith('t1', expect.objectContaining({ estado: 'PENDIENTE_REVISION' }));
     });
 
     it('usa una tolerancia configurada distinta del default si el tenant la cambió', async () => {
@@ -548,6 +567,37 @@ describe('PosService', () => {
 
         expect(authService.verificarPin).toHaveBeenCalledWith('supervisor-1', '1234');
       });
+    });
+  });
+
+  describe('revisarTurno (plan de integración Cuadre, ítem E-6)', () => {
+    it('pasa un turno PENDIENTE_REVISION a CERRADO', async () => {
+      posRepository.buscarPorId.mockResolvedValue({ id: 't1', estado: 'PENDIENTE_REVISION' } as never);
+      posRepository.marcarRevisado.mockResolvedValue({ id: 't1', estado: 'CERRADO' } as never);
+
+      await service.revisarTurno('t1', 'supervisor-1');
+
+      expect(posRepository.marcarRevisado).toHaveBeenCalledWith('t1', 'supervisor-1');
+    });
+
+    it('rechaza con 400 si el turno no está en PENDIENTE_REVISION', async () => {
+      posRepository.buscarPorId.mockResolvedValue({ id: 't1', estado: 'CERRADO' } as never);
+
+      await expect(service.revisarTurno('t1', 'supervisor-1')).rejects.toThrow(BadRequestException);
+      expect(posRepository.marcarRevisado).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('reporteCierres (plan de integración Cuadre, ítem E-6)', () => {
+    it('convierte desde/hasta a Date antes de delegar en el repositorio', async () => {
+      posRepository.reporteCierres.mockResolvedValue({} as never);
+
+      await service.reporteCierres({ desde: '2026-01-01', hasta: '2026-01-31', cajeroId: 'c1' });
+
+      const [[args]] = posRepository.reporteCierres.mock.calls;
+      expect(args.desde).toBeInstanceOf(Date);
+      expect(args.hasta).toBeInstanceOf(Date);
+      expect(args.cajeroId).toBe('c1');
     });
   });
 

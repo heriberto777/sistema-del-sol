@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../lib/api-client';
 import { AbrirTurnoForm } from '../components/organisms/AbrirTurnoForm/AbrirTurnoForm';
 import { TurnosCajaTable } from '../components/organisms/TurnosCajaTable/TurnosCajaTable';
+import { CierresCajaDashboard } from '../components/organisms/CierresCajaDashboard/CierresCajaDashboard';
 import { Button } from '../components/atoms/Button/Button';
 import { RequierePermiso } from '../components/organisms/RequierePermiso/RequierePermiso';
 import { useAuth } from '../hooks/useAuth';
@@ -33,6 +34,7 @@ export function Pos() {
       <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Punto de venta</h1>
       <RequierePermiso permiso="pos.ver">
         {tienePermiso('pos.supervisar') && <MensajeCajasSupervisorPanel />}
+        {tienePermiso('pos.supervisar') && <CierresCajaDashboard />}
         <TurnosCajaTable seleccionadoId={seleccionadoId} onSeleccionar={setSeleccionadoId} />
         {seleccionadoId && (
           <div className="flex justify-end">

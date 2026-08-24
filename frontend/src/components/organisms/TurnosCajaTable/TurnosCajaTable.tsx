@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../../lib/api-client';
 import { AbrirTurnoForm } from '../AbrirTurnoForm/AbrirTurnoForm';
 import { Badge } from '../../atoms/Badge/Badge';
@@ -19,7 +19,19 @@ interface Bodega {
   sucursalId: string;
 }
 
-type EstadoTurno = 'ABIERTO' | 'CERRADO';
+type EstadoTurno = 'ABIERTO' | 'PENDIENTE_REVISION' | 'CERRADO';
+
+const TONO_ESTADO: Record<EstadoTurno, 'exito' | 'advertencia' | 'neutro'> = {
+  ABIERTO: 'exito',
+  PENDIENTE_REVISION: 'advertencia',
+  CERRADO: 'neutro',
+};
+
+const ETIQUETA_ESTADO: Record<EstadoTurno, string> = {
+  ABIERTO: 'ABIERTO',
+  PENDIENTE_REVISION: 'PENDIENTE DE REVISIÓN',
+  CERRADO: 'CERRADO',
+};
 
 interface Cajero {
   id: string;
@@ -43,6 +55,7 @@ interface TurnosCajaTableProps {
 
 export function TurnosCajaTable({ seleccionadoId, onSeleccionar }: TurnosCajaTableProps) {
   const { tienePermiso } = useAuth();
+  const queryClient = useQueryClient();
   const [pagina, setPagina] = useState(1);
   const [modalAbrirTurno, setModalAbrirTurno] = useState(false);
   const [filtroCajeroId, setFiltroCajeroId] = useState('');
@@ -77,6 +90,11 @@ export function TurnosCajaTable({ seleccionadoId, onSeleccionar }: TurnosCajaTab
           },
         })
       ).data,
+  });
+
+  const revisar = useMutation({
+    mutationFn: async (turnoId: string) => apiClient.patch(`/pos/turnos/${turnoId}/revisar`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['pos-turnos'] }),
   });
 
   return (
@@ -120,6 +138,7 @@ export function TurnosCajaTable({ seleccionadoId, onSeleccionar }: TurnosCajaTab
           >
             <option value="">Todos</option>
             <option value="ABIERTO">Abierto</option>
+            <option value="PENDIENTE_REVISION">Pendiente de revisión</option>
             <option value="CERRADO">Cerrado</option>
           </select>
         </div>
@@ -170,13 +189,20 @@ export function TurnosCajaTable({ seleccionadoId, onSeleccionar }: TurnosCajaTab
                     </td>
                     <td className="px-5 py-3">RD$ {Number(turno.montoInicial).toLocaleString('es-DO')}</td>
                     <td className="px-5 py-3">
-                      <Badge tono={turno.estado === 'ABIERTO' ? 'exito' : 'neutro'}>{turno.estado}</Badge>
+                      <Badge tono={TONO_ESTADO[turno.estado]}>{ETIQUETA_ESTADO[turno.estado]}</Badge>
                     </td>
                     <td className="px-5 py-3">{new Date(turno.abiertoEn).toLocaleString('es-DO')}</td>
                     <td className="px-5 py-3">
-                      <Button variante="secundario" onClick={() => onSeleccionar(turno.id)}>
-                        Ver detalle
-                      </Button>
+                      <div className="flex gap-2">
+                        <Button variante="secundario" onClick={() => onSeleccionar(turno.id)}>
+                          Ver detalle
+                        </Button>
+                        {turno.estado === 'PENDIENTE_REVISION' && tienePermiso('pos.supervisar') && (
+                          <Button disabled={revisar.isPending} onClick={() => revisar.mutate(turno.id)}>
+                            Marcar revisado
+                          </Button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}

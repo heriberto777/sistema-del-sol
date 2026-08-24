@@ -8,7 +8,7 @@ import { MensajeCajasBanner } from '../components/molecules/MensajeCajasBanner/M
 import { useAuth } from '../hooks/useAuth';
 
 interface TurnoCajaResumen {
-  estado: 'ABIERTO' | 'CERRADO';
+  estado: 'ABIERTO' | 'PENDIENTE_REVISION' | 'CERRADO';
   cajero: { nombre: string };
 }
 

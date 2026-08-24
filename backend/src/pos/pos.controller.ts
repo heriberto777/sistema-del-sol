@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { PosService } from './pos.service';
 import { AbrirTurnoDto } from './dto/abrir-turno.dto';
@@ -9,6 +9,7 @@ import { CotizarVentaPosDto } from './dto/cotizar-venta.dto';
 import { GuardarVentaDto } from './dto/guardar-venta.dto';
 import { RegistrarDevolucionDto } from './dto/registrar-devolucion.dto';
 import { ListarTurnosQueryDto } from './dto/listar-turnos-query.dto';
+import { ReporteCierresQueryDto } from './dto/reporte-cierres-query.dto';
 import { PublicarMensajeCajasDto } from './dto/publicar-mensaje-cajas.dto';
 import { Permissions } from '../common/decorators/permissions.decorator';
 import { RequiereModulo } from '../common/decorators/requiere-modulo.decorator';
@@ -49,6 +50,15 @@ export class PosController {
     return this.posService.listarVendedores(busqueda);
   }
 
+  // Ruta literal declarada ANTES de 'turnos/:id' — Nest matchea en orden
+  // de declaración, así que si ':id' fuera primero, "reporte-cierres" se
+  // interpretaría como un id de turno en vez de llegar acá (ítem E-6).
+  @Get('turnos/reporte-cierres')
+  @Permissions('pos.ver')
+  reporteCierres(@Query() query: ReporteCierresQueryDto) {
+    return this.posService.reporteCierres(query);
+  }
+
   @Get('turnos/:id')
   @Permissions('pos.ver')
   buscarTurno(@Param('id') id: string) {
@@ -65,6 +75,14 @@ export class PosController {
   @Permissions('pos.editar')
   cerrarTurno(@Param('id') id: string, @Body() dto: CerrarTurnoDto, @CurrentUser() user: JwtPayloadUser) {
     return this.posService.cerrarTurno(id, dto, user.userId, user.tenantId, user.permisos.includes('pos.supervisar'));
+  }
+
+  // Ítem E-6 — un turno PENDIENTE_REVISION (diferencia de arqueo fuera de
+  // tolerancia) pasa a CERRADO solo cuando un supervisor lo confirma.
+  @Patch('turnos/:id/revisar')
+  @Permissions('pos.supervisar')
+  revisarTurno(@Param('id') id: string, @CurrentUser() user: JwtPayloadUser) {
+    return this.posService.revisarTurno(id, user.userId);
   }
 
   // Sin efectos secundarios — el checkout la llama antes de armar los pagos

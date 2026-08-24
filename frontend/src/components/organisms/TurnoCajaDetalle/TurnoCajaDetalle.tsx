@@ -20,7 +20,13 @@ import { PaginaResultado } from '../../../types/pagina-resultado';
 const ID_COMBOBOX_CLIENTE = 'turno-cliente-combobox';
 const ID_COMBOBOX_VENDEDOR = 'turno-vendedor-combobox';
 
-type EstadoTurno = 'ABIERTO' | 'CERRADO';
+type EstadoTurno = 'ABIERTO' | 'PENDIENTE_REVISION' | 'CERRADO';
+
+const TONO_ESTADO_TURNO: Record<EstadoTurno, 'exito' | 'advertencia' | 'neutro'> = {
+  ABIERTO: 'exito',
+  PENDIENTE_REVISION: 'advertencia',
+  CERRADO: 'neutro',
+};
 
 type ComprobantePorDefecto = 'CONTADO' | 'CREDITO' | 'REGIMEN_ESPECIAL' | 'GUBERNAMENTAL';
 
@@ -78,7 +84,7 @@ interface VentaAparcada {
 
 interface PagoVentaResumen {
   monto: string;
-  formaPago: { esEfectivo: boolean };
+  formaPago: { id: string; nombre: string; esEfectivo: boolean };
 }
 
 interface FacturaTurno {
@@ -141,6 +147,49 @@ function calcularMontoEsperado(data: TurnoCajaDetalleData): number {
   const entradas = data.movimientos.filter((m) => m.tipo === 'ENTRADA').reduce((acc, m) => acc + Number(m.monto), 0);
   const salidas = data.movimientos.filter((m) => m.tipo === 'SALIDA').reduce((acc, m) => acc + Number(m.monto), 0);
   return Number(data.montoInicial) + ventasEfectivo + entradas - salidas;
+}
+
+/** Desglose por TODAS las formas de pago (plan de integración Cuadre, ítem E-6) — antes el resumen del cierre solo distinguía efectivo. */
+function DesglosePorFormaPago({ facturas }: { facturas: FacturaTurno[] }) {
+  const porForma = new Map<string, { nombre: string; monto: number }>();
+  for (const factura of facturas) {
+    if (factura.estado !== 'EMITIDA') continue;
+    for (const pago of factura.pagosVenta) {
+      const actual = porForma.get(pago.formaPago.id) ?? { nombre: pago.formaPago.nombre, monto: 0 };
+      actual.monto += Number(pago.monto);
+      porForma.set(pago.formaPago.id, actual);
+    }
+  }
+  const filas = [...porForma.values()].sort((a, b) => b.monto - a.monto);
+  if (filas.length === 0) return null;
+
+  return (
+    <div>
+      <p className="font-medium text-slate-700 dark:text-slate-300">Ventas por forma de pago</p>
+      <ul className="mt-1 grid grid-cols-2 gap-x-4 gap-y-0.5 sm:grid-cols-3">
+        {filas.map((f) => (
+          <li key={f.nombre} className="flex justify-between gap-2 text-slate-600 dark:text-slate-400">
+            <span>{f.nombre}</span>
+            <span>{formatoRD(f.monto)}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/** PENDIENTE_REVISION -> CERRADO (ítem E-6). */
+function RevisarTurnoBoton({ turnoId, onRevisado }: { turnoId: string; onRevisado: () => void }) {
+  const revisar = useMutation({
+    mutationFn: async () => apiClient.patch(`/pos/turnos/${turnoId}/revisar`),
+    onSuccess: onRevisado,
+  });
+
+  return (
+    <Button disabled={revisar.isPending} onClick={() => revisar.mutate()}>
+      {revisar.isPending ? 'Marcando…' : 'Marcar revisado'}
+    </Button>
+  );
 }
 
 interface TurnoCajaDetalleProps {
@@ -432,7 +481,7 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
     <Card
       titulo={pantallaCompleta ? undefined : 'Turno de caja'}
       descripcion={pantallaCompleta ? undefined : descripcion}
-      acciones={pantallaCompleta ? undefined : <Badge tono={data.estado === 'ABIERTO' ? 'exito' : 'neutro'}>{data.estado}</Badge>}
+      acciones={pantallaCompleta ? undefined : <Badge tono={TONO_ESTADO_TURNO[data.estado]}>{data.estado}</Badge>}
       className={pantallaCompleta ? 'border-0 bg-transparent shadow-none dark:bg-transparent' : undefined}
       sinPadding={pantallaCompleta}
     >
@@ -635,7 +684,7 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
         </>
       )}
 
-      {data.estado === 'CERRADO' && (
+      {(data.estado === 'CERRADO' || data.estado === 'PENDIENTE_REVISION') && (
         <div className="space-y-2 border-t border-slate-200 pt-3 text-sm dark:border-slate-800">
           <div className="grid grid-cols-3 gap-3">
             <p>Esperado: {formatoRD(data.montoEsperado ?? 0)}</p>
@@ -644,6 +693,16 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
           </div>
           {data.justificacionDiferencia && (
             <p className="text-slate-600 dark:text-slate-400">Justificación: {data.justificacionDiferencia}</p>
+          )}
+          <DesglosePorFormaPago facturas={data.facturas} />
+          {data.estado === 'PENDIENTE_REVISION' && tienePermiso('pos.supervisar') && (
+            <RevisarTurnoBoton
+              turnoId={turnoId}
+              onRevisado={() => {
+                queryClient.invalidateQueries({ queryKey: ['pos-turno', turnoId] });
+                queryClient.invalidateQueries({ queryKey: ['pos-turnos'] });
+              }}
+            />
           )}
         </div>
       )}

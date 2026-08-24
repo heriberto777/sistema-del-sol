@@ -235,10 +235,19 @@ Resumen de lo que cambió (detalle en cada ítem más abajo):
   brecha separada); cuando F-2 se implemente, debería reusar el mismo
   campo. Migración `20260821170000_cliente_categoria_comprobante`.
   Entregado 2026-08-21.
-- [ ] **E-6** 🟧 — **Cierres de caja como dashboard**: desglose de ventas
+- [x] **E-6** 🟧 — **Cierres de caja como dashboard**: desglose de ventas
   por TODAS las formas de pago (no solo efectivo), estado "Pendiente
-  revisión". *Confirmado: brecha real — `EstadoTurnoCaja` solo tiene
-  `ABIERTO`/`CERRADO`.*
+  revisión". *Confirmado: brecha real — `EstadoTurnoCaja` solo tenía
+  `ABIERTO`/`CERRADO`.* Entregado: `EstadoTurnoCaja.PENDIENTE_REVISION`
+  (una diferencia fuera de tolerancia ya no cierra directo — queda acá
+  hasta que un supervisor confirma vía `PATCH /pos/turnos/:id/revisar`);
+  desglose de ventas por TODAS las formas de pago en el resumen del
+  cierre (`DesglosePorFormaPago`, agrupa `pagosVenta` de las facturas
+  del turno); reporte-dashboard `GET /pos/turnos/reporte-cierres` (4
+  agregados: Total Ventas, Sobrantes, Faltantes, Diferencia Total +
+  exactas), panel `CierresCajaDashboard.tsx` en `/pos` (solo
+  `pos.supervisar`). Migración
+  `20260826120000_turno_caja_pendiente_revision`. Entregado 2026-08-24.
 - [ ] **E-7** 🟥 *diseño primero* — **"Caja" como entidad propia**
   (restricción de catálogo por terminal). *Confirmado: brecha real, no
   existe ningún modelo `Caja` — es literalmente `Bodega`+`TurnoCaja`.*
@@ -617,8 +626,10 @@ bloqueo — **B-9 está deliberadamente pausado** (el usuario
 pidió evaluarlo con más calma, no retomar sin avisar) y B-4 (🟧) no es
 bloqueante. La sección **J** queda completa salvo J-4 (🟥, diseño
 primero). La sección **F** queda completa salvo F-9 (🟥, diseño
-primero). Quedan además C-2 (multi-moneda, 🟧), E-6 (🟧) y H-3 (🟧) sin
-verificar en detalle contra el código. Los 🟥 con "diseño
+primero). La sección **E** (Inventario/POS/Clientes) queda completa
+salvo E-1 (matiz, brecha real confirmada) y E-7 (🟥, diseño primero).
+Quedan además C-2 (multi-moneda, 🟧) y H-3 (🟧) sin verificar en detalle
+contra el código. Los 🟥 con "diseño
 primero" conviene agruparlos en su propia sesión de planeamiento cuando
 se prioricen, siguiendo la misma mecánica que Sucursales (Fase 8) y PIN
 (Fase 9): presentar el diseño, resolver casos límite, y recién después

@@ -2474,6 +2474,34 @@ activo debe poder verlo).
   y `GET /pos/cajeros` lista los cajeros distintos con turnos — sin
   requerir el permiso `admin.usuarios` que protege `GET /admin/usuarios`.
 
+**Cierres de caja: estado PENDIENTE_REVISION, desglose por forma de
+pago, y reporte-dashboard** (plan de integración Cuadre, ítem E-6): 3
+gaps reales confirmados contra la app real de Cuadre. (1)
+`EstadoTurnoCaja` ganó `PENDIENTE_REVISION` — cuando `|diferencia|`
+supera la tolerancia, `PosService.cerrarTurno()` ya NO cierra directo a
+`CERRADO` (aunque venga con `justificacionDiferencia`): queda
+`PENDIENTE_REVISION` hasta que alguien con `pos.supervisar` lo confirma
+vía `PATCH /pos/turnos/:id/revisar` (`PosService.revisarTurno`, guarda
+`revisadoPorId`/`revisadoEn`) — un tercer estado de auditoría, no solo
+un campo de texto libre. (2) El resumen del cierre (`TurnoCajaDetalle.tsx`)
+antes solo mostraba `montoEsperado`/`diferencia` (calculados SOLO sobre
+efectivo, ver arriba); `DesglosePorFormaPago` agrupa
+`Factura.pagosVenta` de todas las facturas EMITIDA del turno por
+`FormaPago` (el `select` de `PosRepository`'s `INCLUDE_TURNO` ganó
+`formaPago.id`/`nombre` — antes solo `esEfectivo` — para que el
+frontend pueda agrupar sin un endpoint nuevo). (3)
+`GET /pos/turnos/reporte-cierres` (`PosRepository.reporteCierres`) es
+un reporte-dashboard nuevo — 4 agregados (Total Ventas + cantidad de
+sesiones, Sobrantes, Faltantes, Diferencia Total + exactas) sobre
+turnos `CERRADO`/`PENDIENTE_REVISION` en un rango — los únicos con
+`diferencia` calculada (`ABIERTO` la tiene `null`). "Total Ventas" suma
+`Factura.total` (todas las formas de pago) de esos turnos — NO
+`montoEsperado`, que es específico de efectivo. Panel
+`CierresCajaDashboard.tsx`, visible en `/pos` solo con
+`pos.supervisar`. Migración `20260826120000_turno_caja_pendiente_revision`
+(`ALTER TYPE ... ADD VALUE` sobre `EstadoTurnoCaja`, mismo patrón que
+`OrigenAsiento` en la Fase 5 de cierre de período contable).
+
 **Fuera de alcance deliberadamente**: modo offline/sincronización
 diferida (de ahí el nombre de esta sección — es la razón de ser del
 "sin offline en v1"), pagos con tarjeta procesados de verdad (elegir la

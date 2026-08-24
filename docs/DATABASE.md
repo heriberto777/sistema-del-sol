@@ -317,7 +317,12 @@ antes de esta fase (default permisivo) — ver ARCHITECTURE.md.
   anterior sobre `recibos_nomina`/`lineas_asiento`). `cerradoPorId` es
   nullable (solo se llena al cerrar) y usa la relación nombrada
   `"TurnoCajaCerradoPor"` porque `User` ya tiene la relación por defecto
-  hacia `TurnoCaja` vía `cajeroId`.
+  hacia `TurnoCaja` vía `cajeroId`. `EstadoTurnoCaja` ganó
+  `PENDIENTE_REVISION` (plan de integración Cuadre, ítem E-6, entre
+  `ABIERTO` y `CERRADO`) — una diferencia de arqueo fuera de tolerancia
+  cae acá en vez de `CERRADO` directo; `revisadoPorId`/`revisadoEn`
+  (mismo patrón nombrado que `cerradoPorId`, relación
+  `"TurnoCajaRevisadoPor"`) registran quién lo confirmó.
 - **`bodegas.sucursalId`** (Fase 8a, requerido) es `ON DELETE CASCADE`
   hacia `sucursales` — a diferencia de los casos de arriba, esto NO es
   una carrera de ramas hermanas: `Tenant → Sucursal → Bodega` es una

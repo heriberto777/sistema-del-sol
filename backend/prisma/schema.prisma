@@ -429,6 +429,7 @@ model User {
   remisiones    Remision[]
   turnosCaja    TurnoCaja[]
   turnosCajaCerrados TurnoCaja[] @relation("TurnoCajaCerradoPor")
+  turnosCajaRevisados TurnoCaja[] @relation("TurnoCajaRevisadoPor")
   pagos         Pago[]
   // Nullable: no todo User de sistema tiene un Empleado de nómina asociado
   // (ej. un Admin Total que no está en planilla).
@@ -1514,8 +1515,13 @@ enum FormatoImpresion {
   TERMICA_58MM
 }
 
+/// PENDIENTE_REVISION (plan de integración Cuadre, ítem E-6): un turno
+/// cuya diferencia de arqueo excedió la tolerancia configurada cae acá al
+/// cerrarse (en vez de directo a CERRADO) — un supervisor lo revisa
+/// después vía `PATCH /pos/turnos/:id/revisar` y ahí sí pasa a CERRADO.
 enum EstadoTurnoCaja {
   ABIERTO
+  PENDIENTE_REVISION
   CERRADO
 }
 
@@ -1579,6 +1585,10 @@ model TurnoCaja {
   // (cajeroId, sin nombre explícito) — Prisma exige distinguirlas.
   cerradoPor        User?           @relation("TurnoCajaCerradoPor", fields: [cerradoPorId], references: [id], onDelete: Cascade)
   justificacionDiferencia String?
+  // PENDIENTE_REVISION -> CERRADO (ítem E-6) — quién y cuándo lo aprobó.
+  revisadoEn        DateTime?
+  revisadoPorId     String?
+  revisadoPor       User?           @relation("TurnoCajaRevisadoPor", fields: [revisadoPorId], references: [id], onDelete: Cascade)
 
   movimientos MovimientoCaja[]
   facturas    Factura[]
