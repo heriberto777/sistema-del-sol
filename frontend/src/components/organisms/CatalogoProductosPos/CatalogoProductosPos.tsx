@@ -19,6 +19,8 @@ export interface ProductoCatalogo {
   porcentajeItbis: string;
   tipo: 'PRODUCTO' | 'SERVICIO' | 'COMBO';
   precioVenta: string | null;
+  /** Plan de integración Cuadre, ítem E-8 — habilita un precio editable por línea en el carrito. */
+  precioVariable: boolean;
 }
 
 function formatoRD(valor: string) {

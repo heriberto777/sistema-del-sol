@@ -242,15 +242,22 @@ Resumen de lo que cambió (detalle en cada ítem más abajo):
 - [ ] **E-7** 🟥 *diseño primero* — **"Caja" como entidad propia**
   (restricción de catálogo por terminal). *Confirmado: brecha real, no
   existe ningún modelo `Caja` — es literalmente `Bodega`+`TurnoCaja`.*
-- [ ] **E-8** 🟧 *(matiz)* — **Producto: campos avanzados** — precio
-  variable, presentación de compra con conversión bulto→unidad, "es
-  ingrediente", "permite devolución" por producto, códigos alternos
-  múltiples. *Confirmado en su mayoría real, con un matiz: `unidadMedida`
-  YA existe como `String @default("UND")` libre — no es un enum
-  estructurado kg/g/lb/etc. con conversión, pero tampoco es un campo
-  ausente; alcanza con ampliarlo si se necesita una lista cerrada. El resto
-  (comisión — ver A-1, OTP, precio variable, ingrediente, permite
-  devolución, códigos alternos) sigue ausente.*
+- [x] **E-8** 🟧 *(matiz + alcance reducido)* — **Producto: campos
+  avanzados** — precio variable, presentación de compra con conversión
+  bulto→unidad, "es ingrediente", "permite devolución" por producto,
+  códigos alternos múltiples. *Confirmado en su mayoría real, con un
+  matiz: `unidadMedida` YA existía como `String @default("UND")` libre
+  — no era un campo ausente, solo sin lista cerrada.* Entregado:
+  `Producto.precioVariable` (input de precio editable en el carrito del
+  POS), `esIngrediente` (informativo), `permiteDevolucion` (default
+  `true`, rechaza con 400 una NOTA_CREDITO si es `false`), `unidadMedida`
+  ahora validado contra una lista cerrada de 10 valores (`@IsIn`, sin
+  migrar la columna). **Deliberadamente fuera, cada uno más grande que
+  un campo suelto**: "Requiere OTP" (flujo de autorización nuevo, mismo
+  nivel de diseño que el PIN de Fase 9), presentación de compra con
+  conversión bulto→unidad (toca Compras real), códigos alternos
+  múltiples (tabla hija nueva + matching de escaneo en POS). Migración
+  `20260826110000_producto_campos_avanzados`. Entregado 2026-08-24.
 - [x] **E-9** 🟨 — **Color por categoría "para POS"**: `Categoria.color`
   nuevo, enum nullable `ColorCategoria` (12 valores, puramente
   decorativo). Selector en `CategoriasPanel.tsx` (form + swatch en la
@@ -610,8 +617,8 @@ bloqueo — **B-9 está deliberadamente pausado** (el usuario
 pidió evaluarlo con más calma, no retomar sin avisar) y B-4 (🟧) no es
 bloqueante. La sección **J** queda completa salvo J-4 (🟥, diseño
 primero). La sección **F** queda completa salvo F-9 (🟥, diseño
-primero). Quedan además C-2 (multi-moneda, 🟧), E-6/E-8 (🟧) y H-3
-(🟧) sin verificar en detalle contra el código. Los 🟥 con "diseño
+primero). Quedan además C-2 (multi-moneda, 🟧), E-6 (🟧) y H-3 (🟧) sin
+verificar en detalle contra el código. Los 🟥 con "diseño
 primero" conviene agruparlos en su propia sesión de planeamiento cuando
 se prioricen, siguiendo la misma mecánica que Sucursales (Fase 8) y PIN
 (Fase 9): presentar el diseño, resolver casos límite, y recién después

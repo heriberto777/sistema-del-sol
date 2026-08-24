@@ -46,6 +46,8 @@ interface LineaCarrito {
   porcentajeItbis: number;
   /** Monto flat (no %) descontado de esta línea — ver ModalDescuento; misma unidad que LineaFactura.descuento en el backend. */
   descuento: number;
+  /** Plan de integración Cuadre, ítem E-8 — habilita el input de precio editable en la fila del carrito. */
+  precioVariable?: boolean;
 }
 
 interface MovimientoCaja {
@@ -307,11 +309,16 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
       precioUnitario: Number(producto.precioVenta),
       porcentajeItbis: Number(producto.porcentajeItbis),
       descuento: 0,
+      precioVariable: producto.precioVariable,
     });
   }
 
   function quitarDelCarrito(productoId: string) {
     setCarrito((prev) => prev.filter((l) => l.productoId !== productoId));
+  }
+
+  function cambiarPrecio(productoId: string, precioUnitario: number) {
+    setCarrito((prev) => prev.map((l) => (l.productoId === productoId ? { ...l, precioUnitario } : l)));
   }
 
   function cambiarCantidad(productoId: string, cantidad: number) {
@@ -530,10 +537,25 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
                     <li key={l.productoId} className="flex items-center gap-2 px-3 py-2 text-sm">
                       <div className="min-w-0 flex-1">
                         <p className="truncate font-medium text-slate-800 dark:text-slate-200">{l.nombre}</p>
-                        <p className="text-xs text-slate-400">
-                          {formatoRD(l.precioUnitario)} c/u
-                          {l.descuento > 0 && <span className="text-amber-600 dark:text-amber-400"> — desc. {formatoRD(l.descuento)}</span>}
-                        </p>
+                        {l.precioVariable ? (
+                          <div className="flex items-center gap-1 text-xs text-slate-400">
+                            <span>RD$</span>
+                            <input
+                              type="number"
+                              min={0}
+                              step="any"
+                              value={l.precioUnitario}
+                              onChange={(e) => cambiarPrecio(l.productoId, Number(e.target.value))}
+                              className="w-20 rounded-md border border-slate-300 px-1 py-0.5 text-xs dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                            />
+                            <span>c/u</span>
+                          </div>
+                        ) : (
+                          <p className="text-xs text-slate-400">{formatoRD(l.precioUnitario)} c/u</p>
+                        )}
+                        {l.descuento > 0 && (
+                          <p className="text-xs text-amber-600 dark:text-amber-400">desc. {formatoRD(l.descuento)}</p>
+                        )}
                       </div>
                       <input
                         type="number"

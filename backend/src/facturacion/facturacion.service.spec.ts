@@ -36,10 +36,12 @@ describe('FacturacionService', () => {
   const TX = { esTransaccion: true };
 
   const producto = (porcentajeItbis: number, precioVenta: number, tipo: 'PRODUCTO' | 'SERVICIO' | 'COMBO' = 'PRODUCTO', componentes: unknown[] = []) => ({
+    nombre: 'Producto de prueba',
     precios: [{ precioVenta }],
     porcentajeItbis,
     tipo,
     componentes,
+    permiteDevolucion: true,
   });
 
   function facturaCreada(overrides: Record<string, unknown> = {}) {
@@ -760,6 +762,26 @@ describe('FacturacionService', () => {
       expect(repository.siguienteNcfEnTx).not.toHaveBeenCalled();
       expect(repository.crearFacturaEnTx).not.toHaveBeenCalled();
       expect(bonosService.procesarPagoEnTx).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('permiteDevolucion (plan de integración Cuadre, ítem E-8)', () => {
+    it('rechaza con 400 una NOTA_CREDITO que incluya un producto con permiteDevolucion:false', async () => {
+      repository.obtenerProductoConPrecioVigente.mockResolvedValue({ ...producto(18, 100), permiteDevolucion: false } as never);
+
+      await expect(
+        service.crear(dto({ tipoFactura: 'NOTA_CREDITO', facturaOrigenId: 'f-original' }), 'tenant-1', 'vendedor-1'),
+      ).rejects.toThrow(BadRequestException);
+      expect(repository.crearFacturaEnTx).not.toHaveBeenCalled();
+    });
+
+    it('permite una venta normal (CONTADO) del mismo producto con permiteDevolucion:false', async () => {
+      repository.obtenerProductoConPrecioVigente.mockResolvedValue({ ...producto(18, 100), permiteDevolucion: false } as never);
+      repository.crearFacturaEnTx.mockResolvedValue(facturaCreada() as never);
+
+      await service.crear(dto(), 'tenant-1', 'vendedor-1');
+
+      expect(repository.crearFacturaEnTx).toHaveBeenCalled();
     });
   });
 

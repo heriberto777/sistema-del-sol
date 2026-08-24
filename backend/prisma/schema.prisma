@@ -1706,6 +1706,17 @@ model Producto {
   // esBono) — si está apagado, este producto sigue funcionando exactamente
   // igual que hoy, sin exigir lote nunca. Ver ARCHITECTURE.md, "Vencimientos".
   controlaVencimiento Boolean @default(false)
+  // Campos avanzados de producto (plan de integración Cuadre, ítem E-8).
+  // `precioVariable`: habilita un precio editable por línea en el carrito
+  // del POS (ej. artículos pesados o de precio negociado) — sin esto, el
+  // precio de línea siempre sale del catálogo. `esIngrediente`: puramente
+  // informativo (no hay motor de recetas/BOM) — mismo criterio que
+  // `Categoria.color`. `permiteDevolucion`: si es false,
+  // `FacturacionService.crear()` rechaza una NOTA_CREDITO que incluya
+  // este producto.
+  precioVariable   Boolean  @default(false)
+  esIngrediente    Boolean  @default(false)
+  permiteDevolucion Boolean @default(true)
   // Data URI completa (data:image/jpeg;base64,...), comprimida en el
   // cliente antes de subir. `listar()` (el listado general de
   // Productos.tsx) NO la selecciona a propósito — solo `catalogo()`

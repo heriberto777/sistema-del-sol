@@ -168,6 +168,15 @@ antes de esta fase (default permisivo) — ver ARCHITECTURE.md.
   `Producto` (decisión explícita del usuario, no al Cliente ni a la
   Factura) porque la reducción depende de QUÉ se vende, no de quién
   compra — ver `FacturacionService.calcularLineasYTotales`.
+- **`productos.precioVariable`/`esIngrediente`/`permiteDevolucion`**
+  (plan de integración Cuadre, ítem E-8): booleanas aditivas, defaults
+  que no cambian el comportamiento existente (`precioVariable`/
+  `esIngrediente` en `false`, `permiteDevolucion` en `true`).
+  `unidadMedida` sigue siendo `String` libre a nivel de columna — la
+  lista cerrada de 10 valores (Unidad/Kilogramo/Gramo/Libra/Onza/Litro/
+  Mililitro/Galón/Porción/Docena) se valida en el DTO (`@IsIn`), no en
+  el schema, para no migrar datos existentes que puedan tener otro
+  texto guardado.
 - **Categorías**: `categorias.categoriaPadreId` es una self-relation real
   (`@relation("JerarquiaCategoria")`, mismo patrón que
   `cuentas_contables.cuentaPadreId`, hasta ahora sembrado pero sin

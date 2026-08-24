@@ -154,6 +154,12 @@ export class FacturacionService {
         // una resolución distinta de la otra.
         const varianteId = await this.variantesService.resolverObligatoria(linea.productoId, linea.varianteId);
         const producto = await this.facturacionRepository.obtenerProductoConPrecioVigente(linea.productoId, varianteId, listaPrecio);
+        // Ítem E-8: un producto con permiteDevolucion:false no puede
+        // incluirse en una Nota de Crédito (ej. productos perecederos que
+        // el negocio nunca acepta de vuelta).
+        if (dto.tipoFactura === 'NOTA_CREDITO' && !producto.permiteDevolucion) {
+          throw new BadRequestException(`El producto "${producto.nombre}" no permite devoluciones`);
+        }
         const precioUnitario = linea.precioUnitario ?? Number(producto.precios[0]?.precioVenta ?? 0);
         // Toggle de ITBIS por línea (plan de integración Cuadre, ítem B-7) —
         // `aplicaItbis: false` fuerza 0% sin importar producto.porcentajeItbis,

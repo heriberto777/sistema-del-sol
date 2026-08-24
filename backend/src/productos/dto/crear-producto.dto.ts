@@ -1,7 +1,10 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { ArrayMinSize, IsArray, IsBoolean, IsEnum, IsNumber, IsOptional, IsPositive, IsString, IsUUID, Matches, MaxLength, Max, Min, ValidateNested } from 'class-validator';
+import { ArrayMinSize, IsArray, IsBoolean, IsEnum, IsIn, IsNumber, IsOptional, IsPositive, IsString, IsUUID, Matches, MaxLength, Max, Min, ValidateNested } from 'class-validator';
 import { TipoProducto } from '@prisma/client';
+
+/** Plan de integración Cuadre, ítem E-8 — lista cerrada (antes String libre sin validar). 'UND' se mantiene por compatibilidad con el default histórico. */
+export const UNIDADES_MEDIDA = ['UND', 'KILOGRAMO', 'GRAMO', 'LIBRA', 'ONZA', 'LITRO', 'MILILITRO', 'GALON', 'PORCION', 'DOCENA'] as const;
 
 export class ComponenteComboDto {
   @ApiProperty()
@@ -40,9 +43,9 @@ export class CrearProductoDto {
   @IsUUID()
   categoriaId?: string | null;
 
-  @ApiProperty({ required: false, default: 'UND' })
+  @ApiProperty({ required: false, default: 'UND', enum: UNIDADES_MEDIDA })
   @IsOptional()
-  @IsString()
+  @IsIn(UNIDADES_MEDIDA)
   unidadMedida?: string;
 
   @ApiProperty({ required: false, default: 18 })
@@ -71,6 +74,21 @@ export class CrearProductoDto {
   @IsOptional()
   @IsBoolean()
   controlaVencimiento?: boolean;
+
+  @ApiProperty({ required: false, default: false, description: 'Plan de integración Cuadre, ítem E-8 — habilita un precio editable por línea en el carrito del POS (ej. artículos de precio negociado)' })
+  @IsOptional()
+  @IsBoolean()
+  precioVariable?: boolean;
+
+  @ApiProperty({ required: false, default: false, description: 'Puramente informativo — no hay motor de recetas/BOM' })
+  @IsOptional()
+  @IsBoolean()
+  esIngrediente?: boolean;
+
+  @ApiProperty({ required: false, default: true, description: 'Si es false, este producto no puede incluirse en una Nota de Crédito' })
+  @IsOptional()
+  @IsBoolean()
+  permiteDevolucion?: boolean;
 
   @ApiProperty({
     type: [ComponenteComboDto],

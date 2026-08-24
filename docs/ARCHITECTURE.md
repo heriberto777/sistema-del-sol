@@ -897,6 +897,33 @@ que `CategoriasClienteModule`/`PuestosModule`), importado por
 `ProductosModule` para validar el FK; `FacturacionModule` no lo importa
 como servicio — solo lee el campo ya incluido en la query existente.
 
+**Producto: campos avanzados** (plan de integración Cuadre, ítem E-8,
+alcance reducido a propósito): de la lista completa auditada contra
+Cuadre (OTP requerido, precio variable, unidad de medida real,
+presentación de compra con conversión bulto→unidad, "es ingrediente",
+"permite devolución", códigos alternos múltiples), se entregó lo que
+tiene un efecto real y contenido en este release — **"Requiere OTP"**
+(un flujo de autorización nuevo, mismo nivel de diseño que el PIN de
+Fase 9, no algo para sumar como campo suelto), **presentación de compra
+con conversión bulto→unidad** (toca `OrdenCompra`/`RecepcionCompra`, un
+cambio real de UI+cálculo en Compras) y **códigos alternos múltiples**
+(necesita una tabla hija nueva y tocar el matching de escaneo de
+`VarianteProducto.codigoBarras` en el POS) quedan **deliberadamente
+fuera** — cada uno es una pieza propia, no un campo agregado a
+`Producto`. Entregado: `Producto.precioVariable` (habilita un input de
+precio editable en la fila del carrito del POS —
+`TurnoCajaDetalle.tsx`, en vez del precio fijo de catálogo; útil para
+artículos de precio negociado o pesados sin báscula integrada),
+`esIngrediente` (puramente informativo, no hay motor de recetas/BOM,
+mismo criterio que `Categoria.color`), `permiteDevolucion` (default
+`true` — `FacturacionService.crear()` rechaza con 400 una
+`NOTA_CREDITO` que incluya un producto con este flag en `false`), y
+`unidadMedida` pasó de `String` libre sin validar a una lista cerrada
+de 10 valores (`UNIDADES_MEDIDA` en `crear-producto.dto.ts`) validada
+con `@IsIn` — sin migración de columna (sigue siendo `String`, mismo
+criterio que el propio catálogo sugería: "alcanza con ampliarlo si se
+necesita una lista cerrada").
+
 Al crear un gasto menor, `GastoMenorService` emite
 `EVENTOS.GASTO_MENOR_CREADO` (mismo patrón fire-and-forget del Event
 Bus) y `ContabilidadEventosService.alCrearGastoMenor` genera el asiento

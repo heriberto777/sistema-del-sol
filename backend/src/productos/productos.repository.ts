@@ -76,6 +76,9 @@ export class ProductosRepository {
       activo: true,
       createdAt: true,
       updatedAt: true,
+      precioVariable: true,
+      esIngrediente: true,
+      permiteDevolucion: true,
     } as const;
     return Promise.all([
       this.db.producto.findMany({ where, orderBy: { nombre: 'asc' }, skip: params.skip, take: params.take, select }),
@@ -100,6 +103,7 @@ export class ProductosRepository {
       imagen: true,
       porcentajeItbis: true,
       tipo: true,
+      precioVariable: true,
       variantes: {
         take: 1,
         orderBy: { createdAt: 'asc' as const },

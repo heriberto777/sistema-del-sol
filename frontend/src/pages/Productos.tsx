@@ -37,6 +37,9 @@ interface Producto {
   leyFiscalId: string | null;
   tipo: TipoProducto;
   controlaVencimiento: boolean;
+  precioVariable: boolean;
+  esIngrediente: boolean;
+  permiteDevolucion: boolean;
 }
 
 interface ComponenteComboDetalle {
@@ -67,7 +70,24 @@ interface ProductoFormValues {
   tipo: TipoProducto;
   imagen: string | null;
   controlaVencimiento: boolean;
+  precioVariable: boolean;
+  esIngrediente: boolean;
+  permiteDevolucion: boolean;
 }
+
+/** Plan de integración Cuadre, ítem E-8 — lista cerrada (antes texto libre sin validar), igual orden que UNIDADES_MEDIDA en el backend. */
+const UNIDADES_MEDIDA: { value: string; label: string }[] = [
+  { value: 'UND', label: 'Unidad' },
+  { value: 'KILOGRAMO', label: 'Kilogramo' },
+  { value: 'GRAMO', label: 'Gramo' },
+  { value: 'LIBRA', label: 'Libra' },
+  { value: 'ONZA', label: 'Onza' },
+  { value: 'LITRO', label: 'Litro' },
+  { value: 'MILILITRO', label: 'Mililitro' },
+  { value: 'GALON', label: 'Galón' },
+  { value: 'PORCION', label: 'Porción' },
+  { value: 'DOCENA', label: 'Docena' },
+];
 
 interface ComponenteComboForm {
   productoId: string;
@@ -84,6 +104,9 @@ const PRODUCTO_VACIO: ProductoFormValues = {
   tipo: 'PRODUCTO',
   imagen: null,
   controlaVencimiento: false,
+  precioVariable: false,
+  esIngrediente: false,
+  permiteDevolucion: true,
 };
 
 const ETIQUETA_TIPO: Record<TipoProducto, string> = { PRODUCTO: 'Producto', SERVICIO: 'Servicio', COMBO: 'Combo' };
@@ -309,6 +332,9 @@ function FormularioProducto({ producto, onGuardado }: { producto: Producto | nul
           tipo: producto.tipo,
           imagen: null,
           controlaVencimiento: producto.controlaVencimiento,
+          precioVariable: producto.precioVariable,
+          esIngrediente: producto.esIngrediente,
+          permiteDevolucion: producto.permiteDevolucion,
         }
       : PRODUCTO_VACIO,
   );
@@ -351,6 +377,9 @@ function FormularioProducto({ producto, onGuardado }: { producto: Producto | nul
       tipo: valores.tipo,
       imagen: valores.imagen,
       controlaVencimiento: valores.tipo === 'PRODUCTO' ? valores.controlaVencimiento : false,
+      precioVariable: valores.precioVariable,
+      esIngrediente: valores.esIngrediente,
+      permiteDevolucion: valores.permiteDevolucion,
       componentes:
         valores.tipo === 'COMBO'
           ? componentes.filter((c) => c.productoId).map((c) => ({ productoId: c.productoId, cantidad: Number(c.cantidad) || 1 }))
@@ -419,12 +448,22 @@ function FormularioProducto({ producto, onGuardado }: { producto: Producto | nul
           onChange={(id) => setValores((v) => ({ ...v, categoriaId: id }))}
         />
       </div>
-      <FormField
-        id="producto-unidad"
-        label="Unidad de medida"
-        value={valores.unidadMedida}
-        onChange={(e) => setValores((v) => ({ ...v, unidadMedida: e.target.value }))}
-      />
+      <div className="flex flex-col gap-1">
+        <label htmlFor="producto-unidad" className="text-sm font-medium text-slate-700 dark:text-slate-300">
+          Unidad de medida
+        </label>
+        <Select
+          id="producto-unidad"
+          value={valores.unidadMedida}
+          onChange={(e) => setValores((v) => ({ ...v, unidadMedida: e.target.value }))}
+        >
+          {UNIDADES_MEDIDA.map((u) => (
+            <option key={u.value} value={u.value}>
+              {u.label}
+            </option>
+          ))}
+        </Select>
+      </div>
       <FormField
         id="producto-itbis"
         label="ITBIS %"
@@ -455,6 +494,31 @@ function FormularioProducto({ producto, onGuardado }: { producto: Producto | nul
           Controla vencimiento (lotes con fecha de vencimiento, consumo FEFO en ventas)
         </label>
       )}
+
+      <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
+        <input
+          type="checkbox"
+          checked={valores.precioVariable}
+          onChange={(e) => setValores((v) => ({ ...v, precioVariable: e.target.checked }))}
+        />
+        Precio variable (habilita un precio editable por línea en el carrito del POS)
+      </label>
+      <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
+        <input
+          type="checkbox"
+          checked={valores.esIngrediente}
+          onChange={(e) => setValores((v) => ({ ...v, esIngrediente: e.target.checked }))}
+        />
+        Es ingrediente (informativo)
+      </label>
+      <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
+        <input
+          type="checkbox"
+          checked={valores.permiteDevolucion}
+          onChange={(e) => setValores((v) => ({ ...v, permiteDevolucion: e.target.checked }))}
+        />
+        Permite devolución (Nota de Crédito)
+      </label>
 
       {valores.tipo === 'COMBO' && (
         <div className="space-y-2 rounded-md border border-slate-200 p-3 dark:border-slate-800">
