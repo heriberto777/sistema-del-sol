@@ -6,6 +6,7 @@ import { AsistenciaTable } from '../components/organisms/AsistenciaTable/Asisten
 import { AusenciasTable } from '../components/organisms/AusenciasTable/AusenciasTable';
 import { FeriadosTable } from '../components/organisms/FeriadosTable/FeriadosTable';
 import { PuestosPanel } from '../components/organisms/PuestosPanel/PuestosPanel';
+import { TiposAusenciaConfigPanel } from '../components/organisms/TiposAusenciaConfigPanel/TiposAusenciaConfigPanel';
 import { RequierePermiso } from '../components/organisms/RequierePermiso/RequierePermiso';
 
 const PESTANAS = [
@@ -13,6 +14,7 @@ const PESTANAS = [
   { id: 'plantillas-horario', etiqueta: 'Plantillas de horario' },
   { id: 'asistencia', etiqueta: 'Asistencia' },
   { id: 'ausencias', etiqueta: 'Ausencias' },
+  { id: 'tipos-ausencia', etiqueta: 'Tipos de ausencia' },
   { id: 'feriados', etiqueta: 'Feriados' },
   { id: 'puestos', etiqueta: 'Puestos' },
 ] as const;
@@ -51,6 +53,7 @@ export function RRHH() {
         {pestana === 'plantillas-horario' && <PlantillasHorarioPanel />}
         {pestana === 'asistencia' && <AsistenciaTable />}
         {pestana === 'ausencias' && <AusenciasTable />}
+        {pestana === 'tipos-ausencia' && <TiposAusenciaConfigPanel />}
         {pestana === 'feriados' && <FeriadosTable />}
         {pestana === 'puestos' && <PuestosPanel />}
       </RequierePermiso>

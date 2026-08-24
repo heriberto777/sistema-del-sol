@@ -11,6 +11,7 @@ import { ComboboxBusqueda } from '../../molecules/ComboboxBusqueda/ComboboxBusqu
 import { Select } from '../../atoms/Select/Select';
 import { useAuth } from '../../../hooks/useAuth';
 import { PaginaResultado } from '../../../types/pagina-resultado';
+import { useTiposAusenciaConfig } from '../../../hooks/useTiposAusenciaConfig';
 
 interface Empleado {
   id: string;
@@ -168,6 +169,7 @@ interface BalanceVacaciones {
 }
 
 function ModalSolicitarAusencia({ onClose, onCreada }: { onClose: () => void; onCreada: () => void }) {
+  const { data: tiposConfig } = useTiposAusenciaConfig();
   const [empleado, setEmpleado] = useState<Empleado | null>(null);
   const [tipo, setTipo] = useState<TipoAusencia>('VACACIONES');
   const [fechaDesde, setFechaDesde] = useState('');
@@ -175,6 +177,11 @@ function ModalSolicitarAusencia({ onClose, onCreada }: { onClose: () => void; on
   const [conGoceDeSueldo, setConGoceDeSueldo] = useState(true);
   const [motivo, setMotivo] = useState('');
   const [error, setError] = useState<string | null>(null);
+
+  const tiposActivos = (Object.keys(ETIQUETAS_TIPO) as TipoAusencia[]).filter(
+    (t) => (tiposConfig?.find((c) => c.tipo === t)?.activo ?? true),
+  );
+  const configTipoActual = tiposConfig?.find((c) => c.tipo === tipo);
 
   const { data: balance } = useQuery({
     queryKey: ['rrhh-balance-vacaciones', empleado?.id],
@@ -239,10 +246,10 @@ function ModalSolicitarAusencia({ onClose, onCreada }: { onClose: () => void; on
             onChange={(e) => {
               const nuevoTipo = e.target.value as TipoAusencia;
               setTipo(nuevoTipo);
-              setConGoceDeSueldo(CON_GOCE_POR_DEFECTO[nuevoTipo]);
+              setConGoceDeSueldo(tiposConfig?.find((c) => c.tipo === nuevoTipo)?.conGoceDeSueldoPorDefecto ?? CON_GOCE_POR_DEFECTO[nuevoTipo]);
             }}
           >
-            {(Object.keys(ETIQUETAS_TIPO) as TipoAusencia[]).map((t) => (
+            {tiposActivos.map((t) => (
               <option key={t} value={t}>
                 {ETIQUETAS_TIPO[t]}
               </option>
@@ -255,6 +262,12 @@ function ModalSolicitarAusencia({ onClose, onCreada }: { onClose: () => void; on
               ? `Balance disponible: ${balance.diasDisponibles} día(s) (${balance.aniosCompletos} año(s) de antigüedad, ${balance.diasAcumulados} acumulado(s))`
               : 'Calculando balance de vacaciones…'}
           </p>
+        )}
+        {tipo !== 'VACACIONES' && configTipoActual?.maximoDiasPorAnio != null && (
+          <p className="text-sm text-slate-600 dark:text-slate-400">Tope configurado: {configTipoActual.maximoDiasPorAnio} día(s)/año.</p>
+        )}
+        {configTipoActual?.requiereAprobacion === false && (
+          <p className="text-sm text-amber-600 dark:text-amber-400">Este tipo se auto-aprueba al solicitarse.</p>
         )}
         <FormField id="ausencia-desde" label="Desde" type="date" value={fechaDesde} onChange={(e) => setFechaDesde(e.target.value)} required />
         <FormField id="ausencia-hasta" label="Hasta" type="date" value={fechaHasta} onChange={(e) => setFechaHasta(e.target.value)} required />

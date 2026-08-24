@@ -5,6 +5,7 @@ import { PERMISOS_BASE, ROLES_BASE, CONFIGURACIONES_BASE } from './roles-base';
 import { CUENTAS_BASE } from '../contabilidad/cuentas-base';
 import { FORMAS_PAGO_BASE } from './formas-pago-base';
 import { LISTAS_PRECIO_BASE } from './listas-precio-base';
+import { TIPOS_AUSENCIA_CONFIG_BASE } from './tipos-ausencia-config-base';
 
 @Injectable()
 export class TenantsRepository {
@@ -92,6 +93,10 @@ export class TenantsRepository {
 
       await tx.listaPrecio.createMany({
         data: LISTAS_PRECIO_BASE.map((l) => ({ tenantId: tenant.id, ...l })),
+      });
+
+      await tx.tipoAusenciaConfig.createMany({
+        data: TIPOS_AUSENCIA_CONFIG_BASE.map((c) => ({ tenantId: tenant.id, ...c })),
       });
 
       let adminRoleId: string | undefined;

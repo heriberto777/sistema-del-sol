@@ -57,6 +57,7 @@ model Tenant {
   puestos       Puesto[]
   leyesFiscales LeyFiscal[]
   plantillasHorario PlantillaHorario[]
+  tiposAusenciaConfig TipoAusenciaConfig[]
   proveedores   Proveedor[]
   ordenesCompra OrdenCompra[]
   webhooks      Webhook[]
@@ -1277,6 +1278,33 @@ model Ausencia {
   createdAt       DateTime       @default(now())
 
   @@map("ausencias")
+}
+
+/// Reglas configurables por tenant para cada valor del enum TipoAusencia
+/// (plan de integración Cuadre, ítem G-2) — alcance reducido a propósito:
+/// NO se reemplaza el enum por un catálogo libre porque VACACIONES es
+/// legalmente especial (Código de Trabajo, balance por antigüedad ya
+/// calculado en vacaciones.util.ts) y en RD los tipos de ausencia son
+/// categorías fijas, no algo que un negocio necesite inventar. Lo
+/// realmente configurable es la REGLA de cada tipo: goce por defecto,
+/// si requiere aprobación o se auto-aprueba, y un tope de días/año
+/// (ignorado para VACACIONES, que sigue su propio cálculo legal).
+/// Sembrado automático de las 6 filas al provisionar un tenant (ver
+/// TipoAusenciaConfigRepository.asegurarSembrado) y por migración para
+/// tenants ya existentes.
+model TipoAusenciaConfig {
+  id                        String       @id @default(uuid())
+  tenantId                  String
+  tenant                    Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tipo                      TipoAusencia
+  maximoDiasPorAnio         Int?
+  conGoceDeSueldoPorDefecto Boolean      @default(true)
+  requiereAprobacion        Boolean      @default(true)
+  activo                    Boolean      @default(true)
+  createdAt                 DateTime     @default(now())
+
+  @@unique([tenantId, tipo])
+  @@map("tipos_ausencia_config")
 }
 
 model PeriodoNomina {

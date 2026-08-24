@@ -399,10 +399,12 @@ para asientos manuales (ajustes, apertura, etc.).
 | POST | `/api/nomina/asistencia` | `rrhh.editar` — registro manual (`{ empleadoId, fecha, horaEntrada?, horaSalida? }`), para empleados sin login o corregir un olvido |
 | GET | `/api/nomina/asistencia?empleadoId&desde&hasta&estado&pagina&tamanoPagina` | `rrhh.ver` — `estado` (ítem G-3) filtra `PENDIENTE`/`APROBADO`/`RECHAZADO` |
 | PATCH | `/api/nomina/asistencia/:id/estado` | `rrhh.aprobar` — `{ estado: APROBADO\|RECHAZADO }` (ítem G-3), 400 si no está en `PENDIENTE`; puramente de revisión/auditoría — no afecta nómina |
-| POST | `/api/nomina/ausencias` | `rrhh.editar` — crea en `SOLICITADA` (`{ empleadoId, tipo, fechaDesde, fechaHasta, conGoceDeSueldo?, motivo? }`, RRHH Fase 7c) |
+| POST | `/api/nomina/ausencias` | `rrhh.editar` — crea en `SOLICITADA` (`{ empleadoId, tipo, fechaDesde, fechaHasta, conGoceDeSueldo?, motivo? }`, RRHH Fase 7c). Ítem G-2: 400 si el tipo está desactivado en `TipoAusenciaConfig` o excede su `maximoDiasPorAnio` (no aplica a VACACIONES, que sigue el balance legal); si `requiereAprobacion: false` para el tipo, se crea directo en `APROBADA` |
 | GET | `/api/nomina/ausencias?empleadoId&estado&pagina&tamanoPagina` | `rrhh.ver` |
 | GET | `/api/nomina/ausencias/:id` | `rrhh.ver` |
 | PATCH | `/api/nomina/ausencias/:id/estado` | `rrhh.aprobar` — `{ estado: APROBADA\|RECHAZADA }`, 400 si no está en SOLICITADA |
+| GET | `/api/nomina/tipos-ausencia` | `rrhh.ver` — ítem G-2, las 6 filas fijas de `TipoAusenciaConfig` (una por valor del enum `TipoAusencia`) |
+| PATCH | `/api/nomina/tipos-ausencia/:tipo` | `rrhh.editar` — `{ maximoDiasPorAnio?, conGoceDeSueldoPorDefecto?, requiereAprobacion?, activo? }`; `maximoDiasPorAnio` se ignora para `VACACIONES` (siempre queda `null`, usa el balance legal) |
 | GET | `/api/nomina/empleados/:id/balance-vacaciones` | `rrhh.ver` — `{ aniosCompletos, diasAcumulados, diasDisponibles, diasPagoPorAntiguedad }` (RRHH, Fase 7d) |
 | POST | `/api/nomina/feriados` | `rrhh.editar` — `{ nombre, fecha, recurrenteAnual?, activo? }` — calendario de feriados (ítem G-5), catálogo puro sin efecto automático en tardanza/horas extra/nómina todavía |
 | GET | `/api/nomina/feriados?activo=true` | `rrhh.ver` |

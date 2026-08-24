@@ -1974,6 +1974,39 @@ registro — `conGoceDeSueldo: false` + `APROBADA` es lo que la Fase 7d
 usa para prorratear el salario en nómina; `SOLICITADA`/`RECHAZADA`
 quedan como historial sin ningún efecto.
 
+**Tipos de ausencia configurables por tenant** (plan de integración
+Cuadre, ítem G-2, alcance reducido a propósito): NO se reemplazó el
+enum `TipoAusencia` por un catálogo libre — en RD los tipos de ausencia
+son categorías fijas del Código de Trabajo, y `VACACIONES` es
+legalmente especial (balance por antigüedad, ver más abajo), así que
+"agregar tipos nuevos" no es una necesidad real del negocio. Lo que sí
+es configurable por tenant es la REGLA de cada uno de los 6 valores del
+enum: `TipoAusenciaConfig` (`@@unique([tenantId, tipo])`, sembrado con
+las 6 filas al provisionar — `TIPOS_AUSENCIA_CONFIG_BASE`, y por
+migración con `INSERT ... CROSS JOIN tenants` para los tenants ya
+existentes, mismo patrón que `formas_pago`) guarda `maximoDiasPorAnio`
+(nullable = sin tope), `conGoceDeSueldoPorDefecto` (reemplaza el mapa
+hardcodeado `CON_GOCE_POR_DEFECTO`, que sigue viviendo en
+`ausencias.service.ts` solo como fallback para un tenant sin fila
+—no debería pasar nunca tras el backfill, pero es gratis no romper si
+pasa—), `requiereAprobacion` y `activo`. `AusenciasService.crear()`
+consulta la fila del tipo solicitado: rechaza con 400 si `activo:
+false`; para cualquier tipo que NO sea `VACACIONES`, si
+`maximoDiasPorAnio` está seteado, suma los días ya usados en el año
+calendario de la fecha solicitada (`TiposAusenciaConfigRepository.
+sumarDiasAprobadosEnAnio`, cuenta calendario simple, a diferencia de
+`contarDiasNoDomingo` que es específico del cálculo legal de
+vacaciones) y rechaza si excede el tope; si `requiereAprobacion:
+false`, la ausencia se crea directo en `APROBADA` (auto-aprobada,
+`aprobadoPorId` = quien la solicitó) en vez de `SOLICITADA`.
+`VACACIONES` ignora `maximoDiasPorAnio` siempre — sigue el balance por
+antigüedad de `calcularBalanceVacaciones` sin excepción;
+`TiposAusenciaConfigService.actualizar()` fuerza ese campo a `null` en
+cualquier `PATCH` sobre `VACACIONES`, para que no queden dos fuentes de
+verdad compitiendo por el mismo límite. Panel propio en RRHH → "Tipos
+de ausencia" (`TiposAusenciaConfigPanel.tsx`) — sin crear/eliminar,
+solo edita las 6 filas fijas.
+
 **Integración con Nómina y balance de vacaciones (7d, implementado —
 última sub-fase de RRHH)**: `PeriodosNominaService.generarPeriodo()`
 calcula, por cada empleado, los días de sus `Ausencia` `APROBADA` +

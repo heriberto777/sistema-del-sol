@@ -249,6 +249,17 @@ antes de esta fase (default permisivo) — ver ARCHITECTURE.md.
   resolverDiasEfectivos` en ARCHITECTURE.md. `predeterminada` (a lo sumo
   una por tenant) se auto-asigna a un `Empleado` nuevo que no reciba
   `plantillaHorarioId` explícito.
+- **`tipos_ausencia_config`** (plan de integración Cuadre, ítem G-2)
+  `@@unique([tenantId, tipo])` — una fila FIJA por cada valor del enum
+  `TipoAusencia` (6 en total), sembradas al provisionar
+  (`TIPOS_AUSENCIA_CONFIG_BASE`) y por migración (`INSERT ... CROSS
+  JOIN tenants`, mismo patrón que `formas_pago`) para tenants ya
+  existentes. Alcance reducido a propósito — NO reemplaza el enum por
+  un catálogo libre (VACACIONES es legalmente especial, ver
+  ARCHITECTURE.md), solo hace configurable la regla de cada tipo:
+  `maximoDiasPorAnio` (nullable, ignorado para VACACIONES),
+  `conGoceDeSueldoPorDefecto`, `requiereAprobacion`, `activo`. Sin
+  create/delete — solo `GET`/`PATCH` sobre las 6 filas existentes.
 - **`registros_asistencia`** (RRHH, Fase 7b) sigue el mismo patrón de
   rama hermana `ON DELETE CASCADE` que `horarios_empleado`.
   `@@unique([tenantId, empleadoId, fecha])` — una fila por empleado por

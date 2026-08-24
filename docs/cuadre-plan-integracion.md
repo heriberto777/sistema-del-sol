@@ -328,10 +328,24 @@ Resumen de lo que cambió (detalle en cada ítem más abajo):
   de horario" (RRHH) con editor de días; `HorarioEmpleadoPanel` oculta el
   editor individual y avisa cuando el empleado usa una plantilla.
   Migración `20260825100000_plantillas_horario`. Entregado 2026-08-24.
-- [ ] **G-2** 🟧 — **Tipos de Ausencia configurables por tenant**.
-  *Confirmado: `TipoAusencia` sigue siendo un enum fijo de Prisma
-  (VACACIONES/ENFERMEDAD/PERMISO/INJUSTIFICADA/MATERNIDAD_PATERNIDAD/OTRO)
-  — brecha real.*
+- [x] **G-2** 🟧→🟨 *(alcance reducido a propósito)* — **Tipos de
+  Ausencia configurables por tenant**. *Confirmado: `TipoAusencia`
+  sigue siendo un enum fijo de Prisma — brecha real, pero reemplazarlo
+  por un catálogo libre (como hace Cuadre) fue deliberadamente
+  descartado: en RD los tipos de ausencia son categorías fijas del
+  Código de Trabajo y VACACIONES es legalmente especial (balance por
+  antigüedad ya calculado), así que "inventar tipos nuevos" no es una
+  necesidad real — lo configurable es la REGLA de cada tipo.*
+  Entregado: catálogo `TipoAusenciaConfig` (`@@unique([tenantId,
+  tipo])`, 6 filas fijas sembradas al provisionar + backfill por
+  migración) con `maximoDiasPorAnio` (nullable, ignorado para
+  VACACIONES), `conGoceDeSueldoPorDefecto`, `requiereAprobacion`,
+  `activo`. `AusenciasService.crear()` rechaza tipos desactivados,
+  valida el tope de días/año (no VACACIONES, que sigue su balance
+  legal) y auto-aprueba cuando `requiereAprobacion: false`. Panel
+  "Tipos de ausencia" en RRHH (editar las 6 filas, sin crear/eliminar).
+  Migración `20260826090000_tipos_ausencia_config`. Entregado
+  2026-08-24.
 - [x] **G-3** 🟨 — **Aprobación de registros de asistencia**. Flujo
   `PENDIENTE → APROBADO/RECHAZADO` en `RegistroAsistencia` (`estado`/
   `aprobadoPorId`/`fechaResolucion`), calcado de `Ausencia.estado` —
@@ -536,23 +550,31 @@ Resumen de lo que cambió (detalle en cada ítem más abajo):
   no existe API pública propia sobre la cual definir scopes. Sin
   migraciones en este lote (los cuatro ítems son aditivos sobre módulos
   existentes o infraestructura ya presente — Redis, service worker).
+- **2026-08-24**: entregado G-2 (Tipos de Ausencia configurables), con
+  alcance reducido a propósito de 🟧 a 🟨 — catálogo `TipoAusenciaConfig`
+  (6 filas fijas por tenant, una por valor del enum `TipoAusencia`) en
+  vez de reemplazar el enum por un catálogo libre (VACACIONES es
+  legalmente especial; en RD los tipos de ausencia no son algo que un
+  negocio necesite inventar). Con esto, la sección **G** (RRHH) queda
+  completa salvo G-6 (🟧) y G-9 (🟥, hardware).
 
 ## Sugerencia de por dónde arrancar
 
-Con el catálogo ya corregido, el lote E-3/E-5/E-9/E-11/F-2/F-8/G-1/G-3/
-G-4/G-5/G-7/G-8/B-3/B-6/B-7/B-8/J-1/J-2/J-3 entregado y verificado (tsc +
-suite unitaria + e2e + lint + build, todo verde), ya no quedan ítems con
-el matiz "ya lo teníamos parcial" original (los 5 que tenía esa nota —
-B-1, E-1, E-5, E-11, G-7 — están todos resueltos o, en el caso de E-1,
-siguen como brecha real confirmada sin cambios). La sección **G** (RRHH)
-queda con solo G-2/G-6 (🟧, sin bloqueo) y G-9 (🟥, depende de hardware)
-pendientes. De la sección **B** solo quedan B-2 (🟧) y B-5 (🟥, e-CF
-real) sin bloqueo — **B-9 está deliberadamente pausado** (el usuario
-pidió evaluarlo con más calma, no retomar sin avisar) y B-4 (🟧) no es
-bloqueante. La sección **J** queda completa salvo J-4 (🟥, diseño
-primero). Quedan además C-2 (multi-moneda, 🟧), E-4/E-6/E-8 (🟧), F-4
-(🟧) y H-3 (🟧) sin verificar en detalle contra el código. Los 🟥 con
-"diseño primero" conviene agruparlos en su propia sesión de
-planeamiento cuando se prioricen, siguiendo la misma mecánica que
+Con el catálogo ya corregido, el lote E-3/E-5/E-9/E-11/F-2/F-8/G-1/G-2/
+G-3/G-4/G-5/G-7/G-8/B-3/B-6/B-7/B-8/J-1/J-2/J-3 entregado y verificado
+(tsc + suite unitaria + e2e + lint + build, todo verde), ya no quedan
+ítems con el matiz "ya lo teníamos parcial" original (los 5 que tenía
+esa nota — B-1, E-1, E-5, E-11, G-7 — están todos resueltos o, en el
+caso de E-1, siguen como brecha real confirmada sin cambios). La
+sección **G** (RRHH) queda con solo G-6 (🟧, sin bloqueo) y G-9 (🟥,
+depende de hardware) pendientes. De la sección **B** solo quedan B-2
+(🟧) y B-5 (🟥, e-CF real) sin bloqueo — **B-9 está deliberadamente
+pausado** (el usuario pidió evaluarlo con más calma, no retomar sin
+avisar) y B-4 (🟧) no es bloqueante. La sección **J** queda completa
+salvo J-4 (🟥, diseño primero). Quedan además C-2 (multi-moneda, 🟧),
+E-4/E-6/E-8 (🟧), F-4 (🟧) y H-3 (🟧) sin verificar en detalle contra
+el código. Los 🟥 con "diseño primero" conviene agruparlos en su propia
+sesión de planeamiento cuando se prioricen, siguiendo la misma mecánica
+que
 Sucursales (Fase 8) y PIN (Fase 9): presentar el diseño, resolver casos
 límite, y recién después ejecutar.

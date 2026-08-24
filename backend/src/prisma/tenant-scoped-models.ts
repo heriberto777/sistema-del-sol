@@ -62,4 +62,5 @@ export const TENANT_SCOPED_MODELS = new Set([
   'Puesto',
   'LeyFiscal',
   'PlantillaHorario',
+  'TipoAusenciaConfig',
 ]);

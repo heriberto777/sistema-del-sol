@@ -25,6 +25,9 @@ export class AusenciasRepository {
     conGoceDeSueldo: boolean;
     motivo?: string;
     solicitadoPorId: string;
+    estado?: EstadoAusencia;
+    aprobadoPorId?: string;
+    fechaResolucion?: Date;
   }) {
     return this.db.ausencia.create({ data: params, include: INCLUDE_AUSENCIA });
   }
