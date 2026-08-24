@@ -18,6 +18,8 @@ import { ListarFacturasQueryDto } from './dto/listar-facturas-query.dto';
 import { paginar } from '../common/types/pagina-resultado';
 import { DocumentoPdfParams, generarDocumentoPdf } from '../common/pdf/documento-pdf';
 import { generarDocumentoTicketHtml } from '../common/pdf/documento-ticket';
+import { NotificacionesService } from '../notificaciones/notificaciones.service';
+import { EnviarReciboDto } from './dto/enviar-recibo.dto';
 import { resolverFormatoImpresion } from '../common/impresion/resolver-formato-impresion';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthService } from '../auth/auth.service';
@@ -104,6 +106,7 @@ export class FacturacionService {
     private readonly ofertasService: OfertasService,
     private readonly bonosService: BonosService,
     private readonly authService: AuthService,
+    private readonly notificacionesService: NotificacionesService,
   ) {}
 
   /**
@@ -602,5 +605,33 @@ export class FacturacionService {
 
   listarPagos(facturaId: string) {
     return this.pagosService.listarPorFactura(facturaId);
+  }
+
+  /**
+   * Entrega manual del recibo por email/WhatsApp (plan de integración
+   * Cuadre, ítem F-4) — a diferencia del envío automático de
+   * `NotificacionesService.alFacturarse` (que solo dispara si
+   * `Cliente.email`/`telefono` ya estaban guardados), acá el
+   * `destinatario` se escribe en el momento: el caso real es POS con
+   * "Consumidor Final" (sin email/teléfono propio) donde el cliente pide
+   * que le manden el recibo a un contacto puntual. Clave de plantilla
+   * separada (`factura_recibo`) para no pisar la personalización del
+   * envío automático.
+   */
+  async enviarRecibo(id: string, dto: EnviarReciboDto, tenantId: string) {
+    const factura = await this.facturacionRepository.buscarPorId(id);
+    const enviado = await this.notificacionesService.enviar({
+      tenantId,
+      canal: dto.canal,
+      clave: 'factura_recibo',
+      destinatario: dto.destinatario,
+      variables: {
+        cliente_nombre: factura.cliente.nombre,
+        factura_ncf: factura.ncf ?? '',
+        factura_total: factura.total.toString(),
+        factura_fecha: factura.fecha.toLocaleDateString('es-DO'),
+      },
+    });
+    return { enviado: !!enviado };
   }
 }

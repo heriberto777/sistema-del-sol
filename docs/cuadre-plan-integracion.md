@@ -296,8 +296,17 @@ Resumen de lo que cambió (detalle en cada ítem más abajo):
   la sesión"**: la sección "Ventas del turno" en `TurnoCajaDetalle.tsx` ya
   lista todo lo vendido en el turno actual, inline, con imprimir/anular por
   fila.
-- [ ] **F-4** 🟧 — **Canales de entrega del recibo**: email y WhatsApp
-  además de imprimir. *Confirmado: brecha real, sin cambios.*
+- [x] **F-4** 🟧 — **Canales de entrega del recibo**: email y WhatsApp
+  además de imprimir. *Confirmado: brecha real — el envío automático
+  existente (`alFacturarse`, dispara en cada factura si el Cliente ya
+  tiene email/teléfono guardado) NO cubre el caso real de POS con
+  "Consumidor Final", que no tiene datos de contacto propios.* Entregado:
+  `POST /facturas/:id/enviar-recibo` (`{ canal, destinatario }`,
+  `destinatario` se escribe en el momento, no depende del Cliente),
+  clave de plantilla propia `factura_recibo`. Sección "Enviar recibo" en
+  `ModalImprimir.tsx` (compartido con Facturación/POS), visible solo
+  para facturas. Sin adjuntar PDF (limitación deliberada, ver
+  ARCHITECTURE.md). Sin migración. Entregado 2026-08-24.
 - [x] **F-5** 🟨 — **Movimiento de caja con motivo estructurado**: enum
   `MotivoMovimientoCaja` (Fondo de cambio / Depósito / Corrección / Otro),
   requerido en `CrearMovimientoCajaDto`; `concepto` (texto libre) pasó a
@@ -583,8 +592,8 @@ Resumen de lo que cambió (detalle en cada ítem más abajo):
 
 ## Sugerencia de por dónde arrancar
 
-Con el catálogo ya corregido, el lote E-3/E-5/E-9/E-11/F-2/F-8/G-1/G-2/
-G-3/G-4/G-5/G-6/G-7/G-8/B-2/B-3/B-6/B-7/B-8/J-1/J-2/J-3 entregado y
+Con el catálogo ya corregido, el lote E-3/E-5/E-9/E-11/F-2/F-4/F-8/G-1/
+G-2/G-3/G-4/G-5/G-6/G-7/G-8/B-2/B-3/B-6/B-7/B-8/J-1/J-2/J-3 entregado y
 verificado (tsc + suite unitaria + e2e + lint + build, todo verde), ya
 no quedan ítems con el matiz "ya lo teníamos parcial" original (los 5
 que tenía esa nota — B-1, E-1, E-5, E-11, G-7 — están todos resueltos
@@ -594,9 +603,10 @@ hardware). De la sección **B** solo queda B-5 (🟥, e-CF real) sin
 bloqueo — **B-9 está deliberadamente pausado** (el usuario
 pidió evaluarlo con más calma, no retomar sin avisar) y B-4 (🟧) no es
 bloqueante. La sección **J** queda completa salvo J-4 (🟥, diseño
-primero). Quedan además C-2 (multi-moneda, 🟧), E-4/E-6/E-8 (🟧), F-4
-(🟧) y H-3 (🟧) sin verificar en detalle contra el código. Los 🟥 con
-"diseño primero" conviene agruparlos en su propia sesión de
-planeamiento cuando se prioricen, siguiendo la misma mecánica que
-Sucursales (Fase 8) y PIN (Fase 9): presentar el diseño, resolver casos
-límite, y recién después ejecutar.
+primero). La sección **F** queda completa salvo F-9 (🟥, diseño
+primero). Quedan además C-2 (multi-moneda, 🟧), E-4/E-6/E-8 (🟧) y H-3
+(🟧) sin verificar en detalle contra el código. Los 🟥 con "diseño
+primero" conviene agruparlos en su propia sesión de planeamiento cuando
+se prioricen, siguiendo la misma mecánica que Sucursales (Fase 8) y PIN
+(Fase 9): presentar el diseño, resolver casos límite, y recién después
+ejecutar.

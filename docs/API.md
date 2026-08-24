@@ -106,6 +106,7 @@ pasa ninguna de ellas.
 | POST | `/api/facturas/:id/pagos` | `facturacion.cobrar` — `{ monto, formaPagoId, referencia?, fecha? }`; pagos parciales soportados, marca `pagada: true` al cubrir el total; 400 si el monto excede el saldo pendiente |
 | GET | `/api/facturas/:id/pagos` | `facturacion.ver` — `{ pagos, totalPagado }` |
 | GET | `/api/facturas/:id/imprimir?formato=CARTA\|A4\|TERMICA_80MM\|TERMICA_58MM` | `facturacion.imprimir` — sin `formato`, resuelve el default (override de bodega > default de tenant > CARTA, ver ARCHITECTURE.md); devuelve PDF o HTML según formato. Separado de `facturacion.ver` para que Vendedor pueda imprimir un recibo de POS sin ver la pantalla general de Facturación |
+| POST | `/api/facturas/:id/enviar-recibo` | `facturacion.imprimir` (ítem F-4) — `{ canal: EMAIL\|WHATSAPP, destinatario }`. `destinatario` NO depende de `Cliente.email`/`telefono` guardado — se escribe en el momento (caso real: POS con Consumidor Final). Responde `{ enviado: boolean }` — `false` si el tenant no tiene una plantilla `factura_recibo` activa para ese canal (Admin → Notificaciones) |
 
 ## Ofertas (Fase 4b de adopción de Cuadre)
 

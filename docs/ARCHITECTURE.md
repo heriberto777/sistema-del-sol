@@ -1652,6 +1652,26 @@ clientes) sigue siendo solo por email porque `User` no tiene un campo de
 teléfono — agregarlo sería la extensión natural si se necesita alertar
 por WhatsApp a los admins también.
 
+**Entrega manual del recibo** (plan de integración Cuadre, ítem F-4):
+`alFacturarse` (arriba) es automático y depende de que `Cliente.email`/
+`telefono` ya estén guardados — no cubre el caso real de POS con
+"Consumidor Final" (sin datos de contacto propios) donde el cliente
+pide, en el momento, que le manden el recibo a un correo o número
+puntual. `FacturacionService.enviarRecibo()`
+(`POST /facturas/:id/enviar-recibo`) es un envío manual e independiente:
+`destinatario` se escribe en el momento (no lee `Cliente`), clave de
+plantilla propia `factura_recibo` (distinta de `factura_creada`, para
+poder personalizar cada mensaje por separado). Integrado en
+`ModalImprimir.tsx` (compartido por Facturación/Cotizaciones/
+Remisiones/POS) como una sección extra "Enviar recibo", visible solo
+cuando `urlBase` apunta a `/facturas/:id` — Cotizaciones/Remisiones ya
+tienen su propio flujo de envío (`COTIZACION_ENVIADA`) y no necesitan
+esta opción. **Limitación conocida, deliberada**: el recibo se manda
+como texto de plantilla (igual que el resto de `NotificacionesService`),
+sin adjuntar el PDF — adjuntar PDFs no es algo que `EmailChannel`
+soporte hoy, y agregarlo solo para este flujo sería una asimetría rara
+frente al resto de eventos que usan el mismo canal.
+
 ## Recordatorios automáticos de cobro
 
 `RecordatoriosService` (`backend/src/recordatorios/`) corre un

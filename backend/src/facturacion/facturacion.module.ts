@@ -9,13 +9,15 @@ import { VariantesModule } from '../variantes/variantes.module';
 import { OfertasModule } from '../ofertas/ofertas.module';
 import { BonosModule } from '../bonos/bonos.module';
 import { AuthModule } from '../auth/auth.module';
+import { NotificacionesModule } from '../notificaciones/notificaciones.module';
 
 @Module({
   // AuthModule: FacturacionService llama a authService.verificarPin() en
   // anular() (Fase 9). El acceso por sucursal se valida vía
   // InventarioService.validarAccesoBodega (ya importado abajo), sin
-  // necesitar SucursalesModule acá directamente.
-  imports: [InventarioModule, PagosModule, ClientesModule, VariantesModule, OfertasModule, BonosModule, AuthModule],
+  // necesitar SucursalesModule acá directamente. NotificacionesModule:
+  // enviarRecibo() (ítem F-4) reusa NotificacionesService.enviar().
+  imports: [InventarioModule, PagosModule, ClientesModule, VariantesModule, OfertasModule, BonosModule, AuthModule, NotificacionesModule],
   controllers: [FacturacionController],
   providers: [FacturacionService, FacturacionRepository],
   exports: [FacturacionService],

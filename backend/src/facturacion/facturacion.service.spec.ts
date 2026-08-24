@@ -13,6 +13,7 @@ import { VariantesService } from '../variantes/variantes.service';
 import { OfertasService } from '../ofertas/ofertas.service';
 import { BonosService } from '../bonos/bonos.service';
 import { AuthService } from '../auth/auth.service';
+import { NotificacionesService } from '../notificaciones/notificaciones.service';
 
 describe('FacturacionService', () => {
   let service: FacturacionService;
@@ -27,6 +28,7 @@ describe('FacturacionService', () => {
   let ofertasService: jest.Mocked<OfertasService>;
   let bonosService: jest.Mocked<BonosService>;
   let authService: jest.Mocked<AuthService>;
+  let notificacionesService: jest.Mocked<NotificacionesService>;
 
   // Un tx opaco: crear()/anular() abren la transacción con tenantPrisma.client.$transaction
   // y pasan este objeto a los métodos *EnTx — para las pruebas basta con que sea el mismo
@@ -96,6 +98,9 @@ describe('FacturacionService', () => {
     authService = {
       verificarPin: jest.fn().mockResolvedValue(undefined),
     } as unknown as jest.Mocked<AuthService>;
+    notificacionesService = {
+      enviar: jest.fn().mockResolvedValue({ id: 'n1' }),
+    } as unknown as jest.Mocked<NotificacionesService>;
     service = new FacturacionService(
       repository,
       inventarioService,
@@ -108,6 +113,7 @@ describe('FacturacionService', () => {
       ofertasService,
       bonosService,
       authService,
+      notificacionesService,
     );
   });
 
@@ -1086,6 +1092,48 @@ describe('FacturacionService', () => {
 
       expect(buffer).toBeInstanceOf(Buffer);
       expect(buffer.subarray(0, 5).toString('latin1')).toBe('%PDF-');
+    });
+  });
+
+  describe('enviarRecibo (plan de integración Cuadre, ítem F-4)', () => {
+    function facturaParaEnviar() {
+      return {
+        id: 'f1',
+        ncf: 'B0200000001',
+        fecha: new Date('2026-01-15'),
+        cliente: { nombre: 'Cliente Demo' },
+        total: 236,
+      };
+    }
+
+    it('usa el destinatario del dto, no el email/teléfono guardado del cliente', async () => {
+      repository.buscarPorId.mockResolvedValue(facturaParaEnviar() as never);
+
+      await service.enviarRecibo('f1', { canal: 'EMAIL', destinatario: 'otra-persona@ejemplo.com' }, 'tenant-1');
+
+      expect(notificacionesService.enviar).toHaveBeenCalledWith(
+        expect.objectContaining({ tenantId: 'tenant-1', canal: 'EMAIL', clave: 'factura_recibo', destinatario: 'otra-persona@ejemplo.com' }),
+      );
+    });
+
+    it('arma las variables de la plantilla con los datos de la factura', async () => {
+      repository.buscarPorId.mockResolvedValue(facturaParaEnviar() as never);
+
+      await service.enviarRecibo('f1', { canal: 'WHATSAPP', destinatario: '8095551234' }, 'tenant-1');
+
+      const [[args]] = notificacionesService.enviar.mock.calls;
+      expect(args.variables).toEqual(
+        expect.objectContaining({ cliente_nombre: 'Cliente Demo', factura_ncf: 'B0200000001', factura_total: '236' }),
+      );
+    });
+
+    it('devuelve enviado:false si el tenant no tiene una plantilla activa para ese canal', async () => {
+      repository.buscarPorId.mockResolvedValue(facturaParaEnviar() as never);
+      notificacionesService.enviar.mockResolvedValue(null as never);
+
+      const resultado = await service.enviarRecibo('f1', { canal: 'EMAIL', destinatario: 'x@x.com' }, 'tenant-1');
+
+      expect(resultado).toEqual({ enviado: false });
     });
   });
 

@@ -11,6 +11,7 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtPayloadUser } from '../common/types/authenticated-request';
 import { ListarFacturasQueryDto } from './dto/listar-facturas-query.dto';
 import { ImprimirDocumentoQueryDto } from '../common/impresion/dto/imprimir-documento-query.dto';
+import { EnviarReciboDto } from './dto/enviar-recibo.dto';
 
 @ApiBearerAuth()
 @ApiTags('facturacion')
@@ -59,6 +60,14 @@ export class FacturacionController {
     const { buffer, contentType } = await this.facturacionService.generarImpreso(id, query.formato, user.tenantId);
     res.set({ 'Content-Type': contentType, 'Content-Disposition': 'inline; filename="factura"' });
     res.send(buffer);
+  }
+
+  // facturacion.imprimir, mismo criterio que /imprimir y /pdf — entregar
+  // el recibo es otra forma de "imprimirlo", no requiere facturacion.ver.
+  @Post(':id/enviar-recibo')
+  @Permissions('facturacion.imprimir')
+  enviarRecibo(@Param('id') id: string, @Body() dto: EnviarReciboDto, @CurrentUser() user: JwtPayloadUser) {
+    return this.facturacionService.enviarRecibo(id, dto, user.tenantId);
   }
 
   @Post(':id/anular')
