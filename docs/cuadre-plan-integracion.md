@@ -88,10 +88,28 @@ Resumen de lo que cambió (detalle en cada ítem más abajo):
   type="datetime-local">` + conversión a UTC (`aFechaHoraUtc`) para
   "vigencia por hora". Migración `20260828090000_ofertas_bogo_acumulable`.
   Entregado 2026-08-24.
-- [ ] **A-3** 🟥 *diseño primero* — **Lealtad / puntos / recompensas**:
+- [x] **A-3** 🟥 *diseño primero* — **Lealtad / puntos / recompensas**:
   acumulación (por monto o unidad), canje, expiración opcional. Apple/Google
   Wallet queda fuera de un primer corte. *Confirmado: cero mención de
-  "lealtad"/"puntos" en todo el schema — brecha real, sin cambios.*
+  "lealtad"/"puntos" en todo el schema — brecha real.* Decisiones
+  confirmadas con el usuario: (1) canje como forma de pago en el
+  checkout (`FormaPago.esPuntosLealtad`, mismo criterio que Bonos), no
+  un endpoint separado de saldo a favor; (2) expiración por lote de
+  acumulación vía cron diario (FEFO, mismo criterio que lotes de
+  inventario), no un vencimiento global simple; (3) base de cálculo
+  (Subtotal/Total) configurable por tenant, igual que Cuadre. Entregado:
+  módulo `lealtad/` (`ConfiguracionLealtad` fila única por tenant,
+  `MovimientoLealtad` ledger), acumulación vía Event Bus
+  (`LealtadEventosService`, nunca bloquea la venta), canje síncrono
+  dentro de la transacción de la venta (`LealtadService.
+  procesarPagoEnTx`, igual patrón que `BonosService`), cron diario de
+  expiración (`LealtadExpiracionCronService`), reversión al anular
+  factura (limitación conocida y documentada: un canje reintegrado no
+  reconstruye los lotes exactos originales, pero el saldo siempre queda
+  correcto). Frontend: panel "Lealtad" en Admin, columna de puntos +
+  historial en Contactos, hint de saldo en el checkout del POS.
+  Migraciones `20260829090000_lealtad_puntos_enum` +
+  `20260829090001_lealtad_puntos`. Entregado 2026-08-24.
 - [ ] **A-4** 🟥 *diseño primero, alcance grande* — **Tienda online**:
   subdominio propio por tenant + Site Builder + pedidos + checkout. Producto
   nuevo completo — merece su propia conversación de alcance separada.
@@ -741,6 +759,14 @@ Resumen de lo que cambió (detalle en cada ítem más abajo):
   (`factura.creada`/`factura.anulada`, nunca bloquea la venta), conecta
   con el `pagaComision` de A-2 ("todo o nada"). Migración
   `20260828100000_comisiones_venta`.
+- **2026-08-24**: entregado A-3 (Lealtad/puntos), cuarto 🟥 atacado —
+  diseño confirmado con el usuario vía `AskUserQuestion` (canje como
+  forma de pago en el checkout, igual que Bonos; expiración por lote vía
+  cron diario FEFO; base de cálculo Subtotal/Total configurable por
+  tenant). Módulo `lealtad/` (`ConfiguracionLealtad`, `MovimientoLealtad`),
+  acumulación vía Event Bus, canje síncrono dentro de la transacción de
+  la venta. Migraciones `20260829090000_lealtad_puntos_enum` +
+  `20260829090001_lealtad_puntos`.
 
 ## Sugerencia de por dónde arrancar
 
@@ -751,7 +777,7 @@ conversación de diseño antes de tocar código). Lote 🟨/🟧 completo:
 B-1/B-2/B-3/B-6/B-7/B-8, E-2/E-3/E-4/E-5/E-6/E-8/E-9/E-11, F-2/F-4/F-5/
 F-8, G-1/G-2/G-3/G-4/G-5/G-6/G-7/G-8, H-3, J-1/J-2/J-3 — todos
 verificados (tsc + suite unitaria + e2e + lint + build, todo verde) y
-commiteados uno por uno. De los 🟥, ya entregados: **D-1, A-2, A-1**.
+commiteados uno por uno. De los 🟥, ya entregados: **D-1, A-2, A-1, A-3**.
 
 Lo que queda, por categoría:
 - **Deliberadamente pausado a pedido del usuario**: B-9 (línea manual/
@@ -759,7 +785,7 @@ Lo que queda, por categoría:
 - **No bloqueante, sin implementar**: B-4 (Recargos de Factura, 🟨→🟧
   corrección de tamaño), E-1 (Patrón Borrador→Confirmado en Compras/
   Ajustes/Transferencias, matiz).
-- **🟥, pendientes de su propia conversación de diseño**: A-3, A-4,
+- **🟥, pendientes de su propia conversación de diseño**: A-4,
   B-5, C-1, C-2 (multi-moneda, reclasificado desde 🟧), E-7, F-9, G-9
   (hardware), H-2 (WhatsApp — con nota de decisión pendiente sobre n8n
   vs. backend propio), I-1, J-4 (API keys, reclasificado — no aplica

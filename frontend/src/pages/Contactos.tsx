@@ -31,6 +31,7 @@ interface Cliente {
   listaPrecioId: string | null;
   categoriaId: string | null;
   comprobantePorDefecto: ComprobantePorDefecto | null;
+  puntosLealtad: number;
 }
 
 interface Proveedor {
@@ -85,6 +86,7 @@ export function Contactos() {
   const [clienteEditando, setClienteEditando] = useState<Cliente | null>(null);
   const [proveedorEditando, setProveedorEditando] = useState<Proveedor | null>(null);
   const [modalAbierto, setModalAbierto] = useState(false);
+  const [clientePuntos, setClientePuntos] = useState<Cliente | null>(null);
 
   useEffect(() => {
     const crear = searchParams.get('crear');
@@ -163,6 +165,7 @@ export function Contactos() {
             busquedaDebounced={busquedaDebounced}
             onEditar={abrirEditarCliente}
             onNuevo={abrirNuevo}
+            onVerPuntos={setClientePuntos}
           />
         </RequierePermiso>
       ) : (
@@ -189,6 +192,68 @@ export function Contactos() {
           <FormularioProveedor proveedor={proveedorEditando} onGuardado={cerrarModal} />
         </Modal>
       )}
+      {clientePuntos && (
+        <Modal titulo={`Historial de puntos — ${clientePuntos.nombre}`} onClose={() => setClientePuntos(null)}>
+          <HistorialLealtadModal cliente={clientePuntos} />
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+interface MovimientoLealtad {
+  id: string;
+  tipo: 'ACUMULACION' | 'CANJE' | 'EXPIRACION' | 'AJUSTE';
+  puntos: number;
+  puntosDisponibles: number;
+  expiraEn: string | null;
+  motivo: string | null;
+  anulado: boolean;
+  createdAt: string;
+}
+
+const ETIQUETA_TIPO_MOVIMIENTO: Record<MovimientoLealtad['tipo'], string> = {
+  ACUMULACION: 'Acumulación',
+  CANJE: 'Canje',
+  EXPIRACION: 'Expiración',
+  AJUSTE: 'Ajuste manual',
+};
+
+/** Ítem A-3 — historial de puntos de lealtad de un cliente. */
+function HistorialLealtadModal({ cliente }: { cliente: Cliente }) {
+  const { data } = useQuery({
+    queryKey: ['lealtad-historial', cliente.id],
+    queryFn: async () => (await apiClient.get<MovimientoLealtad[]>(`/lealtad/clientes/${cliente.id}/historial`)).data,
+  });
+
+  return (
+    <div className="space-y-3">
+      <p className="text-sm text-slate-500 dark:text-slate-400">
+        Saldo actual: <span className="font-semibold text-slate-900 dark:text-slate-100">{cliente.puntosLealtad} puntos</span>
+      </p>
+      {data?.length === 0 && <p className="text-sm text-slate-500 dark:text-slate-400">Sin movimientos de puntos todavía.</p>}
+      {data && data.length > 0 && (
+        <div className="max-h-80 overflow-y-auto">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-slate-50 text-slate-500 dark:bg-slate-900/60 dark:text-slate-400">
+              <tr>
+                <th className="px-3 py-2 font-medium">Fecha</th>
+                <th className="px-3 py-2 font-medium">Tipo</th>
+                <th className="px-3 py-2 font-medium">Puntos</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+              {data.map((m) => (
+                <tr key={m.id} className={m.anulado ? 'opacity-50 line-through' : ''}>
+                  <td className="px-3 py-2">{new Date(m.createdAt).toLocaleDateString('es-DO')}</td>
+                  <td className="px-3 py-2">{ETIQUETA_TIPO_MOVIMIENTO[m.tipo]}</td>
+                  <td className="px-3 py-2">{m.puntos > 0 ? `+${m.puntos}` : m.puntos}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
@@ -203,7 +268,16 @@ interface ListaProps<T> {
   onNuevo: () => void;
 }
 
-function ListaClientes({ busqueda, setBusqueda, pagina, setPagina, busquedaDebounced, onEditar, onNuevo }: ListaProps<Cliente>) {
+function ListaClientes({
+  busqueda,
+  setBusqueda,
+  pagina,
+  setPagina,
+  busquedaDebounced,
+  onEditar,
+  onNuevo,
+  onVerPuntos,
+}: ListaProps<Cliente> & { onVerPuntos: (c: Cliente) => void }) {
   const { data } = useQuery({
     queryKey: ['clientes', pagina, busquedaDebounced],
     queryFn: async () =>
@@ -257,6 +331,7 @@ function ListaClientes({ busqueda, setBusqueda, pagina, setPagina, busquedaDebou
                   <th className="px-5 py-3 font-medium">RNC/Cédula</th>
                   <th className="px-5 py-3 font-medium">Email</th>
                   <th className="px-5 py-3 font-medium">Teléfono</th>
+                  <th className="px-5 py-3 font-medium">Puntos</th>
                   <th className="px-5 py-3" />
                 </tr>
               </thead>
@@ -267,8 +342,14 @@ function ListaClientes({ busqueda, setBusqueda, pagina, setPagina, busquedaDebou
                     <td className="px-5 py-3">{cliente.rncCedula ?? '—'}</td>
                     <td className="px-5 py-3">{cliente.email ?? '—'}</td>
                     <td className="px-5 py-3">{cliente.telefono ?? '—'}</td>
+                    <td className="px-5 py-3">{cliente.puntosLealtad}</td>
                     <td className="px-5 py-3 text-right">
-                      <RowActionsMenu acciones={[{ etiqueta: 'Editar', onClick: () => onEditar(cliente) }]} />
+                      <RowActionsMenu
+                        acciones={[
+                          { etiqueta: 'Editar', onClick: () => onEditar(cliente) },
+                          { etiqueta: 'Ver historial de puntos', onClick: () => onVerPuntos(cliente) },
+                        ]}
+                      />
                     </td>
                   </tr>
                 ))}

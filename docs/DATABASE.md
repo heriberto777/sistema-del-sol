@@ -41,14 +41,15 @@ PostgreSQL 16 + Prisma. Schema completo en `backend/prisma/schema.prisma`.
 | Inventario | `bodegas` (cuelga de `sucursales`, Fase 8a), `stock` (cuelga de `variantes_producto`), `movimiento_inventario` (conserva `productoId` denormalizado + `varianteId` como FK real), `lotes` (control de vencimiento por variante+bodega, opt-in vía `productos.controlaVencimiento`, Fase 5b — ver ARCHITECTURE.md) |
 | Sucursales | `sucursales` (locales físicos, Fase 8 — ver ARCHITECTURE.md) |
 | Compras | `proveedores`, `orden_compra`, `linea_oc`, `recepcion_compra`, `linea_recepcion` |
-| Clientes | `clientes`, `direccion_cliente` |
+| Clientes | `clientes` (ítem A-3: `puntosLealtad Int` denormalizado — ver ARCHITECTURE.md), `direccion_cliente` |
 | Webhooks | `webhooks`, `webhook_deliveries` |
 | Notificaciones | `notificacion_plantillas`, `notificaciones` |
 | Contabilidad | `cuentas_contables`, `asientos_contables`, `lineas_asiento` |
 | Bancos / Gastos menores | `cuentas_bancarias`, `gastos_menores`, `lineas_gasto_menor` |
 | Nómina | `empleados`, `periodos_nomina`, `recibos_nomina` |
 | POS | `turnos_caja`, `movimientos_caja`, `ventas_aparcadas`/`lineas_venta_aparcada`, `pagos_venta` (ledger de pago dividido, hija de `facturas` sin tenantId propio) (+ `facturas.formaPagoId`/`facturas.turnoCajaId`/`facturas.vendedorEmpleadoId`) |
-| Formas de pago | `formas_pago` (tenant-scoped, reemplaza el enum fijo `MetodoPago` para `facturas`/`pagos` — ese enum sigue existiendo solo para `PagoPlataforma`; `esBono: Boolean` identifica la forma "Bono" igual que `esEfectivo`, Fase 4c — ver ARCHITECTURE.md). `formas_pago.tipo` (plan de integración Cuadre, ítem E-11) es un enum nullable de 7 categorías, puramente informativo — `esEfectivo`/`esBono` siguen siendo los que gatillan comportamiento real (arqueo de caja, canje de Bono); "Crédito Cliente" YA existe como fila sembrada (`FORMAS_PAGO_BASE`) desde antes de este ítem, solo con el nombre — no descuenta contra `Cliente.limiteCredito`, eso queda fuera de alcance (candidato a su propia sesión de diseño, no un campo de catálogo chico). |
+| Formas de pago | `formas_pago` (tenant-scoped, reemplaza el enum fijo `MetodoPago` para `facturas`/`pagos` — ese enum sigue existiendo solo para `PagoPlataforma`; `esBono: Boolean` identifica la forma "Bono" igual que `esEfectivo`, Fase 4c — ver ARCHITECTURE.md). `formas_pago.tipo` (plan de integración Cuadre, ítem E-11) es un enum nullable de 8 categorías, puramente informativo — `esEfectivo`/`esBono`/`esPuntosLealtad` (ítem A-3) siguen siendo los que gatillan comportamiento real (arqueo de caja, canje de Bono, canje de puntos); "Crédito Cliente" YA existe como fila sembrada (`FORMAS_PAGO_BASE`) desde antes de este ítem, solo con el nombre — no descuenta contra `Cliente.limiteCredito`, eso queda fuera de alcance (candidato a su propia sesión de diseño, no un campo de catálogo chico). |
+| Lealtad / puntos | `configuraciones_lealtad` (fila única por tenant, ítem A-3), `movimientos_lealtad` (ledger `ACUMULACION`/`CANJE`/`EXPIRACION`/`AJUSTE`, `puntosDisponibles` con el mismo rol FEFO que `Lote.cantidadActual` — ver ARCHITECTURE.md) |
 | Bonos | `bonos` (tenant-scoped, gift cards; `saldoActual` es la única fuente de verdad, sin tabla de movimientos propia — `pagos_venta` filtrado por `formaPago.esBono` ya sirve de ledger, Fase 4c — ver ARCHITECTURE.md) |
 | Plataforma | `platform_admins`, `platform_audit_logs` |
 | RBAC de plataforma | `platform_permissions`, `platform_roles`, `platform_role_permissions` (catálogo global, sin `tenantId` — `platform_admins.roleId` es nullable) |
@@ -89,6 +90,17 @@ lineaFacturaId])` evita duplicar la comisión de la misma línea si el
 reactor de eventos se reintentara). Se genera sola vía Event Bus
 (`ComisionesEventosService`), nunca por un endpoint HTTP — ver
 ARCHITECTURE.md.
+
+`movimientos_lealtad` (ítem A-3) es el ledger de puntos de lealtad —
+`facturaId` es opcional (un `AJUSTE` manual no tiene venta detrás) y
+`onDelete: SetNull` (a diferencia de `comisiones_venta`, que sí cascadea
+con la factura) porque un movimiento de puntos debe sobrevivir aunque
+por algún motivo la factura se borrara físicamente — es dinero/beneficio
+real acreditado al cliente, no solo un registro derivado. Nunca se
+borra una fila (`anulado: true` en su lugar). `puntosDisponibles` solo
+tiene sentido en filas `ACUMULACION` — es cuánto de ESE lote sigue sin
+canjear/expirar, consumido FEFO (`ORDER BY expiraEn ASC NULLS LAST`)
+por canjes y por el cron de expiración diario.
 
 ## Reglas de negocio relevantes al modelo
 

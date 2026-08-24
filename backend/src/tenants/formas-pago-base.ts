@@ -11,6 +11,7 @@ export interface FormaPagoBase {
   requiereReferencia: boolean;
   esEfectivo: boolean;
   esBono?: boolean;
+  esPuntosLealtad?: boolean;
   tipo: TipoFormaPago;
 }
 
@@ -24,4 +25,9 @@ export const FORMAS_PAGO_BASE: FormaPagoBase[] = [
   // requiereReferencia: true — el código del bono se guarda en
   // PagoVenta.referencia (Fase 4c, ver BonosService.procesarPagoEnTx).
   { nombre: 'Bono', requiereReferencia: true, esEfectivo: false, esBono: true, tipo: 'BONO_VOUCHER' },
+  // Ítem A-3 — sin referencia: los puntos se descuentan del cliente de LA
+  // MISMA venta (dto.clienteId), no de un código independiente como Bono.
+  // Existe siempre (igual criterio que Bono); LealtadService.
+  // procesarPagoEnTx la rechaza si el programa no está activo.
+  { nombre: 'Puntos de Lealtad', requiereReferencia: false, esEfectivo: false, esPuntosLealtad: true, tipo: 'PUNTOS_LEALTAD' },
 ];

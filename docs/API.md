@@ -92,7 +92,7 @@ pasa ninguna de ellas.
 | Método | Ruta | Permiso |
 |---|---|---|
 | GET | `/api/formas-pago?activa=true` | sin permiso — cualquier usuario autenticado (POS/Cobranza/Compras necesitan leer el catálogo) |
-| POST | `/api/formas-pago` | `admin.configuracion` — `{ nombre, requiereReferencia?, esEfectivo?, esBono?, tipo?, activa? }`; `tipo` (plan de integración Cuadre, ítem E-11) es un enum nullable de 7 categorías (`EFECTIVO`/`TARJETA`/`TRANSFERENCIA`/`CREDITO`/`BONO_VOUCHER`/`NOTA_CREDITO`/`CHEQUE`) puramente informativo — no reemplaza `esEfectivo`/`esBono`, que siguen gatillando el comportamiento real (arqueo de caja, canje de Bono) |
+| POST | `/api/formas-pago` | `admin.configuracion` — `{ nombre, requiereReferencia?, esEfectivo?, esBono?, tipo?, activa? }`; `tipo` (plan de integración Cuadre, ítem E-11) es un enum nullable de 8 categorías (`EFECTIVO`/`TARJETA`/`TRANSFERENCIA`/`CREDITO`/`BONO_VOUCHER`/`NOTA_CREDITO`/`CHEQUE`/`PUNTOS_LEALTAD`) puramente informativo — no reemplaza `esEfectivo`/`esBono`, que siguen gatillando el comportamiento real (arqueo de caja, canje de Bono). `esPuntosLealtad` (ítem A-3) NO es creable por este endpoint a propósito — la fila "Puntos de Lealtad" ya viene sembrada una sola vez por tenant (`FORMAS_PAGO_BASE`), evitando que un admin cree varias formas de pago con el mismo comportamiento especial |
 | PATCH | `/api/formas-pago/:id` | `admin.configuracion` — parcial; `esEfectivo: true` desmarca automáticamente cualquier otra forma de pago del tenant |
 
 ## Facturación
@@ -147,6 +147,34 @@ vienen ambos). Una línea con `pagaComision:false` (heredado de una
 Oferta que no paga comisión, ver arriba) no genera fila. Al anular la
 factura de origen, sus comisiones se marcan `anulada:true` (nunca se
 borran).
+
+## Lealtad / puntos (ítem A-3)
+
+Programa de puntos por venta, apagado por defecto. Los puntos se ganan
+solos al facturar (Event Bus) y se canjean como forma de pago "Puntos
+de Lealtad" en Facturación/POS — no hay endpoint propio de canje, se
+resuelve dentro de `POST /api/facturas`/`POST /api/pos/ventas` cuando
+una línea de `pagos` usa esa `formaPagoId`.
+
+| Método | Ruta | Permiso |
+|---|---|---|
+| GET | `/api/lealtad/configuracion` | `lealtad.ver` |
+| PATCH | `/api/lealtad/configuracion` | `lealtad.editar` — `{ activo?, modoAcumulacion?: POR_MONTO\|POR_UNIDAD, montoPorPunto?, calcularSobre?: SUBTOTAL\|TOTAL, itemsConDescuentoGeneranPuntos?, valorPunto?, minimoParaCanjear?, diasExpiracion? }`; `montoPorPunto` obligatorio (400 si falta) cuando `modoAcumulacion=POR_MONTO` |
+| GET | `/api/lealtad/clientes/:clienteId/historial` | `lealtad.ver` — ledger completo (`ACUMULACION`/`CANJE`/`EXPIRACION`/`AJUSTE`) de ese cliente |
+| POST | `/api/lealtad/ajuste` | `lealtad.editar` — `{ clienteId, puntos, motivo }`, ajuste manual con signo (positivo acredita, negativo descuenta) |
+
+Puntos ganados: solo en ventas `CONTADO`/`CREDITO` con el programa
+activo — `POR_MONTO` calcula `floor(base/montoPorPunto)` (`base` = suma
+de las líneas calificantes, neto sin ITBIS o con ITBIS según
+`calcularSobre`); `POR_UNIDAD` suma la cantidad de esas líneas.
+`itemsConDescuentoGeneranPuntos:false` excluye cualquier línea con
+descuento (manual, Oferta o general). Canje: convierte el monto RD$ de
+la línea de pago a puntos (`Math.ceil(monto/valorPunto)`), rechaza si
+el programa no está activo, `valorPunto` es 0, el resultado no alcanza
+`minimoParaCanjear`, o el cliente no tiene saldo suficiente — consume
+primero los puntos más próximos a vencer (FEFO). Al anular la factura
+de origen, la acumulación/canje de esa venta se revierte — ver
+ARCHITECTURE.md para el alcance exacto.
 
 ## Bonos (Fase 4c de adopción de Cuadre)
 
@@ -291,7 +319,7 @@ saber a cuál de las variantes reales le corresponde el precio.
 | Método | Ruta | Permiso |
 |---|---|---|
 | POST / PATCH | `/api/clientes` | `clientes.*` — acepta `listaPrecioId` (FK a `ListaPrecio`, `null` explícito quita la asignación); `categoriaId` (FK a `CategoriaCliente`, ítem E-5, `null` quita la asignación) y `comprobantePorDefecto` (`CONTADO`\|`CREDITO`\|`REGIMEN_ESPECIAL`\|`GUBERNAMENTAL`, ítem E-5) — autoselecciona `tipoFactura`/`tipoComprobanteEspecial` al elegir el cliente en el formulario de Facturación, el usuario lo puede cambiar igual |
-| GET | `/api/clientes?pagina&tamanoPagina&busqueda` | `clientes.ver` — `busqueda` filtra por nombre, email o RNC/cédula |
+| GET | `/api/clientes?pagina&tamanoPagina&busqueda` | `clientes.ver` — `busqueda` filtra por nombre, email o RNC/cédula; cada fila trae `puntosLealtad` (ítem A-3, saldo denormalizado, ver "Lealtad / puntos") |
 | POST | `/api/categorias-cliente` | `clientes.editar` — `{ nombre, activa? }` — catálogo de segmentación de cliente (ítem E-5), plano, puramente informativo |
 | GET | `/api/categorias-cliente?activa=true` | `clientes.ver` |
 | PATCH | `/api/categorias-cliente/:id` | `clientes.editar` |

@@ -8,6 +8,7 @@ import { ClientesModule } from '../clientes/clientes.module';
 import { VariantesModule } from '../variantes/variantes.module';
 import { OfertasModule } from '../ofertas/ofertas.module';
 import { BonosModule } from '../bonos/bonos.module';
+import { LealtadModule } from '../lealtad/lealtad.module';
 import { AuthModule } from '../auth/auth.module';
 import { NotificacionesModule } from '../notificaciones/notificaciones.module';
 import { AutorizacionesModule } from '../autorizaciones/autorizaciones.module';
@@ -19,6 +20,7 @@ import { AutorizacionesModule } from '../autorizaciones/autorizaciones.module';
   // necesitar SucursalesModule acá directamente. NotificacionesModule:
   // enviarRecibo() (ítem F-4) reusa NotificacionesService.enviar().
   // AutorizacionesModule: segunda capa de autorización (ítem D-1).
+  // LealtadModule: canje de puntos como forma de pago (ítem A-3).
   imports: [
     InventarioModule,
     PagosModule,
@@ -26,6 +28,7 @@ import { AutorizacionesModule } from '../autorizaciones/autorizaciones.module';
     VariantesModule,
     OfertasModule,
     BonosModule,
+    LealtadModule,
     AuthModule,
     NotificacionesModule,
     AutorizacionesModule,

@@ -12,6 +12,7 @@ import { ClientesService } from '../clientes/clientes.service';
 import { VariantesService } from '../variantes/variantes.service';
 import { OfertasService } from '../ofertas/ofertas.service';
 import { BonosService } from '../bonos/bonos.service';
+import { LealtadService } from '../lealtad/lealtad.service';
 import { AuthService } from '../auth/auth.service';
 import { NotificacionesService } from '../notificaciones/notificaciones.service';
 import { AutorizacionesService } from '../autorizaciones/autorizaciones.service';
@@ -28,6 +29,7 @@ describe('FacturacionService', () => {
   let variantesService: jest.Mocked<VariantesService>;
   let ofertasService: jest.Mocked<OfertasService>;
   let bonosService: jest.Mocked<BonosService>;
+  let lealtadService: jest.Mocked<LealtadService>;
   let authService: jest.Mocked<AuthService>;
   let notificacionesService: jest.Mocked<NotificacionesService>;
   let autorizacionesService: jest.Mocked<AutorizacionesService>;
@@ -100,6 +102,9 @@ describe('FacturacionService', () => {
     bonosService = {
       procesarPagoEnTx: jest.fn().mockResolvedValue(undefined),
     } as unknown as jest.Mocked<BonosService>;
+    lealtadService = {
+      procesarPagoEnTx: jest.fn().mockResolvedValue(undefined),
+    } as unknown as jest.Mocked<LealtadService>;
     authService = {
       verificarPin: jest.fn().mockResolvedValue(undefined),
     } as unknown as jest.Mocked<AuthService>;
@@ -122,6 +127,7 @@ describe('FacturacionService', () => {
       variantesService,
       ofertasService,
       bonosService,
+      lealtadService,
       authService,
       notificacionesService,
       autorizacionesService,
@@ -802,6 +808,36 @@ describe('FacturacionService', () => {
 
       await expect(
         service.crear(dto(), 'tenant-1', 'vendedor-1', { pagos: [{ formaPagoId: 'fp-bono', monto: 236, referencia: 'BONO-X' }] }),
+      ).rejects.toThrow(BadRequestException);
+      expect(repository.crearFacturaEnTx).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('canje de puntos de Lealtad (ítem A-3)', () => {
+    it('llama LealtadService.procesarPagoEnTx con el clienteId de la venta y el facturaId pre-generado, una vez por cada pago', async () => {
+      repository.obtenerProductoConPrecioVigente.mockResolvedValue(producto(18, 100) as never);
+      repository.crearFacturaEnTx.mockResolvedValue(facturaCreada({ total: 236 }) as never);
+
+      await service.crear(dto(), 'tenant-1', 'vendedor-1', {
+        pagos: [
+          { formaPagoId: 'fp-puntos', monto: 200 },
+          { formaPagoId: 'fp-efectivo', monto: 36 },
+        ],
+      });
+
+      expect(lealtadService.procesarPagoEnTx).toHaveBeenCalledTimes(2);
+      expect(lealtadService.procesarPagoEnTx).toHaveBeenCalledWith(TX, 'tenant-1', 'cliente-1', expect.any(String), {
+        formaPagoId: 'fp-puntos',
+        monto: 200,
+      });
+    });
+
+    it('si LealtadService.procesarPagoEnTx rechaza (puntos insuficientes/programa inactivo), no crea la factura', async () => {
+      repository.obtenerProductoConPrecioVigente.mockResolvedValue(producto(18, 100) as never);
+      lealtadService.procesarPagoEnTx.mockRejectedValueOnce(new BadRequestException('El cliente no tiene puntos suficientes'));
+
+      await expect(
+        service.crear(dto(), 'tenant-1', 'vendedor-1', { pagos: [{ formaPagoId: 'fp-puntos', monto: 236 }] }),
       ).rejects.toThrow(BadRequestException);
       expect(repository.crearFacturaEnTx).not.toHaveBeenCalled();
     });

@@ -60,6 +60,8 @@ model Tenant {
   tiposAusenciaConfig TipoAusenciaConfig[]
   codigosAutorizacion CodigoAutorizacion[]
   comisionesVenta ComisionVenta[]
+  configuracionLealtad ConfiguracionLealtad?
+  movimientosLealtad MovimientoLealtad[]
   proveedores   Proveedor[]
   ordenesCompra OrdenCompra[]
   webhooks      Webhook[]
@@ -662,6 +664,7 @@ model Factura {
   pagos            Pago[]
   pagosVenta       PagoVenta[]
   comisiones       ComisionVenta[]
+  movimientosLealtad MovimientoLealtad[]
 
   @@unique([tenantId, ncf])
   @@index([tenantId, clienteId])
@@ -1415,6 +1418,12 @@ model FormaPago {
   // FacturacionService.crear() usa esto para tratar `PagoVenta.referencia`
   // como el código de un Bono a canjear, en vez de una referencia libre.
   esBono             Boolean  @default(false)
+  // Marca la forma de pago "Puntos de Lealtad" (ítem A-3) — mismo
+  // criterio que esBono: FacturacionService.crear() usa esto para
+  // convertir el monto de esa línea de pago a puntos (vía
+  // ConfiguracionLealtad.valorPunto) y descontarlos del saldo del
+  // cliente, en vez de tratarlo como un cobro real.
+  esPuntosLealtad    Boolean  @default(false)
   // Clasificación estructurada (plan de integración Cuadre, ítem E-11) —
   // puramente informativa/de reporte, nullable (no reemplaza esEfectivo/
   // esBono, que siguen gatillando comportamiento real: arqueo de caja y
@@ -1449,6 +1458,7 @@ enum TipoFormaPago {
   BONO_VOUCHER
   NOTA_CREDITO
   CHEQUE
+  PUNTOS_LEALTAD
 }
 
 /// Catálogo de niveles de precio por tenant (General, Mayorista,
@@ -2331,12 +2341,18 @@ model Cliente {
   // ModalNuevaFactura (frontend) para el mapeo exacto.
   comprobantePorDefecto ComprobantePorDefecto?
   createdAt     DateTime    @default(now())
+  // Ítem A-3 (Lealtad/puntos) — saldo denormalizado, mismo criterio que
+  // `Stock.cantidadActual`: la fuente de verdad es la suma de
+  // `MovimientoLealtad`, esto es una caché mantenida por
+  // `LealtadService` para no tener que agregar en cada lectura.
+  puntosLealtad Int @default(0)
 
   direcciones DireccionCliente[]
   facturas    Factura[]
   cotizaciones Cotizacion[]
   remisiones  Remision[]
   ventasAparcadas VentaAparcada[]
+  movimientosLealtad MovimientoLealtad[]
 
   @@map("clientes")
 }
@@ -2556,6 +2572,81 @@ model ComisionVenta {
   @@index([tenantId, empleadoId])
   @@index([tenantId, productoId])
   @@map("comisiones_venta")
+}
+
+enum ModoAcumulacionLealtad {
+  POR_MONTO
+  POR_UNIDAD
+}
+
+enum CalculoLealtad {
+  SUBTOTAL
+  TOTAL
+}
+
+/// Programa de lealtad/puntos (plan de integración Cuadre, ítem A-3) —
+/// una fila por tenant (patrón "config única", igual criterio que
+/// `PlataformaConfiguracion` pero tenant-scoped), apagado por defecto.
+/// Apple/Google Wallet quedan fuera de este primer corte (decisión ya
+/// registrada en el plan de integración).
+model ConfiguracionLealtad {
+  id       String @id @default(uuid())
+  tenantId String @unique
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  activo   Boolean @default(false)
+  modoAcumulacion ModoAcumulacionLealtad @default(POR_MONTO)
+  // Obligatorio (validado en LealtadService) cuando modoAcumulacion=POR_MONTO — RD$ por cada punto ganado.
+  montoPorPunto Decimal? @db.Decimal(14, 4)
+  // Base de cálculo cuando modoAcumulacion=POR_MONTO — decisión confirmada con el usuario: configurable por tenant.
+  calcularSobre CalculoLealtad @default(SUBTOTAL)
+  // Si es false, las líneas con descuento (manual, Oferta o descuento general) no aportan puntos.
+  itemsConDescuentoGeneranPuntos Boolean @default(true)
+  // RD$ que vale UN punto al canjear (0 = no configurado, canje rechazado).
+  valorPunto Decimal @default(0) @db.Decimal(14, 4)
+  minimoParaCanjear Int @default(0)
+  // null = los puntos nunca expiran.
+  diasExpiracion Int?
+  updatedAt DateTime @updatedAt
+
+  @@map("configuraciones_lealtad")
+}
+
+enum TipoMovimientoLealtad {
+  ACUMULACION
+  CANJE
+  EXPIRACION
+  AJUSTE
+}
+
+/// Ledger de puntos de lealtad (ítem A-3) — un `ACUMULACION` por venta
+/// que gana puntos, con `puntosDisponibles` (mismo patrón FEFO que
+/// `Lote`/`MovimientoInventario` de inventario) llevando cuánto de ESE
+/// lote de puntos sigue sin canjear/expirar; `CANJE`/`EXPIRACION`
+/// descuentan de los lotes más próximos a vencer primero (o los más
+/// viejos si no expiran). `anulado` (nunca se borra una fila) se marca
+/// cuando la factura de origen se anula — ver ARCHITECTURE.md para el
+/// alcance exacto de la reversión.
+model MovimientoLealtad {
+  id                String                @id @default(uuid())
+  tenantId          String
+  tenant            Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  clienteId         String
+  cliente           Cliente               @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  tipo              TipoMovimientoLealtad
+  // + en ACUMULACION/AJUSTE positivo, - en CANJE/EXPIRACION/AJUSTE negativo.
+  puntos            Int
+  // Solo tiene sentido en ACUMULACION — cuánto de este lote sigue disponible.
+  puntosDisponibles Int                   @default(0)
+  facturaId         String?
+  factura           Factura?              @relation(fields: [facturaId], references: [id], onDelete: SetNull)
+  expiraEn          DateTime?
+  motivo            String?
+  anulado           Boolean               @default(false)
+  createdAt         DateTime              @default(now())
+
+  @@index([tenantId, clienteId])
+  @@index([tenantId, expiraEn])
+  @@map("movimientos_lealtad")
 }
 
 enum EstadoBono {

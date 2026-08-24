@@ -14,6 +14,7 @@ import { VariantesService } from '../variantes/variantes.service';
 import { OfertasService } from '../ofertas/ofertas.service';
 import { prorratearDescuentoCarrito } from '../ofertas/prorratear-descuento-carrito';
 import { BonosService } from '../bonos/bonos.service';
+import { LealtadService } from '../lealtad/lealtad.service';
 import { ListarFacturasQueryDto } from './dto/listar-facturas-query.dto';
 import { paginar } from '../common/types/pagina-resultado';
 import { DocumentoPdfParams, generarDocumentoPdf } from '../common/pdf/documento-pdf';
@@ -107,6 +108,7 @@ export class FacturacionService {
     private readonly variantesService: VariantesService,
     private readonly ofertasService: OfertasService,
     private readonly bonosService: BonosService,
+    private readonly lealtadService: LealtadService,
     private readonly authService: AuthService,
     private readonly notificacionesService: NotificacionesService,
     private readonly autorizacionesService: AutorizacionesService,
@@ -365,12 +367,15 @@ export class FacturacionService {
     const facturaId = randomUUID();
 
     const factura = await this.tenantPrisma.client.$transaction(async (tx) => {
-      // Canje de Bono (Fase 4c) primero — fail-fast antes de tocar stock/
-      // NCF si el código no existe, venció o no alcanza el saldo. No hace
-      // nada si ningún pago usa una FormaPago con esBono (ver
-      // BonosService.procesarPagoEnTx).
+      // Canje de Bono (Fase 4c) y de puntos de Lealtad (ítem A-3) primero
+      // — fail-fast antes de tocar stock/NCF si el código no existe/
+      // venció/no alcanza el saldo, o si el cliente no tiene puntos
+      // suficientes. Ninguno de los dos hace nada si la FormaPago del
+      // pago no tiene esBono/esPuntosLealtad respectivamente (ver
+      // BonosService/LealtadService.procesarPagoEnTx).
       for (const pago of pagosResueltos) {
         await this.bonosService.procesarPagoEnTx(tx, tenantId, pago);
+        await this.lealtadService.procesarPagoEnTx(tx, tenantId, dto.clienteId, facturaId, pago);
       }
 
       // Una nota de crédito devuelve al cliente lo comprado: el inventario

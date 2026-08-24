@@ -453,6 +453,87 @@ Migración: `20260828100000_comisiones_venta`. Permiso nuevo
 `comisiones.ver` (Admin Total, Gerente, Contador) — backfill con
 `pnpm --filter ./backend permisos:backfill`.
 
+### A-3 — Lealtad / puntos
+
+`backend/src/lealtad/` (`ConfiguracionLealtad` + `MovimientoLealtad`,
+ambos tenant-scoped) es un programa de puntos por venta, apagado por
+defecto — mismo espíritu que el "Lealtad" de Cuadre (`/settings/rewards`),
+sin Apple/Google Wallet (excluidos de este primer corte, decisión ya
+registrada en el plan de integración).
+
+**`ConfiguracionLealtad`** es una fila única por tenant (mismo patrón
+"config singleton" que `PlataformaConfiguracion`, pero tenant-scoped):
+`modoAcumulacion` (`POR_MONTO`/`POR_UNIDAD`), `montoPorPunto`
+(obligatorio solo si `POR_MONTO`), `calcularSobre` (`SUBTOTAL`/`TOTAL` —
+decisión confirmada con el usuario: configurable por tenant, no fijo),
+`itemsConDescuentoGeneranPuntos`, `valorPunto` (RD$ que vale un punto al
+canjear) y `diasExpiracion` (`null` = nunca expiran).
+
+**Acumulación — reactor de eventos, igual patrón que Comisiones/
+Contabilidad**: `LealtadEventosService` reacciona a `factura.creada`
+(nunca bloquea la venta, un fallo solo se loguea) y, si el programa está
+activo y la venta es `CONTADO`/`CREDITO`, calcula los puntos sobre las
+líneas "calificantes" (todas si `itemsConDescuentoGeneranPuntos`, o solo
+las que tienen `descuento: 0` si no) — `POR_MONTO`:
+`floor(suma_de_bases / montoPorPunto)` (cada línea aporta
+`cantidad×precioUnitario − descuento`, más `montoItbis` si
+`calcularSobre: TOTAL`); `POR_UNIDAD`: suma directa de `cantidad`, sin
+mirar el monto. Con `diasExpiracion` configurado, la acumulación queda
+con `expiraEn = ahora + diasExpiracion` — sin eso, `expiraEn: null`
+(nunca vence). Se persiste como una fila `MovimientoLealtad`
+(`tipo: ACUMULACION`) con `puntosDisponibles` igual al total ganado —
+ese campo es lo que se va consumiendo con el tiempo (canje/expiración),
+mismo rol que `Lote.cantidadActual` en inventario.
+
+**Canje — síncrono, dentro de la transacción de la venta (decisión
+confirmada con el usuario), igual patrón que `BonosService.
+procesarPagoEnTx`**: `FormaPago.esPuntosLealtad` (nueva fila sembrada
+"Puntos de Lealtad", `FORMAS_PAGO_BASE`) marca una línea de pago para
+canjear en vez de cobrar. `FacturacionService.crear()` llama
+`LealtadService.procesarPagoEnTx(tx, tenantId, dto.clienteId, facturaId,
+pago)` en el mismo loop que ya llamaba a Bonos, ANTES de tocar stock/
+NCF — convierte el monto RD$ a puntos (`Math.ceil(monto/valorPunto)`,
+redondeando a favor del negocio) y rechaza (400, aborta toda la venta)
+si el programa no está activo, `valorPunto` es 0,
+`puntosNecesarios < minimoParaCanjear`, o el cliente no tiene saldo. El
+consumo real (`LealtadRepository.canjearEnTx`) descuenta primero los
+lotes `ACUMULACION` más próximos a vencer (`ORDER BY expiraEn ASC NULLS
+LAST, createdAt ASC`) — mismo criterio FEFO que el consumo de lotes de
+inventario.
+
+**Expiración — cron diario** (`LealtadExpiracionCronService`, patrón
+`LotesCronService`/`RecordatoriosService`: cruza todos los tenants con
+`PrismaService` global, **inyectado DIRECTO sin pasar por
+`LealtadRepository`** — un `@Cron` no puede registrarse sobre un
+provider que dependa de `TenantPrismaService`, `Scope.REQUEST`, bug real
+ya encontrado con `BonosCronService`): busca lotes `ACUMULACION` con
+`expiraEn` vencido y `puntosDisponibles > 0`, genera un
+`MovimientoLealtad` (`tipo: EXPIRACION`) y descuenta del saldo del
+cliente.
+
+**Reversión al anular una factura** — `LealtadEventosService` reacciona
+a `factura.anulada`: una `ACUMULACION` de esa venta pierde lo que le
+quede sin canjear/expirar (nunca se borra, se marca `anulado: true`); un
+`CANJE` de esa venta se reintegra como una **nueva** `ACUMULACION` sin
+fecha de expiración (un reintegro no debería traer un vencimiento
+arbitrario). **Limitación conocida, documentada a propósito**: esto NO
+reconstruye los lotes exactos que ese canje consumió en su momento (si
+ya se habían usado para otro canje posterior, esos siguen gastados) —
+el saldo total del cliente siempre queda numéricamente correcto, pero
+la fecha de expiración de los puntos reintegrados no es la original.
+
+`Cliente.puntosLealtad` es un saldo denormalizado (mismo criterio que
+`Stock.cantidadActual`) — la fuente de verdad es la suma de
+`MovimientoLealtad`, mantenida consistente por `LealtadRepository` en
+cada escritura.
+
+Migración: `20260829090000_lealtad_puntos_enum` +
+`20260829090001_lealtad_puntos` (separadas porque Postgres no permite
+usar un valor de enum recién agregado — `PUNTOS_LEALTAD` — dentro de la
+misma transacción que lo agregó). Permisos nuevos `lealtad.ver`
+(+ Cajero/Supervisor de Caja, para ver el saldo del cliente al cobrar)
+y `lealtad.editar` (Admin Total, Gerente) — backfill corrido.
+
 ## Bonos — gift cards canjeables como forma de pago (Fase 4c de adopción de Cuadre)
 
 `backend/src/bonos/` (`Bono`, tenant-scoped) son gift cards emitidas en

@@ -65,4 +65,6 @@ export const TENANT_SCOPED_MODELS = new Set([
   'TipoAusenciaConfig',
   'CodigoAutorizacion',
   'ComisionVenta',
+  'ConfiguracionLealtad',
+  'MovimientoLealtad',
 ]);

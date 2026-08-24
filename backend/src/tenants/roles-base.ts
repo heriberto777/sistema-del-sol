@@ -18,6 +18,7 @@ export const PERMISOS_BASE = [
   'precios.ver', 'precios.editar',
   'ofertas.ver', 'ofertas.editar',
   'comisiones.ver',
+  'lealtad.ver', 'lealtad.editar',
   'bonos.ver', 'bonos.editar',
   'compras.crear', 'compras.recibir', 'compras.pagar', 'compras.ver',
   'clientes.crear', 'clientes.editar', 'clientes.ver',
@@ -45,7 +46,7 @@ export const ROLES_BASE: Record<string, string[]> = {
     // facturacion.imprimir reusan los endpoints de Facturación normal, no
     // hay una ruta separada solo para POS.
     'facturacion.anular', 'facturacion.imprimir',
-    'clientes.crear', 'clientes.ver', 'precios.ver', 'bonos.ver',
+    'clientes.crear', 'clientes.ver', 'precios.ver', 'bonos.ver', 'lealtad.ver',
     'pos.ver', 'pos.editar', 'ia.usar', 'notificaciones.ver',
   ],
   // Mismo alcance que Cajero + pos.supervisar: puede cerrar el turno de
@@ -54,7 +55,7 @@ export const ROLES_BASE: Record<string, string[]> = {
   // traería venir de Gerente/Admin Total.
   'Supervisor de Caja': [
     'facturacion.anular', 'facturacion.imprimir',
-    'clientes.crear', 'clientes.ver', 'precios.ver', 'bonos.ver',
+    'clientes.crear', 'clientes.ver', 'precios.ver', 'bonos.ver', 'lealtad.ver',
     'pos.ver', 'pos.editar', 'pos.supervisar', 'ia.usar', 'notificaciones.ver',
   ],
   Almacenero: ['inventario.ver', 'inventario.ajustar', 'inventario.transferir', 'compras.recibir', 'remisiones.ver'],

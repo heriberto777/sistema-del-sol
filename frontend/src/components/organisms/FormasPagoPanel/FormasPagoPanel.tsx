@@ -34,6 +34,7 @@ interface FormaPago {
   requiereReferencia: boolean;
   esEfectivo: boolean;
   esBono: boolean;
+  esPuntosLealtad: boolean;
   tipo: TipoFormaPago | null;
   activa: boolean;
 }
@@ -144,7 +145,13 @@ export function FormasPagoPanel() {
                   {f.esEfectivo ? <Badge tono="exito">Efectivo</Badge> : <span className="text-slate-400">—</span>}
                 </td>
                 <td className="px-5 py-3">
-                  {f.esBono ? <Badge tono="advertencia">Bono</Badge> : <span className="text-slate-400">—</span>}
+                  {f.esBono ? (
+                    <Badge tono="advertencia">Bono</Badge>
+                  ) : f.esPuntosLealtad ? (
+                    <Badge tono="advertencia">Puntos de Lealtad</Badge>
+                  ) : (
+                    <span className="text-slate-400">—</span>
+                  )}
                 </td>
                 <td className="px-5 py-3">
                   <Badge tono={f.activa ? 'exito' : 'neutro'}>{f.activa ? 'Activa' : 'Inactiva'}</Badge>

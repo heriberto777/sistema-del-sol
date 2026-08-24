@@ -36,6 +36,7 @@ interface Cliente {
   nombre: string;
   listaPrecio: { id: string; nombre: string } | null;
   comprobantePorDefecto?: ComprobantePorDefecto | null;
+  puntosLealtad?: number;
 }
 
 interface Vendedor {
@@ -766,6 +767,7 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
       {modalCheckout && cotizacion && (
         <ModalCheckout
           cotizacion={cotizacion}
+          cliente={cliente}
           registrando={registrarVenta.isPending}
           onConfirmar={(pagos) => registrarVenta.mutate(pagos)}
           onClose={() => {
@@ -1166,11 +1168,13 @@ interface PagoAgregado {
  */
 function ModalCheckout({
   cotizacion,
+  cliente,
   registrando,
   onConfirmar,
   onClose,
 }: {
   cotizacion: { subtotal: number; descuento: number; itbis: number; total: number };
+  cliente: Cliente | null;
   registrando: boolean;
   onConfirmar: (pagos: { formaPagoId: string; monto: number; referencia?: string }[]) => void;
   onClose: () => void;
@@ -1306,6 +1310,11 @@ function ModalCheckout({
               placeholder="Monto"
               className="w-28 rounded-md border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
             />
+            {formaSeleccionada?.esPuntosLealtad && (
+              <p className="w-full text-xs text-slate-500 dark:text-slate-400">
+                Saldo de puntos del cliente: <span className="font-medium">{cliente?.puntosLealtad ?? 0}</span>
+              </p>
+            )}
             {formaSeleccionada?.requiereReferencia && (
               <input
                 type="text"

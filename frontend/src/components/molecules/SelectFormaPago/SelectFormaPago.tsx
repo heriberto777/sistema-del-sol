@@ -8,6 +8,7 @@ export interface FormaPago {
   requiereReferencia: boolean;
   esEfectivo: boolean;
   esBono: boolean;
+  esPuntosLealtad: boolean;
 }
 
 interface SelectFormaPagoProps {
