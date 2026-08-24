@@ -297,7 +297,9 @@ export class FacturacionService {
     // Fase 9: cubre Facturación directa, ventas de POS (PosService reusa
     // crear()) y conversión de Cotizaciones/Remisiones a factura — ninguno
     // de esos módulos necesita su propio chequeo de acceso por sucursal.
-    await this.inventarioService.validarAccesoBodega(dto.bodegaId, vendedorId);
+    // La sucursal de la bodega (ítem B-2) también decide de qué secuencia
+    // de NCF se descuenta, más abajo.
+    const bodega = await this.inventarioService.validarAccesoBodega(dto.bodegaId, vendedorId);
     const { lineasCalculadas, subtotal, itbis, total, descuentoTotal } = await this.calcularLineasYTotales(dto, cliente);
 
     // Pago dividido (POS, ver PosService.registrarVenta): si vienen `pagos`
@@ -391,7 +393,14 @@ export class FacturacionService {
         }
       }
 
-      const ncf = await this.facturacionRepository.siguienteNcfEnTx(tx, tipoNcf);
+      const { ncf, restantes, umbralAlerta, sucursalIdUsado } = await this.facturacionRepository.siguienteNcfEnTx(
+        tx,
+        tipoNcf,
+        bodega.sucursalId,
+      );
+      if (umbralAlerta != null && restantes <= umbralAlerta) {
+        this.eventBus.emit(EVENTOS.NCF_POR_AGOTARSE, { tenantId, tipoNcf, sucursalId: sucursalIdUsado, restantes, umbralAlerta });
+      }
 
       return this.facturacionRepository.crearFacturaEnTx(tx, {
         id: facturaId,

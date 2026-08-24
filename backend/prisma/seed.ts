@@ -83,17 +83,21 @@ async function main() {
   unAnioDespues.setFullYear(unAnioDespues.getFullYear() + 1);
 
   for (const tipoNcf of ['B01', 'B02', 'B03', 'B04'] as const) {
-    await prisma.ncfAsignado.upsert({
-      where: { tenantId_tipoNcf: { tenantId: tenant.id, tipoNcf } },
-      update: {},
-      create: {
-        tenantId: tenant.id,
-        tipoNcf,
-        secuenciaActual: 1,
-        secuenciaFinal: 50_000_000,
-        vigenciaHasta: unAnioDespues,
-      },
-    });
+    // Prisma no soporta `null` en la parte de un `@@unique` compuesto vía
+    // upsert/findUnique (limitación conocida) — findFirst + create manual
+    // en su lugar. `sucursalId: null` = secuencia compartida (ítem B-2).
+    const existente = await prisma.ncfAsignado.findFirst({ where: { tenantId: tenant.id, tipoNcf, sucursalId: null } });
+    if (!existente) {
+      await prisma.ncfAsignado.create({
+        data: {
+          tenantId: tenant.id,
+          tipoNcf,
+          secuenciaActual: 1,
+          secuenciaFinal: 50_000_000,
+          vigenciaHasta: unAnioDespues,
+        },
+      });
+    }
   }
 
   const sucursal = await prisma.sucursal.upsert({

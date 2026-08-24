@@ -17,4 +17,10 @@ export class ActualizarNcfDto {
   @IsOptional()
   @IsBoolean()
   activo?: boolean;
+
+  @ApiProperty({ required: false, nullable: true, description: 'null para quitar la alerta' })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  umbralAlerta?: number | null;
 }

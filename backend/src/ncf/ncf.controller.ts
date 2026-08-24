@@ -1,6 +1,5 @@
 import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { TipoNcf } from '@prisma/client';
 import { NcfService } from './ncf.service';
 import { CrearNcfDto } from './dto/crear-ncf.dto';
 import { ActualizarNcfDto } from './dto/actualizar-ncf.dto';
@@ -22,9 +21,9 @@ export class NcfController {
   }
 
   // Rutas literales ('modalidad') declaradas ANTES de la ruta comodín
-  // (':tipoNcf' más abajo) — Nest matchea en orden de declaración, así
-  // que si ':tipoNcf' fuera primero, "modalidad" se interpretaría como un
-  // tipoNcf en vez de llegar acá.
+  // (':id' más abajo) — Nest matchea en orden de declaración, así que si
+  // ':id' fuera primero, "modalidad" se interpretaría como un id en vez
+  // de llegar acá.
   @Get('modalidad')
   @Permissions('admin.configuracion')
   obtenerModalidad(@CurrentUser() user: JwtPayloadUser) {
@@ -43,9 +42,9 @@ export class NcfController {
     return this.ncfService.crear(dto, user.tenantId);
   }
 
-  @Patch(':tipoNcf')
+  @Patch(':id')
   @Permissions('admin.configuracion')
-  actualizar(@Param('tipoNcf') tipoNcf: TipoNcf, @Body() dto: ActualizarNcfDto, @CurrentUser() user: JwtPayloadUser) {
-    return this.ncfService.actualizar(tipoNcf, dto, user.tenantId);
+  actualizar(@Param('id') id: string, @Body() dto: ActualizarNcfDto) {
+    return this.ncfService.actualizar(id, dto);
   }
 }

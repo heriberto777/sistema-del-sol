@@ -83,9 +83,9 @@ pasa ninguna de ellas.
 
 | Método | Ruta | Permiso |
 |---|---|---|
-| GET | `/api/admin/ncf` | `admin.configuracion` |
-| POST | `/api/admin/ncf` | `admin.configuracion` — `{ tipoNcf, secuenciaInicial?, secuenciaFinal, vigenciaHasta }` |
-| PATCH | `/api/admin/ncf/:tipoNcf` | `admin.configuracion` — `{ secuenciaFinal?, vigenciaHasta?, activo? }` |
+| GET | `/api/admin/ncf` | `admin.configuracion` — incluye `sucursal` (`{id, nombre}` o `null` = secuencia compartida) |
+| POST | `/api/admin/ncf` | `admin.configuracion` — `{ tipoNcf, sucursalId?, secuenciaInicial?, secuenciaFinal, vigenciaHasta, umbralAlerta? }` (ítem B-2). Sin `sucursalId` = secuencia compartida por todas las sucursales, 409 si ya existe una compartida activa de ese tipo; con `sucursalId`, 404 si no pertenece al tenant |
+| PATCH | `/api/admin/ncf/:id` | `admin.configuracion` — `{ secuenciaFinal?, vigenciaHasta?, activo?, umbralAlerta? }`. Identificado por `id` (no por `tipoNcf`) desde que puede haber varias filas por tipo, una por sucursal |
 
 ## Formas de pago (por tenant — catálogo configurable, reemplaza el enum fijo)
 

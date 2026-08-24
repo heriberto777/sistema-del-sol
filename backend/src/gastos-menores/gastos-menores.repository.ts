@@ -39,11 +39,15 @@ export class GastosMenoresRepository {
    * Mismo cuerpo atómico que `FacturacionRepository.siguienteNcfEnTx` (ver
    * ese archivo para la explicación completa de por qué `{ increment: 1 }`
    * es seguro bajo concurrencia) — duplicado a propósito, no importado,
-   * misma razón que `obtenerModalidadFacturacion` arriba.
+   * misma razón que `obtenerModalidadFacturacion` arriba. Gastos Menores
+   * no tiene concepto de sucursal (ítem B-2), así que siempre usa la
+   * secuencia COMPARTIDA (`sucursalId: null`) — explícito para no matchear
+   * ambiguamente si alguna vez se crea una secuencia de B11/E43 específica
+   * de una sucursal.
    */
   async siguienteNumeroEnTx(tx: Prisma.TransactionClient, tipoNcf: TipoNcf): Promise<string> {
     const secuencia = await tx.ncfAsignado.findFirstOrThrow({
-      where: { tipoNcf, activo: true },
+      where: { tipoNcf, activo: true, sucursalId: null },
     });
     const actualizada = await tx.ncfAsignado.update({
       where: { id: secuencia.id },

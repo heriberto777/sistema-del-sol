@@ -5,7 +5,7 @@ import { NotificacionesRepository } from './notificaciones.repository';
 import { EmailChannel } from './canales/email.channel';
 import { WhatsAppChannel } from './canales/whatsapp.channel';
 import { renderizarPlantilla } from './plantilla-renderer';
-import { CotizacionEnviadaPayload, EVENTOS, FacturaCreadaPayload, LotePorVencerPayload, StockBajoPayload } from '../event-bus/events';
+import { CotizacionEnviadaPayload, EVENTOS, FacturaCreadaPayload, LotePorVencerPayload, NcfPorAgotarsePayload, StockBajoPayload } from '../event-bus/events';
 import { PrismaService } from '../prisma/prisma.service';
 import { CrearPlantillaDto } from './dto/crear-plantilla.dto';
 import { ListadoQueryDto } from '../common/dto/listado-query.dto';
@@ -124,6 +124,28 @@ export class NotificacionesService {
           producto_id: payload.productoId,
           cantidad_actual: payload.cantidadActual,
           stock_minimo: payload.stockMinimo,
+        },
+      });
+    }
+  }
+
+  /** Plan de integración Cuadre, ítem B-2 — mismo criterio que `alBajarStock`, pero solo a Admin Total (gestionar secuencias de NCF es `admin.configuracion`, exclusivo de ese rol). */
+  @OnEvent(EVENTOS.NCF_POR_AGOTARSE)
+  async alAgotarseNcf(payload: NcfPorAgotarsePayload) {
+    const admins = await this.prisma.user.findMany({
+      where: { tenantId: payload.tenantId, roles: { some: { role: { nombre: 'Admin Total' } } } },
+    });
+
+    for (const admin of admins) {
+      await this.enviar({
+        tenantId: payload.tenantId,
+        canal: 'EMAIL',
+        clave: 'ncf_por_agotarse',
+        destinatario: admin.email,
+        variables: {
+          tipo_ncf: payload.tipoNcf,
+          restantes: String(payload.restantes),
+          umbral_alerta: String(payload.umbralAlerta),
         },
       });
     }

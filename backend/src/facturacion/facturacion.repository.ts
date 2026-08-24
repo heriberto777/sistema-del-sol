@@ -73,14 +73,27 @@ export class FacturacionRepository {
    * violación real de la norma DGII de unicidad/secuencialidad.
    */
   async siguienteNcf(tipoNcf: TipoNcf): Promise<string> {
-    return this.db.$transaction((tx) => this.siguienteNcfEnTx(tx, tipoNcf));
+    const { ncf } = await this.db.$transaction((tx) => this.siguienteNcfEnTx(tx, tipoNcf));
+    return ncf;
   }
 
-  /** Cuerpo puro de `siguienteNcf` — ver `FacturacionService.crear`/`crearFacturaEnTx`: participa en la misma transacción que el descuento de stock y la creación de la factura. */
-  async siguienteNcfEnTx(tx: Prisma.TransactionClient, tipoNcf: TipoNcf): Promise<string> {
-    const secuencia = await tx.ncfAsignado.findFirstOrThrow({
-      where: { tipoNcf, activo: true },
-    });
+  /**
+   * Cuerpo puro de `siguienteNcf` — ver `FacturacionService.crear`/
+   * `crearFacturaEnTx`: participa en la misma transacción que el
+   * descuento de stock y la creación de la factura. `sucursalId` (plan
+   * de integración Cuadre, ítem B-2) intenta primero la secuencia propia
+   * de esa sucursal y cae a la compartida (`sucursalId: null`) si no
+   * existe — así un tenant sin secuencias por sucursal sigue funcionando
+   * exactamente igual que antes.
+   */
+  async siguienteNcfEnTx(
+    tx: Prisma.TransactionClient,
+    tipoNcf: TipoNcf,
+    sucursalId?: string | null,
+  ): Promise<{ ncf: string; restantes: number; umbralAlerta: number | null; sucursalIdUsado: string | null }> {
+    const secuencia =
+      (sucursalId ? await tx.ncfAsignado.findFirst({ where: { tipoNcf, activo: true, sucursalId } }) : null) ??
+      (await tx.ncfAsignado.findFirstOrThrow({ where: { tipoNcf, activo: true, sucursalId: null } }));
     const actualizada = await tx.ncfAsignado.update({
       where: { id: secuencia.id },
       data: { secuenciaActual: { increment: 1 } },
@@ -88,7 +101,12 @@ export class FacturacionRepository {
     if (actualizada.secuenciaActual - 1 > actualizada.secuenciaFinal) {
       throw new Error(`Secuencia de NCF ${tipoNcf} agotada`);
     }
-    return `${tipoNcf}${String(actualizada.secuenciaActual - 1).padStart(8, '0')}`;
+    return {
+      ncf: `${tipoNcf}${String(actualizada.secuenciaActual - 1).padStart(8, '0')}`,
+      restantes: actualizada.secuenciaFinal - (actualizada.secuenciaActual - 1),
+      umbralAlerta: actualizada.umbralAlerta,
+      sucursalIdUsado: actualizada.sucursalId,
+    };
   }
 
   crearFactura(params: Parameters<FacturacionRepository['crearFacturaEnTx']>[1]) {

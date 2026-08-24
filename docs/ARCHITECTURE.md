@@ -746,6 +746,39 @@ guarda saldo propio, no importa extractos ni concilia transacciones — el
 saldo real vive en el libro mayor de la `cuentaContable` que tiene
 vinculada (`GET /contabilidad/libro-mayor/:cuentaId`, ya existente).
 
+**Secuencias de NCF por sucursal + umbral de alerta** (plan de
+integración Cuadre, ítem B-2): `NcfAsignado` ganó `sucursalId` (nullable
+= secuencia COMPARTIDA por todas las sucursales, comportamiento
+histórico y default) y `umbralAlerta` (nullable = sin alerta).
+`FacturacionRepository.siguienteNcfEnTx(tx, tipoNcf, sucursalId?)`
+intenta primero la fila específica de la sucursal de la bodega de la
+venta (resuelta en `FacturacionService.crear()` vía
+`InventarioService.validarAccesoBodega`, ya necesaria para Fase 9) y
+cae a la compartida si no existe — un tenant sin secuencias por
+sucursal sigue funcionando exactamente igual que antes, sin ningún
+cambio de comportamiento. `NcfService.crear()` exige que `sucursalId`
+pertenezca al tenant (mismo patrón IDOR-safe de FKs suministradas por
+el cliente) y valida en CÓDIGO que a lo sumo exista una fila compartida
+activa por tipo — Postgres no deduplica `NULL` en el índice único
+compuesto (`@@unique([tenantId, tipoNcf, sucursalId])`), así que esta
+invariante no se puede expresar como constraint de DB (mismo criterio
+que `PlantillaHorario.predeterminada`, código en vez de índice parcial).
+`GastosMenoresRepository.siguienteNumeroEnTx` (B11/E43, sin concepto de
+sucursal) filtra explícito `sucursalId: null` para no matchear
+ambiguamente si alguna vez se crea una secuencia de esos tipos
+específica de una sucursal. El umbral se evalúa en
+`FacturacionService.crear()` después de tomar el NCF (necesita el valor
+YA actualizado de `secuenciaActual`) y emite `EVENTOS.NCF_POR_AGOTARSE`
+(consumido por `NotificacionesService.alAgotarseNcf`, mismo criterio
+que `STOCK_BAJO` pero avisando solo a `Admin Total` — gestionar NCF es
+`admin.configuracion`, exclusivo de ese rol) — como toda notificación de
+este proyecto, requiere que el tenant tenga creada la plantilla
+`ncf_por_agotarse` (Admin → Notificaciones); sin ella, no falla, solo no
+envía nada (mismo degrade que el resto de `NotificacionPlantilla`).
+Migración `20260826100000_ncf_sucursal_umbral`. El `PATCH` de una
+secuencia pasó de identificarse por `tipoNcf` a por `id` (ver API.md) —
+ya no es válido asumir una sola fila por tipo.
+
 **Tipo de comprobante especial en Facturación** (plan de integración de
 brechas Cuadre, ítem B-1): `FacturacionService.crear()` resolvía el
 `TipoNcf` siempre de forma automática a partir de `tipoFactura`

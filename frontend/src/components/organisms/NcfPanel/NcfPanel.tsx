@@ -6,11 +6,20 @@ import { Button } from '../../atoms/Button/Button';
 import { Badge } from '../../atoms/Badge/Badge';
 import { Card } from '../../atoms/Card/Card';
 
+interface Sucursal {
+  id: string;
+  nombre: string;
+}
+
 interface NcfAsignado {
+  id: string;
   tipoNcf: string;
+  sucursalId: string | null;
+  sucursal: Sucursal | null;
   secuenciaActual: number;
   secuenciaFinal: number;
   vigenciaHasta: string;
+  umbralAlerta: number | null;
   activo: boolean;
 }
 
@@ -25,13 +34,20 @@ const TIPOS_NCF = ['B01', 'B02', 'B03', 'B04', 'B11', 'B14', 'B15', 'E31', 'E32'
 export function NcfPanel() {
   const queryClient = useQueryClient();
   const [tipoNcf, setTipoNcf] = useState('B02');
+  const [sucursalId, setSucursalId] = useState('');
   const [secuenciaFinal, setSecuenciaFinal] = useState('');
   const [vigenciaHasta, setVigenciaHasta] = useState('');
+  const [umbralAlerta, setUmbralAlerta] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   const { data: secuencias } = useQuery({
     queryKey: ['admin-ncf'],
     queryFn: async () => (await apiClient.get<NcfAsignado[]>('/admin/ncf')).data,
+  });
+
+  const { data: sucursales } = useQuery({
+    queryKey: ['sucursales'],
+    queryFn: async () => (await apiClient.get<Sucursal[]>('/sucursales')).data,
   });
 
   const { data: modalidad } = useQuery({
@@ -46,18 +62,25 @@ export function NcfPanel() {
 
   const crear = useMutation({
     mutationFn: async () =>
-      apiClient.post('/admin/ncf', { tipoNcf, secuenciaFinal: Number(secuenciaFinal), vigenciaHasta }),
+      apiClient.post('/admin/ncf', {
+        tipoNcf,
+        sucursalId: sucursalId || undefined,
+        secuenciaFinal: Number(secuenciaFinal),
+        vigenciaHasta,
+        umbralAlerta: umbralAlerta ? Number(umbralAlerta) : undefined,
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-ncf'] });
       setSecuenciaFinal('');
       setVigenciaHasta('');
+      setUmbralAlerta('');
       setError(null);
     },
-    onError: () => setError('No se pudo crear la secuencia (¿ya existe una para ese tipo?).'),
+    onError: () => setError('No se pudo crear la secuencia (¿ya existe una para ese tipo/sucursal?).'),
   });
 
   const desactivar = useMutation({
-    mutationFn: async (tipo: string) => apiClient.patch(`/admin/ncf/${tipo}`, { activo: false }),
+    mutationFn: async (id: string) => apiClient.patch(`/admin/ncf/${id}`, { activo: false }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin-ncf'] }),
   });
 
@@ -108,6 +131,24 @@ export function NcfPanel() {
               ))}
             </select>
           </div>
+          <div>
+            <label htmlFor="ncf-sucursal" className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+              Sucursal (opcional)
+            </label>
+            <select
+              id="ncf-sucursal"
+              value={sucursalId}
+              onChange={(e) => setSucursalId(e.target.value)}
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+            >
+              <option value="">Compartida (todas las sucursales)</option>
+              {sucursales?.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.nombre}
+                </option>
+              ))}
+            </select>
+          </div>
           <FormField
             id="secuenciaFinal"
             label="Secuencia final autorizada"
@@ -124,6 +165,13 @@ export function NcfPanel() {
             onChange={(e) => setVigenciaHasta(e.target.value)}
             required
           />
+          <FormField
+            id="umbralAlerta"
+            label="Alertar cuando queden (opcional)"
+            type="number"
+            value={umbralAlerta}
+            onChange={(e) => setUmbralAlerta(e.target.value)}
+          />
           {error && <p className="text-sm text-red-600">{error}</p>}
           <Button type="submit" disabled={crear.isPending} className="w-full">
             {crear.isPending ? 'Creando…' : 'Crear secuencia'}
@@ -136,6 +184,7 @@ export function NcfPanel() {
           <thead className="bg-slate-50 text-slate-500 dark:bg-slate-900/60 dark:text-slate-400">
             <tr>
               <th className="px-5 py-3 font-medium">Tipo</th>
+              <th className="px-5 py-3 font-medium">Sucursal</th>
               <th className="px-5 py-3 font-medium">Actual</th>
               <th className="px-5 py-3 font-medium">Final</th>
               <th className="px-5 py-3 font-medium">Vigente hasta</th>
@@ -145,8 +194,9 @@ export function NcfPanel() {
           </thead>
           <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
             {secuencias?.map((s) => (
-              <tr key={s.tipoNcf} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+              <tr key={s.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
                 <td className="px-5 py-3 font-mono text-xs">{s.tipoNcf}</td>
+                <td className="px-5 py-3">{s.sucursal?.nombre ?? <span className="text-slate-400">Compartida</span>}</td>
                 <td className="px-5 py-3">{s.secuenciaActual}</td>
                 <td className="px-5 py-3">{s.secuenciaFinal}</td>
                 <td className="px-5 py-3">{new Date(s.vigenciaHasta).toLocaleDateString('es-DO')}</td>
@@ -155,7 +205,7 @@ export function NcfPanel() {
                 </td>
                 <td className="px-5 py-3">
                   {s.activo && (
-                    <Button variante="peligro" onClick={() => desactivar.mutate(s.tipoNcf)}>
+                    <Button variante="peligro" onClick={() => desactivar.mutate(s.id)}>
                       Desactivar
                     </Button>
                   )}

@@ -56,7 +56,7 @@ describe('FacturacionService', () => {
     repository = {
       obtenerProductoConPrecioVigente: jest.fn(),
       obtenerModalidadFacturacion: jest.fn().mockResolvedValue('NCF'),
-      siguienteNcfEnTx: jest.fn().mockResolvedValue('B0200000001'),
+      siguienteNcfEnTx: jest.fn().mockResolvedValue({ ncf: 'B0200000001', restantes: 999, umbralAlerta: null, sucursalIdUsado: null }),
       crearFacturaEnTx: jest.fn(),
       buscarPorId: jest.fn(),
       listar: jest.fn(),
@@ -444,7 +444,7 @@ describe('FacturacionService', () => {
 
     await service.crear(dto({ tipoFactura: tipoFactura as CrearFacturaDto['tipoFactura'] }), 'tenant-1', 'vendedor-1');
 
-    expect(repository.siguienteNcfEnTx).toHaveBeenCalledWith(TX, tipoNcfEsperado);
+    expect(repository.siguienteNcfEnTx).toHaveBeenCalledWith(TX, tipoNcfEsperado, 's1');
   });
 
   it.each([
@@ -459,7 +459,7 @@ describe('FacturacionService', () => {
 
     await service.crear(dto({ tipoFactura: tipoFactura as CrearFacturaDto['tipoFactura'] }), 'tenant-1', 'vendedor-1');
 
-    expect(repository.siguienteNcfEnTx).toHaveBeenCalledWith(TX, tipoEcfEsperado);
+    expect(repository.siguienteNcfEnTx).toHaveBeenCalledWith(TX, tipoEcfEsperado, 's1');
   });
 
   describe('tipoComprobanteEspecial (plan de integración Cuadre, ítem B-1)', () => {
@@ -476,7 +476,7 @@ describe('FacturacionService', () => {
         'vendedor-1',
       );
 
-      expect(repository.siguienteNcfEnTx).toHaveBeenCalledWith(TX, tipoNcfEsperado);
+      expect(repository.siguienteNcfEnTx).toHaveBeenCalledWith(TX, tipoNcfEsperado, 's1');
     });
 
     it.each([
@@ -493,7 +493,7 @@ describe('FacturacionService', () => {
         'vendedor-1',
       );
 
-      expect(repository.siguienteNcfEnTx).toHaveBeenCalledWith(TX, tipoEcfEsperado);
+      expect(repository.siguienteNcfEnTx).toHaveBeenCalledWith(TX, tipoEcfEsperado, 's1');
     });
 
     it('se ignora en una Nota de Crédito — siempre usa B04, nunca un tipo especial', async () => {
@@ -506,7 +506,7 @@ describe('FacturacionService', () => {
         'vendedor-1',
       );
 
-      expect(repository.siguienteNcfEnTx).toHaveBeenCalledWith(TX, 'B04');
+      expect(repository.siguienteNcfEnTx).toHaveBeenCalledWith(TX, 'B04', 's1');
     });
   });
 
@@ -588,8 +588,43 @@ describe('FacturacionService', () => {
 
     expect(tenantPrisma.client.$transaction).toHaveBeenCalledTimes(1);
     expect(inventarioService.verificarYDescontarStockEnTx).toHaveBeenCalledWith(TX, expect.anything());
-    expect(repository.siguienteNcfEnTx).toHaveBeenCalledWith(TX, expect.anything());
+    expect(repository.siguienteNcfEnTx).toHaveBeenCalledWith(TX, expect.anything(), 's1');
     expect(repository.crearFacturaEnTx).toHaveBeenCalledWith(TX, expect.anything());
+  });
+
+  describe('umbral de alerta de NCF (plan de integración Cuadre, ítem B-2)', () => {
+    it('emite NCF_POR_AGOTARSE cuando los comprobantes restantes caen al umbral configurado o menos', async () => {
+      repository.obtenerProductoConPrecioVigente.mockResolvedValue(producto(18, 100) as never);
+      repository.crearFacturaEnTx.mockResolvedValue(facturaCreada() as never);
+      repository.siguienteNcfEnTx.mockResolvedValue({ ncf: 'B0200000001', restantes: 5, umbralAlerta: 10, sucursalIdUsado: 's1' } as never);
+
+      await service.crear(dto(), 'tenant-1', 'vendedor-1');
+
+      expect(eventBus.emit).toHaveBeenCalledWith(
+        EVENTOS.NCF_POR_AGOTARSE,
+        expect.objectContaining({ tenantId: 'tenant-1', tipoNcf: 'B02', sucursalId: 's1', restantes: 5, umbralAlerta: 10 }),
+      );
+    });
+
+    it('no emite nada si no hay umbralAlerta configurado', async () => {
+      repository.obtenerProductoConPrecioVigente.mockResolvedValue(producto(18, 100) as never);
+      repository.crearFacturaEnTx.mockResolvedValue(facturaCreada() as never);
+      repository.siguienteNcfEnTx.mockResolvedValue({ ncf: 'B0200000001', restantes: 5, umbralAlerta: null, sucursalIdUsado: 's1' } as never);
+
+      await service.crear(dto(), 'tenant-1', 'vendedor-1');
+
+      expect(eventBus.emit).not.toHaveBeenCalledWith(EVENTOS.NCF_POR_AGOTARSE, expect.anything());
+    });
+
+    it('no emite nada si los restantes todavía están por encima del umbral', async () => {
+      repository.obtenerProductoConPrecioVigente.mockResolvedValue(producto(18, 100) as never);
+      repository.crearFacturaEnTx.mockResolvedValue(facturaCreada() as never);
+      repository.siguienteNcfEnTx.mockResolvedValue({ ncf: 'B0200000001', restantes: 50, umbralAlerta: 10, sucursalIdUsado: 's1' } as never);
+
+      await service.crear(dto(), 'tenant-1', 'vendedor-1');
+
+      expect(eventBus.emit).not.toHaveBeenCalledWith(EVENTOS.NCF_POR_AGOTARSE, expect.anything());
+    });
   });
 
   describe('pago dividido (opciones.pagos)', () => {

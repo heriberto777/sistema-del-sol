@@ -88,10 +88,19 @@ Resumen de lo que cambió (detalle en cada ítem más abajo):
   exterior) que los produciría; agregarlos al enum sin nada que los use
   sería una brecha decorativa. Migración
   `20260821130000_tipo_ncf_especial`. Entregado 2026-08-21.
-- [ ] **B-2** 🟧 — **Secuencias de NCF por sucursal** (hoy `NcfAsignado` es
+- [x] **B-2** 🟧 — **Secuencias de NCF por sucursal** (hoy `NcfAsignado` es
   `@@unique([tenantId, tipoNcf])`, sin sucursal) + **umbral de alerta**
-  configurable ("quedan pocos comprobantes"). *Confirmado: brecha real, sin
-  cambios — el módulo `ncf/` existe pero no tiene ninguno de los dos.*
+  configurable ("quedan pocos comprobantes"). *Confirmado: brecha real —
+  el módulo `ncf/` existe pero no tenía ninguno de los dos.* Entregado:
+  `NcfAsignado.sucursalId` (nullable = compartida, default) +
+  `umbralAlerta` (nullable = sin alerta). `siguienteNcfEnTx` intenta la
+  secuencia de la sucursal de la bodega de la venta primero y cae a la
+  compartida si no existe — cero cambio de comportamiento para un tenant
+  sin secuencias por sucursal. Emite `EVENTOS.NCF_POR_AGOTARSE` (mismo
+  patrón que `stock_bajo`, solo a Admin Total) cuando los restantes caen
+  al umbral. `PATCH /admin/ncf/:id` (antes `:tipoNcf` — ya puede haber
+  varias filas por tipo). Migración `20260826100000_ncf_sucursal_umbral`.
+  Entregado 2026-08-24.
 - [x] **B-3** 🟨 — **Leyes Fiscales**: % del ITBIS a pagar por norma/sector
   (ej. construcción). Decisión del usuario: se ata al **Producto** (no al
   Cliente ni a la Factura) — la reducción depende de QUÉ se vende.
@@ -575,14 +584,14 @@ Resumen de lo que cambió (detalle en cada ítem más abajo):
 ## Sugerencia de por dónde arrancar
 
 Con el catálogo ya corregido, el lote E-3/E-5/E-9/E-11/F-2/F-8/G-1/G-2/
-G-3/G-4/G-5/G-6/G-7/G-8/B-3/B-6/B-7/B-8/J-1/J-2/J-3 entregado y
+G-3/G-4/G-5/G-6/G-7/G-8/B-2/B-3/B-6/B-7/B-8/J-1/J-2/J-3 entregado y
 verificado (tsc + suite unitaria + e2e + lint + build, todo verde), ya
 no quedan ítems con el matiz "ya lo teníamos parcial" original (los 5
 que tenía esa nota — B-1, E-1, E-5, E-11, G-7 — están todos resueltos
 o, en el caso de E-1, siguen como brecha real confirmada sin cambios).
 La sección **G** (RRHH) queda completa salvo G-9 (🟥, depende de
-hardware). De la sección **B** solo quedan B-2 (🟧) y B-5 (🟥, e-CF
-real) sin bloqueo — **B-9 está deliberadamente pausado** (el usuario
+hardware). De la sección **B** solo queda B-5 (🟥, e-CF real) sin
+bloqueo — **B-9 está deliberadamente pausado** (el usuario
 pidió evaluarlo con más calma, no retomar sin avisar) y B-4 (🟧) no es
 bloqueante. La sección **J** queda completa salvo J-4 (🟥, diseño
 primero). Quedan además C-2 (multi-moneda, 🟧), E-4/E-6/E-8 (🟧), F-4

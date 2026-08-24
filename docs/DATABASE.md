@@ -76,7 +76,12 @@ antes de esta fase (default permisivo) — ver ARCHITECTURE.md.
   duplicados (ver ARCHITECTURE.md, "Concurrencia y atomicidad"); el
   incremento relativo sí, porque Postgres lo resuelve contra el valor
   real de la fila en el momento del `UPDATE`, no contra un valor leído
-  antes en JS.
+  antes en JS. `sucursalId`/`umbralAlerta` (plan de integración Cuadre,
+  ítem B-2): `sucursalId` nullable = secuencia compartida (default,
+  `@@unique([tenantId, tipoNcf, sucursalId])` no deduplica los `NULL` a
+  nivel de Postgres, así que "a lo sumo una compartida por tipo" se
+  valida en código — ver ARCHITECTURE.md); `umbralAlerta` nullable = sin
+  alerta configurada.
 - **Precios**: `precios` es un historial — cada cambio cierra el registro
   vigente (`vigenteHasta = now()`) y crea uno nuevo con `vigenteHasta:
   null`. La vigente es siempre `WHERE vigenteHasta IS NULL`.

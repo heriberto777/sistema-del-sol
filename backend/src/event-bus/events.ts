@@ -13,6 +13,7 @@ export const EVENTOS = {
   COTIZACION_ENVIADA: 'cotizaciones.enviada',
   GASTO_MENOR_CREADO: 'gastos_menores.creado',
   LOTE_POR_VENCER: 'inventario.lote_por_vencer',
+  NCF_POR_AGOTARSE: 'ncf.por_agotarse',
 } as const;
 
 export type NombreEvento = (typeof EVENTOS)[keyof typeof EVENTOS];
@@ -106,4 +107,13 @@ export interface LotePorVencerPayload {
   numeroLote: string;
   fechaVencimiento: string;
   cantidadActual: string;
+}
+
+/** Emitido por FacturacionRepository.siguienteNcfEnTx (plan de integración Cuadre, ítem B-2) cuando los comprobantes restantes caen a `umbralAlerta` o menos. */
+export interface NcfPorAgotarsePayload {
+  tenantId: string;
+  tipoNcf: string;
+  sucursalId: string | null;
+  restantes: number;
+  umbralAlerta: number;
 }

@@ -573,17 +573,32 @@ enum EstadoFactura {
   ANULADA
 }
 
+/// `sucursalId` nullable (plan de integración Cuadre, ítem B-2) = secuencia
+/// COMPARTIDA por todas las sucursales (comportamiento histórico, default
+/// para un tenant sin sucursales configuradas o que no necesita separar).
+/// Con sucursales, se puede crear una fila adicional con `sucursalId` fijo
+/// para que esa sucursal emita desde su propio rango — `NcfRepository.
+/// siguienteNcfEnTx` intenta la fila específica de la sucursal primero y
+/// cae a la compartida (`sucursalId: null`) si no existe. A lo sumo UNA
+/// fila compartida por tipo (`@@unique` no lo cubre porque Postgres no
+/// deduplica NULLs — se valida en `NcfService.crear`, mismo criterio de
+/// invariante en código que `PlantillaHorario.predeterminada`).
+/// `umbralAlerta` (nullable = sin alerta) dispara `EVENTOS.NCF_POR_AGOTARSE`
+/// cuando los comprobantes restantes caen a ese nivel o menos.
 model NcfAsignado {
-  id               String   @id @default(uuid())
+  id               String    @id @default(uuid())
   tenantId         String
-  tenant           Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant           Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   tipoNcf          TipoNcf
+  sucursalId       String?
+  sucursal         Sucursal? @relation(fields: [sucursalId], references: [id], onDelete: SetNull)
   secuenciaActual  Int
   secuenciaFinal   Int
   vigenciaHasta    DateTime
-  activo           Boolean  @default(true)
+  umbralAlerta     Int?
+  activo           Boolean   @default(true)
 
-  @@unique([tenantId, tipoNcf])
+  @@unique([tenantId, tipoNcf, sucursalId])
   @@map("ncf_asignados")
 }
 
@@ -1853,8 +1868,9 @@ model Sucursal {
   activa          Boolean  @default(true)
   createdAt       DateTime @default(now())
 
-  bodegas  Bodega[]
-  usuarios UsuarioSucursal[]
+  bodegas      Bodega[]
+  usuarios     UsuarioSucursal[]
+  ncfAsignados NcfAsignado[]
 
   @@unique([tenantId, nombre])
   @@map("sucursales")
