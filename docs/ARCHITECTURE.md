@@ -1819,6 +1819,29 @@ verificar contra la fuente oficial en tiempo real — confirmar contra la
 resolución DGII/TSS vigente antes de procesar nómina real, especialmente
 los topes de TSS (se recalculan cada vez que sube el salario mínimo).
 
+**Tasas de TSS configurables por tenant, ISR NO** (plan de integración
+Cuadre, ítem G-6): las 5 tasas (`SFS_EMPLEADO`/`SFS_EMPLEADOR`/
+`AFP_EMPLEADO`/`AFP_EMPLEADOR`/`INFOTEP_EMPLEADOR`) y los 2 topes
+(`SFS`/`AFP`) de `TASAS_TSS`/`TOPES_TSS` siguen siendo los defaults,
+pero ahora son overrideables por tenant vía `Configuracion`
+(`NOMINA_TASA_*`/`NOMINA_TOPE_*`, mismo patrón `CONFIGURACIONES_BASE` +
+`ConfiguracionesService.buscarValor` que `ASISTENCIA_UMBRAL_HORAS_EXTRA`
+— un tenant sin la fila sembrada cae al default hardcodeado, sin
+backfill). `PeriodosNominaService.generarPeriodo()` las lee una vez por
+llamada y las pasa a `calcularRecibo()`, que ahora las recibe como
+parámetros (`tasasTss`/`topesTss`, default = las constantes) en vez de
+importar `TASAS_TSS`/`TOPES_TSS` directo — mantiene la función pura y
+testeable sin mockear config. **El ISR (`isr.util.ts`,
+`TRAMOS_ISR_ANUAL`) deliberadamente NO se hizo configurable** — decisión
+explícita: el cálculo real por tramos en código ya es una ventaja
+competitiva documentada frente a Cuadre (su modo "Escalonado" admite en
+su propia UI que no es self-service, "se configura en la base de
+datos"), y permitir que un tenant edite los tramos del ISR abriría la
+puerta a errores de cálculo fiscal sin ningún control. Sin panel
+propio — las nuevas claves aparecen automáticamente en el panel
+genérico Admin → Parámetros (`ConfiguracionesPanel.tsx`), igual que
+cualquier otra `Configuracion`.
+
 Los topes y tasas se evalúan siempre sobre el **salario mensual
 completo** del empleado, nunca sobre el monto ya prorrateado — un
 período `QUINCENAL` calcula primero los montos mensuales y recién

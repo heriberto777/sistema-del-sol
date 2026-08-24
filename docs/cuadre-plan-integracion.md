@@ -364,10 +364,20 @@ Resumen de lo que cambió (detalle en cada ítem más abajo):
   panel propios (RRHH → Feriados). Deliberadamente sin efecto automático
   en tardanza/horas extra/nómina todavía — es solo el catálogo.
   Migración `20260824120000_feriados`. Entregado 2026-08-24.
-- [ ] **G-6** 🟧 — **Deducciones de nómina configurables** (AFP/SFS) —
-  **mantener el ISR calculado en código** (`isr.util.ts`). *Confirmado: no
-  existe ningún modelo de deducciones configurables — brecha real, sin
-  cambios en la recomendación de no tocar el ISR.*
+- [x] **G-6** 🟧→🟨 *(alcance reducido)* — **Deducciones de nómina
+  configurables** (AFP/SFS) — **mantener el ISR calculado en código**
+  (`isr.util.ts`). *Confirmado: no existía ningún modelo de deducciones
+  configurables — brecha real.* Entregado: en vez de un modelo nuevo, se
+  reusó el store genérico `Configuracion` (mismo patrón que
+  `ASISTENCIA_UMBRAL_HORAS_EXTRA`) — 7 claves nuevas
+  (`NOMINA_TASA_SFS_EMPLEADO/EMPLEADOR`, `NOMINA_TASA_AFP_EMPLEADO/
+  EMPLEADOR`, `NOMINA_TASA_INFOTEP_EMPLEADOR`, `NOMINA_TOPE_SFS`,
+  `NOMINA_TOPE_AFP`), leídas por `PeriodosNominaService.generarPeriodo()`
+  y pasadas a `calcularRecibo()` (que ahora las recibe como parámetro en
+  vez de importar las constantes directo). Sin panel propio — aparecen
+  solas en Admin → Parámetros. **ISR intacto, sin cambios** — sigue
+  siendo la ventaja competitiva documentada frente a Cuadre. Sin
+  migración (no toca schema). Entregado 2026-08-24.
 - [x] **G-7** 🟨 *(alcance reducido)* — **Nómina: lo que falta de
   período/puesto**. `TipoPeriodoNomina` ganó `SEMANAL` y `BIMENSUAL`
   (`FACTOR_PERIODO_NOMINA` en `nomina-config.ts`): `SEMANAL` = 7 días
@@ -555,26 +565,29 @@ Resumen de lo que cambió (detalle en cada ítem más abajo):
   (6 filas fijas por tenant, una por valor del enum `TipoAusencia`) en
   vez de reemplazar el enum por un catálogo libre (VACACIONES es
   legalmente especial; en RD los tipos de ausencia no son algo que un
-  negocio necesite inventar). Con esto, la sección **G** (RRHH) queda
-  completa salvo G-6 (🟧) y G-9 (🟥, hardware).
+  negocio necesite inventar).
+- **2026-08-24**: entregado G-6 (Deducciones de nómina configurables),
+  alcance reducido de 🟧 a 🟨 — tasas/topes de TSS movidos a
+  `Configuracion` (7 claves nuevas, sin modelo/migración nueva), ISR
+  intacto en código a propósito. Con esto, la sección **G** (RRHH)
+  queda completa salvo G-9 (🟥, hardware).
 
 ## Sugerencia de por dónde arrancar
 
 Con el catálogo ya corregido, el lote E-3/E-5/E-9/E-11/F-2/F-8/G-1/G-2/
-G-3/G-4/G-5/G-7/G-8/B-3/B-6/B-7/B-8/J-1/J-2/J-3 entregado y verificado
-(tsc + suite unitaria + e2e + lint + build, todo verde), ya no quedan
-ítems con el matiz "ya lo teníamos parcial" original (los 5 que tenía
-esa nota — B-1, E-1, E-5, E-11, G-7 — están todos resueltos o, en el
-caso de E-1, siguen como brecha real confirmada sin cambios). La
-sección **G** (RRHH) queda con solo G-6 (🟧, sin bloqueo) y G-9 (🟥,
-depende de hardware) pendientes. De la sección **B** solo quedan B-2
-(🟧) y B-5 (🟥, e-CF real) sin bloqueo — **B-9 está deliberadamente
-pausado** (el usuario pidió evaluarlo con más calma, no retomar sin
-avisar) y B-4 (🟧) no es bloqueante. La sección **J** queda completa
-salvo J-4 (🟥, diseño primero). Quedan además C-2 (multi-moneda, 🟧),
-E-4/E-6/E-8 (🟧), F-4 (🟧) y H-3 (🟧) sin verificar en detalle contra
-el código. Los 🟥 con "diseño primero" conviene agruparlos en su propia
-sesión de planeamiento cuando se prioricen, siguiendo la misma mecánica
-que
+G-3/G-4/G-5/G-6/G-7/G-8/B-3/B-6/B-7/B-8/J-1/J-2/J-3 entregado y
+verificado (tsc + suite unitaria + e2e + lint + build, todo verde), ya
+no quedan ítems con el matiz "ya lo teníamos parcial" original (los 5
+que tenía esa nota — B-1, E-1, E-5, E-11, G-7 — están todos resueltos
+o, en el caso de E-1, siguen como brecha real confirmada sin cambios).
+La sección **G** (RRHH) queda completa salvo G-9 (🟥, depende de
+hardware). De la sección **B** solo quedan B-2 (🟧) y B-5 (🟥, e-CF
+real) sin bloqueo — **B-9 está deliberadamente pausado** (el usuario
+pidió evaluarlo con más calma, no retomar sin avisar) y B-4 (🟧) no es
+bloqueante. La sección **J** queda completa salvo J-4 (🟥, diseño
+primero). Quedan además C-2 (multi-moneda, 🟧), E-4/E-6/E-8 (🟧), F-4
+(🟧) y H-3 (🟧) sin verificar en detalle contra el código. Los 🟥 con
+"diseño primero" conviene agruparlos en su propia sesión de
+planeamiento cuando se prioricen, siguiendo la misma mecánica que
 Sucursales (Fase 8) y PIN (Fase 9): presentar el diseño, resolver casos
 límite, y recién después ejecutar.

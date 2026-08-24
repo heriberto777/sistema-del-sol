@@ -88,4 +88,17 @@ export const CONFIGURACIONES_BASE: Record<string, string> = {
   // de RegistroAsistencia (ver el comentario en el schema).
   ASISTENCIA_UMBRAL_HORAS_EXTRA: '8',
   ASISTENCIA_TOLERANCIA_SALIDA_ANTICIPADA_MIN: '15',
+  // Plan de integración Cuadre, ítem G-6 — tasas/topes de TSS (AFP/SFS)
+  // configurables por tenant, leídos por PeriodosNominaService.generarPeriodo
+  // y pasados a calcularRecibo(). Valores porcentuales (igual convención que
+  // ITBIS_GENERAL/RETENCION_ISR_TASA), defaults = los mismos hardcodeados
+  // en nomina-config.ts (TASAS_TSS/TOPES_TSS). El ISR (isr.util.ts) NO se
+  // hizo configurable a propósito — decisión explícita, ver ARCHITECTURE.md.
+  NOMINA_TASA_SFS_EMPLEADO: '3.04',
+  NOMINA_TASA_SFS_EMPLEADOR: '7.09',
+  NOMINA_TASA_AFP_EMPLEADO: '2.87',
+  NOMINA_TASA_AFP_EMPLEADOR: '7.10',
+  NOMINA_TASA_INFOTEP_EMPLEADOR: '1',
+  NOMINA_TOPE_SFS: '232230',
+  NOMINA_TOPE_AFP: '464460',
 };

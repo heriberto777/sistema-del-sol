@@ -4,12 +4,13 @@ import { EmpleadosRepository } from './empleados.repository';
 import { AusenciasRepository } from './ausencias.repository';
 import { GenerarPeriodoDto } from './dto/generar-periodo.dto';
 import { calcularRecibo } from './calculo-nomina';
-import { DIVISOR_SALARIO_DIARIO, FACTOR_PERIODO_NOMINA } from './nomina-config';
+import { DIVISOR_SALARIO_DIARIO, FACTOR_PERIODO_NOMINA, TASAS_TSS, TOPES_TSS } from './nomina-config';
 import { contarDiasNoDomingo } from './vacaciones.util';
 import { EventBusService } from '../event-bus/event-bus.service';
 import { EVENTOS } from '../event-bus/events';
 import { paginar } from '../common/types/pagina-resultado';
 import { ListarPeriodosNominaQueryDto } from './dto/listar-periodos-nomina-query.dto';
+import { ConfiguracionesService } from '../configuraciones/configuraciones.service';
 
 @Injectable()
 export class PeriodosNominaService {
@@ -18,7 +19,31 @@ export class PeriodosNominaService {
     private readonly empleadosRepository: EmpleadosRepository,
     private readonly ausenciasRepository: AusenciasRepository,
     private readonly eventBus: EventBusService,
+    private readonly configuracionesService: ConfiguracionesService,
   ) {}
+
+  /** Tasas/topes de TSS configurables por tenant (ítem G-6) — cae a TASAS_TSS/TOPES_TSS si el tenant no los personalizó. */
+  private async tasasYTopesTss(tenantId: string) {
+    const [sfsEmpleado, sfsEmpleador, afpEmpleado, afpEmpleador, infotepEmpleador, topeSfs, topeAfp] = await Promise.all([
+      this.configuracionesService.buscarValor('NOMINA_TASA_SFS_EMPLEADO', tenantId, String(TASAS_TSS.SFS_EMPLEADO * 100)),
+      this.configuracionesService.buscarValor('NOMINA_TASA_SFS_EMPLEADOR', tenantId, String(TASAS_TSS.SFS_EMPLEADOR * 100)),
+      this.configuracionesService.buscarValor('NOMINA_TASA_AFP_EMPLEADO', tenantId, String(TASAS_TSS.AFP_EMPLEADO * 100)),
+      this.configuracionesService.buscarValor('NOMINA_TASA_AFP_EMPLEADOR', tenantId, String(TASAS_TSS.AFP_EMPLEADOR * 100)),
+      this.configuracionesService.buscarValor('NOMINA_TASA_INFOTEP_EMPLEADOR', tenantId, String(TASAS_TSS.INFOTEP_EMPLEADOR * 100)),
+      this.configuracionesService.buscarValor('NOMINA_TOPE_SFS', tenantId, String(TOPES_TSS.SFS)),
+      this.configuracionesService.buscarValor('NOMINA_TOPE_AFP', tenantId, String(TOPES_TSS.AFP)),
+    ]);
+    return {
+      tasas: {
+        SFS_EMPLEADO: Number(sfsEmpleado) / 100,
+        SFS_EMPLEADOR: Number(sfsEmpleador) / 100,
+        AFP_EMPLEADO: Number(afpEmpleado) / 100,
+        AFP_EMPLEADOR: Number(afpEmpleador) / 100,
+        INFOTEP_EMPLEADOR: Number(infotepEmpleador) / 100,
+      },
+      topes: { SFS: Number(topeSfs), AFP: Number(topeAfp) },
+    };
+  }
 
   /**
    * Días de ausencia sin goce de sueldo del empleado que se solapan con el
@@ -47,13 +72,17 @@ export class PeriodosNominaService {
     const factorPeriodo = FACTOR_PERIODO_NOMINA[dto.tipo];
     const fechaInicio = new Date(dto.fechaInicio);
     const fechaFin = new Date(dto.fechaFin);
+    const { tasas, topes } = await this.tasasYTopesTss(tenantId);
 
     const recibos = await Promise.all(
       empleados.map(async (empleado) => {
         const salarioBrutoMensual = Number(empleado.salarioBrutoMensual);
         const diasDescuento = await this.diasDescuentoAusencias(empleado.id, fechaInicio, fechaFin);
         const descuentoAusencias = diasDescuento * (salarioBrutoMensual / DIVISOR_SALARIO_DIARIO);
-        return { empleadoId: empleado.id, ...calcularRecibo(salarioBrutoMensual, factorPeriodo, 0, descuentoAusencias) };
+        return {
+          empleadoId: empleado.id,
+          ...calcularRecibo(salarioBrutoMensual, factorPeriodo, 0, descuentoAusencias, tasas, topes),
+        };
       }),
     );
 

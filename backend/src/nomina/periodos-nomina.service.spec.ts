@@ -5,6 +5,7 @@ import { EmpleadosRepository } from './empleados.repository';
 import { AusenciasRepository } from './ausencias.repository';
 import { EventBusService } from '../event-bus/event-bus.service';
 import { EVENTOS } from '../event-bus/events';
+import { ConfiguracionesService } from '../configuraciones/configuraciones.service';
 
 describe('PeriodosNominaService', () => {
   let service: PeriodosNominaService;
@@ -12,13 +13,19 @@ describe('PeriodosNominaService', () => {
   let empleadosRepository: jest.Mocked<EmpleadosRepository>;
   let ausenciasRepository: jest.Mocked<AusenciasRepository>;
   let eventBus: jest.Mocked<EventBusService>;
+  let configuracionesService: jest.Mocked<ConfiguracionesService>;
 
   beforeEach(() => {
     periodosRepository = { crear: jest.fn(), buscarPorId: jest.fn(), listar: jest.fn(), actualizarEstado: jest.fn() } as unknown as jest.Mocked<PeriodosNominaRepository>;
     empleadosRepository = { listarActivos: jest.fn() } as unknown as jest.Mocked<EmpleadosRepository>;
     ausenciasRepository = { listarSinGoceSolapadas: jest.fn().mockResolvedValue([]) } as unknown as jest.Mocked<AusenciasRepository>;
     eventBus = { emit: jest.fn() } as unknown as jest.Mocked<EventBusService>;
-    service = new PeriodosNominaService(periodosRepository, empleadosRepository, ausenciasRepository, eventBus);
+    // buscarValor devuelve siempre el default recibido — mismo comportamiento
+    // que un tenant sin ninguna Configuracion de TSS personalizada (ítem G-6).
+    configuracionesService = {
+      buscarValor: jest.fn((_clave: string, _tenantId: string, valorDefault: string) => Promise.resolve(valorDefault)),
+    } as unknown as jest.Mocked<ConfiguracionesService>;
+    service = new PeriodosNominaService(periodosRepository, empleadosRepository, ausenciasRepository, eventBus, configuracionesService);
   });
 
   describe('listar', () => {
@@ -80,6 +87,19 @@ describe('PeriodosNominaService', () => {
 
       const [llamada] = periodosRepository.crear.mock.calls[0];
       expect(llamada.recibos[0].salarioBruto).toBeCloseTo(35000 * (7 / 23.83), 2);
+    });
+
+    it('usa las tasas de TSS configuradas por el tenant en vez de las hardcodeadas (ítem G-6)', async () => {
+      empleadosRepository.listarActivos.mockResolvedValue([{ id: 'e1', salarioBrutoMensual: 35000 }] as never);
+      periodosRepository.crear.mockResolvedValue({ id: 'p1' } as never);
+      configuracionesService.buscarValor.mockImplementation((clave: string, _t: string, valorDefault: string) =>
+        Promise.resolve(clave === 'NOMINA_TASA_SFS_EMPLEADO' ? '5' : valorDefault),
+      );
+
+      await service.generarPeriodo({ tipo: 'MENSUAL', fechaInicio: '2026-01-01', fechaFin: '2026-01-31' }, 't1');
+
+      const [llamada] = periodosRepository.crear.mock.calls[0];
+      expect(llamada.recibos[0].sfsEmpleado).toBeCloseTo(35000 * 0.05, 2);
     });
 
     it('descuenta salario por ausencias APROBADAS sin goce que se solapan con el período, sin tocar TSS/ISR', async () => {
