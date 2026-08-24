@@ -472,6 +472,20 @@ Resumen de lo que cambió (detalle en cada ítem más abajo):
   conversacional con IA**: bot que responde automáticamente a clientes.
   *Confirmado: brecha real — nuestro canal de WhatsApp solo envía
   notificaciones salientes, sin recepción/respuesta automática.*
+  **Nota del usuario (2026-08-24, decisión pendiente)**: antes de
+  diseñar el flujo de negocio (qué preguntas responde el bot, cuándo
+  escala a un humano, etc.) hay que decidir el mecanismo de recepción/
+  orquestación — el proyecto ya tiene **n8n** self-hosted en
+  `docker-compose.yml`, pero hoy es solo consumidor de los webhooks
+  salientes existentes (`docs/ARCHITECTURE.md`, sección "n8n") — nunca
+  se usó para recibir mensajes entrantes ni orquestar una conversación.
+  Las opciones reales a evaluar cuando se retome: (a) n8n recibe el
+  webhook entrante de Twilio y orquesta todo (llamada a IA, respuesta),
+  dejando el backend de Nest fuera del loop conversacional; (b) un
+  endpoint nuevo en el backend (`POST /webhooks/whatsapp-inbound` o
+  similar) que reusa `IaClientService` directo, sin n8n; (c) un híbrido.
+  Explícitamente diferido — no arrancar el diseño de negocio hasta
+  resolver esto primero.
 - [x] **H-3** 🟧 *(alcance reducido a propósito)* — **Plantillas de
   documentos personalizables** (factura/recibo). *Confirmado: brecha
   real — `documento-pdf.ts`/`documento-ticket.ts` son generadores fijos
