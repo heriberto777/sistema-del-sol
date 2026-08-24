@@ -26,7 +26,7 @@ describe('RemisionesService', () => {
     } as unknown as jest.Mocked<FacturacionService>;
     prisma = {
       bodega: { findFirst: jest.fn().mockResolvedValue(null) },
-      configuracion: { findUnique: jest.fn().mockResolvedValue(null) },
+      configuracion: { findUnique: jest.fn().mockResolvedValue(null), findMany: jest.fn().mockResolvedValue([]) },
     } as unknown as jest.Mocked<PrismaService>;
     variantesService = {
       resolverObligatoria: jest.fn().mockResolvedValue('variante-1'),

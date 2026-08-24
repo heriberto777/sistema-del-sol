@@ -2952,6 +2952,38 @@ endpoint propio: una venta de POS ya es una `Factura` real
 así que un recibo de POS se imprime contra el mismo
 `GET /facturas/:id/imprimir`.
 
+**Personalización de documentos** (plan de integración Cuadre, ítem
+H-3, alcance reducido a propósito): `documento-pdf.ts`/`documento-ticket.ts`
+siguen siendo generadores fijos en código — NO hay editor visual de
+plantillas ni bloques reordenables, eso sería un cambio de arquitectura
+mucho más grande y con mucho menos detalle confirmado en la auditoría
+(Cuadre solo se vio como un ítem de menú, "Plantillas Docs", sin
+explorar qué es editable). Lo que sí se entrega es lo que un negocio
+real pide con más frecuencia: `DocumentoPdfParams` gana `logo?` (data
+URI) y `notaPie?` (texto libre, ej. términos o "gracias por su
+compra"), renderizados en el PDF (logo arriba a la izquierda,
+`fit: [100, 60]`; nota de pie centrada al final) y en el ticket térmico
+(`<img>`/`<div>`, con el mismo escape HTML que el resto del ticket —
+`logo` se valida con `startsWith('data:image/')` antes de interpolarse
+como `src`, para no poder inyectar un `javascript:`/URL arbitraria).
+`resolverPersonalizacionDocumento()` (`backend/src/common/impresion/`,
+función pura, mismo criterio que `resolverFormatoImpresion` —
+`PrismaService` global en vez de inyectar `ConfiguracionesService` en
+cada servicio de documento) lee dos claves nuevas del store genérico
+`Configuracion` (`DOCUMENTO_LOGO`/`DOCUMENTO_NOTA_PIE`) — sin agregarlas
+a `CONFIGURACIONES_BASE` porque no tienen un default útil (vacío = sin
+personalizar) y `ConfiguracionesService.actualizar()` ya hace upsert.
+Un logo corrupto no bloquea la generación del documento (try/catch
+alrededor de `doc.image()`). Panel propio `PersonalizacionDocumentosPanel.tsx`
+(Admin → Configuración general → Documentos, con `CampoImagen` —
+reusado tal cual de `Producto.imagen` — y un textarea) en vez de la
+fila de texto plano del `ConfiguracionesPanel.tsx` genérico: pegar un
+data URI de varios KB en un `<input>` de una línea sería ilegible y
+fácil de corromper sin querer, así que estas 2 claves se excluyen
+explícitamente de esa tabla. Se aplica igual a Facturación/
+Cotizaciones/Remisiones — las 3 comparten `generarImpreso()` con la
+misma forma.
+
 ## IA (asistente de negocio, transversal a varios módulos)
 
 `backend/src/ia/` no es un módulo de negocio propio — son tres

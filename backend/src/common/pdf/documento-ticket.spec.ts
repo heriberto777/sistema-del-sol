@@ -61,4 +61,60 @@ describe('generarDocumentoTicketHtml', () => {
     expect(html).toContain('&lt;script&gt;');
     expect(html).toContain('&lt;img src=x');
   });
+
+  describe('personalización (plan de integración Cuadre, ítem H-3)', () => {
+    it('incluye el logo como <img> cuando es un data URI de imagen válido', () => {
+      const html = generarDocumentoTicketHtml(
+        {
+          tipoDocumento: 'Factura de venta',
+          numero: 'B0200000001',
+          fecha: new Date('2026-01-15'),
+          cliente: 'Cliente Demo',
+          lineas: [{ concepto: 'Producto A', cantidad: '1', precioUnitario: '10.00', total: '10.00' }],
+          subtotal: 10,
+          total: 10,
+          logo: 'data:image/png;base64,abc123',
+        },
+        'TERMICA_80MM',
+      );
+
+      expect(html).toContain('<img class="logo" src="data:image/png;base64,abc123"');
+    });
+
+    it('ignora un logo que no es un data URI de imagen (evita inyectar un src arbitrario)', () => {
+      const html = generarDocumentoTicketHtml(
+        {
+          tipoDocumento: 'Factura de venta',
+          numero: 'B0200000001',
+          fecha: new Date('2026-01-15'),
+          cliente: 'Cliente Demo',
+          lineas: [{ concepto: 'Producto A', cantidad: '1', precioUnitario: '10.00', total: '10.00' }],
+          subtotal: 10,
+          total: 10,
+          logo: 'javascript:alert(1)',
+        },
+        'TERMICA_80MM',
+      );
+
+      expect(html).not.toContain('<img');
+    });
+
+    it('incluye la nota de pie escapada', () => {
+      const html = generarDocumentoTicketHtml(
+        {
+          tipoDocumento: 'Factura de venta',
+          numero: 'B0200000001',
+          fecha: new Date('2026-01-15'),
+          cliente: 'Cliente Demo',
+          lineas: [{ concepto: 'Producto A', cantidad: '1', precioUnitario: '10.00', total: '10.00' }],
+          subtotal: 10,
+          total: 10,
+          notaPie: 'Gracias por su compra',
+        },
+        'TERMICA_80MM',
+      );
+
+      expect(html).toContain('<div class="nota-pie">Gracias por su compra</div>');
+    });
+  });
 });

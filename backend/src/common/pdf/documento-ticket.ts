@@ -73,10 +73,13 @@ export function generarDocumentoTicketHtml(params: DocumentoPdfParams, ancho: An
   .totales { margin-top: 6px; }
   .totales .total { font-weight: bold; }
   .notas { margin-top: 8px; }
+  .nota-pie { margin-top: 8px; text-align: center; }
+  .logo { max-width: 60%; max-height: 60px; margin-bottom: 4px; }
 </style>
 </head>
 <body>
   <div class="encabezado">
+    ${params.logo?.startsWith('data:image/') ? `<img class="logo" src="${e(params.logo)}" alt="">` : ''}
     <h1>${e(params.tipoDocumento)}</h1>
     <p>Número: ${e(params.numero)}</p>
     <p>Fecha: ${e(params.fecha.toLocaleDateString('es-DO'))}</p>
@@ -86,6 +89,7 @@ export function generarDocumentoTicketHtml(params: DocumentoPdfParams, ancho: An
   ${lineasHtml}
   ${totalesHtml ? `<hr>${totalesHtml}` : ''}
   ${params.notas ? `<div class="notas">Notas: ${e(params.notas)}</div>` : ''}
+  ${params.notaPie ? `<div class="nota-pie">${e(params.notaPie)}</div>` : ''}
   <script>window.onload = () => window.print();</script>
 </body>
 </html>`;

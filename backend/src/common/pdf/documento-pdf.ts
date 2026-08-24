@@ -24,6 +24,9 @@ export interface DocumentoPdfParams {
   itbis?: number;
   total?: number;
   notas?: string;
+  /** Personalización de documentos (plan de integración Cuadre, ítem H-3) — logo como data URI y texto libre de pie de página. */
+  logo?: string;
+  notaPie?: string;
 }
 
 /**
@@ -45,6 +48,16 @@ export function generarDocumentoPdf(
     doc.on('error', reject);
 
     const anchoUtil = doc.page.width - MARGEN * 2;
+
+    if (params.logo) {
+      try {
+        const base64 = params.logo.includes(',') ? params.logo.split(',')[1] : params.logo;
+        doc.image(Buffer.from(base64, 'base64'), MARGEN, doc.y, { fit: [100, 60] });
+        doc.moveDown(4.5);
+      } catch {
+        // Logo corrupto o formato no soportado por pdfkit — no bloquea la generación del documento.
+      }
+    }
 
     doc.font('Helvetica-Bold').fontSize(18).text(params.tipoDocumento, { width: anchoUtil });
     doc.font('Helvetica').fontSize(10);
@@ -108,6 +121,11 @@ export function generarDocumentoPdf(
     if (params.notas) {
       doc.moveDown();
       doc.font('Helvetica').fontSize(9).text(`Notas: ${params.notas}`);
+    }
+
+    if (params.notaPie) {
+      doc.moveDown();
+      doc.font('Helvetica').fontSize(8).text(params.notaPie, { width: anchoUtil, align: 'center' });
     }
 
     doc.end();

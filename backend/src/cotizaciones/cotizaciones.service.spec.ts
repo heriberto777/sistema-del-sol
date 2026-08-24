@@ -51,7 +51,7 @@ describe('CotizacionesService', () => {
     eventBus = { emit: jest.fn(), on: jest.fn() } as unknown as jest.Mocked<EventBusService>;
     prisma = {
       bodega: { findFirst: jest.fn().mockResolvedValue(null) },
-      configuracion: { findUnique: jest.fn().mockResolvedValue(null) },
+      configuracion: { findUnique: jest.fn().mockResolvedValue(null), findMany: jest.fn().mockResolvedValue([]) },
     } as unknown as jest.Mocked<PrismaService>;
     service = new CotizacionesService(repository, facturacionService, clientesService, variantesService, ofertasService, eventBus, prisma);
   });

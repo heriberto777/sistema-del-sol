@@ -174,10 +174,23 @@ Resumen de lo que cambió (detalle en cada ítem más abajo):
   que un cliente le pague a un tenant en su POS. El patrón de adaptador es
   reusable como referencia de diseño, pero no hay nada construido para
   este caso.*
-- [ ] **C-2** 🟧 — **Multi-moneda de punta a punta**. *Confirmado: brecha
-  real en comportamiento — existe un campo `TenantSettings.moneda` (String,
-  default "DOP") pero no se lee/usa en ningún lado del backend; es un
-  campo muerto, no una feature.*
+- [ ] **C-2** 🟧→🟥 *(corrección — diseño primero)* — **Multi-moneda de
+  punta a punta**. *Confirmado: brecha real en comportamiento —
+  `TenantSettings.moneda` (String, default "DOP") es un campo muerto,
+  no se lee/usa en ningún lado del backend. Pero "de punta a punta"
+  resultó ser más grande de lo catalogado al verificar el alcance real:
+  ni `Factura`/`LineaFactura` ni `AsientoContable`/`LineaAsiento` ni
+  `Producto.precios` tienen NINGUNA columna de moneda hoy — todo el
+  sistema asume DOP implícito. Hacerlo real de punta a punta exige
+  decisiones de diseño no triviales antes de tocar código: (1) si una
+  venta en moneda extranjera necesita guardar tasa de cambio +
+  equivalente en DOP (obligatorio para reportes DGII/NCF, que exigen
+  montos en DOP); (2) si la contabilidad postea siempre en DOP con
+  ganancia/pérdida cambiaria, o si se permite un libro mayor
+  multi-moneda; (3) si precios/costos de inventario se cotizan en
+  varias monedas o siempre en DOP con conversión al vender. Es una
+  decisión de alcance comparable a A-2/D-1 (ya 🟥), no un campo o
+  parámetro suelto — reclasificado, NO implementado.*
 
 ## D — Autorización de acciones sensibles
 
@@ -459,9 +472,18 @@ Resumen de lo que cambió (detalle en cada ítem más abajo):
   conversacional con IA**: bot que responde automáticamente a clientes.
   *Confirmado: brecha real — nuestro canal de WhatsApp solo envía
   notificaciones salientes, sin recepción/respuesta automática.*
-- [ ] **H-3** 🟧 — **Plantillas de documentos personalizables** (factura/
-  recibo). *Confirmado: brecha real — `documento-pdf.ts`/`documento-ticket.ts`
-  son generadores fijos en código, sin ningún editor.*
+- [x] **H-3** 🟧 *(alcance reducido a propósito)* — **Plantillas de
+  documentos personalizables** (factura/recibo). *Confirmado: brecha
+  real — `documento-pdf.ts`/`documento-ticket.ts` son generadores fijos
+  en código, sin ningún editor. Matiz: en la auditoría, "Plantillas
+  Docs" solo se vio como ítem de menú en Cuadre, nunca se exploró qué es
+  editable — un editor visual completo sería una brecha de alcance
+  desconocido, no algo para implementar a ciegas.* Entregado: logo +
+  nota de pie configurables (Admin → Configuración general →
+  Documentos), aplicados a Facturación/Cotizaciones/Remisiones (PDF y
+  ticket térmico). Guardado en el store genérico `Configuracion`
+  (`DOCUMENTO_LOGO`/`DOCUMENTO_NOTA_PIE`), sin claves nuevas en
+  `CONFIGURACIONES_BASE`. Sin migración. Entregado 2026-08-24.
 
 ## I — Contabilidad
 
@@ -611,26 +633,56 @@ Resumen de lo que cambió (detalle en cada ítem más abajo):
   `Configuracion` (7 claves nuevas, sin modelo/migración nueva), ISR
   intacto en código a propósito. Con esto, la sección **G** (RRHH)
   queda completa salvo G-9 (🟥, hardware).
+- **2026-08-24**: entregados B-2 (Secuencias de NCF por sucursal +
+  umbral de alerta), F-4 (Entrega manual del recibo por email/
+  WhatsApp), E-4 (Alertas de inventario segmentadas en el dashboard),
+  E-8 (Producto: campos avanzados, alcance reducido — precioVariable/
+  esIngrediente/permiteDevolucion, sin "Requiere OTP"/presentación de
+  compra/códigos alternos múltiples) y E-6 (Cierres de caja como
+  dashboard — estado PENDIENTE_REVISION, desglose por forma de pago,
+  reporte-dashboard).
+- **2026-08-24**: reclasificado C-2 (Multi-moneda de punta a punta) de
+  🟧 a 🟥 *diseño primero* al verificar el alcance real — ninguna tabla
+  de negocio (`Factura`/`AsientoContable`/`Producto.precios`) tiene
+  columna de moneda hoy, es una decisión de arquitectura (tasa de
+  cambio, ganancia/pérdida cambiaria, reportes DGII en DOP obligatorio),
+  no un campo suelto. NO implementado.
+- **2026-08-24**: entregado H-3 (Plantillas de documentos
+  personalizables), alcance reducido a propósito — logo + nota de pie
+  configurables (Admin → Documentos), aplicados a Facturación/
+  Cotizaciones/Remisiones (PDF y ticket térmico). Un editor visual
+  completo de plantillas queda fuera — en la auditoría, "Plantillas
+  Docs" de Cuadre solo se vio como ítem de menú, nunca se exploró qué es
+  editable. **Con este lote, todo el catálogo 🟨/🟧 sin "diseño primero"
+  queda entregado** — lo único pendiente son los 🟥 (requieren diseño
+  primero) y B-9/B-4/E-1 (pausados o no bloqueantes, ver "Sugerencia de
+  por dónde arrancar").
 
 ## Sugerencia de por dónde arrancar
 
-Con el catálogo ya corregido, el lote E-3/E-5/E-9/E-11/F-2/F-4/F-8/G-1/
-G-2/G-3/G-4/G-5/G-6/G-7/G-8/B-2/B-3/B-6/B-7/B-8/J-1/J-2/J-3 entregado y
-verificado (tsc + suite unitaria + e2e + lint + build, todo verde), ya
-no quedan ítems con el matiz "ya lo teníamos parcial" original (los 5
-que tenía esa nota — B-1, E-1, E-5, E-11, G-7 — están todos resueltos
-o, en el caso de E-1, siguen como brecha real confirmada sin cambios).
-La sección **G** (RRHH) queda completa salvo G-9 (🟥, depende de
-hardware). De la sección **B** solo queda B-5 (🟥, e-CF real) sin
-bloqueo — **B-9 está deliberadamente pausado** (el usuario
-pidió evaluarlo con más calma, no retomar sin avisar) y B-4 (🟧) no es
-bloqueante. La sección **J** queda completa salvo J-4 (🟥, diseño
-primero). La sección **F** queda completa salvo F-9 (🟥, diseño
-primero). La sección **E** (Inventario/POS/Clientes) queda completa
-salvo E-1 (matiz, brecha real confirmada) y E-7 (🟥, diseño primero).
-Quedan además C-2 (multi-moneda, 🟧) y H-3 (🟧) sin verificar en detalle
-contra el código. Los 🟥 con "diseño
-primero" conviene agruparlos en su propia sesión de planeamiento cuando
-se prioricen, siguiendo la misma mecánica que Sucursales (Fase 8) y PIN
-(Fase 9): presentar el diseño, resolver casos límite, y recién después
-ejecutar.
+**Estado actual: todo el catálogo 🟨/🟧 sin "diseño primero" está
+entregado.** Lote completo: B-1/B-2/B-3/B-6/B-7/B-8, E-2/E-3/E-4/E-5/
+E-6/E-8/E-9/E-11, F-2/F-4/F-5/F-8, G-1/G-2/G-3/G-4/G-5/G-6/G-7/G-8,
+H-3, J-1/J-2/J-3 — todos verificados (tsc + suite unitaria + e2e + lint
++ build, todo verde) y commiteados uno por uno. Los 5 ítems que tenían
+el matiz "ya lo teníamos parcial" original (B-1, E-1, E-5, E-11, G-7)
+están todos resueltos o, en el caso de E-1, confirmados como brecha
+real sin cambios de alcance.
+
+Lo que queda, por categoría:
+- **Deliberadamente pausado a pedido del usuario**: B-9 (línea manual/
+  libre en factura) — NO retomar sin que el usuario lo traiga de nuevo.
+- **No bloqueante, sin implementar**: B-4 (Recargos de Factura, 🟨→🟧
+  corrección de tamaño), E-1 (Patrón Borrador→Confirmado en Compras/
+  Ajustes/Transferencias, matiz).
+- **Reclasificados a "diseño primero" al verificar el alcance real**
+  (mismo criterio que los 🟥 originales — no son campos sueltos):
+  C-2 (multi-moneda de punta a punta, 🟧→🟥) y J-4 (API keys, ya no
+  aplica sin una API pública) se sumaron a la lista original de 🟥:
+  A-1 a A-4, B-5, C-1, D-1, E-7, F-9, G-9 (hardware), H-2, I-1.
+
+Todos los 🟥 restantes necesitan una conversación de alcance ANTES de
+tocar código — mismo criterio que Sucursales (Fase 8) y PIN (Fase 9):
+presentar el diseño, resolver casos límite con el usuario, y recién
+después ejecutar. Ninguno se debe empezar a implementar directo desde
+este documento.

@@ -9,6 +9,7 @@ import { paginar } from '../common/types/pagina-resultado';
 import { DocumentoPdfParams, generarDocumentoPdf } from '../common/pdf/documento-pdf';
 import { generarDocumentoTicketHtml } from '../common/pdf/documento-ticket';
 import { resolverFormatoImpresion } from '../common/impresion/resolver-formato-impresion';
+import { resolverPersonalizacionDocumento } from '../common/impresion/resolver-personalizacion-documento';
 import { PrismaService } from '../prisma/prisma.service';
 import { FormatoImpresion } from '@prisma/client';
 
@@ -116,8 +117,11 @@ export class RemisionesService {
 
   async generarImpreso(id: string, formatoSolicitado: FormatoImpresion | undefined, tenantId: string) {
     const remision = await this.remisionesRepository.buscarPorId(id);
-    const formato = formatoSolicitado ?? (await resolverFormatoImpresion(this.prisma, tenantId, remision.bodegaId));
-    const params = this.mapearRemisionAParams(remision);
+    const [formato, personalizacion] = await Promise.all([
+      formatoSolicitado ?? resolverFormatoImpresion(this.prisma, tenantId, remision.bodegaId),
+      resolverPersonalizacionDocumento(this.prisma, tenantId),
+    ]);
+    const params = { ...this.mapearRemisionAParams(remision), ...personalizacion };
 
     if (formato === 'TERMICA_80MM' || formato === 'TERMICA_58MM') {
       return { buffer: Buffer.from(generarDocumentoTicketHtml(params, formato), 'utf-8'), contentType: 'text/html; charset=utf-8' };

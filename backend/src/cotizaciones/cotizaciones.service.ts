@@ -14,6 +14,7 @@ import { EVENTOS } from '../event-bus/events';
 import { DocumentoPdfParams, generarDocumentoPdf } from '../common/pdf/documento-pdf';
 import { generarDocumentoTicketHtml } from '../common/pdf/documento-ticket';
 import { resolverFormatoImpresion } from '../common/impresion/resolver-formato-impresion';
+import { resolverPersonalizacionDocumento } from '../common/impresion/resolver-personalizacion-documento';
 import { PrismaService } from '../prisma/prisma.service';
 import { FormatoImpresion } from '@prisma/client';
 
@@ -200,8 +201,11 @@ export class CotizacionesService {
   /** Cotización no tiene bodegaId (no toca stock hasta convertirse en factura) — solo aplica el default de tenant. */
   async generarImpreso(id: string, formatoSolicitado: FormatoImpresion | undefined, tenantId: string) {
     const cotizacion = await this.cotizacionesRepository.buscarPorId(id);
-    const formato = formatoSolicitado ?? (await resolverFormatoImpresion(this.prisma, tenantId, null));
-    const params = this.mapearCotizacionAParams(cotizacion);
+    const [formato, personalizacion] = await Promise.all([
+      formatoSolicitado ?? resolverFormatoImpresion(this.prisma, tenantId, null),
+      resolverPersonalizacionDocumento(this.prisma, tenantId),
+    ]);
+    const params = { ...this.mapearCotizacionAParams(cotizacion), ...personalizacion };
 
     if (formato === 'TERMICA_80MM' || formato === 'TERMICA_58MM') {
       return { buffer: Buffer.from(generarDocumentoTicketHtml(params, formato), 'utf-8'), contentType: 'text/html; charset=utf-8' };

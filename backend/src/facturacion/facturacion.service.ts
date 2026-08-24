@@ -21,6 +21,7 @@ import { generarDocumentoTicketHtml } from '../common/pdf/documento-ticket';
 import { NotificacionesService } from '../notificaciones/notificaciones.service';
 import { EnviarReciboDto } from './dto/enviar-recibo.dto';
 import { resolverFormatoImpresion } from '../common/impresion/resolver-formato-impresion';
+import { resolverPersonalizacionDocumento } from '../common/impresion/resolver-personalizacion-documento';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthService } from '../auth/auth.service';
 
@@ -479,8 +480,11 @@ export class FacturacionService {
 
   async generarImpreso(id: string, formatoSolicitado: FormatoImpresion | undefined, tenantId: string) {
     const factura = await this.facturacionRepository.buscarPorId(id);
-    const formato = formatoSolicitado ?? (await resolverFormatoImpresion(this.prisma, tenantId, factura.bodegaId));
-    const params = this.mapearFacturaAParams(factura);
+    const [formato, personalizacion] = await Promise.all([
+      formatoSolicitado ?? resolverFormatoImpresion(this.prisma, tenantId, factura.bodegaId),
+      resolverPersonalizacionDocumento(this.prisma, tenantId),
+    ]);
+    const params = { ...this.mapearFacturaAParams(factura), ...personalizacion };
 
     if (formato === 'TERMICA_80MM' || formato === 'TERMICA_58MM') {
       return { buffer: Buffer.from(generarDocumentoTicketHtml(params, formato), 'utf-8'), contentType: 'text/html; charset=utf-8' };

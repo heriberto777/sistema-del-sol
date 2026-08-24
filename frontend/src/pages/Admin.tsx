@@ -13,6 +13,7 @@ import { OfertasPanel } from '../components/organisms/OfertasPanel/OfertasPanel'
 import { BonosPanel } from '../components/organisms/BonosPanel/BonosPanel';
 import { CategoriasClientePanel } from '../components/organisms/CategoriasClientePanel/CategoriasClientePanel';
 import { LeyesFiscalesPanel } from '../components/organisms/LeyesFiscalesPanel/LeyesFiscalesPanel';
+import { PersonalizacionDocumentosPanel } from '../components/organisms/PersonalizacionDocumentosPanel/PersonalizacionDocumentosPanel';
 import { useAuth } from '../hooks/useAuth';
 
 interface Pestana {
@@ -66,7 +67,10 @@ const CATEGORIAS: Categoria[] = [
     id: 'general',
     etiqueta: 'Configuración general',
     descripcion: 'Parámetros del tenant (ITBIS, plazos, stock mínimo).',
-    pestanas: [{ id: 'configuracion', etiqueta: 'Parámetros', permiso: 'admin.configuracion', panel: ConfiguracionesPanel }],
+    pestanas: [
+      { id: 'configuracion', etiqueta: 'Parámetros', permiso: 'admin.configuracion', panel: ConfiguracionesPanel },
+      { id: 'documentos', etiqueta: 'Documentos', permiso: 'admin.configuracion', panel: PersonalizacionDocumentosPanel },
+    ],
   },
   {
     id: 'integraciones',

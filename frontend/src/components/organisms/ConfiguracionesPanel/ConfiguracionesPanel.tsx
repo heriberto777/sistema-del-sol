@@ -14,6 +14,11 @@ interface Configuracion {
 
 const CLAVE_FORMATO_IMPRESION_DEFAULT = 'FORMATO_IMPRESION_DEFAULT';
 
+// Ítem H-3 — logo/nota de pie tienen su propio panel con widgets adecuados
+// (CampoImagen, textarea) en vez de este input de una línea; un data URI de
+// logo acá sería ilegible y fácil de corromper por accidente al editarlo.
+const CLAVES_CON_PANEL_PROPIO = new Set(['DOCUMENTO_LOGO', 'DOCUMENTO_NOTA_PIE']);
+
 function FilaConfiguracion({ configuracion }: { configuracion: Configuracion }) {
   const queryClient = useQueryClient();
   const [valor, setValor] = useState(configuracion.valor);
@@ -72,9 +77,11 @@ export function ConfiguracionesPanel() {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-            {configuraciones?.map((configuracion) => (
-              <FilaConfiguracion key={configuracion.clave} configuracion={configuracion} />
-            ))}
+            {configuraciones
+              ?.filter((c) => !CLAVES_CON_PANEL_PROPIO.has(c.clave))
+              .map((configuracion) => (
+                <FilaConfiguracion key={configuracion.clave} configuracion={configuracion} />
+              ))}
           </tbody>
         </table>
       </div>
