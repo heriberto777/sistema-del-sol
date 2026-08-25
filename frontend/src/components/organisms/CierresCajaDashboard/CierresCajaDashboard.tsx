@@ -35,7 +35,7 @@ export function CierresCajaDashboard() {
 
   return (
     <div className="space-y-3">
-      <Card className="flex flex-wrap items-end gap-3 p-4">
+      <Card contentClassName="flex flex-wrap items-end gap-3">
         <FormField id="cierres-desde" label="Desde" type="date" value={desde} onChange={(e) => setDesde(e.target.value)} className="w-40" />
         <FormField id="cierres-hasta" label="Hasta" type="date" value={hasta} onChange={(e) => setHasta(e.target.value)} className="w-40" />
       </Card>

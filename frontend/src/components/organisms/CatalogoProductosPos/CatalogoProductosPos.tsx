@@ -103,7 +103,7 @@ export function CatalogoProductosPos({
   }
 
   return (
-    <Card sinPadding className="flex h-full flex-col">
+    <Card sinPadding className="h-full" contentClassName="flex h-full flex-col">
       <div className="space-y-2 border-b border-slate-200 p-3 dark:border-slate-800">
         <div className="flex items-center gap-2">
           <div className="flex-1">

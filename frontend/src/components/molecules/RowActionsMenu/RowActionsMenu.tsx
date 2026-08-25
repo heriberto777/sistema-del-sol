@@ -1,53 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import clsx from 'clsx';
-import {
-  Ban,
-  Banknote,
-  Check,
-  CheckCircle2,
-  Eye,
-  FileText,
-  type LucideIcon,
-  MoreVertical,
-  PackageCheck,
-  Pencil,
-  Printer,
-  Send,
-  Tag,
-  Trash2,
-  Undo2,
-  X,
-} from 'lucide-react';
+import { MoreVertical, type LucideIcon } from 'lucide-react';
+import { inferirIconoAccion } from '../../../lib/inferir-icono-accion';
 
 interface Accion {
   etiqueta: string;
   onClick: () => void;
   tono?: 'peligro';
-  /** Si se omite, se infiere de la etiqueta (ver INFERENCIA_ICONO) — no hace falta tocar cada llamado para tener íconos consistentes. */
+  /** Si se omite, se infiere de la etiqueta (ver `inferirIconoAccion`) — no hace falta tocar cada llamado para tener íconos consistentes. */
   icono?: LucideIcon;
-}
-
-/** Orden de evaluación importa: la primera coincidencia gana (ej. "Ver detalle" no debe caer en "detalle" si hubiera dos reglas ambiguas). */
-const INFERENCIA_ICONO: [RegExp, LucideIcon][] = [
-  [/imprimir/i, Printer],
-  [/^ver\b|ver detalle|ver entregas/i, Eye],
-  [/eliminar/i, Trash2],
-  [/anular|rechazar/i, Ban],
-  [/editar/i, Pencil],
-  [/aceptar|marcar entregada|marcar pagado/i, CheckCircle2],
-  [/enviar/i, Send],
-  [/cobro|pago/i, Banknote],
-  [/recibir/i, PackageCheck],
-  [/devolver/i, Undo2],
-  [/convertir/i, FileText],
-  [/precio/i, Tag],
-  [/confirmar/i, Check],
-  [/cancelar|cerrar/i, X],
-];
-
-function inferirIcono(etiqueta: string): LucideIcon | undefined {
-  return INFERENCIA_ICONO.find(([patron]) => patron.test(etiqueta))?.[1];
 }
 
 /**
@@ -114,7 +76,7 @@ export function RowActionsMenu({ acciones }: { acciones: Accion[] }) {
             className="z-50 w-44 rounded-md border border-slate-200 bg-white py-1 shadow-lg dark:border-slate-800 dark:bg-slate-900"
           >
             {acciones.map((accion) => {
-              const Icono = accion.icono ?? inferirIcono(accion.etiqueta);
+              const Icono = accion.icono ?? inferirIconoAccion(accion.etiqueta);
               return (
                 <button
                   key={accion.etiqueta}

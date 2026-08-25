@@ -107,7 +107,7 @@ export function TurnosCajaTable({ seleccionadoId, onSeleccionar }: TurnosCajaTab
         {tienePermiso('pos.editar') && <Button onClick={() => setModalAbrirTurno(true)}>Abrir turno</Button>}
       </div>
 
-      <Card className="flex flex-wrap items-end gap-3 p-4">
+      <Card contentClassName="flex flex-wrap items-end gap-3">
         <div>
           <label className="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">Cajero</label>
           <select
