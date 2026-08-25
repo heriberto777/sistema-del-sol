@@ -2,9 +2,17 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { PeriodosNominaRepository } from './periodos-nomina.repository';
 import { EmpleadosRepository } from './empleados.repository';
 import { AusenciasRepository } from './ausencias.repository';
+import { AsistenciaRepository } from './asistencia.repository';
 import { GenerarPeriodoDto } from './dto/generar-periodo.dto';
 import { calcularRecibo } from './calculo-nomina';
-import { DIVISOR_SALARIO_DIARIO, FACTOR_PERIODO_NOMINA, TASAS_TSS, TOPES_TSS } from './nomina-config';
+import {
+  DIVISOR_SALARIO_DIARIO,
+  FACTOR_PERIODO_NOMINA,
+  HORAS_JORNADA_DIARIA,
+  RECARGO_HORAS_EXTRA,
+  TASAS_TSS,
+  TOPES_TSS,
+} from './nomina-config';
 import { contarDiasNoDomingo } from './vacaciones.util';
 import { EventBusService } from '../event-bus/event-bus.service';
 import { EVENTOS } from '../event-bus/events';
@@ -18,6 +26,7 @@ export class PeriodosNominaService {
     private readonly periodosRepository: PeriodosNominaRepository,
     private readonly empleadosRepository: EmpleadosRepository,
     private readonly ausenciasRepository: AusenciasRepository,
+    private readonly asistenciaRepository: AsistenciaRepository,
     private readonly eventBus: EventBusService,
     private readonly configuracionesService: ConfiguracionesService,
   ) {}
@@ -77,11 +86,16 @@ export class PeriodosNominaService {
     const recibos = await Promise.all(
       empleados.map(async (empleado) => {
         const salarioBrutoMensual = Number(empleado.salarioBrutoMensual);
-        const diasDescuento = await this.diasDescuentoAusencias(empleado.id, fechaInicio, fechaFin);
+        const [diasDescuento, horasExtraSumadas] = await Promise.all([
+          this.diasDescuentoAusencias(empleado.id, fechaInicio, fechaFin),
+          this.asistenciaRepository.sumarHorasExtraEnRango(empleado.id, fechaInicio, fechaFin),
+        ]);
         const descuentoAusencias = diasDescuento * (salarioBrutoMensual / DIVISOR_SALARIO_DIARIO);
+        const valorHoraOrdinaria = salarioBrutoMensual / DIVISOR_SALARIO_DIARIO / HORAS_JORNADA_DIARIA;
+        const montoHorasExtra = horasExtraSumadas * valorHoraOrdinaria * RECARGO_HORAS_EXTRA;
         return {
           empleadoId: empleado.id,
-          ...calcularRecibo(salarioBrutoMensual, factorPeriodo, 0, descuentoAusencias, tasas, topes),
+          ...calcularRecibo(salarioBrutoMensual, factorPeriodo, 0, descuentoAusencias, montoHorasExtra, tasas, topes),
         };
       }),
     );
@@ -131,6 +145,7 @@ export class PeriodosNominaService {
         | 'isr'
         | 'otrasDeducciones'
         | 'descuentoAusencias'
+        | 'montoHorasExtra'
         | 'salarioNeto'
         | 'sfsEmpleador'
         | 'afpEmpleador'
@@ -146,6 +161,7 @@ export class PeriodosNominaService {
       totalIsr: String(sumar('isr')),
       totalOtrasDeducciones: String(sumar('otrasDeducciones')),
       totalDescuentoAusencias: String(sumar('descuentoAusencias')),
+      totalHorasExtra: String(sumar('montoHorasExtra')),
       totalSalarioNeto: String(sumar('salarioNeto')),
       totalSfsEmpleador: String(sumar('sfsEmpleador')),
       totalAfpEmpleador: String(sumar('afpEmpleador')),

@@ -21,6 +21,7 @@ export interface ReciboCalculado {
   isr: number;
   otrasDeducciones: number;
   descuentoAusencias: number;
+  montoHorasExtra: number;
   salarioNeto: number;
   sfsEmpleador: number;
   afpEmpleador: number;
@@ -49,11 +50,22 @@ export interface ReciboCalculado {
  * personalizó). El ISR (`calcularIsrMensual`) NO se hizo configurable a
  * propósito — decisión explícita, ver ARCHITECTURE.md.
  */
+/**
+ * `montoHorasExtra` (ya en RD$, no horas — ver
+ * `PeriodosNominaService.generarPeriodo`) se SUMA al neto en el mismo punto
+ * final que `descuentoAusencias`/`otrasDeducciones` se restan — no toca la
+ * base de TSS/ISR. Simplificación deliberada: legalmente el pago de horas
+ * extra sí suele integrar el salario cotizable de TSS en RD, pero eso
+ * requiere verificación contra fuente oficial antes de nómina real (mismo
+ * disclaimer que el resto de `nomina-config.ts`) — se prefirió no arriesgar
+ * el cálculo de TSS/ISR ya en producción por esta feature nueva.
+ */
 export function calcularRecibo(
   salarioBrutoMensual: number,
   factorPeriodo: number,
   otrasDeducciones = 0,
   descuentoAusencias = 0,
+  montoHorasExtra = 0,
   tasasTss: TasasTss = TASAS_TSS,
   topesTss: TopesTss = TOPES_TSS,
 ): ReciboCalculado {
@@ -84,7 +96,8 @@ export function calcularRecibo(
     isr,
     otrasDeducciones,
     descuentoAusencias,
-    salarioNeto: salarioBruto - sfsEmpleado - afpEmpleado - isr - otrasDeducciones - descuentoAusencias,
+    montoHorasExtra,
+    salarioNeto: salarioBruto - sfsEmpleado - afpEmpleado - isr - otrasDeducciones - descuentoAusencias + montoHorasExtra,
     sfsEmpleador,
     afpEmpleador,
     infotep,

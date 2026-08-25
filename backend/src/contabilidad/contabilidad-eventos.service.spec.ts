@@ -208,6 +208,7 @@ describe('ContabilidadEventosService', () => {
         totalIsr: 0,
         totalOtrasDeducciones: 0,
         totalDescuentoAusencias: 0,
+        totalHorasExtra: 0,
         totalSalarioNeto: 32931.5,
         totalSfsEmpleador: 2481.5,
         totalAfpEmpleador: 2485,

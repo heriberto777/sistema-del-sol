@@ -1391,6 +1391,9 @@ model ReciboNomina {
   // muestra separado de otrasDeducciones (ese sigue siendo el ajuste
   // manual de siempre) para que quede visible por qué se descontó.
   descuentoAusencias Decimal     @default(0) @db.Decimal(14, 2)
+  // Monto ya calculado (RD$, no horas) de horas extra registradas en
+  // Asistencia dentro del rango del período — ver calculo-nomina.ts.
+  montoHorasExtra  Decimal       @default(0) @db.Decimal(14, 2)
   salarioNeto      Decimal       @db.Decimal(14, 2)
   sfsEmpleador     Decimal       @db.Decimal(14, 2)
   afpEmpleador     Decimal       @db.Decimal(14, 2)

@@ -3,6 +3,7 @@ import { PeriodosNominaService } from './periodos-nomina.service';
 import { PeriodosNominaRepository } from './periodos-nomina.repository';
 import { EmpleadosRepository } from './empleados.repository';
 import { AusenciasRepository } from './ausencias.repository';
+import { AsistenciaRepository } from './asistencia.repository';
 import { EventBusService } from '../event-bus/event-bus.service';
 import { EVENTOS } from '../event-bus/events';
 import { ConfiguracionesService } from '../configuraciones/configuraciones.service';
@@ -12,6 +13,7 @@ describe('PeriodosNominaService', () => {
   let periodosRepository: jest.Mocked<PeriodosNominaRepository>;
   let empleadosRepository: jest.Mocked<EmpleadosRepository>;
   let ausenciasRepository: jest.Mocked<AusenciasRepository>;
+  let asistenciaRepository: jest.Mocked<AsistenciaRepository>;
   let eventBus: jest.Mocked<EventBusService>;
   let configuracionesService: jest.Mocked<ConfiguracionesService>;
 
@@ -19,13 +21,21 @@ describe('PeriodosNominaService', () => {
     periodosRepository = { crear: jest.fn(), buscarPorId: jest.fn(), listar: jest.fn(), actualizarEstado: jest.fn() } as unknown as jest.Mocked<PeriodosNominaRepository>;
     empleadosRepository = { listarActivos: jest.fn() } as unknown as jest.Mocked<EmpleadosRepository>;
     ausenciasRepository = { listarSinGoceSolapadas: jest.fn().mockResolvedValue([]) } as unknown as jest.Mocked<AusenciasRepository>;
+    asistenciaRepository = { sumarHorasExtraEnRango: jest.fn().mockResolvedValue(0) } as unknown as jest.Mocked<AsistenciaRepository>;
     eventBus = { emit: jest.fn() } as unknown as jest.Mocked<EventBusService>;
     // buscarValor devuelve siempre el default recibido — mismo comportamiento
     // que un tenant sin ninguna Configuracion de TSS personalizada (ítem G-6).
     configuracionesService = {
       buscarValor: jest.fn((_clave: string, _tenantId: string, valorDefault: string) => Promise.resolve(valorDefault)),
     } as unknown as jest.Mocked<ConfiguracionesService>;
-    service = new PeriodosNominaService(periodosRepository, empleadosRepository, ausenciasRepository, eventBus, configuracionesService);
+    service = new PeriodosNominaService(
+      periodosRepository,
+      empleadosRepository,
+      ausenciasRepository,
+      asistenciaRepository,
+      eventBus,
+      configuracionesService,
+    );
   });
 
   describe('listar', () => {
@@ -118,6 +128,30 @@ describe('PeriodosNominaService', () => {
       expect(llamada.recibos[0].sfsEmpleado).toBeCloseTo(23830 * 0.0304, 2);
     });
 
+    it('suma horas extra de Asistencia al recibo, sin tocar TSS/ISR', async () => {
+      empleadosRepository.listarActivos.mockResolvedValue([{ id: 'e1', salarioBrutoMensual: 23830 }] as never);
+      periodosRepository.crear.mockResolvedValue({ id: 'p1' } as never);
+      asistenciaRepository.sumarHorasExtraEnRango.mockResolvedValue(10);
+
+      await service.generarPeriodo({ tipo: 'MENSUAL', fechaInicio: '2026-01-01', fechaFin: '2026-01-31' }, 't1');
+
+      expect(asistenciaRepository.sumarHorasExtraEnRango).toHaveBeenCalledWith('e1', new Date('2026-01-01'), new Date('2026-01-31'));
+      const [llamada] = periodosRepository.crear.mock.calls[0];
+      // valorHora = 23830/23.83/8 = 125; 10h * 125 * 1.35 = 1687.5
+      expect(llamada.recibos[0].montoHorasExtra).toBeCloseTo(1687.5, 2);
+      expect(llamada.recibos[0].sfsEmpleado).toBeCloseTo(23830 * 0.0304, 2);
+    });
+
+    it('sin horas extra registradas, montoHorasExtra queda en 0', async () => {
+      empleadosRepository.listarActivos.mockResolvedValue([{ id: 'e1', salarioBrutoMensual: 35000 }] as never);
+      periodosRepository.crear.mockResolvedValue({ id: 'p1' } as never);
+
+      await service.generarPeriodo({ tipo: 'MENSUAL', fechaInicio: '2026-01-01', fechaFin: '2026-01-31' }, 't1');
+
+      const [llamada] = periodosRepository.crear.mock.calls[0];
+      expect(llamada.recibos[0].montoHorasExtra).toBe(0);
+    });
+
     it('recorta una ausencia que empieza antes del período a los límites reales del período', async () => {
       empleadosRepository.listarActivos.mockResolvedValue([{ id: 'e1', salarioBrutoMensual: 23830 }] as never);
       periodosRepository.crear.mockResolvedValue({ id: 'p1' } as never);
@@ -158,8 +192,8 @@ describe('PeriodosNominaService', () => {
         tenantId: 't1',
         estado: 'PAGADO',
         recibos: [
-          { salarioBruto: 35000, sfsEmpleado: 1064, afpEmpleado: 1004.5, isr: 0, otrasDeducciones: 0, descuentoAusencias: 1200, salarioNeto: 31731.5, sfsEmpleador: 2481.5, afpEmpleador: 2485, infotep: 350 },
-          { salarioBruto: 20000, sfsEmpleado: 608, afpEmpleado: 574, isr: 0, otrasDeducciones: 0, descuentoAusencias: 0, salarioNeto: 18818, sfsEmpleador: 1418, afpEmpleador: 1420, infotep: 200 },
+          { salarioBruto: 35000, sfsEmpleado: 1064, afpEmpleado: 1004.5, isr: 0, otrasDeducciones: 0, descuentoAusencias: 1200, montoHorasExtra: 0, salarioNeto: 31731.5, sfsEmpleador: 2481.5, afpEmpleador: 2485, infotep: 350 },
+          { salarioBruto: 20000, sfsEmpleado: 608, afpEmpleado: 574, isr: 0, otrasDeducciones: 0, descuentoAusencias: 0, montoHorasExtra: 500, salarioNeto: 19318, sfsEmpleador: 1418, afpEmpleador: 1420, infotep: 200 },
         ],
       } as never);
 
@@ -173,7 +207,8 @@ describe('PeriodosNominaService', () => {
           periodoId: 'p1',
           totalSalarioBruto: '55000',
           totalDescuentoAusencias: '1200',
-          totalSalarioNeto: '50549.5',
+          totalHorasExtra: '500',
+          totalSalarioNeto: '51049.5',
         }),
       );
     });

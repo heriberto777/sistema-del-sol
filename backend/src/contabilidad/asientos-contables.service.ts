@@ -205,6 +205,8 @@ export class AsientosContablesService {
     totalIsr: number;
     totalOtrasDeducciones: number;
     totalDescuentoAusencias: number;
+    /** RD$ ya calculados (no horas) — ver PeriodosNominaService.generarPeriodo. Opcional para no romper llamadores/tests anteriores a esta feature. */
+    totalHorasExtra?: number;
     totalSalarioNeto: number;
     totalSfsEmpleador: number;
     totalAfpEmpleador: number;
@@ -216,12 +218,18 @@ export class AsientosContablesService {
       this.cuentasRepository.buscarPorCodigoGlobal(params.tenantId, CODIGOS_CUENTA.TSS_ISR_POR_PAGAR),
     ]);
 
+    // Las horas extra suman al costo laboral (débito) porque ya están
+    // incluidas en totalSalarioNeto (crédito, ver calcularRecibo) — sin
+    // sumarlas acá el asiento quedaría descuadrado (crédito > débito) apenas
+    // algún período tenga horas extra, mismo criterio que el comentario de
+    // arriba sobre por qué totalDescuentoAusencias SÍ resta acá.
     const costoLaboral =
       params.totalSalarioBruto +
       params.totalSfsEmpleador +
       params.totalAfpEmpleador +
       params.totalInfotep -
-      params.totalDescuentoAusencias;
+      params.totalDescuentoAusencias +
+      (params.totalHorasExtra ?? 0);
     const porPagarTssIsr =
       params.totalSfsEmpleado +
       params.totalAfpEmpleado +

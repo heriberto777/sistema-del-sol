@@ -78,3 +78,17 @@ export const DIAS_VACACIONES_POR_ANIO = 14;
 /** Años de antigüedad a partir de los cuales el pago de vacaciones sube de 14 a 18 días de salario (Art. 178). */
 export const ANTIGUEDAD_VACACIONES_18_DIAS = 5;
 export const DIAS_PAGO_VACACIONES_POR_ANTIGUEDAD = { MENOS_DE_5_ANIOS: 14, DESDE_5_ANIOS: 18 } as const;
+
+/**
+ * Jornada ordinaria diaria (Código de Trabajo, Ley 16-92, Art. 147) — usada
+ * junto a `DIVISOR_SALARIO_DIARIO` para derivar un valor por hora
+ * (`salarioBrutoMensual / DIVISOR_SALARIO_DIARIO / HORAS_JORNADA_DIARIA`).
+ * `RECARGO_HORAS_EXTRA` es el recargo de primera categoría (135%, Art. 203)
+ * aplicado plano a toda hora extra registrada — no distingue entre las
+ * primeras horas y las siguientes (que la ley paga distinto) ni horas
+ * nocturnas/festivas. Mismo disclaimer que el resto de este archivo: NO
+ * verificado contra fuente oficial en tiempo real — confirmar antes de
+ * nómina real.
+ */
+export const HORAS_JORNADA_DIARIA = 8;
+export const RECARGO_HORAS_EXTRA = 1.35;

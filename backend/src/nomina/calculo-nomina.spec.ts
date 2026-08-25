@@ -51,4 +51,14 @@ describe('calcularRecibo', () => {
     expect(conDescuento.sfsEmpleado).toBeCloseTo(sinDescuento.sfsEmpleado, 5);
     expect(conDescuento.isr).toBeCloseTo(sinDescuento.isr, 5);
   });
+
+  it('montoHorasExtra se SUMA al neto sin afectar los cálculos de TSS/ISR', () => {
+    const sinHorasExtra = calcularRecibo(35000, 1);
+    const conHorasExtra = calcularRecibo(35000, 1, 0, 0, 800);
+
+    expect(conHorasExtra.montoHorasExtra).toBe(800);
+    expect(conHorasExtra.salarioNeto).toBeCloseTo(sinHorasExtra.salarioNeto + 800, 5);
+    expect(conHorasExtra.sfsEmpleado).toBeCloseTo(sinHorasExtra.sfsEmpleado, 5);
+    expect(conHorasExtra.isr).toBeCloseTo(sinHorasExtra.isr, 5);
+  });
 });

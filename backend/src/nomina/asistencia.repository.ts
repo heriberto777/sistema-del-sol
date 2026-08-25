@@ -48,6 +48,15 @@ export class AsistenciaRepository {
     return this.db.registroAsistencia.update({ where: { id }, data: { estado, aprobadoPorId, fechaResolucion }, include: INCLUDE_EMPLEADO });
   }
 
+  /** Suma de horas extra registradas por el empleado dentro del rango — usado por PeriodosNominaService.generarPeriodo. */
+  async sumarHorasExtraEnRango(empleadoId: string, desde: Date, hasta: Date): Promise<number> {
+    const resultado = await this.db.registroAsistencia.aggregate({
+      where: { empleadoId, fecha: { gte: desde, lte: hasta } },
+      _sum: { horasExtra: true },
+    });
+    return Number(resultado._sum.horasExtra ?? 0);
+  }
+
   listar(params: { empleadoId?: string; desde?: Date; hasta?: Date; estado?: EstadoAsistencia; skip: number; take: number }) {
     const where = {
       empleadoId: params.empleadoId,

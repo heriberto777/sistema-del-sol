@@ -10,6 +10,7 @@ interface ReciboCalculado {
   isr: number;
   otrasDeducciones: number;
   descuentoAusencias: number;
+  montoHorasExtra: number;
   salarioNeto: number;
   sfsEmpleador: number;
   afpEmpleador: number;
