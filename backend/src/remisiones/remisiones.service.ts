@@ -2,6 +2,7 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { RemisionesRepository } from './remisiones.repository';
 import { FacturacionService } from '../facturacion/facturacion.service';
 import { VariantesService } from '../variantes/variantes.service';
+import { CorrelativosRepository } from '../correlativos/correlativos.repository';
 import { CrearRemisionDto } from './dto/crear-remision.dto';
 import { ConvertirRemisionDto } from './dto/convertir-remision.dto';
 import { ListadoQueryDto } from '../common/dto/listado-query.dto';
@@ -11,6 +12,7 @@ import { generarDocumentoTicketHtml } from '../common/pdf/documento-ticket';
 import { resolverFormatoImpresion } from '../common/impresion/resolver-formato-impresion';
 import { resolverPersonalizacionDocumento } from '../common/impresion/resolver-personalizacion-documento';
 import { PrismaService } from '../prisma/prisma.service';
+import { TenantPrismaService } from '../prisma/tenant-prisma.service';
 import { FormatoImpresion } from '@prisma/client';
 
 @Injectable()
@@ -19,7 +21,9 @@ export class RemisionesService {
     private readonly remisionesRepository: RemisionesRepository,
     private readonly facturacionService: FacturacionService,
     private readonly variantesService: VariantesService,
+    private readonly correlativosRepository: CorrelativosRepository,
     private readonly prisma: PrismaService,
+    private readonly tenantPrisma: TenantPrismaService,
   ) {}
 
   private async resolverLineas(lineas: CrearRemisionDto['lineas']) {
@@ -33,13 +37,17 @@ export class RemisionesService {
   }
 
   async crear(dto: CrearRemisionDto, tenantId: string, vendedorId: string) {
-    return this.remisionesRepository.crear({
-      tenantId,
-      clienteId: dto.clienteId,
-      bodegaId: dto.bodegaId,
-      vendedorId,
-      numero: dto.numero,
-      lineas: await this.resolverLineas(dto.lineas),
+    const lineas = await this.resolverLineas(dto.lineas);
+    return this.tenantPrisma.client.$transaction(async (tx) => {
+      const numero = await this.correlativosRepository.siguienteEnTx(tx, tenantId, 'REMISION');
+      return this.remisionesRepository.crearEnTx(tx, {
+        tenantId,
+        clienteId: dto.clienteId,
+        bodegaId: dto.bodegaId,
+        vendedorId,
+        numero,
+        lineas,
+      });
     });
   }
 
@@ -55,7 +63,6 @@ export class RemisionesService {
     return this.remisionesRepository.actualizar(id, {
       clienteId: dto.clienteId,
       bodegaId: dto.bodegaId,
-      numero: dto.numero,
       lineas: await this.resolverLineas(dto.lineas),
     });
   }

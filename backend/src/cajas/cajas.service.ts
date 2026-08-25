@@ -1,13 +1,22 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { CajasRepository } from './cajas.repository';
+import { CorrelativosRepository } from '../correlativos/correlativos.repository';
+import { TenantPrismaService } from '../prisma/tenant-prisma.service';
 import { CrearCajaDto } from './dto/crear-caja.dto';
 
 @Injectable()
 export class CajasService {
-  constructor(private readonly cajasRepository: CajasRepository) {}
+  constructor(
+    private readonly cajasRepository: CajasRepository,
+    private readonly correlativosRepository: CorrelativosRepository,
+    private readonly tenantPrisma: TenantPrismaService,
+  ) {}
 
   crear(dto: CrearCajaDto, tenantId: string) {
-    return this.cajasRepository.crear(dto, tenantId);
+    return this.tenantPrisma.client.$transaction(async (tx) => {
+      const codigo = await this.correlativosRepository.siguienteEnTx(tx, tenantId, 'CAJA');
+      return this.cajasRepository.crearEnTx(tx, dto, tenantId, codigo);
+    });
   }
 
   listar() {

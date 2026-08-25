@@ -10,15 +10,19 @@ export class ComprasRepository {
     return this.tenantPrisma.client;
   }
 
-  crearOrden(params: {
-    tenantId: string;
-    proveedorId: string;
-    numero: string;
-    userId: string;
-    total: number;
-    lineas: { productoId: string; varianteId: string; cantidad: number; costoUnitario: number }[];
-  }) {
-    return this.db.ordenCompra.create({
+  /** Participa en la transacción abierta por ComprasService.crear (consumo del correlativo + creación, todo o nada). */
+  crearOrdenEnTx(
+    tx: Prisma.TransactionClient,
+    params: {
+      tenantId: string;
+      proveedorId: string;
+      numero: string;
+      userId: string;
+      total: number;
+      lineas: { productoId: string; varianteId: string; cantidad: number; costoUnitario: number }[];
+    },
+  ) {
+    return tx.ordenCompra.create({
       data: {
         tenantId: params.tenantId,
         proveedorId: params.proveedorId,

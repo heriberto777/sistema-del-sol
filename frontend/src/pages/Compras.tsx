@@ -293,7 +293,6 @@ function ModalVerOrden({ orden, onClose }: { orden: OrdenCompra; onClose: () => 
 function ModalNuevaOrdenCompra({ onClose }: { onClose: () => void }) {
   const queryClient = useQueryClient();
   const [proveedor, setProveedor] = useState<Proveedor | null>(null);
-  const [numero, setNumero] = useState('');
   const [lineas, setLineas] = useState([{ productoId: '', varianteId: '', cantidad: '1', costoUnitario: '' }]);
   const [mostrarNuevoProveedor, setMostrarNuevoProveedor] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -313,7 +312,6 @@ function ModalNuevaOrdenCompra({ onClose }: { onClose: () => void }) {
     mutationFn: async () =>
       apiClient.post('/compras', {
         proveedorId: proveedor?.id,
-        numero,
         lineas: lineas
           .filter((l) => l.productoId)
           .map((l) => ({
@@ -377,7 +375,6 @@ function ModalNuevaOrdenCompra({ onClose }: { onClose: () => void }) {
             />
           )}
         </div>
-        <FormField id="oc-numero" label="Número" value={numero} onChange={(e) => setNumero(e.target.value)} required />
 
         <div className="space-y-2">
           <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Líneas</p>

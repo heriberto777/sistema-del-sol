@@ -4,17 +4,24 @@ import { RemisionesRepository } from './remisiones.repository';
 import { FacturacionService } from '../facturacion/facturacion.service';
 import { VariantesService } from '../variantes/variantes.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { TenantPrismaService } from '../prisma/tenant-prisma.service';
+import { CorrelativosRepository } from '../correlativos/correlativos.repository';
 
 describe('RemisionesService', () => {
   let service: RemisionesService;
   let repository: jest.Mocked<RemisionesRepository>;
   let facturacionService: jest.Mocked<FacturacionService>;
   let variantesService: jest.Mocked<VariantesService>;
+  let correlativosRepository: jest.Mocked<CorrelativosRepository>;
   let prisma: jest.Mocked<PrismaService>;
+  let tenantPrisma: { client: { $transaction: jest.Mock } };
+
+  // Ver el mismo patrón en compras.service.spec.ts/facturacion.service.spec.ts.
+  const TX = { esTransaccion: true };
 
   beforeEach(() => {
     repository = {
-      crear: jest.fn(),
+      crearEnTx: jest.fn(),
       buscarPorId: jest.fn(),
       listar: jest.fn(),
       actualizarEstado: jest.fn(),
@@ -31,25 +38,35 @@ describe('RemisionesService', () => {
     variantesService = {
       resolverObligatoria: jest.fn().mockResolvedValue('variante-1'),
     } as unknown as jest.Mocked<VariantesService>;
-    service = new RemisionesService(repository, facturacionService, variantesService, prisma);
+    correlativosRepository = { siguienteEnTx: jest.fn().mockResolvedValue('REM-00001') } as unknown as jest.Mocked<CorrelativosRepository>;
+    tenantPrisma = { client: { $transaction: jest.fn((cb: (tx: unknown) => unknown) => cb(TX)) } };
+    service = new RemisionesService(
+      repository,
+      facturacionService,
+      variantesService,
+      correlativosRepository,
+      prisma,
+      tenantPrisma as unknown as TenantPrismaService,
+    );
   });
 
   describe('crear', () => {
     it('crea la remisión sin tocar inventario ni FacturacionService (movimiento ocurre al facturar)', async () => {
-      repository.crear.mockResolvedValue({ id: 'r1' } as never);
+      repository.crearEnTx.mockResolvedValue({ id: 'r1' } as never);
 
       await service.crear(
-        { clienteId: 'cliente-1', bodegaId: 'bodega-1', numero: 'REM-001', lineas: [{ productoId: 'prod-1', cantidad: 3 }] },
+        { clienteId: 'cliente-1', bodegaId: 'bodega-1', lineas: [{ productoId: 'prod-1', cantidad: 3 }] },
         'tenant-1',
         'vendedor-1',
       );
 
-      expect(repository.crear).toHaveBeenCalledWith({
+      expect(correlativosRepository.siguienteEnTx).toHaveBeenCalledWith(TX, 'tenant-1', 'REMISION');
+      expect(repository.crearEnTx).toHaveBeenCalledWith(TX, {
         tenantId: 'tenant-1',
         clienteId: 'cliente-1',
         bodegaId: 'bodega-1',
         vendedorId: 'vendedor-1',
-        numero: 'REM-001',
+        numero: 'REM-00001',
         lineas: [{ productoId: 'prod-1', varianteId: 'variante-1', cantidad: 3 }],
       });
       expect(facturacionService.crear).not.toHaveBeenCalled();
@@ -57,9 +74,9 @@ describe('RemisionesService', () => {
   });
 
   describe('actualizar', () => {
-    const dto = { clienteId: 'cliente-2', bodegaId: 'bodega-2', numero: 'REM-002', lineas: [{ productoId: 'prod-2', cantidad: 5 }] };
+    const dto = { clienteId: 'cliente-2', bodegaId: 'bodega-2', lineas: [{ productoId: 'prod-2', cantidad: 5 }] };
 
-    it('reemplaza clienteId/bodegaId/numero/líneas cuando la remisión está en BORRADOR', async () => {
+    it('reemplaza clienteId/bodegaId/líneas cuando la remisión está en BORRADOR (el número no se toca)', async () => {
       repository.buscarPorId.mockResolvedValue({ id: 'r1', estado: 'BORRADOR', facturaId: null } as never);
       repository.actualizar.mockResolvedValue({ id: 'r1' } as never);
 

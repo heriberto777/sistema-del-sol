@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { ArrayMinSize, IsArray, IsNumber, IsOptional, IsPositive, IsString, IsUUID, ValidateNested } from 'class-validator';
+import { ArrayMinSize, IsArray, IsNumber, IsOptional, IsPositive, IsUUID, ValidateNested } from 'class-validator';
 
 export class LineaOcDto {
   @ApiProperty()
@@ -27,10 +27,6 @@ export class CrearOrdenCompraDto {
   @ApiProperty()
   @IsUUID()
   proveedorId: string;
-
-  @ApiProperty()
-  @IsString()
-  numero: string;
 
   @ApiProperty({ type: [LineaOcDto] })
   @IsArray()

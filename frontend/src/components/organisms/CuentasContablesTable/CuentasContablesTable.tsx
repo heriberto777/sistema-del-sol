@@ -170,7 +170,21 @@ function ModalNuevaCuenta({ cuentas, onClose }: { cuentas: CuentaContablePlana[]
   return (
     <Modal titulo="Nueva cuenta contable" onClose={onClose}>
       <form onSubmit={onSubmit} className="space-y-3">
-        <FormField id="cuenta-codigo" label="Código" value={codigo} onChange={(e) => setCodigo(e.target.value)} required />
+        <div className="flex items-end gap-2">
+          <div className="flex-1">
+            <FormField id="cuenta-codigo" label="Código" value={codigo} onChange={(e) => setCodigo(e.target.value)} required />
+          </div>
+          <Button
+            type="button"
+            variante="secundario"
+            onClick={async () => {
+              const { data } = await apiClient.post<{ valor: string }>('/admin/correlativos/CUENTA_CONTABLE/siguiente');
+              setCodigo(data.valor);
+            }}
+          >
+            Asignar
+          </Button>
+        </div>
         <FormField id="cuenta-nombre" label="Nombre" value={nombre} onChange={(e) => setNombre(e.target.value)} required />
         <div>
           <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Cuenta padre (opcional)</label>

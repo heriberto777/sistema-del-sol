@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { TenantPrismaService } from '../prisma/tenant-prisma.service';
-import { EstadoCotizacion } from '@prisma/client';
+import { EstadoCotizacion, Prisma } from '@prisma/client';
 
 interface LineaCalculada {
   productoId: string;
@@ -38,19 +38,23 @@ export class CotizacionesRepository {
     return { ...resto, precios: variantes[0]?.precios ?? [] };
   }
 
-  crear(params: {
-    tenantId: string;
-    numero: string;
-    clienteId: string;
-    vendedorId: string;
-    fechaVigenciaHasta: Date;
-    subtotal: number;
-    descuento: number;
-    itbis: number;
-    total: number;
-    lineas: LineaCalculada[];
-  }) {
-    return this.db.cotizacion.create({
+  /** Participa en la transacción abierta por CotizacionesService.crear (consumo del correlativo + creación, todo o nada). */
+  crearEnTx(
+    tx: Prisma.TransactionClient,
+    params: {
+      tenantId: string;
+      numero: string;
+      clienteId: string;
+      vendedorId: string;
+      fechaVigenciaHasta: Date;
+      subtotal: number;
+      descuento: number;
+      itbis: number;
+      total: number;
+      lineas: LineaCalculada[];
+    },
+  ) {
+    return tx.cotizacion.create({
       data: {
         tenantId: params.tenantId,
         numero: params.numero,
@@ -67,11 +71,10 @@ export class CotizacionesRepository {
     });
   }
 
-  /** Reemplaza líneas por completo (delete+recreate) — solo se permite en BORRADOR, ver CotizacionesService.actualizar. */
+  /** Reemplaza líneas por completo (delete+recreate) — solo se permite en BORRADOR, ver CotizacionesService.actualizar. El número asignado al crear no se toca acá. */
   actualizar(
     id: string,
     params: {
-      numero: string;
       clienteId: string;
       fechaVigenciaHasta: Date;
       subtotal: number;
@@ -86,7 +89,6 @@ export class CotizacionesRepository {
       return tx.cotizacion.update({
         where: { id },
         data: {
-          numero: params.numero,
           clienteId: params.clienteId,
           fechaVigenciaHasta: params.fechaVigenciaHasta,
           subtotal: params.subtotal,

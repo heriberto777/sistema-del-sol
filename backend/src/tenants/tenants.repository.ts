@@ -6,6 +6,7 @@ import { CUENTAS_BASE } from '../contabilidad/cuentas-base';
 import { FORMAS_PAGO_BASE } from './formas-pago-base';
 import { LISTAS_PRECIO_BASE } from './listas-precio-base';
 import { TIPOS_AUSENCIA_CONFIG_BASE } from './tipos-ausencia-config-base';
+import { CORRELATIVOS_BASE } from './correlativos-base';
 
 @Injectable()
 export class TenantsRepository {
@@ -97,6 +98,10 @@ export class TenantsRepository {
 
       await tx.tipoAusenciaConfig.createMany({
         data: TIPOS_AUSENCIA_CONFIG_BASE.map((c) => ({ tenantId: tenant.id, ...c })),
+      });
+
+      await tx.correlativo.createMany({
+        data: CORRELATIVOS_BASE.map((tipo) => ({ tenantId: tenant.id, tipo })),
       });
 
       let adminRoleId: string | undefined;

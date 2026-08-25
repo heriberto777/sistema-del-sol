@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { TenantPrismaService } from '../prisma/tenant-prisma.service';
 import { CrearCajaDto } from './dto/crear-caja.dto';
 
@@ -17,11 +18,13 @@ export class CajasRepository {
     return this.tenantPrisma.client;
   }
 
-  crear(dto: CrearCajaDto, tenantId: string) {
+  /** Participa en la transacción abierta por CajasService.crear (consumo del correlativo + creación, todo o nada). `codigo` viene resuelto por el service, nunca del cliente. */
+  crearEnTx(tx: Prisma.TransactionClient, dto: CrearCajaDto, tenantId: string, codigo: string) {
     const { categoriaIds, productoIds, favoritoIds, ...datos } = dto;
-    return this.db.caja.create({
+    return tx.caja.create({
       data: {
         ...datos,
+        codigo,
         tenantId,
         categorias: categoriaIds?.length ? { create: categoriaIds.map((categoriaId) => ({ categoriaId })) } : undefined,
         productos: productoIds?.length ? { create: productoIds.map((productoId) => ({ productoId })) } : undefined,

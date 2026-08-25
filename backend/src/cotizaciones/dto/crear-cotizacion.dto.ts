@@ -32,10 +32,6 @@ export class LineaCotizacionDto {
 
 export class CrearCotizacionDto {
   @ApiProperty()
-  @IsString()
-  numero: string;
-
-  @ApiProperty()
   @IsUUID()
   clienteId: string;
 

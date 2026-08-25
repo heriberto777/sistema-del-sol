@@ -10,6 +10,7 @@ import { RecibirOrdenCompraDto } from './dto/recibir-orden-compra.dto';
 import { DevolverOrdenCompraDto } from './dto/devolver-orden-compra.dto';
 import { CrearPagoOrdenCompraDto } from './dto/crear-pago-orden-compra.dto';
 import { PagosService } from '../pagos/pagos.service';
+import { CorrelativosRepository } from '../correlativos/correlativos.repository';
 import { ListadoQueryDto } from '../common/dto/listado-query.dto';
 import { paginar } from '../common/types/pagina-resultado';
 
@@ -22,6 +23,7 @@ export class ComprasService {
     private readonly tenantPrisma: TenantPrismaService,
     private readonly eventBus: EventBusService,
     private readonly pagosService: PagosService,
+    private readonly correlativosRepository: CorrelativosRepository,
   ) {}
 
   async crear(dto: CrearOrdenCompraDto, userId: string, tenantId: string) {
@@ -42,7 +44,10 @@ export class ComprasService {
         varianteId: await this.variantesService.resolverObligatoria(linea.productoId, linea.varianteId),
       })),
     );
-    return this.comprasRepository.crearOrden({ ...dto, tenantId, userId, total, lineas });
+    return this.tenantPrisma.client.$transaction(async (tx) => {
+      const numero = await this.correlativosRepository.siguienteEnTx(tx, tenantId, 'ORDEN_COMPRA');
+      return this.comprasRepository.crearOrdenEnTx(tx, { proveedorId: dto.proveedorId, tenantId, userId, total, lineas, numero });
+    });
   }
 
   async listar(query: ListadoQueryDto) {

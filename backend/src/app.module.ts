@@ -29,6 +29,7 @@ import { PlatformAuthModule } from './platform-auth/platform-auth.module';
 import { TenantsModule } from './tenants/tenants.module';
 import { PlatformAuditLogModule } from './platform-audit-log/platform-audit-log.module';
 import { NcfModule } from './ncf/ncf.module';
+import { CorrelativosModule } from './correlativos/correlativos.module';
 import { ReportesModule } from './reportes/reportes.module';
 import { ReportesFiscalesModule } from './reportes-fiscales/reportes-fiscales.module';
 import { CotizacionesModule } from './cotizaciones/cotizaciones.module';
@@ -100,6 +101,7 @@ import { TenantMiddleware } from './common/middleware/tenant.middleware';
     TenantsModule,
     PlatformAuditLogModule,
     NcfModule,
+    CorrelativosModule,
     ReportesModule,
     ReportesFiscalesModule,
     CotizacionesModule,

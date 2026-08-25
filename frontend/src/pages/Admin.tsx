@@ -5,6 +5,7 @@ import { RolesPanel } from '../components/organisms/RolesPanel/RolesPanel';
 import { WebhooksPanel } from '../components/organisms/WebhooksPanel/WebhooksPanel';
 import { ConfiguracionesPanel } from '../components/organisms/ConfiguracionesPanel/ConfiguracionesPanel';
 import { NcfPanel } from '../components/organisms/NcfPanel/NcfPanel';
+import { CorrelativosPanel } from '../components/organisms/CorrelativosPanel/CorrelativosPanel';
 import { FormasPagoPanel } from '../components/organisms/FormasPagoPanel/FormasPagoPanel';
 import { CategoriasPanel } from '../components/organisms/CategoriasPanel/CategoriasPanel';
 import { ListasPrecioPanel } from '../components/organisms/ListasPrecioPanel/ListasPrecioPanel';
@@ -50,6 +51,7 @@ const CATEGORIAS: Categoria[] = [
     descripcion: 'Numeraciones de NCF (comprobantes fiscales), formas de pago y bonos.',
     pestanas: [
       { id: 'ncf', etiqueta: 'NCF', permiso: 'admin.configuracion', panel: NcfPanel },
+      { id: 'consecutivos', etiqueta: 'Consecutivos', permiso: 'admin.configuracion', panel: CorrelativosPanel },
       { id: 'formas-pago', etiqueta: 'Formas de pago', permiso: 'admin.configuracion', panel: FormasPagoPanel },
       { id: 'cajas', etiqueta: 'Cajas', permiso: 'admin.configuracion', panel: CajasPanel },
       { id: 'bonos', etiqueta: 'Bonos', permiso: 'admin.configuracion', panel: BonosPanel },

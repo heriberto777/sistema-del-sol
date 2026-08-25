@@ -4,6 +4,7 @@ import { FacturacionService } from '../facturacion/facturacion.service';
 import { ClientesService } from '../clientes/clientes.service';
 import { VariantesService } from '../variantes/variantes.service';
 import { OfertasService } from '../ofertas/ofertas.service';
+import { CorrelativosRepository } from '../correlativos/correlativos.repository';
 import { prorratearDescuentoCarrito } from '../ofertas/prorratear-descuento-carrito';
 import { CrearCotizacionDto } from './dto/crear-cotizacion.dto';
 import { ConvertirCotizacionDto } from './dto/convertir-cotizacion.dto';
@@ -16,6 +17,7 @@ import { generarDocumentoTicketHtml } from '../common/pdf/documento-ticket';
 import { resolverFormatoImpresion } from '../common/impresion/resolver-formato-impresion';
 import { resolverPersonalizacionDocumento } from '../common/impresion/resolver-personalizacion-documento';
 import { PrismaService } from '../prisma/prisma.service';
+import { TenantPrismaService } from '../prisma/tenant-prisma.service';
 import { FormatoImpresion } from '@prisma/client';
 
 /** Una cotización vigente cuya fecha de validez ya pasó se muestra como vencida sin necesidad de un job que la actualice. */
@@ -34,8 +36,10 @@ export class CotizacionesService {
     private readonly clientesService: ClientesService,
     private readonly variantesService: VariantesService,
     private readonly ofertasService: OfertasService,
+    private readonly correlativosRepository: CorrelativosRepository,
     private readonly eventBus: EventBusService,
     private readonly prisma: PrismaService,
+    private readonly tenantPrisma: TenantPrismaService,
   ) {}
 
   /**
@@ -109,17 +113,20 @@ export class CotizacionesService {
     const listaPrecio = await this.resolverListaPrecio(dto);
     const { lineasCalculadas, subtotal, itbis, descuentoTotal, total } = await this.calcularLineas(dto.lineas, listaPrecio);
 
-    return this.cotizacionesRepository.crear({
-      tenantId,
-      numero: dto.numero,
-      clienteId: dto.clienteId,
-      vendedorId,
-      fechaVigenciaHasta: new Date(dto.fechaVigenciaHasta),
-      subtotal,
-      descuento: descuentoTotal,
-      itbis,
-      total,
-      lineas: lineasCalculadas,
+    return this.tenantPrisma.client.$transaction(async (tx) => {
+      const numero = await this.correlativosRepository.siguienteEnTx(tx, tenantId, 'COTIZACION');
+      return this.cotizacionesRepository.crearEnTx(tx, {
+        tenantId,
+        numero,
+        clienteId: dto.clienteId,
+        vendedorId,
+        fechaVigenciaHasta: new Date(dto.fechaVigenciaHasta),
+        subtotal,
+        descuento: descuentoTotal,
+        itbis,
+        total,
+        lineas: lineasCalculadas,
+      });
     });
   }
 
@@ -133,7 +140,6 @@ export class CotizacionesService {
     const { lineasCalculadas, subtotal, itbis, descuentoTotal, total } = await this.calcularLineas(dto.lineas, listaPrecio);
 
     return this.cotizacionesRepository.actualizar(id, {
-      numero: dto.numero,
       clienteId: dto.clienteId,
       fechaVigenciaHasta: new Date(dto.fechaVigenciaHasta),
       subtotal,

@@ -438,13 +438,27 @@ function FormularioProducto({ producto, onGuardado }: { producto: Producto | nul
           <option value="COMBO">Combo (bundle de otros productos)</option>
         </Select>
       </div>
-      <FormField
-        id="producto-codigo"
-        label="Código"
-        value={valores.codigo}
-        onChange={(e) => setValores((v) => ({ ...v, codigo: e.target.value }))}
-        required
-      />
+      <div className="flex items-end gap-2">
+        <div className="flex-1">
+          <FormField
+            id="producto-codigo"
+            label="Código"
+            value={valores.codigo}
+            onChange={(e) => setValores((v) => ({ ...v, codigo: e.target.value }))}
+            required
+          />
+        </div>
+        <Button
+          type="button"
+          variante="secundario"
+          onClick={async () => {
+            const { data } = await apiClient.post<{ valor: string }>('/admin/correlativos/PRODUCTO/siguiente');
+            setValores((v) => ({ ...v, codigo: data.valor }));
+          }}
+        >
+          Asignar
+        </Button>
+      </div>
       <FormField
         id="producto-nombre"
         label="Nombre"

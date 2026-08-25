@@ -176,20 +176,21 @@ function FormularioCaja({ caja, onGuardado }: { caja: Caja | null; onGuardado: (
     mutationFn: async () => {
       const payload = {
         bodegaId: valores.bodegaId,
-        codigo: valores.codigo,
         nombre: valores.nombre,
         activa: valores.activa,
         categoriaIds: valores.categoriaIds,
         productoIds: valores.productoIds,
         favoritoIds: valores.favoritoIds,
       };
+      // El código lo asigna el correlativo parametrizado al crear — no se
+      // envía en el alta. En edición no se toca (no hay campo editable).
       return caja ? apiClient.patch(`/cajas/${caja.id}`, payload) : apiClient.post('/cajas', payload);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['cajas'] });
       onGuardado();
     },
-    onError: () => setError('No se pudo guardar la caja. Revisá que el código no esté repetido.'),
+    onError: () => setError('No se pudo guardar la caja.'),
   });
 
   function onSubmit(e: FormEvent) {
@@ -204,7 +205,11 @@ function FormularioCaja({ caja, onGuardado }: { caja: Caja | null; onGuardado: (
         <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Bodega</label>
         <SelectorBodega value={valores.bodegaId} onChange={(bodegaId) => setValores((v) => ({ ...v, bodegaId }))} required />
       </div>
-      <FormField label="Código" value={valores.codigo} onChange={(e) => setValores((v) => ({ ...v, codigo: e.target.value }))} required />
+      {caja && (
+        <p className="text-sm text-slate-500 dark:text-slate-400">
+          Código <span className="font-mono font-medium text-slate-700 dark:text-slate-300">{caja.codigo}</span> (asignado automáticamente, no editable)
+        </p>
+      )}
       <FormField label="Nombre" value={valores.nombre} onChange={(e) => setValores((v) => ({ ...v, nombre: e.target.value }))} required />
       <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
         <input type="checkbox" checked={valores.activa} onChange={(e) => setValores((v) => ({ ...v, activa: e.target.checked }))} />

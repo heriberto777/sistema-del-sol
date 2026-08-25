@@ -8,6 +8,7 @@ import { EventBusService } from '../event-bus/event-bus.service';
 import { EVENTOS } from '../event-bus/events';
 import { RecibirOrdenCompraDto } from './dto/recibir-orden-compra.dto';
 import { PagosService } from '../pagos/pagos.service';
+import { CorrelativosRepository } from '../correlativos/correlativos.repository';
 
 describe('ComprasService', () => {
   let service: ComprasService;
@@ -17,6 +18,7 @@ describe('ComprasService', () => {
   let tenantPrisma: { client: { $transaction: jest.Mock; producto: { findMany: jest.Mock } } };
   let eventBus: jest.Mocked<EventBusService>;
   let pagosService: jest.Mocked<PagosService>;
+  let correlativosRepository: jest.Mocked<CorrelativosRepository>;
 
   // Ver el mismo patrón en facturacion.service.spec.ts: un tx opaco pasado
   // por $transaction a los métodos *EnTx — no necesita comportarse como un
@@ -25,7 +27,7 @@ describe('ComprasService', () => {
 
   beforeEach(() => {
     repository = {
-      crearOrden: jest.fn(),
+      crearOrdenEnTx: jest.fn(),
       listar: jest.fn(),
       buscarPorId: jest.fn(),
       buscarPorIdEnTx: jest.fn(),
@@ -55,6 +57,7 @@ describe('ComprasService', () => {
     variantesService = {
       resolverObligatoria: jest.fn().mockResolvedValue('variante-1'),
     } as unknown as jest.Mocked<VariantesService>;
+    correlativosRepository = { siguienteEnTx: jest.fn().mockResolvedValue('OC-00001') } as unknown as jest.Mocked<CorrelativosRepository>;
     service = new ComprasService(
       repository,
       inventarioService,
@@ -62,6 +65,7 @@ describe('ComprasService', () => {
       tenantPrisma as unknown as TenantPrismaService,
       eventBus,
       pagosService,
+      correlativosRepository,
     );
   });
 
@@ -70,7 +74,6 @@ describe('ComprasService', () => {
       await service.crear(
         {
           proveedorId: 'prov-1',
-          numero: 'OC-001',
           lineas: [
             { productoId: 'p1', cantidad: 10, costoUnitario: 5 },
             { productoId: 'p2', cantidad: 3, costoUnitario: 20 },
@@ -80,8 +83,10 @@ describe('ComprasService', () => {
         'tenant-1',
       );
 
-      expect(repository.crearOrden).toHaveBeenCalledWith(
-        expect.objectContaining({ tenantId: 'tenant-1', userId: 'user-1', total: 110 }),
+      expect(correlativosRepository.siguienteEnTx).toHaveBeenCalledWith(TX, 'tenant-1', 'ORDEN_COMPRA');
+      expect(repository.crearOrdenEnTx).toHaveBeenCalledWith(
+        TX,
+        expect.objectContaining({ tenantId: 'tenant-1', userId: 'user-1', total: 110, numero: 'OC-00001' }),
       );
     });
 
@@ -90,12 +95,12 @@ describe('ComprasService', () => {
 
       await expect(
         service.crear(
-          { proveedorId: 'prov-1', numero: 'OC-001', lineas: [{ productoId: 'p1', cantidad: 1, costoUnitario: 100 }] },
+          { proveedorId: 'prov-1', lineas: [{ productoId: 'p1', cantidad: 1, costoUnitario: 100 }] },
           'user-1',
           'tenant-1',
         ),
       ).rejects.toThrow(BadRequestException);
-      expect(repository.crearOrden).not.toHaveBeenCalled();
+      expect(repository.crearOrdenEnTx).not.toHaveBeenCalled();
     });
   });
 

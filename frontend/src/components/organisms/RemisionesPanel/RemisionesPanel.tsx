@@ -3,7 +3,6 @@ import { User } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../../lib/api-client';
 import { ModalImprimir } from '../../molecules/ModalImprimir/ModalImprimir';
-import { FormField } from '../../molecules/FormField/FormField';
 import { Modal } from '../../molecules/Modal/Modal';
 import { RowActionsMenu } from '../../molecules/RowActionsMenu/RowActionsMenu';
 import { Button } from '../../atoms/Button/Button';
@@ -202,7 +201,6 @@ function ModalNuevaRemision({
   const queryClient = useQueryClient();
   const [cliente, setCliente] = useState<Cliente | null>(null);
   const [bodegaId, setBodegaId] = useState('');
-  const [numero, setNumero] = useState('');
   const [lineas, setLineas] = useState<LineaForm[]>([{ productoId: '', varianteId: '', cantidad: '1' }]);
   const [error, setError] = useState<string | null>(null);
 
@@ -211,7 +209,6 @@ function ModalNuevaRemision({
       apiClient.post('/remisiones', {
         clienteId: cliente?.id,
         bodegaId,
-        numero,
         lineas: lineas
           .filter((l) => l.productoId)
           .map((l) => ({ productoId: l.productoId, varianteId: l.varianteId || undefined, cantidad: Number(l.cantidad) })),
@@ -243,7 +240,6 @@ function ModalNuevaRemision({
         Registra la entrega de mercancía sin facturar todavía. El inventario se descuenta al convertirla en factura, no al crearla.
       </p>
       <form onSubmit={onSubmit} className="space-y-3">
-        <FormField id="numero" label="Número" value={numero} onChange={(e) => setNumero(e.target.value)} required />
         <div>
           <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Cliente</label>
           <ComboboxBusqueda<Cliente>
@@ -326,7 +322,7 @@ function ModalEditarRemision({
   const queryClient = useQueryClient();
   const [error, setError] = useState<string | null>(null);
   const [cliente, setCliente] = useState<Cliente | null>(null);
-  const [valores, setValores] = useState<{ numero: string; bodegaId: string; lineas: LineaForm[] } | null>(null);
+  const [valores, setValores] = useState<{ bodegaId: string; lineas: LineaForm[] } | null>(null);
 
   const { data: detalle } = useQuery({
     queryKey: ['remision-detalle', remisionId],
@@ -337,7 +333,6 @@ function ModalEditarRemision({
     if (!detalle) return;
     setCliente({ id: detalle.clienteId, nombre: detalle.cliente.nombre });
     setValores({
-      numero: detalle.numero,
       bodegaId: detalle.bodegaId,
       lineas: detalle.lineas.map((l) => ({ productoId: l.productoId, varianteId: l.varianteId, cantidad: l.cantidad })),
     });
@@ -346,7 +341,6 @@ function ModalEditarRemision({
   const guardar = useMutation({
     mutationFn: async () =>
       apiClient.patch(`/remisiones/${remisionId}`, {
-        numero: valores!.numero,
         clienteId: cliente?.id,
         bodegaId: valores!.bodegaId,
         lineas: valores!.lineas.filter((l) => l.productoId).map((l) => ({ productoId: l.productoId, varianteId: l.varianteId || undefined, cantidad: Number(l.cantidad) })),
@@ -379,13 +373,9 @@ function ModalEditarRemision({
   return (
     <Modal titulo={`Editar remisión ${numeroActual}`} onClose={onClose}>
       <form onSubmit={onSubmit} className="space-y-3">
-        <FormField
-          id="editar-rem-numero"
-          label="Número"
-          value={valores.numero}
-          onChange={(e) => setValores({ ...valores, numero: e.target.value })}
-          required
-        />
+        <p className="text-sm text-slate-500 dark:text-slate-400">
+          Número <span className="font-medium text-slate-700 dark:text-slate-300">{numeroActual}</span> (asignado automáticamente, no editable)
+        </p>
         <div className="flex flex-col gap-1">
           <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Cliente</label>
           <ComboboxBusqueda<Cliente>

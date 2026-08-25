@@ -1,14 +1,18 @@
 import { BadRequestException } from '@nestjs/common';
 import { CajasService } from './cajas.service';
 import { CajasRepository } from './cajas.repository';
+import { CorrelativosRepository } from '../correlativos/correlativos.repository';
+import { TenantPrismaService } from '../prisma/tenant-prisma.service';
 
 describe('CajasService', () => {
   let service: CajasService;
   let repository: jest.Mocked<CajasRepository>;
+  let correlativosRepository: jest.Mocked<CorrelativosRepository>;
+  let tenantPrisma: jest.Mocked<TenantPrismaService>;
 
   beforeEach(() => {
     repository = {
-      crear: jest.fn(),
+      crearEnTx: jest.fn(),
       listar: jest.fn(),
       buscarPorId: jest.fn(),
       buscarRestriccion: jest.fn(),
@@ -16,7 +20,22 @@ describe('CajasService', () => {
       actualizar: jest.fn(),
       eliminar: jest.fn(),
     } as unknown as jest.Mocked<CajasRepository>;
-    service = new CajasService(repository);
+    correlativosRepository = { siguienteEnTx: jest.fn().mockResolvedValue('00001') } as unknown as jest.Mocked<CorrelativosRepository>;
+    tenantPrisma = {
+      client: { $transaction: jest.fn((cb: (tx: unknown) => unknown) => cb('tx-fake')) },
+    } as unknown as jest.Mocked<TenantPrismaService>;
+    service = new CajasService(repository, correlativosRepository, tenantPrisma);
+  });
+
+  describe('crear', () => {
+    it('consume el correlativo CAJA dentro de la misma transacción y usa ese código, no uno enviado por el cliente', async () => {
+      repository.crearEnTx.mockResolvedValue({ id: 'c1', codigo: '00001' } as never);
+
+      await service.crear({ bodegaId: 'b1', nombre: 'Caja 1' } as never, 't1');
+
+      expect(correlativosRepository.siguienteEnTx).toHaveBeenCalledWith('tx-fake', 't1', 'CAJA');
+      expect(repository.crearEnTx).toHaveBeenCalledWith('tx-fake', expect.objectContaining({ bodegaId: 'b1' }), 't1', '00001');
+    });
   });
 
   describe('validarLineasPermitidas (ítem E-7)', () => {

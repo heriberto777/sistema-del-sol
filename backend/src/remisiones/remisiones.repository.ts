@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { TenantPrismaService } from '../prisma/tenant-prisma.service';
-import { EstadoRemision } from '@prisma/client';
+import { EstadoRemision, Prisma } from '@prisma/client';
 
 const INCLUDE_REMISION = { lineas: { include: { producto: true } }, cliente: true, bodega: true } as const;
 
@@ -12,15 +12,19 @@ export class RemisionesRepository {
     return this.tenantPrisma.client;
   }
 
-  crear(params: {
-    tenantId: string;
-    clienteId: string;
-    bodegaId: string;
-    vendedorId: string;
-    numero: string;
-    lineas: { productoId: string; varianteId: string; cantidad: number }[];
-  }) {
-    return this.db.remision.create({
+  /** Participa en la transacción abierta por RemisionesService.crear (consumo del correlativo + creación, todo o nada). */
+  crearEnTx(
+    tx: Prisma.TransactionClient,
+    params: {
+      tenantId: string;
+      clienteId: string;
+      bodegaId: string;
+      vendedorId: string;
+      numero: string;
+      lineas: { productoId: string; varianteId: string; cantidad: number }[];
+    },
+  ) {
+    return tx.remision.create({
       data: {
         tenantId: params.tenantId,
         clienteId: params.clienteId,
@@ -37,13 +41,12 @@ export class RemisionesRepository {
     return this.db.remision.findUniqueOrThrow({ where: { id }, include: INCLUDE_REMISION });
   }
 
-  /** Reemplaza líneas por completo (delete+recreate) — solo se permite en BORRADOR, ver RemisionesService.actualizar. */
+  /** Reemplaza líneas por completo (delete+recreate) — solo se permite en BORRADOR, ver RemisionesService.actualizar. El número asignado al crear no se toca acá. */
   actualizar(
     id: string,
     params: {
       clienteId: string;
       bodegaId: string;
-      numero: string;
       lineas: { productoId: string; varianteId: string; cantidad: number }[];
     },
   ) {
@@ -54,7 +57,6 @@ export class RemisionesRepository {
         data: {
           clienteId: params.clienteId,
           bodegaId: params.bodegaId,
-          numero: params.numero,
           lineas: { create: params.lineas },
         },
         include: INCLUDE_REMISION,

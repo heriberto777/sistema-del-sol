@@ -6,10 +6,11 @@ export class CrearCajaDto {
   @IsUUID()
   bodegaId: string;
 
-  @ApiProperty()
+  @ApiProperty({ required: false, description: 'Autogenerado desde el correlativo parametrizado — ignorado al crear, se acepta solo para edición interna.' })
+  @IsOptional()
   @IsString()
   @MinLength(1)
-  codigo: string;
+  codigo?: string;
 
   @ApiProperty()
   @IsString()

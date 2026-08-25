@@ -203,7 +203,6 @@ export function CotizacionesPanel() {
 
 function ModalNuevaCotizacion({ productos, onClose }: { productos: Producto[]; onClose: () => void }) {
   const queryClient = useQueryClient();
-  const [numero, setNumero] = useState('');
   const [cliente, setCliente] = useState<Cliente | null>(null);
   const [fechaVigenciaHasta, setFechaVigenciaHasta] = useState('');
   const [lineas, setLineas] = useState<LineaForm[]>([{ productoId: '', varianteId: '', cantidad: '1' }]);
@@ -212,7 +211,6 @@ function ModalNuevaCotizacion({ productos, onClose }: { productos: Producto[]; o
   const crear = useMutation({
     mutationFn: async () =>
       apiClient.post('/cotizaciones', {
-        numero,
         clienteId: cliente?.id,
         fechaVigenciaHasta,
         lineas: lineas
@@ -243,7 +241,6 @@ function ModalNuevaCotizacion({ productos, onClose }: { productos: Producto[]; o
   return (
     <Modal titulo="Nueva cotización" onClose={onClose}>
       <form onSubmit={onSubmit} className="space-y-3">
-        <FormField id="numero" label="Número" value={numero} onChange={(e) => setNumero(e.target.value)} required />
         <div>
           <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Cliente</label>
           <ComboboxBusqueda<Cliente>
@@ -321,7 +318,7 @@ function ModalEditarCotizacion({
   const queryClient = useQueryClient();
   const [error, setError] = useState<string | null>(null);
   const [cliente, setCliente] = useState<Cliente | null>(null);
-  const [valores, setValores] = useState<{ numero: string; fechaVigenciaHasta: string; lineas: LineaForm[] } | null>(null);
+  const [valores, setValores] = useState<{ fechaVigenciaHasta: string; lineas: LineaForm[] } | null>(null);
 
   const { data: detalle } = useQuery({
     queryKey: ['cotizacion-detalle', cotizacionId],
@@ -332,7 +329,6 @@ function ModalEditarCotizacion({
     if (!detalle) return;
     setCliente({ id: detalle.clienteId, nombre: detalle.cliente.nombre });
     setValores({
-      numero: detalle.numero,
       fechaVigenciaHasta: detalle.fechaVigenciaHasta.slice(0, 10),
       lineas: detalle.lineas.map((l) => ({ productoId: l.productoId, varianteId: l.varianteId, cantidad: l.cantidad })),
     });
@@ -341,7 +337,6 @@ function ModalEditarCotizacion({
   const guardar = useMutation({
     mutationFn: async () =>
       apiClient.patch(`/cotizaciones/${cotizacionId}`, {
-        numero: valores!.numero,
         clienteId: cliente?.id,
         fechaVigenciaHasta: valores!.fechaVigenciaHasta,
         lineas: valores!.lineas
@@ -376,13 +371,9 @@ function ModalEditarCotizacion({
   return (
     <Modal titulo={`Editar cotización ${numeroActual}`} onClose={onClose}>
       <form onSubmit={onSubmit} className="space-y-3">
-        <FormField
-          id="editar-numero"
-          label="Número"
-          value={valores.numero}
-          onChange={(e) => setValores({ ...valores, numero: e.target.value })}
-          required
-        />
+        <p className="text-sm text-slate-500 dark:text-slate-400">
+          Número <span className="font-medium text-slate-700 dark:text-slate-300">{numeroActual}</span> (asignado automáticamente, no editable)
+        </p>
         <div className="flex flex-col gap-1">
           <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Cliente</label>
           <ComboboxBusqueda<Cliente>

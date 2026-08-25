@@ -44,6 +44,7 @@ model Tenant {
   auditLogs     AuditLog[]
   facturas      Factura[]
   ncfAsignados  NcfAsignado[]
+  correlativos  Correlativo[]
   productos     Producto[]
   categorias    Categoria[]
   variantesProducto VarianteProducto[]
@@ -593,6 +594,38 @@ enum EstadoFactura {
 /// invariante en código que `PlantillaHorario.predeterminada`).
 /// `umbralAlerta` (nullable = sin alerta) dispara `EVENTOS.NCF_POR_AGOTARSE`
 /// cuando los comprobantes restantes caen a ese nivel o menos.
+enum TipoCorrelativo {
+  COTIZACION
+  REMISION
+  ORDEN_COMPRA
+  CAJA
+  PRODUCTO
+  CUENTA_CONTABLE
+}
+
+/// Correlativo automático genérico (plan de integración Cuadre, ítem de
+/// "consecutivos" — ver ARCHITECTURE.md) — mismo patrón atómico que
+/// NcfAsignado.secuenciaActual (`{ increment: 1 }`, ver
+/// CorrelativosRepository.siguienteEnTx), reusado para varios tipos de
+/// documento en vez de un contador por tabla. `siguienteNumero` apunta al
+/// PRÓXIMO a asignar (no al último usado) — mismo criterio que
+/// NcfAsignado.secuenciaActual. COTIZACION/REMISION/ORDEN_COMPRA/CAJA se
+/// consumen automáticamente al crear (sin edición manual en el
+/// formulario); PRODUCTO/CUENTA_CONTABLE se consumen solo bajo demanda
+/// (botón "Asignar"), el campo sigue aceptando texto libre.
+model Correlativo {
+  id              String          @id @default(uuid())
+  tenantId        String
+  tenant          Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tipo            TipoCorrelativo
+  prefijo         String          @default("")
+  siguienteNumero Int             @default(1)
+  digitos         Int             @default(5)
+
+  @@unique([tenantId, tipo])
+  @@map("correlativos")
+}
+
 model NcfAsignado {
   id               String    @id @default(uuid())
   tenantId         String

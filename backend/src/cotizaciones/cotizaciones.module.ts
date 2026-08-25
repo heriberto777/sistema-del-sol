@@ -6,9 +6,10 @@ import { FacturacionModule } from '../facturacion/facturacion.module';
 import { ClientesModule } from '../clientes/clientes.module';
 import { VariantesModule } from '../variantes/variantes.module';
 import { OfertasModule } from '../ofertas/ofertas.module';
+import { CorrelativosModule } from '../correlativos/correlativos.module';
 
 @Module({
-  imports: [FacturacionModule, ClientesModule, VariantesModule, OfertasModule],
+  imports: [FacturacionModule, ClientesModule, VariantesModule, OfertasModule, CorrelativosModule],
   controllers: [CotizacionesController],
   providers: [CotizacionesService, CotizacionesRepository],
 })

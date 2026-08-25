@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { ArrayMinSize, IsArray, IsNumber, IsOptional, IsPositive, IsString, IsUUID, ValidateNested } from 'class-validator';
+import { ArrayMinSize, IsArray, IsNumber, IsOptional, IsPositive, IsUUID, ValidateNested } from 'class-validator';
 
 export class LineaRemisionDto {
   @ApiProperty()
@@ -26,10 +26,6 @@ export class CrearRemisionDto {
   @ApiProperty()
   @IsUUID()
   bodegaId: string;
-
-  @ApiProperty()
-  @IsString()
-  numero: string;
 
   @ApiProperty({ type: [LineaRemisionDto] })
   @IsArray()

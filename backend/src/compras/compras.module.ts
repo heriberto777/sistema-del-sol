@@ -5,9 +5,10 @@ import { ComprasRepository } from './compras.repository';
 import { InventarioModule } from '../inventario/inventario.module';
 import { PagosModule } from '../pagos/pagos.module';
 import { VariantesModule } from '../variantes/variantes.module';
+import { CorrelativosModule } from '../correlativos/correlativos.module';
 
 @Module({
-  imports: [InventarioModule, PagosModule, VariantesModule],
+  imports: [InventarioModule, PagosModule, VariantesModule, CorrelativosModule],
   controllers: [ComprasController],
   providers: [ComprasService, ComprasRepository],
   exports: [ComprasService],
