@@ -139,7 +139,7 @@ export class InventarioService {
     });
 
     if (!stock) {
-      await this.lanzarStockInsuficiente(params.productoId, varianteId, params.bodegaId);
+      await this.lanzarStockInsuficiente(producto!.nombre, varianteId, params.bodegaId);
     }
 
     // `lanzarStockInsuficiente` siempre lanza — si llegamos acá, `stock` no es null (TS no infiere
@@ -149,13 +149,18 @@ export class InventarioService {
     return stock;
   }
 
-  /** Mensaje de error con el disponible real — solo se lee en el camino de error, no afecta la atomicidad del descuento. */
-  private async lanzarStockInsuficiente(productoId: string, varianteId: string, bodegaId: string): Promise<never> {
+  /**
+   * Mensaje de error con el disponible real — solo se lee en el camino de
+   * error, no afecta la atomicidad del descuento. Usa el NOMBRE del
+   * producto (ya resuelto por el caller vía `validarPertenencia`, no hay
+   * que volver a pedirlo) en vez del id crudo — este mensaje llega tal
+   * cual a la pantalla del cajero en el POS (ver `mensajeErrorApi` en
+   * TurnoCajaDetalle.tsx), un UUID ahí no le sirve a nadie.
+   */
+  private async lanzarStockInsuficiente(nombreProducto: string, varianteId: string, bodegaId: string): Promise<never> {
     const stockActual = await this.inventarioRepository.obtenerStock(varianteId, bodegaId);
     const disponible = Number(stockActual?.cantidadActual ?? 0) - Number(stockActual?.cantidadReservada ?? 0);
-    throw new BadRequestException(
-      `Stock insuficiente para el producto ${productoId} en la bodega ${bodegaId} (disponible: ${disponible})`,
-    );
+    throw new BadRequestException(`Stock insuficiente para "${nombreProducto}" (disponible: ${disponible})`);
   }
 
   private emitirSiStockBajo(
@@ -220,7 +225,7 @@ export class InventarioService {
     });
 
     if (!stock) {
-      await this.lanzarStockInsuficiente(params.productoId, varianteId, params.bodegaId);
+      await this.lanzarStockInsuficiente(producto!.nombre, varianteId, params.bodegaId);
     }
 
     // `lanzarStockInsuficiente` siempre lanza — si llegamos acá, `stock` no es null (TS no infiere

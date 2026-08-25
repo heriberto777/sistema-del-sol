@@ -182,11 +182,11 @@ export function CatalogoProductosPos({
             title={!producto.precioVenta ? 'Sin precio configurado' : undefined}
             className="flex flex-col items-center gap-1.5 rounded-lg border border-slate-200 p-2 text-center transition-colors hover:border-sol-400 hover:bg-sol-50/50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-800 dark:hover:bg-sol-900/10"
           >
-            <div className="flex h-20 w-full items-center justify-center overflow-hidden rounded-md bg-slate-50 dark:bg-slate-800">
+            <div className="flex h-32 w-full items-center justify-center overflow-hidden rounded-md bg-slate-50 dark:bg-slate-800">
               {producto.imagen ? (
                 <img src={producto.imagen} alt="" className="h-full w-full object-cover" />
               ) : (
-                <Package size={22} className="text-slate-300 dark:text-slate-600" />
+                <Package size={30} className="text-slate-300 dark:text-slate-600" />
               )}
             </div>
             <p className="line-clamp-2 text-xs font-medium leading-tight text-slate-700 dark:text-slate-300">{producto.nombre}</p>
