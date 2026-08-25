@@ -9,5 +9,6 @@ import { ContabilidadModule } from '../contabilidad/contabilidad.module';
   imports: [ReportesModule, ContabilidadModule],
   controllers: [IaController],
   providers: [IaService, IaClientService],
+  exports: [IaClientService],
 })
 export class IaModule {}
