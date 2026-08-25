@@ -1025,6 +1025,35 @@ negocio (venta de exportación, pago al exterior) que los produciría, así
 que agregarlos al enum sin nada que los use sería una brecha decorativa,
 no una brecha cerrada.
 
+**Consecutivos automáticos genéricos** (plan de integración Cuadre, ítem
+K-1): `backend/src/correlativos/`, un `Correlativo` por
+`(tenantId, tipo)` — `TipoCorrelativo` = `COTIZACION`/`REMISION`/
+`ORDEN_COMPRA`/`CAJA`/`PRODUCTO`/`CUENTA_CONTABLE`, `@@unique([tenantId,
+tipo])`. Reusa el MISMO mecanismo atómico que NCF
+(`CorrelativosRepository.siguienteEnTx`, `{ increment: 1 }` sobre
+`siguienteNumero` dentro de la transacción del caller, formateado como
+`prefijo + String(valorPrevio).padStart(digitos, '0')`) en vez de
+inventar un patrón nuevo. Decisión confirmada con el usuario
+(`AskUserQuestion`, alcance total): Cotización/Remisión/Orden de
+compra/Caja consumen el correlativo automáticamente al crearse (el
+`numero`/`codigo` deja de ser un campo del DTO de creación — cada
+`service.crear()` ahora abre su propia `$transaction`, con variantes
+`crearEnTx` de los repositorios correspondientes, mismo criterio
+`*EnTx` que el resto del proyecto); Producto y CuentaContable
+**mantienen el campo de texto libre** y solo suman un botón "Asignar"
+(`POST /admin/correlativos/:tipo/siguiente`, sin permiso extra — el
+formulario que lo llama ya está gateado por su propio permiso de
+módulo) que rellena el campo sin bloquear que el usuario lo edite
+después. Prefijo/próximo número/dígitos son editables desde Admin →
+Facturación → Consecutivos (`GET`/`PATCH /admin/correlativos`,
+`admin.configuracion`, mismo permiso que NCF) — el "próximo número" es
+editable directamente (a diferencia de NCF, que no expone esto), porque
+acá no hay una autorización DGII externa que ligue el rango. Seeding:
+las 6 filas se crean al aprovisionar un tenant nuevo
+(`TenantsRepository.crearConProvisioning`, mismo momento que
+`Suscripcion`); tenants preexistentes necesitaron un backfill
+(`pnpm --filter ./backend correlativos:backfill`, ya corrido en dev).
+
 **Categoría de cliente y comprobante por defecto** (ítem E-5): nuevo
 catálogo plano `CategoriaCliente` (`categorias-cliente/`, mismo molde que
 `ListasPrecioModule` — crear/listar/actualizar, sin `eliminar`, se
@@ -2185,15 +2214,33 @@ se agrupa también en `TSS e ISR por Pagar` en vez de tener su propia
 sub-cuenta — si el negocio necesita rastrear eso por separado, es la
 extensión natural.
 
-**Fuera de alcance deliberadamente**: pago de horas extra/comisiones/
-bonificaciones (solo salario fijo mensual por ahora), liquidación por
-despido (preaviso + cesantía del Art. 80), regalía pascual (salario
-13), remesa real a la TSS/DGII (el asiento registra la obligación, no
-la transferencia bancaria de pago a esas entidades). El control de
-asistencia/horas trabajadas y las vacaciones se están incorporando en
-Fase 7 (RRHH, ver abajo) — a la fecha de este documento, cubre
-horarios; asistencia, ausencias y su integración con el prorrateo de
-nómina todavía no.
+**Horas extra conectadas al recibo** (plan de integración Cuadre, ítem
+G-11): `RegistroAsistencia.horasExtra` (calculado en Fase 7/G-4, ver
+abajo) se suma al `PeriodoNomina` — `AsistenciaRepository.
+sumarHorasExtraEnRango(empleadoId, desde, hasta)` agrega las horas del
+rango del período, `PeriodosNominaService.generarPeriodo()` calcula
+`valorHoraOrdinaria = salarioBrutoMensual / DIVISOR_SALARIO_DIARIO /
+HORAS_JORNADA_DIARIA` y `montoHorasExtra = horasExtraSumadas *
+valorHoraOrdinaria * RECARGO_HORAS_EXTRA` (135%, primera categoría —
+**mismo disclaimer que TSS/ISR**: sin verificar contra fuente oficial,
+confirmar antes de nómina real). Se suma directo al `salarioNeto` del
+recibo (`ReciboNomina.montoHorasExtra`), sin tocar la base de TSS/ISR —
+mismo criterio conservador que `descuentoAusencias`. El asiento
+automático (abajo) también suma `totalHorasExtra` al débito
+(`costoLaboral`) para no descuadrar el asiento en un período con horas
+extra.
+
+**Fuera de alcance deliberadamente**: pago de comisiones/bonificaciones
+fuera de las horas extra (Comisiones de venta ya existe como módulo
+aparte, ver A-1 — esto es específicamente sobre el recibo de nómina),
+liquidación por despido (preaviso + cesantía del Art. 80), regalía
+pascual (salario 13), remesa real a la TSS/DGII (el asiento registra la
+obligación, no la transferencia bancaria de pago a esas entidades). El
+control de asistencia/horas trabajadas y las vacaciones se están
+incorporando en Fase 7 (RRHH, ver abajo) — a la fecha de este
+documento, cubre horarios, asistencia y ausencias; solo horas extra
+llegó al prorrateo de nómina, el resto (tardanza, ausencias) sigue sin
+efecto en el recibo.
 
 ### RRHH: Horarios, asistencia y ausencias (Fase 7 de adopción de Cuadre)
 
@@ -2247,11 +2294,20 @@ nuevos empleados" de la comparación original con Cuadre.
 su `User` de login — no todo empleado necesita acceso al sistema (ej.
 personal de bodega). Es la base para que la sub-fase de Asistencia
 resuelva "quién soy" desde el JWT (`req.user.userId`) sin pedirle al
-empleado que elija su propio registro de una lista. **Sin UI dedicada
-todavía** para vincularlo — se hace vía `PATCH /nomina/empleados/:id
-{ userId }` (Swagger/API directo); agregar un selector de usuario en la
-ficha de Empleado es la extensión natural cuando se defina el flujo de
-UX (¿lo vincula RRHH desde ahí, o lo reclama el propio empleado?).
+empleado que elija su propio registro de una lista.
+
+**UI del vínculo Empleado↔Usuario** (plan de integración Cuadre, ítem
+G-10): análisis confirmado con el usuario antes de tocar código —
+Empleado y Usuario se **mantienen separados**, no se fusionan ni se
+genera un Empleado automáticamente al crear un Usuario (un Usuario
+puede no ser nómina, ej. un contador externo con acceso al sistema pero
+sin recibo de sueldo); solo se expuso el vínculo ya existente en el
+schema. `GET /nomina/empleados/usuarios-disponibles` (`nomina.editar`)
+delega en `UsuariosService.listar` (nunca expone `passwordHash`) para
+alimentar un combobox en el formulario de Empleado, ahora compartido
+crear/editar (antes solo existía alta). Un conflicto de `userId` ya
+tomado por otro empleado devuelve `BadRequestException` con mensaje
+claro (mismo `try/catch` de `P2002` que ya usaba `actualizar()`).
 
 **Asistencia (7b, implementado)**: `RegistroAsistencia` — una fila por
 empleado por día calendario, completada progresivamente
@@ -2280,10 +2336,13 @@ zona habría registrado la hora equivocada para el empleado.
 integración Cuadre, ítems G-3/G-4)**: `RegistroAsistencia.estado`
 (`PENDIENTE → APROBADO/RECHAZADO`, `PATCH /nomina/asistencia/:id/estado`,
 `rrhh.aprobar`) es un flujo calcado de `Ausencia.estado` — puramente de
-revisión/auditoría, a diferencia de `Ausencia` **ningún cálculo de
-nómina lee este `estado`** (`PeriodosNominaService` nunca consulta
-`RegistroAsistencia`, solo `Ausencia`), así que aprobar/rechazar un
-marcaje no cambia ningún monto pagado. `salidaAnticipada`/`horasExtra`
+revisión/auditoría: aprobar/rechazar un marcaje no cambia ningún monto
+pagado, a diferencia de `Ausencia.estado`. **Matiz desde G-11**:
+`PeriodosNominaService` SÍ consulta `RegistroAsistencia` ahora —
+`sumarHorasExtraEnRango()` sobre `horasExtra` — pero sin filtrar por
+este `estado` de aprobación (suma registros `PENDIENTE` igual que
+`APROBADO`); si se necesita que solo las horas extra aprobadas paguen,
+es la extensión natural. `salidaAnticipada`/`horasExtra`
 se calculan una sola vez al marcar la salida (o en `registrarManual` si
 trae `horaSalida`), mismo criterio que `tardanza`: `salidaAnticipada`
 compara contra `HorarioEmpleado` del día (sin horario, no hay contra qué

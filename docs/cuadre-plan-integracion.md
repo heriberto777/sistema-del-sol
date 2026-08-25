@@ -220,6 +220,32 @@ Resumen de lo que cambió (detalle en cada ítem más abajo):
   que un cliente le pague a un tenant en su POS. El patrón de adaptador es
   reusable como referencia de diseño, pero no hay nada construido para
   este caso.*
+  **Investigación de API real (2026-08-25, sin implementar — para no
+  re-derivar esto cuando se retome)**: se leyeron los contratos reales de
+  ambos proveedores (docs. oficiales en `dev.azul.com.do` y
+  `developers.cardnet.com.do`). Son dos mecanismos completamente
+  distintos entre sí: **AZUL "Página de Pagos"** NO es una API
+  backend-to-backend — es un formulario HTML que el navegador postea
+  directo a una página de checkout hospedada por AZUL
+  (`pruebas.azul.com.do/PaymentPage/` sandbox,
+  `pagos.azul.com.do/PaymentPage/Default.aspx` producción), firmado con
+  HMAC-SHA512 sobre los campos concatenados (`MerchantId`, `OrderNumber`,
+  `Amount`/`ITBIS` en centavos, `ApprovedUrl`/`DeclinedUrl`/`CancelUrl`,
+  `AuthHash`) usando un `AuthKey` secreto que nunca se transmite; AZUL
+  redirige de vuelta con el resultado + su propio `AuthHash` (verificar
+  antes de confiar). **CardNet** sí es una API REST/JSON de sesiones:
+  `POST {urlbase}/sessions` (sandbox `labservicios.cardnet.com.do`,
+  producción `ecommerce.cardnet.com.do`) devuelve un id de sesión + clave
+  (`sk`), se postea a un endpoint de "Botón de Pago" con ese id, y el
+  resultado se consulta con `GET /sessions/{id}?sk={sk}`. Ninguno de los
+  dos encaja directo en el contrato `{url, referenciaExterna}` de
+  `PasarelaPagoAdapter` (pensado para una API JSON simétrica) — habría
+  que diseñarlo de nuevo para admitir "formulario HTML firmado" como
+  variante. **Decisión (2026-08-25)**: queda fuera del lote de RRHH/
+  Consecutivos/Configuración implementado ese día — es más grande que
+  esos 4 ítems combinados y merece su propia conversación de diseño
+  (nuevo modelo de link público para `Factura` de tenant, cómo mapear el
+  flujo de AZUL de vuelta al contrato existente). Sin implementar.
 - [x] **C-2** 🟧→🟥 *(corrección — diseño primero)* — **Multi-moneda de
   punta a punta**. *Confirmado: brecha real en comportamiento —
   `TenantSettings.moneda` (String, default "DOP") era un campo muerto,
@@ -530,6 +556,40 @@ Resumen de lo que cambió (detalle en cada ítem más abajo):
 - [ ] **G-9** 🟥 *diseño primero, depende de hardware del cliente* —
   **Integración con relojes biométricos** (ANVIZ/CrossChex Cloud).
   *Confirmado: brecha real, sin cambios.*
+- [x] **G-10** 🟨 — **Vínculo Empleado ↔ Usuario**. *`Empleado.userId` ya
+  existía en el schema desde antes, sin exponerse en ningún formulario —
+  brecha de UI, no de modelo.* Análisis confirmado con el usuario (no se
+  fusionó Empleado con Usuario ni se generó un Empleado automático al
+  crear un Usuario — son conceptos que a veces coinciden y a veces no:
+  un Usuario puede no ser nómina, ej. un contador externo con acceso al
+  sistema). Entregado: `GET /nomina/empleados/usuarios-disponibles`
+  (permiso `nomina.editar`, delega en `UsuariosService.listar` — nunca
+  expone `passwordHash`), combobox de usuario en el formulario de
+  Empleado (ahora compartido crear/editar, antes solo existía alta),
+  conflicto `P2002` de `userId` ya vinculado devuelve error claro. Sin
+  migración. Entregado 2026-08-25.
+- [x] **G-11** 🟨 — **Horas extra conectadas al recibo de nómina**.
+  *Confirmado: `RegistroAsistencia.horasExtra` (G-4) se calculaba y
+  mostraba en Asistencia, pero `PeriodosNominaService.generarPeriodo()`
+  nunca lo leía — el recibo de nómina lo ignoraba por completo.*
+  Entregado: `AsistenciaRepository.sumarHorasExtraEnRango()`,
+  `RECARGO_HORAS_EXTRA = 1.35` (135%, primera categoría — **sin
+  verificar contra fuente oficial**, mismo disclaimer que ISR/TSS),
+  `ReciboNomina.montoHorasExtra` sumado al salario neto (no afecta base
+  de TSS/ISR, mismo criterio conservador que `descuentoAusencias`). El
+  asiento contable automático (`AsientosContablesService.
+  generarDesdeNomina`) se actualizó para sumar `totalHorasExtra` también
+  al débito (`costoLaboral`) — si no, el asiento hubiera quedado
+  descuadrado en cualquier período con horas extra. Migración
+  `20260901090000_recibo_nomina_horas_extra`. Entregado 2026-08-25.
+- [x] **G-12** ✅ *reconfirmado, sin cambios* — **"Marcar entrada" al
+  hacer login**. El usuario preguntó de nuevo si el login debería marcar
+  la entrada automáticamente; se reconfirmó la decisión ya tomada
+  anteriormente (documentada en `MarcarAsistenciaWidget.tsx`): login y
+  marcar asistencia quedan separados a propósito — un usuario puede
+  loguearse sin estar físicamente llegando a trabajar (ej. revisar algo
+  desde casa), así que fusionar ambos generaría marcas de asistencia
+  falsas. Sin cambios de código.
 
 ## H — Comunicación y plantillas
 
@@ -637,6 +697,30 @@ Resumen de lo que cambió (detalle en cada ítem más abajo):
   de seguridad mal diseñado en el peor. Reclasificado a "diseño
   primero", NO implementado — necesita decidir el alcance de una API
   pública antes de poder diseñar sus scopes.*
+
+## K — Configuración general
+
+*Sección nueva (2026-08-25), no venía del catálogo A-J original — salió
+de comparar `app.cuadre.do/settings` contra `Admin.tsx` en una revisión
+aparte.*
+
+- [x] **K-1** 🟧 — **Consecutivos/numeración automática**. *Confirmado:
+  Cotización/Remisión/Orden de compra/Caja pedían el número/código
+  tipeado a mano en el formulario de creación — sin ningún contador
+  centralizado (a diferencia de NCF, que sí es atómico desde siempre).*
+  Decisión confirmada con el usuario (`AskUserQuestion`): alcance total
+  — además de los 4 automáticos, Producto y CuentaContable **mantienen
+  el campo de texto libre** y suman un botón "Asignar" para tomar el
+  siguiente consecutivo cuando se quiera (no se les fuerza el
+  automático). Entregado: modelo `Correlativo` (`@@unique([tenantId,
+  tipo])`, prefijo/próximo número/dígitos editables desde Admin →
+  Facturación → Consecutivos, mismo criterio que NCF), incremento
+  atómico vía `{ increment: 1 }` (`CorrelativosRepository.
+  siguienteEnTx`, calcado de `siguienteNcfEnTx`), consumido dentro de la
+  misma transacción de creación en Cotizaciones/Remisiones/Compras/
+  Cajas (`crearEnTx`). Seeding automático al aprovisionar un tenant +
+  script de backfill (`correlativos:backfill`) para los ya existentes.
+  Migración `20260902090000_correlativos`. Entregado 2026-08-25.
 
 ---
 
@@ -835,6 +919,21 @@ Resumen de lo que cambió (detalle en cada ítem más abajo):
   presentación (equivalente mostrado en el documento impreso). Catálogo
   `TasaCambio` manual, sin feed automático. Migración
   `20260831090000_multi_moneda`.
+- **2026-08-25**: análisis a fondo de Gestión Humana/Nómina y de
+  Configuración (`app.cuadre.do/hr`, `/settings`) a pedido del usuario,
+  con 4 ítems implementados en la misma tanda (uno por commit): **G-10**
+  (vínculo Empleado↔Usuario, solo exponer el campo ya existente — no
+  fusionar conceptos), **G-11** (horas extra conectadas al recibo de
+  nómina, con el ajuste correspondiente al asiento contable para que
+  siga cuadrando), **G-12** (re-confirmado con el usuario: "Marcar
+  entrada" sigue separado del login, sin cambios) y **K-1**
+  (Consecutivos automáticos — sección nueva K, no existía en el catálogo
+  A-J original). De paso se investigó a fondo **C-1** (AZUL/CardNet
+  Payment Link, contratos reales leídos) pero se decidió dejarlo fuera
+  de este lote — ver la nota agregada en C-1. Queda pendiente **H-2a**
+  (formulario de configuración de WhatsApp por tenant, entrega parcial
+  de H-2 — decidido con el usuario construirlo ya, sin esperar la
+  decisión de mecanismo de H-2b).
 
 ## Sugerencia de por dónde arrancar
 
@@ -843,10 +942,10 @@ entregado, y arrancó la ronda de ítems 🟥** (el usuario pidió seguir con
 "todos, no parar hasta finalizar todo" — cada uno con su propia
 conversación de diseño antes de tocar código). Lote 🟨/🟧 completo:
 B-1/B-2/B-3/B-6/B-7/B-8, E-2/E-3/E-4/E-5/E-6/E-8/E-9/E-11, F-2/F-4/F-5/
-F-8, G-1/G-2/G-3/G-4/G-5/G-6/G-7/G-8, H-3, J-1/J-2/J-3 — todos
-verificados (tsc + suite unitaria + e2e + lint + build, todo verde) y
-commiteados uno por uno. De los 🟥, ya entregados: **D-1, A-2, A-1, A-3,
-E-7, C-2**. I-1 resultó falso positivo (ya estaba construido).
+F-8, G-1/G-2/G-3/G-4/G-5/G-6/G-7/G-8/G-10/G-11/G-12, H-3, J-1/J-2/J-3,
+K-1 — todos verificados (tsc + suite unitaria + e2e + lint + build, todo
+verde) y commiteados uno por uno. De los 🟥, ya entregados: **D-1, A-2,
+A-1, A-3, E-7, C-2**. I-1 resultó falso positivo (ya estaba construido).
 
 Lo que queda, por categoría:
 - **Deliberadamente pausado a pedido del usuario**: B-9 (línea manual/

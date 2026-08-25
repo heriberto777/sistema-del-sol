@@ -46,7 +46,8 @@ PostgreSQL 16 + Prisma. Schema completo en `backend/prisma/schema.prisma`.
 | Notificaciones | `notificacion_plantillas`, `notificaciones` |
 | Contabilidad | `cuentas_contables`, `asientos_contables`, `lineas_asiento` |
 | Bancos / Gastos menores | `cuentas_bancarias`, `gastos_menores`, `lineas_gasto_menor` |
-| Nómina | `empleados`, `periodos_nomina`, `recibos_nomina` |
+| Nómina | `empleados`, `periodos_nomina`, `recibos_nomina` (ítem G-11: `montoHorasExtra Decimal @default(0)`, sumado desde `asistencia.horasExtra` — ver ARCHITECTURE.md) |
+| Consecutivos | `correlativos` (ítem K-1: `@@unique([tenantId, tipo])`, numeración automática de Cotización/Remisión/Orden de compra/Caja + botón "Asignar" opcional para Producto/CuentaContable — ver ARCHITECTURE.md) |
 | POS | `turnos_caja` (ítem E-7: `cajaId` nullable — sin esto, sin restricción de catálogo), `movimientos_caja`, `ventas_aparcadas`/`lineas_venta_aparcada`, `pagos_venta` (ledger de pago dividido, hija de `facturas` sin tenantId propio) (+ `facturas.formaPagoId`/`facturas.turnoCajaId`/`facturas.vendedorEmpleadoId`); `cajas` (terminal física, pertenece a UNA `bodega`), `caja_categorias`/`caja_productos`/`caja_producto_favoritos` (tablas hija sin tenantId propio, mismo patrón que `componentes_combo` — ver ARCHITECTURE.md) |
 | Formas de pago | `formas_pago` (tenant-scoped, reemplaza el enum fijo `MetodoPago` para `facturas`/`pagos` — ese enum sigue existiendo solo para `PagoPlataforma`; `esBono: Boolean` identifica la forma "Bono" igual que `esEfectivo`, Fase 4c — ver ARCHITECTURE.md). `formas_pago.tipo` (plan de integración Cuadre, ítem E-11) es un enum nullable de 8 categorías, puramente informativo — `esEfectivo`/`esBono`/`esPuntosLealtad` (ítem A-3) siguen siendo los que gatillan comportamiento real (arqueo de caja, canje de Bono, canje de puntos); "Crédito Cliente" YA existe como fila sembrada (`FORMAS_PAGO_BASE`) desde antes de este ítem, solo con el nombre — no descuenta contra `Cliente.limiteCredito`, eso queda fuera de alcance (candidato a su propia sesión de diseño, no un campo de catálogo chico). |
 | Lealtad / puntos | `configuraciones_lealtad` (fila única por tenant, ítem A-3), `movimientos_lealtad` (ledger `ACUMULACION`/`CANJE`/`EXPIRACION`/`AJUSTE`, `puntosDisponibles` con el mismo rol FEFO que `Lote.cantidadActual` — ver ARCHITECTURE.md) |
@@ -119,6 +120,16 @@ por canjes y por el cron de expiración diario.
   nivel de Postgres, así que "a lo sumo una compartida por tipo" se
   valida en código — ver ARCHITECTURE.md); `umbralAlerta` nullable = sin
   alerta configurada.
+- **Consecutivos genéricos** (`correlativos`, ítem K-1): mismo mecanismo
+  atómico que NCF (`{ increment: 1 }` sobre `siguienteNumero`), pero SIN
+  el concepto de rango/vigencia de NCF — solo prefijo + próximo número +
+  dígitos de padding. `siguienteNumero` siempre representa "el PRÓXIMO
+  número a asignar", nunca el último ya usado — al leerlo desde
+  `CorrelativosRepository.siguienteEnTx`, el valor devuelto al caller es
+  `actualizada.siguienteNumero - 1` (el valor ANTES de este incremento),
+  igual que `NcfAsignado`. A diferencia de NCF, el "próximo número" es
+  editable directamente desde Admin — no hay una autorización externa
+  (DGII) que ligue el rango a un valor específico.
 - **Precios**: `precios` es un historial — cada cambio cierra el registro
   vigente (`vigenteHasta = now()`) y crea uno nuevo con `vigenteHasta:
   null`. La vigente es siempre `WHERE vigenteHasta IS NULL`.
@@ -279,6 +290,13 @@ por canjes y por el cron de expiración diario.
   período. No hay historial de cambios de salario (a diferencia de
   `precios`) — si se necesita auditar aumentos salariales, es la
   extensión natural.
+- **`recibos_nomina.montoHorasExtra`** (ítem G-11, `@default(0)`): suma
+  de `asistencia.horasExtra` del rango del período al momento de
+  generarlo, valorizada a `salarioBrutoMensual / DIVISOR_SALARIO_DIARIO
+  / HORAS_JORNADA_DIARIA * 1.35`. Igual que el resto del recibo, es un
+  valor congelado — no se recalcula si se corrige un `RegistroAsistencia`
+  después de generado el período. Se suma al `salarioNeto`, nunca a la
+  base de TSS/ISR.
 - **`empleados.userId`** (nullable, único) es `ON DELETE SET NULL` —
   borrar el `User` de login no debe borrar el historial de nómina del
   empleado, solo desvincularlo (RRHH, Fase 7a). `horarios_empleado`
