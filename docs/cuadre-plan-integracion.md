@@ -211,41 +211,46 @@ Resumen de lo que cambió (detalle en cada ítem más abajo):
 
 ## C — Pagos
 
-- [ ] **C-1** 🟥 *diseño primero* — **AZUL y CARDNET** para las ventas del
-  propio tenant (link de pago + terminal física Pin Pad). *Confirmado:
-  brecha real — existe un patrón de adaptador reutilizable
-  (`PasarelaPagoAdapter`, con `AzulAdapter`/`CardNetAdapter` ya como stubs),
-  pero es para la **facturación de la plataforma a los tenants**
-  (`facturacion-plataforma/pasarela/`), un contexto totalmente distinto a
-  que un cliente le pague a un tenant en su POS. El patrón de adaptador es
-  reusable como referencia de diseño, pero no hay nada construido para
-  este caso.*
-  **Investigación de API real (2026-08-25, sin implementar — para no
-  re-derivar esto cuando se retome)**: se leyeron los contratos reales de
-  ambos proveedores (docs. oficiales en `dev.azul.com.do` y
-  `developers.cardnet.com.do`). Son dos mecanismos completamente
-  distintos entre sí: **AZUL "Página de Pagos"** NO es una API
-  backend-to-backend — es un formulario HTML que el navegador postea
-  directo a una página de checkout hospedada por AZUL
-  (`pruebas.azul.com.do/PaymentPage/` sandbox,
-  `pagos.azul.com.do/PaymentPage/Default.aspx` producción), firmado con
-  HMAC-SHA512 sobre los campos concatenados (`MerchantId`, `OrderNumber`,
-  `Amount`/`ITBIS` en centavos, `ApprovedUrl`/`DeclinedUrl`/`CancelUrl`,
-  `AuthHash`) usando un `AuthKey` secreto que nunca se transmite; AZUL
-  redirige de vuelta con el resultado + su propio `AuthHash` (verificar
-  antes de confiar). **CardNet** sí es una API REST/JSON de sesiones:
-  `POST {urlbase}/sessions` (sandbox `labservicios.cardnet.com.do`,
-  producción `ecommerce.cardnet.com.do`) devuelve un id de sesión + clave
-  (`sk`), se postea a un endpoint de "Botón de Pago" con ese id, y el
-  resultado se consulta con `GET /sessions/{id}?sk={sk}`. Ninguno de los
-  dos encaja directo en el contrato `{url, referenciaExterna}` de
-  `PasarelaPagoAdapter` (pensado para una API JSON simétrica) — habría
-  que diseñarlo de nuevo para admitir "formulario HTML firmado" como
-  variante. **Decisión (2026-08-25)**: queda fuera del lote de RRHH/
-  Consecutivos/Configuración implementado ese día — es más grande que
-  esos 4 ítems combinados y merece su propia conversación de diseño
-  (nuevo modelo de link público para `Factura` de tenant, cómo mapear el
-  flujo de AZUL de vuelta al contrato existente). Sin implementar.
+- [x] **C-1** 🟥→✅ *diseño primero, entregado* — **AZUL y CARDNET** para
+  las ventas del propio tenant, como **Payment Link** (decisión ya
+  confirmada con el usuario — la terminal física Pin Pad queda fuera).
+  *Confirmado: brecha real — `PasarelaPagoAdapter` (`facturacion-
+  plataforma/pasarela/`) es para la facturación de PLATAFORMA a los
+  tenants, un contexto totalmente distinto a que el CLIENTE de un tenant
+  le pague una `Factura` de ese tenant.* Contratos reales de ambos
+  proveedores (docs. oficiales `dev.azul.com.do`/`developers.cardnet.
+  com.do`) resultaron completamente distintos entre sí — **AZUL "Página
+  de Pagos"**: formulario HTML firmado con HMAC-SHA512 (una sola
+  `AuthKey`, no Auth1/Auth2 — eso es de su API SOAP separada), sin
+  sesión de servidor; **CardNet "Botón de Pago — Web con Pantalla"**:
+  API REST de sesiones (`POST /sessions` → form POST a `/authorize` →
+  `GET /sessions/{id}?sk=` para el resultado autoritativo), sin firma
+  ni push de resultado. Ninguno encajaba en el contrato `{url,
+  referenciaExterna}` de `PasarelaPagoAdapter` — se construyó una
+  interfaz local nueva (`pasarela-cobro/adapters/`) que admite tanto
+  redirect simple como formulario POST autoenviado. Entregado en 3
+  commits: (1) infra común — `PasarelaConfigTenant` (credenciales por
+  tenant, mismo cifrado que `WhatsappConfigTenant`), `SesionCobroFactura`
+  (ledger de idempotencia real por `referenciaExterna`, deliberadamente
+  distinto del atajo "si ya está pagada" de `PagoPlataforma` — acá se
+  permiten pagos parciales, ese atajo dejaría de ser seguro),
+  `Pago.userId` nullable (un pago de gateway no tiene operador humano,
+  mismo criterio que `PagoPlataforma.registradoPorId`); (2) AZUL
+  end-to-end; (3) CardNet end-to-end. Decisiones confirmadas con el
+  usuario (`AskUserQuestion`): construir los dos proveedores en la
+  misma tanda (no uno primero); permitir **pago parcial** desde el link
+  público (no solo el saldo completo); el link se genera con un **botón
+  manual** en el detalle de la Factura, no automático. Ver
+  ARCHITECTURE.md para el detalle de diseño (incluye por qué se "forja"
+  `request.user` para reusar `FacturacionService.registrarPago` desde
+  el controller público). Verificado end-to-end contra AMBOS sandboxes
+  reales (formularios llegaron a `pruebas.azul.com.do`/`labservicios.
+  cardnet.com.do`, credenciales de prueba rechazadas como se esperaba) y
+  con retornos simulados/reales: idempotencia confirmada, pago parcial
+  no marca la factura pagada, `Pago.userId` queda `null`. Migraciones
+  `20260904090000_pasarela_cobro`, `20260905090000_pasarela_cobro_
+  ajuste_azul`, `20260906090000_pasarela_cobro_ajuste_cardnet`.
+  Entregado 2026-08-25.
 - [x] **C-2** 🟧→🟥 *(corrección — diseño primero)* — **Multi-moneda de
   punta a punta**. *Confirmado: brecha real en comportamiento —
   `TenantSettings.moneda` (String, default "DOP") era un campo muerto,
@@ -945,6 +950,12 @@ aparte.*
   (formulario de configuración de WhatsApp por tenant, entrega parcial
   de H-2 — decidido con el usuario construirlo ya, sin esperar la
   decisión de mecanismo de H-2b).
+- **2026-08-25**: entregado **C-1** (AZUL/CardNet Payment Link),
+  retomado tras el lote anterior con su propia conversación de diseño
+  (`AskUserQuestion`). Los dos proveedores en la misma tanda, pago
+  parcial permitido desde el link público, botón manual en Factura para
+  generarlo — ver el detalle completo en el ítem C-1 arriba. Verificado
+  end-to-end contra los sandboxes reales de ambos proveedores.
 
 ## Sugerencia de por dónde arrancar
 
@@ -956,12 +967,10 @@ B-1/B-2/B-3/B-6/B-7/B-8, E-2/E-3/E-4/E-5/E-6/E-8/E-9/E-11, F-2/F-4/F-5/
 F-8, G-1/G-2/G-3/G-4/G-5/G-6/G-7/G-8/G-10/G-11/G-12, H-3, J-1/J-2/J-3,
 K-1 — todos verificados (tsc + suite unitaria + e2e + lint + build, todo
 verde) y commiteados uno por uno. De los 🟥, ya entregados: **D-1, A-2,
-A-1, A-3, E-7, C-2**. I-1 resultó falso positivo (ya estaba construido).
-Con esto queda cerrado el lote de RRHH/Consecutivos/Configuración del
-2026-08-25 (G-10, G-11, G-12, K-1, H-2a) — de ese análisis, lo único
-pendiente es C-1 (AZUL/CardNet, fuera de alcance a propósito, ver
-arriba) y H-2b (bot conversacional, bloqueado por la decisión de
-mecanismo).
+A-1, A-3, E-7, C-2, C-1**. I-1 resultó falso positivo (ya estaba
+construido). Con esto queda cerrado el lote de RRHH/Consecutivos/
+Configuración del 2026-08-25 (G-10, G-11, G-12, K-1, H-2a) y también
+C-1 (AZUL/CardNet Payment Link), retomado aparte el mismo día.
 
 Lo que queda, por categoría:
 - **Deliberadamente pausado a pedido del usuario**: B-9 (línea manual/
@@ -970,9 +979,8 @@ Lo que queda, por categoría:
   corrección de tamaño), E-1 (Patrón Borrador→Confirmado en Compras/
   Ajustes/Transferencias, matiz).
 - **🟥, pendientes de su propia conversación de diseño**: A-4,
-  B-5, C-1 (AZUL/CardNet, investigación ya hecha — ver arriba), F-9,
-  G-9 (hardware), H-2b (bot conversacional de WhatsApp — H-2a, el
-  formulario de configuración, ya entregado; sigue pendiente la
+  B-5, F-9, G-9 (hardware), H-2b (bot conversacional de WhatsApp — H-2a,
+  el formulario de configuración, ya entregado; sigue pendiente la
   decisión de mecanismo n8n vs. backend propio), J-4 (API keys,
   reclasificado — no aplica sin una API pública).
 

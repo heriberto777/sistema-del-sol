@@ -49,6 +49,7 @@ PostgreSQL 16 + Prisma. Schema completo en `backend/prisma/schema.prisma`.
 | Nómina | `empleados`, `periodos_nomina`, `recibos_nomina` (ítem G-11: `montoHorasExtra Decimal @default(0)`, sumado desde `asistencia.horasExtra` — ver ARCHITECTURE.md) |
 | Consecutivos | `correlativos` (ítem K-1: `@@unique([tenantId, tipo])`, numeración automática de Cotización/Remisión/Orden de compra/Caja + botón "Asignar" opcional para Producto/CuentaContable — ver ARCHITECTURE.md) |
 | Configuración de WhatsApp por tenant | `whatsapp_config_tenant` (ítem H-2a: `tenantId @unique`, credenciales Twilio + proveedor de IA, secretos cifrados igual que `plataforma_configuracion` — solo guarda datos, todavía sin conectar a `WhatsAppChannel` ni a ningún bot — ver ARCHITECTURE.md) |
+| Pasarela de cobro de tenant (AZUL/CardNet) | `pasarela_config_tenant` (ítem C-1: `tenantId @unique`, credenciales por proveedor — AZUL usa una sola `azulAuthKeyCifrado`, CardNet no tiene ningún secreto), `sesiones_cobro_factura` (`@@unique([pasarela, referenciaExterna])`, ledger de idempotencia real — ver ARCHITECTURE.md) |
 | POS | `turnos_caja` (ítem E-7: `cajaId` nullable — sin esto, sin restricción de catálogo), `movimientos_caja`, `ventas_aparcadas`/`lineas_venta_aparcada`, `pagos_venta` (ledger de pago dividido, hija de `facturas` sin tenantId propio) (+ `facturas.formaPagoId`/`facturas.turnoCajaId`/`facturas.vendedorEmpleadoId`); `cajas` (terminal física, pertenece a UNA `bodega`), `caja_categorias`/`caja_productos`/`caja_producto_favoritos` (tablas hija sin tenantId propio, mismo patrón que `componentes_combo` — ver ARCHITECTURE.md) |
 | Formas de pago | `formas_pago` (tenant-scoped, reemplaza el enum fijo `MetodoPago` para `facturas`/`pagos` — ese enum sigue existiendo solo para `PagoPlataforma`; `esBono: Boolean` identifica la forma "Bono" igual que `esEfectivo`, Fase 4c — ver ARCHITECTURE.md). `formas_pago.tipo` (plan de integración Cuadre, ítem E-11) es un enum nullable de 8 categorías, puramente informativo — `esEfectivo`/`esBono`/`esPuntosLealtad` (ítem A-3) siguen siendo los que gatillan comportamiento real (arqueo de caja, canje de Bono, canje de puntos); "Crédito Cliente" YA existe como fila sembrada (`FORMAS_PAGO_BASE`) desde antes de este ítem, solo con el nombre — no descuenta contra `Cliente.limiteCredito`, eso queda fuera de alcance (candidato a su propia sesión de diseño, no un campo de catálogo chico). |
 | Lealtad / puntos | `configuraciones_lealtad` (fila única por tenant, ítem A-3), `movimientos_lealtad` (ledger `ACUMULACION`/`CANJE`/`EXPIRACION`/`AJUSTE`, `puntosDisponibles` con el mismo rol FEFO que `Lote.cantidadActual` — ver ARCHITECTURE.md) |
@@ -405,6 +406,13 @@ por canjes y por el cron de expiración diario.
 - **`gastos_menores.ncf`/`tipoNcf`** reutilizan el mismo mecanismo de
   `ncf_asignados` que facturación (tipo `B11` tradicional o `E43` si el
   tenant está en modalidad e-CF) — no es una secuencia propia.
+- **`pagos.userId`** (nullable, ítem C-1): un pago registrado por el
+  checkout público de AZUL/CardNet no tiene operador humano —
+  `CobrosPublicosService.procesarRetorno` le pasa `null` explícito.
+  Mismo criterio que `pagos_plataforma.registradoPorId`, ya nullable
+  por esta misma razón desde antes. Ninguna pantalla mostraba "cobrado
+  por" antes de este cambio (`Pago.user` no estaba `include`do en
+  ningún listado), así que no hubo que tocar UI.
 - **`pagos.retencionIsr`/`retencionItbis`** (default 0): retención de
   ISR/ITBIS practicada a un proveedor al pagarle una orden de compra
   (Art. 309/349), ingresada a mano por quien registra el pago — nunca se

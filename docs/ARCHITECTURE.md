@@ -1808,10 +1808,19 @@ ni `PagosPlataformaService` conocen la pasarela concreta.
   lanza `ServiceUnavailableException` sin llegar a llamar `fetch` (nunca
   crashea la app). `client_reference_id`/`metadata[facturaId]` llevan el
   id de la factura para que el webhook sepa qué marcar.
-- **`AzulAdapter`/`CardNetAdapter`**: stubs (`habilitado: false`,
-  lanzan `ServiceUnavailableException`) — demuestran que el patrón
-  admite sumar la pasarela real después sin tocar
-  `PasarelaPagoService`, el controller ni `PagosPlataformaService`.
+- **`AzulAdapter`/`CardNetAdapter`** (de ESTA carpeta,
+  `facturacion-plataforma/pasarela/`): siguen siendo stubs
+  (`habilitado: false`, lanzan `ServiceUnavailableException`) —
+  demuestran que el patrón admite sumar la pasarela real después sin
+  tocar `PasarelaPagoService`, el controller ni
+  `PagosPlataformaService`. **No confundir** con las clases del mismo
+  nombre en `backend/src/pasarela-cobro/adapters/` (ítem C-1, ver
+  abajo) — esas SÍ están conectadas de verdad, pero resuelven un
+  problema distinto (el cliente de un tenant pagándole al tenant, no el
+  tenant pagándole a la plataforma) con un contrato de adapter
+  completamente distinto (`PasarelaCobroAdapter`, no
+  `PasarelaPagoAdapter`) — se investigó reusar este mismo contrato y no
+  encajaba (ver la sección de abajo para el porqué).
 
 **Verificación de firma del webhook** (`stripe-webhook.util.ts`,
 `verificarFirmaStripe`): hand-rolled con `crypto` nativo (HMAC-SHA256
@@ -1838,6 +1847,159 @@ mismo monto numérico de la factura, **sin conversión de tasa de
 cambio**. Facturar en DOP real requeriría configurar la cuenta de
 Stripe para liquidar en DOP o aplicar una tasa de conversión — fuera de
 alcance de esta fase.
+
+## Pasarela de cobro de tenant — AZUL/CardNet (`backend/src/pasarela-cobro/`, ítem C-1)
+
+Quién paga: **el cliente de un tenant**, a una `Factura` de ESE
+tenant — no confundir con la sección de arriba (esa es el tenant
+pagándole a la plataforma). Mecanismo confirmado con el usuario:
+**Payment Link** (no terminal física Pin Pad). Namespace público
+separado (`/api/cobros-publicos/**`, distinto de `/api/pagos-publicos/**`)
+y frontend separado (`/pagar-factura/:facturaId`, distinto de
+`/pagar/:facturaId`).
+
+**Por qué no se reusó `PasarelaPagoAdapter`**: ese contrato
+(`{url, referenciaExterna}`, redirect GET simple, pensado para una API
+JSON simétrica como Stripe) no encaja con ninguno de los dos
+proveedores reales de este ítem. Se investigaron los contratos
+oficiales (`dev.azul.com.do`, `developers.cardnet.com.do`) y son dos
+mecanismos completamente distintos entre sí — se construyó una
+interfaz local nueva:
+
+```ts
+interface ResultadoCheckoutCobro {
+  metodo: 'GET' | 'POST';
+  url: string;
+  campos?: Record<string, string>; // solo si metodo === 'POST'
+  referenciaExterna: string;
+  datosVerificacion?: string; // ej. el sk de sesión de CardNet, cifrado
+}
+interface PasarelaCobroAdapter {
+  readonly clave: 'AZUL' | 'CARDNET';
+  crearCheckout(params: CrearCheckoutParams): Promise<ResultadoCheckoutCobro>;
+  verificarRetorno(query, sesion, config): Promise<{ aprobado: boolean }>;
+}
+```
+
+El frontend (`CobroFactura.tsx`) resuelve `metodo`: `'GET'` hace
+`window.location.href = url`; `'POST'` arma un `<form>` oculto con
+`campos` y lo autoenvía — el mismo patrón sirve para ambos proveedores
+sin que el frontend necesite saber cuál está activo.
+
+### `PasarelaConfigTenant` — credenciales por tenant
+
+Mismo molde de 4 capas que `WhatsappConfigTenant`
+(`obtenerOCrear`/`aplicarCampoSecreto`/`aFormaSegura`). `pasarelaActiva`
+(`'AZUL'|'CARDNET'|null`) decide cuál procesa el checkout público; los
+campos de ambos proveedores conviven en una sola fila (mismo criterio
+que `PlataformaConfiguracion`, que junta SMTP/Twilio/Stripe).
+
+- **AZUL "Página de Pagos"** (`adapters/azul.adapter.ts`): formulario
+  HTML POST a una página hospedada por AZUL (`pruebas.azul.com.do/
+  PaymentPage/` sandbox, `pagos.azul.com.do/PaymentPage/Default.aspx`
+  producción — env `AZUL_PAYMENT_PAGE_URL`), sin sesión de servidor.
+  Firma `AuthHash` = HMAC-SHA512 (`adapters/azul-hash.util.ts`, sin SDK
+  — AZUL no publica uno para Node.js), clave = `AuthKey` (bytes UTF-8),
+  mensaje = concatenación de campos + `AuthKey` otra vez al final,
+  codificado UTF-16LE (exactamente como documenta el PDF oficial —
+  el `AuthKey` va DOS veces: como clave del HMAC y dentro del propio
+  mensaje). Orden de concatenación del requerimiento: `MerchantId +
+  MerchantName + MerchantType + CurrencyCode + OrderNumber + Amount +
+  ITBIS + ApprovedUrl + DeclinedUrl + CancelUrl + UseCustomFieldX...`.
+  El retorno (mismo mecanismo, otro orden de campos) se verifica
+  siempre server-side antes de registrar nada — nunca se confía en el
+  redirect crudo del navegador. `IsoCode === '00'` es la señal de
+  aprobación ("si es satisfactorio, se recibe 00", doc oficial).
+  **Corrección de diseño real**: la Página de Pagos usa una sola
+  `AuthKey` (no Auth1/Auth2, que pertenecen a su API SOAP de
+  Webservices, un producto distinto) — el schema se corrigió con una
+  migración de ajuste después de confirmar esto contra el PDF.
+- **CardNet "Botón de Pago — Web con Pantalla"**
+  (`adapters/cardnet.adapter.ts`): API REST de sesiones, sin firma
+  (autentica con TLS 1.2 + `MerchantNumber`/`MerchantTerminal`, sin
+  header de autorización ni HMAC — confirmado contra la doc oficial).
+  Flujo: `POST {urlbase}/sessions` (sandbox `labservicios.cardnet.
+  com.do`, producción `ecommerce.cardnet.com.do` — env
+  `CARDNET_API_URL`) devuelve `{ SESSION, "session-key" }`; formulario
+  POST a `{urlbase}/authorize` con `SESSION` como único campo; el
+  resultado NUNCA llega confiable por el `ReturnUrl` (CardNet no firma
+  ni empuja webhook) — hay que re-consultar siempre `GET {urlbase}/
+  sessions/{SESSION}?sk={session-key}` para el resultado autoritativo
+  (`ResponseCode === '00'` = aprobado), con una ventana de 30 minutos
+  antes de que la sesión expire (`404 "Session not found"`). Como el
+  `ReturnUrl` no trae ningún identificador confiable, la correlación la
+  arma este módulo: una referencia propia (no la `SESSION` real de
+  CardNet) viaja como `OrdenId` del requerimiento y como query param
+  `?ref=` del propio `ReturnUrl` — es esa referencia la que identifica
+  la `SesionCobroFactura` al volver; la `SESSION`/`session-key` reales
+  quedan cifradas en `SesionCobroFactura.datosVerificacion` para el
+  paso de re-consulta.
+
+### `SesionCobroFactura` — idempotencia real, no el atajo de `PagoPlataforma`
+
+`PagoPlataforma`/`PagosPlataformaService.registrarPagoGateway` es
+idempotente apoyándose en "si la factura ya está PAGADA/ANULADA, no
+hagas nada" — seguro ahí porque el checkout siempre cubre el 100% del
+pendiente. Este ítem permite **pagos parciales** (decisión confirmada
+con el usuario), así que ese atajo dejaría de ser seguro — una
+`Factura` con saldo puede recibir varios pagos parciales legítimos sin
+llegar nunca a `pagada: true`. `SesionCobroFactura` es un ledger
+dedicado: `@@unique([pasarela, referenciaExterna])` + una transición de
+estado atómica (`intentarResolver`, `updateMany({where:{id,
+estado:'PENDIENTE'}})` — compare-and-swap real, Postgres serializa el
+`UPDATE` por fila) que garantiza que un reintento del mismo retorno
+(doble-click, replay) nunca registre el `Pago` dos veces.
+
+### Reuso de `FacturacionService.registrarPago` desde un controller público
+
+`CobrosPublicosController` es `@Public()` (sin JWT) — pero
+`FacturacionService.registrarPago()`/`PagosService`/`FormasPagoRepository`
+usan `TenantPrismaService`, que lee `request.user?.tenantId` y lanza
+`ForbiddenException` si no hay JWT. En vez de duplicar la lógica de
+negocio de `registrarPago` (validación EMITIDA/no-nota-de-crédito/no-
+ya-pagada, cálculo de pendiente, marcar pagada) en una versión paralela
+con `PrismaService` global — el mismo tipo de duplicación que ya causó
+bugs de divergencia en otras partes del proyecto —
+`CobrosPublicosService.procesarRetorno()` **"forja"** `request.user`
+con el `tenantId` ya resuelto (de la `Factura`, vía `PrismaService`
+global) justo antes de llamar a `facturacionService.registrarPago(...)`.
+Esto es seguro y no es un hack: el propio comentario de
+`tenant-prisma.service.ts` explica que `tenantIdActual()` lee
+`request.user?.tenantId` "en el momento real de cada query, no antes"
+precisamente para tolerar que se popule tarde — asignarlo desde este
+único call site es la extensión que ese diseño ya anticipaba. El
+`userId` forjado (`'pasarela-cobro'`) nunca se persiste — se le pasa
+`null` explícito como tercer argumento de `registrarPago`, que es lo
+que de verdad termina en `Pago.userId`.
+
+**`Pago.userId` ahora es nullable** (antes `String` NOT NULL) — mismo
+criterio que `PagoPlataforma.registradoPorId`, que ya era nullable por
+esta misma razón (un pago de gateway no tiene operador humano).
+Ninguna pantalla mostraba "cobrado por" antes de este cambio (`Pago.user`
+no estaba `include`do en ningún listado), así que no hubo que tocar UI.
+
+**Resolución de la forma de pago**: como no hay ningún operador
+eligiendo la forma de pago en un checkout público, se usa siempre la
+`FormaPago` de `tipo: 'TARJETA'` del tenant (ya sembrada por defecto en
+`FORMAS_PAGO_BASE`) — si el tenant la borró/renombró de forma que ya no
+exista con ese `tipo`, el checkout falla con un mensaje claro en vez de
+adivinar otra.
+
+### Botón "Generar link de pago" y página pública
+
+`FacturasTable.tsx`: mismo criterio de elegibilidad que "Registrar
+cobro" (`tipoFactura === 'CREDITO' && estado === 'EMITIDA' && !pagada`,
+permiso `facturacion.cobrar`) — el link en sí es solo
+`${origin}/pagar-factura/:facturaId`, armado 100% en el frontend (no
+hace falta ningún endpoint para "generarlo", la página pública resuelve
+todo por su cuenta al visitarse). `CobroFactura.tsx` deja elegir el
+monto (prellenado con el pendiente completo, tope el pendiente —
+**pago parcial permitido**, decisión confirmada con el usuario) y
+llama `POST /api/cobros-publicos/facturas/:facturaId/checkout`.
+`CobroFacturaResultado.tsx` lee `?estado=` — que arma el backend
+DESPUÉS de verificar, nunca los query params crudos del proveedor, así
+que no hay forma de fabricar una URL "?estado=aprobado" desde el
+cliente.
 
 ## Configuración de plataforma (`backend/src/plataforma-config/`)
 
