@@ -14,15 +14,17 @@ interface WhatsappConfig {
   iaModelo: string | null;
   iaApiKeyConfigurado: boolean;
   historialMensajes: number;
+  iaPromptNegocio: string | null;
+  limiteRespuestasDiarias: number;
 }
 
 /**
- * Solo guarda credenciales/preferencias (plan de integración Cuadre, ítem
- * H-2a) — a propósito no envía ningún mensaje de prueba ni conecta con el
- * bot conversacional todavía (H-2b, diferido). Mismo criterio de secretos
- * que WebhooksPanel/PlataformaConfig: nunca se muestran en claro, solo
- * "configurado: true/false"; dejar el campo vacío al guardar no borra el
- * secreto ya guardado (hay que escribir explícitamente para reemplazarlo).
+ * Credenciales/preferencias del bot de WhatsApp (ítems H-2a/H-2b). Mismo
+ * criterio de secretos que WebhooksPanel/PlataformaConfig: nunca se
+ * muestran en claro, solo "configurado: true/false"; dejar el campo
+ * vacío al guardar no borra el secreto ya guardado. Sin botón de
+ * "Probar conexión" (decisión explícita del usuario). El bot hoy solo
+ * funciona con IA de Anthropic — elegir otro proveedor no tiene efecto.
  */
 export function WhatsappConfigPanel() {
   const queryClient = useQueryClient();
@@ -34,6 +36,8 @@ export function WhatsappConfigPanel() {
   const [iaModelo, setIaModelo] = useState('');
   const [iaApiKey, setIaApiKey] = useState('');
   const [historialMensajes, setHistorialMensajes] = useState('10');
+  const [iaPromptNegocio, setIaPromptNegocio] = useState('');
+  const [limiteRespuestasDiarias, setLimiteRespuestasDiarias] = useState('50');
   const [error, setError] = useState<string | null>(null);
 
   const { data: config } = useQuery({
@@ -49,6 +53,8 @@ export function WhatsappConfigPanel() {
     setIaProveedor(config.iaProveedor ?? '');
     setIaModelo(config.iaModelo ?? '');
     setHistorialMensajes(String(config.historialMensajes));
+    setIaPromptNegocio(config.iaPromptNegocio ?? '');
+    setLimiteRespuestasDiarias(String(config.limiteRespuestasDiarias));
   }, [config]);
 
   const guardar = useMutation({
@@ -60,6 +66,8 @@ export function WhatsappConfigPanel() {
         iaProveedor: iaProveedor || undefined,
         iaModelo,
         historialMensajes: Number(historialMensajes),
+        iaPromptNegocio,
+        limiteRespuestasDiarias: Number(limiteRespuestasDiarias),
         ...(twilioAuthToken !== '' ? { twilioAuthToken } : {}),
         ...(iaApiKey !== '' ? { iaApiKey } : {}),
       }),
@@ -74,7 +82,7 @@ export function WhatsappConfigPanel() {
   return (
     <Card
       titulo="WhatsApp"
-      descripcion="Credenciales de Twilio y del proveedor de IA para el futuro bot conversacional — este formulario solo las guarda, todavía no envía ni responde mensajes."
+      descripcion="Credenciales de Twilio y del proveedor de IA para el bot conversacional — responde automáticamente a tus clientes por WhatsApp."
     >
       <div className="space-y-4">
         <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
@@ -108,6 +116,7 @@ export function WhatsappConfigPanel() {
 
         <div className="space-y-3 border-t border-slate-200 pt-3 dark:border-slate-800">
           <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Proveedor de IA</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400">Por ahora el bot solo funciona con Anthropic — elegir otro proveedor no tiene efecto todavía.</p>
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Proveedor</label>
             <select
@@ -144,6 +153,34 @@ export function WhatsappConfigPanel() {
             min={0}
             value={historialMensajes}
             onChange={(e) => setHistorialMensajes(e.target.value)}
+          />
+        </div>
+
+        <div className="space-y-3 border-t border-slate-200 pt-3 dark:border-slate-800">
+          <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Comportamiento del bot</p>
+          <div className="flex flex-col gap-1">
+            <label htmlFor="whatsapp-prompt-negocio" className="text-sm font-medium text-slate-700 dark:text-slate-300">
+              Información del negocio (horario, dirección, tono)
+            </label>
+            <textarea
+              id="whatsapp-prompt-negocio"
+              value={iaPromptNegocio}
+              onChange={(e) => setIaPromptNegocio(e.target.value)}
+              rows={4}
+              placeholder="Ej: Horario L-V 9am-5pm, sábados 9am-1pm. Dirección: Av. Principal #123. Tono cercano y breve."
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+            />
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              El bot nunca inventa datos de facturas o pedidos — si le preguntan eso, deriva a un representante.
+            </p>
+          </div>
+          <FormField
+            id="whatsapp-limite-diario"
+            label="Tope de respuestas automáticas de IA por día"
+            type="number"
+            min={1}
+            value={limiteRespuestasDiarias}
+            onChange={(e) => setLimiteRespuestasDiarias(e.target.value)}
           />
         </div>
 
