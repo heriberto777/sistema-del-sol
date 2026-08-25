@@ -41,13 +41,15 @@ export class EstadosFinancierosService {
     }
 
     // Sin este renglón, el balance nunca cuadra mientras haya ventas sin
-    // "cerrar" contra utilidades retenidas (proceso de cierre de periodo
-    // que este sistema no implementa todavía — ver ARCHITECTURE.md): toda
-    // venta aumenta el Activo, pero su contrapartida vive en una cuenta de
-    // INGRESO, que por definición no es Activo/Pasivo/Patrimonio. Mostrar
-    // el resultado acumulado como una línea de patrimonio (como hacen los
-    // balances reales antes del cierre anual) es lo que hace que
-    // Activo = Pasivo + Patrimonio vuelva a cumplirse.
+    // "cerrar" contra utilidades retenidas (CierrePeriodoService.
+    // cerrarPeriodo SÍ existe, pero es manual — ver ARCHITECTURE.md):
+    // toda venta del tramo todavía no cerrado aumenta el Activo, pero su
+    // contrapartida vive en una cuenta de INGRESO, que por definición no
+    // es Activo/Pasivo/Patrimonio. Mostrar el resultado acumulado como
+    // una línea de patrimonio (como hacen los balances reales antes del
+    // cierre anual) es lo que hace que Activo = Pasivo + Patrimonio
+    // vuelva a cumplirse — sin importar si ya hubo cierres previos (esas
+    // líneas se cancelan solas entre sí) o ninguno todavía.
     if (resultadoEjercicio !== 0) {
       grupos.PATRIMONIO.push({ codigo: '3099', nombre: 'Resultado del Ejercicio (no distribuido)', saldo: resultadoEjercicio });
     }

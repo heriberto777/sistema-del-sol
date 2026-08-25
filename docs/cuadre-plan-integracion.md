@@ -574,8 +574,28 @@ Resumen de lo que cambió (detalle en cada ítem más abajo):
 
 ## I — Contabilidad
 
-- [ ] **I-1** 🟥 *diseño primero* — **Cierre de período fiscal real**.
-  *Confirmado: brecha real, ya documentada en ARCHITECTURE.md.*
+- [x] **I-1** ~~🟥 *diseño primero*~~ **→ falso positivo, ya estaba
+  construido** — **Cierre de período fiscal real**. *La ficha original
+  decía "confirmado: brecha real, ya documentada en ARCHITECTURE.md" —
+  pero ese texto de ARCHITECTURE.md (la explicación de "Resultado del
+  Ejercicio") quedó desactualizado: `CierrePeriodoService.cerrarPeriodo`
+  (`POST /contabilidad/cierre-periodo`, permiso
+  `contabilidad.cerrarperiodo`, ya sembrado en `PERMISOS_BASE`) existe
+  desde el 2026-08-17 (commit `9b12e4e`, ANTES de que arrancara esta
+  auditoría de Cuadre) — traspasa el saldo neto de INGRESO/GASTO a
+  Utilidades Retenidas con un asiento real, `validarFechaAbierta()`
+  bloquea asientos manuales/gastos retroactivos contra un período ya
+  cerrado, y tiene controller/repositorio/tests + vista propia
+  (`CierrePeriodoView.tsx`) en Contabilidad → Cierre de período. La
+  única brecha real, MENOR (matiz, no re-verificada con el usuario si
+  vale la pena): Cuadre modela "Períodos Fiscales" como objetos
+  discretos con nombre + fecha inicio + fecha fin (`/accounting/periods`
+  — ej. "Enero 2026"), mientras que el nuestro es un cursor simple
+  ("cerrar hasta esta fecha", en secuencia, sin objeto de período
+  nombrado) — cosmético/organizativo, no afecta si el cierre "funciona
+  de verdad". Corregido 2026-08-24, sin cambios de código (solo se
+  actualizó la explicación de "Resultado del Ejercicio" en
+  ARCHITECTURE.md, que sí estaba mal redactada).*
 
 ## J — Varios / bajo esfuerzo
 
@@ -785,6 +805,18 @@ Resumen de lo que cambió (detalle en cada ítem más abajo):
   sin asignación = vende todo; bloqueo solo en el checkout de POS).
   Módulo `cajas/`, `TurnoCaja.cajaId` opcional. Migración
   `20260830090000_cajas`.
+- **2026-08-24**: I-1 (Cierre de período fiscal real) resultó ser un
+  **falso positivo** — `CierrePeriodoService.cerrarPeriodo` ya existía
+  desde el 2026-08-17 (commit `9b12e4e`, antes de esta auditoría), con
+  controller, repositorio, tests, permiso y UI propia
+  (`CierrePeriodoView.tsx`). Lo único desactualizado era la explicación
+  de "Resultado del Ejercicio" en ARCHITECTURE.md, que decía "este
+  sistema no implementa cierre de período" — corregida, sin tocar
+  código de negocio (solo un comentario en `estados-financieros.
+  service.ts`). Único matiz menor sin resolver, no reimplementado:
+  Cuadre modela períodos fiscales como objetos discretos con nombre +
+  fecha inicio/fin; el nuestro es un cursor simple en secuencia —
+  cosmético, no afecta si el cierre funciona de verdad.
 
 ## Sugerencia de por dónde arrancar
 
@@ -796,6 +828,7 @@ B-1/B-2/B-3/B-6/B-7/B-8, E-2/E-3/E-4/E-5/E-6/E-8/E-9/E-11, F-2/F-4/F-5/
 F-8, G-1/G-2/G-3/G-4/G-5/G-6/G-7/G-8, H-3, J-1/J-2/J-3 — todos
 verificados (tsc + suite unitaria + e2e + lint + build, todo verde) y
 commiteados uno por uno. De los 🟥, ya entregados: **D-1, A-2, A-1, A-3, E-7**.
+I-1 resultó falso positivo (ya estaba construido).
 
 Lo que queda, por categoría:
 - **Deliberadamente pausado a pedido del usuario**: B-9 (línea manual/
@@ -806,8 +839,8 @@ Lo que queda, por categoría:
 - **🟥, pendientes de su propia conversación de diseño**: A-4,
   B-5, C-1, C-2 (multi-moneda, reclasificado desde 🟧), F-9, G-9
   (hardware), H-2 (WhatsApp — con nota de decisión pendiente sobre n8n
-  vs. backend propio), I-1, J-4 (API keys, reclasificado — no aplica
-  sin una API pública).
+  vs. backend propio), J-4 (API keys, reclasificado — no aplica sin una
+  API pública).
 
 Todos los 🟥 restantes necesitan una conversación de alcance ANTES de
 tocar código — mismo criterio que Sucursales (Fase 8), PIN (Fase 9) y

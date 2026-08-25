@@ -2075,19 +2075,25 @@ corren fuera de un contexto de request y no tienen acceso al
 agrega saldos de todas las líneas hasta una fecha; `estadoResultados()`
 agrega INGRESO/GASTO dentro de un rango (mes actual por defecto).
 
-**"Resultado del Ejercicio" — por qué existe esta línea sintética**:
-este sistema no implementa un proceso de cierre de período (no hay
-"cerrar el mes" que traslade INGRESO/GASTO contra Utilidades
-Retenidas). Sin ese cierre, cada venta aumenta el Activo (Caja/CxC)
-pero su contrapartida vive en una cuenta de INGRESO, que por
-definición no es Activo/Pasivo/Patrimonio — así que
-`Activo = Pasivo + Patrimonio` dejaría de cumplirse apenas hubiera una
-venta. `balanceGeneral()` calcula `resultadoEjercicio` (ingresos menos
-gastos acumulados a la fecha) y lo inyecta como una línea sintética
-`3099 — Resultado del Ejercicio (no distribuido)` dentro del grupo
-PATRIMONIO — el tratamiento contable estándar para un balance *antes*
-del cierre anual. Es la razón por la que el balance general siempre
-debe cuadrar (`diferencia ≈ 0`) sin necesitar ese cierre.
+**"Resultado del Ejercicio" — por qué existe esta línea sintética**
+(ítem I-1 del plan de integración Cuadre — **confirmado ya
+implementado**, ver más abajo): `CierrePeriodoService.cerrarPeriodo` SÍ
+traslada INGRESO/GASTO contra Utilidades Retenidas, pero es un cierre
+manual (el usuario decide cuándo correrlo, no corre solo) — entre un
+cierre y el siguiente (o desde el inicio, si nunca se cerró ninguno),
+cada venta sigue aumentando el Activo (Caja/CxC) con su contrapartida
+en una cuenta de INGRESO, que por definición no es Activo/Pasivo/
+Patrimonio — así que `Activo = Pasivo + Patrimonio` dejaría de cumplirse
+para ese tramo todavía no cerrado. `balanceGeneral()` calcula
+`resultadoEjercicio` (ingresos menos gastos acumulados a la fecha,
+sobre TODAS las líneas — las de un cierre anterior ya se cancelan solas
+entre sí, así que en la práctica esto termina siendo solo el resultado
+del tramo abierto) y lo inyecta como una línea sintética `3099 —
+Resultado del Ejercicio (no distribuido)` dentro del grupo PATRIMONIO —
+el tratamiento contable estándar para un balance *antes* del cierre.
+Es la razón por la que el balance general siempre cuadra
+(`diferencia ≈ 0`), tanto si el tenant nunca cerró un período como si
+ya cerró varios y este es apenas el más reciente sin cerrar.
 
 **Fuera de alcance deliberadamente**: edición in-place de un asiento ya
 creado (solo anulación vía reverso, nunca `PATCH`); importar extractos
