@@ -693,7 +693,7 @@ export class FacturacionService {
     return facturaAnulada;
   }
 
-  async registrarPago(id: string, dto: CrearPagoDto, userId: string, tenantId: string) {
+  async registrarPago(id: string, dto: CrearPagoDto, userId: string | null, tenantId: string) {
     const factura = await this.facturacionRepository.buscarPorId(id);
     if (factura.estado !== 'EMITIDA') {
       throw new BadRequestException('Solo se puede registrar el pago de una factura EMITIDA');

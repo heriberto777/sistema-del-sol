@@ -24,7 +24,7 @@ export class PagosService {
    * sabe de "ledger de pagos parciales contra un total", sin acoplarse a
    * qué es un `Factura` o una `OrdenCompra`.
    */
-  async registrarPagoFactura(factura: { id: string; total: unknown }, dto: CrearPagoDto, userId: string, tenantId: string) {
+  async registrarPagoFactura(factura: { id: string; total: unknown }, dto: CrearPagoDto, userId: string | null, tenantId: string) {
     const pagadoAntes = await this.pagosRepository.sumaPagosFactura(factura.id);
     const total = Number(factura.total);
     const pendiente = total - pagadoAntes;

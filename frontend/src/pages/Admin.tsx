@@ -7,6 +7,7 @@ import { WhatsappConfigPanel } from '../components/organisms/WhatsappConfigPanel
 import { ConfiguracionesPanel } from '../components/organisms/ConfiguracionesPanel/ConfiguracionesPanel';
 import { NcfPanel } from '../components/organisms/NcfPanel/NcfPanel';
 import { CorrelativosPanel } from '../components/organisms/CorrelativosPanel/CorrelativosPanel';
+import { PasarelaCobroConfigPanel } from '../components/organisms/PasarelaCobroConfigPanel/PasarelaCobroConfigPanel';
 import { FormasPagoPanel } from '../components/organisms/FormasPagoPanel/FormasPagoPanel';
 import { CategoriasPanel } from '../components/organisms/CategoriasPanel/CategoriasPanel';
 import { ListasPrecioPanel } from '../components/organisms/ListasPrecioPanel/ListasPrecioPanel';
@@ -58,6 +59,7 @@ const CATEGORIAS: Categoria[] = [
       { id: 'bonos', etiqueta: 'Bonos', permiso: 'admin.configuracion', panel: BonosPanel },
       { id: 'lealtad', etiqueta: 'Lealtad', permiso: 'admin.configuracion', panel: LealtadPanel },
       { id: 'autorizaciones', etiqueta: 'Autorizaciones', permiso: 'admin.configuracion', panel: AutorizacionesPanel },
+      { id: 'pasarela-cobro', etiqueta: 'Pasarela de pago', permiso: 'admin.configuracion', panel: PasarelaCobroConfigPanel },
     ],
   },
   {

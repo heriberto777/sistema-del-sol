@@ -93,6 +93,8 @@ model Tenant {
   facturasPlataforma FacturaPlataforma[]
   ventasAparcadas VentaAparcada[]
   whatsappConfig WhatsappConfigTenant?
+  pasarelaConfig PasarelaConfigTenant?
+  sesionesCobroFactura SesionCobroFactura[]
 
   @@map("tenants")
 }
@@ -651,6 +653,62 @@ model WhatsappConfigTenant {
   updatedAt              DateTime @updatedAt
 
   @@map("whatsapp_config_tenant")
+}
+
+/// Credenciales de AZUL/CardNet por tenant (ítem C-1, Payment Link — ver
+/// ARCHITECTURE.md) — mismo molde de 4 capas que WhatsappConfigTenant
+/// (obtenerOCrear/aplicarCampoSecreto/aFormaSegura). `pasarelaActiva`
+/// decide cuál de los dos procesa el checkout público; ambos bloques de
+/// campos conviven en una sola fila (mismo criterio que
+/// PlataformaConfiguracion, que junta SMTP/Twilio/Stripe en una fila
+/// única) en vez de dos tablas separadas.
+model PasarelaConfigTenant {
+  id                      String   @id @default(uuid())
+  tenantId                String   @unique
+  tenant                  Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  pasarelaActiva          String?  // 'AZUL' | 'CARDNET' | null
+
+  azulMerchantId          String?
+  azulMerchantName        String?
+  azulAuth1Cifrado        String?
+  azulAuth2Cifrado        String?
+
+  cardnetMerchantNumber   String?
+  cardnetMerchantTerminal String?
+  cardnetMerchantName     String?
+  cardnetAuthKeyCifrado   String?
+
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  @@map("pasarela_config_tenant")
+}
+
+/// Ledger de intentos de cobro por pasarela (ítem C-1) — dos propósitos:
+/// (1) idempotencia real, dedup explícito por (pasarela, referenciaExterna)
+/// ANTES de registrar el Pago — a propósito no se replica el atajo de
+/// PagoPlataforma ("si la factura ya está pagada, no hagas nada"), que
+/// deja de ser seguro en cuanto se permiten pagos parciales (este ítem sí
+/// los permite); (2) guarda el `sk` de CardNet entre crear la sesión y
+/// verificar el retorno — CardNet no empuja webhook, hay que re-consultar
+/// con esa clave.
+model SesionCobroFactura {
+  id                String   @id @default(uuid())
+  tenantId          String
+  tenant            Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  facturaId         String
+  pasarela          String   // 'AZUL' | 'CARDNET'
+  referenciaExterna String   // OrderNumber (Azul) o session id (CardNet)
+  monto             Decimal  @db.Decimal(14, 2)
+  datosVerificacion String?  // ej. sk de CardNet, cifrado — null para Azul
+  estado            String   @default("PENDIENTE") // PENDIENTE | CONFIRMADO | RECHAZADO
+  pagoId            String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@unique([pasarela, referenciaExterna])
+  @@index([facturaId])
+  @@map("sesiones_cobro_factura")
 }
 
 model NcfAsignado {
@@ -2462,8 +2520,11 @@ model Pago {
   formaPago     FormaPago    @relation(fields: [formaPagoId], references: [id])
   referencia    String?
   fecha         DateTime     @default(now())
-  userId        String
-  user          User         @relation(fields: [userId], references: [id])
+  // Nullable (ítem C-1, Payment Link AZUL/CardNet) — un pago de gateway
+  // público no tiene operador humano, mismo criterio ya usado por
+  // PagoPlataforma.registradoPorId.
+  userId        String?
+  user          User?        @relation(fields: [userId], references: [id])
   createdAt     DateTime     @default(now())
 
   @@index([facturaId])

@@ -19,7 +19,7 @@ export class PagosRepository {
     formaPagoId: string;
     referencia?: string;
     fecha: Date;
-    userId: string;
+    userId: string | null;
   }) {
     return this.db.pago.create({ data: params, include: { formaPago: { select: { nombre: true } } } });
   }
