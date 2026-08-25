@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { useDebouncedValue } from '../../../hooks/useDebouncedValue';
 
 interface ComboboxBusquedaProps<T> {
@@ -9,6 +9,8 @@ interface ComboboxBusquedaProps<T> {
   obtenerId: (item: T) => string;
   obtenerEtiqueta: (item: T) => string;
   placeholder?: string;
+  /** Ícono opcional dentro del campo (ej. Cliente/Vendedor en Caja) — puramente visual, no cambia el comportamiento. */
+  icono?: ReactNode;
 }
 
 /**
@@ -25,6 +27,7 @@ export function ComboboxBusqueda<T>({
   obtenerId,
   obtenerEtiqueta,
   placeholder,
+  icono,
 }: ComboboxBusquedaProps<T>) {
   const [texto, setTexto] = useState('');
   const [abierto, setAbierto] = useState(false);
@@ -92,6 +95,7 @@ export function ComboboxBusqueda<T>({
   if (valor) {
     return (
       <div className="flex items-center gap-2 rounded-md border border-slate-300 bg-slate-50 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
+        {icono && <span className="shrink-0 text-slate-400 dark:text-slate-500">{icono}</span>}
         <span className="flex-1 truncate">{obtenerEtiqueta(valor)}</span>
         <button
           type="button"
@@ -107,6 +111,11 @@ export function ComboboxBusqueda<T>({
 
   return (
     <div ref={contenedorRef} className="relative">
+      {icono && (
+        <span className="pointer-events-none absolute inset-y-0 left-2.5 flex items-center text-slate-400 dark:text-slate-500">
+          {icono}
+        </span>
+      )}
       <input
         id={id}
         type="text"
@@ -119,7 +128,7 @@ export function ComboboxBusqueda<T>({
         onKeyDown={onKeyDownInput}
         placeholder={placeholder ?? 'Buscar…'}
         autoComplete="off"
-        className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+        className={`w-full rounded-md border border-slate-300 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 ${icono ? 'pl-8 pr-3' : 'px-3'}`}
       />
       {abierto && texto.trim().length > 0 && (
         <div className="absolute z-50 mt-1 max-h-56 w-full overflow-auto rounded-md border border-slate-200 bg-white py-1 shadow-lg dark:border-slate-800 dark:bg-slate-900">

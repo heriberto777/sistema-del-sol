@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { User, IdCard, ChevronDown, SlidersHorizontal } from 'lucide-react';
 import { apiClient } from '../../../lib/api-client';
 import { ModalImprimir } from '../../molecules/ModalImprimir/ModalImprimir';
 import { Badge } from '../../atoms/Badge/Badge';
@@ -56,6 +57,18 @@ interface LineaCarrito {
   descuento: number;
   /** Plan de integración Cuadre, ítem E-8 — habilita el input de precio editable en la fila del carrito. */
   precioVariable?: boolean;
+}
+
+/**
+ * Identificador único de una línea del carrito — `productoId` SOLO no
+ * alcanza: dos variantes del mismo producto (ej. Talla S y Talla M)
+ * comparten `productoId` pero son líneas distintas. Usarlo como `key` de
+ * React y como criterio de "cuál línea" en quitar/editar/descontar evita
+ * que dos variantes del mismo producto colapsen en una sola fila (bug
+ * real: agregar la variante S y después la M solo mostraba una).
+ */
+function claveLinea(l: { productoId: string; varianteId?: string }): string {
+  return `${l.productoId}::${l.varianteId ?? ''}`;
 }
 
 interface MovimientoCaja {
@@ -364,16 +377,19 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
     });
   }
 
-  function quitarDelCarrito(productoId: string) {
-    setCarrito((prev) => prev.filter((l) => l.productoId !== productoId));
+  function quitarDelCarrito(productoId: string, varianteId?: string) {
+    const clave = claveLinea({ productoId, varianteId });
+    setCarrito((prev) => prev.filter((l) => claveLinea(l) !== clave));
   }
 
-  function cambiarPrecio(productoId: string, precioUnitario: number) {
-    setCarrito((prev) => prev.map((l) => (l.productoId === productoId ? { ...l, precioUnitario } : l)));
+  function cambiarPrecio(productoId: string, varianteId: string | undefined, precioUnitario: number) {
+    const clave = claveLinea({ productoId, varianteId });
+    setCarrito((prev) => prev.map((l) => (claveLinea(l) === clave ? { ...l, precioUnitario } : l)));
   }
 
-  function cambiarCantidad(productoId: string, cantidad: number) {
-    setCarrito((prev) => prev.map((l) => (l.productoId === productoId ? { ...l, cantidad } : l)));
+  function cambiarCantidad(productoId: string, varianteId: string | undefined, cantidad: number) {
+    const clave = claveLinea({ productoId, varianteId });
+    setCarrito((prev) => prev.map((l) => (claveLinea(l) === clave ? { ...l, cantidad } : l)));
   }
 
   /** Recupera una venta aparcada (Guardadas, ⇧F12): repone el carrito/cliente/vendedor y la borra de la lista. */
@@ -396,11 +412,11 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
     setModalGuardadas(false);
   }
 
-  /** Aplica un descuento (monto flat o %) a las líneas seleccionadas — ver ModalDescuento. */
-  function aplicarDescuento(productoIds: string[], montoOPct: number, modo: 'MONTO' | 'PORCENTAJE') {
+  /** Aplica un descuento (monto flat o %) a las líneas seleccionadas (claveLinea) — ver ModalDescuento. */
+  function aplicarDescuento(claves: string[], montoOPct: number, modo: 'MONTO' | 'PORCENTAJE') {
     setCarrito((prev) =>
       prev.map((l) => {
-        if (!productoIds.includes(l.productoId)) return l;
+        if (!claves.includes(claveLinea(l))) return l;
         const descuento = modo === 'PORCENTAJE' ? (l.cantidad * l.precioUnitario * montoOPct) / 100 : montoOPct;
         return { ...l, descuento };
       }),
@@ -498,78 +514,93 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
             </div>
 
             <div className="space-y-3 lg:col-span-2">
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Cliente</label>
-                <ComboboxBusqueda<Cliente>
-                  id={ID_COMBOBOX_CLIENTE}
-                  valor={cliente}
-                  onSeleccionar={setCliente}
-                  obtenerId={(c) => c.id}
-                  obtenerEtiqueta={(c) => c.nombre}
-                  placeholder="Buscar cliente…"
-                  buscar={async (texto) =>
-                    (await apiClient.get<PaginaResultado<Cliente>>('/clientes', { params: { busqueda: texto, tamanoPagina: 10 } })).data.datos
-                  }
-                />
-                <button
-                  type="button"
-                  onClick={() => setMostrarNuevoCliente((v) => !v)}
-                  className="self-start text-xs font-medium text-sol-600 hover:text-sol-700 dark:text-sol-400"
-                >
-                  + Nuevo cliente
-                </button>
-                {mostrarNuevoCliente && (
-                  <NuevoClienteInlinePos
-                    onCreado={(c) => {
-                      setCliente(c);
-                      setMostrarNuevoCliente(false);
-                    }}
-                  />
-                )}
-              </div>
-
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Nivel de precio</label>
-                <Select value={listaPrecioOverride} onChange={(e) => setListaPrecioOverride(e.target.value)}>
-                  <option value="">Usar el del cliente ({listaPrecioResuelta})</option>
-                  {listasPrecio?.map((lista) => (
-                    <option key={lista.id} value={lista.nombre}>
-                      {lista.nombre}
-                    </option>
-                  ))}
-                </Select>
-              </div>
-
               <div className="grid grid-cols-2 gap-2">
                 <div className="flex flex-col gap-1">
-                  <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Tipo</label>
-                  <Select value={tipoFactura} onChange={(e) => setTipoFactura(e.target.value as 'CONTADO' | 'CREDITO')}>
-                    <option value="CONTADO">Contado</option>
-                    <option value="CREDITO">Crédito</option>
-                  </Select>
+                  <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Cliente</label>
+                  <ComboboxBusqueda<Cliente>
+                    id={ID_COMBOBOX_CLIENTE}
+                    valor={cliente}
+                    onSeleccionar={setCliente}
+                    obtenerId={(c) => c.id}
+                    obtenerEtiqueta={(c) => c.nombre}
+                    placeholder="Buscar cliente…"
+                    icono={<User size={15} />}
+                    buscar={async (texto) =>
+                      (await apiClient.get<PaginaResultado<Cliente>>('/clientes', { params: { busqueda: texto, tamanoPagina: 10 } })).data.datos
+                    }
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setMostrarNuevoCliente((v) => !v)}
+                    className="self-start text-xs font-medium text-sol-600 hover:text-sol-700 dark:text-sol-400"
+                  >
+                    + Nuevo cliente
+                  </button>
                 </div>
+
                 <div className="flex flex-col gap-1">
-                  <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Comprobante</label>
-                  <Select value={tipoComprobanteEspecial} onChange={(e) => setTipoComprobanteEspecial(e.target.value)}>
-                    <option value="">Normal</option>
-                    <option value="REGIMEN_ESPECIAL">Régimen Especial (B14)</option>
-                    <option value="GUBERNAMENTAL">Gubernamental (B15)</option>
-                  </Select>
+                  <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Vendedor</label>
+                  <ComboboxBusqueda<Vendedor>
+                    id={ID_COMBOBOX_VENDEDOR}
+                    valor={vendedor}
+                    onSeleccionar={setVendedor}
+                    obtenerId={(v) => v.id}
+                    obtenerEtiqueta={(v) => v.nombre}
+                    placeholder="Buscar vendedor…"
+                    icono={<IdCard size={15} />}
+                    buscar={async (texto) => (await apiClient.get<Vendedor[]>('/pos/vendedores', { params: { busqueda: texto } })).data}
+                  />
+                  <p className="text-xs text-slate-400 dark:text-slate-500">Opcional, para comisión</p>
                 </div>
               </div>
 
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Vendedor (opcional, para comisión)</label>
-                <ComboboxBusqueda<Vendedor>
-                  id={ID_COMBOBOX_VENDEDOR}
-                  valor={vendedor}
-                  onSeleccionar={setVendedor}
-                  obtenerId={(v) => v.id}
-                  obtenerEtiqueta={(v) => v.nombre}
-                  placeholder="Buscar vendedor…"
-                  buscar={async (texto) => (await apiClient.get<Vendedor[]>('/pos/vendedores', { params: { busqueda: texto } })).data}
+              {mostrarNuevoCliente && (
+                <NuevoClienteInlinePos
+                  onCreado={(c) => {
+                    setCliente(c);
+                    setMostrarNuevoCliente(false);
+                  }}
                 />
-              </div>
+              )}
+
+              <details className="group rounded-lg border border-slate-200 dark:border-slate-800">
+                <summary className="flex cursor-pointer list-none items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium text-slate-500 marker:content-none hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-800/60 [&::-webkit-details-marker]:hidden">
+                  <SlidersHorizontal size={13} />
+                  Nivel de precio · Tipo · Comprobante
+                  <ChevronDown size={13} className="ml-auto transition-transform group-open:rotate-180" />
+                </summary>
+                <div className="space-y-2 border-t border-slate-100 p-2 dark:border-slate-800">
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Nivel de precio</label>
+                    <Select value={listaPrecioOverride} onChange={(e) => setListaPrecioOverride(e.target.value)}>
+                      <option value="">Usar el del cliente ({listaPrecioResuelta})</option>
+                      {listasPrecio?.map((lista) => (
+                        <option key={lista.id} value={lista.nombre}>
+                          {lista.nombre}
+                        </option>
+                      ))}
+                    </Select>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="flex flex-col gap-1">
+                      <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Tipo</label>
+                      <Select value={tipoFactura} onChange={(e) => setTipoFactura(e.target.value as 'CONTADO' | 'CREDITO')}>
+                        <option value="CONTADO">Contado</option>
+                        <option value="CREDITO">Crédito</option>
+                      </Select>
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Comprobante</label>
+                      <Select value={tipoComprobanteEspecial} onChange={(e) => setTipoComprobanteEspecial(e.target.value)}>
+                        <option value="">Normal</option>
+                        <option value="REGIMEN_ESPECIAL">Régimen Especial (B14)</option>
+                        <option value="GUBERNAMENTAL">Gubernamental (B15)</option>
+                      </Select>
+                    </div>
+                  </div>
+                </div>
+              </details>
 
               <Card sinPadding>
                 {carrito.length > 0 && (
@@ -583,9 +614,9 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
                     </button>
                   </div>
                 )}
-                <ul className="max-h-64 divide-y divide-slate-100 overflow-y-auto dark:divide-slate-800">
+                <ul className="max-h-96 divide-y divide-slate-100 overflow-y-auto dark:divide-slate-800">
                   {carrito.map((l) => (
-                    <li key={l.productoId} className="flex items-center gap-2 px-3 py-2 text-sm">
+                    <li key={claveLinea(l)} className="flex items-center gap-2 px-3 py-2 text-sm">
                       <div className="min-w-0 flex-1">
                         <p className="truncate font-medium text-slate-800 dark:text-slate-200">{l.nombre}</p>
                         {l.precioVariable ? (
@@ -596,7 +627,7 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
                               min={0}
                               step="any"
                               value={l.precioUnitario}
-                              onChange={(e) => cambiarPrecio(l.productoId, Number(e.target.value))}
+                              onChange={(e) => cambiarPrecio(l.productoId, l.varianteId, Number(e.target.value))}
                               className="w-20 rounded-md border border-slate-300 px-1 py-0.5 text-xs dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
                             />
                             <span>c/u</span>
@@ -613,7 +644,7 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
                         min={0.01}
                         step="any"
                         value={l.cantidad}
-                        onChange={(e) => cambiarCantidad(l.productoId, Number(e.target.value))}
+                        onChange={(e) => cambiarCantidad(l.productoId, l.varianteId, Number(e.target.value))}
                         className="w-16 rounded-md border border-slate-300 px-2 py-1 text-right text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
                       />
                       <span className="w-20 shrink-0 text-right font-medium text-slate-700 dark:text-slate-300">
@@ -621,7 +652,7 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
                       </span>
                       <button
                         type="button"
-                        onClick={() => quitarDelCarrito(l.productoId)}
+                        onClick={() => quitarDelCarrito(l.productoId, l.varianteId)}
                         className="text-red-600 hover:text-red-700"
                         aria-label="Quitar del carrito"
                       >
@@ -883,15 +914,15 @@ function ModalDescuento({
   onClose,
 }: {
   carrito: LineaCarrito[];
-  onAplicar: (productoIds: string[], montoOPct: number, modo: 'MONTO' | 'PORCENTAJE') => void;
+  onAplicar: (claves: string[], montoOPct: number, modo: 'MONTO' | 'PORCENTAJE') => void;
   onClose: () => void;
 }) {
   const [modo, setModo] = useState<'PORCENTAJE' | 'MONTO'>('PORCENTAJE');
   const [valor, setValor] = useState('');
-  const [seleccionadas, setSeleccionadas] = useState<string[]>(carrito.map((l) => l.productoId));
+  const [seleccionadas, setSeleccionadas] = useState<string[]>(carrito.map(claveLinea));
 
-  function alternar(productoId: string) {
-    setSeleccionadas((prev) => (prev.includes(productoId) ? prev.filter((id) => id !== productoId) : [...prev, productoId]));
+  function alternar(clave: string) {
+    setSeleccionadas((prev) => (prev.includes(clave) ? prev.filter((c) => c !== clave) : [...prev, clave]));
   }
 
   function onSubmit(e: FormEvent) {
@@ -926,9 +957,9 @@ function ModalDescuento({
           <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Aplicar a</p>
           <ul className="max-h-40 space-y-1 overflow-y-auto rounded-md border border-slate-200 p-2 dark:border-slate-800">
             {carrito.map((l) => (
-              <li key={l.productoId}>
+              <li key={claveLinea(l)}>
                 <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
-                  <input type="checkbox" checked={seleccionadas.includes(l.productoId)} onChange={() => alternar(l.productoId)} />
+                  <input type="checkbox" checked={seleccionadas.includes(claveLinea(l))} onChange={() => alternar(claveLinea(l))} />
                   {l.nombre}
                 </label>
               </li>
