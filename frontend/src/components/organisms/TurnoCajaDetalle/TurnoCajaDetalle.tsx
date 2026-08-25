@@ -510,7 +510,7 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
         <>
           <div className="grid grid-cols-1 gap-4 border-t border-slate-200 pt-3 dark:border-slate-800 lg:grid-cols-5">
             <div className="lg:col-span-3">
-              <CatalogoProductosPos onAgregar={agregarProductoCatalogo} />
+              <CatalogoProductosPos onAgregar={agregarProductoCatalogo} bodegaId={data.bodegaId} />
             </div>
 
             <div className="space-y-3 lg:col-span-2">

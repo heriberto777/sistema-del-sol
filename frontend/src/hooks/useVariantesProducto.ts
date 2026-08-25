@@ -7,13 +7,16 @@ export interface VarianteProducto {
   codigoBarras: string | null;
   activa: boolean;
   valoresAtributo: { valorAtributo: { id: string; valor: string; atributoId: string; atributo: { nombre: string } } }[];
+  /** Solo viene si se pidió con `bodegaId` — disponible = cantidadActual - cantidadReservada, puramente informativo (ver CatalogoProductosPos). */
+  existencia?: number;
 }
 
-/** Variantes reales de un producto (Fase 3c) — vacío mientras no haya productoId, o si el producto nunca tuvo atributos (una sola variante "por defecto", que no exige selección explícita). */
-export function useVariantesProducto(productoId: string | null | undefined) {
+/** Variantes reales de un producto (Fase 3c) — vacío mientras no haya productoId, o si el producto nunca tuvo atributos (una sola variante "por defecto", que no exige selección explícita). `bodegaId` opcional agrega `existencia` por variante (ver VariantesService.listarPorProducto). */
+export function useVariantesProducto(productoId: string | null | undefined, bodegaId?: string) {
   return useQuery({
-    queryKey: ['variantes-producto', productoId],
-    queryFn: async () => (await apiClient.get<VarianteProducto[]>(`/productos/${productoId}/variantes`)).data,
+    queryKey: ['variantes-producto', productoId, bodegaId],
+    queryFn: async () =>
+      (await apiClient.get<VarianteProducto[]>(`/productos/${productoId}/variantes`, { params: { bodegaId } })).data,
     enabled: !!productoId,
   });
 }

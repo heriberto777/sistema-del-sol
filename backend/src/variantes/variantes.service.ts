@@ -17,8 +17,22 @@ export class VariantesService {
     private readonly atributosRepository: AtributosRepository,
   ) {}
 
-  listarPorProducto(productoId: string) {
-    return this.variantesRepository.listarPorProducto(productoId);
+  /**
+   * `bodegaId` opcional (plan de integración Cuadre — POS, selector de
+   * variante): además de los atributos, resuelve `existencia` (disponible
+   * = `cantidadActual - cantidadReservada`, 0 si nunca se cargó Stock para
+   * esa variante en esa bodega) — puramente informativo, el POS no
+   * bloquea la venta por esto (el backend ya rechaza el cobro si de
+   * verdad no alcanza, ver `descontarStockCondicionalEnTx`). Sin
+   * `bodegaId`, se comporta igual que antes (sin el campo `existencia`).
+   */
+  async listarPorProducto(productoId: string, bodegaId?: string) {
+    const variantes = await this.variantesRepository.listarPorProducto(productoId, bodegaId);
+    if (!bodegaId) return variantes;
+    return variantes.map(({ stock, ...variante }) => ({
+      ...variante,
+      existencia: Number(stock?.[0]?.cantidadActual ?? 0) - Number(stock?.[0]?.cantidadReservada ?? 0),
+    }));
   }
 
   /**

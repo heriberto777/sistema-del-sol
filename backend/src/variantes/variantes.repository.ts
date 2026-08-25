@@ -9,10 +9,14 @@ export class VariantesRepository {
     return this.tenantPrisma.client;
   }
 
-  listarPorProducto(productoId: string) {
+  /** `bodegaId`: además de los atributos, trae el `Stock` de esa bodega puntual (ver VariantesService.listarPorProducto — resuelve `existencia` a partir de esto). */
+  listarPorProducto(productoId: string, bodegaId?: string) {
     return this.db.varianteProducto.findMany({
       where: { productoId },
-      include: { valoresAtributo: { include: { valorAtributo: { include: { atributo: true } } } } },
+      include: {
+        valoresAtributo: { include: { valorAtributo: { include: { atributo: true } } } },
+        ...(bodegaId ? { stock: { where: { bodegaId } } } : {}),
+      },
       orderBy: { createdAt: 'asc' },
     });
   }

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { VariantesService } from './variantes.service';
 import { ActualizarCodigoBarrasDto } from './dto/actualizar-codigo-barras.dto';
@@ -12,8 +12,8 @@ export class VariantesController {
 
   @Get()
   @Permissions('precios.ver')
-  listar(@Param('productoId') productoId: string) {
-    return this.variantesService.listarPorProducto(productoId);
+  listar(@Param('productoId') productoId: string, @Query('bodegaId') bodegaId?: string) {
+    return this.variantesService.listarPorProducto(productoId, bodegaId);
   }
 
   @Patch(':varianteId')

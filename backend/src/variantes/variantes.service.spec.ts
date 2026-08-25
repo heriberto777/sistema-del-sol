@@ -23,6 +23,32 @@ describe('VariantesService', () => {
     service = new VariantesService(variantesRepository, atributosRepository);
   });
 
+  describe('listarPorProducto', () => {
+    it('sin bodegaId devuelve las variantes tal cual, sin campo existencia', async () => {
+      variantesRepository.listarPorProducto.mockResolvedValue([{ id: 'v1', valoresAtributo: [] }] as never);
+
+      const resultado = await service.listarPorProducto('p1');
+
+      expect(variantesRepository.listarPorProducto).toHaveBeenCalledWith('p1', undefined);
+      expect(resultado).toEqual([{ id: 'v1', valoresAtributo: [] }]);
+    });
+
+    it('con bodegaId resuelve existencia = cantidadActual - cantidadReservada', async () => {
+      variantesRepository.listarPorProducto.mockResolvedValue([
+        { id: 'v1', valoresAtributo: [], stock: [{ cantidadActual: 10, cantidadReservada: 3 }] },
+        { id: 'v2', valoresAtributo: [], stock: [] },
+      ] as never);
+
+      const resultado = await service.listarPorProducto('p1', 'b1');
+
+      expect(variantesRepository.listarPorProducto).toHaveBeenCalledWith('p1', 'b1');
+      expect(resultado).toEqual([
+        { id: 'v1', valoresAtributo: [], existencia: 7 },
+        { id: 'v2', valoresAtributo: [], existencia: 0 },
+      ]);
+    });
+  });
+
   it('sin atributos (seleccion vacía) genera una única variante "por defecto"', async () => {
     await service.generarCombinaciones('p1', 't1', []);
 

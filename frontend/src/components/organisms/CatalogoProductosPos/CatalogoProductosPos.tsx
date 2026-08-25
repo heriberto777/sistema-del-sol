@@ -41,8 +41,11 @@ function formatoRD(valor: string) {
  */
 export function CatalogoProductosPos({
   onAgregar,
+  bodegaId,
 }: {
   onAgregar: (producto: ProductoCatalogo, cantidad: number, varianteId?: string) => void;
+  /** Bodega del turno abierto — se usa solo para mostrar la existencia por variante en el selector, nunca para bloquear el agregado (ver ARCHITECTURE.md). */
+  bodegaId: string;
 }) {
   const queryClient = useQueryClient();
   const [busqueda, setBusqueda] = useState('');
@@ -74,8 +77,9 @@ export function CatalogoProductosPos({
   async function agregar(producto: ProductoCatalogo) {
     const cantidadNumerica = Number(cantidad) > 0 ? Number(cantidad) : 1;
     const variantes = await queryClient.fetchQuery({
-      queryKey: ['variantes-producto', producto.id],
-      queryFn: async () => (await apiClient.get<VarianteProducto[]>(`/productos/${producto.id}/variantes`)).data,
+      queryKey: ['variantes-producto', producto.id, bodegaId],
+      queryFn: async () =>
+        (await apiClient.get<VarianteProducto[]>(`/productos/${producto.id}/variantes`, { params: { bodegaId } })).data,
     });
     if (variantes.length > 1) {
       // El precio de la grilla es el de una variante "representativa" (ver
@@ -207,7 +211,14 @@ export function CatalogoProductosPos({
                   title={!precioVenta ? 'Sin precio configurado' : undefined}
                   className="flex w-full items-center justify-between gap-3 rounded-lg border border-slate-200 px-3 py-2 text-left text-sm hover:border-sol-400 hover:bg-sol-50/50 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-slate-200 disabled:hover:bg-transparent dark:border-slate-800 dark:hover:bg-sol-900/10"
                 >
-                  <span>{etiquetaVariante(v) || '(sin atributos)'}</span>
+                  <span className="flex flex-col">
+                    <span>{etiquetaVariante(v) || '(sin atributos)'}</span>
+                    {v.existencia !== undefined && (
+                      <span className={v.existencia > 0 ? 'text-xs text-slate-400 dark:text-slate-500' : 'text-xs text-amber-600 dark:text-amber-500'}>
+                        {v.existencia > 0 ? `${v.existencia} disponible${v.existencia === 1 ? '' : 's'}` : 'Sin existencia'}
+                      </span>
+                    )}
+                  </span>
                   <span className="shrink-0 font-medium text-sol-600 dark:text-sol-400">
                     {precioVenta ? formatoRD(precioVenta) : 'Sin precio'}
                   </span>
