@@ -22,6 +22,7 @@ import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { useListasPrecio } from '../hooks/useListasPrecio';
 import { useVariantesProducto, etiquetaVariante } from '../hooks/useVariantesProducto';
 import { descargarBlob } from '../lib/descargar-archivo';
+import type { AjusteImagen } from '../constants/ajuste-imagen';
 import { PaginaResultado } from '../types/pagina-resultado';
 
 type TipoProducto = 'PRODUCTO' | 'SERVICIO' | 'COMBO';
@@ -52,6 +53,7 @@ interface ComponenteComboDetalle {
 interface ProductoDetalle extends Producto {
   componentes: ComponenteComboDetalle[];
   imagen: string | null;
+  imagenAjuste: AjusteImagen;
 }
 
 interface Precio {
@@ -71,6 +73,7 @@ interface ProductoFormValues {
   leyFiscalId: string;
   tipo: TipoProducto;
   imagen: string | null;
+  imagenAjuste: AjusteImagen;
   controlaVencimiento: boolean;
   precioVariable: boolean;
   esIngrediente: boolean;
@@ -107,6 +110,7 @@ const PRODUCTO_VACIO: ProductoFormValues = {
   leyFiscalId: '',
   tipo: 'PRODUCTO',
   imagen: null,
+  imagenAjuste: 'COVER',
   controlaVencimiento: false,
   precioVariable: false,
   esIngrediente: false,
@@ -333,6 +337,7 @@ function FormularioProducto({ producto, onGuardado }: { producto: Producto | nul
           leyFiscalId: producto.leyFiscalId ?? '',
           tipo: producto.tipo,
           imagen: null,
+          imagenAjuste: 'COVER',
           controlaVencimiento: producto.controlaVencimiento,
           precioVariable: producto.precioVariable,
           esIngrediente: producto.esIngrediente,
@@ -351,7 +356,7 @@ function FormularioProducto({ producto, onGuardado }: { producto: Producto | nul
   useEffect(() => {
     if (!producto) return;
     apiClient.get<ProductoDetalle>(`/productos/${producto.id}`).then(({ data }) => {
-      setValores((v) => ({ ...v, imagen: data.imagen }));
+      setValores((v) => ({ ...v, imagen: data.imagen, imagenAjuste: data.imagenAjuste }));
       if (data.tipo === 'COMBO') {
         setComponentes(data.componentes.map((c) => ({ productoId: c.componente.id, cantidad: c.cantidad })));
       }
@@ -380,6 +385,7 @@ function FormularioProducto({ producto, onGuardado }: { producto: Producto | nul
       leyFiscalId: valores.leyFiscalId || null,
       tipo: valores.tipo,
       imagen: valores.imagen,
+      imagenAjuste: valores.imagenAjuste,
       controlaVencimiento: valores.tipo === 'PRODUCTO' ? valores.controlaVencimiento : false,
       precioVariable: valores.precioVariable,
       esIngrediente: valores.esIngrediente,
@@ -419,7 +425,12 @@ function FormularioProducto({ producto, onGuardado }: { producto: Producto | nul
 
   return (
     <form onSubmit={onSubmit} className="space-y-3">
-      <CampoImagen valor={valores.imagen} onChange={(imagen) => setValores((v) => ({ ...v, imagen }))} />
+      <CampoImagen
+        valor={valores.imagen}
+        onChange={(imagen) => setValores((v) => ({ ...v, imagen }))}
+        ajuste={valores.imagenAjuste}
+        onChangeAjuste={(imagenAjuste) => setValores((v) => ({ ...v, imagenAjuste }))}
+      />
       <div className="flex flex-col gap-1">
         <label htmlFor="producto-tipo" className="text-sm font-medium text-slate-700 dark:text-slate-300">
           Tipo

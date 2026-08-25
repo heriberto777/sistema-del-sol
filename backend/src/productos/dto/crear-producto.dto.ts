@@ -1,7 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { ArrayMinSize, IsArray, IsBoolean, IsEnum, IsIn, IsNumber, IsOptional, IsPositive, IsString, IsUUID, Matches, MaxLength, Max, Min, ValidateNested } from 'class-validator';
-import { TipoProducto } from '@prisma/client';
+import { AjusteImagenProducto, TipoProducto } from '@prisma/client';
 
 /** Plan de integración Cuadre, ítem E-8 — lista cerrada (antes String libre sin validar). 'UND' se mantiene por compatibilidad con el default histórico. */
 export const UNIDADES_MEDIDA = ['UND', 'KILOGRAMO', 'GRAMO', 'LIBRA', 'ONZA', 'LITRO', 'MILILITRO', 'GALON', 'PORCION', 'DOCENA'] as const;
@@ -135,6 +135,16 @@ export class CrearProductoDto {
   @Matches(/^data:image\/(jpeg|jpg|png|webp);base64,/, { message: 'imagen debe ser una data URI de imagen (jpeg/png/webp)' })
   @MaxLength(2_000_000, { message: 'La imagen es demasiado pesada — comprimila antes de subirla' })
   imagen?: string | null;
+
+  @ApiProperty({
+    enum: AjusteImagenProducto,
+    required: false,
+    default: 'COVER',
+    description: 'Cómo encajar la imagen dentro del recuadro de la tarjeta (catálogo del POS) — mismo criterio que object-fit de CSS.',
+  })
+  @IsOptional()
+  @IsEnum(AjusteImagenProducto)
+  imagenAjuste?: AjusteImagenProducto;
 
   @ApiProperty({
     type: [SeleccionAtributoDto],

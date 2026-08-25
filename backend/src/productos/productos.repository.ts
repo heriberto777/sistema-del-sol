@@ -104,6 +104,7 @@ export class ProductosRepository {
       codigo: true,
       nombre: true,
       imagen: true,
+      imagenAjuste: true,
       porcentajeItbis: true,
       tipo: true,
       precioVariable: true,

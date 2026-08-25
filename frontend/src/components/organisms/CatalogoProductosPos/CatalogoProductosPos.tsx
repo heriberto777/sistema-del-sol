@@ -10,12 +10,14 @@ import { aplanarArbolCategorias, type CategoriaPlana } from '../../../lib/catego
 import { CLASE_PUNTO_COLOR_CATEGORIA } from '../../../lib/color-categoria';
 import { etiquetaVariante, type VarianteProducto } from '../../../hooks/useVariantesProducto';
 import { PaginaResultado } from '../../../types/pagina-resultado';
+import { CLASE_AJUSTE_IMAGEN, type AjusteImagen } from '../../../constants/ajuste-imagen';
 
 export interface ProductoCatalogo {
   id: string;
   codigo: string;
   nombre: string;
   imagen: string | null;
+  imagenAjuste: AjusteImagen;
   porcentajeItbis: string;
   tipo: 'PRODUCTO' | 'SERVICIO' | 'COMBO';
   precioVenta: string | null;
@@ -184,7 +186,7 @@ export function CatalogoProductosPos({
           >
             <div className="flex h-32 w-full items-center justify-center overflow-hidden rounded-md bg-slate-50 dark:bg-slate-800">
               {producto.imagen ? (
-                <img src={producto.imagen} alt="" className="h-full w-full object-cover" />
+                <img src={producto.imagen} alt="" className={`h-full w-full ${CLASE_AJUSTE_IMAGEN[producto.imagenAjuste]}`} />
               ) : (
                 <Package size={30} className="text-slate-300 dark:text-slate-600" />
               )}

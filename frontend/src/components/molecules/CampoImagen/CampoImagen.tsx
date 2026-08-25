@@ -1,15 +1,28 @@
 import { useRef, useState } from 'react';
 import { ImageOff, Upload } from 'lucide-react';
 import { comprimirImagen } from '../../../lib/comprimir-imagen';
+import { AJUSTES_IMAGEN, CLASE_AJUSTE_IMAGEN, type AjusteImagen } from '../../../constants/ajuste-imagen';
+import { Select } from '../../atoms/Select/Select';
+import { cn } from '../../../lib/cn';
 
 interface CampoImagenProps {
   valor: string | null;
   onChange: (dataUri: string | null) => void;
   label?: string;
+  /** Cómo encajar la imagen dentro de su recuadro donde se muestre (ej. tarjeta del catálogo del POS) — ver AJUSTES_IMAGEN. */
+  ajuste?: AjusteImagen;
+  onChangeAjuste?: (ajuste: AjusteImagen) => void;
 }
 
-/** Subida de imagen con vista previa — comprime en el navegador (ver comprimir-imagen.ts) antes de entregar el data URI. */
-export function CampoImagen({ valor, onChange, label = 'Foto' }: CampoImagenProps) {
+/**
+ * Subida de imagen con vista previa — comprime en el navegador (ver
+ * comprimir-imagen.ts) antes de entregar el data URI. El selector de
+ * "ajuste" (`onChangeAjuste`) es opcional: sin él, se comporta igual que
+ * antes (miniatura en `object-cover` fijo) — lo usa `FormularioProducto`
+ * en Productos.tsx, que es hoy el único lugar donde el ajuste importa de
+ * verdad (la tarjeta del catálogo del POS).
+ */
+export function CampoImagen({ valor, onChange, label = 'Foto', ajuste = 'COVER', onChangeAjuste }: CampoImagenProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [procesando, setProcesando] = useState(false);
@@ -34,7 +47,7 @@ export function CampoImagen({ valor, onChange, label = 'Foto' }: CampoImagenProp
       <div className="flex items-center gap-3">
         <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800">
           {valor ? (
-            <img src={valor} alt="" className="h-full w-full object-cover" />
+            <img src={valor} alt="" className={cn('h-full w-full', CLASE_AJUSTE_IMAGEN[ajuste])} />
           ) : (
             <ImageOff size={20} className="text-slate-300 dark:text-slate-600" />
           )}
@@ -58,6 +71,19 @@ export function CampoImagen({ valor, onChange, label = 'Foto' }: CampoImagenProp
         <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={(e) => onSeleccionar(e.target.files?.[0])} />
       </div>
       {error && <p className="text-xs text-red-600">{error}</p>}
+      {onChangeAjuste && (
+        <div className="mt-1 flex flex-col gap-1">
+          <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Cómo mostrarla en la tarjeta del POS</label>
+          <Select value={ajuste} onChange={(e) => onChangeAjuste(e.target.value as AjusteImagen)} className="max-w-xs">
+            {AJUSTES_IMAGEN.map((a) => (
+              <option key={a.value} value={a.value}>
+                {a.label}
+              </option>
+            ))}
+          </Select>
+          <p className="text-xs text-slate-400">{AJUSTES_IMAGEN.find((a) => a.value === ajuste)?.descripcion}</p>
+        </div>
+      )}
     </div>
   );
 }

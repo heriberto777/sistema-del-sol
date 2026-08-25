@@ -1928,6 +1928,18 @@ enum TipoProducto {
   COMBO
 }
 
+// Mapea 1:1 a `object-fit` de CSS — cómo encajar `Producto.imagen` dentro
+// del recuadro fijo de la tarjeta (catálogo del POS, miniatura del
+// formulario). COVER (default, recorta para llenar el recuadro) es el
+// comportamiento que ya existía hardcodeado antes de este campo.
+enum AjusteImagenProducto {
+  COVER
+  CONTAIN
+  FILL
+  NONE
+  SCALE_DOWN
+}
+
 /// Catálogo de categorías con jerarquía real (mismo patrón de auto-relación
 /// que `CuentaContable.cuentaPadreId` — no un prefijo de código, que en la
 /// práctica nadie parsea en tiempo de ejecución). El frontend arma el árbol
@@ -2006,6 +2018,7 @@ model Producto {
   // (pensado para el catálogo del POS) y `buscarPorId()` la incluyen,
   // para no inflar la página normal con blobs — ver ProductosRepository.
   imagen           String?  @db.Text
+  imagenAjuste     AjusteImagenProducto @default(COVER)
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
