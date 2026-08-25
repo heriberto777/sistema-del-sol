@@ -1937,6 +1937,25 @@ clientes) sigue siendo solo por email porque `User` no tiene un campo de
 teléfono — agregarlo sería la extensión natural si se necesita alertar
 por WhatsApp a los admins también.
 
+**Configuración de WhatsApp por tenant** (`backend/src/whatsapp-config/`,
+plan de integración Cuadre, ítem H-2a — entrega parcial de H-2):
+formulario en Admin → Integraciones → WhatsApp para que cada tenant
+guarde SUS PROPIAS credenciales de Twilio + preferencia de proveedor de
+IA (Anthropic/OpenAI/Vercel) + modelo + historial de conversación a
+pasarle a la IA. Mismo patrón de secretos que `PlataformaConfigService`
+(`aplicarCampoSecreto`/`aFormaSegura`, reusa `cifrar`/`descifrar` de
+`encriptado.util.ts` tal cual) pero tenant-scoped (`WhatsappConfigTenant.
+tenantId @unique`, vía `TenantPrismaService` en vez de `PrismaService`
+global) en lugar de fila única de plataforma. **Deliberadamente
+desconectado de todo lo demás**: `WhatsAppChannel.enviar()` (arriba)
+sigue leyendo `TWILIO_*` de `process.env` (nivel plataforma, no
+tenant); este formulario solo persiste datos, nadie los lee todavía. Es
+la base para cuando se resuelva H-2b (bot conversacional) — decidir el
+mecanismo de recepción (n8n/backend/híbrido, nota pendiente en
+`docs/cuadre-plan-integracion.md`) es un ítem aparte, sin código
+todavía. Sin botón de "Probar conexión" (decisión explícita del
+usuario — no se necesita, es solo un formulario).
+
 **Entrega manual del recibo** (plan de integración Cuadre, ítem F-4):
 `alFacturarse` (arriba) es automático y depende de que `Cliente.email`/
 `telefono` ya estén guardados — no cubre el caso real de POS con

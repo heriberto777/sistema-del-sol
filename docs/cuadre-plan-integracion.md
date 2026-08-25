@@ -626,6 +626,17 @@ Resumen de lo que cambió (detalle en cada ítem más abajo):
   similar) que reusa `IaClientService` directo, sin n8n; (c) un híbrido.
   Explícitamente diferido — no arrancar el diseño de negocio hasta
   resolver esto primero.
+  **H-2a entregado (2026-08-25)**: decisión del usuario — construir ya
+  el formulario de configuración por tenant (credenciales Twilio +
+  proveedor/modelo/API key de IA + historial de conversación), sin
+  esperar a resolver el mecanismo de H-2b. Módulo `whatsapp-config/`,
+  panel en Admin → Integraciones → WhatsApp, mismo patrón de secretos
+  cifrados que `plataforma-config/` pero tenant-scoped. **Sin botón de
+  "Probar conexión"** (pedido explícito) y **sin conectar con nada
+  todavía** — `WhatsAppChannel.enviar()` sigue leyendo `TWILIO_*` de
+  `process.env` (nivel plataforma), este formulario solo persiste
+  datos. H-2b (el bot en sí) sigue bloqueado por la misma decisión de
+  mecanismo pendiente. Migración `20260903090000_whatsapp_config_tenant`.
 - [x] **H-3** 🟧 *(alcance reducido a propósito)* — **Plantillas de
   documentos personalizables** (factura/recibo). *Confirmado: brecha
   real — `documento-pdf.ts`/`documento-ticket.ts` son generadores fijos
@@ -946,6 +957,11 @@ F-8, G-1/G-2/G-3/G-4/G-5/G-6/G-7/G-8/G-10/G-11/G-12, H-3, J-1/J-2/J-3,
 K-1 — todos verificados (tsc + suite unitaria + e2e + lint + build, todo
 verde) y commiteados uno por uno. De los 🟥, ya entregados: **D-1, A-2,
 A-1, A-3, E-7, C-2**. I-1 resultó falso positivo (ya estaba construido).
+Con esto queda cerrado el lote de RRHH/Consecutivos/Configuración del
+2026-08-25 (G-10, G-11, G-12, K-1, H-2a) — de ese análisis, lo único
+pendiente es C-1 (AZUL/CardNet, fuera de alcance a propósito, ver
+arriba) y H-2b (bot conversacional, bloqueado por la decisión de
+mecanismo).
 
 Lo que queda, por categoría:
 - **Deliberadamente pausado a pedido del usuario**: B-9 (línea manual/
@@ -954,10 +970,11 @@ Lo que queda, por categoría:
   corrección de tamaño), E-1 (Patrón Borrador→Confirmado en Compras/
   Ajustes/Transferencias, matiz).
 - **🟥, pendientes de su propia conversación de diseño**: A-4,
-  B-5, C-1, F-9, G-9
-  (hardware), H-2 (WhatsApp — con nota de decisión pendiente sobre n8n
-  vs. backend propio), J-4 (API keys, reclasificado — no aplica sin una
-  API pública).
+  B-5, C-1 (AZUL/CardNet, investigación ya hecha — ver arriba), F-9,
+  G-9 (hardware), H-2b (bot conversacional de WhatsApp — H-2a, el
+  formulario de configuración, ya entregado; sigue pendiente la
+  decisión de mecanismo n8n vs. backend propio), J-4 (API keys,
+  reclasificado — no aplica sin una API pública).
 
 Todos los 🟥 restantes necesitan una conversación de alcance ANTES de
 tocar código — mismo criterio que Sucursales (Fase 8), PIN (Fase 9) y
