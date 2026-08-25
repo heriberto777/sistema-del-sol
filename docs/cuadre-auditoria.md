@@ -18,6 +18,7 @@ tomar de acá al planear la integración.
 4. [RRHH, Contabilidad, Fiscal DGII, resto de Sistema](#parte-4)
 5. [POS — pasada 1 (atajos, primeros flujos)](#parte-5)
 6. [POS — pasada 2 (flujos confirmados con interacción real)](#parte-6)
+7. [Sitio Web / Tienda Online, auditoría profunda](#parte-7)
 
 ---
 
@@ -1322,6 +1323,217 @@ replica).
 8. Cierre de caja (F9): modal completo documentado, comportamiento de
    "diferencia/justificación" post-conteo sigue sin confirmar en la
    práctica.
+
+---
+
+<a id="parte-7"></a>
+## Parte 7 — Sitio Web / Tienda Online, auditoría profunda (app.cuadre.do)
+
+Alcance: solo lectura, sin crear/guardar ningún banner/página/cambio de
+apariencia real (todo formulario abierto se canceló sin "Guardar"). Se
+navegó a las 6 sub-secciones de "Sitio Web" (`/online-store/*`) y al
+subdominio público de la tienda (`ciguadr.cuadre.do`) — la tienda de este
+tenant está **desactivada**, así que el público devuelve `404 Tienda no
+encontrada` (no fue posible ver el catálogo/carrito/checkout reales del
+lado del cliente sin activar la tienda, algo que se evitó a propósito por
+ser un cambio de estado real y no reversible sin dejar rastro).
+
+### Configuración (`/online-store/settings`)
+
+Toggle **"Tienda en Línea"** (activado/desactivado) — con la cuenta
+CIGUADR está OFF ("Tu tienda está desactivada"). Botón **"Ver Tienda"**
+enlaza directo a `https://{subdominio}.cuadre.do/`. Formulario
+"Información General": Nombre de la Tienda (separado del nombre del
+negocio — acá dice "CIGUADR" pero es editable independiente), **Subdominio**
+(`ciguadr` + sufijo fijo `.cuadre.do`, validado a solo minúsculas/números/
+guiones — **sin campo de dominio propio/custom domain en ningún lado de
+esta pantalla**, confirma que el único modo de publicación es el
+subdominio de Cuadre), Descripción (textarea libre), Email de Contacto,
+Teléfono, Dirección (textarea). Todo en un único formulario con un botón
+"Guardar Cambios".
+
+### Apariencia (`/online-store/appearance`)
+
+Editor de tema completo con vista previa en vivo (desktop/móvil) al
+costado derecho, reflejando los cambios en tiempo real sobre una tienda de
+ejemplo ("Mi Tienda", productos genéricos $99/$149/$79):
+
+- **Tipografías**: 2 selects independientes (Fuente de Títulos / Fuente
+  de Cuerpo), 10 opciones cada uno (Inter, Roboto, Open Sans, Lato,
+  Poppins, Montserrat, Raleway, Playfair Display, Source Sans Pro,
+  Nunito) — típicas fuentes de Google Fonts.
+- **Bordes Redondeados**: 5 niveles (Ninguno/Pequeño/Mediano/Grande/Extra).
+- **Estilo de Botones**: 3 formas (Cuadrado/Redondeado/Pastilla).
+- **Estilo de Tarjetas**: 3 estilos (Plano/Bordeado/Sombra).
+- **Encabezado**: estilo (Moderno/Clásico/Minimalista/Centrado) +
+  2 toggles (Fijo al hacer scroll / Transparente).
+- **Pie de Página**: estilo (Simple/Columnas/Minimalista) + 2 toggles
+  (Mostrar Newsletter / Mostrar Redes Sociales).
+- **Tarjetas de Producto**: Aspecto de Imagen (Cuadrado/Vertical/
+  Horizontal) + 2 toggles (Vista Rápida sin salir de la página / botón
+  Agregar al Carrito directo desde la tarjeta).
+- **Colores** (color picker + hex manual, con preview swatch), 7 en
+  total: Primario, Secundario, Acento (para "elementos importantes como
+  ofertas"), Fondo Principal, Superficie (tarjetas/paneles), Texto
+  Principal, Texto Secundario — con un aviso de accesibilidad
+  ("asegurate de que haya suficiente contraste").
+- Botones "Restaurar" (vuelve a los valores por defecto) y "Guardar
+  Cambios" (deshabilitado hasta que haya un cambio real).
+
+🆕 Sistema de theming genuino y completo — no son 2-3 campos de color,
+es un editor con ~20 controles independientes y preview en vivo.
+
+### Site Builder (`/online-store/builder`)
+
+**Confirmado: es un editor visual real de drag-and-drop, no un
+formulario con secciones fijas.** Selector de página (combobox: Inicio,
+Productos, Detalle de Producto, Categoría, Carrito, Checkout — cada una
+se diseña por separado) + un banco de **16 tipos de widget** arrastrables
+al lienzo central: Hero Banner, Productos Destacados, Categorías (grid),
+Carrusel de Productos, Bloque de Contenido (texto con formato),
+Banner de Imagen, Testimonios, Newsletter, Formulario de Contacto,
+Espaciador, HTML Personalizado (código libre), Preguntas Frecuentes,
+Equipo, Galería, Estadísticas, Llamada a Acción. Cada widget ya colocado
+tiene controles propios: "Visible en móvil" (toggle), "Ocultar", "Eliminar".
+Con la cuenta CIGUADR, la página "Inicio" ya trae un **diseño generado
+automáticamente** ("basado en tus categorías, productos y banners
+existentes") con un widget Hero Banner precargado — el sistema arma un
+borrador inicial solo, sin que el usuario tenga que empezar de cero.
+
+Botón **"Templates"** abre un modal con dos categorías:
+1. **Estilos de Diseño** (5 presets completos — cambian colores/
+   fuentes/imágenes a la vez): Moderno Minimalista (Inter, mucho blanco),
+   Elegante y Lujoso (Playfair Display, tonos oscuros/dorados), Colorido
+   y Vibrante (Poppins, gradientes), Profesional Corporativo (Source
+   Sans Pro, azules/grises), Rústico Artesanal (Merriweather, tonos
+   tierra).
+2. **Solo Estructura** (3 templates de widgets sin tocar el tema
+   actual): Landing Page (7 widgets: hero+servicios+equipo+contacto),
+   Tienda Online (6 widgets: productos+categorías), Restaurante
+   (7 widgets: menú+reservaciones) — este último confirma que el Site
+   Builder de Cuadre apunta a un producto genérico de "sitio web para
+   cualquier negocio", no solo e-commerce puro.
+
+🆕🆕 Esto es un page builder tipo Wix/Shopify simplificado — el
+gap más grande de todo el catálogo confirmado con evidencia directa
+(no solo el nombre del menú).
+
+### Banners (`/online-store/banners`)
+
+Lista vacía en esta cuenta ("No hay banners"). Formulario "Nuevo
+Banner": Título, Subtítulo, Descripción (opcionales salvo título);
+**Imagen Principal** (obligatoria) + **Imagen Móvil** (opcional, "imagen
+optimizada para dispositivos móviles" — confirma que el frontend sirve
+distinta imagen según viewport); Texto del Botón + URL del Enlace;
+**Posición** (Hero Principal / Barra lateral / Pie de página / Popup —
+4 zonas de inserción distintas, no solo el hero de portada); Orden de
+visualización (numérico); **Vigencia** (fecha inicio/fin, "dejalas
+vacías para mostrar siempre" — mismo patrón de vigencia por fecha que
+Ofertas y Bonos); checkbox "Banner activo".
+
+### Páginas (`/online-store/pages`)
+
+Lista vacía en esta cuenta ("No hay páginas creadas"). Formulario
+"Nueva Página": Título + Slug (auto-sugerido desde el título, editable,
+validado a minúsculas/números/guiones); **Tipo de página** — 7 opciones:
+Acerca de, Contacto, Privacidad, Términos, Envíos, Devoluciones,
+Personalizada (sugiere que las primeras 6 tienen tratamiento especial
+en el footer/menú, aunque el campo de contenido es el mismo textarea
+libre para todas — no se pudo confirmar si hay un editor WYSIWYG/rich
+text real detrás o es texto plano, el campo se ve como un
+`<textarea>` simple sin toolbar de formato visible); sección SEO (Meta
+título, Meta descripción — si se deja vacío el meta título usa el
+título de la página); Opciones de visualización: Orden numérico,
+"Mostrar en menú" (toggle), "Mostrar en footer" (toggle, viene activado
+por defecto), "Publicada" (toggle, viene DESACTIVADO por defecto — una
+página nueva no es pública hasta activarla explícitamente).
+
+### Pedidos (`/online-store/orders`)
+
+Lista vacía en esta cuenta ("0 pedidos en total", sin poder confirmar
+si un pedido se puede convertir a una venta/factura real del backoffice
+o si vive en un flujo 100% separado — dato pendiente, ver "no explorado"
+abajo). Filtros: rango de fechas, **Estado del pedido** — 7 valores
+(Pendiente, Confirmado, Procesando, Listo, Enviado, Entregado,
+Cancelado) — y por separado **Estado de Pago** — 4 valores (Pendiente,
+Pagado, Fallido, Reembolsado), más búsqueda por orden/cliente/email.
+🆕 Confirma que un pedido online tiene un ciclde de vida propio de 7
+estados de cumplimiento, independiente y más granular que el de una
+`Factura`/`TurnoCaja` de Sistema del Sol o del propio Cuadre backoffice.
+
+### Checkout (`/online-store/checkout`)
+
+Formulario de configuración (no un editor visual, a diferencia del
+Site Builder) con 4 bloques:
+
+- **Métodos de Pago**: 3 toggles — Tarjeta de Crédito/Débito,
+  Transferencia Bancaria (con un textarea de "Instrucciones de
+  transferencia" que se le muestra al cliente en el checkout, ej.
+  "Banco Popular, Cuenta 123456789..."), Pago Contra Entrega. **No hay
+  ningún selector de proveedor de tarjeta acá** (AZUL/CardNet) — el
+  toggle "Tarjeta de Crédito/Débito" es genérico, no se pudo confirmar
+  si internamente usa el/los `card-providers` ya configurados en
+  Sistema → Proveedores de Tarjeta (ver Parte 4) o si es un campo
+  independiente sin conectar todavía.
+- **Opciones de Envío**: lista editable de métodos de entrega, cada uno
+  con Nombre (texto libre), Precio (RD$), Tiempo estimado (texto
+  libre, ej. "3-5 días"), y un botón para eliminar la fila — con 3 filas
+  precargadas de ejemplo: "Retiro en tienda" (RD$0), "Envío estándar"
+  (RD$150, "3-5 días"), "Envío express" (sin datos de ejemplo, en
+  blanco).
+- **Campos Requeridos**: 2 toggles — Número de teléfono, Dirección de
+  envío (sugiere que sin "Dirección de envío" activado, existe la
+  variante "recoger en tienda" sin pedir dirección).
+- **Límites de Pedido**: Monto mínimo de pedido (RD$, 0 = sin mínimo) y
+  Envío gratis a partir de (RD$, 0 = nunca gratis).
+
+### El subdominio público, desactivado
+
+`https://ciguadr.cuadre.do/` devuelve `404 — Tienda no encontrada` con
+la tienda en OFF — confirma que el toggle de Configuración controla el
+resolver del subdominio completo (no solo un banner de "en mantenimiento"
+encima de la tienda real). No se activó la tienda para ver el catálogo/
+ficha de producto/carrito/checkout reales del lado del cliente, por ser
+un cambio de estado con efecto público real — queda pendiente si se
+decide avanzar con el diseño de A-4 y se autoriza activarla puntualmente.
+
+### No explorado en la Parte 7
+
+Vista del sitio público real (requiere activar la tienda, ver arriba);
+detalle de un Pedido individual y si existe un botón/flujo de
+"Convertir a factura" hacia el backoffice (sin pedidos de ejemplo en
+esta cuenta); si el campo de contenido de una Página es texto plano o
+un editor de texto enriquecido real (WYSIWYG) por dentro; conexión real
+entre el toggle "Tarjeta de Crédito/Débito" del Checkout y los
+`card-providers` (AZUL/CardNet, ítem C-1) ya vistos en Sistema; límite
+de banners/páginas por plan; si "Detalle de Producto"/"Categoría"/
+"Carrito"/"Checkout" en el Site Builder tienen los mismos 16 widgets
+disponibles que "Inicio" o un catálogo reducido específico por tipo de
+página.
+
+### Resumen de hallazgos de la Parte 7 (para dimensionar A-4)
+
+1. **Site Builder es un page builder visual real** (drag-and-drop, 16
+   tipos de widget, 6 páginas editables por separado, generación
+   automática de un borrador inicial, 5 presets de tema completo + 3
+   templates de estructura) — no un formulario de configuración con
+   secciones fijas. Es, con diferencia, la pieza más grande de A-4.
+2. **Apariencia es un theming system independiente y completo** (~20
+   controles: tipografía, radios, botones, tarjetas, header/footer,
+   7 colores) con preview en vivo — un layer separado del Site Builder,
+   que probablemente lo consume como fuente de estilos.
+3. **Pedidos online tiene un ciclo de vida de 7 estados propio**
+   (Pendiente→Confirmado→Procesando→Listo→Enviado→Entregado→Cancelado)
+   más 4 estados de pago separados — no quedó claro si conecta con
+   `Factura` del backoffice o es un sistema paralelo; hay que confirmarlo
+   con datos reales antes de diseñar el modelo de datos de A-4.
+4. **Sin dominio propio (custom domain)** — solo subdominio
+   `{nombre}.cuadre.do`, más simple de lo que se podría haber asumido.
+5. **Checkout es configuración de métodos de pago/envío**, sin
+   conexión visible con los `card-providers` (AZUL/CardNet) de Sistema
+   — sugiere que, si se construye A-4, el pago con tarjeta en la tienda
+   pública necesitaría su propia integración (posiblemente compartiendo
+   adaptador con C-1, pero no confirmado que Cuadre mismo lo reusa).
 
 ---
 
