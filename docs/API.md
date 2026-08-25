@@ -507,6 +507,29 @@ ARCHITECTURE.md.
 | PATCH | `/api/cajas/:id` | `pos.supervisar` — `categoriaIds`/`productoIds`/`favoritoIds` reemplazan por completo la asignación existente (mismo patrón que `componentes` de un Producto COMBO); `undefined` deja la lista actual tal cual, `[]` la vacía |
 | DELETE | `/api/cajas/:id` | `pos.supervisar` — los turnos históricos que la usaban quedan con `cajaId: null` (no se borran) |
 
+## Tasas de cambio (ítem C-2, multi-moneda)
+
+Catálogo manual, sin feed automático (mismo criterio que Cuadre). Solo
+afecta la PRESENTACIÓN de una venta — nunca los precios/costos del
+catálogo, que siguen siempre en DOP. Ver "Multi-moneda" en
+ARCHITECTURE.md.
+
+| Método | Ruta | Permiso |
+|---|---|---|
+| POST | `/api/tasas-cambio` | `admin.configuracion` — `{ moneda, tasa }`; `moneda` código ISO de 3 letras (ej. `USD`), `tasa` = cuántos DOP vale 1 unidad de esa moneda (ej. `58.5`); 400 si ya existe una tasa para esa moneda (editarla, no duplicarla) |
+| GET | `/api/tasas-cambio` | `facturacion.crear` — sin permiso más restrictivo a propósito: cualquiera que factura necesita ver qué monedas están configuradas |
+| PATCH | `/api/tasas-cambio/:id` | `admin.configuracion` |
+| DELETE | `/api/tasas-cambio/:id` | `admin.configuracion` |
+
+`POST /api/facturas` gana `moneda?` (código ISO, ej. `"USD"`) — si se
+omite o es `"DOP"`, sin cambios de comportamiento. Con otra moneda:
+400 si no hay una `TasaCambio` configurada; si la hay, la `Factura`
+persiste `moneda`, `tasaCambio` (snapshot de la tasa vigente al momento
+de la venta — no cambia si la tasa se actualiza después) y
+`subtotalMoneda`/`itbisMoneda`/`totalMoneda` (equivalente para el
+documento impreso). `subtotal`/`itbis`/`total` siguen siendo SIEMPRE
+DOP — NCF, contabilidad, reportes, pagos y el dashboard no cambian.
+
 ## IA
 
 **Sin `ANTHROPIC_API_KEY` configurada, cada endpoint degrada a un modo

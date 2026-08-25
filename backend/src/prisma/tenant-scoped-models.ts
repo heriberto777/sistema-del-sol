@@ -68,4 +68,5 @@ export const TENANT_SCOPED_MODELS = new Set([
   'ConfiguracionLealtad',
   'MovimientoLealtad',
   'Caja',
+  'TasaCambio',
 ]);

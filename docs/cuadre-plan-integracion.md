@@ -220,23 +220,30 @@ Resumen de lo que cambió (detalle en cada ítem más abajo):
   que un cliente le pague a un tenant en su POS. El patrón de adaptador es
   reusable como referencia de diseño, pero no hay nada construido para
   este caso.*
-- [ ] **C-2** 🟧→🟥 *(corrección — diseño primero)* — **Multi-moneda de
+- [x] **C-2** 🟧→🟥 *(corrección — diseño primero)* — **Multi-moneda de
   punta a punta**. *Confirmado: brecha real en comportamiento —
-  `TenantSettings.moneda` (String, default "DOP") es un campo muerto,
-  no se lee/usa en ningún lado del backend. Pero "de punta a punta"
+  `TenantSettings.moneda` (String, default "DOP") era un campo muerto,
+  no se leía/usaba en ningún lado del backend. Pero "de punta a punta"
   resultó ser más grande de lo catalogado al verificar el alcance real:
   ni `Factura`/`LineaFactura` ni `AsientoContable`/`LineaAsiento` ni
-  `Producto.precios` tienen NINGUNA columna de moneda hoy — todo el
-  sistema asume DOP implícito. Hacerlo real de punta a punta exige
-  decisiones de diseño no triviales antes de tocar código: (1) si una
-  venta en moneda extranjera necesita guardar tasa de cambio +
-  equivalente en DOP (obligatorio para reportes DGII/NCF, que exigen
-  montos en DOP); (2) si la contabilidad postea siempre en DOP con
-  ganancia/pérdida cambiaria, o si se permite un libro mayor
-  multi-moneda; (3) si precios/costos de inventario se cotizan en
-  varias monedas o siempre en DOP con conversión al vender. Es una
-  decisión de alcance comparable a A-2/D-1 (ya 🟥), no un campo o
-  parámetro suelto — reclasificado, NO implementado.*
+  `Producto.precios` tenían NINGUNA columna de moneda — todo el sistema
+  asumía DOP implícito.* Decisiones confirmadas con el usuario (alcance
+  acotado a propósito, comparable a A-2/D-1): (1) `subtotal`/`itbis`/
+  `total` de `Factura` NUNCA cambian de significado — siguen siendo
+  SIEMPRE DOP (cero riesgo para NCF/contabilidad/reportes/pagos, que ya
+  los leen así); se agregan `moneda`/`tasaCambio` (snapshot) +
+  `subtotalMoneda`/`itbisMoneda`/`totalMoneda`, puramente de
+  presentación; (2) contabilidad siempre en DOP, sin libro mayor
+  multi-moneda ni ganancia/pérdida cambiaria (fuera de alcance,
+  documentado); (3) precios/costos de catálogo siguen siempre en DOP —
+  la conversión es solo al facturar. Entregado: catálogo
+  `TasaCambio` (manual, sin feed automático, mismo criterio que
+  Cuadre), `CrearFacturaDto.moneda?` (400 si no hay tasa configurada),
+  `FacturacionService.resolverMoneda()`, equivalente mostrado en PDF y
+  ticket térmico ("Equivalente: USD 123.45"). Frontend: panel "Tasas de
+  cambio" en Admin, selector de moneda en Facturación (fuera de
+  alcance: Cotizaciones/Remisiones/cotizar de POS, que siguen solo en
+  DOP). Migración `20260831090000_multi_moneda`. Entregado 2026-08-24.*
 
 ## D — Autorización de acciones sensibles
 
@@ -817,6 +824,17 @@ Resumen de lo que cambió (detalle en cada ítem más abajo):
   Cuadre modela períodos fiscales como objetos discretos con nombre +
   fecha inicio/fin; el nuestro es un cursor simple en secuencia —
   cosmético, no afecta si el cierre funciona de verdad.
+- **2026-08-24**: entregado C-2 (Multi-moneda de punta a punta), sexto
+  🟥 atacado — diseño confirmado con el usuario vía `AskUserQuestion`
+  (moneda + tasa + equivalente en DOP guardado; contabilidad siempre en
+  DOP sin libro mayor multi-moneda ni ganancia/pérdida cambiaria;
+  precios/costos de catálogo sin tocar, conversión solo al facturar).
+  `subtotal`/`itbis`/`total` de `Factura` NUNCA cambian de significado
+  (siguen SIEMPRE en DOP) — se agregan `moneda`/`tasaCambio`/
+  `subtotalMoneda`/`itbisMoneda`/`totalMoneda`, puramente de
+  presentación (equivalente mostrado en el documento impreso). Catálogo
+  `TasaCambio` manual, sin feed automático. Migración
+  `20260831090000_multi_moneda`.
 
 ## Sugerencia de por dónde arrancar
 
@@ -827,8 +845,8 @@ conversación de diseño antes de tocar código). Lote 🟨/🟧 completo:
 B-1/B-2/B-3/B-6/B-7/B-8, E-2/E-3/E-4/E-5/E-6/E-8/E-9/E-11, F-2/F-4/F-5/
 F-8, G-1/G-2/G-3/G-4/G-5/G-6/G-7/G-8, H-3, J-1/J-2/J-3 — todos
 verificados (tsc + suite unitaria + e2e + lint + build, todo verde) y
-commiteados uno por uno. De los 🟥, ya entregados: **D-1, A-2, A-1, A-3, E-7**.
-I-1 resultó falso positivo (ya estaba construido).
+commiteados uno por uno. De los 🟥, ya entregados: **D-1, A-2, A-1, A-3,
+E-7, C-2**. I-1 resultó falso positivo (ya estaba construido).
 
 Lo que queda, por categoría:
 - **Deliberadamente pausado a pedido del usuario**: B-9 (línea manual/
@@ -837,7 +855,7 @@ Lo que queda, por categoría:
   corrección de tamaño), E-1 (Patrón Borrador→Confirmado en Compras/
   Ajustes/Transferencias, matiz).
 - **🟥, pendientes de su propia conversación de diseño**: A-4,
-  B-5, C-1, C-2 (multi-moneda, reclasificado desde 🟧), F-9, G-9
+  B-5, C-1, F-9, G-9
   (hardware), H-2 (WhatsApp — con nota de decisión pendiente sobre n8n
   vs. backend propio), J-4 (API keys, reclasificado — no aplica sin una
   API pública).

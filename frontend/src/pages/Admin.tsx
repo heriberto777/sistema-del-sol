@@ -17,6 +17,7 @@ import { PersonalizacionDocumentosPanel } from '../components/organisms/Personal
 import { AutorizacionesPanel } from '../components/organisms/AutorizacionesPanel/AutorizacionesPanel';
 import { LealtadPanel } from '../components/organisms/LealtadPanel/LealtadPanel';
 import { CajasPanel } from '../components/organisms/CajasPanel/CajasPanel';
+import { TasasCambioPanel } from '../components/organisms/TasasCambioPanel/TasasCambioPanel';
 import { useAuth } from '../hooks/useAuth';
 
 interface Pestana {
@@ -67,6 +68,7 @@ const CATEGORIAS: Categoria[] = [
       { id: 'atributos', etiqueta: 'Atributos', permiso: 'admin.configuracion', panel: AtributosPanel },
       { id: 'ofertas', etiqueta: 'Ofertas', permiso: 'admin.configuracion', panel: OfertasPanel },
       { id: 'leyes-fiscales', etiqueta: 'Leyes fiscales', permiso: 'admin.configuracion', panel: LeyesFiscalesPanel },
+      { id: 'tasas-cambio', etiqueta: 'Tasas de cambio', permiso: 'admin.configuracion', panel: TasasCambioPanel },
     ],
   },
   {

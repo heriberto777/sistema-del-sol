@@ -27,6 +27,8 @@ export interface DocumentoPdfParams {
   /** Personalización de documentos (plan de integración Cuadre, ítem H-3) — logo como data URI y texto libre de pie de página. */
   logo?: string;
   notaPie?: string;
+  /** Ítem C-2 (multi-moneda) — equivalente informativo, `total` de arriba sigue siendo siempre DOP. */
+  totalEnMoneda?: { moneda: string; monto: number };
 }
 
 /**
@@ -116,6 +118,12 @@ export function generarDocumentoPdf(
       if (params.descuento) doc.text(`Descuento: ${formatearMontoDop(params.descuento)}`, { align: 'right' });
       if (params.itbis !== undefined) doc.text(`ITBIS: ${formatearMontoDop(params.itbis)}`, { align: 'right' });
       if (params.total !== undefined) doc.font('Helvetica-Bold').text(`Total: ${formatearMontoDop(params.total)}`, { align: 'right' });
+      if (params.totalEnMoneda) {
+        doc.font('Helvetica').fontSize(9).text(
+          `Equivalente: ${params.totalEnMoneda.moneda} ${params.totalEnMoneda.monto.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+          { align: 'right' },
+        );
+      }
     }
 
     if (params.notas) {

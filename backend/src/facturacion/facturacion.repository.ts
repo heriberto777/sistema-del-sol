@@ -161,6 +161,13 @@ export class FacturacionRepository {
       descuento: number;
       itbis: number;
       total: number;
+      // Ítem C-2 (multi-moneda) — puramente de presentación, ver
+      // FacturacionService.resolverMoneda.
+      moneda?: string;
+      tasaCambio?: number;
+      subtotalMoneda?: number;
+      itbisMoneda?: number;
+      totalMoneda?: number;
       lineas: LineaCalculada[];
     },
   ) {
@@ -185,6 +192,11 @@ export class FacturacionRepository {
         descuento: params.descuento,
         itbis: params.itbis,
         total: params.total,
+        moneda: params.moneda,
+        tasaCambio: params.tasaCambio,
+        subtotalMoneda: params.subtotalMoneda,
+        itbisMoneda: params.itbisMoneda,
+        totalMoneda: params.totalMoneda,
         lineas: {
           create: params.lineas.map((linea) => ({
             productoId: linea.productoId,

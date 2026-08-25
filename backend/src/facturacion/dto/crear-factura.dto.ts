@@ -114,4 +114,14 @@ export class CrearFacturaDto {
   @IsOptional()
   @IsIn([15, 30, 45, 60, 90])
   plazoPagoDias?: number;
+
+  @ApiProperty({
+    required: false,
+    default: 'DOP',
+    description:
+      'Ítem C-2 (multi-moneda) — código ISO de la moneda en la que se le PRESENTA el total al cliente (ej. "USD"). Requiere una TasaCambio configurada para esa moneda (400 si no existe). subtotal/itbis/total siguen siempre en DOP — esto solo agrega subtotalMoneda/itbisMoneda/totalMoneda para el documento impreso; NCF/contabilidad/reportes/pagos no se ven afectados.',
+  })
+  @IsOptional()
+  @IsString()
+  moneda?: string;
 }

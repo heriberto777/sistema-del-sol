@@ -80,7 +80,16 @@ function ModalNuevaFactura({ onClose }: { onClose: () => void }) {
   const [listaPrecioOverride, setListaPrecioOverride] = useState('');
   const [descuentoGeneralTipo, setDescuentoGeneralTipo] = useState<'' | 'PCT' | 'MONTO'>('');
   const [descuentoGeneralValor, setDescuentoGeneralValor] = useState('');
+  const [moneda, setMoneda] = useState('DOP');
   const [error, setError] = useState<string | null>(null);
+
+  // Ítem C-2 (multi-moneda) — solo para mostrarle al cliente un
+  // equivalente en el documento impreso; subtotal/itbis/total internos
+  // siguen siempre en DOP.
+  const { data: tasasCambio } = useQuery({
+    queryKey: ['tasas-cambio'],
+    queryFn: async () => (await apiClient.get<{ id: string; moneda: string; tasa: string }[]>('/tasas-cambio')).data,
+  });
 
   const { data: clientes } = useQuery({
     queryKey: ['clientes-select'],
@@ -126,6 +135,7 @@ function ModalNuevaFactura({ onClose }: { onClose: () => void }) {
         plazoPagoDias: tipoFactura === 'CREDITO' ? plazoPagoDias : undefined,
         descuentoGeneralPct: descuentoGeneralTipo === 'PCT' && descuentoGeneralValor ? Number(descuentoGeneralValor) : undefined,
         descuentoGeneralMonto: descuentoGeneralTipo === 'MONTO' && descuentoGeneralValor ? Number(descuentoGeneralValor) : undefined,
+        moneda: moneda !== 'DOP' ? moneda : undefined,
         lineas: lineas
           .filter((l) => l.productoId)
           .map((l) => ({
@@ -199,6 +209,22 @@ function ModalNuevaFactura({ onClose }: { onClose: () => void }) {
           <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Bodega (de donde sale el inventario)</label>
           <SelectorBodega value={bodegaId} onChange={setBodegaId} required />
         </div>
+
+        {tasasCambio && tasasCambio.length > 0 && (
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+              Moneda de presentación (ítem C-2 — el total interno sigue en DOP)
+            </label>
+            <Select value={moneda} onChange={(e) => setMoneda(e.target.value)}>
+              <option value="DOP">DOP (sin equivalente)</option>
+              {tasasCambio.map((t) => (
+                <option key={t.id} value={t.moneda}>
+                  {t.moneda} (tasa {Number(t.tasa).toLocaleString('es-DO')})
+                </option>
+              ))}
+            </Select>
+          </div>
+        )}
 
         <div className="flex flex-col gap-1">
           <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Tipo</label>

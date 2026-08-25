@@ -51,6 +51,7 @@ export function generarDocumentoTicketHtml(params: DocumentoPdfParams, ancho: An
         ${params.descuento ? `<div class="fila-montos"><span>Descuento</span><span>${e(formatearMontoDop(params.descuento))}</span></div>` : ''}
         ${params.itbis !== undefined ? `<div class="fila-montos"><span>ITBIS</span><span>${e(formatearMontoDop(params.itbis))}</span></div>` : ''}
         ${params.total !== undefined ? `<div class="fila-montos total"><span>Total</span><span>${e(formatearMontoDop(params.total))}</span></div>` : ''}
+        ${params.totalEnMoneda ? `<div class="fila-montos"><span>Equivalente</span><span>${e(params.totalEnMoneda.moneda)} ${e(params.totalEnMoneda.monto.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }))}</span></div>` : ''}
       </div>`
     : '';
 

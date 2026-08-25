@@ -12,6 +12,7 @@ import { LealtadModule } from '../lealtad/lealtad.module';
 import { AuthModule } from '../auth/auth.module';
 import { NotificacionesModule } from '../notificaciones/notificaciones.module';
 import { AutorizacionesModule } from '../autorizaciones/autorizaciones.module';
+import { TasasCambioModule } from '../tasas-cambio/tasas-cambio.module';
 
 @Module({
   // AuthModule: FacturacionService llama a authService.verificarPin() en
@@ -21,6 +22,7 @@ import { AutorizacionesModule } from '../autorizaciones/autorizaciones.module';
   // enviarRecibo() (ítem F-4) reusa NotificacionesService.enviar().
   // AutorizacionesModule: segunda capa de autorización (ítem D-1).
   // LealtadModule: canje de puntos como forma de pago (ítem A-3).
+  // TasasCambioModule: presentación en moneda extranjera (ítem C-2).
   imports: [
     InventarioModule,
     PagosModule,
@@ -32,6 +34,7 @@ import { AutorizacionesModule } from '../autorizaciones/autorizaciones.module';
     AuthModule,
     NotificacionesModule,
     AutorizacionesModule,
+    TasasCambioModule,
   ],
   controllers: [FacturacionController],
   providers: [FacturacionService, FacturacionRepository],

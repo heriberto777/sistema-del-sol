@@ -63,6 +63,7 @@ model Tenant {
   configuracionLealtad ConfiguracionLealtad?
   movimientosLealtad MovimientoLealtad[]
   cajas         Caja[]
+  tasasCambio   TasaCambio[]
   proveedores   Proveedor[]
   ordenesCompra OrdenCompra[]
   webhooks      Webhook[]
@@ -632,6 +633,19 @@ model Factura {
   descuento       Decimal       @default(0) @db.Decimal(14, 2)
   itbis           Decimal       @db.Decimal(14, 2)
   total           Decimal       @db.Decimal(14, 2)
+  // Ítem C-2 (multi-moneda) — `subtotal`/`itbis`/`total` de arriba SIGUEN
+  // siendo siempre DOP (nunca cambian de significado, cero riesgo para
+  // NCF/contabilidad/reportes/pagos, que ya los leen así). `moneda`
+  // (default "DOP") + `tasaCambio` (snapshot al momento de la venta,
+  // null si moneda=DOP) + `subtotalMoneda`/`itbisMoneda`/`totalMoneda`
+  // (equivalente en esa moneda, solo para mostrar al cliente en el
+  // documento impreso) son PURAMENTE de presentación — ver
+  // ARCHITECTURE.md.
+  moneda          String        @default("DOP")
+  tasaCambio      Decimal?      @db.Decimal(14, 6)
+  subtotalMoneda  Decimal?      @db.Decimal(14, 2)
+  itbisMoneda     Decimal?      @db.Decimal(14, 2)
+  totalMoneda     Decimal?      @db.Decimal(14, 2)
   plazoPagoDias   Int           @default(30)
   pagada          Boolean       @default(false)
   fechaPago       DateTime?
@@ -1507,6 +1521,27 @@ model LeyFiscal {
 
   @@unique([tenantId, codigo])
   @@map("leyes_fiscales")
+}
+
+/// Tasas de cambio (ítem C-2, multi-moneda) — catálogo manual, sin feed
+/// automático (mismo criterio que Cuadre: entrada manual, sin fecha de
+/// vigencia futura, la tasa vigente es la última guardada). `tasa` =
+/// cuántos DOP vale 1 unidad de `moneda` (ej. USD con tasa 58.50 — "el
+/// dólar está a 58.50"), dirección elegida por ser la más natural para
+/// un negocio dominicano, no necesariamente la de Cuadre ("1 DOP = X
+/// moneda"). Solo afecta la PRESENTACIÓN de una venta (ver
+/// `Factura.moneda`/`tasaCambio`/`*Moneda` y ARCHITECTURE.md) — nunca
+/// toca `Producto.precios`/costos, que siguen siempre en DOP.
+model TasaCambio {
+  id            String   @id @default(uuid())
+  tenantId      String
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  moneda        String
+  tasa          Decimal  @db.Decimal(14, 6)
+  actualizadaEn DateTime @updatedAt
+
+  @@unique([tenantId, moneda])
+  @@map("tasas_cambio")
 }
 
 /// Ledger de "con qué se pagó" una venta de POS — permite pagos divididos

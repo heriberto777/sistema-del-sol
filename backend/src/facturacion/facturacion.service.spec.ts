@@ -13,6 +13,7 @@ import { VariantesService } from '../variantes/variantes.service';
 import { OfertasService } from '../ofertas/ofertas.service';
 import { BonosService } from '../bonos/bonos.service';
 import { LealtadService } from '../lealtad/lealtad.service';
+import { TasasCambioService } from '../tasas-cambio/tasas-cambio.service';
 import { AuthService } from '../auth/auth.service';
 import { NotificacionesService } from '../notificaciones/notificaciones.service';
 import { AutorizacionesService } from '../autorizaciones/autorizaciones.service';
@@ -30,6 +31,7 @@ describe('FacturacionService', () => {
   let ofertasService: jest.Mocked<OfertasService>;
   let bonosService: jest.Mocked<BonosService>;
   let lealtadService: jest.Mocked<LealtadService>;
+  let tasasCambioService: jest.Mocked<TasasCambioService>;
   let authService: jest.Mocked<AuthService>;
   let notificacionesService: jest.Mocked<NotificacionesService>;
   let autorizacionesService: jest.Mocked<AutorizacionesService>;
@@ -105,6 +107,9 @@ describe('FacturacionService', () => {
     lealtadService = {
       procesarPagoEnTx: jest.fn().mockResolvedValue(undefined),
     } as unknown as jest.Mocked<LealtadService>;
+    tasasCambioService = {
+      buscarPorMoneda: jest.fn().mockResolvedValue(null),
+    } as unknown as jest.Mocked<TasasCambioService>;
     authService = {
       verificarPin: jest.fn().mockResolvedValue(undefined),
     } as unknown as jest.Mocked<AuthService>;
@@ -128,6 +133,7 @@ describe('FacturacionService', () => {
       ofertasService,
       bonosService,
       lealtadService,
+      tasasCambioService,
       authService,
       notificacionesService,
       autorizacionesService,
@@ -839,6 +845,52 @@ describe('FacturacionService', () => {
       await expect(
         service.crear(dto(), 'tenant-1', 'vendedor-1', { pagos: [{ formaPagoId: 'fp-puntos', monto: 236 }] }),
       ).rejects.toThrow(BadRequestException);
+      expect(repository.crearFacturaEnTx).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('multi-moneda (ítem C-2)', () => {
+    it('sin moneda en el dto, persiste moneda DOP y ningún campo *Moneda', async () => {
+      repository.obtenerProductoConPrecioVigente.mockResolvedValue(producto(18, 100) as never);
+      repository.crearFacturaEnTx.mockResolvedValue(facturaCreada() as never);
+
+      await service.crear(dto(), 'tenant-1', 'vendedor-1');
+
+      expect(repository.crearFacturaEnTx).toHaveBeenCalledWith(
+        TX,
+        expect.objectContaining({ moneda: 'DOP', tasaCambio: undefined, subtotalMoneda: undefined, itbisMoneda: undefined, totalMoneda: undefined }),
+      );
+      expect(tasasCambioService.buscarPorMoneda).not.toHaveBeenCalled();
+    });
+
+    it('con una moneda configurada, calcula subtotal/itbis/total equivalentes dividiendo por la tasa', async () => {
+      repository.obtenerProductoConPrecioVigente.mockResolvedValue(producto(18, 100) as never);
+      tasasCambioService.buscarPorMoneda.mockResolvedValue({ tasa: 58.5 } as never);
+      repository.crearFacturaEnTx.mockResolvedValue(facturaCreada() as never);
+
+      await service.crear(dto({ lineas: [{ productoId: 'prod-1', cantidad: 2 }], moneda: 'usd' }), 'tenant-1', 'vendedor-1');
+
+      // 2*100=200 subtotal, itbis 18%=36, total 236 — todo en DOP; /58.5 para el equivalente en USD
+      expect(repository.crearFacturaEnTx).toHaveBeenCalledWith(
+        TX,
+        expect.objectContaining({
+          moneda: 'USD',
+          tasaCambio: 58.5,
+          subtotalMoneda: 200 / 58.5,
+          itbisMoneda: 36 / 58.5,
+          totalMoneda: 236 / 58.5,
+          subtotal: 200,
+          itbis: 36,
+          total: 236,
+        }),
+      );
+    });
+
+    it('rechaza una moneda sin tasa de cambio configurada, sin crear la factura', async () => {
+      repository.obtenerProductoConPrecioVigente.mockResolvedValue(producto(18, 100) as never);
+      tasasCambioService.buscarPorMoneda.mockResolvedValue(null);
+
+      await expect(service.crear(dto({ moneda: 'EUR' }), 'tenant-1', 'vendedor-1')).rejects.toThrow(BadRequestException);
       expect(repository.crearFacturaEnTx).not.toHaveBeenCalled();
     });
   });

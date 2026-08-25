@@ -3233,6 +3233,72 @@ grilla del POS) y `buscarPorId()` (detalle de un producto) la incluyen.
 `imagen` simplemente ausente en el body deja la existente intacta
 (comportamiento normal de un `PATCH` parcial).
 
+## Multi-moneda (ítem C-2, plan de integración Cuadre)
+
+Alcance deliberadamente acotado tras verificar el tamaño real de "multi-
+moneda de punta a punta" (reclasificado de 🟧 a 🟥 — ver plan de
+integración): ninguna tabla de negocio tenía columna de moneda, y
+hacerlo "de punta a punta" de verdad (libro mayor multi-moneda, ganancia/
+pérdida cambiaria, precios de catálogo en varias monedas) es un proyecto
+en sí mismo. Decisiones confirmadas con el usuario para este primer
+corte:
+
+1. **`subtotal`/`itbis`/`total` de `Factura` (y todo lo que ya los lee)
+   NUNCA cambian de significado — siguen siendo SIEMPRE DOP.** Cero
+   riesgo para NCF, `AsientosContablesService` (la contabilidad postea
+   en DOP, sin excepción), `ReportesService`/dashboard (que suman
+   `Factura.total` de un rango sin conocer moneda), `PagosService`
+   (el saldo pendiente se calcula y cobra en DOP). Esto evitó tener que
+   auditar y tocar cada uno de esos consumidores.
+2. **Nuevos campos, puramente de presentación**: `Factura.moneda`
+   (default `"DOP"`), `tasaCambio` (snapshot de la tasa AL MOMENTO de
+   la venta — un cambio de tasa después no altera documentos ya
+   emitidos), `subtotalMoneda`/`itbisMoneda`/`totalMoneda` (los montos
+   DOP de arriba, divididos por `tasaCambio` — solo se llenan si
+   `moneda != 'DOP'`). Nada de esto se lee en ningún cálculo interno;
+   solo se usan para el documento impreso (`DocumentoPdfParams.
+   totalEnMoneda`, línea "Equivalente: USD 123.45" en PDF y ticket
+   térmico).
+3. **`Producto.precios`/costos no se tocan** — siguen siempre en DOP.
+   Elegir una moneda distinta de DOP al facturar NO cambia cómo se
+   calculan las líneas (inventario, ITBIS, ofertas, comisiones, puntos
+   de lealtad — todo eso sigue exactamente igual, en DOP); solo agrega,
+   al final, el equivalente para mostrar.
+4. **Contabilidad siempre en DOP, sin ganancia/pérdida cambiaria** —
+   `ContabilidadEventosService`/`AsientosContablesService` no cambian ni
+   un carácter: reciben `subtotal`/`itbis`/`total` (DOP) exactamente
+   como antes de este ítem. Revaluación cambiaria de cuentas por cobrar
+   en moneda extranjera queda **fuera de alcance** — sería un libro
+   mayor multi-moneda real, un proyecto aparte.
+
+**`TasaCambio`** (`backend/src/tasas-cambio/`, tenant-scoped): catálogo
+manual sin feed automático, mismo criterio que la pantalla "Tasas de
+Cambio" de Cuadre. `tasa` = cuántos DOP vale 1 unidad de esa moneda (ej.
+USD con `tasa: 58.5` — "el dólar está a 58.50"), dirección elegida por
+ser la más natural para un negocio dominicano, no necesariamente la de
+Cuadre ("1 DOP = X moneda"). Único por `[tenantId, moneda]` — crear de
+nuevo la misma moneda da 400 (se edita, no se duplica).
+
+**`FacturacionService.resolverMoneda(moneda?)`**: sin `moneda` (o
+`'DOP'`), no hace nada (`tasaCambio: null`). Con otra moneda, busca la
+`TasaCambio` (400 si no existe — no hay conversión implícita) y
+devuelve la tasa vigente EN ESE MOMENTO. Se llama una sola vez dentro de
+`crear()`, después de `calcularLineasYTotales()` (que sigue calculando
+subtotal/itbis/total en DOP sin ningún cambio) — `montoMoneda(montoDop)
+= montoDop / tasaCambio` calcula los 3 campos `*Moneda` antes de
+persistir la factura.
+
+**Fuera de alcance de este primer corte**: `Cotizaciones`/`Remisiones`
+(sin selector de moneda — solo Facturación directa y POS, que reusa
+`FacturacionService.crear()`, lo heredan); `PosService.cotizar()`
+(previsualización antes de pagar, sigue mostrando solo DOP); libro mayor
+multi-moneda y ganancia/pérdida cambiaria (ver arriba); precios de
+catálogo en múltiples monedas.
+
+Migración: `20260831090000_multi_moneda`. Sin permisos nuevos (reusa
+`admin.configuracion` para el catálogo de tasas, `facturacion.crear`
+para leerlo).
+
 ## Impresión multi-formato (Facturación/Cotizaciones/Remisiones/POS)
 
 Antes, Facturación/Cotizaciones/Remisiones solo generaban PDF a tamaño

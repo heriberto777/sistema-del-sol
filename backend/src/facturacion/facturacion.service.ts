@@ -15,6 +15,7 @@ import { OfertasService } from '../ofertas/ofertas.service';
 import { prorratearDescuentoCarrito } from '../ofertas/prorratear-descuento-carrito';
 import { BonosService } from '../bonos/bonos.service';
 import { LealtadService } from '../lealtad/lealtad.service';
+import { TasasCambioService } from '../tasas-cambio/tasas-cambio.service';
 import { ListarFacturasQueryDto } from './dto/listar-facturas-query.dto';
 import { paginar } from '../common/types/pagina-resultado';
 import { DocumentoPdfParams, generarDocumentoPdf } from '../common/pdf/documento-pdf';
@@ -109,6 +110,7 @@ export class FacturacionService {
     private readonly ofertasService: OfertasService,
     private readonly bonosService: BonosService,
     private readonly lealtadService: LealtadService,
+    private readonly tasasCambioService: TasasCambioService,
     private readonly authService: AuthService,
     private readonly notificacionesService: NotificacionesService,
     private readonly autorizacionesService: AutorizacionesService,
@@ -278,6 +280,22 @@ export class FacturacionService {
   }
 
   /**
+   * Ítem C-2 (multi-moneda) — sin `moneda` (o `moneda: 'DOP'`), no hace
+   * nada. Con otra moneda, exige una `TasaCambio` configurada (400 si no
+   * existe) y devuelve la tasa vigente EN ESE MOMENTO — se guarda como
+   * snapshot en la factura, para que un cambio de tasa después no altere
+   * documentos ya emitidos.
+   */
+  private async resolverMoneda(moneda?: string): Promise<{ moneda: string; tasaCambio: number | null }> {
+    if (!moneda || moneda.toUpperCase() === 'DOP') return { moneda: 'DOP', tasaCambio: null };
+    const tasaCambio = await this.tasasCambioService.buscarPorMoneda(moneda);
+    if (!tasaCambio) {
+      throw new BadRequestException(`No hay una tasa de cambio configurada para ${moneda.toUpperCase()}`);
+    }
+    return { moneda: moneda.toUpperCase(), tasaCambio: Number(tasaCambio.tasa) };
+  }
+
+  /**
    * Previsualización de solo lectura — mismo cálculo que `crear()` pero sin
    * abrir transacción ni tocar stock/NCF/pagos (Fase 4c: el checkout del POS
    * la llama al armar el carrito para mostrar el total YA con ofertas
@@ -332,6 +350,12 @@ export class FacturacionService {
     // de NCF se descuenta, más abajo.
     const bodega = await this.inventarioService.validarAccesoBodega(dto.bodegaId, vendedorId);
     const { lineasCalculadas, subtotal, itbis, total, descuentoTotal } = await this.calcularLineasYTotales(dto, cliente);
+    // Ítem C-2 (multi-moneda) — subtotal/itbis/total de arriba siguen
+    // siendo SIEMPRE DOP (stock/NCF/contabilidad/pagos operan sobre
+    // ellos sin cambios); esto solo agrega el equivalente en la moneda
+    // pedida, puramente para mostrar en el documento impreso.
+    const { moneda, tasaCambio } = await this.resolverMoneda(dto.moneda);
+    const montoMoneda = (montoDop: number) => (tasaCambio ? montoDop / tasaCambio : undefined);
 
     // Pago dividido (POS, ver PosService.registrarVenta): si vienen `pagos`
     // explícitos, deben sumar exacto el total (EPSILON, mismo criterio que
@@ -456,6 +480,11 @@ export class FacturacionService {
         descuento: descuentoTotal,
         itbis,
         total,
+        moneda,
+        tasaCambio: tasaCambio ?? undefined,
+        subtotalMoneda: montoMoneda(subtotal),
+        itbisMoneda: montoMoneda(itbis),
+        totalMoneda: montoMoneda(total),
         lineas: lineasCalculadas,
       });
     });
@@ -496,6 +525,7 @@ export class FacturacionService {
       descuento: Number(factura.descuento),
       itbis: Number(factura.itbis),
       total: Number(factura.total),
+      totalEnMoneda: factura.totalMoneda != null ? { moneda: factura.moneda, monto: Number(factura.totalMoneda) } : undefined,
     };
   }
 
