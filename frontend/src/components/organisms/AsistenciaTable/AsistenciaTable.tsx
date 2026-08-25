@@ -1,4 +1,5 @@
 import { FormEvent, useState } from 'react';
+import { User } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../../lib/api-client';
 import { Badge } from '../../atoms/Badge/Badge';
@@ -81,6 +82,7 @@ export function AsistenciaTable() {
             obtenerId={(e) => e.id}
             obtenerEtiqueta={(e) => `${e.nombre} — ${e.cedula}`}
             placeholder="Filtrar por empleado…"
+            icono={<User size={15} />}
           />
         </div>
         {tienePermiso('rrhh.editar') && <Button onClick={() => setModalManual(true)}>Registrar manualmente</Button>}
@@ -216,6 +218,7 @@ function ModalRegistrarManual({ onClose, onCreado }: { onClose: () => void; onCr
             obtenerId={(e) => e.id}
             obtenerEtiqueta={(e) => `${e.nombre} — ${e.cedula}`}
             placeholder="Buscar empleado por nombre o cédula…"
+            icono={<User size={15} />}
           />
         </div>
         <FormField id="asistencia-fecha" label="Fecha" type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} required />

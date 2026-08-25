@@ -1,4 +1,5 @@
 import { FormEvent, useState } from 'react';
+import { Package } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../../lib/api-client';
 import { Button } from '../../atoms/Button/Button';
@@ -219,6 +220,7 @@ export function OfertasPanel() {
                 obtenerId={(p) => p.id}
                 obtenerEtiqueta={(p) => `${p.codigo} — ${p.nombre}`}
                 placeholder="Buscar producto…"
+                icono={<Package size={15} />}
                 buscar={async (texto) =>
                   (await apiClient.get<PaginaResultado<Producto>>('/productos', { params: { busqueda: texto, tamanoPagina: 10 } })).data.datos
                 }

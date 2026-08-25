@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useState } from 'react';
+import { User } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../../lib/api-client';
 import { ModalImprimir } from '../../molecules/ModalImprimir/ModalImprimir';
@@ -8,6 +9,7 @@ import { RowActionsMenu } from '../../molecules/RowActionsMenu/RowActionsMenu';
 import { Button } from '../../atoms/Button/Button';
 import { Card } from '../../atoms/Card/Card';
 import { Select } from '../../atoms/Select/Select';
+import { ComboboxBusqueda } from '../../molecules/ComboboxBusqueda/ComboboxBusqueda';
 import { Badge } from '../../atoms/Badge/Badge';
 import { SearchInput } from '../../molecules/SearchInput/SearchInput';
 import { Paginacion } from '../../molecules/Paginacion/Paginacion';
@@ -66,10 +68,6 @@ export function RemisionesPanel() {
   const [remisionConvirtiendo, setRemisionConvirtiendo] = useState<Remision | null>(null);
   const [remisionImprimiendo, setRemisionImprimiendo] = useState<Remision | null>(null);
 
-  const { data: clientes } = useQuery({
-    queryKey: ['clientes-select'],
-    queryFn: async () => (await apiClient.get<PaginaResultado<Cliente>>('/clientes', { params: { tamanoPagina: 100 } })).data.datos,
-  });
   const { data: productos } = useQuery({
     queryKey: ['productos-select'],
     queryFn: async () => (await apiClient.get<PaginaResultado<Producto>>('/productos', { params: { tamanoPagina: 100 } })).data.datos,
@@ -166,12 +164,7 @@ export function RemisionesPanel() {
       </Card>
 
       {modalNuevaRemision && (
-        <ModalNuevaRemision
-          productos={productos ?? []}
-          clientes={clientes ?? []}
-          bodegas={bodegas ?? []}
-          onClose={() => setModalNuevaRemision(false)}
-        />
+        <ModalNuevaRemision productos={productos ?? []} bodegas={bodegas ?? []} onClose={() => setModalNuevaRemision(false)} />
       )}
 
       {remisionEditando && (
@@ -179,7 +172,6 @@ export function RemisionesPanel() {
           remisionId={remisionEditando.id}
           numeroActual={remisionEditando.numero}
           productos={productos ?? []}
-          clientes={clientes ?? []}
           bodegas={bodegas ?? []}
           onClose={() => setRemisionEditando(null)}
         />
@@ -200,17 +192,15 @@ export function RemisionesPanel() {
 
 function ModalNuevaRemision({
   productos,
-  clientes,
   bodegas,
   onClose,
 }: {
   productos: Producto[];
-  clientes: Cliente[];
   bodegas: Bodega[];
   onClose: () => void;
 }) {
   const queryClient = useQueryClient();
-  const [clienteId, setClienteId] = useState('');
+  const [cliente, setCliente] = useState<Cliente | null>(null);
   const [bodegaId, setBodegaId] = useState('');
   const [numero, setNumero] = useState('');
   const [lineas, setLineas] = useState<LineaForm[]>([{ productoId: '', varianteId: '', cantidad: '1' }]);
@@ -219,7 +209,7 @@ function ModalNuevaRemision({
   const crear = useMutation({
     mutationFn: async () =>
       apiClient.post('/remisiones', {
-        clienteId,
+        clienteId: cliente?.id,
         bodegaId,
         numero,
         lineas: lineas
@@ -240,6 +230,10 @@ function ModalNuevaRemision({
   function onSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
+    if (!cliente) {
+      setError('Seleccioná un cliente.');
+      return;
+    }
     crear.mutate();
   }
 
@@ -252,14 +246,17 @@ function ModalNuevaRemision({
         <FormField id="numero" label="Número" value={numero} onChange={(e) => setNumero(e.target.value)} required />
         <div>
           <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Cliente</label>
-          <Select value={clienteId} onChange={(e) => setClienteId(e.target.value)} required>
-            <option value="">Seleccionar…</option>
-            {clientes.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.nombre}
-              </option>
-            ))}
-          </Select>
+          <ComboboxBusqueda<Cliente>
+            valor={cliente}
+            onSeleccionar={setCliente}
+            obtenerId={(c) => c.id}
+            obtenerEtiqueta={(c) => c.nombre}
+            placeholder="Buscar cliente…"
+            icono={<User size={15} />}
+            buscar={async (texto) =>
+              (await apiClient.get<PaginaResultado<Cliente>>('/clientes', { params: { busqueda: texto, tamanoPagina: 10 } })).data.datos
+            }
+          />
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Bodega</label>
@@ -317,20 +314,19 @@ function ModalEditarRemision({
   remisionId,
   numeroActual,
   productos,
-  clientes,
   bodegas,
   onClose,
 }: {
   remisionId: string;
   numeroActual: string;
   productos: Producto[];
-  clientes: Cliente[];
   bodegas: Bodega[];
   onClose: () => void;
 }) {
   const queryClient = useQueryClient();
   const [error, setError] = useState<string | null>(null);
-  const [valores, setValores] = useState<{ numero: string; clienteId: string; bodegaId: string; lineas: LineaForm[] } | null>(null);
+  const [cliente, setCliente] = useState<Cliente | null>(null);
+  const [valores, setValores] = useState<{ numero: string; bodegaId: string; lineas: LineaForm[] } | null>(null);
 
   const { data: detalle } = useQuery({
     queryKey: ['remision-detalle', remisionId],
@@ -339,9 +335,9 @@ function ModalEditarRemision({
 
   useEffect(() => {
     if (!detalle) return;
+    setCliente({ id: detalle.clienteId, nombre: detalle.cliente.nombre });
     setValores({
       numero: detalle.numero,
-      clienteId: detalle.clienteId,
       bodegaId: detalle.bodegaId,
       lineas: detalle.lineas.map((l) => ({ productoId: l.productoId, varianteId: l.varianteId, cantidad: l.cantidad })),
     });
@@ -351,7 +347,7 @@ function ModalEditarRemision({
     mutationFn: async () =>
       apiClient.patch(`/remisiones/${remisionId}`, {
         numero: valores!.numero,
-        clienteId: valores!.clienteId,
+        clienteId: cliente?.id,
         bodegaId: valores!.bodegaId,
         lineas: valores!.lineas.filter((l) => l.productoId).map((l) => ({ productoId: l.productoId, varianteId: l.varianteId || undefined, cantidad: Number(l.cantidad) })),
       }),
@@ -365,6 +361,10 @@ function ModalEditarRemision({
   function onSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
+    if (!cliente) {
+      setError('Seleccioná un cliente.');
+      return;
+    }
     guardar.mutate();
   }
 
@@ -388,14 +388,17 @@ function ModalEditarRemision({
         />
         <div className="flex flex-col gap-1">
           <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Cliente</label>
-          <Select value={valores.clienteId} onChange={(e) => setValores({ ...valores, clienteId: e.target.value })} required>
-            <option value="">Seleccionar…</option>
-            {clientes.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.nombre}
-              </option>
-            ))}
-          </Select>
+          <ComboboxBusqueda<Cliente>
+            valor={cliente}
+            onSeleccionar={setCliente}
+            obtenerId={(c) => c.id}
+            obtenerEtiqueta={(c) => c.nombre}
+            placeholder="Buscar cliente…"
+            icono={<User size={15} />}
+            buscar={async (texto) =>
+              (await apiClient.get<PaginaResultado<Cliente>>('/clientes', { params: { busqueda: texto, tamanoPagina: 10 } })).data.datos
+            }
+          />
         </div>
         <div className="flex flex-col gap-1">
           <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Bodega</label>

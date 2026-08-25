@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useState } from 'react';
+import { Truck } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 import { apiClient } from '../lib/api-client';
@@ -6,6 +7,7 @@ import { Badge } from '../components/atoms/Badge/Badge';
 import { Button } from '../components/atoms/Button/Button';
 import { Card } from '../components/atoms/Card/Card';
 import { Select } from '../components/atoms/Select/Select';
+import { ComboboxBusqueda } from '../components/molecules/ComboboxBusqueda/ComboboxBusqueda';
 import { FormField } from '../components/molecules/FormField/FormField';
 import { SelectFormaPago } from '../components/molecules/SelectFormaPago/SelectFormaPago';
 import { Modal } from '../components/molecules/Modal/Modal';
@@ -290,17 +292,12 @@ function ModalVerOrden({ orden, onClose }: { orden: OrdenCompra; onClose: () => 
 
 function ModalNuevaOrdenCompra({ onClose }: { onClose: () => void }) {
   const queryClient = useQueryClient();
-  const [proveedorId, setProveedorId] = useState('');
+  const [proveedor, setProveedor] = useState<Proveedor | null>(null);
   const [numero, setNumero] = useState('');
   const [lineas, setLineas] = useState([{ productoId: '', varianteId: '', cantidad: '1', costoUnitario: '' }]);
   const [mostrarNuevoProveedor, setMostrarNuevoProveedor] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const { data: proveedores } = useQuery({
-    queryKey: ['proveedores-select'],
-    queryFn: async () =>
-      (await apiClient.get<PaginaResultado<Proveedor>>('/proveedores', { params: { tamanoPagina: 100 } })).data.datos,
-  });
   const { data: productos } = useQuery({
     queryKey: ['productos-select'],
     queryFn: async () => (await apiClient.get<PaginaResultado<Producto>>('/productos', { params: { tamanoPagina: 100 } })).data.datos,
@@ -315,7 +312,7 @@ function ModalNuevaOrdenCompra({ onClose }: { onClose: () => void }) {
   const crear = useMutation({
     mutationFn: async () =>
       apiClient.post('/compras', {
-        proveedorId,
+        proveedorId: proveedor?.id,
         numero,
         lineas: lineas
           .filter((l) => l.productoId)
@@ -336,6 +333,10 @@ function ModalNuevaOrdenCompra({ onClose }: { onClose: () => void }) {
   function onSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
+    if (!proveedor) {
+      setError('Seleccioná un proveedor.');
+      return;
+    }
     if (lineas.filter((l) => l.productoId).length === 0) {
       setError('Agregá al menos una línea con producto.');
       return;
@@ -348,14 +349,18 @@ function ModalNuevaOrdenCompra({ onClose }: { onClose: () => void }) {
       <form onSubmit={onSubmit} className="space-y-3">
         <div className="flex flex-col gap-1">
           <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Proveedor</label>
-          <Select value={proveedorId} onChange={(e) => setProveedorId(e.target.value)} required>
-            <option value="">Seleccionar…</option>
-            {proveedores?.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.nombre}
-              </option>
-            ))}
-          </Select>
+          <ComboboxBusqueda<Proveedor>
+            valor={proveedor}
+            onSeleccionar={setProveedor}
+            obtenerId={(p) => p.id}
+            obtenerEtiqueta={(p) => p.nombre}
+            placeholder="Buscar proveedor…"
+            icono={<Truck size={15} />}
+            buscar={async (texto) =>
+              (await apiClient.get<PaginaResultado<Proveedor>>('/proveedores', { params: { busqueda: texto, tamanoPagina: 10 } })).data
+                .datos
+            }
+          />
           <button
             type="button"
             onClick={() => setMostrarNuevoProveedor((v) => !v)}
@@ -366,7 +371,7 @@ function ModalNuevaOrdenCompra({ onClose }: { onClose: () => void }) {
           {mostrarNuevoProveedor && (
             <NuevoProveedorInline
               onCreado={(p) => {
-                setProveedorId(p.id);
+                setProveedor(p);
                 setMostrarNuevoProveedor(false);
               }}
             />
@@ -437,16 +442,12 @@ function ModalNuevaOrdenCompra({ onClose }: { onClose: () => void }) {
 }
 
 function NuevoProveedorInline({ onCreado }: { onCreado: (p: Proveedor) => void }) {
-  const queryClient = useQueryClient();
   const [nombre, setNombre] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   const crear = useMutation({
     mutationFn: async () => (await apiClient.post<Proveedor>('/proveedores', { nombre })).data,
-    onSuccess: (proveedor) => {
-      queryClient.invalidateQueries({ queryKey: ['proveedores-select'] });
-      onCreado(proveedor);
-    },
+    onSuccess: (proveedor) => onCreado(proveedor),
     onError: () => setError('No se pudo crear el proveedor.'),
   });
 

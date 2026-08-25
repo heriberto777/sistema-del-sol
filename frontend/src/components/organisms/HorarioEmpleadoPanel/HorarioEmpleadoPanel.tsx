@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { User } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../../lib/api-client';
 import { Card } from '../../atoms/Card/Card';
@@ -117,6 +118,7 @@ export function HorarioEmpleadoPanel() {
             obtenerId={(e) => e.id}
             obtenerEtiqueta={(e) => `${e.nombre} — ${e.cedula}`}
             placeholder="Buscar empleado por nombre o cédula…"
+            icono={<User size={15} />}
           />
         </div>
 

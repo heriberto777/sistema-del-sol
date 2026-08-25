@@ -1,4 +1,5 @@
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
+import { User } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../../lib/api-client';
 import { ModalImprimir } from '../../molecules/ModalImprimir/ModalImprimir';
@@ -8,6 +9,7 @@ import { RowActionsMenu } from '../../molecules/RowActionsMenu/RowActionsMenu';
 import { Button } from '../../atoms/Button/Button';
 import { Card } from '../../atoms/Card/Card';
 import { Select } from '../../atoms/Select/Select';
+import { ComboboxBusqueda } from '../../molecules/ComboboxBusqueda/ComboboxBusqueda';
 import { Badge } from '../../atoms/Badge/Badge';
 import { SearchInput } from '../../molecules/SearchInput/SearchInput';
 import { Paginacion } from '../../molecules/Paginacion/Paginacion';
@@ -75,10 +77,6 @@ export function CotizacionesPanel() {
   const [cotizacionConvirtiendo, setCotizacionConvirtiendo] = useState<Cotizacion | null>(null);
   const [cotizacionImprimiendo, setCotizacionImprimiendo] = useState<Cotizacion | null>(null);
 
-  const { data: clientes } = useQuery({
-    queryKey: ['clientes-select'],
-    queryFn: async () => (await apiClient.get<PaginaResultado<Cliente>>('/clientes', { params: { tamanoPagina: 100 } })).data.datos,
-  });
   const { data: productos } = useQuery({
     queryKey: ['productos-select'],
     queryFn: async () => (await apiClient.get<PaginaResultado<Producto>>('/productos', { params: { tamanoPagina: 100 } })).data.datos,
@@ -178,18 +176,14 @@ export function CotizacionesPanel() {
       </Card>
 
       {modalNuevaCotizacion && (
-        <ModalNuevaCotizacion
-          productos={productos ?? []}
-          clientes={clientes ?? []}
-          onClose={() => setModalNuevaCotizacion(false)}
-        />
+        <ModalNuevaCotizacion productos={productos ?? []} onClose={() => setModalNuevaCotizacion(false)} />
       )}
 
       {cotizacionEditando && (
         <ModalEditarCotizacion
-          cotizacion={cotizacionEditando}
+          cotizacionId={cotizacionEditando.id}
+          numeroActual={cotizacionEditando.numero}
           productos={productos ?? []}
-          clientes={clientes ?? []}
           onClose={() => setCotizacionEditando(null)}
         />
       )}
@@ -207,18 +201,10 @@ export function CotizacionesPanel() {
   );
 }
 
-function ModalNuevaCotizacion({
-  productos,
-  clientes,
-  onClose,
-}: {
-  productos: Producto[];
-  clientes: Cliente[];
-  onClose: () => void;
-}) {
+function ModalNuevaCotizacion({ productos, onClose }: { productos: Producto[]; onClose: () => void }) {
   const queryClient = useQueryClient();
   const [numero, setNumero] = useState('');
-  const [clienteId, setClienteId] = useState('');
+  const [cliente, setCliente] = useState<Cliente | null>(null);
   const [fechaVigenciaHasta, setFechaVigenciaHasta] = useState('');
   const [lineas, setLineas] = useState<LineaForm[]>([{ productoId: '', varianteId: '', cantidad: '1' }]);
   const [error, setError] = useState<string | null>(null);
@@ -227,7 +213,7 @@ function ModalNuevaCotizacion({
     mutationFn: async () =>
       apiClient.post('/cotizaciones', {
         numero,
-        clienteId,
+        clienteId: cliente?.id,
         fechaVigenciaHasta,
         lineas: lineas
           .filter((l) => l.productoId)
@@ -247,6 +233,10 @@ function ModalNuevaCotizacion({
   function onSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
+    if (!cliente) {
+      setError('Seleccioná un cliente.');
+      return;
+    }
     crear.mutate();
   }
 
@@ -256,14 +246,17 @@ function ModalNuevaCotizacion({
         <FormField id="numero" label="Número" value={numero} onChange={(e) => setNumero(e.target.value)} required />
         <div>
           <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Cliente</label>
-          <Select value={clienteId} onChange={(e) => setClienteId(e.target.value)} required>
-            <option value="">Seleccionar…</option>
-            {clientes.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.nombre}
-              </option>
-            ))}
-          </Select>
+          <ComboboxBusqueda<Cliente>
+            valor={cliente}
+            onSeleccionar={setCliente}
+            obtenerId={(c) => c.id}
+            obtenerEtiqueta={(c) => c.nombre}
+            placeholder="Buscar cliente…"
+            icono={<User size={15} />}
+            buscar={async (texto) =>
+              (await apiClient.get<PaginaResultado<Cliente>>('/clientes', { params: { busqueda: texto, tamanoPagina: 10 } })).data.datos
+            }
+          />
         </div>
         <FormField
           id="fechaVigenciaHasta"
@@ -315,32 +308,45 @@ function ModalNuevaCotizacion({
 }
 
 function ModalEditarCotizacion({
-  cotizacion,
+  cotizacionId,
+  numeroActual,
   productos,
-  clientes,
   onClose,
 }: {
-  cotizacion: Cotizacion;
+  cotizacionId: string;
+  numeroActual: string;
   productos: Producto[];
-  clientes: Cliente[];
   onClose: () => void;
 }) {
   const queryClient = useQueryClient();
-  const [numero, setNumero] = useState(cotizacion.numero);
-  const [clienteId, setClienteId] = useState(cotizacion.clienteId);
-  const [fechaVigenciaHasta, setFechaVigenciaHasta] = useState(cotizacion.fechaVigenciaHasta.slice(0, 10));
-  const [lineas, setLineas] = useState<LineaForm[]>(
-    cotizacion.lineas.map((l) => ({ productoId: l.productoId, varianteId: l.varianteId, cantidad: l.cantidad })),
-  );
   const [error, setError] = useState<string | null>(null);
+  const [cliente, setCliente] = useState<Cliente | null>(null);
+  const [valores, setValores] = useState<{ numero: string; fechaVigenciaHasta: string; lineas: LineaForm[] } | null>(null);
+
+  const { data: detalle } = useQuery({
+    queryKey: ['cotizacion-detalle', cotizacionId],
+    queryFn: async () => (await apiClient.get<Cotizacion>(`/cotizaciones/${cotizacionId}`)).data,
+  });
+
+  useEffect(() => {
+    if (!detalle) return;
+    setCliente({ id: detalle.clienteId, nombre: detalle.cliente.nombre });
+    setValores({
+      numero: detalle.numero,
+      fechaVigenciaHasta: detalle.fechaVigenciaHasta.slice(0, 10),
+      lineas: detalle.lineas.map((l) => ({ productoId: l.productoId, varianteId: l.varianteId, cantidad: l.cantidad })),
+    });
+  }, [detalle]);
 
   const guardar = useMutation({
     mutationFn: async () =>
-      apiClient.patch(`/cotizaciones/${cotizacion.id}`, {
-        numero,
-        clienteId,
-        fechaVigenciaHasta,
-        lineas: lineas.filter((l) => l.productoId).map((l) => ({ productoId: l.productoId, varianteId: l.varianteId || undefined, cantidad: Number(l.cantidad) })),
+      apiClient.patch(`/cotizaciones/${cotizacionId}`, {
+        numero: valores!.numero,
+        clienteId: cliente?.id,
+        fechaVigenciaHasta: valores!.fechaVigenciaHasta,
+        lineas: valores!.lineas
+          .filter((l) => l.productoId)
+          .map((l) => ({ productoId: l.productoId, varianteId: l.varianteId || undefined, cantidad: Number(l.cantidad) })),
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['cotizaciones'] });
@@ -352,43 +358,67 @@ function ModalEditarCotizacion({
   function onSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
+    if (!cliente) {
+      setError('Seleccioná un cliente.');
+      return;
+    }
     guardar.mutate();
   }
 
+  if (!valores) {
+    return (
+      <Modal titulo={`Editar cotización ${numeroActual}`} onClose={onClose}>
+        <p className="text-sm text-slate-500">Cargando…</p>
+      </Modal>
+    );
+  }
+
   return (
-    <Modal titulo={`Editar cotización ${cotizacion.numero}`} onClose={onClose}>
+    <Modal titulo={`Editar cotización ${numeroActual}`} onClose={onClose}>
       <form onSubmit={onSubmit} className="space-y-3">
-        <FormField id="editar-numero" label="Número" value={numero} onChange={(e) => setNumero(e.target.value)} required />
+        <FormField
+          id="editar-numero"
+          label="Número"
+          value={valores.numero}
+          onChange={(e) => setValores({ ...valores, numero: e.target.value })}
+          required
+        />
         <div className="flex flex-col gap-1">
           <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Cliente</label>
-          <Select value={clienteId} onChange={(e) => setClienteId(e.target.value)} required>
-            <option value="">Seleccionar…</option>
-            {clientes.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.nombre}
-              </option>
-            ))}
-          </Select>
+          <ComboboxBusqueda<Cliente>
+            valor={cliente}
+            onSeleccionar={setCliente}
+            obtenerId={(c) => c.id}
+            obtenerEtiqueta={(c) => c.nombre}
+            placeholder="Buscar cliente…"
+            icono={<User size={15} />}
+            buscar={async (texto) =>
+              (await apiClient.get<PaginaResultado<Cliente>>('/clientes', { params: { busqueda: texto, tamanoPagina: 10 } })).data.datos
+            }
+          />
         </div>
         <FormField
           id="editar-vigencia"
           label="Válida hasta"
           type="date"
-          value={fechaVigenciaHasta}
-          onChange={(e) => setFechaVigenciaHasta(e.target.value)}
+          value={valores.fechaVigenciaHasta}
+          onChange={(e) => setValores({ ...valores, fechaVigenciaHasta: e.target.value })}
           required
         />
 
         <div className="space-y-2">
           <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Líneas</p>
-          {lineas.map((linea, i) => (
+          {valores.lineas.map((linea, i) => (
             <div key={i} className="flex items-center gap-2">
               <SelectorLineaProducto
                 productos={productos}
                 productoId={linea.productoId}
                 varianteId={linea.varianteId}
                 onChange={(productoId, varianteId) =>
-                  setLineas((prev) => prev.map((l, idx) => (idx === i ? { ...l, productoId, varianteId } : l)))
+                  setValores({
+                    ...valores,
+                    lineas: valores.lineas.map((l, idx) => (idx === i ? { ...l, productoId, varianteId } : l)),
+                  })
                 }
                 className="flex-1"
               />
@@ -397,17 +427,27 @@ function ModalEditarCotizacion({
                 min={1}
                 step="any"
                 value={linea.cantidad}
-                onChange={(e) => setLineas((prev) => prev.map((l, idx) => (idx === i ? { ...l, cantidad: e.target.value } : l)))}
+                onChange={(e) =>
+                  setValores({ ...valores, lineas: valores.lineas.map((l, idx) => (idx === i ? { ...l, cantidad: e.target.value } : l)) })
+                }
                 className="w-24 rounded-md border border-slate-300 px-2 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
               />
-              {lineas.length > 1 && (
-                <Button type="button" variante="secundario" onClick={() => setLineas((prev) => prev.filter((_, idx) => idx !== i))}>
+              {valores.lineas.length > 1 && (
+                <Button
+                  type="button"
+                  variante="secundario"
+                  onClick={() => setValores({ ...valores, lineas: valores.lineas.filter((_, idx) => idx !== i) })}
+                >
                   Quitar
                 </Button>
               )}
             </div>
           ))}
-          <Button type="button" variante="secundario" onClick={() => setLineas((prev) => [...prev, { productoId: '', varianteId: '', cantidad: '1' }])}>
+          <Button
+            type="button"
+            variante="secundario"
+            onClick={() => setValores({ ...valores, lineas: [...valores.lineas, { productoId: '', varianteId: '', cantidad: '1' }] })}
+          >
             + Línea
           </Button>
         </div>

@@ -1,9 +1,11 @@
 import { FormEvent, useEffect, useState } from 'react';
+import { User } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 import { apiClient } from '../lib/api-client';
 import { Button } from '../components/atoms/Button/Button';
 import { Select } from '../components/atoms/Select/Select';
+import { ComboboxBusqueda } from '../components/molecules/ComboboxBusqueda/ComboboxBusqueda';
 import { FormField } from '../components/molecules/FormField/FormField';
 import { Modal } from '../components/molecules/Modal/Modal';
 import { FacturasTable } from '../components/organisms/FacturasTable/FacturasTable';
@@ -70,7 +72,7 @@ export function Facturacion() {
 
 function ModalNuevaFactura({ onClose }: { onClose: () => void }) {
   const queryClient = useQueryClient();
-  const [clienteId, setClienteId] = useState('');
+  const [cliente, setCliente] = useState<Cliente | null>(null);
   const [bodegaId, setBodegaId] = useState('');
   const [tipoFactura, setTipoFactura] = useState<'CONTADO' | 'CREDITO'>('CONTADO');
   const [tipoComprobanteEspecial, setTipoComprobanteEspecial] = useState('');
@@ -91,13 +93,8 @@ function ModalNuevaFactura({ onClose }: { onClose: () => void }) {
     queryFn: async () => (await apiClient.get<{ id: string; moneda: string; tasa: string }[]>('/tasas-cambio')).data,
   });
 
-  const { data: clientes } = useQuery({
-    queryKey: ['clientes-select'],
-    queryFn: async () => (await apiClient.get<PaginaResultado<Cliente>>('/clientes', { params: { tamanoPagina: 100 } })).data.datos,
-  });
   const { data: listasPrecio } = useListasPrecio();
-  const clienteSeleccionado = clientes?.find((c) => c.id === clienteId);
-  const listaPrecioResuelta = clienteSeleccionado?.listaPrecio?.nombre ?? 'GENERAL';
+  const listaPrecioResuelta = cliente?.listaPrecio?.nombre ?? 'GENERAL';
 
   // Comprobante fiscal por defecto del cliente (plan de integración Cuadre,
   // ítem E-5) — autoselecciona tipoFactura + tipoComprobanteEspecial al
@@ -106,7 +103,7 @@ function ModalNuevaFactura({ onClose }: { onClose: () => void }) {
   // REGIMEN_ESPECIAL/GUBERNAMENTAL solo fijan el especial (tipoFactura queda
   // en lo que ya estuviera — ver TIPO_NCF_ESPECIAL en facturacion.service.ts).
   useEffect(() => {
-    const defecto = clienteSeleccionado?.comprobantePorDefecto;
+    const defecto = cliente?.comprobantePorDefecto;
     if (!defecto) return;
     if (defecto === 'CONTADO' || defecto === 'CREDITO') {
       setTipoFactura(defecto);
@@ -115,7 +112,7 @@ function ModalNuevaFactura({ onClose }: { onClose: () => void }) {
       setTipoComprobanteEspecial(defecto);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clienteId]);
+  }, [cliente?.id]);
   const { data: productos } = useQuery({
     queryKey: ['productos-select'],
     queryFn: async () => (await apiClient.get<PaginaResultado<Producto>>('/productos', { params: { tamanoPagina: 100 } })).data.datos,
@@ -127,7 +124,7 @@ function ModalNuevaFactura({ onClose }: { onClose: () => void }) {
   const crear = useMutation({
     mutationFn: async () =>
       apiClient.post('/facturas', {
-        clienteId,
+        clienteId: cliente?.id,
         bodegaId,
         tipoFactura,
         tipoComprobanteEspecial: tipoComprobanteEspecial || undefined,
@@ -156,6 +153,10 @@ function ModalNuevaFactura({ onClose }: { onClose: () => void }) {
   function onSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
+    if (!cliente) {
+      setError('Seleccioná un cliente.');
+      return;
+    }
     if (lineas.filter((l) => l.productoId).length === 0) {
       setError('Agregá al menos una línea con producto.');
       return;
@@ -168,14 +169,17 @@ function ModalNuevaFactura({ onClose }: { onClose: () => void }) {
       <form onSubmit={onSubmit} className="space-y-3">
         <div className="flex flex-col gap-1">
           <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Cliente</label>
-          <Select value={clienteId} onChange={(e) => setClienteId(e.target.value)} required>
-            <option value="">Seleccionar…</option>
-            {clientes?.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.nombre}
-              </option>
-            ))}
-          </Select>
+          <ComboboxBusqueda<Cliente>
+            valor={cliente}
+            onSeleccionar={setCliente}
+            obtenerId={(c) => c.id}
+            obtenerEtiqueta={(c) => c.nombre}
+            placeholder="Buscar cliente…"
+            icono={<User size={15} />}
+            buscar={async (texto) =>
+              (await apiClient.get<PaginaResultado<Cliente>>('/clientes', { params: { busqueda: texto, tamanoPagina: 10 } })).data.datos
+            }
+          />
           <button
             type="button"
             onClick={() => setMostrarNuevoCliente((v) => !v)}
@@ -186,7 +190,7 @@ function ModalNuevaFactura({ onClose }: { onClose: () => void }) {
           {mostrarNuevoCliente && (
             <NuevoClienteInline
               onCreado={(c) => {
-                setClienteId(c.id);
+                setCliente(c);
                 setMostrarNuevoCliente(false);
               }}
             />
@@ -362,16 +366,12 @@ function ModalNuevaFactura({ onClose }: { onClose: () => void }) {
 }
 
 function NuevoClienteInline({ onCreado }: { onCreado: (c: Cliente) => void }) {
-  const queryClient = useQueryClient();
   const [nombre, setNombre] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   const crear = useMutation({
     mutationFn: async () => (await apiClient.post<Cliente>('/clientes', { nombre, tipo: 'PERSONA_FISICA' })).data,
-    onSuccess: (cliente) => {
-      queryClient.invalidateQueries({ queryKey: ['clientes-select'] });
-      onCreado(cliente);
-    },
+    onSuccess: (cliente) => onCreado(cliente),
     onError: () => setError('No se pudo crear el cliente.'),
   });
 
