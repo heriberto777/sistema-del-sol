@@ -3,7 +3,7 @@ import { IsIn, IsOptional, IsString } from 'class-validator';
 
 /**
  * Todos los campos opcionales — solo se actualiza lo que venga. Para los
- * de secreto (azulAuth1/azulAuth2/cardnetAuthKey): string no vacío = nuevo
+ * de secreto (azulAuthKey/cardnetAuthKey): string no vacío = nuevo
  * valor (se cifra server-side), "" = borra el override, omitido = sin
  * cambios. Nunca se aceptan/devuelven en texto plano fuera de este flujo.
  */
@@ -23,15 +23,15 @@ export class ActualizarPasarelaConfigDto {
   @IsString()
   azulMerchantName?: string;
 
-  @ApiProperty({ required: false, description: '"" borra el override guardado' })
+  @ApiProperty({ required: false, description: 'Provisto por AZUL al momento de la afiliación — no es un código ISO 4217 genérico' })
   @IsOptional()
   @IsString()
-  azulAuth1?: string;
+  azulCurrencyCode?: string;
 
   @ApiProperty({ required: false, description: '"" borra el override guardado' })
   @IsOptional()
   @IsString()
-  azulAuth2?: string;
+  azulAuthKey?: string;
 
   @ApiProperty({ required: false })
   @IsOptional()

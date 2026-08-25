@@ -11,8 +11,8 @@ const CONFIG_VACIA = {
   pasarelaActiva: null,
   azulMerchantId: null,
   azulMerchantName: null,
-  azulAuth1Cifrado: null,
-  azulAuth2Cifrado: null,
+  azulCurrencyCode: '$',
+  azulAuthKeyCifrado: null,
   cardnetMerchantNumber: null,
   cardnetMerchantTerminal: null,
   cardnetMerchantName: null,
@@ -39,18 +39,17 @@ describe('PasarelaCobroConfigService', () => {
 
   describe('obtener', () => {
     it('nunca expone un secreto en texto plano — solo si está configurado', async () => {
-      repo.obtenerOCrear.mockResolvedValue({ ...CONFIG_VACIA, azulAuth1Cifrado: cifrar('auth1-real') } as never);
+      repo.obtenerOCrear.mockResolvedValue({ ...CONFIG_VACIA, azulAuthKeyCifrado: cifrar('auth-key-real') } as never);
 
       const resultado = await service.obtener('t1');
 
-      expect(resultado.azul.auth1Configurado).toBe(true);
-      expect(JSON.stringify(resultado)).not.toContain('auth1-real');
+      expect(resultado.azul.authKeyConfigurado).toBe(true);
+      expect(JSON.stringify(resultado)).not.toContain('auth-key-real');
     });
 
     it('reporta configurado:false cuando no hay nada guardado', async () => {
       const resultado = await service.obtener('t1');
-      expect(resultado.azul.auth1Configurado).toBe(false);
-      expect(resultado.azul.auth2Configurado).toBe(false);
+      expect(resultado.azul.authKeyConfigurado).toBe(false);
       expect(resultado.cardnet.authKeyConfigurado).toBe(false);
     });
   });
@@ -59,11 +58,11 @@ describe('PasarelaCobroConfigService', () => {
     it('cifra un secreto nuevo antes de guardarlo', async () => {
       repo.actualizar.mockResolvedValue(CONFIG_VACIA as never);
 
-      await service.actualizar('t1', { azulAuth1: 'auth1-nuevo' });
+      await service.actualizar('t1', { azulAuthKey: 'auth-key-nuevo' });
 
       const [, data] = repo.actualizar.mock.calls[0];
-      expect((data as { azulAuth1Cifrado?: string }).azulAuth1Cifrado).not.toBe('auth1-nuevo');
-      expect((data as { azulAuth1Cifrado?: string }).azulAuth1Cifrado).toEqual(expect.any(String));
+      expect((data as { azulAuthKeyCifrado?: string }).azulAuthKeyCifrado).not.toBe('auth-key-nuevo');
+      expect((data as { azulAuthKeyCifrado?: string }).azulAuthKeyCifrado).toEqual(expect.any(String));
     });
 
     it('"" borra el override guardado (queda null)', async () => {
@@ -81,7 +80,7 @@ describe('PasarelaCobroConfigService', () => {
       await service.actualizar('t1', { azulMerchantId: '12345' });
 
       const [, data] = repo.actualizar.mock.calls[0];
-      expect(data).not.toHaveProperty('azulAuth1Cifrado');
+      expect(data).not.toHaveProperty('azulAuthKeyCifrado');
       expect((data as { azulMerchantId?: string }).azulMerchantId).toBe('12345');
     });
 

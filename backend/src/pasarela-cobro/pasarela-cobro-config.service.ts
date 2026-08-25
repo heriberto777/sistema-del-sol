@@ -28,12 +28,12 @@ export class PasarelaCobroConfigService {
     if (dto.pasarelaActiva !== undefined) data.pasarelaActiva = dto.pasarelaActiva;
     if (dto.azulMerchantId !== undefined) data.azulMerchantId = dto.azulMerchantId;
     if (dto.azulMerchantName !== undefined) data.azulMerchantName = dto.azulMerchantName;
+    if (dto.azulCurrencyCode !== undefined) data.azulCurrencyCode = dto.azulCurrencyCode;
     if (dto.cardnetMerchantNumber !== undefined) data.cardnetMerchantNumber = dto.cardnetMerchantNumber;
     if (dto.cardnetMerchantTerminal !== undefined) data.cardnetMerchantTerminal = dto.cardnetMerchantTerminal;
     if (dto.cardnetMerchantName !== undefined) data.cardnetMerchantName = dto.cardnetMerchantName;
 
-    this.aplicarCampoSecreto(data, 'azulAuth1Cifrado', dto.azulAuth1);
-    this.aplicarCampoSecreto(data, 'azulAuth2Cifrado', dto.azulAuth2);
+    this.aplicarCampoSecreto(data, 'azulAuthKeyCifrado', dto.azulAuthKey);
     this.aplicarCampoSecreto(data, 'cardnetAuthKeyCifrado', dto.cardnetAuthKey);
 
     const actualizado = await this.repository.actualizar(config.id, data);
@@ -61,8 +61,8 @@ export class PasarelaCobroConfigService {
       azul: {
         merchantId: config.azulMerchantId,
         merchantName: config.azulMerchantName,
-        auth1Configurado: Boolean(config.azulAuth1Cifrado),
-        auth2Configurado: Boolean(config.azulAuth2Cifrado),
+        currencyCode: config.azulCurrencyCode,
+        authKeyConfigurado: Boolean(config.azulAuthKeyCifrado),
       },
       cardnet: {
         merchantNumber: config.cardnetMerchantNumber,

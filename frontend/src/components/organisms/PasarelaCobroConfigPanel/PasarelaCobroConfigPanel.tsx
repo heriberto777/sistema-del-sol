@@ -7,7 +7,7 @@ import { FormField } from '../../molecules/FormField/FormField';
 
 interface PasarelaConfig {
   pasarelaActiva: 'AZUL' | 'CARDNET' | null;
-  azul: { merchantId: string | null; merchantName: string | null; auth1Configurado: boolean; auth2Configurado: boolean };
+  azul: { merchantId: string | null; merchantName: string | null; currencyCode: string | null; authKeyConfigurado: boolean };
   cardnet: { merchantNumber: string | null; merchantTerminal: string | null; merchantName: string | null; authKeyConfigurado: boolean };
 }
 
@@ -22,8 +22,8 @@ export function PasarelaCobroConfigPanel() {
   const [pasarelaActiva, setPasarelaActiva] = useState<'AZUL' | 'CARDNET' | ''>('');
   const [azulMerchantId, setAzulMerchantId] = useState('');
   const [azulMerchantName, setAzulMerchantName] = useState('');
-  const [azulAuth1, setAzulAuth1] = useState('');
-  const [azulAuth2, setAzulAuth2] = useState('');
+  const [azulCurrencyCode, setAzulCurrencyCode] = useState('');
+  const [azulAuthKey, setAzulAuthKey] = useState('');
   const [cardnetMerchantNumber, setCardnetMerchantNumber] = useState('');
   const [cardnetMerchantTerminal, setCardnetMerchantTerminal] = useState('');
   const [cardnetMerchantName, setCardnetMerchantName] = useState('');
@@ -40,6 +40,7 @@ export function PasarelaCobroConfigPanel() {
     setPasarelaActiva(config.pasarelaActiva ?? '');
     setAzulMerchantId(config.azul.merchantId ?? '');
     setAzulMerchantName(config.azul.merchantName ?? '');
+    setAzulCurrencyCode(config.azul.currencyCode ?? '');
     setCardnetMerchantNumber(config.cardnet.merchantNumber ?? '');
     setCardnetMerchantTerminal(config.cardnet.merchantTerminal ?? '');
     setCardnetMerchantName(config.cardnet.merchantName ?? '');
@@ -51,16 +52,15 @@ export function PasarelaCobroConfigPanel() {
         pasarelaActiva: pasarelaActiva || null,
         azulMerchantId,
         azulMerchantName,
+        azulCurrencyCode,
         cardnetMerchantNumber,
         cardnetMerchantTerminal,
         cardnetMerchantName,
-        ...(azulAuth1 !== '' ? { azulAuth1 } : {}),
-        ...(azulAuth2 !== '' ? { azulAuth2 } : {}),
+        ...(azulAuthKey !== '' ? { azulAuthKey } : {}),
         ...(cardnetAuthKey !== '' ? { cardnetAuthKey } : {}),
       }),
     onSuccess: () => {
-      setAzulAuth1('');
-      setAzulAuth2('');
+      setAzulAuthKey('');
       setCardnetAuthKey('');
       queryClient.invalidateQueries({ queryKey: ['pasarela-cobro-config'] });
     },
@@ -96,20 +96,18 @@ export function PasarelaCobroConfigPanel() {
             onChange={(e) => setAzulMerchantName(e.target.value)}
           />
           <FormField
-            id="azul-auth1"
-            label={config?.azul.auth1Configurado ? 'Auth1 (ya configurado — dejar vacío para no cambiarlo)' : 'Auth1'}
-            type="password"
-            value={azulAuth1}
-            onChange={(e) => setAzulAuth1(e.target.value)}
-            placeholder={config?.azul.auth1Configurado ? '••••••••' : undefined}
+            id="azul-currency-code"
+            label="Currency Code (provisto por AZUL, junto al Merchant ID)"
+            value={azulCurrencyCode}
+            onChange={(e) => setAzulCurrencyCode(e.target.value)}
           />
           <FormField
-            id="azul-auth2"
-            label={config?.azul.auth2Configurado ? 'Auth2 (ya configurado — dejar vacío para no cambiarlo)' : 'Auth2'}
+            id="azul-auth-key"
+            label={config?.azul.authKeyConfigurado ? 'Auth Key (ya configurada — dejar vacío para no cambiarla)' : 'Auth Key'}
             type="password"
-            value={azulAuth2}
-            onChange={(e) => setAzulAuth2(e.target.value)}
-            placeholder={config?.azul.auth2Configurado ? '••••••••' : undefined}
+            value={azulAuthKey}
+            onChange={(e) => setAzulAuthKey(e.target.value)}
+            placeholder={config?.azul.authKeyConfigurado ? '••••••••' : undefined}
           />
         </div>
 

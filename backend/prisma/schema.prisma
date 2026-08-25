@@ -668,10 +668,15 @@ model PasarelaConfigTenant {
   tenant                  Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   pasarelaActiva          String?  // 'AZUL' | 'CARDNET' | null
 
+  // Página de Pagos AZUL usa una sola AuthKey entregada al afiliarse (no
+  // Auth1/Auth2 — esos campos son de su API SOAP de Webservices, que no
+  // es la que se implementa acá). CurrencyCode también lo asigna AZUL
+  // por comercio (no es un código ISO 4217 genérico) — ver
+  // ARCHITECTURE.md/PDF oficial "Página de Pagos".
   azulMerchantId          String?
   azulMerchantName        String?
-  azulAuth1Cifrado        String?
-  azulAuth2Cifrado        String?
+  azulCurrencyCode        String?  @default("$")
+  azulAuthKeyCifrado      String?
 
   cardnetMerchantNumber   String?
   cardnetMerchantTerminal String?

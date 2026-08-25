@@ -40,6 +40,8 @@ import { PlatformConfiguracion } from './pages/PlatformConfiguracion';
 import { PagarFactura } from './pages/PagarFactura';
 import { PagoExitoso } from './pages/PagoExitoso';
 import { PagoCancelado } from './pages/PagoCancelado';
+import { CobroFactura } from './pages/CobroFactura';
+import { CobroFacturaResultado } from './pages/CobroFacturaResultado';
 
 export const router = createBrowserRouter([
   { path: '*', element: <NoEncontrado /> },
@@ -52,6 +54,9 @@ export const router = createBrowserRouter([
   { path: '/pagar/:facturaId', element: <PagarFactura /> },
   { path: '/pagar/:facturaId/exito', element: <PagoExitoso /> },
   { path: '/pagar/:facturaId/cancelado', element: <PagoCancelado /> },
+  // Cobro de Factura de TENANT (ítem C-1) — distinto de /pagar/:facturaId (pasarela de PLATAFORMA).
+  { path: '/pagar-factura/:facturaId', element: <CobroFactura /> },
+  { path: '/pagar-factura/:facturaId/resultado', element: <CobroFacturaResultado /> },
   {
     element: <RutaProtegidaPlataforma />,
     children: [

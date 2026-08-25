@@ -56,6 +56,7 @@ export function FacturasTable({ tiposFactura, titulo = 'Facturas', busquedaPlace
   const [facturaCobrando, setFacturaCobrando] = useState<Factura | null>(null);
   const [facturaAnulando, setFacturaAnulando] = useState<Factura | null>(null);
   const [facturaImprimiendo, setFacturaImprimiendo] = useState<Factura | null>(null);
+  const [facturaLinkPago, setFacturaLinkPago] = useState<Factura | null>(null);
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['facturas', pagina, busquedaDebounced, tiposFactura],
@@ -109,7 +110,10 @@ export function FacturasTable({ tiposFactura, titulo = 'Facturas', busquedaPlace
                     factura.estado === 'EMITIDA' &&
                     !factura.pagada &&
                     tienePermiso('facturacion.cobrar')
-                      ? [{ etiqueta: 'Registrar cobro', onClick: () => setFacturaCobrando(factura) }]
+                      ? [
+                          { etiqueta: 'Registrar cobro', onClick: () => setFacturaCobrando(factura) },
+                          { etiqueta: 'Generar link de pago', onClick: () => setFacturaLinkPago(factura) },
+                        ]
                       : []),
                     ...(factura.estado === 'EMITIDA' && tienePermiso('facturacion.anular')
                       ? [{ etiqueta: 'Anular', onClick: () => setFacturaAnulando(factura), tono: 'peligro' as const }]
@@ -146,6 +150,7 @@ export function FacturasTable({ tiposFactura, titulo = 'Facturas', busquedaPlace
 
       {facturaCobrando && <ModalRegistrarCobro factura={facturaCobrando} onClose={() => setFacturaCobrando(null)} />}
       {facturaAnulando && <ModalAnularFactura factura={facturaAnulando} onClose={() => setFacturaAnulando(null)} />}
+      {facturaLinkPago && <ModalLinkPago factura={facturaLinkPago} onClose={() => setFacturaLinkPago(null)} />}
       {facturaImprimiendo && (
         <ModalImprimir
           urlBase={`/facturas/${facturaImprimiendo.id}`}
@@ -303,6 +308,43 @@ function ModalRegistrarCobro({ factura, onClose }: { factura: Factura; onClose: 
         ) : (
           <p className="text-sm text-slate-500">Esta factura ya está pagada en su totalidad.</p>
         )}
+      </div>
+    </Modal>
+  );
+}
+
+/**
+ * El link se arma 100% en el frontend (`/pagar-factura/:facturaId`
+ * resuelve todo por su cuenta — monto, pasarela activa, checkout) — no
+ * hace falta ningún endpoint para "generarlo" (ítem C-1).
+ */
+function ModalLinkPago({ factura, onClose }: { factura: Factura; onClose: () => void }) {
+  const [copiado, setCopiado] = useState(false);
+  const link = `${window.location.origin}/pagar-factura/${factura.id}`;
+
+  return (
+    <Modal titulo={`Link de pago — ${factura.ncf ?? factura.id}`} onClose={onClose}>
+      <div className="space-y-3">
+        <p className="text-sm text-slate-700 dark:text-slate-300">
+          Compartí este link con el cliente para que pague esta factura en línea con tarjeta. Si el negocio no tiene una pasarela de pago
+          configurada (Admin → Facturación → Pasarela de pago), el link se lo va a indicar al cliente.
+        </p>
+        <div className="flex items-center gap-2">
+          <code className="flex-1 overflow-x-auto rounded-md bg-slate-100 px-3 py-2 text-xs dark:bg-slate-800">{link}</code>
+          <Button
+            type="button"
+            variante="secundario"
+            onClick={() => {
+              navigator.clipboard.writeText(link);
+              setCopiado(true);
+            }}
+          >
+            {copiado ? 'Copiado' : 'Copiar'}
+          </Button>
+        </div>
+        <Button onClick={onClose} className="w-full">
+          Listo
+        </Button>
       </div>
     </Modal>
   );
