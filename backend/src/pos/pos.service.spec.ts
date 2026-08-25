@@ -10,6 +10,7 @@ import { InventarioService } from '../inventario/inventario.service';
 import { AuthService } from '../auth/auth.service';
 import { RedisService } from '../redis/redis.service';
 import { AutorizacionesService } from '../autorizaciones/autorizaciones.service';
+import { CajasService } from '../cajas/cajas.service';
 
 describe('PosService', () => {
   let service: PosService;
@@ -23,6 +24,7 @@ describe('PosService', () => {
   let authService: jest.Mocked<AuthService>;
   let redis: jest.Mocked<RedisService>;
   let autorizacionesService: jest.Mocked<AutorizacionesService>;
+  let cajasService: jest.Mocked<CajasService>;
 
   beforeEach(() => {
     posRepository = {
@@ -66,6 +68,10 @@ describe('PosService', () => {
       verificar: jest.fn().mockResolvedValue(undefined),
       solicitar: jest.fn(),
     } as unknown as jest.Mocked<AutorizacionesService>;
+    cajasService = {
+      buscarPorId: jest.fn(),
+      validarLineasPermitidas: jest.fn().mockResolvedValue(undefined),
+    } as unknown as jest.Mocked<CajasService>;
     service = new PosService(
       posRepository,
       facturacionService,
@@ -77,6 +83,7 @@ describe('PosService', () => {
       authService,
       redis,
       autorizacionesService,
+      cajasService,
     );
   });
 
@@ -118,6 +125,43 @@ describe('PosService', () => {
 
       await expect(service.abrirTurno({ bodegaId: 'b1', montoInicial: 1000 }, 'tenant-1', 'cajero-1')).rejects.toThrow(ForbiddenException);
       expect(posRepository.crearTurno).not.toHaveBeenCalled();
+    });
+
+    describe('cajaId (ítem E-7)', () => {
+      it('acepta una caja de la misma bodega y la pasa al crear el turno', async () => {
+        posRepository.buscarTurnoAbierto.mockResolvedValue(null);
+        posRepository.crearTurno.mockResolvedValue({ id: 't1' } as never);
+        cajasService.buscarPorId.mockResolvedValue({ id: 'caja-1', bodegaId: 'b1' } as never);
+
+        await service.abrirTurno({ bodegaId: 'b1', montoInicial: 1000, cajaId: 'caja-1' }, 'tenant-1', 'cajero-1');
+
+        expect(posRepository.crearTurno).toHaveBeenCalledWith({
+          tenantId: 'tenant-1',
+          bodegaId: 'b1',
+          cajaId: 'caja-1',
+          cajeroId: 'cajero-1',
+          montoInicial: 1000,
+        });
+      });
+
+      it('rechaza una caja que pertenece a otra bodega', async () => {
+        posRepository.buscarTurnoAbierto.mockResolvedValue(null);
+        cajasService.buscarPorId.mockResolvedValue({ id: 'caja-1', bodegaId: 'b2' } as never);
+
+        await expect(
+          service.abrirTurno({ bodegaId: 'b1', montoInicial: 1000, cajaId: 'caja-1' }, 'tenant-1', 'cajero-1'),
+        ).rejects.toThrow(BadRequestException);
+        expect(posRepository.crearTurno).not.toHaveBeenCalled();
+      });
+
+      it('sin cajaId, no consulta CajasService', async () => {
+        posRepository.buscarTurnoAbierto.mockResolvedValue(null);
+        posRepository.crearTurno.mockResolvedValue({ id: 't1' } as never);
+
+        await service.abrirTurno({ bodegaId: 'b1', montoInicial: 1000 }, 'tenant-1', 'cajero-1');
+
+        expect(cajasService.buscarPorId).not.toHaveBeenCalled();
+      });
     });
   });
 
@@ -279,6 +323,53 @@ describe('PosService', () => {
         ),
       ).rejects.toThrow(BadRequestException);
       expect(facturacionService.crear).not.toHaveBeenCalled();
+    });
+
+    describe('restricción de catálogo por Caja (ítem E-7)', () => {
+      it('sin cajaId en el turno, no valida restricción de catálogo', async () => {
+        posRepository.buscarPorId.mockResolvedValue({ id: 't1', estado: 'ABIERTO', bodegaId: 'b1' } as never);
+        facturacionService.crear.mockResolvedValue({ id: 'f1' } as never);
+
+        await service.registrarVenta(
+          { turnoCajaId: 't1', clienteId: 'c1', pagos: [{ formaPagoId: 'fp1', monto: 177 }], lineas: [{ productoId: 'p1', cantidad: 1 }] },
+          'tenant-1',
+          'cajero-1',
+        );
+
+        expect(cajasService.validarLineasPermitidas).not.toHaveBeenCalled();
+      });
+
+      it('con cajaId en el turno, valida las líneas contra esa Caja antes de facturar', async () => {
+        posRepository.buscarPorId.mockResolvedValue({ id: 't1', estado: 'ABIERTO', bodegaId: 'b1', cajaId: 'caja-1' } as never);
+        facturacionService.crear.mockResolvedValue({ id: 'f1' } as never);
+
+        await service.registrarVenta(
+          {
+            turnoCajaId: 't1',
+            clienteId: 'c1',
+            pagos: [{ formaPagoId: 'fp1', monto: 177 }],
+            lineas: [{ productoId: 'p1', cantidad: 1 }, { productoId: 'p2', cantidad: 1 }],
+          },
+          'tenant-1',
+          'cajero-1',
+        );
+
+        expect(cajasService.validarLineasPermitidas).toHaveBeenCalledWith('caja-1', ['p1', 'p2']);
+      });
+
+      it('si la Caja rechaza un producto, no llega a facturar', async () => {
+        posRepository.buscarPorId.mockResolvedValue({ id: 't1', estado: 'ABIERTO', bodegaId: 'b1', cajaId: 'caja-1' } as never);
+        cajasService.validarLineasPermitidas.mockRejectedValueOnce(new BadRequestException('Esta caja no puede vender "Producto X"'));
+
+        await expect(
+          service.registrarVenta(
+            { turnoCajaId: 't1', clienteId: 'c1', pagos: [{ formaPagoId: 'fp1', monto: 177 }], lineas: [{ productoId: 'p1', cantidad: 1 }] },
+            'tenant-1',
+            'cajero-1',
+          ),
+        ).rejects.toThrow(BadRequestException);
+        expect(facturacionService.crear).not.toHaveBeenCalled();
+      });
     });
   });
 

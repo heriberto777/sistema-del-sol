@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNumber, IsUUID, Min } from 'class-validator';
+import { IsNumber, IsOptional, IsUUID, Min } from 'class-validator';
 
 export class AbrirTurnoDto {
   @ApiProperty()
@@ -10,4 +10,9 @@ export class AbrirTurnoDto {
   @IsNumber()
   @Min(0)
   montoInicial: number;
+
+  @ApiProperty({ required: false, description: 'Ítem E-7 — terminal física; sin esto, el turno no tiene ninguna restricción de catálogo' })
+  @IsOptional()
+  @IsUUID()
+  cajaId?: string;
 }

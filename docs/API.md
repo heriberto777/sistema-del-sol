@@ -471,7 +471,7 @@ para asientos manuales (ajustes, apertura, etc.).
 
 | Método | Ruta | Permiso |
 |---|---|---|
-| POST | `/api/pos/turnos` | `pos.editar` — abre un turno (`{ bodegaId, montoInicial }`); 400 si esa bodega ya tiene uno ABIERTO; 403 (Fase 9) si la bodega es de una sucursal no asignada al usuario |
+| POST | `/api/pos/turnos` | `pos.editar` — abre un turno (`{ bodegaId, montoInicial, cajaId? }`); 400 si esa bodega ya tiene uno ABIERTO; 403 (Fase 9) si la bodega es de una sucursal no asignada al usuario; `cajaId` (ítem E-7, opcional) 400 si la Caja no pertenece a `bodegaId` |
 | GET | `/api/pos/turnos?pagina&tamanoPagina&cajeroId&estado&desde&hasta&busqueda` | `pos.ver` — `estado` acepta `PENDIENTE_REVISION` (ítem E-6) además de `ABIERTO`/`CERRADO` |
 | GET | `/api/pos/turnos/reporte-cierres?desde&hasta&cajeroId&bodegaId` | `pos.ver` (ítem E-6) — reporte-dashboard de cierres: `{ totalVentas, cantidadSesiones, sobrantes: {cantidad, monto}, faltantes: {cantidad, monto}, exactas, diferenciaTotal }`, sobre turnos `CERRADO`/`PENDIENTE_REVISION` (los únicos con `diferencia` calculada) en el rango |
 | GET | `/api/pos/cajeros` | `pos.ver` — cajeros distintos que han tenido al menos un turno, sin exigir `admin.usuarios` |
@@ -481,7 +481,7 @@ para asientos manuales (ajustes, apertura, etc.).
 | POST | `/api/pos/turnos/:id/cerrar` | `pos.editar` — `{ montoFinalContado, justificacionDiferencia?, pin? }`, calcula `montoEsperado`/`diferencia`; `pin` (Fase 9) requerido solo si el usuario tiene uno configurado Y (la diferencia supera la tolerancia O se cierra el turno de otro cajero). Ítem E-6: si la diferencia supera la tolerancia, el turno queda `PENDIENTE_REVISION` en vez de `CERRADO` directo |
 | PATCH | `/api/pos/turnos/:id/revisar` | `pos.supervisar` (ítem E-6) — `PENDIENTE_REVISION → CERRADO`; 400 si el turno no está en `PENDIENTE_REVISION` |
 | POST | `/api/pos/cotizar` | `pos.editar` — previsualización de solo lectura (`{ clienteId, lineas, listaPrecio? }`, mismo shape de líneas que `/pos/ventas`), sin `turnoCajaId` ni `pagos`: devuelve `{ lineas, subtotal, descuento, itbis, total }` ya con ofertas/nivel de precio resueltos, sin tocar stock/NCF/pagos. El checkout del POS la llama antes de armar los pagos para no cobrar sobre un estimado del navegador que ignora ofertas (Fase 4c — ver ARCHITECTURE.md) |
-| POST | `/api/pos/ventas` | `pos.editar` — venta contra la bodega del turno (`{ turnoCajaId, clienteId, vendedorEmpleadoId?, listaPrecio?, tipoFactura?, tipoComprobanteEspecial?, pagos: [{formaPagoId, monto, referencia?}], lineas }`); soporta pago dividido (uno o más pagos que sumen exacto el total); `listaPrecio` sobreescribe el nivel de precio resuelto del cliente para esta venta puntual; `tipoFactura` (plan de integración Cuadre, ítem F-2) default `CONTADO` si se omite — solo `CONTADO`/`CREDITO`, nunca `NOTA_CREDITO`/`NOTA_DEBITO` (eso es `registrarDevolucion`); `tipoComprobanteEspecial` igual que en Facturación (ítem B-1); genera su asiento contable automático igual que cualquier factura |
+| POST | `/api/pos/ventas` | `pos.editar` — venta contra la bodega del turno (`{ turnoCajaId, clienteId, vendedorEmpleadoId?, listaPrecio?, tipoFactura?, tipoComprobanteEspecial?, pagos: [{formaPagoId, monto, referencia?}], lineas }`); soporta pago dividido (uno o más pagos que sumen exacto el total); `listaPrecio` sobreescribe el nivel de precio resuelto del cliente para esta venta puntual; `tipoFactura` (plan de integración Cuadre, ítem F-2) default `CONTADO` si se omite — solo `CONTADO`/`CREDITO`, nunca `NOTA_CREDITO`/`NOTA_DEBITO` (eso es `registrarDevolucion`); `tipoComprobanteEspecial` igual que en Facturación (ítem B-1); genera su asiento contable automático igual que cualquier factura; 400 (ítem E-7) si el turno tiene una `cajaId` asignada y alguna línea es de un producto/categoría no permitido en esa Caja |
 | POST | `/api/pos/devoluciones/solicitar-autorizacion` | `facturacion.anular` (ítem D-1) — `{ facturaOrigenId, turnoCajaId }`; mismo mecanismo que `/facturas/:id/solicitar-autorizacion` |
 | POST | `/api/pos/devoluciones` | `facturacion.anular` — devolución parcial (`{ facturaOrigenId, turnoCajaId, formaPagoId, referenciaPago?, lineas: [{productoId, cantidad}], codigoAutorizacion? }`); emite una NOTA_CREDITO, 400 si la cantidad excede lo disponible; `codigoAutorizacion` (ítem D-1) requerido solo si el tenant activó `AUTORIZACION_2FA_DEVOLUCION` |
 | GET | `/api/pos/facturas/:id/devolucion` | `facturacion.anular` (no `facturacion.ver` — Cajero/Vendedor no lo tienen) — detalle de una factura con lo disponible por producto, para armar la Devolución |
@@ -491,6 +491,21 @@ para asientos manuales (ajustes, apertura, etc.).
 | GET | `/api/pos/mensaje-cajas` | `pos.ver` — "Mensaje a cajas" (ítem J-3), `{ texto, fecha } \| null`; en Redis, TTL 8h, sin historial |
 | POST | `/api/pos/mensaje-cajas` | `pos.supervisar` — `{ texto }` (máx. 280 caracteres) — publica/reemplaza el aviso |
 | DELETE | `/api/pos/mensaje-cajas` | `pos.supervisar` — borra el aviso activo |
+
+## Cajas (ítem E-7)
+
+"Caja" es una terminal física de POS, distinta de `Bodega` (el local) y
+de `TurnoCaja` (una jornada de un cajero) — restringe qué puede vender
+esa terminal. Ver "Cajas — restricción de catálogo por terminal" en
+ARCHITECTURE.md.
+
+| Método | Ruta | Permiso |
+|---|---|---|
+| POST | `/api/cajas` | `pos.supervisar` — `{ bodegaId, codigo, nombre, activa?, categoriaIds?, productoIds?, favoritoIds? }`; sin `categoriaIds` ni `productoIds`, la Caja vende el catálogo completo |
+| GET | `/api/cajas` | `pos.ver` — todas las cajas del tenant, con `categorias`/`productos`/`favoritos` ya resueltos (nombre incluido) |
+| GET | `/api/cajas/:id` | `pos.ver` |
+| PATCH | `/api/cajas/:id` | `pos.supervisar` — `categoriaIds`/`productoIds`/`favoritoIds` reemplazan por completo la asignación existente (mismo patrón que `componentes` de un Producto COMBO); `undefined` deja la lista actual tal cual, `[]` la vacía |
+| DELETE | `/api/cajas/:id` | `pos.supervisar` — los turnos históricos que la usaban quedan con `cajaId: null` (no se borran) |
 
 ## IA
 

@@ -44,7 +44,7 @@ export class PosRepository {
     return this.db.turnoCaja.findFirst({ where: { bodegaId, estado: 'ABIERTO' }, include: INCLUDE_TURNO });
   }
 
-  crearTurno(params: { tenantId: string; bodegaId: string; cajeroId: string; montoInicial: number }) {
+  crearTurno(params: { tenantId: string; bodegaId: string; cajaId?: string; cajeroId: string; montoInicial: number }) {
     return this.db.turnoCaja.create({ data: params, include: INCLUDE_TURNO });
   }
 

@@ -20,6 +20,7 @@ import { paginar } from '../common/types/pagina-resultado';
 import { CONFIGURACIONES_BASE } from '../tenants/roles-base';
 import { MotivoMovimientoCaja } from '@prisma/client';
 import { AutorizacionesService } from '../autorizaciones/autorizaciones.service';
+import { CajasService } from '../cajas/cajas.service';
 
 const CLAVE_TOLERANCIA_ARQUEO = 'POS_TOLERANCIA_ARQUEO';
 
@@ -53,6 +54,7 @@ export class PosService {
     private readonly authService: AuthService,
     private readonly redis: RedisService,
     private readonly autorizacionesService: AutorizacionesService,
+    private readonly cajasService: CajasService,
   ) {}
 
   listarVendedores(busqueda?: string) {
@@ -83,7 +85,17 @@ export class PosService {
     if (turnoAbierto) {
       throw new BadRequestException('Esta bodega ya tiene un turno de caja abierto');
     }
-    return this.posRepository.crearTurno({ tenantId, bodegaId: dto.bodegaId, cajeroId, montoInicial: dto.montoInicial });
+    // Ítem E-7 — findUniqueOrThrow tenant-scoped (404 si es de otro
+    // tenant, mismo patrón de prevención de IDOR ya documentado para FKs
+    // cliente-suministradas); además valida que sea una Caja de ESTA
+    // bodega, no de otra sucursal.
+    if (dto.cajaId) {
+      const caja = await this.cajasService.buscarPorId(dto.cajaId);
+      if (caja.bodegaId !== dto.bodegaId) {
+        throw new BadRequestException('Esa caja no pertenece a la bodega elegida');
+      }
+    }
+    return this.posRepository.crearTurno({ tenantId, bodegaId: dto.bodegaId, cajaId: dto.cajaId, cajeroId, montoInicial: dto.montoInicial });
   }
 
   buscarPorId(id: string) {
@@ -149,6 +161,12 @@ export class PosService {
   async registrarVenta(dto: RegistrarVentaPosDto, tenantId: string, cajeroId: string) {
     const turno = await this.posRepository.buscarPorId(dto.turnoCajaId);
     this.validarAbierto(turno);
+    // Ítem E-7 — solo si el turno abierto tiene una Caja asignada
+    // (decisión confirmada con el usuario: la restricción de catálogo es
+    // exclusiva del checkout de POS, nunca de Facturación directa).
+    if (turno.cajaId) {
+      await this.cajasService.validarLineasPermitidas(turno.cajaId, dto.lineas.map((l) => l.productoId));
+    }
     // findUniqueOrThrow tenant-scoped: si alguna formaPagoId/vendedorEmpleadoId
     // es de otro tenant, 404 — mismo patrón que InventarioService.validarPertenencia.
     await Promise.all(dto.pagos.map((p) => this.formasPagoRepository.buscarPorId(p.formaPagoId)));

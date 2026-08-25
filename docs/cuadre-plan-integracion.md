@@ -322,9 +322,21 @@ Resumen de lo que cambió (detalle en cada ítem más abajo):
   exactas), panel `CierresCajaDashboard.tsx` en `/pos` (solo
   `pos.supervisar`). Migración
   `20260826120000_turno_caja_pendiente_revision`. Entregado 2026-08-24.
-- [ ] **E-7** 🟥 *diseño primero* — **"Caja" como entidad propia**
+- [x] **E-7** 🟥 *diseño primero* — **"Caja" como entidad propia**
   (restricción de catálogo por terminal). *Confirmado: brecha real, no
-  existe ningún modelo `Caja` — es literalmente `Bodega`+`TurnoCaja`.*
+  existía ningún modelo `Caja` — era literalmente `Bodega`+`TurnoCaja`.*
+  Decisiones confirmadas con el usuario: (1) una Caja pertenece a UNA
+  Bodega (no independiente); (2) restricción como lista blanca combinada
+  (categorías OR productos) — sin ninguna asignación, vende todo; (3) el
+  bloqueo se aplica SOLO en el checkout del POS, nunca en Facturación
+  directa. Entregado: módulo `cajas/` (`Caja`, `CajaCategoria`,
+  `CajaProducto`, `CajaProductoFavorito`), `TurnoCaja.cajaId` opcional
+  (sin elegir Caja, el POS funciona igual que antes),
+  `PosService.registrarVenta()` valida las líneas contra la Caja del
+  turno antes de facturar. "Print Service" (impresión ESC/POS local por
+  Caja) queda deliberadamente FUERA — es el ítem F-9, ya separado.
+  Frontend: panel "Cajas" en Admin, selector opcional de Caja al abrir
+  turno. Migración `20260830090000_cajas`. Entregado 2026-08-24.
 - [x] **E-8** 🟧 *(matiz + alcance reducido)* — **Producto: campos
   avanzados** — precio variable, presentación de compra con conversión
   bulto→unidad, "es ingrediente", "permite devolución" por producto,
@@ -767,6 +779,12 @@ Resumen de lo que cambió (detalle en cada ítem más abajo):
   acumulación vía Event Bus, canje síncrono dentro de la transacción de
   la venta. Migraciones `20260829090000_lealtad_puntos_enum` +
   `20260829090001_lealtad_puntos`.
+- **2026-08-24**: entregado E-7 ("Caja" como entidad propia), quinto 🟥
+  atacado — diseño confirmado con el usuario vía `AskUserQuestion` (Caja
+  pertenece a una Bodega; lista blanca combinada categorías/productos,
+  sin asignación = vende todo; bloqueo solo en el checkout de POS).
+  Módulo `cajas/`, `TurnoCaja.cajaId` opcional. Migración
+  `20260830090000_cajas`.
 
 ## Sugerencia de por dónde arrancar
 
@@ -777,7 +795,7 @@ conversación de diseño antes de tocar código). Lote 🟨/🟧 completo:
 B-1/B-2/B-3/B-6/B-7/B-8, E-2/E-3/E-4/E-5/E-6/E-8/E-9/E-11, F-2/F-4/F-5/
 F-8, G-1/G-2/G-3/G-4/G-5/G-6/G-7/G-8, H-3, J-1/J-2/J-3 — todos
 verificados (tsc + suite unitaria + e2e + lint + build, todo verde) y
-commiteados uno por uno. De los 🟥, ya entregados: **D-1, A-2, A-1, A-3**.
+commiteados uno por uno. De los 🟥, ya entregados: **D-1, A-2, A-1, A-3, E-7**.
 
 Lo que queda, por categoría:
 - **Deliberadamente pausado a pedido del usuario**: B-9 (línea manual/
@@ -786,7 +804,7 @@ Lo que queda, por categoría:
   corrección de tamaño), E-1 (Patrón Borrador→Confirmado en Compras/
   Ajustes/Transferencias, matiz).
 - **🟥, pendientes de su propia conversación de diseño**: A-4,
-  B-5, C-1, C-2 (multi-moneda, reclasificado desde 🟧), E-7, F-9, G-9
+  B-5, C-1, C-2 (multi-moneda, reclasificado desde 🟧), F-9, G-9
   (hardware), H-2 (WhatsApp — con nota de decisión pendiente sobre n8n
   vs. backend propio), I-1, J-4 (API keys, reclasificado — no aplica
   sin una API pública).

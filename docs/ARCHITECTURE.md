@@ -2725,6 +2725,37 @@ activo debe poder verlo).
   junto al de cliente en `TurnoCajaDetalle.tsx`, que también ahora tiene
   un botón "+ Nuevo cliente" inline (alta rápida sin salir de la venta,
   mismo criterio que `NuevoClienteInline` de Facturación).
+- **`Caja` — restricción de catálogo por terminal (ítem E-7)**:
+  `backend/src/cajas/` (`Caja`, tenant-scoped, pertenece a UNA `Bodega` —
+  decisión confirmada con el usuario) modela una terminal física de POS,
+  distinta de `Bodega` (el local) y de `TurnoCaja` (una jornada de un
+  cajero). `TurnoCaja.cajaId` es **opcional** — sin elegir una Caja al
+  abrir el turno, el POS funciona exactamente igual que antes de este
+  ítem, sin ninguna restricción (default permisivo, mismo criterio que
+  `UsuarioSucursal` sin asignaciones). Con una Caja asignada,
+  `PosService.registrarVenta()` llama `CajasService.
+  validarLineasPermitidas(cajaId, productoIds)` ANTES de tocar
+  `FacturacionService.crear()` — **lista blanca combinada** (decisión
+  confirmada con el usuario): `CajaCategoria` OR `CajaProducto`; sin
+  ninguna fila en ninguna de las dos tablas, la Caja vende el catálogo
+  completo; con al menos una, un producto es vendible si su categoría
+  está en `CajaCategoria` O el producto mismo está en `CajaProducto`.
+  **La restricción es exclusiva del checkout de POS** (decisión
+  confirmada con el usuario) — Facturación directa, Cotizaciones y
+  Remisiones nunca pasan por esta validación, porque "Caja" es
+  conceptualmente una terminal de venta rápida, no un concepto de
+  facturación general. `CajaProductoFavorito` es independiente de la
+  restricción — solo alimenta accesos rápidos en la grilla del POS
+  (frontend), nunca bloquea nada. `CajaCategoria`/`CajaProducto`/
+  `CajaProductoFavorito` son tablas "hija" sin `tenantId` propio (mismo
+  patrón que `ComponenteCombo`) — su aislamiento depende de llegar
+  siempre vía una `Caja` ya resuelta contra el tenant.
+  **Fuera de alcance, a propósito**: el "Print Service" de Cuadre
+  (impresión ESC/POS local por Caja) es el ítem F-9, deliberadamente
+  separado — contradice la arquitectura "sin agente local" ya
+  establecida (ver "Impresión multi-formato" más abajo) y necesita su
+  propia conversación antes de siquiera
+  evaluarse. Migración `20260830090000_cajas`.
 - **`Factura.formaPagoId`/`Factura.turnoCajaId`** son nullable y
   **solo los llena una venta de POS** — el resto de la facturación
   (venta normal desde el módulo de Facturación, conversión de

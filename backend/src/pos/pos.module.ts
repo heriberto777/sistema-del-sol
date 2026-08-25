@@ -10,6 +10,7 @@ import { VariantesModule } from '../variantes/variantes.module';
 import { InventarioModule } from '../inventario/inventario.module';
 import { AuthModule } from '../auth/auth.module';
 import { AutorizacionesModule } from '../autorizaciones/autorizaciones.module';
+import { CajasModule } from '../cajas/cajas.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { AutorizacionesModule } from '../autorizaciones/autorizaciones.module';
     InventarioModule,
     AuthModule,
     AutorizacionesModule,
+    CajasModule,
   ],
   controllers: [PosController],
   providers: [PosService, PosRepository],

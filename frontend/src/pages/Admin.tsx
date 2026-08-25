@@ -16,6 +16,7 @@ import { LeyesFiscalesPanel } from '../components/organisms/LeyesFiscalesPanel/L
 import { PersonalizacionDocumentosPanel } from '../components/organisms/PersonalizacionDocumentosPanel/PersonalizacionDocumentosPanel';
 import { AutorizacionesPanel } from '../components/organisms/AutorizacionesPanel/AutorizacionesPanel';
 import { LealtadPanel } from '../components/organisms/LealtadPanel/LealtadPanel';
+import { CajasPanel } from '../components/organisms/CajasPanel/CajasPanel';
 import { useAuth } from '../hooks/useAuth';
 
 interface Pestana {
@@ -49,6 +50,7 @@ const CATEGORIAS: Categoria[] = [
     pestanas: [
       { id: 'ncf', etiqueta: 'NCF', permiso: 'admin.configuracion', panel: NcfPanel },
       { id: 'formas-pago', etiqueta: 'Formas de pago', permiso: 'admin.configuracion', panel: FormasPagoPanel },
+      { id: 'cajas', etiqueta: 'Cajas', permiso: 'admin.configuracion', panel: CajasPanel },
       { id: 'bonos', etiqueta: 'Bonos', permiso: 'admin.configuracion', panel: BonosPanel },
       { id: 'lealtad', etiqueta: 'Lealtad', permiso: 'admin.configuracion', panel: LealtadPanel },
       { id: 'autorizaciones', etiqueta: 'Autorizaciones', permiso: 'admin.configuracion', panel: AutorizacionesPanel },

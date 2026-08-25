@@ -53,6 +53,7 @@ import { VariantesModule } from './variantes/variantes.module';
 import { OfertasModule } from './ofertas/ofertas.module';
 import { ComisionesModule } from './comisiones/comisiones.module';
 import { LealtadModule } from './lealtad/lealtad.module';
+import { CajasModule } from './cajas/cajas.module';
 import { BonosModule } from './bonos/bonos.module';
 import { SucursalesModule } from './sucursales/sucursales.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
@@ -122,6 +123,7 @@ import { TenantMiddleware } from './common/middleware/tenant.middleware';
     OfertasModule,
     ComisionesModule,
     LealtadModule,
+    CajasModule,
     BonosModule,
   ],
   providers: [
