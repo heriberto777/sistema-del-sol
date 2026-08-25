@@ -18,6 +18,8 @@ import { SearchInput } from '../components/molecules/SearchInput/SearchInput';
 import { useAuth } from '../hooks/useAuth';
 import { Paginacion } from '../components/molecules/Paginacion/Paginacion';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
+import { useVariantesProducto } from '../hooks/useVariantesProducto';
+import { SelectorLineaProducto } from '../components/molecules/SelectorLineaProducto/SelectorLineaProducto';
 import { PaginaResultado } from '../types/pagina-resultado';
 import { FORMATOS_IMPRESION, FormatoImpresion } from '../constants/formato-impresion';
 
@@ -52,6 +54,13 @@ interface Stock {
   valoresAtributo: { atributo: string; valor: string }[];
 }
 
+/** Lo mínimo que necesita ModalAjustarStock — un `Stock` ya existente lo cumple tal cual, pero también permite construirlo "a mano" para un producto/variante que todavía no tiene fila de Stock en esta bodega (ver ModalAgregarProductoStock). */
+interface ProductoParaAjuste {
+  producto: Producto;
+  varianteId: string;
+  valoresAtributo: { atributo: string; valor: string }[];
+}
+
 export function Inventario() {
   const { tienePermiso } = useAuth();
   const tienePermisoAjustar = tienePermiso('inventario.ajustar');
@@ -60,6 +69,7 @@ export function Inventario() {
   const [bodegaSeleccionadaId, setBodegaSeleccionadaId] = useState<string | null>(null);
   const [modalNuevaBodega, setModalNuevaBodega] = useState(false);
   const [stockAjustando, setStockAjustando] = useState<Stock | null>(null);
+  const [agregandoProducto, setAgregandoProducto] = useState(false);
   const [stockTransfiriendo, setStockTransfiriendo] = useState<Stock | null>(null);
   const [stockVerKardex, setStockVerKardex] = useState<Stock | null>(null);
   const [modalVencimientos, setModalVencimientos] = useState(false);
@@ -173,14 +183,17 @@ export function Inventario() {
             titulo={`Stock — ${bodegaSeleccionada.nombre}`}
             descripcion={stock ? `${stock.total} producto(s) en esta bodega` : undefined}
             acciones={
-              <SearchInput
-                value={busquedaStock}
-                onChange={(v) => {
-                  setBusquedaStock(v);
-                  setPaginaStock(1);
-                }}
-                placeholder="Buscar por código o nombre de producto…"
-              />
+              <div className="flex items-center gap-2">
+                <SearchInput
+                  value={busquedaStock}
+                  onChange={(v) => {
+                    setBusquedaStock(v);
+                    setPaginaStock(1);
+                  }}
+                  placeholder="Buscar por código o nombre de producto…"
+                />
+                {tienePermisoAjustar && <Button onClick={() => setAgregandoProducto(true)}>Agregar producto</Button>}
+              </div>
             }
           >
             <div className="overflow-x-auto">
@@ -228,7 +241,7 @@ export function Inventario() {
                   {stock?.datos.length === 0 && (
                     <tr>
                       <td colSpan={6} className="px-5 py-6 text-center text-slate-400">
-                        Esta bodega no tiene stock registrado todavía.
+                        Esta bodega no tiene stock registrado todavía — usá "Agregar producto" arriba para cargar el primero.
                       </td>
                     </tr>
                   )}
@@ -254,6 +267,9 @@ export function Inventario() {
           stockInicial={stockAjustando}
           onClose={() => setStockAjustando(null)}
         />
+      )}
+      {agregandoProducto && bodegaSeleccionadaId && (
+        <ModalAgregarProductoStock bodegaId={bodegaSeleccionadaId} onClose={() => setAgregandoProducto(false)} />
       )}
       {stockTransfiriendo && bodegaSeleccionadaId && (
         <ModalTransferirStock
@@ -373,7 +389,7 @@ function ModalAjustarStock({
   onClose,
 }: {
   bodegaId: string;
-  stockInicial: Stock;
+  stockInicial: ProductoParaAjuste;
   onClose: () => void;
 }) {
   const queryClient = useQueryClient();
@@ -480,6 +496,63 @@ function ModalAjustarStock({
         </Button>
       </form>
     </Modal>
+  );
+}
+
+/**
+ * "Ajustar stock" (de la fila) solo sirve para un producto/variante que YA
+ * tiene una fila de `Stock` en esta bodega — una bodega recién creada (o un
+ * producto que nunca se cargó acá) no tiene ninguna fila para hacerle clic,
+ * así que no había forma de arrancar. Este modal elige producto (y variante,
+ * si tiene más de una — mismo `SelectorLineaProducto` que usan Facturación/
+ * Cotizaciones/Remisiones/Compras) y después reusa el formulario de
+ * `ModalAjustarStock` tal cual — `ajustarStock` en el backend ya hace upsert
+ * sobre `Stock` (crea la fila si no existía), no hacía falta tocar nada ahí.
+ */
+function ModalAgregarProductoStock({ bodegaId, onClose }: { bodegaId: string; onClose: () => void }) {
+  const { data: productos } = useQuery({
+    queryKey: ['productos-select'],
+    queryFn: async () => (await apiClient.get<PaginaResultado<Producto>>('/productos', { params: { tamanoPagina: 100 } })).data.datos,
+  });
+  const [productoId, setProductoId] = useState('');
+  const [varianteId, setVarianteId] = useState('');
+  const { data: variantes } = useVariantesProducto(productoId || undefined);
+
+  const productoElegido = productos?.find((p) => p.id === productoId);
+  const varianteElegida = variantes?.find((v) => v.id === varianteId);
+
+  if (!productoElegido || !varianteId) {
+    return (
+      <Modal titulo="Agregar producto a esta bodega" onClose={onClose}>
+        <div className="space-y-3">
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            Elegí el producto (y su variante, si tiene más de una) para cargarle su stock inicial en esta bodega.
+          </p>
+          <SelectorLineaProducto
+            productos={productos ?? []}
+            productoId={productoId}
+            varianteId={varianteId}
+            onChange={(p, v) => {
+              setProductoId(p);
+              setVarianteId(v);
+            }}
+          />
+        </div>
+      </Modal>
+    );
+  }
+
+  return (
+    <ModalAjustarStock
+      bodegaId={bodegaId}
+      stockInicial={{
+        producto: productoElegido,
+        varianteId,
+        valoresAtributo:
+          varianteElegida?.valoresAtributo.map((va) => ({ atributo: va.valorAtributo.atributo.nombre, valor: va.valorAtributo.valor })) ?? [],
+      }}
+      onClose={onClose}
+    />
   );
 }
 
