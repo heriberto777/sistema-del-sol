@@ -60,7 +60,7 @@ export const INFERENCIA_ICONO_ACCION: [RegExp, LucideIcon][] = [
   [/^enviar|enviando|publicar|publicando/i, Send],
   [/cobro|pago/i, Banknote],
   [/recibir|recibiendo/i, PackageCheck],
-  [/devolver|devolviendo/i, Undo2],
+  [/devolver|devolviendo|^devoluci/i, Undo2],
   [/convertir|convirtiendo|^emitir|emitiendo/i, FileText],
   [/precio/i, Tag],
   [/^transferir|transfiriendo/i, ArrowLeftRight],

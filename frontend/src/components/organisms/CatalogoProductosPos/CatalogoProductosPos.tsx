@@ -153,7 +153,7 @@ export function CatalogoProductosPos({
           </div>
         )}
       </div>
-      <div className="grid flex-1 grid-cols-2 gap-3 overflow-y-auto p-3 sm:grid-cols-3 xl:grid-cols-4" style={{ maxHeight: 560 }}>
+      <div className="grid flex-1 grid-cols-2 gap-3 overflow-y-auto p-3 sm:grid-cols-3 xl:grid-cols-4">
         {isLoading && <p className="col-span-full text-sm text-slate-500">Cargando catálogo…</p>}
         {!isLoading && data?.datos.length === 0 && <p className="col-span-full text-sm text-slate-400">Sin productos para mostrar.</p>}
         {data?.datos.map((producto) => (
