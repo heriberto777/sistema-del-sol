@@ -30,20 +30,32 @@ export class EmpleadosService {
     // la marcada `predeterminada` (si existe alguna) — referencia viva,
     // igual que una asignación manual.
     const plantillaHorarioId = dto.plantillaHorarioId ?? (await this.plantillasHorarioRepository.buscarPredeterminada())?.id;
-    return this.empleadosRepository.crear({
-      tenantId,
-      nombre: dto.nombre,
-      cedula: dto.cedula,
-      cargo: dto.cargo,
-      puestoId: dto.puestoId,
-      plantillaHorarioId,
-      departamento: dto.departamento,
-      fechaIngreso: new Date(dto.fechaIngreso),
-      salarioBrutoMensual: dto.salarioBrutoMensual,
-      tipoContrato: dto.tipoContrato,
-      email: dto.email,
-      telefono: dto.telefono,
-    });
+    try {
+      return await this.empleadosRepository.crear({
+        tenantId,
+        nombre: dto.nombre,
+        cedula: dto.cedula,
+        cargo: dto.cargo,
+        puestoId: dto.puestoId,
+        plantillaHorarioId,
+        departamento: dto.departamento,
+        fechaIngreso: new Date(dto.fechaIngreso),
+        salarioBrutoMensual: dto.salarioBrutoMensual,
+        tipoContrato: dto.tipoContrato,
+        email: dto.email,
+        telefono: dto.telefono,
+        userId: dto.userId,
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        const campo = (error.meta?.target as string[] | undefined)?.join(',') ?? '';
+        if (campo.includes('userId')) {
+          throw new BadRequestException('Ese usuario ya está vinculado a otro empleado');
+        }
+        throw new BadRequestException('Ya existe otro empleado con esa cédula');
+      }
+      throw error;
+    }
   }
 
   buscarPorId(id: string) {

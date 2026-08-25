@@ -1,4 +1,5 @@
 import { FormEvent, useState } from 'react';
+import { IdCard } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../../lib/api-client';
 import { Badge } from '../../atoms/Badge/Badge';
@@ -6,6 +7,7 @@ import { Button } from '../../atoms/Button/Button';
 import { Card } from '../../atoms/Card/Card';
 import { FormField } from '../../molecules/FormField/FormField';
 import { Modal } from '../../molecules/Modal/Modal';
+import { ComboboxBusqueda } from '../../molecules/ComboboxBusqueda/ComboboxBusqueda';
 import { SearchInput } from '../../molecules/SearchInput/SearchInput';
 import { Paginacion } from '../../molecules/Paginacion/Paginacion';
 import { SelectPuesto } from '../../molecules/SelectPuesto/SelectPuesto';
@@ -14,15 +16,23 @@ import { useDebouncedValue } from '../../../hooks/useDebouncedValue';
 import { useAuth } from '../../../hooks/useAuth';
 import { PaginaResultado } from '../../../types/pagina-resultado';
 
+interface Usuario {
+  id: string;
+  nombre: string;
+  email: string;
+}
+
 interface Empleado {
   id: string;
   nombre: string;
   cedula: string;
   cargo: string;
   puesto: { id: string; nombre: string } | null;
+  plantillaHorario: { id: string; nombre: string } | null;
   salarioBrutoMensual: string;
   activo: boolean;
   fechaIngreso: string;
+  user: Usuario | null;
 }
 
 export function EmpleadosTable() {
@@ -33,6 +43,7 @@ export function EmpleadosTable() {
   const [pagina, setPagina] = useState(1);
   const busquedaDebounced = useDebouncedValue(busqueda);
   const [modalNuevoEmpleado, setModalNuevoEmpleado] = useState(false);
+  const [empleadoEditando, setEmpleadoEditando] = useState<Empleado | null>(null);
 
   const { data, isLoading, error: errorCarga } = useQuery({
     queryKey: ['nomina-empleados', pagina, busquedaDebounced, puestoFiltro],
@@ -112,10 +123,17 @@ export function EmpleadosTable() {
                       <Badge tono={empleado.activo ? 'exito' : 'neutro'}>{empleado.activo ? 'Activo' : 'Inactivo'}</Badge>
                     </td>
                     <td className="px-5 py-3">
-                      {empleado.activo && tienePermiso('nomina.editar') && (
-                        <Button variante="peligro" onClick={() => desactivar.mutate(empleado.id)} disabled={desactivar.isPending}>
-                          Desactivar
-                        </Button>
+                      {tienePermiso('nomina.editar') && (
+                        <div className="flex justify-end gap-2">
+                          <Button variante="secundario" onClick={() => setEmpleadoEditando(empleado)}>
+                            Editar
+                          </Button>
+                          {empleado.activo && (
+                            <Button variante="peligro" onClick={() => desactivar.mutate(empleado.id)} disabled={desactivar.isPending}>
+                              Desactivar
+                            </Button>
+                          )}
+                        </div>
                       )}
                     </td>
                   </tr>
@@ -131,48 +149,71 @@ export function EmpleadosTable() {
         )}
       </Card>
 
-      {modalNuevoEmpleado && <ModalNuevoEmpleado onClose={() => setModalNuevoEmpleado(false)} />}
+      {(modalNuevoEmpleado || empleadoEditando) && (
+        <ModalEmpleado
+          empleado={empleadoEditando}
+          onClose={() => {
+            setModalNuevoEmpleado(false);
+            setEmpleadoEditando(null);
+          }}
+        />
+      )}
     </div>
   );
 }
 
-function ModalNuevoEmpleado({ onClose }: { onClose: () => void }) {
+function ModalEmpleado({ empleado, onClose }: { empleado: Empleado | null; onClose: () => void }) {
   const queryClient = useQueryClient();
-  const [nombre, setNombre] = useState('');
-  const [cedula, setCedula] = useState('');
-  const [cargo, setCargo] = useState('');
-  const [puestoId, setPuestoId] = useState('');
-  const [plantillaHorarioId, setPlantillaHorarioId] = useState('');
-  const [fechaIngreso, setFechaIngreso] = useState('');
-  const [salarioBrutoMensual, setSalarioBrutoMensual] = useState('');
+  const [nombre, setNombre] = useState(empleado?.nombre ?? '');
+  const [cedula, setCedula] = useState(empleado?.cedula ?? '');
+  const [cargo, setCargo] = useState(empleado?.cargo ?? '');
+  const [puestoId, setPuestoId] = useState(empleado?.puesto?.id ?? '');
+  const [plantillaHorarioId, setPlantillaHorarioId] = useState(empleado?.plantillaHorario?.id ?? '');
+  const [fechaIngreso, setFechaIngreso] = useState(empleado?.fechaIngreso.slice(0, 10) ?? '');
+  const [salarioBrutoMensual, setSalarioBrutoMensual] = useState(empleado?.salarioBrutoMensual ?? '');
+  const [usuario, setUsuario] = useState<Usuario | null>(empleado?.user ?? null);
   const [error, setError] = useState<string | null>(null);
 
-  const crear = useMutation({
-    mutationFn: async () =>
-      apiClient.post('/nomina/empleados', {
+  const guardar = useMutation({
+    mutationFn: async () => {
+      const datosComunes = {
         nombre,
         cedula,
         cargo,
-        puestoId: puestoId || undefined,
-        plantillaHorarioId: plantillaHorarioId || undefined,
         fechaIngreso,
         salarioBrutoMensual: Number(salarioBrutoMensual),
-      }),
+      };
+      if (empleado) {
+        return apiClient.patch(`/nomina/empleados/${empleado.id}`, {
+          ...datosComunes,
+          puestoId: puestoId || null,
+          plantillaHorarioId: plantillaHorarioId || null,
+          userId: usuario?.id ?? null,
+        });
+      }
+      return apiClient.post('/nomina/empleados', {
+        ...datosComunes,
+        puestoId: puestoId || undefined,
+        plantillaHorarioId: plantillaHorarioId || undefined,
+        userId: usuario?.id || undefined,
+      });
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['nomina-empleados'] });
       onClose();
     },
-    onError: () => setError('No se pudo crear el empleado — revisá que la cédula no esté repetida.'),
+    onError: () =>
+      setError(`No se pudo ${empleado ? 'guardar' : 'crear'} el empleado — revisá que la cédula y el usuario vinculado no estén repetidos.`),
   });
 
   function onSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
-    crear.mutate();
+    guardar.mutate();
   }
 
   return (
-    <Modal titulo="Nuevo empleado" onClose={onClose}>
+    <Modal titulo={empleado ? `Editar empleado — ${empleado.nombre}` : 'Nuevo empleado'} onClose={onClose}>
       <form onSubmit={onSubmit} className="space-y-3">
         <FormField id="empleado-nombre" label="Nombre" value={nombre} onChange={(e) => setNombre(e.target.value)} required />
         <FormField id="empleado-cedula" label="Cédula" value={cedula} onChange={(e) => setCedula(e.target.value)} required />
@@ -188,6 +229,26 @@ function ModalNuevoEmpleado({ onClose }: { onClose: () => void }) {
             Plantilla de horario (opcional — sin elegir, se auto-asigna la predeterminada si existe)
           </label>
           <SelectPlantillaHorario id="empleado-plantilla-horario" value={plantillaHorarioId} onChange={setPlantillaHorarioId} />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+            Vincular a un usuario existente (opcional, habilita marcar entrada/salida por autoservicio)
+          </label>
+          <ComboboxBusqueda<Usuario>
+            valor={usuario}
+            onSeleccionar={setUsuario}
+            obtenerId={(u) => u.id}
+            obtenerEtiqueta={(u) => `${u.nombre} (${u.email})`}
+            placeholder="Buscar usuario…"
+            icono={<IdCard size={15} />}
+            buscar={async (texto) =>
+              (
+                await apiClient.get<PaginaResultado<Usuario>>('/nomina/empleados/usuarios-disponibles', {
+                  params: { busqueda: texto, tamanoPagina: 10 },
+                })
+              ).data.datos
+            }
+          />
         </div>
         <FormField
           id="empleado-fecha-ingreso"
@@ -208,8 +269,8 @@ function ModalNuevoEmpleado({ onClose }: { onClose: () => void }) {
           required
         />
         {error && <p className="text-sm text-red-600">{error}</p>}
-        <Button type="submit" disabled={crear.isPending} className="w-full">
-          {crear.isPending ? 'Creando…' : 'Agregar empleado'}
+        <Button type="submit" disabled={guardar.isPending} className="w-full">
+          {guardar.isPending ? 'Guardando…' : empleado ? 'Guardar cambios' : 'Agregar empleado'}
         </Button>
       </form>
     </Modal>

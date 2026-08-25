@@ -63,4 +63,12 @@ export class CrearEmpleadoDto {
   @IsOptional()
   @IsString()
   telefono?: string;
+
+  @ApiProperty({
+    required: false,
+    description: 'Vincula el empleado a un User de login (habilita el check-in/check-out de autoservicio) desde el alta.',
+  })
+  @IsOptional()
+  @IsUUID()
+  userId?: string;
 }

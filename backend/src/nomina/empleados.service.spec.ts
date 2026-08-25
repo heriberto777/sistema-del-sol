@@ -57,6 +57,42 @@ describe('EmpleadosService', () => {
     );
   });
 
+  it('crear pasa userId al repositorio cuando viene en el DTO', async () => {
+    repository.crear.mockResolvedValue({ id: 'e1' } as never);
+
+    await service.crear(
+      { nombre: 'Juan Pérez', cedula: '001-1', cargo: 'Vendedor', fechaIngreso: '2024-01-01', salarioBrutoMensual: 30000, userId: 'u1' },
+      't1',
+    );
+
+    expect(repository.crear).toHaveBeenCalledWith(expect.objectContaining({ userId: 'u1' }));
+  });
+
+  it('crear rechaza con 400 si el userId ya lo tiene otro empleado vinculado', async () => {
+    const error = new Prisma.PrismaClientKnownRequestError('duplicado', {
+      code: 'P2002',
+      clientVersion: 'x',
+      meta: { target: ['tenantId', 'userId'] },
+    });
+    repository.crear.mockRejectedValue(error);
+
+    await expect(
+      service.crear(
+        { nombre: 'Juan Pérez', cedula: '001-1', cargo: 'Vendedor', fechaIngreso: '2024-01-01', salarioBrutoMensual: 30000, userId: 'u1' },
+        't1',
+      ),
+    ).rejects.toThrow('Ese usuario ya está vinculado a otro empleado');
+  });
+
+  it('crear rechaza con 400 con mensaje distinto si la cédula ya existe (violación de índice único)', async () => {
+    const error = new Prisma.PrismaClientKnownRequestError('duplicado', { code: 'P2002', clientVersion: 'x' });
+    repository.crear.mockRejectedValue(error);
+
+    await expect(
+      service.crear({ nombre: 'Juan Pérez', cedula: '001-1', cargo: 'Vendedor', fechaIngreso: '2024-01-01', salarioBrutoMensual: 30000 }, 't1'),
+    ).rejects.toThrow('Ya existe otro empleado con esa cédula');
+  });
+
   it('rechaza con 400 si la cédula editada ya la tiene otro empleado (violación de índice único)', async () => {
     const error = new Prisma.PrismaClientKnownRequestError('duplicado', { code: 'P2002', clientVersion: 'x' });
     repository.actualizar.mockRejectedValue(error);

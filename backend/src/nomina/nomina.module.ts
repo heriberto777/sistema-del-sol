@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfiguracionesModule } from '../configuraciones/configuraciones.module';
 import { PuestosModule } from '../puestos/puestos.module';
 import { PlantillasHorarioModule } from '../plantillas-horario/plantillas-horario.module';
+import { UsuariosModule } from '../usuarios/usuarios.module';
 import { EmpleadosService } from './empleados.service';
 import { EmpleadosController } from './empleados.controller';
 import { EmpleadosRepository } from './empleados.repository';
@@ -22,7 +23,7 @@ import { TiposAusenciaConfigController } from './tipos-ausencia-config.controlle
 import { TiposAusenciaConfigRepository } from './tipos-ausencia-config.repository';
 
 @Module({
-  imports: [ConfiguracionesModule, PuestosModule, PlantillasHorarioModule],
+  imports: [ConfiguracionesModule, PuestosModule, PlantillasHorarioModule, UsuariosModule],
   controllers: [
     EmpleadosController,
     PeriodosNominaController,

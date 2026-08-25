@@ -5,6 +5,7 @@ import { TipoContrato } from '@prisma/client';
 const INCLUDE_EMPLEADO = {
   puesto: { select: { id: true, nombre: true } },
   plantillaHorario: { select: { id: true, nombre: true, codigo: true } },
+  user: { select: { id: true, nombre: true, email: true } },
 } as const;
 
 @Injectable()
@@ -28,6 +29,7 @@ export class EmpleadosRepository {
     tipoContrato?: TipoContrato;
     email?: string;
     telefono?: string;
+    userId?: string;
   }) {
     return this.db.empleado.create({ data: params, include: INCLUDE_EMPLEADO });
   }
