@@ -5,11 +5,11 @@ import { ActualizarWhatsappConfigDto } from './dto/actualizar-whatsapp-config.dt
 import { cifrar } from '../common/utils/encriptado.util';
 
 /**
- * Solo guarda credenciales/preferencias de WhatsApp por tenant (plan de
- * integración Cuadre, ítem H-2a) — a propósito NO se conecta con
- * `WhatsAppChannel.enviar()` (notificaciones salientes existentes, que
- * siguen leyendo `TWILIO_*` de `process.env`, nivel plataforma). La
- * orquestación real del bot conversacional (H-2b) sigue diferida.
+ * Guarda credenciales/preferencias de WhatsApp por tenant (ítems H-2a y
+ * H-2b) — a propósito NO se conecta con `WhatsAppChannel.enviar()`
+ * (notificaciones salientes existentes, que siguen leyendo `TWILIO_*` de
+ * `process.env`, nivel plataforma). El consumo real de estos datos vive
+ * en `backend/src/whatsapp-bot/` (`WhatsappBotService`).
  */
 @Injectable()
 export class WhatsappConfigService {
@@ -30,6 +30,8 @@ export class WhatsappConfigService {
     if (dto.iaProveedor !== undefined) data.iaProveedor = dto.iaProveedor;
     if (dto.iaModelo !== undefined) data.iaModelo = dto.iaModelo;
     if (dto.historialMensajes !== undefined) data.historialMensajes = dto.historialMensajes;
+    if (dto.iaPromptNegocio !== undefined) data.iaPromptNegocio = dto.iaPromptNegocio;
+    if (dto.limiteRespuestasDiarias !== undefined) data.limiteRespuestasDiarias = dto.limiteRespuestasDiarias;
 
     this.aplicarCampoSecreto(data, 'twilioAuthTokenCifrado', dto.twilioAuthToken);
     this.aplicarCampoSecreto(data, 'iaApiKeyCifrado', dto.iaApiKey);
@@ -63,6 +65,8 @@ export class WhatsappConfigService {
       iaModelo: config.iaModelo,
       iaApiKeyConfigurado: Boolean(config.iaApiKeyCifrado),
       historialMensajes: config.historialMensajes,
+      iaPromptNegocio: config.iaPromptNegocio,
+      limiteRespuestasDiarias: config.limiteRespuestasDiarias,
     };
   }
 }

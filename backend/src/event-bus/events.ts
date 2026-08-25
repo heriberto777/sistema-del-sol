@@ -14,6 +14,7 @@ export const EVENTOS = {
   GASTO_MENOR_CREADO: 'gastos_menores.creado',
   LOTE_POR_VENCER: 'inventario.lote_por_vencer',
   NCF_POR_AGOTARSE: 'ncf.por_agotarse',
+  WHATSAPP_REQUIERE_ATENCION: 'whatsapp.requiere_atencion',
 } as const;
 
 export type NombreEvento = (typeof EVENTOS)[keyof typeof EVENTOS];
@@ -121,4 +122,11 @@ export interface NcfPorAgotarsePayload {
   sucursalId: string | null;
   restantes: number;
   umbralAlerta: number;
+}
+
+/** Emitido por WhatsappBotService (ítem H-2b) cuando la IA marca `requiereHumano` o se agotó el tope diario de respuestas automáticas. */
+export interface WhatsappRequiereAtencionPayload {
+  tenantId: string;
+  mensajeId: string;
+  telefono: string;
 }

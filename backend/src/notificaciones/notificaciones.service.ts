@@ -5,7 +5,15 @@ import { NotificacionesRepository } from './notificaciones.repository';
 import { EmailChannel } from './canales/email.channel';
 import { WhatsAppChannel } from './canales/whatsapp.channel';
 import { renderizarPlantilla } from './plantilla-renderer';
-import { CotizacionEnviadaPayload, EVENTOS, FacturaCreadaPayload, LotePorVencerPayload, NcfPorAgotarsePayload, StockBajoPayload } from '../event-bus/events';
+import {
+  CotizacionEnviadaPayload,
+  EVENTOS,
+  FacturaCreadaPayload,
+  LotePorVencerPayload,
+  NcfPorAgotarsePayload,
+  StockBajoPayload,
+  WhatsappRequiereAtencionPayload,
+} from '../event-bus/events';
 import { PrismaService } from '../prisma/prisma.service';
 import { CrearPlantillaDto } from './dto/crear-plantilla.dto';
 import { ListadoQueryDto } from '../common/dto/listado-query.dto';
@@ -147,6 +155,24 @@ export class NotificacionesService {
           restantes: String(payload.restantes),
           umbral_alerta: String(payload.umbralAlerta),
         },
+      });
+    }
+  }
+
+  /** Ítem H-2b (bot de WhatsApp) — calcado de `alAgotarseNcf`: solo Admin Total, mismo criterio de "acá no hay un rol más específico obvio para esto". Requiere que el tenant tenga creada la plantilla `whatsapp_requiere_atencion` (EMAIL) — sin ella, no falla, solo no envía (mismo degrade que el resto de `NotificacionPlantilla`). */
+  @OnEvent(EVENTOS.WHATSAPP_REQUIERE_ATENCION)
+  async alRequerirAtencionWhatsapp(payload: WhatsappRequiereAtencionPayload) {
+    const admins = await this.prisma.user.findMany({
+      where: { tenantId: payload.tenantId, roles: { some: { role: { nombre: 'Admin Total' } } } },
+    });
+
+    for (const admin of admins) {
+      await this.enviar({
+        tenantId: payload.tenantId,
+        canal: 'EMAIL',
+        clave: 'whatsapp_requiere_atencion',
+        destinatario: admin.email,
+        variables: { telefono: payload.telefono },
       });
     }
   }

@@ -16,6 +16,8 @@ const CONFIG_VACIA = {
   iaModelo: null,
   iaApiKeyCifrado: null,
   historialMensajes: 10,
+  iaPromptNegocio: null,
+  limiteRespuestasDiarias: 50,
 };
 
 describe('WhatsappConfigService', () => {
@@ -86,6 +88,15 @@ describe('WhatsappConfigService', () => {
       const [, data] = repo.actualizar.mock.calls[0];
       expect(data).not.toHaveProperty('twilioAuthTokenCifrado');
       expect((data as { historialMensajes?: number }).historialMensajes).toBe(20);
+    });
+
+    it('actualiza iaPromptNegocio y limiteRespuestasDiarias (ítem H-2b)', async () => {
+      repo.actualizar.mockResolvedValue(CONFIG_VACIA as never);
+
+      await service.actualizar('t1', { iaPromptNegocio: 'Horario: 9am-5pm', limiteRespuestasDiarias: 25 });
+
+      const [, data] = repo.actualizar.mock.calls[0];
+      expect(data).toEqual(expect.objectContaining({ iaPromptNegocio: 'Horario: 9am-5pm', limiteRespuestasDiarias: 25 }));
     });
 
     it('rechaza con 400 si falta ENCRYPTION_KEY al guardar un secreto', async () => {

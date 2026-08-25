@@ -185,4 +185,21 @@ describe('NotificacionesService', () => {
       expect(emailChannel.enviar).toHaveBeenCalledTimes(2);
     });
   });
+
+  describe('alRequerirAtencionWhatsapp (ítem H-2b)', () => {
+    it('notifica por email a los usuarios con rol Admin Total, con el teléfono como variable', async () => {
+      prisma.user.findMany.mockResolvedValue([{ id: 'u1', email: 'admin@x.com' }]);
+      repository.buscarPlantilla.mockResolvedValue({ activa: true, asunto: null, cuerpo: 'Atender WhatsApp {{telefono}}' } as never);
+      repository.crearNotificacion.mockResolvedValue({ id: 'n1' } as never);
+      emailChannel.enviar.mockResolvedValue(true);
+
+      await service.alRequerirAtencionWhatsapp({ tenantId: 't1', mensajeId: 'm1', telefono: 'whatsapp:+18095551234' });
+
+      expect(prisma.user.findMany).toHaveBeenCalledWith({
+        where: { tenantId: 't1', roles: { some: { role: { nombre: 'Admin Total' } } } },
+      });
+      expect(repository.buscarPlantilla).toHaveBeenCalledWith('t1', 'EMAIL', 'whatsapp_requiere_atencion');
+      expect(emailChannel.enviar).toHaveBeenCalledWith('admin@x.com', '', 'Atender WhatsApp whatsapp:+18095551234');
+    });
+  });
 });

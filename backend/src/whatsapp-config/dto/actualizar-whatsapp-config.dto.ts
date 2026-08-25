@@ -48,4 +48,15 @@ export class ActualizarWhatsappConfigDto {
   @IsInt()
   @Min(0)
   historialMensajes?: number;
+
+  @ApiProperty({ required: false, description: 'Texto libre — horario, dirección, tono — se antepone al prompt fijo del bot, nunca lo reemplaza' })
+  @IsOptional()
+  @IsString()
+  iaPromptNegocio?: string;
+
+  @ApiProperty({ required: false, description: 'Tope de respuestas automáticas de IA por día — al llegar acá, se responde un mensaje fijo sin llamar a la IA' })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  limiteRespuestasDiarias?: number;
 }

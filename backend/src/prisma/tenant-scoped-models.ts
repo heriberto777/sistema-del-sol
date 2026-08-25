@@ -73,4 +73,5 @@ export const TENANT_SCOPED_MODELS = new Set([
   'WhatsappConfigTenant',
   'PasarelaConfigTenant',
   'SesionCobroFactura',
+  'WhatsappMensaje',
 ]);

@@ -93,6 +93,7 @@ model Tenant {
   facturasPlataforma FacturaPlataforma[]
   ventasAparcadas VentaAparcada[]
   whatsappConfig WhatsappConfigTenant?
+  whatsappMensajes WhatsappMensaje[]
   pasarelaConfig PasarelaConfigTenant?
   sesionesCobroFactura SesionCobroFactura[]
 
@@ -630,13 +631,11 @@ model Correlativo {
 }
 
 /// Configuración de WhatsApp por tenant (plan de integración Cuadre,
-/// ítem H-2a — entrega parcial de H-2) — SOLO guarda credenciales/
-/// preferencias, todavía no lo consume nadie. `WhatsAppChannel.enviar()`
-/// (notificaciones salientes existentes) sigue leyendo `TWILIO_*` de
-/// `process.env`, sincronizado desde `PlataformaConfiguracion` (nivel
-/// plataforma) — ver ARCHITECTURE.md. La orquestación real del bot
-/// conversacional (H-2b) sigue diferida, pendiente de decidir el
-/// mecanismo (n8n/backend/híbrido).
+/// ítem H-2a, extendida en H-2b con el bot conversacional real —
+/// ver ARCHITECTURE.md). `WhatsAppChannel.enviar()` (notificaciones
+/// salientes existentes, nivel plataforma) sigue sin tocarse — el bot
+/// usa sus propias credenciales tenant-scoped vía
+/// `enviarWhatsappTwilio()` (`common/utils/twilio-whatsapp.util.ts`).
 model WhatsappConfigTenant {
   id                     String   @id @default(uuid())
   tenantId               String   @unique
@@ -644,15 +643,49 @@ model WhatsappConfigTenant {
   habilitado             Boolean  @default(false)
   twilioAccountSid       String?
   twilioAuthTokenCifrado String?
-  twilioWhatsappFrom     String?
+  // @unique: es la clave para resolver a qué tenant pertenece un
+  // webhook entrante de Twilio (ver WhatsappWebhookController) — antes
+  // de H-2b no tenía índice porque nadie lo consultaba por valor.
+  twilioWhatsappFrom     String?  @unique
   iaProveedor            String?
   iaModelo               String?
   iaApiKeyCifrado        String?
   historialMensajes      Int      @default(10)
+  // Texto libre del tenant (horario, dirección, tono) — se antepone al
+  // scaffolding fijo del prompt de sistema (JSON de respuesta +
+  // guardrail de no inventar datos reales), nunca lo reemplaza — ver
+  // WhatsappBotService.
+  iaPromptNegocio         String?
+  // Tope de respuestas de IA por día calendario de RD (WhatsappMensaje.diaRD)
+  // — al llegar acá, se responde un mensaje fijo sin llamar a la IA.
+  limiteRespuestasDiarias Int      @default(50)
   createdAt              DateTime @default(now())
   updatedAt              DateTime @updatedAt
 
   @@map("whatsapp_config_tenant")
+}
+
+/// Historial de conversación del bot de WhatsApp (ítem H-2b) — usa
+/// `PrismaService` global (no `TenantPrismaService`) porque lo escribe
+/// un webhook público sin JWT, mismo criterio que `SesionCobroFactura`
+/// (ítem C-1). `diaRD` (no un rango de fechas) para el tope diario sin
+/// aritmética de husos horarios — ver `fechaHoyRD()`.
+model WhatsappMensaje {
+  id                     String   @id @default(uuid())
+  tenantId               String
+  tenant                 Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  telefono               String   // remitente tal cual lo manda Twilio (whatsapp:+...)
+  rol                    String   // 'USUARIO' | 'ASISTENTE' | 'HUMANO' (staff respondiendo desde la bandeja)
+  contenido              String
+  requiereAtencionHumana Boolean  @default(false)
+  atendido               Boolean  @default(false)
+  diaRD                  String
+  createdAt              DateTime @default(now())
+
+  @@index([tenantId, telefono, createdAt])
+  @@index([tenantId, diaRD])
+  @@index([tenantId, requiereAtencionHumana, atendido])
+  @@map("whatsapp_mensajes")
 }
 
 /// Credenciales de AZUL/CardNet por tenant (ítem C-1, Payment Link — ver
