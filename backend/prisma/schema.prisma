@@ -92,6 +92,7 @@ model Tenant {
   suscripcion   Suscripcion?
   facturasPlataforma FacturaPlataforma[]
   ventasAparcadas VentaAparcada[]
+  whatsappConfig WhatsappConfigTenant?
 
   @@map("tenants")
 }
@@ -624,6 +625,32 @@ model Correlativo {
 
   @@unique([tenantId, tipo])
   @@map("correlativos")
+}
+
+/// Configuración de WhatsApp por tenant (plan de integración Cuadre,
+/// ítem H-2a — entrega parcial de H-2) — SOLO guarda credenciales/
+/// preferencias, todavía no lo consume nadie. `WhatsAppChannel.enviar()`
+/// (notificaciones salientes existentes) sigue leyendo `TWILIO_*` de
+/// `process.env`, sincronizado desde `PlataformaConfiguracion` (nivel
+/// plataforma) — ver ARCHITECTURE.md. La orquestación real del bot
+/// conversacional (H-2b) sigue diferida, pendiente de decidir el
+/// mecanismo (n8n/backend/híbrido).
+model WhatsappConfigTenant {
+  id                     String   @id @default(uuid())
+  tenantId               String   @unique
+  tenant                 Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  habilitado             Boolean  @default(false)
+  twilioAccountSid       String?
+  twilioAuthTokenCifrado String?
+  twilioWhatsappFrom     String?
+  iaProveedor            String?
+  iaModelo               String?
+  iaApiKeyCifrado        String?
+  historialMensajes      Int      @default(10)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  @@map("whatsapp_config_tenant")
 }
 
 model NcfAsignado {

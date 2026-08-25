@@ -30,6 +30,7 @@ import { TenantsModule } from './tenants/tenants.module';
 import { PlatformAuditLogModule } from './platform-audit-log/platform-audit-log.module';
 import { NcfModule } from './ncf/ncf.module';
 import { CorrelativosModule } from './correlativos/correlativos.module';
+import { WhatsappConfigModule } from './whatsapp-config/whatsapp-config.module';
 import { ReportesModule } from './reportes/reportes.module';
 import { ReportesFiscalesModule } from './reportes-fiscales/reportes-fiscales.module';
 import { CotizacionesModule } from './cotizaciones/cotizaciones.module';
@@ -102,6 +103,7 @@ import { TenantMiddleware } from './common/middleware/tenant.middleware';
     PlatformAuditLogModule,
     NcfModule,
     CorrelativosModule,
+    WhatsappConfigModule,
     ReportesModule,
     ReportesFiscalesModule,
     CotizacionesModule,

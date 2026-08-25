@@ -70,4 +70,5 @@ export const TENANT_SCOPED_MODELS = new Set([
   'Caja',
   'TasaCambio',
   'Correlativo',
+  'WhatsappConfigTenant',
 ]);

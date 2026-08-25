@@ -3,6 +3,7 @@ import clsx from 'clsx';
 import { UsuariosPanel } from '../components/organisms/UsuariosPanel/UsuariosPanel';
 import { RolesPanel } from '../components/organisms/RolesPanel/RolesPanel';
 import { WebhooksPanel } from '../components/organisms/WebhooksPanel/WebhooksPanel';
+import { WhatsappConfigPanel } from '../components/organisms/WhatsappConfigPanel/WhatsappConfigPanel';
 import { ConfiguracionesPanel } from '../components/organisms/ConfiguracionesPanel/ConfiguracionesPanel';
 import { NcfPanel } from '../components/organisms/NcfPanel/NcfPanel';
 import { CorrelativosPanel } from '../components/organisms/CorrelativosPanel/CorrelativosPanel';
@@ -85,8 +86,11 @@ const CATEGORIAS: Categoria[] = [
   {
     id: 'integraciones',
     etiqueta: 'Integraciones',
-    descripcion: 'Webhooks hacia sistemas externos.',
-    pestanas: [{ id: 'webhooks', etiqueta: 'Webhooks', permiso: 'admin.configuracion', panel: WebhooksPanel }],
+    descripcion: 'Webhooks y WhatsApp hacia sistemas externos.',
+    pestanas: [
+      { id: 'webhooks', etiqueta: 'Webhooks', permiso: 'admin.configuracion', panel: WebhooksPanel },
+      { id: 'whatsapp', etiqueta: 'WhatsApp', permiso: 'admin.configuracion', panel: WhatsappConfigPanel },
+    ],
   },
 ];
 
