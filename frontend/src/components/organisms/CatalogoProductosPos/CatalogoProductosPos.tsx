@@ -48,9 +48,11 @@ export function CatalogoProductosPos({
   const [busqueda, setBusqueda] = useState('');
   const [categoriaId, setCategoriaId] = useState<string | null>(null);
   const [cantidad, setCantidad] = useState('1');
-  const [eligiendoVariante, setEligiendoVariante] = useState<{ producto: ProductoCatalogo; variantes: VarianteProducto[] } | null>(
-    null,
-  );
+  const [eligiendoVariante, setEligiendoVariante] = useState<{
+    producto: ProductoCatalogo;
+    variantes: VarianteProducto[];
+    precios: Record<string, string | null>;
+  } | null>(null);
   const busquedaDebounced = useDebouncedValue(busqueda);
 
   const { data: categorias } = useQuery({
@@ -76,28 +78,39 @@ export function CatalogoProductosPos({
       queryFn: async () => (await apiClient.get<VarianteProducto[]>(`/productos/${producto.id}/variantes`)).data,
     });
     if (variantes.length > 1) {
-      setEligiendoVariante({ producto, variantes });
+      // El precio de la grilla es el de una variante "representativa" (ver
+      // ARCHITECTURE.md, Fase 3b) — con variantes reales, cada una puede
+      // tener (o no) su propio precio configurado (ver FormularioPrecio en
+      // Productos.tsx). Se resuelven TODOS antes de mostrar el modal para
+      // poder deshabilitar de entrada las variantes sin precio — antes se
+      // recién enteraba al hacer clic, y como no había ningún aviso, un
+      // clic sobre una variante sin precio simplemente no hacía nada (bug
+      // real: "a veces la variante no se agrega").
+      const precios = await Promise.all(
+        variantes.map((v) =>
+          queryClient
+            .fetchQuery({
+              queryKey: ['precio-vigente', producto.id, v.id],
+              queryFn: async () =>
+                (await apiClient.get<{ precioVenta: string } | null>(`/precios/${producto.id}`, { params: { varianteId: v.id } })).data,
+            })
+            .then((p) => [v.id, p?.precioVenta ?? null] as const),
+        ),
+      );
+      setEligiendoVariante({ producto, variantes, precios: Object.fromEntries(precios) });
       return;
     }
     onAgregar(producto, cantidadNumerica, variantes[0]?.id);
     setCantidad('1');
   }
 
-  async function agregarConVariante(varianteId: string) {
+  function agregarConVariante(varianteId: string) {
     if (!eligiendoVariante) return;
     const cantidadNumerica = Number(cantidad) > 0 ? Number(cantidad) : 1;
-    const { producto } = eligiendoVariante;
-    // El precio de la grilla es el de una variante "representativa" (ver
-    // ARCHITECTURE.md, Fase 3b) — con variantes reales, cada una puede
-    // tener su propio precio (ver FormularioPrecio en Productos.tsx), así
-    // que hay que resolver el precio de la variante REALMENTE elegida
-    // antes de agregarla al carrito, no reusar el de la grilla.
-    const precio = await queryClient.fetchQuery({
-      queryKey: ['precio-vigente', producto.id, varianteId],
-      queryFn: async () =>
-        (await apiClient.get<{ precioVenta: string } | null>(`/precios/${producto.id}`, { params: { varianteId } })).data,
-    });
-    onAgregar({ ...producto, precioVenta: precio?.precioVenta ?? null }, cantidadNumerica, varianteId);
+    const { producto, precios } = eligiendoVariante;
+    const precioVenta = precios[varianteId] ?? null;
+    if (!precioVenta) return; // el botón ya queda deshabilitado en este caso — ver el render de abajo
+    onAgregar({ ...producto, precioVenta }, cantidadNumerica, varianteId);
     setCantidad('1');
     setEligiendoVariante(null);
   }
@@ -183,16 +196,24 @@ export function CatalogoProductosPos({
       {eligiendoVariante && (
         <Modal titulo={`Elegí la variante — ${eligiendoVariante.producto.nombre}`} onClose={() => setEligiendoVariante(null)}>
           <div className="space-y-2">
-            {eligiendoVariante.variantes.map((v) => (
-              <button
-                key={v.id}
-                type="button"
-                onClick={() => agregarConVariante(v.id)}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-left text-sm hover:border-sol-400 hover:bg-sol-50/50 dark:border-slate-800 dark:hover:bg-sol-900/10"
-              >
-                {etiquetaVariante(v) || '(sin atributos)'}
-              </button>
-            ))}
+            {eligiendoVariante.variantes.map((v) => {
+              const precioVenta = eligiendoVariante.precios[v.id];
+              return (
+                <button
+                  key={v.id}
+                  type="button"
+                  onClick={() => agregarConVariante(v.id)}
+                  disabled={!precioVenta}
+                  title={!precioVenta ? 'Sin precio configurado' : undefined}
+                  className="flex w-full items-center justify-between gap-3 rounded-lg border border-slate-200 px-3 py-2 text-left text-sm hover:border-sol-400 hover:bg-sol-50/50 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-slate-200 disabled:hover:bg-transparent dark:border-slate-800 dark:hover:bg-sol-900/10"
+                >
+                  <span>{etiquetaVariante(v) || '(sin atributos)'}</span>
+                  <span className="shrink-0 font-medium text-sol-600 dark:text-sol-400">
+                    {precioVenta ? formatoRD(precioVenta) : 'Sin precio'}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         </Modal>
       )}
