@@ -285,11 +285,7 @@ export function Productos() {
           <FormularioProducto producto={productoEditando} onGuardado={cerrarModalProducto} />
         </Modal>
       )}
-      {productoPrecio && (
-        <Modal titulo={`Cambiar precio — ${productoPrecio.nombre}`} onClose={() => setProductoPrecio(null)}>
-          <FormularioPrecio productoId={productoPrecio.id} onGuardado={() => setProductoPrecio(null)} />
-        </Modal>
-      )}
+      {productoPrecio && <ModalCambiarPrecio producto={productoPrecio} onClose={() => setProductoPrecio(null)} />}
       {modalImportarAbierto && (
         <Modal titulo="Importar productos" ancho="xl" onClose={() => setModalImportarAbierto(false)}>
           <ImportarProductosModal
@@ -639,25 +635,98 @@ function FormularioProducto({ producto, onGuardado }: { producto: Producto | nul
   );
 }
 
-function FormularioPrecio({ productoId, onGuardado }: { productoId: string; onGuardado: () => void }) {
+/**
+ * Cambiar precio de un producto con variantes reales (Fase 3c): antes era
+ * un `<select>` metido dentro del mismo formulario — ahora, mismo criterio
+ * que el selector de variante del POS (`CatalogoProductosPos`), primero
+ * se elige la variante en una lista de botones (con su precio vigente
+ * visible) y recién después se abre el formulario de precio para esa
+ * variante puntual. Un producto sin atributos reales (una sola variante
+ * "por defecto") se salta este paso — va directo al formulario, igual que
+ * antes.
+ */
+function ModalCambiarPrecio({ producto, onClose }: { producto: Producto; onClose: () => void }) {
+  const { data: variantes } = useVariantesProducto(producto.id);
+  const [varianteId, setVarianteId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (variantes?.length === 1) setVarianteId(variantes[0].id);
+  }, [variantes]);
+
+  const varianteElegida = variantes?.find((v) => v.id === varianteId);
+  const eligiendoVariante = !!variantes && variantes.length > 1 && !varianteId;
+
+  const titulo = varianteElegida
+    ? `Cambiar precio — ${producto.nombre} (${etiquetaVariante(varianteElegida) || 'sin atributos'})`
+    : `Cambiar precio — ${producto.nombre}`;
+
+  return (
+    <Modal titulo={titulo} onClose={onClose}>
+      {!variantes ? (
+        <p className="text-sm text-slate-500 dark:text-slate-400">Cargando variantes…</p>
+      ) : eligiendoVariante ? (
+        <div className="space-y-2">
+          {variantes.map((v) => (
+            <button
+              key={v.id}
+              type="button"
+              onClick={() => setVarianteId(v.id)}
+              className="flex w-full items-center justify-between gap-3 rounded-lg border border-slate-200 px-3 py-2 text-left text-sm hover:border-sol-400 hover:bg-sol-50/50 dark:border-slate-800 dark:hover:bg-sol-900/10"
+            >
+              <span>{etiquetaVariante(v) || '(sin atributos)'}</span>
+              <PrecioVigenteVariante productoId={producto.id} varianteId={v.id} />
+            </button>
+          ))}
+        </div>
+      ) : (
+        <FormularioPrecio
+          productoId={producto.id}
+          varianteId={varianteId ?? undefined}
+          onVolver={variantes.length > 1 ? () => setVarianteId(null) : undefined}
+          onGuardado={onClose}
+        />
+      )}
+    </Modal>
+  );
+}
+
+/** Precio vigente (nivel GENERAL) de una variante puntual — solo para mostrarlo junto a cada opción del selector de arriba, referencial nada más (FormularioPrecio deja elegir otro nivel de precio). */
+function PrecioVigenteVariante({ productoId, varianteId }: { productoId: string; varianteId: string }) {
+  const { data } = useQuery({
+    queryKey: ['precio-vigente', productoId, varianteId, 'GENERAL'],
+    queryFn: async () =>
+      (await apiClient.get<Precio | null>(`/precios/${productoId}`, { params: { varianteId, listaPrecio: 'GENERAL' } })).data,
+  });
+  return (
+    <span className="shrink-0 font-medium text-sol-600 dark:text-sol-400">
+      {data ? `RD$ ${Number(data.precioVenta).toLocaleString('es-DO')}` : 'Sin precio'}
+    </span>
+  );
+}
+
+function FormularioPrecio({
+  productoId,
+  varianteId,
+  onVolver,
+  onGuardado,
+}: {
+  productoId: string;
+  /** Ya resuelta por `ModalCambiarPrecio` — un producto de una sola variante manda la suya, sin que nadie tenga que elegir nada. */
+  varianteId?: string;
+  /** Solo cuando el producto tiene más de una variante — deja volver a la lista para cambiarle el precio a otra. */
+  onVolver?: () => void;
+  onGuardado: () => void;
+}) {
   const queryClient = useQueryClient();
   const { data: listasPrecio } = useListasPrecio();
-  const { data: variantes } = useVariantesProducto(productoId);
   const [listaPrecio, setListaPrecio] = useState('GENERAL');
-  const [varianteId, setVarianteId] = useState('');
-  // Un producto sin atributos reales tiene una única variante — se resuelve
-  // sola, sin obligar a elegir nada. Con más de una, hay que elegir cuál.
-  useEffect(() => {
-    if (variantes?.length === 1 && varianteId !== variantes[0].id) setVarianteId(variantes[0].id);
-  }, [variantes, varianteId]);
-  const varianteLista = variantes && variantes.length > 1 ? varianteId : undefined;
   const { data: vigente } = useQuery({
     queryKey: ['precio-vigente', productoId, varianteId, listaPrecio],
-    enabled: !(variantes && variantes.length > 1) || !!varianteId,
+    enabled: !!varianteId,
     queryFn: async () =>
       (
         await apiClient.get<Precio | null>(`/precios/${productoId}`, {
-          params: { varianteId: varianteLista, listaPrecio },
+          params: { varianteId, listaPrecio },
         })
       ).data,
   });
@@ -670,7 +739,7 @@ function FormularioPrecio({ productoId, onGuardado }: { productoId: string; onGu
     mutationFn: async () =>
       apiClient.post('/precios', {
         productoId,
-        varianteId: varianteLista,
+        varianteId,
         listaPrecio,
         costo: Number(costo),
         margenPct: margenPct ? Number(margenPct) : undefined,
@@ -690,15 +759,16 @@ function FormularioPrecio({ productoId, onGuardado }: { productoId: string; onGu
       setError('Indicá el margen % o el precio de venta.');
       return;
     }
-    if (variantes && variantes.length > 1 && !varianteId) {
-      setError('Elegí a qué variante le corresponde este precio.');
-      return;
-    }
     guardar.mutate();
   }
 
   return (
     <form onSubmit={onSubmit} className="space-y-3">
+      {onVolver && (
+        <button type="button" onClick={onVolver} className="text-sm font-medium text-sol-600 hover:text-sol-700 dark:text-sol-400">
+          ← Elegir otra variante
+        </button>
+      )}
       {vigente && (
         <p className="text-sm text-slate-500 dark:text-slate-400">
           Precio vigente: RD$ {Number(vigente.precioVenta).toLocaleString('es-DO')} (costo RD${' '}
@@ -708,21 +778,6 @@ function FormularioPrecio({ productoId, onGuardado }: { productoId: string; onGu
       <p className="text-xs text-slate-500 dark:text-slate-400">
         Cambiar el precio no edita el anterior: cierra el vigente y crea uno nuevo, para conservar el historial.
       </p>
-      {variantes && variantes.length > 1 && (
-        <div className="flex flex-col gap-1">
-          <label htmlFor="precio-variante" className="text-sm font-medium text-slate-700 dark:text-slate-300">
-            Variante
-          </label>
-          <Select id="precio-variante" value={varianteId} onChange={(e) => setVarianteId(e.target.value)} required>
-            <option value="">Elegir…</option>
-            {variantes.map((v) => (
-              <option key={v.id} value={v.id}>
-                {etiquetaVariante(v) || '(sin atributos)'}
-              </option>
-            ))}
-          </Select>
-        </div>
-      )}
       <div className="flex flex-col gap-1">
         <label htmlFor="precio-lista" className="text-sm font-medium text-slate-700 dark:text-slate-300">
           Nivel de precio
