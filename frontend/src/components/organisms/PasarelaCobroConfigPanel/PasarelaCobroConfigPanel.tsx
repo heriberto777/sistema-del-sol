@@ -8,7 +8,14 @@ import { FormField } from '../../molecules/FormField/FormField';
 interface PasarelaConfig {
   pasarelaActiva: 'AZUL' | 'CARDNET' | null;
   azul: { merchantId: string | null; merchantName: string | null; currencyCode: string | null; authKeyConfigurado: boolean };
-  cardnet: { merchantNumber: string | null; merchantTerminal: string | null; merchantName: string | null; authKeyConfigurado: boolean };
+  cardnet: {
+    merchantNumber: string | null;
+    merchantTerminal: string | null;
+    merchantTerminalAmex: string | null;
+    merchantName: string | null;
+    merchantType: string | null;
+    acquiringInstitutionCode: string | null;
+  };
 }
 
 /**
@@ -26,8 +33,10 @@ export function PasarelaCobroConfigPanel() {
   const [azulAuthKey, setAzulAuthKey] = useState('');
   const [cardnetMerchantNumber, setCardnetMerchantNumber] = useState('');
   const [cardnetMerchantTerminal, setCardnetMerchantTerminal] = useState('');
+  const [cardnetMerchantTerminalAmex, setCardnetMerchantTerminalAmex] = useState('');
   const [cardnetMerchantName, setCardnetMerchantName] = useState('');
-  const [cardnetAuthKey, setCardnetAuthKey] = useState('');
+  const [cardnetMerchantType, setCardnetMerchantType] = useState('');
+  const [cardnetAcquiringInstitutionCode, setCardnetAcquiringInstitutionCode] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   const { data: config } = useQuery({
@@ -43,7 +52,10 @@ export function PasarelaCobroConfigPanel() {
     setAzulCurrencyCode(config.azul.currencyCode ?? '');
     setCardnetMerchantNumber(config.cardnet.merchantNumber ?? '');
     setCardnetMerchantTerminal(config.cardnet.merchantTerminal ?? '');
+    setCardnetMerchantTerminalAmex(config.cardnet.merchantTerminalAmex ?? '');
     setCardnetMerchantName(config.cardnet.merchantName ?? '');
+    setCardnetMerchantType(config.cardnet.merchantType ?? '');
+    setCardnetAcquiringInstitutionCode(config.cardnet.acquiringInstitutionCode ?? '');
   }, [config]);
 
   const guardar = useMutation({
@@ -55,13 +67,14 @@ export function PasarelaCobroConfigPanel() {
         azulCurrencyCode,
         cardnetMerchantNumber,
         cardnetMerchantTerminal,
+        cardnetMerchantTerminalAmex,
         cardnetMerchantName,
+        cardnetMerchantType,
+        cardnetAcquiringInstitutionCode,
         ...(azulAuthKey !== '' ? { azulAuthKey } : {}),
-        ...(cardnetAuthKey !== '' ? { cardnetAuthKey } : {}),
       }),
     onSuccess: () => {
       setAzulAuthKey('');
-      setCardnetAuthKey('');
       queryClient.invalidateQueries({ queryKey: ['pasarela-cobro-config'] });
     },
     onError: () => setError('No se pudo guardar la configuración.'),
@@ -113,6 +126,9 @@ export function PasarelaCobroConfigPanel() {
 
         <div className="space-y-3 border-t border-slate-200 pt-3 dark:border-slate-800">
           <p className="text-sm font-medium text-slate-700 dark:text-slate-300">CardNet</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            Sin clave de firma — autentica con TLS 1.2 y estos datos, asignados por CardNet al afiliarse.
+          </p>
           <FormField
             id="cardnet-merchant-number"
             label="Merchant Number"
@@ -126,18 +142,28 @@ export function PasarelaCobroConfigPanel() {
             onChange={(e) => setCardnetMerchantTerminal(e.target.value)}
           />
           <FormField
+            id="cardnet-merchant-terminal-amex"
+            label="Merchant Terminal Amex (opcional)"
+            value={cardnetMerchantTerminalAmex}
+            onChange={(e) => setCardnetMerchantTerminalAmex(e.target.value)}
+          />
+          <FormField
             id="cardnet-merchant-name"
             label="Merchant Name"
             value={cardnetMerchantName}
             onChange={(e) => setCardnetMerchantName(e.target.value)}
           />
           <FormField
-            id="cardnet-auth-key"
-            label={config?.cardnet.authKeyConfigurado ? 'Auth Key (ya configurada — dejar vacío para no cambiarla)' : 'Auth Key'}
-            type="password"
-            value={cardnetAuthKey}
-            onChange={(e) => setCardnetAuthKey(e.target.value)}
-            placeholder={config?.cardnet.authKeyConfigurado ? '••••••••' : undefined}
+            id="cardnet-merchant-type"
+            label="Merchant Type (código de categoría de comercio)"
+            value={cardnetMerchantType}
+            onChange={(e) => setCardnetMerchantType(e.target.value)}
+          />
+          <FormField
+            id="cardnet-acquiring-institution-code"
+            label="Acquiring Institution Code"
+            value={cardnetAcquiringInstitutionCode}
+            onChange={(e) => setCardnetAcquiringInstitutionCode(e.target.value)}
           />
         </div>
 

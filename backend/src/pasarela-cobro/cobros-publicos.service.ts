@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, NotFoundException, ServiceUnavailableE
 import { PrismaService } from '../prisma/prisma.service';
 import { SesionesCobroRepository } from './sesiones-cobro.repository';
 import { AzulAdapter } from './adapters/azul.adapter';
+import { CardNetAdapter } from './adapters/cardnet.adapter';
 import { PasarelaCobroAdapter } from './adapters/pasarela-cobro-adapter.interface';
 import { FacturacionService } from '../facturacion/facturacion.service';
 import { AuthenticatedRequest, JwtPayloadUser } from '../common/types/authenticated-request';
@@ -16,10 +17,12 @@ export class CobrosPublicosService {
     private readonly sesionesCobroRepository: SesionesCobroRepository,
     private readonly facturacionService: FacturacionService,
     private readonly azulAdapter: AzulAdapter,
+    private readonly cardNetAdapter: CardNetAdapter,
   ) {}
 
   private resolverAdapter(clave: string): PasarelaCobroAdapter {
     if (clave === 'AZUL') return this.azulAdapter;
+    if (clave === 'CARDNET') return this.cardNetAdapter;
     throw new ServiceUnavailableException(`Pasarela "${clave}" no soportada todavía`);
   }
 
@@ -105,7 +108,7 @@ export class CobrosPublicosService {
    * nunca se persiste (se le pasa `null` explícito a `registrarPago`,
    * ver abajo) — es inerte, solo llena el tipo `JwtPayloadUser`.
    */
-  async procesarRetorno(pasarela: 'AZUL', referenciaExterna: string, query: Record<string, string>, request: AuthenticatedRequest) {
+  async procesarRetorno(pasarela: 'AZUL' | 'CARDNET', referenciaExterna: string, query: Record<string, string>, request: AuthenticatedRequest) {
     const sesion = await this.sesionesCobroRepository.buscarPorReferencia(pasarela, referenciaExterna);
     if (!sesion) throw new NotFoundException('Sesión de cobro no encontrada');
 

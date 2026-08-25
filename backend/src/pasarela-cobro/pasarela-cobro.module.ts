@@ -6,11 +6,12 @@ import { CobrosPublicosController } from './cobros-publicos.controller';
 import { CobrosPublicosService } from './cobros-publicos.service';
 import { SesionesCobroRepository } from './sesiones-cobro.repository';
 import { AzulAdapter } from './adapters/azul.adapter';
+import { CardNetAdapter } from './adapters/cardnet.adapter';
 import { FacturacionModule } from '../facturacion/facturacion.module';
 
 @Module({
   imports: [FacturacionModule],
   controllers: [PasarelaCobroConfigController, CobrosPublicosController],
-  providers: [PasarelaCobroConfigService, PasarelaCobroConfigRepository, CobrosPublicosService, SesionesCobroRepository, AzulAdapter],
+  providers: [PasarelaCobroConfigService, PasarelaCobroConfigRepository, CobrosPublicosService, SesionesCobroRepository, AzulAdapter, CardNetAdapter],
 })
 export class PasarelaCobroModule {}

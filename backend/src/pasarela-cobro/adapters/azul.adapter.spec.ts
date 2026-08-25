@@ -18,8 +18,10 @@ const CONFIG_BASE: PasarelaConfigTenant = {
   azulAuthKeyCifrado: null,
   cardnetMerchantNumber: null,
   cardnetMerchantTerminal: null,
+  cardnetMerchantTerminalAmex: null,
   cardnetMerchantName: null,
-  cardnetAuthKeyCifrado: null,
+  cardnetMerchantType: null,
+  cardnetAcquiringInstitutionCode: null,
   createdAt: new Date(),
   updatedAt: new Date(),
 };

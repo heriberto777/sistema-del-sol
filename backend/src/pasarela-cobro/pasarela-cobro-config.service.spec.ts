@@ -15,8 +15,10 @@ const CONFIG_VACIA = {
   azulAuthKeyCifrado: null,
   cardnetMerchantNumber: null,
   cardnetMerchantTerminal: null,
+  cardnetMerchantTerminalAmex: null,
   cardnetMerchantName: null,
-  cardnetAuthKeyCifrado: null,
+  cardnetMerchantType: null,
+  cardnetAcquiringInstitutionCode: null,
 };
 
 describe('PasarelaCobroConfigService', () => {
@@ -50,7 +52,7 @@ describe('PasarelaCobroConfigService', () => {
     it('reporta configurado:false cuando no hay nada guardado', async () => {
       const resultado = await service.obtener('t1');
       expect(resultado.azul.authKeyConfigurado).toBe(false);
-      expect(resultado.cardnet.authKeyConfigurado).toBe(false);
+      expect(resultado.cardnet.merchantNumber).toBeNull();
     });
   });
 
@@ -68,10 +70,21 @@ describe('PasarelaCobroConfigService', () => {
     it('"" borra el override guardado (queda null)', async () => {
       repo.actualizar.mockResolvedValue(CONFIG_VACIA as never);
 
-      await service.actualizar('t1', { cardnetAuthKey: '' });
+      await service.actualizar('t1', { azulAuthKey: '' });
 
       const [, data] = repo.actualizar.mock.calls[0];
-      expect((data as { cardnetAuthKeyCifrado?: string | null }).cardnetAuthKeyCifrado).toBeNull();
+      expect((data as { azulAuthKeyCifrado?: string | null }).azulAuthKeyCifrado).toBeNull();
+    });
+
+    it('actualiza los campos de CardNet (sin secreto que cifrar)', async () => {
+      repo.actualizar.mockResolvedValue(CONFIG_VACIA as never);
+
+      await service.actualizar('t1', { cardnetMerchantNumber: '349011300', cardnetMerchantTerminal: '00567856', cardnetMerchantType: '5440' });
+
+      const [, data] = repo.actualizar.mock.calls[0];
+      expect(data).toEqual(
+        expect.objectContaining({ cardnetMerchantNumber: '349011300', cardnetMerchantTerminal: '00567856', cardnetMerchantType: '5440' }),
+      );
     });
 
     it('omitir un campo no lo toca', async () => {
@@ -87,7 +100,7 @@ describe('PasarelaCobroConfigService', () => {
     it('rechaza con 400 si falta ENCRYPTION_KEY al guardar un secreto', async () => {
       delete process.env.ENCRYPTION_KEY;
 
-      await expect(service.actualizar('t1', { cardnetAuthKey: 'x' })).rejects.toThrow(BadRequestException);
+      await expect(service.actualizar('t1', { azulAuthKey: 'x' })).rejects.toThrow(BadRequestException);
       expect(repo.actualizar).not.toHaveBeenCalled();
     });
 

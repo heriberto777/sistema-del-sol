@@ -31,10 +31,12 @@ export class PasarelaCobroConfigService {
     if (dto.azulCurrencyCode !== undefined) data.azulCurrencyCode = dto.azulCurrencyCode;
     if (dto.cardnetMerchantNumber !== undefined) data.cardnetMerchantNumber = dto.cardnetMerchantNumber;
     if (dto.cardnetMerchantTerminal !== undefined) data.cardnetMerchantTerminal = dto.cardnetMerchantTerminal;
+    if (dto.cardnetMerchantTerminalAmex !== undefined) data.cardnetMerchantTerminalAmex = dto.cardnetMerchantTerminalAmex;
     if (dto.cardnetMerchantName !== undefined) data.cardnetMerchantName = dto.cardnetMerchantName;
+    if (dto.cardnetMerchantType !== undefined) data.cardnetMerchantType = dto.cardnetMerchantType;
+    if (dto.cardnetAcquiringInstitutionCode !== undefined) data.cardnetAcquiringInstitutionCode = dto.cardnetAcquiringInstitutionCode;
 
     this.aplicarCampoSecreto(data, 'azulAuthKeyCifrado', dto.azulAuthKey);
-    this.aplicarCampoSecreto(data, 'cardnetAuthKeyCifrado', dto.cardnetAuthKey);
 
     const actualizado = await this.repository.actualizar(config.id, data);
     return this.aFormaSegura(actualizado);
@@ -67,8 +69,10 @@ export class PasarelaCobroConfigService {
       cardnet: {
         merchantNumber: config.cardnetMerchantNumber,
         merchantTerminal: config.cardnetMerchantTerminal,
+        merchantTerminalAmex: config.cardnetMerchantTerminalAmex,
         merchantName: config.cardnetMerchantName,
-        authKeyConfigurado: Boolean(config.cardnetAuthKeyCifrado),
+        merchantType: config.cardnetMerchantType,
+        acquiringInstitutionCode: config.cardnetAcquiringInstitutionCode,
       },
     };
   }

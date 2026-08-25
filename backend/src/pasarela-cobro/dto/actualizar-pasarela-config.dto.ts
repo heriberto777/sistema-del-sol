@@ -2,10 +2,11 @@ import { ApiProperty } from '@nestjs/swagger';
 import { IsIn, IsOptional, IsString } from 'class-validator';
 
 /**
- * Todos los campos opcionales — solo se actualiza lo que venga. Para los
- * de secreto (azulAuthKey/cardnetAuthKey): string no vacío = nuevo
- * valor (se cifra server-side), "" = borra el override, omitido = sin
- * cambios. Nunca se aceptan/devuelven en texto plano fuera de este flujo.
+ * Todos los campos opcionales — solo se actualiza lo que venga. Para el
+ * único de secreto (azulAuthKey): string no vacío = nuevo valor (se cifra
+ * server-side), "" = borra el override, omitido = sin cambios. CardNet
+ * ("Botón de Pago — Web con Pantalla") no usa clave de firma — autentica
+ * con TLS 1.2 + MerchantNumber/MerchantTerminal, sin secreto que cifrar.
  */
 export class ActualizarPasarelaConfigDto {
   @ApiProperty({ required: false, enum: ['AZUL', 'CARDNET'], description: 'null/omitido = ninguna pasarela activa' })
@@ -43,13 +44,23 @@ export class ActualizarPasarelaConfigDto {
   @IsString()
   cardnetMerchantTerminal?: string;
 
+  @ApiProperty({ required: false, description: 'Opcional — solo si el comercio procesa American Express' })
+  @IsOptional()
+  @IsString()
+  cardnetMerchantTerminalAmex?: string;
+
   @ApiProperty({ required: false })
   @IsOptional()
   @IsString()
   cardnetMerchantName?: string;
 
-  @ApiProperty({ required: false, description: '"" borra el override guardado' })
+  @ApiProperty({ required: false, description: 'Código de categoría de comercio (MCC), asignado por CardNet' })
   @IsOptional()
   @IsString()
-  cardnetAuthKey?: string;
+  cardnetMerchantType?: string;
+
+  @ApiProperty({ required: false, description: 'Asignado por CardNet al afiliarse' })
+  @IsOptional()
+  @IsString()
+  cardnetAcquiringInstitutionCode?: string;
 }

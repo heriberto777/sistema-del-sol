@@ -2,6 +2,7 @@ import { BadRequestException, NotFoundException, ServiceUnavailableException } f
 import { CobrosPublicosService } from './cobros-publicos.service';
 import { SesionesCobroRepository } from './sesiones-cobro.repository';
 import { AzulAdapter } from './adapters/azul.adapter';
+import { CardNetAdapter } from './adapters/cardnet.adapter';
 import { FacturacionService } from '../facturacion/facturacion.service';
 import { AuthenticatedRequest } from '../common/types/authenticated-request';
 
@@ -43,6 +44,7 @@ describe('CobrosPublicosService', () => {
   let sesionesCobroRepository: jest.Mocked<SesionesCobroRepository>;
   let facturacionService: jest.Mocked<FacturacionService>;
   let azulAdapter: jest.Mocked<AzulAdapter>;
+  let cardNetAdapter: jest.Mocked<CardNetAdapter>;
 
   beforeEach(() => {
     prisma = {
@@ -66,8 +68,13 @@ describe('CobrosPublicosService', () => {
       crearCheckout: jest.fn().mockResolvedValue({ metodo: 'POST', url: 'https://azul/pay', campos: { OrderNumber: 'orden-1' }, referenciaExterna: 'orden-1' }),
       verificarRetorno: jest.fn().mockResolvedValue({ aprobado: true }),
     } as unknown as jest.Mocked<AzulAdapter>;
+    cardNetAdapter = {
+      clave: 'CARDNET',
+      crearCheckout: jest.fn().mockResolvedValue({ metodo: 'POST', url: 'https://cardnet/authorize', campos: { SESSION: 'sess-1' }, referenciaExterna: 'ref-1' }),
+      verificarRetorno: jest.fn().mockResolvedValue({ aprobado: true }),
+    } as unknown as jest.Mocked<CardNetAdapter>;
 
-    service = new CobrosPublicosService(prisma as never, sesionesCobroRepository, facturacionService, azulAdapter);
+    service = new CobrosPublicosService(prisma as never, sesionesCobroRepository, facturacionService, azulAdapter, cardNetAdapter);
   });
 
   describe('obtenerFacturaPublica', () => {
@@ -112,6 +119,13 @@ describe('CobrosPublicosService', () => {
       await service.crearCheckout('f1', 400);
       expect(azulAdapter.crearCheckout).toHaveBeenCalledWith(expect.objectContaining({ monto: 400 }));
       expect(sesionesCobroRepository.crear).toHaveBeenCalledWith(expect.objectContaining({ monto: 400, tenantId: 't1' }));
+    });
+
+    it('delega en CardNetAdapter cuando esa es la pasarela activa del tenant', async () => {
+      prisma.pasarelaConfigTenant.findUnique.mockResolvedValue({ ...CONFIG_BASE, pasarelaActiva: 'CARDNET' });
+      await service.crearCheckout('f1', 200);
+      expect(cardNetAdapter.crearCheckout).toHaveBeenCalledWith(expect.objectContaining({ monto: 200 }));
+      expect(azulAdapter.crearCheckout).not.toHaveBeenCalled();
     });
   });
 
@@ -168,6 +182,14 @@ describe('CobrosPublicosService', () => {
       facturacionService.registrarPago.mockRejectedValue(new BadRequestException('saldo cambió'));
       await expect(service.procesarRetorno('AZUL', 'orden-1', {}, request)).rejects.toThrow(BadRequestException);
       expect(sesionesCobroRepository.marcarRechazada).toHaveBeenCalledWith('s1');
+    });
+
+    it('CardNet: delega la verificación en CardNetAdapter, no en AzulAdapter', async () => {
+      sesionesCobroRepository.buscarPorReferencia.mockResolvedValue({ ...SESION_BASE, pasarela: 'CARDNET', referenciaExterna: 'ref-1' } as never);
+      const resultado = await service.procesarRetorno('CARDNET', 'ref-1', {}, request);
+      expect(resultado.aprobado).toBe(true);
+      expect(cardNetAdapter.verificarRetorno).toHaveBeenCalled();
+      expect(azulAdapter.verificarRetorno).not.toHaveBeenCalled();
     });
 
     it('forja request.user con el tenantId de la sesión, no uno arbitrario', async () => {

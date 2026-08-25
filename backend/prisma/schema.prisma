@@ -678,10 +678,19 @@ model PasarelaConfigTenant {
   azulCurrencyCode        String?  @default("$")
   azulAuthKeyCifrado      String?
 
-  cardnetMerchantNumber   String?
-  cardnetMerchantTerminal String?
-  cardnetMerchantName     String?
-  cardnetAuthKeyCifrado   String?
+  // "Botón de Pago — Web con Pantalla" de CardNet NO usa clave de firma —
+  // autentica con TLS 1.2 + el par MerchantNumber/MerchantTerminal
+  // (asignados por CardNet al afiliarse), sin header de autorización ni
+  // HMAC — confirmado contra developers.cardnet.com.do (a diferencia de
+  // AZUL, que sí firma con AuthHash). MerchantType (código de categoría
+  // de comercio) y AcquiringInstitutionCode también los asigna CardNet
+  // por comercio, no son constantes genéricas.
+  cardnetMerchantNumber        String?
+  cardnetMerchantTerminal      String?
+  cardnetMerchantTerminalAmex  String?
+  cardnetMerchantName          String?
+  cardnetMerchantType          String?
+  cardnetAcquiringInstitutionCode String?
 
   createdAt               DateTime @default(now())
   updatedAt               DateTime @updatedAt

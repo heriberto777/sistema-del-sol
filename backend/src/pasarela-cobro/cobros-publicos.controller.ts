@@ -31,12 +31,30 @@ export class CobrosPublicosController {
 
   @Get('azul/retorno')
   async retornoAzul(@Query() query: Record<string, string>, @Req() request: AuthenticatedRequest, @Res() res: Response) {
+    return this.procesarRetornoYRedirigir('AZUL', query.OrderNumber, query, request, res);
+  }
+
+  @Get('cardnet/retorno')
+  async retornoCardNet(@Query() query: Record<string, string>, @Req() request: AuthenticatedRequest, @Res() res: Response) {
+    // CardNet no manda ningún identificador propio confiable en el
+    // ReturnUrl (ver cardnet.adapter.ts) — `ref` es una referencia PROPIA
+    // que este mismo módulo generó y le pidió a CardNet que reflejara.
+    return this.procesarRetornoYRedirigir('CARDNET', query.ref, query, request, res);
+  }
+
+  private async procesarRetornoYRedirigir(
+    pasarela: 'AZUL' | 'CARDNET',
+    referenciaExterna: string,
+    query: Record<string, string>,
+    request: AuthenticatedRequest,
+    res: Response,
+  ) {
     const frontendUrl = process.env.FRONTEND_URL ?? '';
     try {
-      const { facturaId, aprobado } = await this.cobrosPublicosService.procesarRetorno('AZUL', query.OrderNumber, query, request);
-      // Nunca se reenvían los query params crudos de AZUL al frontend —
-      // solo el resultado YA verificado server-side, para que nadie pueda
-      // armar su propia URL "?estado=aprobado" y colarse.
+      const { facturaId, aprobado } = await this.cobrosPublicosService.procesarRetorno(pasarela, referenciaExterna, query, request);
+      // Nunca se reenvían los query params crudos del proveedor al
+      // frontend — solo el resultado YA verificado server-side, para que
+      // nadie pueda armar su propia URL "?estado=aprobado" y colarse.
       return res.redirect(302, `${frontendUrl}/pagar-factura/${facturaId}/resultado?estado=${aprobado ? 'aprobado' : 'rechazado'}`);
     } catch {
       return res.redirect(302, `${frontendUrl}/pagar-factura/error/resultado?estado=error`);
