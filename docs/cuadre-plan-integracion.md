@@ -613,7 +613,7 @@ Resumen de lo que cambió (detalle en cada ítem más abajo):
   propias (el reset de password usa su propio flujo, no este sistema). Si
   se necesita alguno de esos dos, es un ítem chico, no el rediseño
   completo que se había planteado.
-- [ ] **H-2** 🟥 *diseño primero, alcance grande* — **WhatsApp
+- [x] **H-2** 🟥 *diseño primero, alcance grande* — **WhatsApp
   conversacional con IA**: bot que responde automáticamente a clientes.
   *Confirmado: brecha real — nuestro canal de WhatsApp solo envía
   notificaciones salientes, sin recepción/respuesta automática.*
@@ -642,6 +642,35 @@ Resumen de lo que cambió (detalle en cada ítem más abajo):
   `process.env` (nivel plataforma), este formulario solo persiste
   datos. H-2b (el bot en sí) sigue bloqueado por la misma decisión de
   mecanismo pendiente. Migración `20260903090000_whatsapp_config_tenant`.
+  **H-2b entregado (2026-08-25)**: mecanismo resuelto a favor de
+  **backend directo** (opción b) — n8n habría sido solo un intermediario
+  sin acceso a Prisma tenant-scoped para casi ninguna parte real de la
+  lógica (resolver tenant por número, descifrar credenciales, historial,
+  IA con la clave del tenant). Webhook de Twilio (`POST
+  /webhooks/whatsapp/inbound`, `@Public()`, clona el patrón de
+  `pago-publico.controller.ts`/Stripe) verifica `X-Twilio-Signature`
+  (HMAC-SHA1, `twilio-signature.util.ts`) con el `authToken` **del
+  tenant** resuelto por el número de destino (`To`) — todos los tenants
+  comparten la misma URL de webhook. **Decisiones de negocio confirmadas
+  con el usuario**: (1) alcance = solo asistente general con un prompt
+  de negocio configurado por el tenant, **nunca lee Factura/Cliente
+  reales** (evita exponer datos de otro tenant si el matcheo por
+  teléfono falla — no hay normalización de formato); (2) escalación a
+  humano = notificación por email (reusa
+  `NotificacionesService`/`EventBusService`, plantilla
+  `whatsapp_requiere_atencion`) + bandeja simple en Admin → Integraciones
+  → "Bandeja WhatsApp" (responder manual, marcar atendido) — **sin chat
+  en vivo**; (3) abuso = tope diario de respuestas de IA configurable
+  por tenant (`WhatsappConfigTenant.limiteRespuestasDiarias`), al
+  llegar al tope responde un mensaje fijo sin llamar la IA (y también
+  escala). La IA responde ÚNICAMENTE en JSON estructurado
+  (`{"respuesta","requiereHumano"}`) — si el parseo falla, fail-safe a
+  `requiereHumano: true` con un mensaje genérico, nunca se arriesga una
+  respuesta libre sin vetar. Nunca cae a la clave de Anthropic de la
+  plataforma si el tenant no configuró la suya. Tabla nueva
+  `WhatsappMensaje` (historial + `diaRD` denormalizado para el tope
+  diario sin aritmética de fechas). Módulo `backend/src/whatsapp-bot/`.
+  Migración `20260907090000_whatsapp_bot`.
 - [x] **H-3** 🟧 *(alcance reducido a propósito)* — **Plantillas de
   documentos personalizables** (factura/recibo). *Confirmado: brecha
   real — `documento-pdf.ts`/`documento-ticket.ts` son generadores fijos
@@ -956,6 +985,17 @@ aparte.*
   parcial permitido desde el link público, botón manual en Factura para
   generarlo — ver el detalle completo en el ítem C-1 arriba. Verificado
   end-to-end contra los sandboxes reales de ambos proveedores.
+- **2026-08-25**: entregado **H-2b** (bot conversacional de WhatsApp),
+  retomado con su propia conversación de diseño (`AskUserQuestion`):
+  mecanismo backend directo (no n8n), alcance solo-asistente-general sin
+  leer datos reales, escalación por notificación + bandeja simple sin
+  chat en vivo, tope diario configurable por tenant — ver el detalle
+  completo en el ítem H-2 arriba. Verificado end-to-end contra la API
+  real de Twilio y de Anthropic (credenciales de prueba, incluyendo el
+  camino de fail-safe con una clave de Anthropic inválida). En el
+  camino se encontró y corrigió un bug real de scope-hoisting de Nest
+  (un repositorio no puede mezclar `PrismaService` global y
+  `TenantPrismaService` request-scoped en el mismo constructor).
 
 ## Sugerencia de por dónde arrancar
 
@@ -967,10 +1007,11 @@ B-1/B-2/B-3/B-6/B-7/B-8, E-2/E-3/E-4/E-5/E-6/E-8/E-9/E-11, F-2/F-4/F-5/
 F-8, G-1/G-2/G-3/G-4/G-5/G-6/G-7/G-8/G-10/G-11/G-12, H-3, J-1/J-2/J-3,
 K-1 — todos verificados (tsc + suite unitaria + e2e + lint + build, todo
 verde) y commiteados uno por uno. De los 🟥, ya entregados: **D-1, A-2,
-A-1, A-3, E-7, C-2, C-1**. I-1 resultó falso positivo (ya estaba
-construido). Con esto queda cerrado el lote de RRHH/Consecutivos/
-Configuración del 2026-08-25 (G-10, G-11, G-12, K-1, H-2a) y también
-C-1 (AZUL/CardNet Payment Link), retomado aparte el mismo día.
+A-1, A-3, E-7, C-2, C-1, H-2 (H-2a + H-2b)**. I-1 resultó falso positivo
+(ya estaba construido). Con esto queda cerrado el lote de RRHH/
+Consecutivos/Configuración del 2026-08-25 (G-10, G-11, G-12, K-1, H-2a),
+C-1 (AZUL/CardNet Payment Link) y H-2b (bot de WhatsApp), los tres
+retomados aparte el mismo día.
 
 Lo que queda, por categoría:
 - **Deliberadamente pausado a pedido del usuario**: B-9 (línea manual/
@@ -979,10 +1020,8 @@ Lo que queda, por categoría:
   corrección de tamaño), E-1 (Patrón Borrador→Confirmado en Compras/
   Ajustes/Transferencias, matiz).
 - **🟥, pendientes de su propia conversación de diseño**: A-4,
-  B-5, F-9, G-9 (hardware), H-2b (bot conversacional de WhatsApp — H-2a,
-  el formulario de configuración, ya entregado; sigue pendiente la
-  decisión de mecanismo n8n vs. backend propio), J-4 (API keys,
-  reclasificado — no aplica sin una API pública).
+  B-5, F-9, G-9 (hardware), J-4 (API keys, reclasificado — no aplica
+  sin una API pública).
 
 Todos los 🟥 restantes necesitan una conversación de alcance ANTES de
 tocar código — mismo criterio que Sucursales (Fase 8), PIN (Fase 9) y

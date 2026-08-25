@@ -2104,19 +2104,75 @@ plan de integración Cuadre, ítem H-2a — entrega parcial de H-2):
 formulario en Admin → Integraciones → WhatsApp para que cada tenant
 guarde SUS PROPIAS credenciales de Twilio + preferencia de proveedor de
 IA (Anthropic/OpenAI/Vercel) + modelo + historial de conversación a
-pasarle a la IA. Mismo patrón de secretos que `PlataformaConfigService`
+pasarle a la IA + prompt de negocio + tope diario de respuestas
+automáticas. Mismo patrón de secretos que `PlataformaConfigService`
 (`aplicarCampoSecreto`/`aFormaSegura`, reusa `cifrar`/`descifrar` de
 `encriptado.util.ts` tal cual) pero tenant-scoped (`WhatsappConfigTenant.
 tenantId @unique`, vía `TenantPrismaService` en vez de `PrismaService`
-global) en lugar de fila única de plataforma. **Deliberadamente
-desconectado de todo lo demás**: `WhatsAppChannel.enviar()` (arriba)
-sigue leyendo `TWILIO_*` de `process.env` (nivel plataforma, no
-tenant); este formulario solo persiste datos, nadie los lee todavía. Es
-la base para cuando se resuelva H-2b (bot conversacional) — decidir el
-mecanismo de recepción (n8n/backend/híbrido, nota pendiente en
-`docs/cuadre-plan-integracion.md`) es un ítem aparte, sin código
-todavía. Sin botón de "Probar conexión" (decisión explícita del
-usuario — no se necesita, es solo un formulario).
+global) en lugar de fila única de plataforma. Sin botón de "Probar
+conexión" (decisión explícita del usuario — no se necesita, es solo un
+formulario).
+
+**Bot conversacional de WhatsApp** (`backend/src/whatsapp-bot/`, plan de
+integración Cuadre, ítem H-2b — cierra H-2): mecanismo resuelto a favor
+de **backend directo**, no n8n (self-hosted, expuesto sin auth, sin
+acceso a Prisma tenant-scoped — habría sido solo un intermediario que
+llama de vuelta al backend para casi todo). Webhook de Twilio (`POST
+/webhooks/whatsapp/inbound`, `@Public()`) clona el único precedente real
+de webhook entrante firmado del proyecto
+(`facturacion-plataforma/pasarela/pago-publico.controller.ts`, Stripe):
+Twilio manda `application/x-www-form-urlencoded` (`From`/`To`/`Body`,
+no JSON) firmado con `X-Twilio-Signature` (HMAC-SHA1 sobre la URL
+completa + parámetros ordenados alfabéticamente, `twilio-signature.util.ts`,
+crypto nativo sin SDK — mismo criterio que `azul-hash.util.ts`/
+`stripe-webhook.util.ts`). Como todos los tenants apuntan a la MISMA URL
+de webhook, el tenant se resuelve primero por el número de destino
+(`To`, vía `WhatsappConfigTenant.twilioWhatsappFrom @unique`) y **recién
+después** se verifica la firma con el `authToken` de ESE tenant — sigue
+siendo seguro porque solo el dueño real de ese `authToken` puede producir
+una firma válida. La URL completa para el HMAC sale de
+`WHATSAPP_WEBHOOK_URL` (env var explícita), no se reconstruye desde
+headers de un posible proxy.
+
+Decisiones de negocio confirmadas con el usuario (`AskUserQuestion`):
+(1) **alcance = solo asistente general** — responde con el prompt de
+negocio del tenant, **nunca lee Factura/Cliente reales** (evita el
+riesgo de exponer datos de otro tenant si el matcheo por teléfono falla
+— no hay normalización de formato de número hoy); (2) **escalación a
+humano = notificación + bandeja simple**, sin chat en vivo — la IA
+responde ÚNICAMENTE en JSON estructurado
+(`{"respuesta":"...","requiereHumano":true|false}`, prompt fijo en
+`WhatsappBotService`); si el parseo falla o el shape no calza,
+**fail-safe a `requiereHumano: true`** con un mensaje genérico — nunca
+se arriesga a mandar una respuesta libre sin vetar. `requiereHumano:
+true` emite `EVENTOS.WHATSAPP_REQUIERE_ATENCION` (mismo patrón Event
+Bus + `NotificacionPlantilla` que `alBajarStock`/`alAgotarseNcf`:
+notifica por email a `Admin Total`, degrada solo si el tenant no creó la
+plantilla `whatsapp_requiere_atencion`) y aparece en Admin →
+Integraciones → "Bandeja WhatsApp" para responder manual/marcar
+atendido; (3) **abuso = tope diario configurable por tenant**
+(`WhatsappConfigTenant.limiteRespuestasDiarias`) — al llegar al tope,
+mensaje fijo sin llamar la IA (y también escala, para no perder el
+seguimiento). El bot **nunca cae a la clave de Anthropic de la
+plataforma** si el tenant no configuró la suya (`IaClientService.
+completarConversacion`, método nuevo de mensajes multi-turno junto al
+`completar()` de un solo turno ya existente) — no se le cobra a la
+plataforma el uso de IA de un tenant sin IA propia.
+
+`WhatsappMensaje` (historial + `diaRD` denormalizado, `fechaHoyRD()` —
+el tope diario es un `count()` simple sin aritmética de fechas/huso
+horario) tiene dos repositorios separados A PROPÓSITO:
+`WhatsappMensajesRepository` (`PrismaService` global + `tenantId`
+explícito, el webhook corre sin JWT — mismo criterio que
+`SesionesCobroRepository` de C-1) y `WhatsappMensajesAdminRepository`
+(`TenantPrismaService`, solo la bandeja autenticada). **Nunca mezclar
+ambos clientes de Prisma en un mismo constructor**: se probó y rompe el
+scope-hoisting de Nest — un provider que depende de un singleton global
+Y de un provider `Scope.REQUEST` en el mismo constructor puede quedar
+resuelto como SINGLETON, y entonces `TenantPrismaService` llega como un
+stand-in vacío (sin `.client`, `Object.keys() === []`) porque Nest lo
+instancia antes de que exista un request real — bug real, encontrado
+en vivo (500 al abrir la bandeja) y corregido separando en dos clases.
 
 **Entrega manual del recibo** (plan de integración Cuadre, ítem F-4):
 `alFacturarse` (arriba) es automático y depende de que `Cliente.email`/
