@@ -2,6 +2,8 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { RemisionesRepository } from './remisiones.repository';
 import { FacturacionService } from '../facturacion/facturacion.service';
 import { VariantesService } from '../variantes/variantes.service';
+import { InventarioService } from '../inventario/inventario.service';
+import { expandirParaInventario } from '../inventario/expandir-para-inventario';
 import { CorrelativosRepository } from '../correlativos/correlativos.repository';
 import { CrearRemisionDto } from './dto/crear-remision.dto';
 import { ConvertirRemisionDto } from './dto/convertir-remision.dto';
@@ -21,6 +23,7 @@ export class RemisionesService {
     private readonly remisionesRepository: RemisionesRepository,
     private readonly facturacionService: FacturacionService,
     private readonly variantesService: VariantesService,
+    private readonly inventarioService: InventarioService,
     private readonly correlativosRepository: CorrelativosRepository,
     private readonly prisma: PrismaService,
     private readonly tenantPrisma: TenantPrismaService,
@@ -73,10 +76,60 @@ export class RemisionesService {
     return { datos, total, pagina, tamanoPagina };
   }
 
-  async cambiarEstado(id: string, estado: 'ENTREGADA' | 'ANULADA') {
+  /**
+   * "Remisión + stock" — a diferencia de la v1 (ver el comentario del
+   * modelo en schema.prisma), BORRADOR → ENTREGADA ahora descuenta
+   * inventario de verdad: una remisión entregada representa mercancía que
+   * YA salió físicamente, no solo al convertirla en factura.
+   * BORRADOR → ANULADA nunca movió stock, nada que reintegrar.
+   * ENTREGADA → ANULADA sí lo reintegra (ya se había descontado al
+   * entregar). `convertirEnFactura` sabe, por el estado ENTREGADA, que no
+   * debe descontar una segunda vez (ver `sinMovimientoInventario` ahí).
+   */
+  async cambiarEstado(id: string, estado: 'ENTREGADA' | 'ANULADA', tenantId: string, userId: string) {
     const remision = await this.remisionesRepository.buscarPorId(id);
     this.validarQueSigaAbierta(remision);
-    return this.remisionesRepository.actualizarEstado(id, estado);
+    if (estado === 'ENTREGADA' && remision.estado !== 'BORRADOR') {
+      throw new BadRequestException('Solo se puede marcar entregada una remisión en borrador');
+    }
+
+    return this.tenantPrisma.client.$transaction(async (tx) => {
+      if (estado === 'ENTREGADA') {
+        for (const linea of remision.lineas) {
+          const producto = { tipoProducto: linea.producto.tipo, componentesCombo: linea.producto.componentes };
+          for (const item of expandirParaInventario(producto, linea.productoId, Number(linea.cantidad), linea.varianteId)) {
+            await this.inventarioService.verificarYDescontarStockEnTx(tx, {
+              tenantId,
+              productoId: item.productoId,
+              varianteId: item.varianteId,
+              bodegaId: remision.bodegaId,
+              cantidad: item.cantidad,
+              userId,
+              referencia: `Remisión ${remision.numero}`,
+              referenciaTipo: 'REMISION',
+              referenciaId: remision.id,
+            });
+          }
+        }
+      } else if (remision.estado === 'ENTREGADA') {
+        for (const linea of remision.lineas) {
+          const producto = { tipoProducto: linea.producto.tipo, componentesCombo: linea.producto.componentes };
+          for (const item of expandirParaInventario(producto, linea.productoId, Number(linea.cantidad), linea.varianteId)) {
+            await this.inventarioService.entradaStockEnTx(tx, {
+              tenantId,
+              productoId: item.productoId,
+              varianteId: item.varianteId,
+              bodegaId: remision.bodegaId,
+              cantidad: item.cantidad,
+              userId,
+              motivo: `Anulación de remisión ${remision.numero}`,
+            });
+          }
+        }
+      }
+
+      return this.remisionesRepository.actualizarEstadoEnTx(tx, id, estado);
+    });
   }
 
   async convertirEnFactura(id: string, dto: ConvertirRemisionDto, tenantId: string, vendedorId: string) {
@@ -96,6 +149,11 @@ export class RemisionesService {
       },
       tenantId,
       vendedorId,
+      // Si la remisión ya pasó por ENTREGADA, el stock YA se descontó ahí
+      // (ver cambiarEstado) — crear() no debe volver a hacerlo. Si se
+      // convierte directo desde BORRADOR (nunca entregada), crear() mueve
+      // stock como siempre — cero cambio de comportamiento para ese camino.
+      { sinMovimientoInventario: remision.estado === 'ENTREGADA' },
     );
 
     await this.remisionesRepository.marcarFacturada(id, factura.id);

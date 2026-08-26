@@ -1,8 +1,9 @@
 import { randomUUID } from 'crypto';
 import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
-import { FormatoImpresion, Prisma, TipoFactura, TipoNcf, TipoProducto } from '@prisma/client';
+import { FormatoImpresion, TipoFactura, TipoNcf } from '@prisma/client';
 import { FacturacionRepository } from './facturacion.repository';
 import { InventarioService } from '../inventario/inventario.service';
+import { expandirParaInventario } from '../inventario/expandir-para-inventario';
 import { TenantPrismaService } from '../prisma/tenant-prisma.service';
 import { EventBusService } from '../event-bus/event-bus.service';
 import { EVENTOS } from '../event-bus/events';
@@ -58,39 +59,6 @@ const TIPO_NCF_ESPECIAL: Record<'REGIMEN_ESPECIAL' | 'GUBERNAMENTAL', { ncf: Tip
   REGIMEN_ESPECIAL: { ncf: 'B14', ecf: 'E44' },
   GUBERNAMENTAL: { ncf: 'B15', ecf: 'E45' },
 };
-
-/**
- * Un SERVICIO nunca mueve inventario. Un COMBO expande a sus componentes
- * físicos (cantidad de la línea × cantidad del componente) — el combo en sí
- * nunca tiene fila propia en Stock. Un componente está restringido en
- * ProductosService a PRODUCTO/SERVICIO (nunca otro COMBO), así que un solo
- * nivel de expansión alcanza, sin necesidad de recursión.
- */
-/**
- * `varianteId` (Fase 3c) es la variante YA resuelta de `productoId` — solo
- * tiene sentido para el producto vendido directamente, no para los
- * componentes de un combo (nadie elige variante por componente; cada uno
- * resuelve la suya propia — su "por defecto" si tiene una sola, o rechaza
- * si tiene varias — en `InventarioService`, ver `VariantesService.
- * resolverObligatoria`).
- */
-function expandirParaInventario(
-  producto: {
-    tipoProducto: TipoProducto;
-    componentesCombo: Array<{ cantidad: Prisma.Decimal; componente: { id: string; tipo: TipoProducto } }>;
-  },
-  productoId: string,
-  cantidad: number,
-  varianteId?: string,
-): Array<{ productoId: string; cantidad: number; varianteId?: string }> {
-  if (producto.tipoProducto === 'SERVICIO') return [];
-  if (producto.tipoProducto === 'COMBO') {
-    return producto.componentesCombo
-      .filter((c) => c.componente.tipo !== 'SERVICIO')
-      .map((c) => ({ productoId: c.componente.id, cantidad: cantidad * Number(c.cantidad) }));
-  }
-  return [{ productoId, cantidad, varianteId }];
-}
 
 @Injectable()
 export class FacturacionService {
@@ -333,6 +301,13 @@ export class FacturacionService {
       turnoCajaId?: string;
       vendedorEmpleadoId?: string;
       pagos?: { formaPagoId: string; monto: number; referencia?: string }[];
+      // "Remisión + stock" — una Remisión que ya pasó por ENTREGADA movió
+      // el inventario en ESE momento (ver RemisionesService.cambiarEstado);
+      // al convertirla en factura, `crear()` no debe volver a descontarlo.
+      // Default false/undefined: cero cambio de comportamiento para el
+      // resto de los que llaman a `crear()` (POS, Facturación directa,
+      // Cotización, Remisión sin pasar por ENTREGADA).
+      sinMovimientoInventario?: boolean;
     },
   ) {
     // findUniqueOrThrow tenant-scoped: si clienteId es de otro tenant, 404 —
@@ -447,7 +422,7 @@ export class FacturacionService {
             });
           }
         }
-      } else if (dto.tipoFactura !== 'NOTA_DEBITO') {
+      } else if (dto.tipoFactura !== 'NOTA_DEBITO' && !opciones?.sinMovimientoInventario) {
         for (const linea of lineasCalculadas) {
           for (const item of expandirParaInventario(linea, linea.productoId, linea.cantidad, linea.varianteId)) {
             await this.inventarioService.verificarYDescontarStockEnTx(tx, {

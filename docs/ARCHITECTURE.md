@@ -804,16 +804,26 @@ de stock.
   `VENCIDA` en la respuesta sin necesidad de un cron que actualice la fila.
   Al convertir, copia sus líneas (con el `precioUnitario` que ya tenía) a
   una factura nueva.
-- **Remisión**: `BORRADOR → ENTREGADA → FACTURADA`. **Simplificación
-  deliberada de v1**: a diferencia de una remisión real (que mueve
-  inventario físico al entregarse, antes de facturar), esta no toca stock
-  por sí sola — el descuento ocurre recién al convertirla en factura,
-  igual que una venta normal. Modelar la entrega física por separado de
-  la facturación es una mejora futura si el negocio la necesita; evita
-  duplicar la lógica de movimiento de stock en dos lugares mientras tanto.
-  Al convertir, las líneas van sin `precioUnitario` (la remisión no
-  guarda precio) — se resuelve al precio vigente del producto en ese
-  momento, igual que una factura normal sin precio explícito.
+- **Remisión**: `BORRADOR → ENTREGADA → FACTURADA`. **"Remisión + stock"
+  (2026-08-26)**: `BORRADOR → ENTREGADA` descuenta inventario de verdad
+  (`RemisionesService.cambiarEstado`, misma transacción, mismas
+  primitivas de `InventarioService` que usa `FacturacionService.crear()`
+  — `verificarYDescontarStockEnTx`, con `expandirParaInventario` movido a
+  `inventario/expandir-para-inventario.ts` para que ambos servicios lo
+  reusen) — una remisión entregada representa mercancía que YA salió
+  físicamente. `ENTREGADA → ANULADA` reintegra ese stock
+  (`entradaStockEnTx`); `BORRADOR → ANULADA` nunca movió nada, no
+  reintegra. Al convertir en factura, `FacturacionService.crear()` recibe
+  `sinMovimientoInventario: true` si la remisión ya pasó por ENTREGADA
+  (el stock ya se movió ahí, no hay que descontarlo dos veces) — si se
+  convierte directo desde BORRADOR (sin pasar por ENTREGADA, camino que
+  sigue existiendo), `crear()` descuenta como siempre. Antes de este
+  ítem, la remisión no tocaba stock por sí sola (simplificación
+  deliberada de v1, evitaba duplicar la lógica de movimiento en dos
+  lugares) — se cerró esa brecha reusando en vez de duplicar. Al
+  convertir, las líneas van sin `precioUnitario` (la remisión no guarda
+  precio) — se resuelve al precio vigente del producto en ese momento,
+  igual que una factura normal sin precio explícito.
 
 Ambos quedan con `facturaId` (único) apuntando a la factura resultante
 una vez convertidos, y no se pueden operar ni reconvertir después de eso

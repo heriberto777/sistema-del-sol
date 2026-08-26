@@ -975,13 +975,16 @@ enum EstadoRemision {
   ANULADA
 }
 
-/// v1 simplificado a propósito: a diferencia de una remisión "real" (que
-/// mueve inventario físico al entregarse, antes de facturar), esta
-/// remisión no toca stock por sí sola — el descuento de inventario ocurre
-/// al convertirla en factura (mismo flujo que ya usa FacturacionService).
-/// Modelar la reserva/entrega física por separado de la facturación es
-/// una mejora futura si el negocio lo necesita; por ahora evita duplicar
-/// la lógica de movimiento de stock en dos lugares.
+/// "Remisión + stock" (2026-08-26): BORRADOR -> ENTREGADA descuenta
+/// inventario de verdad (RemisionesService.cambiarEstado, mismas
+/// primitivas de InventarioService que FacturacionService.crear() —
+/// verificarYDescontarStockEnTx/entradaStockEnTx) — una remisión
+/// entregada representa mercancía que YA salió físicamente, no solo al
+/// convertirla en factura. ENTREGADA -> ANULADA reintegra ese stock;
+/// BORRADOR -> ANULADA nunca lo movió. Al convertir, FacturacionService.
+/// crear() recibe sinMovimientoInventario:true si ya pasó por ENTREGADA
+/// (evita descontar dos veces) — convertir directo desde BORRADOR sigue
+/// descontando en crear(), como siempre.
 model Remision {
   id         String         @id @default(uuid())
   tenantId   String

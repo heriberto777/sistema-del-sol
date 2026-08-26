@@ -2,7 +2,15 @@ import { Injectable } from '@nestjs/common';
 import { TenantPrismaService } from '../prisma/tenant-prisma.service';
 import { EstadoRemision, Prisma } from '@prisma/client';
 
-const INCLUDE_REMISION = { lineas: { include: { producto: true } }, cliente: true, bodega: true } as const;
+// "Remisión + stock" — `producto` necesita el include profundo (mismo que
+// `FacturacionRepository.buscarPorId`) para que `expandirParaInventario`
+// pueda expandir un COMBO a sus componentes físicos al mover inventario en
+// "Marcar entregada"/anular desde ENTREGADA.
+const INCLUDE_REMISION = {
+  lineas: { include: { producto: { include: { componentes: { include: { componente: true } } } } } },
+  cliente: true,
+  bodega: true,
+} as const;
 
 @Injectable()
 export class RemisionesRepository {
@@ -87,6 +95,11 @@ export class RemisionesRepository {
 
   actualizarEstado(id: string, estado: EstadoRemision) {
     return this.db.remision.update({ where: { id }, data: { estado }, include: INCLUDE_REMISION });
+  }
+
+  /** Participa en la transacción de RemisionesService.cambiarEstado (movimiento de stock + cambio de estado, todo o nada). */
+  actualizarEstadoEnTx(tx: Prisma.TransactionClient, id: string, estado: EstadoRemision) {
+    return tx.remision.update({ where: { id }, data: { estado }, include: INCLUDE_REMISION });
   }
 
   marcarFacturada(id: string, facturaId: string) {

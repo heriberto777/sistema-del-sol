@@ -97,7 +97,7 @@ export function RemisionesPanel() {
       <Card
         sinPadding
         titulo="Remisiones"
-        descripcion={data ? `${data.total} remisión(es) — el inventario se descuenta al convertir en factura, no al crear` : undefined}
+        descripcion={data ? `${data.total} remisión(es) — el inventario se descuenta al marcar "Entregada", no al crear` : undefined}
         acciones={
           <div className="flex items-center gap-2">
             <SearchInput
@@ -237,7 +237,8 @@ function ModalNuevaRemision({
   return (
     <Modal titulo="Nueva remisión" onClose={onClose}>
       <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">
-        Registra la entrega de mercancía sin facturar todavía. El inventario se descuenta al convertirla en factura, no al crearla.
+        Registra la entrega de mercancía sin facturar todavía. Se crea en borrador (sin tocar inventario) — el descuento real ocurre al marcar
+        "Entregada".
       </p>
       <form onSubmit={onSubmit} className="space-y-3">
         <div>

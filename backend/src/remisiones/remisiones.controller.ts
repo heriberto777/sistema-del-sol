@@ -45,8 +45,8 @@ export class RemisionesController {
 
   @Patch(':id/estado')
   @Permissions('remisiones.editar')
-  cambiarEstado(@Param('id') id: string, @Body() dto: CambiarEstadoRemisionDto) {
-    return this.remisionesService.cambiarEstado(id, dto.estado);
+  cambiarEstado(@Param('id') id: string, @Body() dto: CambiarEstadoRemisionDto, @CurrentUser() user: JwtPayloadUser) {
+    return this.remisionesService.cambiarEstado(id, dto.estado, user.tenantId, user.userId);
   }
 
   @Get(':id/pdf')
