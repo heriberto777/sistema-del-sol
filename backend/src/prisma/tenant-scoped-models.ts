@@ -74,4 +74,5 @@ export const TENANT_SCOPED_MODELS = new Set([
   'PasarelaConfigTenant',
   'SesionCobroFactura',
   'WhatsappMensaje',
+  'CarritoBorrador',
 ]);

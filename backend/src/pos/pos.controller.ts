@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Put, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { PosService } from './pos.service';
 import { AbrirTurnoDto } from './dto/abrir-turno.dto';
@@ -7,6 +7,7 @@ import { CrearMovimientoCajaDto } from './dto/crear-movimiento-caja.dto';
 import { RegistrarVentaPosDto } from './dto/registrar-venta.dto';
 import { CotizarVentaPosDto } from './dto/cotizar-venta.dto';
 import { GuardarVentaDto } from './dto/guardar-venta.dto';
+import { GuardarBorradorCarritoDto } from './dto/guardar-borrador-carrito.dto';
 import { RegistrarDevolucionDto } from './dto/registrar-devolucion.dto';
 import { SolicitarAutorizacionDevolucionDto } from './dto/solicitar-autorizacion-devolucion.dto';
 import { ListarTurnosQueryDto } from './dto/listar-turnos-query.dto';
@@ -139,6 +140,27 @@ export class PosController {
   @Permissions('pos.editar')
   eliminarGuardada(@Param('id') id: string) {
     return this.posService.eliminarGuardada(id);
+  }
+
+  // Borrador silencioso del carrito activo — distinto de guardar/guardadas
+  // (F12, aparcado explícito). El frontend llama este PUT debounced en cada
+  // cambio del carrito (ver TurnoCajaDetalle.tsx).
+  @Put('turnos/:id/borrador')
+  @Permissions('pos.editar')
+  guardarBorrador(@Param('id') id: string, @Body() dto: GuardarBorradorCarritoDto, @CurrentUser() user: JwtPayloadUser) {
+    return this.posService.guardarBorrador(id, dto, user.tenantId);
+  }
+
+  @Get('turnos/:id/borrador')
+  @Permissions('pos.editar')
+  obtenerBorrador(@Param('id') id: string) {
+    return this.posService.obtenerBorrador(id);
+  }
+
+  @Delete('turnos/:id/borrador')
+  @Permissions('pos.editar')
+  eliminarBorrador(@Param('id') id: string) {
+    return this.posService.eliminarBorrador(id);
   }
 
   // "Mensaje a cajas" (ítem J-3) — GET sin permiso más restrictivo que

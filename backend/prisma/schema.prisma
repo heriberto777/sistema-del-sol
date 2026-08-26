@@ -18,84 +18,85 @@ enum EstadoTenant {
 }
 
 model Tenant {
-  id        String       @id @default(uuid())
-  nombre    String
-  rnc       String?
-  subdominio String      @unique
-  estado    EstadoTenant @default(ACTIVO)
+  id                   String               @id @default(uuid())
+  nombre               String
+  rnc                  String?
+  subdominio           String               @unique
+  estado               EstadoTenant         @default(ACTIVO)
   // Qué módulos tiene disponibles este tenant — ver ModuloActivoGuard.
   // Nullable a propósito: un tenant recién creado sin plan asignado cae
   // al fallback "denegar" del guard hasta que plataforma le asigne uno
   // (los tenants ya existentes se backfillean a un plan al migrar).
-  planId    String?
-  plan      Plan?        @relation(fields: [planId], references: [id])
+  planId               String?
+  plan                 Plan?                @relation(fields: [planId], references: [id])
   // Ver ModalidadFacturacion — vive acá (no en TenantSettings) porque a
   // diferencia de esa tabla, Tenant siempre tiene una fila garantizada
   // desde su creación (TenantSettings hoy no se crea en ningún flujo).
   modalidadFacturacion ModalidadFacturacion @default(NCF)
-  createdAt DateTime     @default(now())
-  updatedAt DateTime     @updatedAt
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
 
-  settings      TenantSettings?
-  configuraciones Configuracion[]
-  modulosOverride TenantModuloOverride[]
-  users         User[]
-  roles         Role[]
-  auditLogs     AuditLog[]
-  facturas      Factura[]
-  ncfAsignados  NcfAsignado[]
-  correlativos  Correlativo[]
-  productos     Producto[]
-  categorias    Categoria[]
-  variantesProducto VarianteProducto[]
-  atributos     Atributo[]
-  bodegas       Bodega[]
-  sucursales    Sucursal[]
-  movimientosInventario MovimientoInventario[]
-  clientes      Cliente[]
-  categoriasCliente CategoriaCliente[]
-  feriados      Feriado[]
-  puestos       Puesto[]
-  leyesFiscales LeyFiscal[]
-  plantillasHorario PlantillaHorario[]
-  tiposAusenciaConfig TipoAusenciaConfig[]
-  codigosAutorizacion CodigoAutorizacion[]
-  comisionesVenta ComisionVenta[]
-  configuracionLealtad ConfiguracionLealtad?
-  movimientosLealtad MovimientoLealtad[]
-  cajas         Caja[]
-  tasasCambio   TasaCambio[]
-  proveedores   Proveedor[]
-  ordenesCompra OrdenCompra[]
-  webhooks      Webhook[]
-  notificaciones Notificacion[]
-  plantillasNotificacion NotificacionPlantilla[]
-  ofertas       Oferta[]
-  bonos         Bono[]
-  lotes         Lote[]
-  cotizaciones  Cotizacion[]
-  remisiones    Remision[]
-  cuentasContables  CuentaContable[]
-  asientosContables AsientoContable[]
+  settings                  TenantSettings?
+  configuraciones           Configuracion[]
+  modulosOverride           TenantModuloOverride[]
+  users                     User[]
+  roles                     Role[]
+  auditLogs                 AuditLog[]
+  facturas                  Factura[]
+  ncfAsignados              NcfAsignado[]
+  correlativos              Correlativo[]
+  productos                 Producto[]
+  categorias                Categoria[]
+  variantesProducto         VarianteProducto[]
+  atributos                 Atributo[]
+  bodegas                   Bodega[]
+  sucursales                Sucursal[]
+  movimientosInventario     MovimientoInventario[]
+  clientes                  Cliente[]
+  categoriasCliente         CategoriaCliente[]
+  feriados                  Feriado[]
+  puestos                   Puesto[]
+  leyesFiscales             LeyFiscal[]
+  plantillasHorario         PlantillaHorario[]
+  tiposAusenciaConfig       TipoAusenciaConfig[]
+  codigosAutorizacion       CodigoAutorizacion[]
+  comisionesVenta           ComisionVenta[]
+  configuracionLealtad      ConfiguracionLealtad?
+  movimientosLealtad        MovimientoLealtad[]
+  cajas                     Caja[]
+  tasasCambio               TasaCambio[]
+  proveedores               Proveedor[]
+  ordenesCompra             OrdenCompra[]
+  webhooks                  Webhook[]
+  notificaciones            Notificacion[]
+  plantillasNotificacion    NotificacionPlantilla[]
+  ofertas                   Oferta[]
+  bonos                     Bono[]
+  lotes                     Lote[]
+  cotizaciones              Cotizacion[]
+  remisiones                Remision[]
+  cuentasContables          CuentaContable[]
+  asientosContables         AsientoContable[]
   periodosContablesCerrados PeriodoContableCerrado[]
-  empleados     Empleado[]
-  periodosNomina PeriodoNomina[]
-  turnosCaja    TurnoCaja[]
-  pagos         Pago[]
-  formasPago    FormaPago[]
-  listasPrecio  ListaPrecio[]
-  cuentasBancarias CuentaBancaria[]
-  gastosMenores GastoMenor[]
-  horariosEmpleado HorarioEmpleado[]
-  registrosAsistencia RegistroAsistencia[]
-  ausencias     Ausencia[]
-  suscripcion   Suscripcion?
-  facturasPlataforma FacturaPlataforma[]
-  ventasAparcadas VentaAparcada[]
-  whatsappConfig WhatsappConfigTenant?
-  whatsappMensajes WhatsappMensaje[]
-  pasarelaConfig PasarelaConfigTenant?
-  sesionesCobroFactura SesionCobroFactura[]
+  empleados                 Empleado[]
+  periodosNomina            PeriodoNomina[]
+  turnosCaja                TurnoCaja[]
+  pagos                     Pago[]
+  formasPago                FormaPago[]
+  listasPrecio              ListaPrecio[]
+  cuentasBancarias          CuentaBancaria[]
+  gastosMenores             GastoMenor[]
+  horariosEmpleado          HorarioEmpleado[]
+  registrosAsistencia       RegistroAsistencia[]
+  ausencias                 Ausencia[]
+  suscripcion               Suscripcion?
+  facturasPlataforma        FacturaPlataforma[]
+  ventasAparcadas           VentaAparcada[]
+  carritosBorrador          CarritoBorrador[]
+  whatsappConfig            WhatsappConfigTenant?
+  whatsappMensajes          WhatsappMensaje[]
+  pasarelaConfig            PasarelaConfigTenant?
+  sesionesCobroFactura      SesionCobroFactura[]
 
   @@map("tenants")
 }
@@ -105,18 +106,18 @@ model Tenant {
 // tenants. Login y JWT separados de los usuarios de tenant (ver
 // src/platform-auth/).
 model PlatformAdmin {
-  id                      String    @id @default(uuid())
-  email                   String    @unique
-  passwordHash            String
-  nombre                  String
-  activo                  Boolean   @default(true)
-  resetPasswordTokenHash  String?
-  resetPasswordExpiraEn   DateTime?
-  createdAt               DateTime  @default(now())
-  roleId                  String?
-  role                    PlatformRole? @relation(fields: [roleId], references: [id])
+  id                     String        @id @default(uuid())
+  email                  String        @unique
+  passwordHash           String
+  nombre                 String
+  activo                 Boolean       @default(true)
+  resetPasswordTokenHash String?
+  resetPasswordExpiraEn  DateTime?
+  createdAt              DateTime      @default(now())
+  roleId                 String?
+  role                   PlatformRole? @relation(fields: [roleId], references: [id])
 
-  auditLogs PlatformAuditLog[]
+  auditLogs                  PlatformAuditLog[]
   pagosPlataformaRegistrados PagoPlataforma[]
 
   @@map("platform_admins")
@@ -158,20 +159,20 @@ model PlatformRolePermission {
 
 // Datos estructurados de integración/config por tenant (MSSQL, canales habilitados, moneda)
 model TenantSettings {
-  id                  String  @id @default(uuid())
-  tenantId            String  @unique
-  tenant              Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  moneda              String  @default("DOP")
-  timezone            String  @default("America/Santo_Domingo")
-  emailHabilitado     Boolean @default(true)
-  smsHabilitado       Boolean @default(false)
-  mssqlHabilitado     Boolean @default(false)
-  mssqlHost           String?
-  mssqlPort           Int?
-  mssqlDatabase       String?
-  mssqlUserEncrypted  String?
+  id                     String   @id @default(uuid())
+  tenantId               String   @unique
+  tenant                 Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  moneda                 String   @default("DOP")
+  timezone               String   @default("America/Santo_Domingo")
+  emailHabilitado        Boolean  @default(true)
+  smsHabilitado          Boolean  @default(false)
+  mssqlHabilitado        Boolean  @default(false)
+  mssqlHost              String?
+  mssqlPort              Int?
+  mssqlDatabase          String?
+  mssqlUserEncrypted     String?
   mssqlPasswordEncrypted String?
-  updatedAt           DateTime @updatedAt
+  updatedAt              DateTime @updatedAt
 
   @@map("tenant_settings")
 }
@@ -215,8 +216,8 @@ model Plan {
   cicloFacturacion CicloFacturacion @default(MENSUAL)
   createdAt        DateTime         @default(now())
 
-  modulos PlanModulo[]
-  tenants Tenant[]
+  modulos       PlanModulo[]
+  tenants       Tenant[]
   suscripciones Suscripcion[]
 
   @@map("planes")
@@ -320,7 +321,7 @@ model FacturaPlataforma {
   createdAt        DateTime                @default(now())
   updatedAt        DateTime                @updatedAt
 
-  pagos PagoPlataforma[]
+  pagos  PagoPlataforma[]
   lineas FacturaPlataformaLinea[]
 
   @@map("facturas_plataforma")
@@ -431,24 +432,24 @@ model User {
   createdAt              DateTime  @default(now())
   updatedAt              DateTime  @updatedAt
 
-  roles         UserRole[]
-  auditLogs     AuditLog[]
-  facturasVendedor Factura[] @relation("FacturaVendedor")
-  movimientosInventario MovimientoInventario[]
-  ordenesCompra OrdenCompra[]
-  cotizaciones  Cotizacion[]
-  remisiones    Remision[]
-  turnosCaja    TurnoCaja[]
-  turnosCajaCerrados TurnoCaja[] @relation("TurnoCajaCerradoPor")
-  turnosCajaRevisados TurnoCaja[] @relation("TurnoCajaRevisadoPor")
-  pagos         Pago[]
+  roles                          UserRole[]
+  auditLogs                      AuditLog[]
+  facturasVendedor               Factura[]              @relation("FacturaVendedor")
+  movimientosInventario          MovimientoInventario[]
+  ordenesCompra                  OrdenCompra[]
+  cotizaciones                   Cotizacion[]
+  remisiones                     Remision[]
+  turnosCaja                     TurnoCaja[]
+  turnosCajaCerrados             TurnoCaja[]            @relation("TurnoCajaCerradoPor")
+  turnosCajaRevisados            TurnoCaja[]            @relation("TurnoCajaRevisadoPor")
+  pagos                          Pago[]
   // Nullable: no todo User de sistema tiene un Empleado de nómina asociado
   // (ej. un Admin Total que no está en planilla).
-  empleado      Empleado?
-  ausenciasSolicitadas Ausencia[] @relation("AusenciaSolicitadaPor")
-  ausenciasAprobadas   Ausencia[] @relation("AusenciaAprobadaPor")
-  asistenciasAprobadas RegistroAsistencia[] @relation("AsistenciaAprobadaPor")
-  sucursales    UsuarioSucursal[]
+  empleado                       Empleado?
+  ausenciasSolicitadas           Ausencia[]             @relation("AusenciaSolicitadaPor")
+  ausenciasAprobadas             Ausencia[]             @relation("AusenciaAprobadaPor")
+  asistenciasAprobadas           RegistroAsistencia[]   @relation("AsistenciaAprobadaPor")
+  sucursales                     UsuarioSucursal[]
   codigosAutorizacionSolicitados CodigoAutorizacion[]
 
   @@unique([tenantId, email])
@@ -456,14 +457,14 @@ model User {
 }
 
 model Role {
-  id          String   @id @default(uuid())
+  id          String  @id @default(uuid())
   tenantId    String
-  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant      Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   nombre      String
   descripcion String?
-  esSistema   Boolean  @default(false)
+  esSistema   Boolean @default(false)
 
-  permisos UserRole[] @relation("RoleUserRole")
+  permisos        UserRole[]       @relation("RoleUserRole")
   rolePermissions RolePermission[]
 
   @@unique([tenantId, nombre])
@@ -472,8 +473,8 @@ model Role {
 
 // Catálogo global de permisos, ej: "facturacion.crear", "inventario.ajustar"
 model Permission {
-  id          String @id @default(uuid())
-  clave       String @unique
+  id          String  @id @default(uuid())
+  clave       String  @unique
   descripcion String?
 
   roles RolePermission[]
@@ -522,15 +523,15 @@ model AuditLog {
 /// Bitácora de acciones del super admin de plataforma (crear/suspender
 /// tenants, etc.) — separada de AuditLog porque no tiene tenantId.
 model PlatformAuditLog {
-  id            String        @id @default(uuid())
-  adminId       String?
-  admin         PlatformAdmin? @relation(fields: [adminId], references: [id], onDelete: SetNull)
-  accion        String
-  entidad       String
-  entidadId     String?
-  despues       Json?
-  ip            String?
-  createdAt     DateTime      @default(now())
+  id        String         @id @default(uuid())
+  adminId   String?
+  admin     PlatformAdmin? @relation(fields: [adminId], references: [id], onDelete: SetNull)
+  accion    String
+  entidad   String
+  entidadId String?
+  despues   Json?
+  ip        String?
+  createdAt DateTime       @default(now())
 
   @@index([entidad, entidadId])
   @@map("platform_audit_logs")
@@ -637,20 +638,20 @@ model Correlativo {
 /// usa sus propias credenciales tenant-scoped vía
 /// `enviarWhatsappTwilio()` (`common/utils/twilio-whatsapp.util.ts`).
 model WhatsappConfigTenant {
-  id                     String   @id @default(uuid())
-  tenantId               String   @unique
-  tenant                 Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  habilitado             Boolean  @default(false)
-  twilioAccountSid       String?
-  twilioAuthTokenCifrado String?
+  id                      String   @id @default(uuid())
+  tenantId                String   @unique
+  tenant                  Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  habilitado              Boolean  @default(false)
+  twilioAccountSid        String?
+  twilioAuthTokenCifrado  String?
   // @unique: es la clave para resolver a qué tenant pertenece un
   // webhook entrante de Twilio (ver WhatsappWebhookController) — antes
   // de H-2b no tenía índice porque nadie lo consultaba por valor.
-  twilioWhatsappFrom     String?  @unique
-  iaProveedor            String?
-  iaModelo               String?
-  iaApiKeyCifrado        String?
-  historialMensajes      Int      @default(10)
+  twilioWhatsappFrom      String?  @unique
+  iaProveedor             String?
+  iaModelo                String?
+  iaApiKeyCifrado         String?
+  historialMensajes       Int      @default(10)
   // Texto libre del tenant (horario, dirección, tono) — se antepone al
   // scaffolding fijo del prompt de sistema (JSON de respuesta +
   // guardrail de no inventar datos reales), nunca lo reemplaza — ver
@@ -659,8 +660,8 @@ model WhatsappConfigTenant {
   // Tope de respuestas de IA por día calendario de RD (WhatsappMensaje.diaRD)
   // — al llegar acá, se responde un mensaje fijo sin llamar a la IA.
   limiteRespuestasDiarias Int      @default(50)
-  createdAt              DateTime @default(now())
-  updatedAt              DateTime @updatedAt
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
 
   @@map("whatsapp_config_tenant")
 }
@@ -674,8 +675,8 @@ model WhatsappMensaje {
   id                     String   @id @default(uuid())
   tenantId               String
   tenant                 Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  telefono               String   // remitente tal cual lo manda Twilio (whatsapp:+...)
-  rol                    String   // 'USUARIO' | 'ASISTENTE' | 'HUMANO' (staff respondiendo desde la bandeja)
+  telefono               String // remitente tal cual lo manda Twilio (whatsapp:+...)
+  rol                    String // 'USUARIO' | 'ASISTENTE' | 'HUMANO' (staff respondiendo desde la bandeja)
   contenido              String
   requiereAtencionHumana Boolean  @default(false)
   atendido               Boolean  @default(false)
@@ -696,20 +697,20 @@ model WhatsappMensaje {
 /// PlataformaConfiguracion, que junta SMTP/Twilio/Stripe en una fila
 /// única) en vez de dos tablas separadas.
 model PasarelaConfigTenant {
-  id                      String   @id @default(uuid())
-  tenantId                String   @unique
-  tenant                  Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  pasarelaActiva          String?  // 'AZUL' | 'CARDNET' | null
+  id             String  @id @default(uuid())
+  tenantId       String  @unique
+  tenant         Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  pasarelaActiva String? // 'AZUL' | 'CARDNET' | null
 
   // Página de Pagos AZUL usa una sola AuthKey entregada al afiliarse (no
   // Auth1/Auth2 — esos campos son de su API SOAP de Webservices, que no
   // es la que se implementa acá). CurrencyCode también lo asigna AZUL
   // por comercio (no es un código ISO 4217 genérico) — ver
   // ARCHITECTURE.md/PDF oficial "Página de Pagos".
-  azulMerchantId          String?
-  azulMerchantName        String?
-  azulCurrencyCode        String?  @default("$")
-  azulAuthKeyCifrado      String?
+  azulMerchantId     String?
+  azulMerchantName   String?
+  azulCurrencyCode   String? @default("$")
+  azulAuthKeyCifrado String?
 
   // "Botón de Pago — Web con Pantalla" de CardNet NO usa clave de firma —
   // autentica con TLS 1.2 + el par MerchantNumber/MerchantTerminal
@@ -718,15 +719,15 @@ model PasarelaConfigTenant {
   // AZUL, que sí firma con AuthHash). MerchantType (código de categoría
   // de comercio) y AcquiringInstitutionCode también los asigna CardNet
   // por comercio, no son constantes genéricas.
-  cardnetMerchantNumber        String?
-  cardnetMerchantTerminal      String?
-  cardnetMerchantTerminalAmex  String?
-  cardnetMerchantName          String?
-  cardnetMerchantType          String?
+  cardnetMerchantNumber           String?
+  cardnetMerchantTerminal         String?
+  cardnetMerchantTerminalAmex     String?
+  cardnetMerchantName             String?
+  cardnetMerchantType             String?
   cardnetAcquiringInstitutionCode String?
 
-  createdAt               DateTime @default(now())
-  updatedAt               DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("pasarela_config_tenant")
 }
@@ -744,10 +745,10 @@ model SesionCobroFactura {
   tenantId          String
   tenant            Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   facturaId         String
-  pasarela          String   // 'AZUL' | 'CARDNET'
-  referenciaExterna String   // OrderNumber (Azul) o session id (CardNet)
+  pasarela          String // 'AZUL' | 'CARDNET'
+  referenciaExterna String // OrderNumber (Azul) o session id (CardNet)
   monto             Decimal  @db.Decimal(14, 2)
-  datosVerificacion String?  // ej. sk de CardNet, cifrado — null para Azul
+  datosVerificacion String? // ej. sk de CardNet, cifrado — null para Azul
   estado            String   @default("PENDIENTE") // PENDIENTE | CONFIRMADO | RECHAZADO
   pagoId            String?
   createdAt         DateTime @default(now())
@@ -759,45 +760,45 @@ model SesionCobroFactura {
 }
 
 model NcfAsignado {
-  id               String    @id @default(uuid())
-  tenantId         String
-  tenant           Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  tipoNcf          TipoNcf
-  sucursalId       String?
-  sucursal         Sucursal? @relation(fields: [sucursalId], references: [id], onDelete: SetNull)
-  secuenciaActual  Int
-  secuenciaFinal   Int
-  vigenciaHasta    DateTime
-  umbralAlerta     Int?
-  activo           Boolean   @default(true)
+  id              String    @id @default(uuid())
+  tenantId        String
+  tenant          Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tipoNcf         TipoNcf
+  sucursalId      String?
+  sucursal        Sucursal? @relation(fields: [sucursalId], references: [id], onDelete: SetNull)
+  secuenciaActual Int
+  secuenciaFinal  Int
+  vigenciaHasta   DateTime
+  umbralAlerta    Int?
+  activo          Boolean   @default(true)
 
   @@unique([tenantId, tipoNcf, sucursalId])
   @@map("ncf_asignados")
 }
 
 model Factura {
-  id              String        @id @default(uuid())
-  tenantId        String
-  tenant          Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  clienteId       String
-  cliente         Cliente       @relation(fields: [clienteId], references: [id])
-  vendedorId      String
-  vendedor        User          @relation("FacturaVendedor", fields: [vendedorId], references: [id])
+  id                 String        @id @default(uuid())
+  tenantId           String
+  tenant             Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  clienteId          String
+  cliente            Cliente       @relation(fields: [clienteId], references: [id])
+  vendedorId         String
+  vendedor           User          @relation("FacturaVendedor", fields: [vendedorId], references: [id])
   // Nullable porque las facturas creadas antes de esta columna no lo tienen;
   // sin esto no hay forma de saber a qué bodega devolver stock al anular.
-  bodegaId        String?
-  bodega          Bodega?       @relation(fields: [bodegaId], references: [id])
-  ncf             String?
-  tipoNcf         TipoNcf?
-  tipoFactura     TipoFactura
-  estado          EstadoFactura @default(BORRADOR)
-  motivoAnulacion String?
-  motivoNota      String?
-  fecha           DateTime      @default(now())
-  subtotal        Decimal       @db.Decimal(14, 2)
-  descuento       Decimal       @default(0) @db.Decimal(14, 2)
-  itbis           Decimal       @db.Decimal(14, 2)
-  total           Decimal       @db.Decimal(14, 2)
+  bodegaId           String?
+  bodega             Bodega?       @relation(fields: [bodegaId], references: [id])
+  ncf                String?
+  tipoNcf            TipoNcf?
+  tipoFactura        TipoFactura
+  estado             EstadoFactura @default(BORRADOR)
+  motivoAnulacion    String?
+  motivoNota         String?
+  fecha              DateTime      @default(now())
+  subtotal           Decimal       @db.Decimal(14, 2)
+  descuento          Decimal       @default(0) @db.Decimal(14, 2)
+  itbis              Decimal       @db.Decimal(14, 2)
+  total              Decimal       @db.Decimal(14, 2)
   // Ítem C-2 (multi-moneda) — `subtotal`/`itbis`/`total` de arriba SIGUEN
   // siendo siempre DOP (nunca cambian de significado, cero riesgo para
   // NCF/contabilidad/reportes/pagos, que ya los leen así). `moneda`
@@ -806,44 +807,44 @@ model Factura {
   // (equivalente en esa moneda, solo para mostrar al cliente en el
   // documento impreso) son PURAMENTE de presentación — ver
   // ARCHITECTURE.md.
-  moneda          String        @default("DOP")
-  tasaCambio      Decimal?      @db.Decimal(14, 6)
-  subtotalMoneda  Decimal?      @db.Decimal(14, 2)
-  itbisMoneda     Decimal?      @db.Decimal(14, 2)
-  totalMoneda     Decimal?      @db.Decimal(14, 2)
-  plazoPagoDias   Int           @default(30)
-  pagada          Boolean       @default(false)
-  fechaPago       DateTime?
-  facturaOrigenId String?
-  facturaOrigen   Factura?      @relation("FacturaOrigenNota", fields: [facturaOrigenId], references: [id])
-  notasRelacionadas Factura[]   @relation("FacturaOrigenNota")
+  moneda             String        @default("DOP")
+  tasaCambio         Decimal?      @db.Decimal(14, 6)
+  subtotalMoneda     Decimal?      @db.Decimal(14, 2)
+  itbisMoneda        Decimal?      @db.Decimal(14, 2)
+  totalMoneda        Decimal?      @db.Decimal(14, 2)
+  plazoPagoDias      Int           @default(30)
+  pagada             Boolean       @default(false)
+  fechaPago          DateTime?
+  facturaOrigenId    String?
+  facturaOrigen      Factura?      @relation("FacturaOrigenNota", fields: [facturaOrigenId], references: [id])
+  notasRelacionadas  Factura[]     @relation("FacturaOrigenNota")
   // Solo lo llenan las ventas de POS (ver PosService.registrarVenta) — el resto de
   // flujos de facturación (venta normal, conversión de cotización/remisión) los deja null.
   // FormaPago (catálogo configurable por tenant, ver formas-pago/) reemplazó al enum
   // MetodoPago acá — ese enum sigue existiendo solo para PagoPlataforma (plataforma).
-  formaPagoId     String?
-  formaPago       FormaPago?    @relation(fields: [formaPagoId], references: [id])
+  formaPagoId        String?
+  formaPago          FormaPago?    @relation(fields: [formaPagoId], references: [id])
   // Solo aplica si formaPago.requiereReferencia — nro. de cheque, confirmación de
   // transferencia, etc. Sin relación con `ncf`.
-  referenciaPago  String?
-  turnoCajaId     String?
+  referenciaPago     String?
+  turnoCajaId        String?
   // SetNull (no Cascade): si el turno se borra, la factura (documento fiscal) debe
   // sobrevivir siempre — solo se pierde el vínculo con el turno de caja.
-  turnoCaja       TurnoCaja?    @relation(fields: [turnoCajaId], references: [id], onDelete: SetNull)
+  turnoCaja          TurnoCaja?    @relation(fields: [turnoCajaId], references: [id], onDelete: SetNull)
   // Empleado (cargo "Vendedor" en Nómina) acreditado por comisión en la venta —
   // distinto de `vendedorId` (User, quien la registra/cobra). Solo lo llenan
   // ventas de POS que eligen un vendedor (F2) — ver PosService.registrarVenta.
   vendedorEmpleadoId String?
-  vendedorEmpleado   Empleado?  @relation(fields: [vendedorEmpleadoId], references: [id], onDelete: SetNull)
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  vendedorEmpleado   Empleado?     @relation(fields: [vendedorEmpleadoId], references: [id], onDelete: SetNull)
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
 
-  lineas LineaFactura[]
-  cotizacionOrigen Cotizacion?
-  remisionOrigen   Remision?
-  pagos            Pago[]
-  pagosVenta       PagoVenta[]
-  comisiones       ComisionVenta[]
+  lineas             LineaFactura[]
+  cotizacionOrigen   Cotizacion?
+  remisionOrigen     Remision?
+  pagos              Pago[]
+  pagosVenta         PagoVenta[]
+  comisiones         ComisionVenta[]
   movimientosLealtad MovimientoLealtad[]
 
   @@unique([tenantId, ncf])
@@ -852,30 +853,30 @@ model Factura {
 }
 
 model LineaFactura {
-  id                String  @id @default(uuid())
-  facturaId         String
-  factura           Factura @relation(fields: [facturaId], references: [id], onDelete: Cascade)
-  productoId        String
-  producto          Producto @relation(fields: [productoId], references: [id])
+  id              String           @id @default(uuid())
+  facturaId       String
+  factura         Factura          @relation(fields: [facturaId], references: [id], onDelete: Cascade)
+  productoId      String
+  producto        Producto         @relation(fields: [productoId], references: [id])
   // Fase 3c, incremento 3: la variante realmente vendida — necesaria para
   // que anular() reintegre stock a la MISMA variante, no a "la que sea".
   // Restrict (no Cascade): perder esto sería perder a qué variante
   // corresponde una línea fiscal ya emitida.
-  varianteId        String
-  variante          VarianteProducto @relation(fields: [varianteId], references: [id])
-  cantidad          Decimal @db.Decimal(14, 4)
-  precioUnitario    Decimal @db.Decimal(14, 4)
-  porcentajeItbis   Decimal @db.Decimal(5, 2)
-  descuento         Decimal @default(0) @db.Decimal(14, 2)
-  montoItbis        Decimal @db.Decimal(14, 2)
-  montoTotal        Decimal @db.Decimal(14, 2)
+  varianteId      String
+  variante        VarianteProducto @relation(fields: [varianteId], references: [id])
+  cantidad        Decimal          @db.Decimal(14, 4)
+  precioUnitario  Decimal          @db.Decimal(14, 4)
+  porcentajeItbis Decimal          @db.Decimal(5, 2)
+  descuento       Decimal          @default(0) @db.Decimal(14, 2)
+  montoItbis      Decimal          @db.Decimal(14, 2)
+  montoTotal      Decimal          @db.Decimal(14, 2)
   // Ítem A-1 — false solo cuando el descuento automático de esta línea
   // vino de una Oferta con `pagaComision: false` (decisión "todo o nada":
   // si alguna oferta ganadora no paga comisión, la línea entera no genera
   // comisión). true por default: sin oferta, o con descuento manual, la
   // línea sí genera comisión normalmente. Ver
   // OfertasService.resolverDescuentoLineaConComision.
-  pagaComision      Boolean @default(true)
+  pagaComision    Boolean          @default(true)
 
   @@map("linea_factura")
 }
@@ -922,25 +923,25 @@ model Cotizacion {
 }
 
 model LineaCotizacion {
-  id              String     @id @default(uuid())
+  id              String           @id @default(uuid())
   cotizacionId    String
-  cotizacion      Cotizacion @relation(fields: [cotizacionId], references: [id], onDelete: Cascade)
+  cotizacion      Cotizacion       @relation(fields: [cotizacionId], references: [id], onDelete: Cascade)
   productoId      String
   // Cascade (a diferencia de LineaFactura, que preserva historial fiscal):
   // una cotización no es un documento fiscal, y sin esto un borrado en
   // cascada del tenant puede fallar por una carrera en el orden en que
   // Postgres resuelve las cascadas de "productos" vs. "cotizaciones".
-  producto        Producto   @relation(fields: [productoId], references: [id], onDelete: Cascade)
+  producto        Producto         @relation(fields: [productoId], references: [id], onDelete: Cascade)
   // Ver el comentario equivalente en LineaFactura.varianteId — se propaga
   // sin cambios al convertir la cotización en factura.
   varianteId      String
   variante        VarianteProducto @relation(fields: [varianteId], references: [id])
-  cantidad        Decimal    @db.Decimal(14, 4)
-  precioUnitario  Decimal    @db.Decimal(14, 4)
-  porcentajeItbis Decimal    @db.Decimal(5, 2)
-  descuento       Decimal    @default(0) @db.Decimal(14, 2)
-  montoItbis      Decimal    @db.Decimal(14, 2)
-  montoTotal      Decimal    @db.Decimal(14, 2)
+  cantidad        Decimal          @db.Decimal(14, 4)
+  precioUnitario  Decimal          @db.Decimal(14, 4)
+  porcentajeItbis Decimal          @db.Decimal(5, 2)
+  descuento       Decimal          @default(0) @db.Decimal(14, 2)
+  montoItbis      Decimal          @db.Decimal(14, 2)
+  montoTotal      Decimal          @db.Decimal(14, 2)
 
   @@map("linea_cotizacion")
 }
@@ -983,16 +984,16 @@ model Remision {
 }
 
 model LineaRemision {
-  id         String   @id @default(uuid())
+  id         String           @id @default(uuid())
   remisionId String
-  remision   Remision @relation(fields: [remisionId], references: [id], onDelete: Cascade)
+  remision   Remision         @relation(fields: [remisionId], references: [id], onDelete: Cascade)
   productoId String
   // Ver comentario equivalente en LineaCotizacion.producto.
-  producto   Producto @relation(fields: [productoId], references: [id], onDelete: Cascade)
+  producto   Producto         @relation(fields: [productoId], references: [id], onDelete: Cascade)
   // Ver el comentario equivalente en LineaFactura.varianteId.
   varianteId String
   variante   VarianteProducto @relation(fields: [varianteId], references: [id])
-  cantidad   Decimal  @db.Decimal(14, 4)
+  cantidad   Decimal          @db.Decimal(14, 4)
 
   @@map("linea_remision")
 }
@@ -1020,20 +1021,20 @@ enum NaturalezaCuenta {
 }
 
 model CuentaContable {
-  id            String              @id @default(uuid())
+  id            String             @id @default(uuid())
   tenantId      String
-  tenant        Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant        Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   codigo        String
   nombre        String
   tipo          TipoCuentaContable
   naturaleza    NaturalezaCuenta
   cuentaPadreId String?
-  cuentaPadre   CuentaContable?     @relation("JerarquiaCuenta", fields: [cuentaPadreId], references: [id])
-  subcuentas    CuentaContable[]    @relation("JerarquiaCuenta")
-  activa        Boolean             @default(true)
-  createdAt     DateTime            @default(now())
+  cuentaPadre   CuentaContable?    @relation("JerarquiaCuenta", fields: [cuentaPadreId], references: [id])
+  subcuentas    CuentaContable[]   @relation("JerarquiaCuenta")
+  activa        Boolean            @default(true)
+  createdAt     DateTime           @default(now())
 
-  lineasAsiento LineaAsiento[]
+  lineasAsiento    LineaAsiento[]
   cuentasBancarias CuentaBancaria[]
   lineasGastoMenor LineaGastoMenor[]
 
@@ -1137,18 +1138,18 @@ model LineaGastoMenor {
 }
 
 model AsientoContable {
-  id       String        @id @default(uuid())
-  tenantId String
-  tenant   Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  numero   Int
-  fecha    DateTime      @default(now())
-  concepto String
-  origen   OrigenAsiento
-  origenId String?
-  anulado  Boolean       @default(false)
-  createdAt DateTime     @default(now())
+  id        String        @id @default(uuid())
+  tenantId  String
+  tenant    Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  numero    Int
+  fecha     DateTime      @default(now())
+  concepto  String
+  origen    OrigenAsiento
+  origenId  String?
+  anulado   Boolean       @default(false)
+  createdAt DateTime      @default(now())
 
-  lineas LineaAsiento[]
+  lineas         LineaAsiento[]
   periodoCerrado PeriodoContableCerrado?
 
   @@unique([tenantId, numero])
@@ -1228,9 +1229,9 @@ enum EstadoPeriodoNomina {
 }
 
 model Empleado {
-  id                  String        @id @default(uuid())
+  id                  String            @id @default(uuid())
   tenantId            String
-  tenant              Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant              Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   nombre              String
   cedula              String
   cargo               String
@@ -1241,7 +1242,7 @@ model Empleado {
   // se toca, para no romper esa búsqueda. `puestoId` es un filtro/
   // clasificación adicional, opcional.
   puestoId            String?
-  puesto              Puesto?       @relation(fields: [puestoId], references: [id], onDelete: SetNull)
+  puesto              Puesto?           @relation(fields: [puestoId], references: [id], onDelete: SetNull)
   // Plantilla de horario reutilizable (plan de integración Cuadre, ítem
   // G-1) — referencia VIVA (decisión explícita del usuario): editar la
   // plantilla se propaga automáticamente a todos los empleados
@@ -1254,23 +1255,24 @@ model Empleado {
   departamento        String?
   fechaIngreso        DateTime
   fechaSalida         DateTime?
-  salarioBrutoMensual Decimal       @db.Decimal(14, 2)
-  tipoContrato        TipoContrato  @default(INDEFINIDO)
-  activo              Boolean       @default(true)
+  salarioBrutoMensual Decimal           @db.Decimal(14, 2)
+  tipoContrato        TipoContrato      @default(INDEFINIDO)
+  activo              Boolean           @default(true)
   email               String?
   telefono            String?
-  createdAt           DateTime      @default(now())
+  createdAt           DateTime          @default(now())
   // Nullable + único: no todo empleado necesita login (ej. personal de
   // bodega sin acceso al sistema); habilita el check-in/check-out de
   // autoservicio (RegistroAsistencia) resolviendo req.user.userId -> este
   // campo. onDelete SetNull: borrar el User no debe borrar el historial
   // de nómina del empleado.
-  userId              String?       @unique
-  user                User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+  userId              String?           @unique
+  user                User?             @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   recibos             ReciboNomina[]
   ventasComoVendedor  Factura[]
   ventasAparcadas     VentaAparcada[]
+  carritosBorrador    CarritoBorrador[]
   horarios            HorarioEmpleado[]
   registrosAsistencia RegistroAsistencia[]
   ausencias           Ausencia[]
@@ -1326,12 +1328,12 @@ model PlantillaHorarioDia {
 /// Catálogo de puestos por tenant (plan de integración Cuadre, ítem
 /// G-8) — tenant-scoped, plano (sin jerarquía). Ver Empleado.puestoId.
 model Puesto {
-  id        String     @id @default(uuid())
+  id        String   @id @default(uuid())
   tenantId  String
-  tenant    Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   nombre    String
-  activo    Boolean    @default(true)
-  createdAt DateTime   @default(now())
+  activo    Boolean  @default(true)
+  createdAt DateTime @default(now())
 
   empleados Empleado[]
 
@@ -1386,15 +1388,15 @@ model HorarioEmpleado {
 /// Docker. `tardanza` se calcula una sola vez al marcar la entrada,
 /// comparando contra `HorarioEmpleado` del día correspondiente.
 model RegistroAsistencia {
-  id          String    @id @default(uuid())
-  tenantId    String
-  tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  empleadoId  String
-  empleado    Empleado  @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
-  fecha       DateTime
-  horaEntrada String?
-  horaSalida  String?
-  tardanza    Boolean   @default(false)
+  id               String           @id @default(uuid())
+  tenantId         String
+  tenant           Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  empleadoId       String
+  empleado         Empleado         @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+  fecha            DateTime
+  horaEntrada      String?
+  horaSalida       String?
+  tardanza         Boolean          @default(false)
   // Umbral de horas extra + tolerancia de salida anticipada (plan de
   // integración Cuadre, ítem G-4), calculados una sola vez al marcar la
   // salida (o en registrarManual si viene horaSalida) — mismo criterio
@@ -1402,18 +1404,18 @@ model RegistroAsistencia {
   // configurables `Configuracion.ASISTENCIA_UMBRAL_HORAS_EXTRA`/
   // `ASISTENCIA_TOLERANCIA_SALIDA_ANTICIPADA_MIN`. `horasExtra` queda
   // `null` si no se puede calcular (falta horaEntrada u horaSalida).
-  salidaAnticipada Boolean @default(false)
-  horasExtra       Decimal? @db.Decimal(5, 2)
+  salidaAnticipada Boolean          @default(false)
+  horasExtra       Decimal?         @db.Decimal(5, 2)
   // Flujo de aprobación (plan de integración Cuadre, ítem G-3) — mismo
   // patrón que Ausencia.estado/aprobadoPorId/fechaResolucion. Puramente
   // de revisión/auditoría de RRHH: a diferencia de Ausencia, ningún
   // cálculo de nómina lee `estado` (RegistroAsistencia no alimenta
   // PeriodosNominaService, solo Ausencia lo hace) — marcar/aprobar/
   // rechazar no cambia ningún monto pagado.
-  estado          EstadoAsistencia @default(PENDIENTE)
-  aprobadoPorId   String?
-  aprobadoPor     User?            @relation("AsistenciaAprobadaPor", fields: [aprobadoPorId], references: [id], onDelete: Cascade)
-  fechaResolucion DateTime?
+  estado           EstadoAsistencia @default(PENDIENTE)
+  aprobadoPorId    String?
+  aprobadoPor      User?            @relation("AsistenciaAprobadaPor", fields: [aprobadoPorId], references: [id], onDelete: Cascade)
+  fechaResolucion  DateTime?
 
   @@unique([tenantId, empleadoId, fecha])
   @@map("registros_asistencia")
@@ -1529,7 +1531,7 @@ model PeriodoNomina {
   estado      EstadoPeriodoNomina @default(BORRADOR)
   createdAt   DateTime            @default(now())
 
-  recibos     ReciboNomina[]
+  recibos ReciboNomina[]
 
   @@map("periodos_nomina")
 }
@@ -1539,31 +1541,31 @@ model PeriodoNomina {
 /// guardan igual porque son costo laboral real y alimentan el asiento
 /// contable automático (ver NominaEventosService/AsientosContablesService).
 model ReciboNomina {
-  id               String        @id @default(uuid())
-  periodoId        String
-  periodo          PeriodoNomina @relation(fields: [periodoId], references: [id], onDelete: Cascade)
-  empleadoId       String
+  id                 String        @id @default(uuid())
+  periodoId          String
+  periodo            PeriodoNomina @relation(fields: [periodoId], references: [id], onDelete: Cascade)
+  empleadoId         String
   // Cascade: mismo patrón/razón que LineaAsiento.cuentaContable — Tenant ->
   // Empleado y Tenant -> PeriodoNomina -> ReciboNomina son ramas hermanas
   // que compiten al borrar un tenant completo.
-  empleado         Empleado      @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
-  salarioBruto     Decimal       @db.Decimal(14, 2)
-  sfsEmpleado      Decimal       @db.Decimal(14, 2)
-  afpEmpleado      Decimal       @db.Decimal(14, 2)
-  isr              Decimal       @db.Decimal(14, 2)
-  otrasDeducciones Decimal       @default(0) @db.Decimal(14, 2)
+  empleado           Empleado      @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+  salarioBruto       Decimal       @db.Decimal(14, 2)
+  sfsEmpleado        Decimal       @db.Decimal(14, 2)
+  afpEmpleado        Decimal       @db.Decimal(14, 2)
+  isr                Decimal       @db.Decimal(14, 2)
+  otrasDeducciones   Decimal       @default(0) @db.Decimal(14, 2)
   // Descuento por ausencias sin goce de sueldo (Fase 7d de RRHH) — se
   // muestra separado de otrasDeducciones (ese sigue siendo el ajuste
   // manual de siempre) para que quede visible por qué se descontó.
-  descuentoAusencias Decimal     @default(0) @db.Decimal(14, 2)
+  descuentoAusencias Decimal       @default(0) @db.Decimal(14, 2)
   // Monto ya calculado (RD$, no horas) de horas extra registradas en
   // Asistencia dentro del rango del período — ver calculo-nomina.ts.
-  montoHorasExtra  Decimal       @default(0) @db.Decimal(14, 2)
-  salarioNeto      Decimal       @db.Decimal(14, 2)
-  sfsEmpleador     Decimal       @db.Decimal(14, 2)
-  afpEmpleador     Decimal       @db.Decimal(14, 2)
-  infotep          Decimal       @db.Decimal(14, 2)
-  createdAt        DateTime      @default(now())
+  montoHorasExtra    Decimal       @default(0) @db.Decimal(14, 2)
+  salarioNeto        Decimal       @db.Decimal(14, 2)
+  sfsEmpleador       Decimal       @db.Decimal(14, 2)
+  afpEmpleador       Decimal       @db.Decimal(14, 2)
+  infotep            Decimal       @db.Decimal(14, 2)
+  createdAt          DateTime      @default(now())
 
   @@unique([periodoId, empleadoId])
   @@map("recibos_nomina")
@@ -1590,23 +1592,23 @@ enum MetodoPago {
 /// — debería haber como mucho una en `true` por tenant, pero no se fuerza a
 /// nivel de base, se valida en FormasPagoService.
 model FormaPago {
-  id                 String   @id @default(uuid())
+  id                 String         @id @default(uuid())
   tenantId           String
-  tenant             Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant             Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   nombre             String
-  requiereReferencia Boolean  @default(false)
-  esEfectivo         Boolean  @default(false)
+  requiereReferencia Boolean        @default(false)
+  esEfectivo         Boolean        @default(false)
   // Marca la forma de pago "Bono" (Fase 4c) para identificarla en código
   // sin comparar por nombre — mismo criterio que esEfectivo.
   // FacturacionService.crear() usa esto para tratar `PagoVenta.referencia`
   // como el código de un Bono a canjear, en vez de una referencia libre.
-  esBono             Boolean  @default(false)
+  esBono             Boolean        @default(false)
   // Marca la forma de pago "Puntos de Lealtad" (ítem A-3) — mismo
   // criterio que esBono: FacturacionService.crear() usa esto para
   // convertir el monto de esa línea de pago a puntos (vía
   // ConfiguracionLealtad.valorPunto) y descontarlos del saldo del
   // cliente, en vez de tratarlo como un cobro real.
-  esPuntosLealtad    Boolean  @default(false)
+  esPuntosLealtad    Boolean        @default(false)
   // Clasificación estructurada (plan de integración Cuadre, ítem E-11) —
   // puramente informativa/de reporte, nullable (no reemplaza esEfectivo/
   // esBono, que siguen gatillando comportamiento real: arqueo de caja y
@@ -1614,11 +1616,11 @@ model FormaPago {
   // automáticamente una fila con nombre personalizado ya existente — se
   // deja null hasta que un admin la clasifique a mano.
   tipo               TipoFormaPago?
-  activa             Boolean  @default(true)
-  createdAt          DateTime @default(now())
+  activa             Boolean        @default(true)
+  createdAt          DateTime       @default(now())
 
-  facturas  Factura[]
-  pagos     Pago[]
+  facturas   Factura[]
+  pagos      Pago[]
   pagosVenta PagoVenta[]
 
   @@unique([tenantId, nombre])
@@ -1788,41 +1790,42 @@ enum MotivoMovimientoCaja {
 /// vez por bodega (lo valida PosService, no una constraint de DB, porque
 /// "a la vez" depende del estado, no de una combinación de columnas fija).
 model TurnoCaja {
-  id                String          @id @default(uuid())
-  tenantId          String
-  tenant            Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  bodegaId          String
+  id                      String          @id @default(uuid())
+  tenantId                String
+  tenant                  Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  bodegaId                String
   // Cascade: mismo patrón que LineaAsiento.cuentaContable — Tenant -> Bodega
   // y Tenant -> TurnoCaja son ramas hermanas que compiten al borrar el tenant.
-  bodega            Bodega          @relation(fields: [bodegaId], references: [id], onDelete: Cascade)
+  bodega                  Bodega          @relation(fields: [bodegaId], references: [id], onDelete: Cascade)
   // Ítem E-7 — opcional: sin Caja elegida, el turno funciona exactamente
   // igual que antes de este ítem, sin ninguna restricción de catálogo.
-  cajaId            String?
-  caja              Caja?           @relation(fields: [cajaId], references: [id], onDelete: SetNull)
-  cajeroId          String
+  cajaId                  String?
+  caja                    Caja?           @relation(fields: [cajaId], references: [id], onDelete: SetNull)
+  cajeroId                String
   // Cascade por la misma razón (Tenant -> User es otra rama hermana).
-  cajero            User            @relation(fields: [cajeroId], references: [id], onDelete: Cascade)
-  montoInicial      Decimal         @db.Decimal(14, 2)
-  montoFinalContado Decimal?        @db.Decimal(14, 2)
-  montoEsperado     Decimal?        @db.Decimal(14, 2)
-  diferencia        Decimal?        @db.Decimal(14, 2)
-  estado            EstadoTurnoCaja @default(ABIERTO)
-  abiertoEn         DateTime        @default(now())
-  cerradoEn         DateTime?
-  cerradoPorId      String?
+  cajero                  User            @relation(fields: [cajeroId], references: [id], onDelete: Cascade)
+  montoInicial            Decimal         @db.Decimal(14, 2)
+  montoFinalContado       Decimal?        @db.Decimal(14, 2)
+  montoEsperado           Decimal?        @db.Decimal(14, 2)
+  diferencia              Decimal?        @db.Decimal(14, 2)
+  estado                  EstadoTurnoCaja @default(ABIERTO)
+  abiertoEn               DateTime        @default(now())
+  cerradoEn               DateTime?
+  cerradoPorId            String?
   // Cascade por la misma razón que cajeroId (rama hermana Tenant -> User).
   // Nullable + relación nombrada porque ya existe otra relación User->TurnoCaja
   // (cajeroId, sin nombre explícito) — Prisma exige distinguirlas.
-  cerradoPor        User?           @relation("TurnoCajaCerradoPor", fields: [cerradoPorId], references: [id], onDelete: Cascade)
+  cerradoPor              User?           @relation("TurnoCajaCerradoPor", fields: [cerradoPorId], references: [id], onDelete: Cascade)
   justificacionDiferencia String?
   // PENDIENTE_REVISION -> CERRADO (ítem E-6) — quién y cuándo lo aprobó.
-  revisadoEn        DateTime?
-  revisadoPorId     String?
-  revisadoPor       User?           @relation("TurnoCajaRevisadoPor", fields: [revisadoPorId], references: [id], onDelete: Cascade)
+  revisadoEn              DateTime?
+  revisadoPorId           String?
+  revisadoPor             User?           @relation("TurnoCajaRevisadoPor", fields: [revisadoPorId], references: [id], onDelete: Cascade)
 
-  movimientos MovimientoCaja[]
-  facturas    Factura[]
+  movimientos     MovimientoCaja[]
+  facturas        Factura[]
   ventasAparcadas VentaAparcada[]
+  carritoBorrador CarritoBorrador?
 
   @@map("turnos_caja")
 }
@@ -1864,14 +1867,14 @@ model CodigoAutorizacion {
 /// venta (retiro para gasto menor, ingreso de vuelto adicional, etc.) —
 /// las ventas ya se contabilizan directamente vía Factura.turnoCajaId.
 model MovimientoCaja {
-  id        String             @id @default(uuid())
-  turnoId   String
-  turno     TurnoCaja          @relation(fields: [turnoId], references: [id], onDelete: Cascade)
-  tipo      TipoMovimientoCaja
-  monto     Decimal            @db.Decimal(14, 2)
-  concepto  String
+  id         String                @id @default(uuid())
+  turnoId    String
+  turno      TurnoCaja             @relation(fields: [turnoId], references: [id], onDelete: Cascade)
+  tipo       TipoMovimientoCaja
+  monto      Decimal               @db.Decimal(14, 2)
+  concepto   String
   motivoTipo MotivoMovimientoCaja?
-  createdAt DateTime           @default(now())
+  createdAt  DateTime              @default(now())
 
   @@map("movimientos_caja")
 }
@@ -1899,21 +1902,59 @@ model VentaAparcada {
   @@map("ventas_aparcadas")
 }
 
+// Persistencia incremental del carrito del POS en curso — se guarda solo
+// (upsert, un registro por turno abierto) desde que hay al menos una línea
+// o se asigna cliente/vendedor, para no perder la venta si el navegador se
+// refresca o el equipo se apaga antes de "Cobrar"/"Guardar venta" (F12).
+// Distinto de VentaAparcada: eso es un aparcado EXPLÍCITO del cajero (para
+// atender a otro cliente, puede haber varios a la vez); esto es un borrador
+// SILENCIOSO del carrito activo (uno solo, se sobrescribe) — mezclarlos en
+// la misma tabla ensuciaría la lista de "Guardadas" con carritos que el
+// cajero nunca decidió aparcar. `lineas` en Json, no tabla hija propia,
+// mismo criterio que WebhookDelivery.payload: es un borrador transitorio
+// sin necesidad de integridad referencial, se borra al confirmar la venta,
+// al aparcarla (ya queda a salvo en VentaAparcada) o al vaciar el carrito.
+model CarritoBorrador {
+  id                      String    @id @default(uuid())
+  tenantId                String
+  tenant                  Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  turnoCajaId             String    @unique
+  turnoCaja               TurnoCaja @relation(fields: [turnoCajaId], references: [id], onDelete: Cascade)
+  // SetNull (no Cascade): borrar el cliente/vendedor no debe borrar el
+  // borrador — sigue siendo útil restaurar las líneas, solo se pierde la
+  // referencia (mismo criterio que VentaAparcada).
+  clienteId               String?
+  cliente                 Cliente?  @relation(fields: [clienteId], references: [id], onDelete: SetNull)
+  vendedorEmpleadoId      String?
+  vendedorEmpleado        Empleado? @relation(fields: [vendedorEmpleadoId], references: [id], onDelete: SetNull)
+  // Nombre de la ListaPrecio (ej. "MAYORISTA"), no su id — mismo campo que
+  // RegistrarVentaPosDto.listaPrecio/CotizarVentaPosDto.listaPrecio, sin FK
+  // propia por la misma razón que esos DTOs: es un override puntual de la
+  // venta, no una referencia estructural.
+  listaPrecio             String?
+  tipoFactura             String?
+  tipoComprobanteEspecial String?
+  lineas                  Json
+  actualizadoEn           DateTime  @updatedAt
+
+  @@map("carritos_borrador")
+}
+
 // Tabla "hija" sin tenantId propio (mismo patrón que LineaFactura) — su
 // aislamiento depende de llegar siempre vía VentaAparcada, ya tenant-scoped.
 model VentaAparcadaLinea {
-  id              String        @id @default(uuid())
+  id              String           @id @default(uuid())
   ventaAparcadaId String
-  ventaAparcada   VentaAparcada @relation(fields: [ventaAparcadaId], references: [id], onDelete: Cascade)
+  ventaAparcada   VentaAparcada    @relation(fields: [ventaAparcadaId], references: [id], onDelete: Cascade)
   productoId      String
-  producto        Producto      @relation(fields: [productoId], references: [id])
+  producto        Producto         @relation(fields: [productoId], references: [id])
   // Ver el comentario equivalente en LineaFactura.varianteId.
   varianteId      String
   variante        VarianteProducto @relation(fields: [varianteId], references: [id])
-  cantidad        Decimal       @db.Decimal(14, 4)
-  precioUnitario  Decimal       @db.Decimal(14, 4)
-  porcentajeItbis Decimal       @db.Decimal(5, 2)
-  descuento       Decimal       @default(0) @db.Decimal(14, 2)
+  cantidad        Decimal          @db.Decimal(14, 4)
+  precioUnitario  Decimal          @db.Decimal(14, 4)
+  porcentajeItbis Decimal          @db.Decimal(5, 2)
+  descuento       Decimal          @default(0) @db.Decimal(14, 2)
 
   @@map("lineas_venta_aparcada")
 }
@@ -1945,19 +1986,19 @@ enum AjusteImagenProducto {
 /// práctica nadie parsea en tiempo de ejecución). El frontend arma el árbol
 /// a partir del listado plano con `categoriaPadreId`.
 model Categoria {
-  id               String      @id @default(uuid())
+  id               String          @id @default(uuid())
   tenantId         String
-  tenant           Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant           Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   nombre           String
   categoriaPadreId String?
-  categoriaPadre   Categoria?  @relation("JerarquiaCategoria", fields: [categoriaPadreId], references: [id])
-  subcategorias    Categoria[] @relation("JerarquiaCategoria")
-  activa           Boolean     @default(true)
+  categoriaPadre   Categoria?      @relation("JerarquiaCategoria", fields: [categoriaPadreId], references: [id])
+  subcategorias    Categoria[]     @relation("JerarquiaCategoria")
+  activa           Boolean         @default(true)
   color            ColorCategoria?
-  createdAt        DateTime    @default(now())
+  createdAt        DateTime        @default(now())
 
-  productos Producto[]
-  ofertas   Oferta[]
+  productos      Producto[]
+  ofertas        Oferta[]
   cajaCategorias CajaCategoria[]
 
   @@unique([tenantId, nombre])
@@ -1965,33 +2006,33 @@ model Categoria {
 }
 
 model Producto {
-  id               String   @id @default(uuid())
-  tenantId         String
-  tenant           Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  codigo           String
-  nombre           String
-  categoriaId      String?
-  categoria        Categoria? @relation(fields: [categoriaId], references: [id], onDelete: SetNull)
-  unidadMedida     String   @default("UND")
-  porcentajeItbis  Decimal  @default(18) @db.Decimal(5, 2)
+  id                  String               @id @default(uuid())
+  tenantId            String
+  tenant              Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  codigo              String
+  nombre              String
+  categoriaId         String?
+  categoria           Categoria?           @relation(fields: [categoriaId], references: [id], onDelete: SetNull)
+  unidadMedida        String               @default("UND")
+  porcentajeItbis     Decimal              @default(18) @db.Decimal(5, 2)
   // Ley fiscal aplicable (plan de integración Cuadre, ítem B-3) — reduce
   // el ITBIS efectivo de este producto (ej. Norma 07-2007 construcción:
   // solo se paga 10% del ITBIS normal → 18%→1.8% efectivo). Se ata al
   // Producto (decisión del usuario: la reducción depende de QUÉ se
   // vende, no de quién compra) — ver FacturacionService.
   // calcularLineasYTotales.
-  leyFiscalId      String?
-  leyFiscal        LeyFiscal? @relation(fields: [leyFiscalId], references: [id], onDelete: SetNull)
+  leyFiscalId         String?
+  leyFiscal           LeyFiscal?           @relation(fields: [leyFiscalId], references: [id], onDelete: SetNull)
   // PRODUCTO mueve inventario normal; SERVICIO nunca toca Stock; COMBO
   // expande a sus `componentes` al facturarse (ver FacturacionService.
   // expandirParaInventario) — nunca tiene fila propia en Stock.
-  tipo             TipoProducto @default(PRODUCTO)
-  activo           Boolean  @default(true)
-  origenMssql      Boolean  @default(false)
+  tipo                TipoProducto         @default(PRODUCTO)
+  activo              Boolean              @default(true)
+  origenMssql         Boolean              @default(false)
   // Opt-in (Fase 5b de adopción de Cuadre, mismo patrón que esEfectivo/
   // esBono) — si está apagado, este producto sigue funcionando exactamente
   // igual que hoy, sin exigir lote nunca. Ver ARCHITECTURE.md, "Vencimientos".
-  controlaVencimiento Boolean @default(false)
+  controlaVencimiento Boolean              @default(false)
   // Campos avanzados de producto (plan de integración Cuadre, ítem E-8).
   // `precioVariable`: habilita un precio editable por línea en el carrito
   // del POS (ej. artículos pesados o de precio negociado) — sin esto, el
@@ -2000,9 +2041,9 @@ model Producto {
   // `Categoria.color`. `permiteDevolucion`: si es false,
   // `FacturacionService.crear()` rechaza una NOTA_CREDITO que incluya
   // este producto.
-  precioVariable   Boolean  @default(false)
-  esIngrediente    Boolean  @default(false)
-  permiteDevolucion Boolean @default(true)
+  precioVariable      Boolean              @default(false)
+  esIngrediente       Boolean              @default(false)
+  permiteDevolucion   Boolean              @default(true)
   // Comisión de venta (plan de integración Cuadre, ítem A-1) — mutuamente
   // excluyentes (validado en ProductosService, no en el schema, mismo
   // criterio que Oferta.valor/comprarCantidad): `porcentajeComision` (%
@@ -2010,38 +2051,38 @@ model Producto {
   // `montoComisionFijo` (RD$ fijos por unidad vendida). Sin ninguno de
   // los dos, el producto simplemente no genera comisión — ver
   // ComisionesService.generarDesdeFactura.
-  porcentajeComision Decimal? @db.Decimal(5, 2)
-  montoComisionFijo  Decimal? @db.Decimal(14, 2)
+  porcentajeComision  Decimal?             @db.Decimal(5, 2)
+  montoComisionFijo   Decimal?             @db.Decimal(14, 2)
   // Data URI completa (data:image/jpeg;base64,...), comprimida en el
   // cliente antes de subir. `listar()` (el listado general de
   // Productos.tsx) NO la selecciona a propósito — solo `catalogo()`
   // (pensado para el catálogo del POS) y `buscarPorId()` la incluyen,
   // para no inflar la página normal con blobs — ver ProductosRepository.
-  imagen           String?  @db.Text
-  imagenAjuste     AjusteImagenProducto @default(COVER)
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  imagen              String?              @db.Text
+  imagenAjuste        AjusteImagenProducto @default(COVER)
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
 
   // Precio/Stock ya no cuelgan directo de Producto (Fase 3c — ver
   // VarianteProducto): todo producto tiene siempre al menos una variante
   // "por defecto", incluso sin atributos reales.
-  variantes   VarianteProducto[]
-  movimientos MovimientoInventario[]
-  lineasFactura LineaFactura[]
-  lineasOc    LineaOc[]
-  lineasRecepcion LineaRecepcion[]
-  lineasCotizacion LineaCotizacion[]
-  lineasRemision   LineaRemision[]
+  variantes              VarianteProducto[]
+  movimientos            MovimientoInventario[]
+  lineasFactura          LineaFactura[]
+  lineasOc               LineaOc[]
+  lineasRecepcion        LineaRecepcion[]
+  lineasCotizacion       LineaCotizacion[]
+  lineasRemision         LineaRemision[]
   lineasDevolucionCompra LineaDevolucionCompra[]
-  lineasVentaAparcada VentaAparcadaLinea[]
+  lineasVentaAparcada    VentaAparcadaLinea[]
   // Componentes de ESTE producto cuando `tipo: COMBO`.
-  componentes    ComponenteCombo[] @relation("ComboComponentes")
+  componentes            ComponenteCombo[]       @relation("ComboComponentes")
   // Combos de los que este producto forma parte (como componente).
-  partesDeCombos ComponenteCombo[] @relation("ComponenteDeCombos")
-  ofertas        Oferta[]
-  comisionesVenta ComisionVenta[]
-  cajaProductos  CajaProducto[]
-  cajaProductoFavoritos CajaProductoFavorito[]
+  partesDeCombos         ComponenteCombo[]       @relation("ComponenteDeCombos")
+  ofertas                Oferta[]
+  comisionesVenta        ComisionVenta[]
+  cajaProductos          CajaProducto[]
+  cajaProductoFavoritos  CajaProductoFavorito[]
 
   @@unique([tenantId, codigo])
   @@map("productos")
@@ -2084,18 +2125,18 @@ model VarianteProducto {
   activa       Boolean  @default(true)
   createdAt    DateTime @default(now())
 
-  valoresAtributo ValorAtributoVariante[]
-  precios         Precio[]
-  stock           Stock[]
-  movimientos     MovimientoInventario[]
-  lotes           Lote[]
-  lineasFactura   LineaFactura[]
-  lineasCotizacion LineaCotizacion[]
-  lineasRemision  LineaRemision[]
-  lineasOc        LineaOc[]
-  lineasRecepcion LineaRecepcion[]
+  valoresAtributo        ValorAtributoVariante[]
+  precios                Precio[]
+  stock                  Stock[]
+  movimientos            MovimientoInventario[]
+  lotes                  Lote[]
+  lineasFactura          LineaFactura[]
+  lineasCotizacion       LineaCotizacion[]
+  lineasRemision         LineaRemision[]
+  lineasOc               LineaOc[]
+  lineasRecepcion        LineaRecepcion[]
   lineasDevolucionCompra LineaDevolucionCompra[]
-  lineasVentaAparcada VentaAparcadaLinea[]
+  lineasVentaAparcada    VentaAparcadaLinea[]
 
   @@unique([tenantId, codigoBarras])
   @@map("variantes_producto")
@@ -2146,15 +2187,15 @@ model ValorAtributoVariante {
 }
 
 model Precio {
-  id             String    @id @default(uuid())
-  varianteId     String
-  variante       VarianteProducto @relation(fields: [varianteId], references: [id], onDelete: Cascade)
-  listaPrecio    String    @default("GENERAL")
-  costo          Decimal   @db.Decimal(14, 4)
-  margenPct      Decimal   @db.Decimal(6, 2)
-  precioVenta    Decimal   @db.Decimal(14, 4)
-  vigenteDesde   DateTime  @default(now())
-  vigenteHasta   DateTime?
+  id           String           @id @default(uuid())
+  varianteId   String
+  variante     VarianteProducto @relation(fields: [varianteId], references: [id], onDelete: Cascade)
+  listaPrecio  String           @default("GENERAL")
+  costo        Decimal          @db.Decimal(14, 4)
+  margenPct    Decimal          @db.Decimal(6, 2)
+  precioVenta  Decimal          @db.Decimal(14, 4)
+  vigenteDesde DateTime         @default(now())
+  vigenteHasta DateTime?
 
   @@index([varianteId, listaPrecio, vigenteDesde])
   @@map("precios")
@@ -2202,16 +2243,16 @@ model UsuarioSucursal {
 }
 
 model Bodega {
-  id        String   @id @default(uuid())
-  tenantId  String
-  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  sucursalId String
+  id               String            @id @default(uuid())
+  tenantId         String
+  tenant           Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  sucursalId       String
   // Cascade: Tenant -> Sucursal -> Bodega es una cadena normal (no una
   // carrera de ramas hermanas) — borrar la sucursal se lleva sus bodegas.
-  sucursal  Sucursal @relation(fields: [sucursalId], references: [id], onDelete: Cascade)
-  nombre    String
-  direccion String?
-  activa    Boolean  @default(true)
+  sucursal         Sucursal          @relation(fields: [sucursalId], references: [id], onDelete: Cascade)
+  nombre           String
+  direccion        String?
+  activa           Boolean           @default(true)
   // null = hereda el default de Configuracion[FORMATO_IMPRESION_DEFAULT]
   // del tenant (ver resolver-formato-impresion.ts).
   formatoImpresion FormatoImpresion?
@@ -2239,14 +2280,14 @@ model Bodega {
 /// `CajaProductoFavorito` es independiente de la restricción — solo
 /// alimenta accesos rápidos en la grilla del POS, no bloquea nada.
 model Caja {
-  id       String  @id @default(uuid())
-  tenantId String
-  tenant   Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  bodegaId String
-  bodega   Bodega  @relation(fields: [bodegaId], references: [id], onDelete: Cascade)
-  codigo   String
-  nombre   String
-  activa   Boolean @default(true)
+  id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  bodegaId  String
+  bodega    Bodega   @relation(fields: [bodegaId], references: [id], onDelete: Cascade)
+  codigo    String
+  nombre    String
+  activa    Boolean  @default(true)
   createdAt DateTime @default(now())
 
   categorias CajaCategoria[]
@@ -2295,15 +2336,15 @@ model CajaProductoFavorito {
 }
 
 model Stock {
-  id                 String   @id @default(uuid())
-  varianteId         String
-  variante           VarianteProducto @relation(fields: [varianteId], references: [id], onDelete: Cascade)
-  bodegaId           String
-  bodega             Bodega   @relation(fields: [bodegaId], references: [id], onDelete: Cascade)
-  cantidadActual     Decimal  @default(0) @db.Decimal(14, 4)
-  cantidadReservada  Decimal  @default(0) @db.Decimal(14, 4)
-  stockMinimo        Decimal  @default(10) @db.Decimal(14, 4)
-  updatedAt          DateTime @updatedAt
+  id                String           @id @default(uuid())
+  varianteId        String
+  variante          VarianteProducto @relation(fields: [varianteId], references: [id], onDelete: Cascade)
+  bodegaId          String
+  bodega            Bodega           @relation(fields: [bodegaId], references: [id], onDelete: Cascade)
+  cantidadActual    Decimal          @default(0) @db.Decimal(14, 4)
+  cantidadReservada Decimal          @default(0) @db.Decimal(14, 4)
+  stockMinimo       Decimal          @default(10) @db.Decimal(14, 4)
+  updatedAt         DateTime         @updatedAt
 
   @@unique([varianteId, bodegaId])
   @@map("stock")
@@ -2387,17 +2428,17 @@ model MovimientoInventario {
 // join. El mismo lote físico transferido a otra bodega es una fila nueva
 // ahí — misma granularidad que `Stock`, que también es por variante+bodega.
 model Lote {
-  id               String   @id @default(uuid())
+  id               String           @id @default(uuid())
   tenantId         String
-  tenant           Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant           Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   varianteId       String
   variante         VarianteProducto @relation(fields: [varianteId], references: [id], onDelete: Cascade)
   bodegaId         String
-  bodega           Bodega   @relation(fields: [bodegaId], references: [id], onDelete: Cascade)
+  bodega           Bodega           @relation(fields: [bodegaId], references: [id], onDelete: Cascade)
   numeroLote       String
   fechaVencimiento DateTime
-  cantidadActual   Decimal  @default(0) @db.Decimal(14, 4)
-  createdAt        DateTime @default(now())
+  cantidadActual   Decimal          @default(0) @db.Decimal(14, 4)
+  createdAt        DateTime         @default(now())
 
   movimientos MovimientoInventario[]
 
@@ -2434,22 +2475,22 @@ enum EstadoOrdenCompra {
 }
 
 model OrdenCompra {
-  id           String            @id @default(uuid())
-  tenantId     String
-  tenant       Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  proveedorId  String
-  proveedor    Proveedor         @relation(fields: [proveedorId], references: [id])
-  numero       String
-  estado       EstadoOrdenCompra @default(BORRADOR)
-  fecha        DateTime          @default(now())
-  total        Decimal           @db.Decimal(14, 2)
+  id          String            @id @default(uuid())
+  tenantId    String
+  tenant      Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  proveedorId String
+  proveedor   Proveedor         @relation(fields: [proveedorId], references: [id])
+  numero      String
+  estado      EstadoOrdenCompra @default(BORRADOR)
+  fecha       DateTime          @default(now())
+  total       Decimal           @db.Decimal(14, 2)
   // Igual convención que Factura.pagada/fechaPago — ver PagosService: se
   // recalcula cuando la suma de Pago contra esta orden alcanza el total.
-  pagada       Boolean           @default(false)
-  fechaPago    DateTime?
-  userId       String
-  user         User              @relation(fields: [userId], references: [id])
-  createdAt    DateTime          @default(now())
+  pagada      Boolean           @default(false)
+  fechaPago   DateTime?
+  userId      String
+  user        User              @relation(fields: [userId], references: [id])
+  createdAt   DateTime          @default(now())
 
   lineas       LineaOc[]
   recepciones  RecepcionCompra[]
@@ -2461,38 +2502,38 @@ model OrdenCompra {
 }
 
 model LineaOc {
-  id                String      @id @default(uuid())
-  ordenCompraId     String
-  ordenCompra       OrdenCompra @relation(fields: [ordenCompraId], references: [id], onDelete: Cascade)
-  productoId        String
+  id               String           @id @default(uuid())
+  ordenCompraId    String
+  ordenCompra      OrdenCompra      @relation(fields: [ordenCompraId], references: [id], onDelete: Cascade)
+  productoId       String
   // Cascade: mismo patrón/razón que LineaCotizacion.producto — Tenant -> Producto
   // y Tenant -> OrdenCompra -> LineaOc son ramas hermanas que compiten al borrar
   // el tenant completo (carrera real de Postgres, no solo teórica — encontrada
   // corriendo los e2e de Compras).
-  producto          Producto    @relation(fields: [productoId], references: [id], onDelete: Cascade)
+  producto         Producto         @relation(fields: [productoId], references: [id], onDelete: Cascade)
   // Ver el comentario equivalente en LineaFactura.varianteId.
-  varianteId        String
-  variante          VarianteProducto @relation(fields: [varianteId], references: [id])
-  cantidad          Decimal     @db.Decimal(14, 4)
-  costoUnitario     Decimal     @db.Decimal(14, 4)
-  cantidadRecibida  Decimal     @default(0) @db.Decimal(14, 4)
+  varianteId       String
+  variante         VarianteProducto @relation(fields: [varianteId], references: [id])
+  cantidad         Decimal          @db.Decimal(14, 4)
+  costoUnitario    Decimal          @db.Decimal(14, 4)
+  cantidadRecibida Decimal          @default(0) @db.Decimal(14, 4)
 
   @@map("linea_oc")
 }
 
 model RecepcionCompra {
-  id                       String      @id @default(uuid())
-  tenantId                 String
-  ordenCompraId            String
+  id                     String      @id @default(uuid())
+  tenantId               String
+  ordenCompraId          String
   // Cascade: sin esto, borrar un tenant completo cascadea a OrdenCompra pero
   // se detiene ahí — RecepcionCompra queda huérfana referenciando una orden ya
   // borrada y Postgres rechaza el borrado completo (carrera real encontrada
   // corriendo los e2e de Compras, misma clase de bug que LineaOc.producto).
-  ordenCompra              OrdenCompra @relation(fields: [ordenCompraId], references: [id], onDelete: Cascade)
-  fecha                    DateTime    @default(now())
-  facturaProveedorNumero   String?
-  montoFacturaProveedor    Decimal?    @db.Decimal(14, 2)
-  createdAt                DateTime    @default(now())
+  ordenCompra            OrdenCompra @relation(fields: [ordenCompraId], references: [id], onDelete: Cascade)
+  fecha                  DateTime    @default(now())
+  facturaProveedorNumero String?
+  montoFacturaProveedor  Decimal?    @db.Decimal(14, 2)
+  createdAt              DateTime    @default(now())
 
   lineas LineaRecepcion[]
 
@@ -2500,17 +2541,17 @@ model RecepcionCompra {
 }
 
 model LineaRecepcion {
-  id                String          @id @default(uuid())
-  recepcionId       String
-  recepcion         RecepcionCompra @relation(fields: [recepcionId], references: [id], onDelete: Cascade)
-  productoId        String
+  id               String           @id @default(uuid())
+  recepcionId      String
+  recepcion        RecepcionCompra  @relation(fields: [recepcionId], references: [id], onDelete: Cascade)
+  productoId       String
   // Cascade: mismo patrón que LineaOc.producto (ver ese comentario).
-  producto          Producto        @relation(fields: [productoId], references: [id], onDelete: Cascade)
+  producto         Producto         @relation(fields: [productoId], references: [id], onDelete: Cascade)
   // Ver el comentario equivalente en LineaFactura.varianteId.
-  varianteId        String
-  variante          VarianteProducto @relation(fields: [varianteId], references: [id])
-  cantidadRecibida  Decimal         @db.Decimal(14, 4)
-  costoUnitario     Decimal         @db.Decimal(14, 4)
+  varianteId       String
+  variante         VarianteProducto @relation(fields: [varianteId], references: [id])
+  cantidadRecibida Decimal          @db.Decimal(14, 4)
+  costoUnitario    Decimal          @db.Decimal(14, 4)
 
   @@map("linea_recepcion")
 }
@@ -2561,31 +2602,31 @@ model LineaDevolucionCompra {
 /// Exactamente uno de facturaId/ordenCompraId debe estar presente — no hay
 /// forma declarativa de exigirlo en Prisma, se valida en PagosService.
 model Pago {
-  id            String       @id @default(uuid())
-  tenantId      String
-  tenant        Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  facturaId     String?
-  factura       Factura?     @relation(fields: [facturaId], references: [id], onDelete: Cascade)
-  ordenCompraId String?
-  ordenCompra   OrdenCompra? @relation(fields: [ordenCompraId], references: [id], onDelete: Cascade)
-  monto         Decimal      @db.Decimal(14, 2)
+  id             String       @id @default(uuid())
+  tenantId       String
+  tenant         Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  facturaId      String?
+  factura        Factura?     @relation(fields: [facturaId], references: [id], onDelete: Cascade)
+  ordenCompraId  String?
+  ordenCompra    OrdenCompra? @relation(fields: [ordenCompraId], references: [id], onDelete: Cascade)
+  monto          Decimal      @db.Decimal(14, 2)
   // Retención de ISR/ITBIS practicada al proveedor (Art. 309/349) — solo
   // aplica a pagos de OrdenCompra, ingresada a mano por quien registra el
   // pago (ver AsientosContablesService.generarDesdePagoOrdenCompra). Nunca
   // se usa en pagos de Factura; queda en 0 por defecto para no romper la
   // suma existente contra `orden.total` (ver PagosRepository.sumaPagosOrdenCompra).
-  retencionIsr   Decimal     @default(0) @db.Decimal(14, 2)
-  retencionItbis Decimal     @default(0) @db.Decimal(14, 2)
-  formaPagoId   String
-  formaPago     FormaPago    @relation(fields: [formaPagoId], references: [id])
-  referencia    String?
-  fecha         DateTime     @default(now())
+  retencionIsr   Decimal      @default(0) @db.Decimal(14, 2)
+  retencionItbis Decimal      @default(0) @db.Decimal(14, 2)
+  formaPagoId    String
+  formaPago      FormaPago    @relation(fields: [formaPagoId], references: [id])
+  referencia     String?
+  fecha          DateTime     @default(now())
   // Nullable (ítem C-1, Payment Link AZUL/CardNet) — un pago de gateway
   // público no tiene operador humano, mismo criterio ya usado por
   // PagoPlataforma.registradoPorId.
-  userId        String?
-  user          User?        @relation(fields: [userId], references: [id])
-  createdAt     DateTime     @default(now())
+  userId         String?
+  user           User?        @relation(fields: [userId], references: [id])
+  createdAt      DateTime     @default(now())
 
   @@index([facturaId])
   @@index([ordenCompraId])
@@ -2602,50 +2643,51 @@ enum TipoCliente {
 }
 
 model Cliente {
-  id            String      @id @default(uuid())
-  tenantId      String
-  tenant        Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  nombre        String
-  tipo          TipoCliente @default(PERSONA_FISICA)
-  rncCedula     String?
-  email         String?
-  telefono      String?
-  limiteCredito Decimal     @default(0) @db.Decimal(14, 2)
-  activo        Boolean     @default(true)
+  id                    String                 @id @default(uuid())
+  tenantId              String
+  tenant                Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  nombre                String
+  tipo                  TipoCliente            @default(PERSONA_FISICA)
+  rncCedula             String?
+  email                 String?
+  telefono              String?
+  limiteCredito         Decimal                @default(0) @db.Decimal(14, 2)
+  activo                Boolean                @default(true)
   // Contacto genérico sembrado al provisionar el tenant (ver
   // TenantsRepository.crearConProvisioning) — lo usa POS como cliente
   // por defecto en la venta rápida, para no exigir elegir un cliente
   // real en cada venta de mostrador.
-  esConsumidorFinal Boolean @default(false)
+  esConsumidorFinal     Boolean                @default(false)
   // Nivel de precio por defecto de este cliente (Fase 3b de adopción de
   // Cuadre) — null resuelve a "GENERAL" (ver FacturacionService.crear).
   // Se puede sobreescribir puntualmente al facturar/cotizar/vender en POS.
-  listaPrecioId String?
-  listaPrecio   ListaPrecio? @relation(fields: [listaPrecioId], references: [id], onDelete: SetNull)
+  listaPrecioId         String?
+  listaPrecio           ListaPrecio?           @relation(fields: [listaPrecioId], references: [id], onDelete: SetNull)
   // Categoría/segmentación de cliente (plan de integración Cuadre, ítem
   // E-5) — catálogo propio, puramente informativo/de reporte (sin ningún
   // efecto en precios/permisos, a diferencia de listaPrecioId).
-  categoriaId String?
-  categoria   CategoriaCliente? @relation(fields: [categoriaId], references: [id], onDelete: SetNull)
+  categoriaId           String?
+  categoria             CategoriaCliente?      @relation(fields: [categoriaId], references: [id], onDelete: SetNull)
   // Comprobante fiscal por defecto (ítem E-5) — autoselecciona tipoFactura
   // + tipoComprobanteEspecial (ítem B-1) al elegir este cliente en el
   // formulario de Facturación; el usuario puede cambiarlo igual antes de
   // guardar, no es una restricción, solo un valor inicial. Ver
   // ModalNuevaFactura (frontend) para el mapeo exacto.
   comprobantePorDefecto ComprobantePorDefecto?
-  createdAt     DateTime    @default(now())
+  createdAt             DateTime               @default(now())
   // Ítem A-3 (Lealtad/puntos) — saldo denormalizado, mismo criterio que
   // `Stock.cantidadActual`: la fuente de verdad es la suma de
   // `MovimientoLealtad`, esto es una caché mantenida por
   // `LealtadService` para no tener que agregar en cada lectura.
-  puntosLealtad Int @default(0)
+  puntosLealtad         Int                    @default(0)
 
-  direcciones DireccionCliente[]
-  facturas    Factura[]
-  cotizaciones Cotizacion[]
-  remisiones  Remision[]
-  ventasAparcadas VentaAparcada[]
+  direcciones        DireccionCliente[]
+  facturas           Factura[]
+  cotizaciones       Cotizacion[]
+  remisiones         Remision[]
+  ventasAparcadas    VentaAparcada[]
   movimientosLealtad MovimientoLealtad[]
+  carritosBorrador   CarritoBorrador[]
 
   @@map("clientes")
 }
@@ -2679,12 +2721,12 @@ enum ComprobantePorDefecto {
 }
 
 model DireccionCliente {
-  id           String  @id @default(uuid())
-  clienteId    String
-  cliente      Cliente @relation(fields: [clienteId], references: [id], onDelete: Cascade)
-  direccion    String
-  ciudad       String?
-  esPrincipal  Boolean @default(false)
+  id          String  @id @default(uuid())
+  clienteId   String
+  cliente     Cliente @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  direccion   String
+  ciudad      String?
+  esPrincipal Boolean @default(false)
 
   @@map("direccion_cliente")
 }
@@ -2740,30 +2782,30 @@ enum EstadoNotificacion {
 }
 
 model NotificacionPlantilla {
-  id        String            @id @default(uuid())
-  tenantId  String
-  tenant    Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  canal     CanalNotificacion
-  clave     String
-  asunto    String?
-  cuerpo    String
-  activa    Boolean           @default(true)
+  id       String            @id @default(uuid())
+  tenantId String
+  tenant   Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  canal    CanalNotificacion
+  clave    String
+  asunto   String?
+  cuerpo   String
+  activa   Boolean           @default(true)
 
   @@unique([tenantId, canal, clave])
   @@map("notificacion_plantillas")
 }
 
 model Notificacion {
-  id            String             @id @default(uuid())
-  tenantId      String
-  tenant        Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  canal         CanalNotificacion
-  destinatario  String
-  asunto        String?
-  cuerpo        String
-  estado        EstadoNotificacion @default(PENDIENTE)
-  createdAt     DateTime           @default(now())
-  enviadaEn     DateTime?
+  id           String             @id @default(uuid())
+  tenantId     String
+  tenant       Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  canal        CanalNotificacion
+  destinatario String
+  asunto       String?
+  cuerpo       String
+  estado       EstadoNotificacion @default(PENDIENTE)
+  createdAt    DateTime           @default(now())
+  enviadaEn    DateTime?
 
   @@map("notificaciones")
 }
@@ -2804,32 +2846,32 @@ enum AlcanceOferta {
 /// línea descontada por ESTA oferta no genera comisión de venta, "todo o
 /// nada" — ver ComisionVenta/OfertasService.combinarDescuentos).
 model Oferta {
-  id                 String              @id @default(uuid())
-  tenantId           String
-  tenant             Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  nombre             String
-  tipoDescuento      TipoDescuentoOferta
+  id                        String              @id @default(uuid())
+  tenantId                  String
+  tenant                    Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  nombre                    String
+  tipoDescuento             TipoDescuentoOferta
   // % (0-100) si PORCENTAJE, monto RD$ si MONTO_FIJO — null si BOGO.
-  valor              Decimal?            @db.Decimal(14, 4)
-  comprarCantidad    Int?
-  llevarCantidad     Int?
+  valor                     Decimal?            @db.Decimal(14, 4)
+  comprarCantidad           Int?
+  llevarCantidad            Int?
   // % de descuento sobre las unidades "llevadas" — 100 = gratis (BOGO clásico), 50 = "segunda unidad a mitad de precio".
-  porcentajeDescuentoLlevar Decimal?     @db.Decimal(5, 2)
-  descuentoMaximoMonto Decimal?          @db.Decimal(14, 2)
-  acumulable         Boolean             @default(false)
-  prioridad          Int                 @default(0)
-  pagaComision       Boolean             @default(true)
-  alcance            AlcanceOferta
-  productoId         String?
-  producto           Producto?           @relation(fields: [productoId], references: [id], onDelete: Cascade)
-  categoriaId        String?
-  categoria          Categoria?          @relation(fields: [categoriaId], references: [id], onDelete: Cascade)
+  porcentajeDescuentoLlevar Decimal?            @db.Decimal(5, 2)
+  descuentoMaximoMonto      Decimal?            @db.Decimal(14, 2)
+  acumulable                Boolean             @default(false)
+  prioridad                 Int                 @default(0)
+  pagaComision              Boolean             @default(true)
+  alcance                   AlcanceOferta
+  productoId                String?
+  producto                  Producto?           @relation(fields: [productoId], references: [id], onDelete: Cascade)
+  categoriaId               String?
+  categoria                 Categoria?          @relation(fields: [categoriaId], references: [id], onDelete: Cascade)
   // Solo alcance=CARRITO — null significa "sin mínimo, siempre aplica".
-  montoMinimoCarrito Decimal?            @db.Decimal(14, 2)
-  fechaInicio        DateTime
-  fechaFin           DateTime
-  activa             Boolean             @default(true)
-  createdAt          DateTime            @default(now())
+  montoMinimoCarrito        Decimal?            @db.Decimal(14, 2)
+  fechaInicio               DateTime
+  fechaFin                  DateTime
+  activa                    Boolean             @default(true)
+  createdAt                 DateTime            @default(now())
 
   @@map("ofertas")
 }
@@ -2883,23 +2925,23 @@ enum CalculoLealtad {
 /// Apple/Google Wallet quedan fuera de este primer corte (decisión ya
 /// registrada en el plan de integración).
 model ConfiguracionLealtad {
-  id       String @id @default(uuid())
-  tenantId String @unique
-  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  activo   Boolean @default(false)
-  modoAcumulacion ModoAcumulacionLealtad @default(POR_MONTO)
+  id                             String                 @id @default(uuid())
+  tenantId                       String                 @unique
+  tenant                         Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  activo                         Boolean                @default(false)
+  modoAcumulacion                ModoAcumulacionLealtad @default(POR_MONTO)
   // Obligatorio (validado en LealtadService) cuando modoAcumulacion=POR_MONTO — RD$ por cada punto ganado.
-  montoPorPunto Decimal? @db.Decimal(14, 4)
+  montoPorPunto                  Decimal?               @db.Decimal(14, 4)
   // Base de cálculo cuando modoAcumulacion=POR_MONTO — decisión confirmada con el usuario: configurable por tenant.
-  calcularSobre CalculoLealtad @default(SUBTOTAL)
+  calcularSobre                  CalculoLealtad         @default(SUBTOTAL)
   // Si es false, las líneas con descuento (manual, Oferta o descuento general) no aportan puntos.
-  itemsConDescuentoGeneranPuntos Boolean @default(true)
+  itemsConDescuentoGeneranPuntos Boolean                @default(true)
   // RD$ que vale UN punto al canjear (0 = no configurado, canje rechazado).
-  valorPunto Decimal @default(0) @db.Decimal(14, 4)
-  minimoParaCanjear Int @default(0)
+  valorPunto                     Decimal                @default(0) @db.Decimal(14, 4)
+  minimoParaCanjear              Int                    @default(0)
   // null = los puntos nunca expiran.
-  diasExpiracion Int?
-  updatedAt DateTime @updatedAt
+  diasExpiracion                 Int?
+  updatedAt                      DateTime               @updatedAt
 
   @@map("configuraciones_lealtad")
 }

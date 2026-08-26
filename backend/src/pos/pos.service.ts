@@ -14,6 +14,7 @@ import { CrearMovimientoCajaDto } from './dto/crear-movimiento-caja.dto';
 import { RegistrarVentaPosDto } from './dto/registrar-venta.dto';
 import { CotizarVentaPosDto } from './dto/cotizar-venta.dto';
 import { GuardarVentaDto } from './dto/guardar-venta.dto';
+import { GuardarBorradorCarritoDto } from './dto/guardar-borrador-carrito.dto';
 import { RegistrarDevolucionDto } from './dto/registrar-devolucion.dto';
 import { ListarTurnosQueryDto } from './dto/listar-turnos-query.dto';
 import { paginar } from '../common/types/pagina-resultado';
@@ -404,6 +405,31 @@ export class PosService {
 
   eliminarGuardada(id: string) {
     return this.posRepository.eliminarGuardada(id);
+  }
+
+  /**
+   * Borrador silencioso del carrito activo (no confundir con
+   * guardarVenta/F12) — el frontend lo llama debounced en cada cambio del
+   * carrito para no perderlo ante un refresh o apagón. Un carrito vacío no
+   * tiene nada que proteger: se borra el borrador en vez de guardar uno
+   * vacío (invariante forzado acá, no solo confiado al frontend).
+   */
+  async guardarBorrador(turnoId: string, dto: GuardarBorradorCarritoDto, tenantId: string) {
+    const turno = await this.posRepository.buscarPorId(turnoId);
+    this.validarAbierto(turno);
+    if (dto.lineas.length === 0) {
+      await this.posRepository.eliminarBorrador(turnoId);
+      return null;
+    }
+    return this.posRepository.guardarBorrador({ tenantId, turnoCajaId: turnoId, ...dto, lineas: dto.lineas });
+  }
+
+  obtenerBorrador(turnoId: string) {
+    return this.posRepository.buscarBorrador(turnoId);
+  }
+
+  eliminarBorrador(turnoId: string) {
+    return this.posRepository.eliminarBorrador(turnoId);
   }
 
   private validarAbierto(turno: { estado: string }) {

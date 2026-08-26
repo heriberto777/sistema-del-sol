@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { TenantPrismaService } from '../prisma/tenant-prisma.service';
-import { EstadoTurnoCaja, MotivoMovimientoCaja, TipoMovimientoCaja } from '@prisma/client';
+import { EstadoTurnoCaja, MotivoMovimientoCaja, Prisma, TipoMovimientoCaja } from '@prisma/client';
 
 const INCLUDE_TURNO = {
   movimientos: true,
@@ -211,5 +211,46 @@ export class PosRepository {
 
   eliminarGuardada(id: string) {
     return this.db.ventaAparcada.delete({ where: { id } });
+  }
+
+  /** Borrador silencioso del carrito activo (ver comentario en schema.prisma) — upsert, un registro por turno. */
+  guardarBorrador(params: {
+    tenantId: string;
+    turnoCajaId: string;
+    clienteId?: string;
+    vendedorEmpleadoId?: string;
+    listaPrecio?: string;
+    tipoFactura?: string;
+    tipoComprobanteEspecial?: string;
+    lineas: unknown;
+  }) {
+    const datosComunes = {
+      clienteId: params.clienteId ?? null,
+      vendedorEmpleadoId: params.vendedorEmpleadoId ?? null,
+      listaPrecio: params.listaPrecio ?? null,
+      tipoFactura: params.tipoFactura ?? null,
+      tipoComprobanteEspecial: params.tipoComprobanteEspecial ?? null,
+      lineas: params.lineas as Prisma.InputJsonValue,
+    };
+    return this.db.carritoBorrador.upsert({
+      where: { turnoCajaId: params.turnoCajaId },
+      create: { tenantId: params.tenantId, turnoCajaId: params.turnoCajaId, ...datosComunes },
+      update: datosComunes,
+    });
+  }
+
+  buscarBorrador(turnoCajaId: string) {
+    return this.db.carritoBorrador.findUnique({
+      where: { turnoCajaId },
+      include: {
+        cliente: { select: { id: true, nombre: true } },
+        vendedorEmpleado: { select: { id: true, nombre: true } },
+      },
+    });
+  }
+
+  /** deleteMany (no delete) — no debe romper si ya no había borrador (ej. doble llamada). */
+  eliminarBorrador(turnoCajaId: string) {
+    return this.db.carritoBorrador.deleteMany({ where: { turnoCajaId } });
   }
 }

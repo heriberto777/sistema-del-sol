@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { User, IdCard, ChevronDown, SlidersHorizontal, Printer, Undo2 } from 'lucide-react';
 import { apiClient } from '../../../lib/api-client';
@@ -17,6 +17,7 @@ import { Select } from '../../atoms/Select/Select';
 import { useAuth } from '../../../hooks/useAuth';
 import { useAtajosTeclado } from '../../../hooks/useAtajosTeclado';
 import { useListasPrecio } from '../../../hooks/useListasPrecio';
+import { useDebouncedValue } from '../../../hooks/useDebouncedValue';
 import { PaginaResultado } from '../../../types/pagina-resultado';
 
 const ID_COMBOBOX_CLIENTE = 'turno-cliente-combobox';
@@ -95,6 +96,29 @@ interface VentaAparcada {
   cliente: Cliente | null;
   vendedorEmpleado: Vendedor | null;
   lineas: VentaAparcadaLinea[];
+}
+
+/**
+ * Borrador silencioso del carrito activo (`CarritoBorrador`, backend) —
+ * distinto de VentaAparcada (F12, aparcado explícito del cajero). Se
+ * restaura solo al abrir el turno; ver el efecto de restauración más abajo.
+ */
+interface CarritoBorradorApi {
+  cliente: Cliente | null;
+  vendedorEmpleado: Vendedor | null;
+  listaPrecio: string | null;
+  tipoFactura: 'CONTADO' | 'CREDITO' | null;
+  tipoComprobanteEspecial: string | null;
+  lineas: LineaCarrito[];
+}
+
+interface BorradorPayload {
+  clienteId?: string;
+  vendedorEmpleadoId?: string;
+  listaPrecio?: string;
+  tipoFactura?: string;
+  tipoComprobanteEspecial?: string;
+  lineas: LineaCarrito[];
 }
 
 interface PagoVentaResumen {
@@ -239,6 +263,12 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
   const [facturaAnulando, setFacturaAnulando] = useState<FacturaTurno | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [facturaImprimiendo, setFacturaImprimiendo] = useState<string | null>(null);
+  const [avisoBorrador, setAvisoBorrador] = useState<string | null>(null);
+  // Evita aplicar la restauración del borrador más de una vez, y evita un
+  // DELETE innecesario cuando el carrito arranca vacío y nunca hubo nada
+  // que proteger (ver los dos efectos de borrador más abajo).
+  const restoBorradorAplicadoRef = useRef(false);
+  const huboBorradorRef = useRef(false);
 
   // Comprobante fiscal por defecto del cliente (plan de integración Cuadre,
   // ítem E-5) — mismo criterio que ModalNuevaFactura en Facturacion.tsx:
@@ -268,6 +298,70 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
   useEffect(() => {
     if (!cliente && consumidorFinal) setCliente(consumidorFinal);
   }, [cliente, consumidorFinal]);
+
+  // Borrador silencioso del carrito activo (protege contra un refresh
+  // accidental o un apagón antes de "Cobrar"/"Guardar venta" — pedido del
+  // usuario). Se pide una sola vez al abrir el turno; `isFetched` (no
+  // `data`) es el gate del efecto de restauración de abajo para que corra
+  // exactamente una vez, se haya encontrado borrador o no.
+  const { data: borradorRemoto, isFetched: borradorFetched } = useQuery({
+    queryKey: ['pos-borrador', turnoId],
+    queryFn: async () => (await apiClient.get<CarritoBorradorApi | null>(`/pos/turnos/${turnoId}/borrador`)).data,
+  });
+
+  useEffect(() => {
+    if (!borradorFetched || restoBorradorAplicadoRef.current) return;
+    restoBorradorAplicadoRef.current = true;
+    if (!borradorRemoto || borradorRemoto.lineas.length === 0) return;
+    huboBorradorRef.current = true;
+    setCarrito(borradorRemoto.lineas);
+    if (borradorRemoto.cliente) setCliente(borradorRemoto.cliente);
+    if (borradorRemoto.vendedorEmpleado) setVendedor(borradorRemoto.vendedorEmpleado);
+    if (borradorRemoto.listaPrecio) setListaPrecioOverride(borradorRemoto.listaPrecio);
+    if (borradorRemoto.tipoFactura) setTipoFactura(borradorRemoto.tipoFactura);
+    if (borradorRemoto.tipoComprobanteEspecial) setTipoComprobanteEspecial(borradorRemoto.tipoComprobanteEspecial);
+    setAvisoBorrador('Se restauró un carrito sin terminar que había quedado pendiente en este turno.');
+  }, [borradorFetched, borradorRemoto]);
+
+  const guardarBorrador = useMutation({
+    mutationFn: async (payload: BorradorPayload) => apiClient.put(`/pos/turnos/${turnoId}/borrador`, payload),
+  });
+
+  const eliminarBorrador = useMutation({
+    mutationFn: async () => apiClient.delete(`/pos/turnos/${turnoId}/borrador`),
+  });
+
+  // Snapshot serializado del carrito/cliente/vendedor/etc. — se debounza
+  // (800ms) para no pegarle a la base de datos en cada tecla de
+  // cantidad/precio; una línea agregada/quitada o un cambio de cliente sí
+  // terminan disparando el guardado, solo que con ese pequeño retraso.
+  const borradorSnapshot = JSON.stringify({
+    clienteId: cliente?.id,
+    vendedorEmpleadoId: vendedor?.id,
+    listaPrecio: listaPrecioOverride || undefined,
+    tipoFactura,
+    tipoComprobanteEspecial: tipoComprobanteEspecial || undefined,
+    lineas: carrito,
+  });
+  const borradorSnapshotDebounced = useDebouncedValue(borradorSnapshot, 800);
+
+  useEffect(() => {
+    // Frenado hasta saber si había un borrador previo — sin esto, el
+    // carrito vacío del primer render podría pisar/borrar un borrador real
+    // antes de que el efecto de arriba llegue a restaurarlo.
+    if (!borradorFetched) return;
+    const payload = JSON.parse(borradorSnapshotDebounced) as BorradorPayload;
+    if (payload.lineas.length === 0) {
+      if (huboBorradorRef.current) {
+        huboBorradorRef.current = false;
+        eliminarBorrador.mutate();
+      }
+      return;
+    }
+    huboBorradorRef.current = true;
+    guardarBorrador.mutate(payload);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [borradorSnapshotDebounced, borradorFetched]);
 
   function invalidar() {
     queryClient.invalidateQueries({ queryKey: ['pos-turno', turnoId] });
@@ -309,6 +403,11 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
       setModalCheckout(false);
       setCotizacion(null);
       setVentaConfirmada({ id: respuesta.data.id, total: respuesta.data.total });
+      // Venta confirmada — el borrador ya no protege nada, se borra ya
+      // mismo (no hace falta esperar el debounce del efecto de guardado).
+      huboBorradorRef.current = false;
+      eliminarBorrador.mutate();
+      setAvisoBorrador(null);
     },
     // El error de esta mutación se muestra DENTRO de ModalCheckout (ver
     // registrarVentaError más abajo), no acá — mientras el cajero está
@@ -346,6 +445,11 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
       setCarrito([]);
       setVendedor(null);
       setModalGuardar(false);
+      // Ya quedó a salvo como VentaAparcada (Guardadas, ⇧F12) — el
+      // borrador silencioso ya no hace falta.
+      huboBorradorRef.current = false;
+      eliminarBorrador.mutate();
+      setAvisoBorrador(null);
     },
   });
 
@@ -413,6 +517,7 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
     setVendedor(venta.vendedorEmpleado);
     eliminarGuardada.mutate(venta.id);
     setModalGuardadas(false);
+    setAvisoBorrador(null);
   }
 
   /** Aplica un descuento (monto flat o %) a las líneas seleccionadas (claveLinea) — ver ModalDescuento. */
@@ -494,7 +599,10 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
       F3: () => document.getElementById(ID_COMBOBOX_CLIENTE)?.focus(),
       F4: () => setModalDevolucion(true),
       F5: () => invalidar(),
-      F6: () => setCarrito([]),
+      F6: () => {
+        setCarrito([]);
+        setAvisoBorrador(null);
+      },
       F7: () => setModalMovimiento(true),
       F8: () => carrito.length > 0 && setModalDescuento(true),
       F9: () => setModalCerrarTurno(true),
@@ -521,6 +629,14 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
     >
       <div className="space-y-4">
       {error && <p className="text-sm text-red-600">{error}</p>}
+      {avisoBorrador && (
+        <p className="flex items-center justify-between gap-2 rounded-md bg-sol-50 px-3 py-2 text-sm text-sol-700 dark:bg-sol-900/30 dark:text-sol-300">
+          {avisoBorrador}
+          <button type="button" onClick={() => setAvisoBorrador(null)} className="shrink-0 text-xs underline">
+            Descartar
+          </button>
+        </p>
+      )}
 
       {data.estado === 'ABIERTO' && tienePermiso('pos.editar') && (
         <>
