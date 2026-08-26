@@ -156,16 +156,29 @@ Resumen de lo que cambió (detalle en cada ítem más abajo):
   después del toggle B-7 (`aplicaItbis: false` sigue ganando). Panel
   propio en Admin → Catálogo → "Leyes fiscales". Migración
   `20260824140000_leyes_fiscales`. Entregado 2026-08-24.
-- [ ] **B-4** 🟨→🟧 *(corrección de tamaño)* — **Recargos de Factura**:
+- [x] **B-4** 🟨→🟧 *(corrección de tamaño)* — **Recargos de Factura**:
   cargos post-subtotal (Imprevistos, Viáticos, etc.), con "% gravado con
   ITBIS" opcional y orden configurable. *Confirmado: brecha real, pero
-  más grande de lo catalogado: necesita un catálogo (`RecargoFactura`)
-  MÁS una tabla hija nueva para los recargos aplicados a cada factura
-  (`FacturaRecargo`, patrón `FacturaPlataformaLinea`) MÁS cambios en
-  `calcularLineasYTotales()` MÁS actualizar impresión/PDF para mostrarlos
-  — no es un campo suelto como B-7/B-8, es una entidad nueva. Candidato a
-  su propia sesión (no bloqueante, pero no se apuró para no arriesgar un
-  bug de cálculo fiscal sin poder correr tests en esta tanda).*
+  más grande de lo catalogado: necesita una tabla hija nueva para los
+  recargos aplicados a cada factura (`FacturaRecargo`, patrón
+  `FacturaPlataformaLinea`) MÁS cambios en `calcularLineasYTotales()` MÁS
+  actualizar impresión/PDF para mostrarlos — no es un campo suelto como
+  B-7/B-8, es una entidad nueva.* Entregado: `FacturaRecargo` (concepto
+  texto libre, monto, `gravado`, `orden`) — sin catálogo `RecargoFactura`
+  reusable aparte, mismo criterio minimalista que
+  `FacturaPlataformaLinea` (un recargo es puntual por factura, no una
+  entidad de configuración). `CrearFacturaDto.recargos?[]`, calculado en
+  `FacturacionService.crear()` (no dentro de `calcularLineasYTotales`,
+  que ni `cotizar()` ni el POS usan) — se suman después del descuento
+  general de documento, ITBIS del recargo `gravado:true` a la tasa
+  `ITBIS_GENERAL` del tenant (`ConfiguracionesService`, mismo patrón que
+  `POS_TOLERANCIA_ARQUEO`). Ignorados en NOTA_CREDITO/NOTA_DEBITO, mismo
+  criterio que B-8. PDF/ticket térmico muestran una línea por recargo
+  entre Descuento e ITBIS. UI en `ModalNuevaFactura` (Facturación
+  directa únicamente — Cuadre tampoco lo tiene en Cotizaciones/POS).
+  Migración `20260826014413_factura_recargos`. Verificado en vivo
+  (factura de prueba con un recargo gravado — totales exactos
+  confirmados contra la base de datos). Entregado 2026-08-26.
 - [ ] **B-5** 🟥 *diseño primero* — **e-CF real (firma y envío a la DGII)**:
   Cuadre integra un proveedor certificado ("Pascal ECF") en vez de construir
   el firmador propio. *Confirmado: brecha real, ya documentada en
@@ -1083,16 +1096,19 @@ Consecutivos/Configuración del 2026-08-25 (G-10, G-11, G-12, K-1, H-2a),
 C-1 (AZUL/CardNet Payment Link) y H-2b (bot de WhatsApp), los tres
 retomados aparte el mismo día.
 
+**Lote en curso, 2026-08-26** (Ventas/Facturación, decidido con el
+usuario tras la auditoría Parte 8): B-4 (Recargos, entregado arriba),
+H-4 (link público + adjunto en notificaciones), Remisión + stock
+("Marcar entregada" pasa a descontar de verdad — hallazgo nuevo, no
+tenía ítem propio), B-9 (línea manual/libre, retomado — el usuario
+volvió a traer el tema). Diseño completo en
+`C:\Users\longb\.claude\plans\memoized-noodling-moore.md` — orden
+sugerido: B-4 → H-4 → Remisión+stock → B-9 (riesgo creciente, lo más
+invasivo al final).
+
 Lo que queda, por categoría:
-- **Deliberadamente pausado a pedido del usuario**: B-9 (línea manual/
-  libre en factura) — NO retomar sin que el usuario lo traiga de nuevo.
-- **No bloqueante, sin implementar**: B-4 (Recargos de Factura, 🟨→🟧
-  corrección de tamaño), E-1 (Patrón Borrador→Confirmado en Compras/
-  Ajustes/Transferencias, matiz), E-12 (página dedicada de Alertas de
-  Inventario + popup proactivo, encontrado en la Parte 8 de la
-  auditoría, 2026-08-26), H-4 (notificaciones de Cotización/Factura sin
-  link ni PDF adjunto — el cliente no puede ver el documento real,
-  encontrado revisando nuestro propio flujo de envío, 2026-08-26).
+- **No bloqueante, sin implementar**: E-1 (Patrón Borrador→Confirmado en
+  Compras/Ajustes/Transferencias, matiz).
 - **🟥, pendientes de su propia conversación de diseño**: A-4,
   B-5, F-9, G-9 (hardware), J-4 (API keys, reclasificado — no aplica
   sin una API pública).
