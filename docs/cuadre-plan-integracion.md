@@ -721,7 +721,7 @@ Resumen de lo que cambió (detalle en cada ítem más abajo):
   ticket térmico). Guardado en el store genérico `Configuracion`
   (`DOCUMENTO_LOGO`/`DOCUMENTO_NOTA_PIE`), sin claves nuevas en
   `CONFIGURACIONES_BASE`. Sin migración. Entregado 2026-08-24.
-- [ ] **H-4** 🟧 — **Las notificaciones de Cotización/Factura no llevan el
+- [x] **H-4** 🟧 — **Las notificaciones de Cotización/Factura no llevan el
   documento** — el cliente recibe un aviso de texto sin forma real de
   ver qué le mandaron. *Encontrado revisando nuestro propio flujo de
   "enviar" a pedido del usuario (2026-08-26), no por comparación directa
@@ -748,7 +748,23 @@ Resumen de lo que cambió (detalle en cada ítem más abajo):
   Factura — hoy no tiene NINGÚN mecanismo de envío (ni botón, ni evento,
   ni endpoint) — confirmar con el usuario si hace falta antes de
   sumarlo, una remisión suele entregarse físicamente junto a la
-  mercancía.
+  mercancía. Entregado: módulo público `documentos-publicos/`
+  (`@Public()`, `PrismaService` global, mismo patrón que
+  `pasarela-cobro/cobros-publicos`) con JSON + PDF de Factura/Cotización;
+  páginas `/ver-factura/:id`/`/ver-cotizacion/:id` (calcadas de
+  `CobroFactura.tsx`, sin flujo de pago); variable `{{link}}` nueva en
+  `factura_creada`/`cotizacion_enviada`/`factura_recibo`; PDF adjunto en
+  EMAIL (`EmailChannel.enviar()` gana `attachments`, WhatsApp se cubre
+  solo con el link). `mapearFacturaAParams`/`mapearCotizacionAParams`
+  extraídas a archivos propios para evitar un import circular entre
+  `facturacion.service.ts` y `notificaciones.service.ts`. **De paso se
+  encontró y corrigió un bug real**: el asiento contable de una factura
+  con recargos (B-4) quedaba desbalanceado (el crédito a Ingresos no
+  incluía el recargo crudo) — `FacturaCreadaPayload` gana `recargos`,
+  sumado a Ingresos por Ventas en `AsientosContablesService.
+  generarDesdeFactura`. Verificado en vivo (página pública sin sesión +
+  PDF vía curl + asiento balanceado en la base de datos). Entregado
+  2026-08-26.
 
 ## I — Contabilidad
 
@@ -1079,6 +1095,16 @@ aparte.*
   llevan ningún link ni PDF adjunto — el cliente recibe solo un aviso
   de texto, sin forma real de ver el documento. Sin cambios de código
   — solo investigación y documentación.
+- **2026-08-26**: entregados **B-4** (Recargos de Factura) y **H-4**
+  (link público + PDF adjunto en notificaciones), primeros dos ítems
+  del lote de Ventas/Facturación decidido con el usuario (ver nota del
+  "Lote en curso" arriba). Al implementar B-4 se encontró y corrigió un
+  bug real: el asiento contable de una factura con recargos quedaba
+  desbalanceado (crédito a Ingresos no incluía el recargo crudo) — ver
+  el detalle en el ítem H-4 (se corrigió en la misma sesión, al armar
+  la verificación en vivo de H-4). Ambos verificados en vivo (factura
+  de prueba con recargo → totales/asiento exactos contra la base de
+  datos; página pública `/ver-factura/:id` sin sesión + PDF vía curl).
 
 ## Sugerencia de por dónde arrancar
 
@@ -1097,14 +1123,14 @@ C-1 (AZUL/CardNet Payment Link) y H-2b (bot de WhatsApp), los tres
 retomados aparte el mismo día.
 
 **Lote en curso, 2026-08-26** (Ventas/Facturación, decidido con el
-usuario tras la auditoría Parte 8): B-4 (Recargos, entregado arriba),
-H-4 (link público + adjunto en notificaciones), Remisión + stock
-("Marcar entregada" pasa a descontar de verdad — hallazgo nuevo, no
-tenía ítem propio), B-9 (línea manual/libre, retomado — el usuario
-volvió a traer el tema). Diseño completo en
+usuario tras la auditoría Parte 8): B-4 (Recargos, entregado) y H-4
+(link público + adjunto en notificaciones, entregado) — quedan
+Remisión + stock ("Marcar entregada" pasa a descontar de verdad —
+hallazgo nuevo, no tenía ítem propio) y B-9 (línea manual/libre,
+retomado — el usuario volvió a traer el tema). Diseño completo en
 `C:\Users\longb\.claude\plans\memoized-noodling-moore.md` — orden
-sugerido: B-4 → H-4 → Remisión+stock → B-9 (riesgo creciente, lo más
-invasivo al final).
+sugerido: Remisión+stock → B-9 (riesgo creciente, lo más invasivo al
+final).
 
 Lo que queda, por categoría:
 - **No bloqueante, sin implementar**: E-1 (Patrón Borrador→Confirmado en
