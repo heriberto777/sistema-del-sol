@@ -1,6 +1,8 @@
 import { FormEvent, useState } from 'react';
+import { Eye } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../../lib/api-client';
+import { abrirBlob } from '../../../lib/descargar-archivo';
 import { ModalImprimir } from '../../molecules/ModalImprimir/ModalImprimir';
 import { Badge } from '../../atoms/Badge/Badge';
 import { Button } from '../../atoms/Button/Button';
@@ -13,6 +15,8 @@ import { CampoCodigoAutorizacion } from '../../molecules/CampoCodigoAutorizacion
 import { SearchInput } from '../../molecules/SearchInput/SearchInput';
 import { Paginacion } from '../../molecules/Paginacion/Paginacion';
 import { RowActionsMenu } from '../../molecules/RowActionsMenu/RowActionsMenu';
+import { TablaArticulosDocumento } from '../../molecules/TablaArticulosDocumento/TablaArticulosDocumento';
+import { BloqueTotalesDocumento } from '../../molecules/BloqueTotalesDocumento/BloqueTotalesDocumento';
 import { useDebouncedValue } from '../../../hooks/useDebouncedValue';
 import { useAuth } from '../../../hooks/useAuth';
 import { PaginaResultado } from '../../../types/pagina-resultado';
@@ -27,6 +31,14 @@ interface Factura {
   pagada: boolean;
   fecha: string;
   cliente: { nombre: string };
+}
+
+interface FacturaDetalle extends Factura {
+  subtotal: string;
+  descuento: string;
+  itbis: string;
+  recargos: { concepto: string; monto: string }[];
+  lineas: { producto: { nombre: string } | null; descripcionManual: string | null; cantidad: string; precioUnitario: string; montoTotal: string }[];
 }
 
 interface Pago {
@@ -68,6 +80,7 @@ export function FacturasTable({ tiposFactura, titulo = 'Facturas', busquedaPlace
   const [facturaAnulando, setFacturaAnulando] = useState<Factura | null>(null);
   const [facturaImprimiendo, setFacturaImprimiendo] = useState<Factura | null>(null);
   const [facturaLinkPago, setFacturaLinkPago] = useState<Factura | null>(null);
+  const [facturaViendo, setFacturaViendo] = useState<Factura | null>(null);
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['facturas', pagina, busquedaDebounced, tiposFactura],
@@ -133,7 +146,11 @@ export function FacturasTable({ tiposFactura, titulo = 'Facturas', busquedaPlace
                   ];
 
                   return (
-                    <tr key={factura.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                    <tr
+                      key={factura.id}
+                      onClick={() => setFacturaViendo(factura)}
+                      className="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/40"
+                    >
                       <td className="px-5 py-3 font-mono text-xs font-medium text-slate-900 dark:text-slate-100">
                         {identificadorFactura(factura)}
                       </td>
@@ -148,7 +165,20 @@ export function FacturasTable({ tiposFactura, titulo = 'Facturas', busquedaPlace
                         )}
                       </td>
                       <td className="px-5 py-3">{new Date(factura.fecha).toLocaleDateString('es-DO')}</td>
-                      <td className="px-5 py-3 text-right">{acciones.length > 0 && <RowActionsMenu acciones={acciones} />}</td>
+                      <td className="px-5 py-3 text-right" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-end gap-1">
+                          <button
+                            type="button"
+                            onClick={() => setFacturaViendo(factura)}
+                            className="rounded-md border border-slate-200 p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+                            aria-label="Ver detalle"
+                            title="Ver detalle"
+                          >
+                            <Eye size={16} />
+                          </button>
+                          {acciones.length > 0 && <RowActionsMenu acciones={acciones} />}
+                        </div>
+                      </td>
                     </tr>
                   );
                 })}
@@ -173,7 +203,127 @@ export function FacturasTable({ tiposFactura, titulo = 'Facturas', busquedaPlace
           onClose={() => setFacturaImprimiendo(null)}
         />
       )}
+      {facturaViendo && (
+        <ModalDetalleFactura
+          factura={facturaViendo}
+          onClose={() => setFacturaViendo(null)}
+          onImprimir={() => {
+            setFacturaImprimiendo(facturaViendo);
+            setFacturaViendo(null);
+          }}
+        />
+      )}
     </div>
+  );
+}
+
+function ModalDetalleFactura({ factura, onClose, onImprimir }: { factura: Factura; onClose: () => void; onImprimir: () => void }) {
+  const [descargando, setDescargando] = useState(false);
+
+  const { data: detalle } = useQuery({
+    queryKey: ['factura-detalle', factura.id],
+    queryFn: async () => (await apiClient.get<FacturaDetalle>(`/facturas/${factura.id}`)).data,
+  });
+  const { data: pagosData } = useQuery({
+    queryKey: ['pagos-factura', factura.id],
+    queryFn: async () => (await apiClient.get<{ pagos: Pago[]; totalPagado: number }>(`/facturas/${factura.id}/pagos`)).data,
+  });
+
+  async function descargarPdf() {
+    setDescargando(true);
+    try {
+      const respuesta = await apiClient.get(`/facturas/${factura.id}/imprimir`, { responseType: 'blob' });
+      abrirBlob(new Blob([respuesta.data], { type: String(respuesta.headers['content-type'] ?? 'application/pdf') }));
+    } finally {
+      setDescargando(false);
+    }
+  }
+
+  const totalPagado = pagosData ? Number(pagosData.totalPagado) : 0;
+  const totalRecargos = detalle?.recargos.reduce((acc, r) => acc + Number(r.monto), 0) ?? 0;
+
+  return (
+    <Modal titulo={`Factura ${identificadorFactura(factura)}`} onClose={onClose} ancho="2xl">
+      <div className="space-y-4">
+        <div className="flex items-start justify-between">
+          <div className="space-y-1">
+            <Badge tono={TONO_POR_ESTADO[factura.estado]}>{factura.estado}</Badge>
+            {factura.ncf && <p className="font-mono text-sm text-slate-500 dark:text-slate-400">{factura.ncf}</p>}
+          </div>
+          <p className="text-right text-sm text-slate-500 dark:text-slate-400">
+            Fecha
+            <br />
+            <span className="font-medium text-slate-900 dark:text-slate-100">{new Date(factura.fecha).toLocaleDateString('es-DO')}</span>
+          </p>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" variante="secundario" onClick={descargarPdf} disabled={descargando}>
+            {descargando ? 'Generando…' : 'Descargar PDF'}
+          </Button>
+          <Button type="button" variante="secundario" onClick={onImprimir}>
+            Imprimir / enviar por correo
+          </Button>
+        </div>
+
+        {!detalle ? (
+          <p className="text-sm text-slate-500">Cargando…</p>
+        ) : (
+          <>
+            <TablaArticulosDocumento lineas={detalle.lineas} />
+            <BloqueTotalesDocumento
+              subtotal={detalle.subtotal}
+              descuento={detalle.descuento}
+              recargos={totalRecargos}
+              itbis={detalle.itbis}
+              total={detalle.total}
+            />
+          </>
+        )}
+
+        {pagosData && pagosData.pagos.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Pagos</p>
+            <div className="grid grid-cols-3 gap-3 rounded-lg border border-slate-200 p-4 text-sm dark:border-slate-800">
+              <div>
+                <p className="text-slate-500 dark:text-slate-400">Total</p>
+                <p className="font-medium text-slate-900 dark:text-slate-100">RD$ {Number(factura.total).toLocaleString('es-DO')}</p>
+              </div>
+              <div>
+                <p className="text-slate-500 dark:text-slate-400">Pagado</p>
+                <p className="font-medium text-emerald-600 dark:text-emerald-400">RD$ {totalPagado.toLocaleString('es-DO')}</p>
+              </div>
+              <div>
+                <p className="text-slate-500 dark:text-slate-400">Pendiente</p>
+                <p className="font-medium text-slate-900 dark:text-slate-100">RD$ {(Number(factura.total) - totalPagado).toLocaleString('es-DO')}</p>
+              </div>
+            </div>
+            <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800">
+              <table className="w-full text-left text-sm">
+                <thead className="bg-slate-50 text-xs text-slate-500 dark:bg-slate-900/60 dark:text-slate-400">
+                  <tr>
+                    <th className="px-4 py-2 font-medium">Fecha</th>
+                    <th className="px-4 py-2 font-medium">Método</th>
+                    <th className="px-4 py-2 text-right font-medium">Monto</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {pagosData.pagos.map((pago) => (
+                    <tr key={pago.id}>
+                      <td className="px-4 py-2 text-slate-700 dark:text-slate-300">{new Date(pago.fecha).toLocaleDateString('es-DO')}</td>
+                      <td className="px-4 py-2 text-slate-700 dark:text-slate-300">{pago.formaPago.nombre}</td>
+                      <td className="px-4 py-2 text-right font-medium text-slate-900 dark:text-slate-100">
+                        RD$ {Number(pago.monto).toLocaleString('es-DO')}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
+    </Modal>
   );
 }
 

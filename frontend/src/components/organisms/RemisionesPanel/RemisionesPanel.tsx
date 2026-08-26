@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from 'react';
-import { User } from 'lucide-react';
+import { Eye, User } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../../lib/api-client';
 import { ModalImprimir } from '../../molecules/ModalImprimir/ModalImprimir';
@@ -13,6 +13,7 @@ import { Badge } from '../../atoms/Badge/Badge';
 import { SearchInput } from '../../molecules/SearchInput/SearchInput';
 import { Paginacion } from '../../molecules/Paginacion/Paginacion';
 import { SelectorLineaProducto } from '../../molecules/SelectorLineaProducto/SelectorLineaProducto';
+import { TablaArticulosDocumento } from '../../molecules/TablaArticulosDocumento/TablaArticulosDocumento';
 import { useDebouncedValue } from '../../../hooks/useDebouncedValue';
 import { useAuth } from '../../../hooks/useAuth';
 import { PaginaResultado } from '../../../types/pagina-resultado';
@@ -46,6 +47,12 @@ interface Remision {
   lineas: { productoId: string; varianteId: string; cantidad: string }[];
 }
 
+interface RemisionDetalle extends Omit<Remision, 'lineas'> {
+  fecha: string;
+  bodega: { nombre: string };
+  lineas: { producto: { nombre: string } | null; cantidad: string }[];
+}
+
 const TONO_POR_ESTADO: Record<EstadoRemision, 'exito' | 'advertencia' | 'peligro' | 'neutro'> = {
   BORRADOR: 'neutro',
   ENTREGADA: 'advertencia',
@@ -66,6 +73,7 @@ export function RemisionesPanel() {
   const [remisionEditando, setRemisionEditando] = useState<Remision | null>(null);
   const [remisionConvirtiendo, setRemisionConvirtiendo] = useState<Remision | null>(null);
   const [remisionImprimiendo, setRemisionImprimiendo] = useState<Remision | null>(null);
+  const [remisionViendo, setRemisionViendo] = useState<Remision | null>(null);
 
   const { data: productos } = useQuery({
     queryKey: ['productos-select'],
@@ -141,14 +149,31 @@ export function RemisionesPanel() {
                 ];
 
                 return (
-                  <tr key={remision.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                  <tr
+                    key={remision.id}
+                    onClick={() => setRemisionViendo(remision)}
+                    className="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/40"
+                  >
                     <td className="px-5 py-3 font-mono text-xs">{remision.numero}</td>
                     <td className="px-5 py-3">{remision.cliente?.nombre}</td>
                     <td className="px-5 py-3">
                       <Badge tono={TONO_POR_ESTADO[remision.estado]}>{remision.estado}</Badge>
                       {remision.facturaId && <span className="ml-2 text-xs text-slate-400">Ya facturada</span>}
                     </td>
-                    <td className="px-5 py-3 text-right">{acciones.length > 0 && <RowActionsMenu acciones={acciones} />}</td>
+                    <td className="px-5 py-3 text-right" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center justify-end gap-1">
+                        <button
+                          type="button"
+                          onClick={() => setRemisionViendo(remision)}
+                          className="rounded-md border border-slate-200 p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+                          aria-label="Ver detalle"
+                          title="Ver detalle"
+                        >
+                          <Eye size={16} />
+                        </button>
+                        {acciones.length > 0 && <RowActionsMenu acciones={acciones} />}
+                      </div>
+                    </td>
                   </tr>
                 );
               })}
@@ -185,7 +210,60 @@ export function RemisionesPanel() {
           onClose={() => setRemisionImprimiendo(null)}
         />
       )}
+      {remisionViendo && (
+        <ModalDetalleRemision
+          remision={remisionViendo}
+          onClose={() => setRemisionViendo(null)}
+          onImprimir={() => {
+            setRemisionImprimiendo(remisionViendo);
+            setRemisionViendo(null);
+          }}
+        />
+      )}
     </div>
+  );
+}
+
+function ModalDetalleRemision({ remision, onClose, onImprimir }: { remision: Remision; onClose: () => void; onImprimir: () => void }) {
+  const { data: detalle } = useQuery({
+    queryKey: ['remision-detalle-ver', remision.id],
+    queryFn: async () => (await apiClient.get<RemisionDetalle>(`/remisiones/${remision.id}`)).data,
+  });
+
+  return (
+    <Modal titulo={`Remisión ${remision.numero}`} onClose={onClose} ancho="2xl">
+      <div className="space-y-4">
+        <div className="flex items-start justify-between">
+          <Badge tono={TONO_POR_ESTADO[remision.estado]}>{remision.estado}</Badge>
+          {detalle?.fecha && (
+            <p className="text-right text-sm text-slate-500 dark:text-slate-400">
+              Fecha
+              <br />
+              <span className="font-medium text-slate-900 dark:text-slate-100">{new Date(detalle.fecha).toLocaleDateString('es-DO')}</span>
+            </p>
+          )}
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div className="rounded-lg border border-slate-200 p-3 text-sm dark:border-slate-800">
+            <p className="text-slate-500 dark:text-slate-400">Cliente</p>
+            <p className="font-medium text-slate-900 dark:text-slate-100">{remision.cliente?.nombre}</p>
+          </div>
+          <div className="rounded-lg border border-slate-200 p-3 text-sm dark:border-slate-800">
+            <p className="text-slate-500 dark:text-slate-400">Bodega</p>
+            <p className="font-medium text-slate-900 dark:text-slate-100">{detalle?.bodega?.nombre ?? '—'}</p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" variante="secundario" onClick={onImprimir}>
+            Imprimir / descargar PDF
+          </Button>
+        </div>
+
+        {!detalle ? <p className="text-sm text-slate-500">Cargando…</p> : <TablaArticulosDocumento lineas={detalle.lineas} mostrarPrecios={false} />}
+      </div>
+    </Modal>
   );
 }
 

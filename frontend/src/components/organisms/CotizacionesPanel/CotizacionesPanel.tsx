@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from 'react';
-import { User } from 'lucide-react';
+import { Eye, User } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../../lib/api-client';
 import { ModalImprimir } from '../../molecules/ModalImprimir/ModalImprimir';
@@ -14,6 +14,8 @@ import { Badge } from '../../atoms/Badge/Badge';
 import { SearchInput } from '../../molecules/SearchInput/SearchInput';
 import { Paginacion } from '../../molecules/Paginacion/Paginacion';
 import { SelectorLineaProducto } from '../../molecules/SelectorLineaProducto/SelectorLineaProducto';
+import { TablaArticulosDocumento } from '../../molecules/TablaArticulosDocumento/TablaArticulosDocumento';
+import { BloqueTotalesDocumento } from '../../molecules/BloqueTotalesDocumento/BloqueTotalesDocumento';
 import { useDebouncedValue } from '../../../hooks/useDebouncedValue';
 import { useAuth } from '../../../hooks/useAuth';
 import { PaginaResultado } from '../../../types/pagina-resultado';
@@ -42,6 +44,7 @@ interface LineaCotizacion {
   descripcionManual?: string | null;
   cantidad: string;
   precioUnitario: string;
+  montoTotal?: string;
   producto?: { nombre: string; codigo: string };
 }
 
@@ -50,6 +53,10 @@ interface Cotizacion {
   numero: string;
   estado: EstadoCotizacion;
   total: string;
+  subtotal?: string;
+  descuento?: string;
+  itbis?: string;
+  createdAt?: string;
   fechaVigenciaHasta: string;
   facturaId: string | null;
   clienteId: string;
@@ -88,6 +95,7 @@ export function CotizacionesPanel() {
   const [cotizacionEditando, setCotizacionEditando] = useState<Cotizacion | null>(null);
   const [cotizacionConvirtiendo, setCotizacionConvirtiendo] = useState<Cotizacion | null>(null);
   const [cotizacionImprimiendo, setCotizacionImprimiendo] = useState<Cotizacion | null>(null);
+  const [cotizacionViendo, setCotizacionViendo] = useState<Cotizacion | null>(null);
 
   const { data: productos } = useQuery({
     queryKey: ['productos-select'],
@@ -164,7 +172,11 @@ export function CotizacionesPanel() {
                 ];
 
                 return (
-                  <tr key={cotizacion.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                  <tr
+                    key={cotizacion.id}
+                    onClick={() => setCotizacionViendo(cotizacion)}
+                    className="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/40"
+                  >
                     <td className="px-5 py-3">{cotizacion.numero}</td>
                     <td className="px-5 py-3">{cotizacion.cliente?.nombre}</td>
                     <td className="px-5 py-3 font-medium text-slate-900 dark:text-slate-100">RD$ {Number(cotizacion.total).toLocaleString('es-DO')}</td>
@@ -173,7 +185,20 @@ export function CotizacionesPanel() {
                       <Badge tono={TONO_POR_ESTADO[cotizacion.estado]}>{cotizacion.estado}</Badge>
                       {cotizacion.facturaId && <span className="ml-2 text-xs text-slate-400">Ya facturada</span>}
                     </td>
-                    <td className="px-5 py-3 text-right">{acciones.length > 0 && <RowActionsMenu acciones={acciones} />}</td>
+                    <td className="px-5 py-3 text-right" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center justify-end gap-1">
+                        <button
+                          type="button"
+                          onClick={() => setCotizacionViendo(cotizacion)}
+                          className="rounded-md border border-slate-200 p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+                          aria-label="Ver detalle"
+                          title="Ver detalle"
+                        >
+                          <Eye size={16} />
+                        </button>
+                        {acciones.length > 0 && <RowActionsMenu acciones={acciones} />}
+                      </div>
+                    </td>
                   </tr>
                 );
               })}
@@ -209,7 +234,73 @@ export function CotizacionesPanel() {
           onClose={() => setCotizacionImprimiendo(null)}
         />
       )}
+      {cotizacionViendo && (
+        <ModalDetalleCotizacion
+          cotizacion={cotizacionViendo}
+          onClose={() => setCotizacionViendo(null)}
+          onImprimir={() => {
+            setCotizacionImprimiendo(cotizacionViendo);
+            setCotizacionViendo(null);
+          }}
+        />
+      )}
     </div>
+  );
+}
+
+function ModalDetalleCotizacion({
+  cotizacion,
+  onClose,
+  onImprimir,
+}: {
+  cotizacion: Cotizacion;
+  onClose: () => void;
+  onImprimir: () => void;
+}) {
+  const { data: detalle } = useQuery({
+    queryKey: ['cotizacion-detalle', cotizacion.id],
+    queryFn: async () => (await apiClient.get<Cotizacion>(`/cotizaciones/${cotizacion.id}`)).data,
+  });
+
+  return (
+    <Modal titulo={`Cotización ${cotizacion.numero}`} onClose={onClose} ancho="2xl">
+      <div className="space-y-4">
+        <div className="flex items-start justify-between">
+          <Badge tono={TONO_POR_ESTADO[cotizacion.estado]}>{cotizacion.estado}</Badge>
+          <div className="text-right text-sm text-slate-500 dark:text-slate-400">
+            {detalle?.createdAt && (
+              <p>
+                Fecha <span className="font-medium text-slate-900 dark:text-slate-100">{new Date(detalle.createdAt).toLocaleDateString('es-DO')}</span>
+              </p>
+            )}
+            <p>
+              Válida hasta{' '}
+              <span className="font-medium text-slate-900 dark:text-slate-100">{new Date(cotizacion.fechaVigenciaHasta).toLocaleDateString('es-DO')}</span>
+            </p>
+          </div>
+        </div>
+
+        <div className="rounded-lg border border-slate-200 p-3 text-sm dark:border-slate-800">
+          <p className="text-slate-500 dark:text-slate-400">Cliente</p>
+          <p className="font-medium text-slate-900 dark:text-slate-100">{cotizacion.cliente?.nombre}</p>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" variante="secundario" onClick={onImprimir}>
+            Imprimir / descargar PDF
+          </Button>
+        </div>
+
+        {!detalle ? (
+          <p className="text-sm text-slate-500">Cargando…</p>
+        ) : (
+          <>
+            <TablaArticulosDocumento lineas={detalle.lineas} />
+            <BloqueTotalesDocumento subtotal={detalle.subtotal ?? 0} descuento={detalle.descuento} itbis={detalle.itbis ?? 0} total={detalle.total} />
+          </>
+        )}
+      </div>
+    </Modal>
   );
 }
 

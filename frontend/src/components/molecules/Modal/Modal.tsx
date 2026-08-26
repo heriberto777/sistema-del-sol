@@ -5,11 +5,11 @@ interface ModalProps {
   titulo: string;
   onClose: () => void;
   children: ReactNode;
-  /** 'lg' (default, formularios normales) o 'xl' (tablas anchas — ej. vista previa de importación). */
-  ancho?: 'lg' | 'xl';
+  /** 'lg' (default, formularios normales), 'xl' (tablas anchas — ej. vista previa de importación) o '2xl' ("ver detalle" de un documento — más ancho en desktop/tablet para ver artículos/totales sin scroll horizontal). */
+  ancho?: 'lg' | 'xl' | '2xl';
 }
 
-const ANCHOS = { lg: 'max-w-lg', xl: 'max-w-4xl' } as const;
+const ANCHOS = { lg: 'max-w-lg', xl: 'max-w-4xl', '2xl': 'max-w-5xl' } as const;
 
 /**
  * Overlay simple sin dependencias externas. Cierra al hacer click fuera del
