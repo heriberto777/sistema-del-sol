@@ -19,6 +19,7 @@ tomar de acá al planear la integración.
 5. [POS — pasada 1 (atajos, primeros flujos)](#parte-5)
 6. [POS — pasada 2 (flujos confirmados con interacción real)](#parte-6)
 7. [Sitio Web / Tienda Online, auditoría profunda](#parte-7)
+8. [Facturación y Ventas, auditoría profunda + Alertas de Inventario](#parte-8)
 
 ---
 
@@ -185,6 +186,20 @@ Simple: "Nueva Cotización", buscar, filtros. ✅ cubierto, paridad aparente.
 menú de Cuadre. Sugiere que Cuadre NO tiene el concepto de remisión/nota de
 entrega como documento propio separado de la factura — algo que NOSOTROS SÍ
 tenemos y ellos aparentemente no.
+
+🆕 **Confirmado en vivo (Parte 8, 2026-08-26), a pedido del usuario**: una
+Cotización de Cuadre **nunca se convierte en Factura** — ni en la lista de
+acciones (Ver/Imprimir/Descargar/Ver detalle/Enviar/Editar), ni en el panel
+de detalle, ni en el editor completo (que termina en "Condiciones
+Comerciales" — Forma de Pago/Tiempo de Entrega/Garantía, todo texto libre,
+sin ningún botón de conversión). Es un documento de punta muerta: se
+imprime, se envía por correo, y ahí termina su ciclo de vida — el cajero
+tiene que rehacer manualmente la venta en Facturación o el POS si el
+cliente acepta. **Nosotros SÍ convertimos** (`FacturacionService.crear()`
+reusado desde Cotizaciones/Remisiones, ver CLAUDE.md — sin duplicar NCF/
+ITBIS/stock) — ventaja real y más grande de lo que este documento
+reflejaba antes (el "no existe Remisiones" ya estaba anotado, pero no que
+ademas Cotizaciones tampoco convierte).
 
 #### Ventas → Facturación (`/invoices`, `/invoices/new`)
 
@@ -1537,6 +1552,162 @@ página.
 
 ---
 
+<a id="parte-8"></a>
+## Parte 8 — Facturación y Ventas, auditoría profunda + Alertas de Inventario (app.cuadre.do)
+
+Pasada dirigida específicamente a profundizar **Ventas → Facturación**
+(solo overview en la Parte 1) y a confirmar en vivo, con interacción
+real (crear/ver/cancelar un borrador, no solo mirar listas), el resto
+del submenú Ventas — más una revisión enfocada de **Alertas de
+Inventario** (`/inventory-alerts`) a partir de un popup del dashboard
+reportado por el usuario, ya visto de pasada en la Parte 3.
+
+**Nota operativa**: al probar el campo de línea manual del formulario
+de Nueva Factura se descubrió que Cuadre autoguarda un borrador real
+(número correlativo propio) con solo escribir, sin ningún botón
+"Guardar" — confirmado sin querer, sobre la cuenta real del usuario.
+El borrador (`INV-2026-000003`, RD$0.00, sin cliente, sin NCF
+consumido) se canceló al terminar la pasada (ver hallazgo #1 abajo,
+que documenta exactamente este comportamiento porque resultó relevante
+para la comparación).
+
+### 1. Facturación (`/invoices`, `/invoices/new`) — confirmado en vivo
+
+Todo lo que la Parte 1 describió de memoria/una sola mirada se confirmó
+tal cual con interacción real: selector de Condición de Pago (Contado/
+15/30/45/60/90 Días) con "Vencimiento" recalculado, Tipo de NCF (B01/
+B02/B14/B15), botón "Agregar Línea (F6)" que abre una fila con
+Descripción/Cant/Precio/Desc %/**ITBIS (checkbox, marcado por
+defecto)**/Subtotal, Descuento General (%/$) sobre el subtotal de
+líneas. Los 5 gaps que ya listaba la Parte 1 (B14/B15, condición de
+pago con plazo, línea manual, ITBIS por línea, descuento general) están
+**todos ya en `cuadre-plan-integracion.md`** como B-1/B-6/B-7/B-8
+(entregados) y B-9 (línea manual, deliberadamente pendiente por
+decisión del usuario 2026-08-24) — nada nuevo que agregar ahí.
+
+🆕 **Hallazgo nuevo #1 — autoguardado de borrador mientras se escribe,
+sin botón "Guardar"**: el campo "Descripción" de una línea manual es un
+input de autocompletar producto (placeholder "Buscar producto...") que
+acepta texto libre si no matchea nada — al escribir la primera letra,
+la factura completa YA se persiste como registro real con número
+correlativo propio (`INV-2026-NNNNNN`), visible de inmediato en
+Facturación **y** en Historial de Ventas (que unifica "Estado: Borrador"
+para ambos orígenes, POS y Facturación directa — confirma el hallazgo
+de estado "Borrador" ya anotado en la Parte 1). No hay ningún botón
+"Eliminar"/"Descartar" en ninguna vista (ni la lista, ni "Ver detalle",
+ni el editor) — la única acción disponible sobre un borrador es
+"Cancelar" (lo pasa a estado `Cancelada`, permanece para siempre en el
+historial, nunca se borra de la base). Relevante para nosotros porque
+es **conceptualmente el mismo problema que acabamos de resolver para el
+carrito del POS** (`CarritoBorrador`, sesión 2026-08-25/26) pero
+aplicado a Facturación de servicios directa, no solo POS — y con una
+diferencia de diseño clave: Cuadre lo modela como un registro real de
+la entidad (consume un número correlativo desde el primer caracter
+tipeado), nosotros optamos por una tabla de borrador aparte e invisible
+que nunca consume NCF/correlativo y se borra sola. **No se agrega como
+ítem del catálogo** — es una nota de contexto/idea a evaluar si algún
+día se decide dar el mismo tratamiento a Facturación directa, no una
+brecha confirmada que el usuario haya pedido cerrar.
+
+### 2. Historial de Ventas (`/sales`) — detalle de una venta completada
+
+"Ver detalle" de una venta `Completada` (POS) muestra: Estado/Tipo/
+Fecha, Cliente/Cajero/Bodega, NCF, tabla de Productos (Cant/Precio/
+Desc/Total), Subtotal/Impuestos/Total, **Pagos** (método + monto), y un
+botón **"Generar Nota de Crédito"** directo desde el detalle. ✅ Ya
+cubierto conceptualmente (F4 Devolución en nuestro POS hace lo mismo,
+reusando el mecanismo de Nota de Crédito — ver ARCHITECTURE.md).
+
+🆕 **Observación (no gap confirmado)**: la venta de ejemplo (Total RD$
+480.00) tiene un pago de "Efectivo RD$ 500.00" registrado tal cual —
+Cuadre persiste el monto **tendido** completo (incluyendo lo que
+después se devuelve como cambio), no el monto neto aplicado a la venta.
+En el panel de Facturación esto se ve como "Pendiente: -RD$20.00" en
+vez de una cifra explícita de "Cambio/Vuelto". Nuestro
+`RegistrarVentaPosDto.pagos[].monto` hace exactamente lo contrario a
+propósito ("el cambio nunca se envía", ver el comentario en el DTO) —
+el cambio se calcula y muestra solo en el navegador, nunca se persiste.
+Ambos enfoques son válidos (el de Cuadre reconciliaría más literalmente
+contra "cuánto efectivo físico se contó al recibir el pago" en un
+arqueo); no se propone cambiar nuestro criterio sin más contexto de
+negocio, solo se deja anotada la diferencia de modelo de datos por si
+alguna vez se audita el arqueo de caja a fondo.
+
+### 3. Notas de Crédito, Formas de Pago, Cajas, Bonos — reconfirmado, sin datos nuevos
+
+Las cuatro pantallas coinciden exactamente con lo ya documentado en la
+Parte 1 (estados Activa/Parcial/Usada/Cancelada; catálogo de 6 formas
+de pago con Tipo/Requiere Ref.; "Caja Principal" con Categorías/
+Productos/Favoritos/Impresión "Navegador"; Bonos en lote). El tenant de
+prueba no tiene notas de crédito ni lotes de bonos creados — nada que
+agregar a los gaps ya catalogados (B-9 no aplica a NC, ver Ventas →
+Notas de Crédito en la Parte 1; Bonos ya cubierto por E-10).
+
+### 4. Alertas de Inventario — página dedicada + popup proactivo (`/inventory-alerts`)
+
+La página ya fue descrita en la Parte 3 (4 tabs: Resumen/Stock Bajo/
+Sin Stock/Por Vencer, 4 contadores, dos paneles "Ver todos"). Esta
+pasada confirma el **drill-down real** de cada tab: tabla Producto/
+Bodega/**Stock Mínimo** (columna "-" cuando el producto no tiene mínimo
+configurado) — no es un simple conteo, es un listado navegable por
+producto.
+
+🆕 **Hallazgo nuevo #2 — popup modal al entrar al dashboard, una vez
+por sesión**: al iniciar sesión (o la primera vez que se visita el
+Dashboard tras el login), si hay algo en cualquiera de las 4 categorías
+aparece un modal centrado — "Alerta de Inventario · N producto(s)
+requiere(n) atención" + badges tipo "1 agotado" + botones "Cerrar" /
+"Ver Alertas →" (navega a `/inventory-alerts`). Confirmado que NO
+reaparece en un segundo refresh de la misma sesión (se suprime después
+de mostrarse una vez). Esto es un mecanismo proactivo — el usuario se
+entera sin tener que ir a buscar el dato — distinto de nuestro `GET
+/reportes/dashboard.alertasInventario` (E-4, entregado 2026-08-24), que
+son 4 tarjetas pasivas en `Dashboard.tsx`: si el cajero/admin no entra
+al Dashboard y mira, no se entera. **Gap real, agregado como E-12 en
+`cuadre-plan-integracion.md`** (página dedicada con drill-down + popup
+de sesión) — ver ese ítem para el detalle de alcance propuesto.
+
+### 5. Addendum — revisión de NUESTRO propio flujo de "enviar" (a pedido del usuario)
+
+Cuadre ofrece "Enviar Cotización" (envío real, no probado en vivo para no
+disparar un correo real a un cliente real de este tenant de prueba — el
+botón es `type="submit"`). Revisando el equivalente en nuestro código en
+vez de arriesgar el envío ajeno: **Cotizaciones** SÍ tiene un flujo real
+(botón "Enviar" en `CotizacionesPanel.tsx`, visible solo en `BORRADOR` →
+`PATCH /cotizaciones/:id/estado` → evento `COTIZACION_ENVIADA` →
+`NotificacionesService` manda EMAIL si el cliente tiene `email` y WHATSAPP
+si tiene `telefono`); **Facturación** tiene DOS (automático al crearse,
+`FACTURA_CREADA`, y manual con destinatario libre, `POST /facturas/:id/
+enviar-recibo`, para el caso de POS con "Consumidor Final" sin contacto
+propio guardado); **Remisiones no tiene ninguno** (ni botón, ni evento, ni
+endpoint).
+
+🆕 **Gap real encontrado, más importante que la asimetría de Remisiones**:
+en los TRES casos que sí envían algo, el cliente recibe una notificación de
+puro texto ("tu cotización #X por RD$Y fue enviada") **sin ningún link ni
+PDF adjunto** — no hay forma de que el cliente vea las líneas, precios o
+condiciones reales de lo que le mandaron. `EmailChannel.enviar()` llama a
+`nodemailer.sendMail()` sin `attachments` (nodemailer ya lo soporta nativo,
+no es una librería nueva) y ninguna plantilla tiene una variable de link.
+Agregado como **H-4** en `cuadre-plan-integracion.md` (diseño primero: la
+opción que resuelve EMAIL y WHATSAPP a la vez es un link público de solo
+lectura, mismo patrón sin-autenticación que `/pagar/:facturaId` de la
+pasarela de pago).
+
+### No explorado en la Parte 8
+
+Registrar un pago parcial/completo sobre una factura de Facturación
+directa desde su detalle (las 2 facturas de ejemplo ya estaban
+`Pagada`, sin ninguna `Pendiente`/`Vencida` para probar el flujo);
+enviar una factura "Por correo" de verdad (se ve el botón, no se probó
+el envío real); comportamiento de "Registrar Cobro" (Cobranza) contra
+una Nota de Crédito real como forma de pago (no hay NC de ejemplo en
+este tenant); contenido del dropdown "Ver notificaciones" (campana del
+header) — no mostró ningún panel visible al hacer clic en esta pasada,
+posiblemente porque no había notificaciones sin leer en el momento.
+
+---
+
 ## Síntesis final: qué tenemos, qué no tenemos, qué ya tenemos mejor
 
 Ver el artefacto visual "Radar Cuadre" (publicado en la conversación) para
@@ -1551,5 +1722,8 @@ resumir — usarlo como referencia al planear qué construir (ver
    roles personalizados a checkbox por módulo/acción.
 2. **Cálculo de ISR por tramos en código** — el modo "Escalonado" de Cuadre
    admite que no es self-service ("se configura en la base de datos").
-3. **Remisiones/notas de entrega** — no existe ningún equivalente en todo
-   el menú de Cuadre.
+3. **Cotización/Remisión → Factura de verdad** — Cuadre no tiene Remisiones
+   como concepto, y su Cotización es un documento de punta muerta (jamás se
+   convierte en Factura: se envía por correo y ahí termina). Nosotros
+   convertimos ambas reusando `FacturacionService.crear()` sin duplicar NCF/
+   ITBIS/stock — confirmado en vivo, Parte 8.

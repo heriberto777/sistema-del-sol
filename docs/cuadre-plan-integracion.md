@@ -335,6 +335,10 @@ Resumen de lo que cambió (detalle en cada ítem más abajo):
   vencimientos, independiente del umbral de 30 días del cron de avisos
   existente. Segunda fila de tarjetas en `Dashboard.tsx`, filtrable por
   sucursal igual que el resto. Sin migración. Entregado 2026-08-24.
+  **Corrección (Parte 8, 2026-08-26)**: lo entregado son 4 tarjetas
+  pasivas — Cuadre además tiene una página dedicada con drill-down por
+  producto y un popup proactivo al iniciar sesión, ninguno de los dos
+  construido acá. Ver **E-12**, ítem nuevo para esa parte del gap.
 - [x] **E-5** 🟧 *(alcance reducido)* — **Cliente: campos que faltan**.
   *YA tenemos `limiteCredito` (Decimal) y `esConsumidorFinal` (que ES el
   "cliente por defecto"/walk-in de Cuadre) en `model Cliente`.* Entregado:
@@ -421,6 +425,27 @@ Resumen de lo que cambió (detalle en cada ítem más abajo):
   funcionalidad de cuentas por cobrar más grande, candidata a su propia
   sesión de diseño. Migración `20260821160000_forma_pago_tipo`. Entregado
   2026-08-21.
+- [ ] **E-12** 🟧 — **Página dedicada de Alertas de Inventario + popup
+  proactivo al iniciar sesión**. *Confirmado (Parte 8, auditoría en
+  vivo): `/inventory-alerts` en Cuadre es una página propia (4 tabs:
+  Resumen/Stock Bajo/Sin Stock/Por Vencer) con drill-down real —
+  tabla Producto/Bodega/Stock Mínimo por cada categoría, con "Ver
+  todos" desde el resumen — y un modal que aparece solo al entrar al
+  Dashboard (una vez por sesión, se suprime en refrescos siguientes)
+  si hay algo en cualquiera de las 4 categorías, con botón directo
+  "Ver Alertas →". Nuestro E-4 (entregado 2026-08-24) solo cubre las 4
+  tarjetas de conteo en `Dashboard.tsx` — sin página propia navegable
+  y sin ningún aviso proactivo: si nadie entra al Dashboard a mirar,
+  nadie se entera.* Alcance propuesto: página nueva (ej.
+  `/inventario/alertas`, reusa los 4 números que ya calcula `GET
+  /reportes/dashboard`) con 4 tabs y un endpoint de listado por
+  categoría (`GET /inventario/alertas?categoria=sinStock|stockBajo|
+  porVencer|vencidos`, paginado igual que el resto de listados); popup
+  al primer acceso al Dashboard de la sesión (sessionStorage en el
+  frontend para no repetir — no hace falta persistir "ya visto" en el
+  backend). Diseño primero: confirmar con el usuario si el popup debe
+  respetar permisos (ej. no mostrarse a un Cajero sin `inventario.ver`)
+  antes de implementar.
 
 ## F — POS
 
@@ -683,6 +708,34 @@ Resumen de lo que cambió (detalle en cada ítem más abajo):
   ticket térmico). Guardado en el store genérico `Configuracion`
   (`DOCUMENTO_LOGO`/`DOCUMENTO_NOTA_PIE`), sin claves nuevas en
   `CONFIGURACIONES_BASE`. Sin migración. Entregado 2026-08-24.
+- [ ] **H-4** 🟧 — **Las notificaciones de Cotización/Factura no llevan el
+  documento** — el cliente recibe un aviso de texto sin forma real de
+  ver qué le mandaron. *Encontrado revisando nuestro propio flujo de
+  "enviar" a pedido del usuario (2026-08-26), no por comparación directa
+  contra Cuadre (no se confirmó qué manda exactamente su botón "Enviar
+  Cotización" — no se probó en vivo para no disparar un envío real a un
+  cliente real). Confirmado en el código: `NotificacionesService.
+  alFacturarse`/`alEnviarCotizacion` (factura_creada/cotizacion_enviada)
+  y `FacturacionService.enviarRecibo` (factura_recibo, envío manual)
+  arman sus `variables` con solo nombre/número/total/fecha — ningún link
+  ni adjunto. `EmailChannel.enviar()` manda `html` puro a `nodemailer.
+  sendMail()` sin `attachments` (nodemailer ya soporta attachments
+  nativo, no hace falta una librería nueva). El cliente recibe "tu
+  cotización #X por RD$Y fue enviada" y no tiene cómo ver las líneas,
+  precios ni condiciones reales.* Alcance propuesto (diseño primero —
+  toca 3 módulos y hay una decisión real de arquitectura): un link
+  público de solo lectura (mismo patrón que `/pagar/:facturaId` de la
+  pasarela de pago — sin autenticación, resuelto por id) para Factura/
+  Cotización, agregado como variable `{{link}}` en las plantillas —
+  resuelve EMAIL y WHATSAPP a la vez (WhatsApp no puede adjuntar un PDF
+  sin usar mensajes de media de Twilio, un alcance mayor). Adjuntar el
+  PDF al email además del link es un complemento menor, no un
+  reemplazo (WhatsApp seguiría necesitando el link). Fuera de alcance
+  de este ítem: dar a Remisiones el mismo flujo de envío que Cotización/
+  Factura — hoy no tiene NINGÚN mecanismo de envío (ni botón, ni evento,
+  ni endpoint) — confirmar con el usuario si hace falta antes de
+  sumarlo, una remisión suele entregarse físicamente junto a la
+  mercancía.
 
 ## I — Contabilidad
 
@@ -996,6 +1049,23 @@ aparte.*
   camino se encontró y corrigió un bug real de scope-hoisting de Nest
   (un repositorio no puede mezclar `PrismaService` global y
   `TenantPrismaService` request-scoped en el mismo constructor).
+- **2026-08-26**: auditoría en vivo dirigida a Facturación + Ventas
+  completo (Parte 8 de `docs/cuadre-auditoria.md`), a pedido del
+  usuario. Confirmó sin cambios los 5 gaps de Facturación ya trackeados
+  (B-1/B-6/B-7/B-8 entregados, B-9 deliberadamente pendiente) y agregó
+  **E-12** (página dedicada de Alertas de Inventario + popup proactivo
+  al iniciar sesión — E-4 solo cubrió las tarjetas del dashboard, no la
+  página navegable ni el aviso proactivo). Sin cambios de código en
+  esta sesión — solo investigación y documentación.
+- **2026-08-26**: a pedido del usuario, se confirmó en vivo que una
+  Cotización de Cuadre nunca se convierte en Factura (documento de
+  punta muerta) — reforzado en `cuadre-auditoria.md`, sin ítem nuevo
+  porque ya lo teníamos resuelto de nuestro lado. Revisando el
+  equivalente propio ("flujo de enviar"), se encontró y agregó **H-4**:
+  las notificaciones automáticas/manuales de Cotización y Factura no
+  llevan ningún link ni PDF adjunto — el cliente recibe solo un aviso
+  de texto, sin forma real de ver el documento. Sin cambios de código
+  — solo investigación y documentación.
 
 ## Sugerencia de por dónde arrancar
 
@@ -1018,7 +1088,11 @@ Lo que queda, por categoría:
   libre en factura) — NO retomar sin que el usuario lo traiga de nuevo.
 - **No bloqueante, sin implementar**: B-4 (Recargos de Factura, 🟨→🟧
   corrección de tamaño), E-1 (Patrón Borrador→Confirmado en Compras/
-  Ajustes/Transferencias, matiz).
+  Ajustes/Transferencias, matiz), E-12 (página dedicada de Alertas de
+  Inventario + popup proactivo, encontrado en la Parte 8 de la
+  auditoría, 2026-08-26), H-4 (notificaciones de Cotización/Factura sin
+  link ni PDF adjunto — el cliente no puede ver el documento real,
+  encontrado revisando nuestro propio flujo de envío, 2026-08-26).
 - **🟥, pendientes de su propia conversación de diseño**: A-4,
   B-5, F-9, G-9 (hardware), J-4 (API keys, reclasificado — no aplica
   sin una API pública).
