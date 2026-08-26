@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 import { apiClient } from '../lib/api-client';
 import { Button } from '../components/atoms/Button/Button';
+import { Card } from '../components/atoms/Card/Card';
 import { Select } from '../components/atoms/Select/Select';
 import { ComboboxBusqueda } from '../components/molecules/ComboboxBusqueda/ComboboxBusqueda';
 import { FormField } from '../components/molecules/FormField/FormField';
@@ -13,7 +14,7 @@ import { EmitirNotaForm } from '../components/organisms/EmitirNotaForm/EmitirNot
 import { RequierePermiso } from '../components/organisms/RequierePermiso/RequierePermiso';
 import { useAuth } from '../hooks/useAuth';
 import { useListasPrecio } from '../hooks/useListasPrecio';
-import { SelectorLineaProducto } from '../components/molecules/SelectorLineaProducto/SelectorLineaProducto';
+import { TablaLineasEditable, LineaEditable } from '../components/molecules/TablaLineasEditable/TablaLineasEditable';
 import { SelectorBodega } from '../components/molecules/SelectorBodega/SelectorBodega';
 import { PaginaResultado } from '../types/pagina-resultado';
 
@@ -77,9 +78,8 @@ function ModalNuevaFactura({ onClose }: { onClose: () => void }) {
   const [tipoFactura, setTipoFactura] = useState<'CONTADO' | 'CREDITO'>('CONTADO');
   const [tipoComprobanteEspecial, setTipoComprobanteEspecial] = useState('');
   const [plazoPagoDias, setPlazoPagoDias] = useState(30);
-  const [lineas, setLineas] = useState([
-    { productoId: '', varianteId: '', descripcionManual: '', esManual: false, cantidad: '1', precioUnitario: '', aplicaItbis: true },
-  ]);
+  const LINEA_VACIA: LineaEditable = { productoId: '', varianteId: '', descripcionManual: '', esManual: false, cantidad: '1', precioUnitario: '', aplicaItbis: true };
+  const [lineas, setLineas] = useState<LineaEditable[]>([LINEA_VACIA]);
   const [mostrarNuevoCliente, setMostrarNuevoCliente] = useState(false);
   const [listaPrecioOverride, setListaPrecioOverride] = useState('');
   const [descuentoGeneralTipo, setDescuentoGeneralTipo] = useState<'' | 'PCT' | 'MONTO'>('');
@@ -184,273 +184,209 @@ function ModalNuevaFactura({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <Modal titulo="Nueva factura" onClose={onClose}>
-      <form onSubmit={onSubmit} className="space-y-3">
-        <div className="flex flex-col gap-1">
-          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Cliente</label>
-          <ComboboxBusqueda<Cliente>
-            valor={cliente}
-            onSeleccionar={setCliente}
-            obtenerId={(c) => c.id}
-            obtenerEtiqueta={(c) => c.nombre}
-            placeholder="Buscar cliente…"
-            icono={<User size={15} />}
-            buscar={async (texto) =>
-              (await apiClient.get<PaginaResultado<Cliente>>('/clientes', { params: { busqueda: texto, tamanoPagina: 10 } })).data.datos
-            }
-          />
-          <button
-            type="button"
-            onClick={() => setMostrarNuevoCliente((v) => !v)}
-            className="self-start text-xs font-medium text-sol-600 hover:text-sol-700 dark:text-sol-400"
-          >
-            + Nuevo cliente
-          </button>
-          {mostrarNuevoCliente && (
-            <NuevoClienteInline
-              onCreado={(c) => {
-                setCliente(c);
-                setMostrarNuevoCliente(false);
-              }}
+    <Modal titulo="Nueva factura" onClose={onClose} ancho="2xl">
+      <form onSubmit={onSubmit} className="space-y-4">
+        <Card titulo="Información de la factura" contentClassName="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="flex flex-col gap-1 sm:col-span-2">
+            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Cliente</label>
+            <ComboboxBusqueda<Cliente>
+              valor={cliente}
+              onSeleccionar={setCliente}
+              obtenerId={(c) => c.id}
+              obtenerEtiqueta={(c) => c.nombre}
+              placeholder="Buscar cliente…"
+              icono={<User size={15} />}
+              buscar={async (texto) =>
+                (await apiClient.get<PaginaResultado<Cliente>>('/clientes', { params: { busqueda: texto, tamanoPagina: 10 } })).data.datos
+              }
             />
-          )}
-        </div>
+            <button
+              type="button"
+              onClick={() => setMostrarNuevoCliente((v) => !v)}
+              className="self-start text-xs font-medium text-sol-600 hover:text-sol-700 dark:text-sol-400"
+            >
+              + Nuevo cliente
+            </button>
+            {mostrarNuevoCliente && (
+              <NuevoClienteInline
+                onCreado={(c) => {
+                  setCliente(c);
+                  setMostrarNuevoCliente(false);
+                }}
+              />
+            )}
+          </div>
 
-        <div className="flex flex-col gap-1">
-          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Nivel de precio</label>
-          <Select value={listaPrecioOverride} onChange={(e) => setListaPrecioOverride(e.target.value)}>
-            <option value="">Usar el del cliente ({listaPrecioResuelta})</option>
-            {listasPrecio?.map((lista) => (
-              <option key={lista.id} value={lista.nombre}>
-                {lista.nombre}
-              </option>
-            ))}
-          </Select>
-        </div>
-
-        <div className="flex flex-col gap-1">
-          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Bodega (de donde sale el inventario)</label>
-          <SelectorBodega value={bodegaId} onChange={setBodegaId} required />
-        </div>
-
-        {tasasCambio && tasasCambio.length > 0 && (
           <div className="flex flex-col gap-1">
-            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
-              Moneda de presentación (ítem C-2 — el total interno sigue en DOP)
-            </label>
-            <Select value={moneda} onChange={(e) => setMoneda(e.target.value)}>
-              <option value="DOP">DOP (sin equivalente)</option>
-              {tasasCambio.map((t) => (
-                <option key={t.id} value={t.moneda}>
-                  {t.moneda} (tasa {Number(t.tasa).toLocaleString('es-DO')})
+            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Nivel de precio</label>
+            <Select value={listaPrecioOverride} onChange={(e) => setListaPrecioOverride(e.target.value)}>
+              <option value="">Usar el del cliente ({listaPrecioResuelta})</option>
+              {listasPrecio?.map((lista) => (
+                <option key={lista.id} value={lista.nombre}>
+                  {lista.nombre}
                 </option>
               ))}
             </Select>
           </div>
-        )}
 
-        <div className="flex flex-col gap-1">
-          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Tipo</label>
-          <Select value={tipoFactura} onChange={(e) => setTipoFactura(e.target.value as 'CONTADO' | 'CREDITO')}>
-            <option value="CONTADO">Contado</option>
-            <option value="CREDITO">Crédito</option>
-          </Select>
-        </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Bodega (de donde sale el inventario)</label>
+            <SelectorBodega value={bodegaId} onChange={setBodegaId} required />
+          </div>
 
-        {tipoFactura === 'CREDITO' && (
-          <div className="grid grid-cols-2 gap-2">
-            <div className="flex flex-col gap-1">
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Tipo</label>
+            <Select value={tipoFactura} onChange={(e) => setTipoFactura(e.target.value as 'CONTADO' | 'CREDITO')}>
+              <option value="CONTADO">Contado</option>
+              <option value="CREDITO">Crédito</option>
+            </Select>
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Tipo de comprobante</label>
+            <Select value={tipoComprobanteEspecial} onChange={(e) => setTipoComprobanteEspecial(e.target.value)}>
+              <option value="">Normal</option>
+              <option value="REGIMEN_ESPECIAL">Régimen Especial (B14)</option>
+              <option value="GUBERNAMENTAL">Gubernamental (B15)</option>
+            </Select>
+          </div>
+
+          {tipoFactura === 'CREDITO' && (
+            <>
+              <div className="flex flex-col gap-1">
+                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                  Condición de pago (plan de integración Cuadre, ítem B-6)
+                </label>
+                <Select value={plazoPagoDias} onChange={(e) => setPlazoPagoDias(Number(e.target.value))}>
+                  <option value={15}>15 días</option>
+                  <option value={30}>30 días</option>
+                  <option value={45}>45 días</option>
+                  <option value={60}>60 días</option>
+                  <option value={90}>90 días</option>
+                </Select>
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Vencimiento</label>
+                <input
+                  disabled
+                  value={new Date(Date.now() + plazoPagoDias * 86400000).toLocaleDateString('es-DO', { timeZone: 'UTC' })}
+                  className="rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400"
+                />
+              </div>
+            </>
+          )}
+
+          {tasasCambio && tasasCambio.length > 0 && (
+            <div className="flex flex-col gap-1 sm:col-span-2">
               <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                Condición de pago (plan de integración Cuadre, ítem B-6)
+                Moneda de presentación (ítem C-2 — el total interno sigue en DOP)
               </label>
-              <Select value={plazoPagoDias} onChange={(e) => setPlazoPagoDias(Number(e.target.value))}>
-                <option value={15}>15 días</option>
-                <option value={30}>30 días</option>
-                <option value={45}>45 días</option>
-                <option value={60}>60 días</option>
-                <option value={90}>90 días</option>
+              <Select value={moneda} onChange={(e) => setMoneda(e.target.value)}>
+                <option value="DOP">DOP (sin equivalente)</option>
+                {tasasCambio.map((t) => (
+                  <option key={t.id} value={t.moneda}>
+                    {t.moneda} (tasa {Number(t.tasa).toLocaleString('es-DO')})
+                  </option>
+                ))}
               </Select>
             </div>
+          )}
+        </Card>
+
+        <Card titulo="Líneas">
+          <TablaLineasEditable
+            lineas={lineas}
+            productos={productos ?? []}
+            lineaVacia={LINEA_VACIA}
+            onActualizar={actualizarLinea}
+            onQuitar={(i) => setLineas((prev) => prev.filter((_, idx) => idx !== i))}
+            onAgregar={(vacia) => setLineas((prev) => [...prev, vacia])}
+            mostrarItbis
+          />
+        </Card>
+
+        <Card titulo="Descuento general y recargos">
+          <div className="space-y-4">
             <div className="flex flex-col gap-1">
-              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Vencimiento</label>
-              <input
-                disabled
-                value={new Date(Date.now() + plazoPagoDias * 86400000).toLocaleDateString('es-DO', { timeZone: 'UTC' })}
-                className="rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400"
-              />
-            </div>
-          </div>
-        )}
-
-        <div className="flex flex-col gap-1">
-          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Tipo de comprobante</label>
-          <Select value={tipoComprobanteEspecial} onChange={(e) => setTipoComprobanteEspecial(e.target.value)}>
-            <option value="">Normal</option>
-            <option value="REGIMEN_ESPECIAL">Régimen Especial (B14)</option>
-            <option value="GUBERNAMENTAL">Gubernamental (B15)</option>
-          </Select>
-        </div>
-
-        <div className="space-y-2">
-          <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Líneas</p>
-          {lineas.map((linea, i) => (
-            <div key={i} className="flex gap-2">
-              {linea.esManual ? (
-                <input
-                  type="text"
-                  placeholder="Descripción — ej. Instalación"
-                  value={linea.descripcionManual}
-                  onChange={(e) => actualizarLinea(i, { descripcionManual: e.target.value })}
-                  className="flex-1 rounded-md border border-slate-300 px-2 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-                />
-              ) : (
-                <SelectorLineaProducto
-                  productos={productos ?? []}
-                  productoId={linea.productoId}
-                  varianteId={linea.varianteId}
-                  onChange={(productoId, varianteId) => actualizarLinea(i, { productoId, varianteId })}
-                  className="flex-1"
-                />
-              )}
-              <input
-                type="number"
-                min={1}
-                placeholder="Cant."
-                value={linea.cantidad}
-                onChange={(e) => actualizarLinea(i, { cantidad: e.target.value })}
-                className="w-20 rounded-md border border-slate-300 px-2 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-              />
-              <input
-                type="number"
-                min={0}
-                step="0.01"
-                placeholder={linea.esManual ? 'Precio' : 'Precio (opcional)'}
-                value={linea.precioUnitario}
-                onChange={(e) => actualizarLinea(i, { precioUnitario: e.target.value })}
-                className="w-32 rounded-md border border-slate-300 px-2 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-              />
-              <label className="flex items-center gap-1 text-xs text-slate-600 dark:text-slate-400" title="Toggle de ITBIS por línea">
-                <input
-                  type="checkbox"
-                  checked={linea.aplicaItbis}
-                  onChange={(e) => actualizarLinea(i, { aplicaItbis: e.target.checked })}
-                />
-                ITBIS
+              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                Descuento general de la factura (opcional, plan de integración Cuadre, ítem B-8)
               </label>
+              <div className="flex gap-2">
+                <Select value={descuentoGeneralTipo} onChange={(e) => setDescuentoGeneralTipo(e.target.value as '' | 'PCT' | 'MONTO')}>
+                  <option value="">Sin descuento general</option>
+                  <option value="PCT">% sobre el subtotal</option>
+                  <option value="MONTO">Monto fijo (RD$)</option>
+                </Select>
+                {descuentoGeneralTipo && (
+                  <input
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    placeholder={descuentoGeneralTipo === 'PCT' ? '% ej. 10' : 'RD$'}
+                    value={descuentoGeneralValor}
+                    onChange={(e) => setDescuentoGeneralValor(e.target.value)}
+                    className="w-32 rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                  />
+                )}
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Se reparte proporcionalmente entre todas las líneas (recalcula el ITBIS), además de cualquier descuento por línea u oferta automática.
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-1 border-t border-slate-100 pt-4 dark:border-slate-800">
+              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                Recargos (opcional, plan de integración Cuadre, ítem B-4)
+              </label>
+              {recargos.map((recargo, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    placeholder="Concepto — ej. Imprevistos"
+                    value={recargo.concepto}
+                    onChange={(e) => setRecargos((prev) => prev.map((r, idx) => (idx === i ? { ...r, concepto: e.target.value } : r)))}
+                    className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                  />
+                  <input
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    placeholder="RD$"
+                    value={recargo.monto}
+                    onChange={(e) => setRecargos((prev) => prev.map((r, idx) => (idx === i ? { ...r, monto: e.target.value } : r)))}
+                    className="w-28 rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                  />
+                  <label className="flex items-center gap-1 text-xs text-slate-600 dark:text-slate-400">
+                    <input
+                      type="checkbox"
+                      checked={recargo.gravado}
+                      onChange={(e) => setRecargos((prev) => prev.map((r, idx) => (idx === i ? { ...r, gravado: e.target.checked } : r)))}
+                    />
+                    Gravado
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setRecargos((prev) => prev.filter((_, idx) => idx !== i))}
+                    className="text-red-600 hover:text-red-700"
+                    aria-label="Quitar recargo"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
               <button
                 type="button"
-                title={linea.esManual ? 'Volver a elegir del catálogo' : 'Línea libre sin producto del catálogo (ítem B-9)'}
-                onClick={() =>
-                  actualizarLinea(i, { esManual: !linea.esManual, productoId: '', varianteId: '', descripcionManual: '' })
-                }
-                className="whitespace-nowrap text-xs font-medium text-sol-600 hover:text-sol-700 dark:text-sol-400"
+                onClick={() => setRecargos((prev) => [...prev, { concepto: '', monto: '', gravado: false }])}
+                className="self-start text-sm font-medium text-sol-600 hover:text-sol-700 dark:text-sol-400"
               >
-                {linea.esManual ? 'Del catálogo' : 'Producto libre'}
+                + Agregar recargo
               </button>
-              {lineas.length > 1 && (
-                <button
-                  type="button"
-                  onClick={() => setLineas((prev) => prev.filter((_, idx) => idx !== i))}
-                  className="text-red-600 hover:text-red-700"
-                  aria-label="Quitar línea"
-                >
-                  ×
-                </button>
-              )}
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Cargo aparte, después del subtotal y el descuento — "Gravado" le suma ITBIS a la tasa general del tenant.
+              </p>
             </div>
-          ))}
-          <button
-            type="button"
-            onClick={() =>
-              setLineas((prev) => [
-                ...prev,
-                { productoId: '', varianteId: '', descripcionManual: '', esManual: false, cantidad: '1', precioUnitario: '', aplicaItbis: true },
-              ])
-            }
-            className="text-sm font-medium text-sol-600 hover:text-sol-700 dark:text-sol-400"
-          >
-            + Agregar línea
-          </button>
-        </div>
-
-        <div className="flex flex-col gap-1">
-          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
-            Descuento general de la factura (opcional, plan de integración Cuadre, ítem B-8)
-          </label>
-          <div className="flex gap-2">
-            <Select value={descuentoGeneralTipo} onChange={(e) => setDescuentoGeneralTipo(e.target.value as '' | 'PCT' | 'MONTO')}>
-              <option value="">Sin descuento general</option>
-              <option value="PCT">% sobre el subtotal</option>
-              <option value="MONTO">Monto fijo (RD$)</option>
-            </Select>
-            {descuentoGeneralTipo && (
-              <input
-                type="number"
-                min={0}
-                step="0.01"
-                placeholder={descuentoGeneralTipo === 'PCT' ? '% ej. 10' : 'RD$'}
-                value={descuentoGeneralValor}
-                onChange={(e) => setDescuentoGeneralValor(e.target.value)}
-                className="w-32 rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-              />
-            )}
           </div>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
-            Se reparte proporcionalmente entre todas las líneas (recalcula el ITBIS), además de cualquier descuento por línea u oferta automática.
-          </p>
-        </div>
-
-        <div className="flex flex-col gap-1">
-          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
-            Recargos (opcional, plan de integración Cuadre, ítem B-4)
-          </label>
-          {recargos.map((recargo, i) => (
-            <div key={i} className="flex items-center gap-2">
-              <input
-                type="text"
-                placeholder="Concepto — ej. Imprevistos"
-                value={recargo.concepto}
-                onChange={(e) => setRecargos((prev) => prev.map((r, idx) => (idx === i ? { ...r, concepto: e.target.value } : r)))}
-                className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-              />
-              <input
-                type="number"
-                min={0}
-                step="0.01"
-                placeholder="RD$"
-                value={recargo.monto}
-                onChange={(e) => setRecargos((prev) => prev.map((r, idx) => (idx === i ? { ...r, monto: e.target.value } : r)))}
-                className="w-28 rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-              />
-              <label className="flex items-center gap-1 text-xs text-slate-600 dark:text-slate-400">
-                <input
-                  type="checkbox"
-                  checked={recargo.gravado}
-                  onChange={(e) => setRecargos((prev) => prev.map((r, idx) => (idx === i ? { ...r, gravado: e.target.checked } : r)))}
-                />
-                Gravado
-              </label>
-              <button
-                type="button"
-                onClick={() => setRecargos((prev) => prev.filter((_, idx) => idx !== i))}
-                className="text-red-600 hover:text-red-700"
-                aria-label="Quitar recargo"
-              >
-                ×
-              </button>
-            </div>
-          ))}
-          <button
-            type="button"
-            onClick={() => setRecargos((prev) => [...prev, { concepto: '', monto: '', gravado: false }])}
-            className="self-start text-sm font-medium text-sol-600 hover:text-sol-700 dark:text-sol-400"
-          >
-            + Agregar recargo
-          </button>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
-            Cargo aparte, después del subtotal y el descuento — "Gravado" le suma ITBIS a la tasa general del tenant.
-          </p>
-        </div>
+        </Card>
 
         {error && <p className="text-sm text-red-600">{error}</p>}
         <Button type="submit" disabled={crear.isPending} className="w-full">

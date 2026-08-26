@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from 'react';
-import { Eye, User } from 'lucide-react';
+import { Eye, Plus, User, X } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../../lib/api-client';
 import { ModalImprimir } from '../../molecules/ModalImprimir/ModalImprimir';
@@ -313,68 +313,98 @@ function ModalNuevaRemision({
   }
 
   return (
-    <Modal titulo="Nueva remisión" onClose={onClose}>
-      <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">
-        Registra la entrega de mercancía sin facturar todavía. Se crea en borrador (sin tocar inventario) — el descuento real ocurre al marcar
-        "Entregada".
-      </p>
-      <form onSubmit={onSubmit} className="space-y-3">
-        <div>
-          <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Cliente</label>
-          <ComboboxBusqueda<Cliente>
-            valor={cliente}
-            onSeleccionar={setCliente}
-            obtenerId={(c) => c.id}
-            obtenerEtiqueta={(c) => c.nombre}
-            placeholder="Buscar cliente…"
-            icono={<User size={15} />}
-            buscar={async (texto) =>
-              (await apiClient.get<PaginaResultado<Cliente>>('/clientes', { params: { busqueda: texto, tamanoPagina: 10 } })).data.datos
-            }
-          />
-        </div>
-        <div>
-          <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Bodega</label>
-          <Select value={bodegaId} onChange={(e) => setBodegaId(e.target.value)} required>
-            <option value="">Seleccionar…</option>
-            {bodegas.map((b) => (
-              <option key={b.id} value={b.id}>
-                {b.nombre}
-              </option>
-            ))}
-          </Select>
-        </div>
+    <Modal titulo="Nueva remisión" onClose={onClose} ancho="2xl">
+      <form onSubmit={onSubmit} className="space-y-4">
+        <Card
+          titulo="Información de la remisión"
+          descripcion={'Se crea en borrador (sin tocar inventario) — el descuento real ocurre al marcar "Entregada".'}
+          contentClassName="grid grid-cols-1 gap-3 sm:grid-cols-2"
+        >
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Cliente</label>
+            <ComboboxBusqueda<Cliente>
+              valor={cliente}
+              onSeleccionar={setCliente}
+              obtenerId={(c) => c.id}
+              obtenerEtiqueta={(c) => c.nombre}
+              placeholder="Buscar cliente…"
+              icono={<User size={15} />}
+              buscar={async (texto) =>
+                (await apiClient.get<PaginaResultado<Cliente>>('/clientes', { params: { busqueda: texto, tamanoPagina: 10 } })).data.datos
+              }
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Bodega</label>
+            <Select value={bodegaId} onChange={(e) => setBodegaId(e.target.value)} required>
+              <option value="">Seleccionar…</option>
+              {bodegas.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.nombre}
+                </option>
+              ))}
+            </Select>
+          </div>
+        </Card>
 
-        <div className="space-y-2">
-          <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Líneas</p>
-          {lineas.map((linea, i) => (
-            <div key={i} className="flex items-center gap-2">
-              <SelectorLineaProducto
-                productos={productos}
-                productoId={linea.productoId}
-                varianteId={linea.varianteId}
-                onChange={(productoId, varianteId) => actualizarLinea(i, { productoId, varianteId })}
-                className="flex-1"
-              />
-              <input
-                type="number"
-                min={1}
-                step="any"
-                value={linea.cantidad}
-                onChange={(e) => actualizarLinea(i, { cantidad: e.target.value })}
-                className="w-24 rounded-lg border border-slate-300 px-2 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-              />
-              {lineas.length > 1 && (
-                <Button type="button" variante="secundario" onClick={() => setLineas((prev) => prev.filter((_, idx) => idx !== i))}>
-                  Quitar
-                </Button>
-              )}
+        <Card titulo="Líneas">
+          <div className="space-y-2">
+            <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800">
+              <table className="w-full text-left text-sm">
+                <thead className="bg-slate-50 text-xs text-slate-500 dark:bg-slate-900/60 dark:text-slate-400">
+                  <tr>
+                    <th className="px-3 py-2 font-medium">Descripción</th>
+                    <th className="w-24 px-3 py-2 font-medium">Cant</th>
+                    <th className="w-px px-3 py-2" />
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {lineas.map((linea, i) => (
+                    <tr key={i}>
+                      <td className="px-3 py-2 align-top">
+                        <SelectorLineaProducto
+                          productos={productos}
+                          productoId={linea.productoId}
+                          varianteId={linea.varianteId}
+                          onChange={(productoId, varianteId) => actualizarLinea(i, { productoId, varianteId })}
+                        />
+                      </td>
+                      <td className="px-3 py-2 align-top">
+                        <input
+                          type="number"
+                          min={1}
+                          step="any"
+                          value={linea.cantidad}
+                          onChange={(e) => actualizarLinea(i, { cantidad: e.target.value })}
+                          className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                        />
+                      </td>
+                      <td className="px-3 py-2 align-top">
+                        {lineas.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => setLineas((prev) => prev.filter((_, idx) => idx !== i))}
+                            className="text-red-600 hover:text-red-700"
+                            aria-label="Quitar línea"
+                          >
+                            <X size={16} />
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-          ))}
-          <Button type="button" variante="secundario" onClick={() => setLineas((prev) => [...prev, { productoId: '', varianteId: '', cantidad: '1' }])}>
-            + Línea
-          </Button>
-        </div>
+            <button
+              type="button"
+              onClick={() => setLineas((prev) => [...prev, { productoId: '', varianteId: '', cantidad: '1' }])}
+              className="flex items-center gap-1 text-sm font-medium text-sol-600 hover:text-sol-700 dark:text-sol-400"
+            >
+              <Plus size={15} /> Agregar línea
+            </button>
+          </div>
+        </Card>
 
         {error && <p className="text-sm text-red-600">{error}</p>}
         <Button type="submit" disabled={crear.isPending} className="w-full">

@@ -14,6 +14,7 @@ import { Badge } from '../../atoms/Badge/Badge';
 import { SearchInput } from '../../molecules/SearchInput/SearchInput';
 import { Paginacion } from '../../molecules/Paginacion/Paginacion';
 import { SelectorLineaProducto } from '../../molecules/SelectorLineaProducto/SelectorLineaProducto';
+import { TablaLineasEditable } from '../../molecules/TablaLineasEditable/TablaLineasEditable';
 import { TablaArticulosDocumento } from '../../molecules/TablaArticulosDocumento/TablaArticulosDocumento';
 import { BloqueTotalesDocumento } from '../../molecules/BloqueTotalesDocumento/BloqueTotalesDocumento';
 import { useDebouncedValue } from '../../../hooks/useDebouncedValue';
@@ -350,90 +351,44 @@ function ModalNuevaCotizacion({ productos, onClose }: { productos: Producto[]; o
   }
 
   return (
-    <Modal titulo="Nueva cotización" onClose={onClose}>
-      <form onSubmit={onSubmit} className="space-y-3">
-        <div>
-          <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Cliente</label>
-          <ComboboxBusqueda<Cliente>
-            valor={cliente}
-            onSeleccionar={setCliente}
-            obtenerId={(c) => c.id}
-            obtenerEtiqueta={(c) => c.nombre}
-            placeholder="Buscar cliente…"
-            icono={<User size={15} />}
-            buscar={async (texto) =>
-              (await apiClient.get<PaginaResultado<Cliente>>('/clientes', { params: { busqueda: texto, tamanoPagina: 10 } })).data.datos
-            }
+    <Modal titulo="Nueva cotización" onClose={onClose} ancho="2xl">
+      <form onSubmit={onSubmit} className="space-y-4">
+        <Card titulo="Información de la cotización" contentClassName="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="sm:col-span-2">
+            <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Cliente</label>
+            <ComboboxBusqueda<Cliente>
+              valor={cliente}
+              onSeleccionar={setCliente}
+              obtenerId={(c) => c.id}
+              obtenerEtiqueta={(c) => c.nombre}
+              placeholder="Buscar cliente…"
+              icono={<User size={15} />}
+              buscar={async (texto) =>
+                (await apiClient.get<PaginaResultado<Cliente>>('/clientes', { params: { busqueda: texto, tamanoPagina: 10 } })).data.datos
+              }
+            />
+          </div>
+          <FormField
+            id="fechaVigenciaHasta"
+            label="Válida hasta"
+            type="date"
+            value={fechaVigenciaHasta}
+            onChange={(e) => setFechaVigenciaHasta(e.target.value)}
+            required
           />
-        </div>
-        <FormField
-          id="fechaVigenciaHasta"
-          label="Válida hasta"
-          type="date"
-          value={fechaVigenciaHasta}
-          onChange={(e) => setFechaVigenciaHasta(e.target.value)}
-          required
-        />
+        </Card>
 
-        <div className="space-y-2">
-          <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Líneas</p>
-          {lineas.map((linea, i) => (
-            <div key={i} className="flex items-center gap-2">
-              {linea.esManual ? (
-                <input
-                  type="text"
-                  placeholder="Descripción — ej. Instalación"
-                  value={linea.descripcionManual}
-                  onChange={(e) => actualizarLinea(i, { descripcionManual: e.target.value })}
-                  className="flex-1 rounded-lg border border-slate-300 px-2 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-                />
-              ) : (
-                <SelectorLineaProducto
-                  productos={productos}
-                  productoId={linea.productoId}
-                  varianteId={linea.varianteId}
-                  onChange={(productoId, varianteId) => actualizarLinea(i, { productoId, varianteId })}
-                  className="flex-1"
-                />
-              )}
-              <input
-                type="number"
-                min={1}
-                step="any"
-                value={linea.cantidad}
-                onChange={(e) => actualizarLinea(i, { cantidad: e.target.value })}
-                className="w-24 rounded-lg border border-slate-300 px-2 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-              />
-              {linea.esManual && (
-                <input
-                  type="number"
-                  min={0}
-                  step="0.01"
-                  placeholder="Precio"
-                  value={linea.precioUnitario}
-                  onChange={(e) => actualizarLinea(i, { precioUnitario: e.target.value })}
-                  className="w-28 rounded-lg border border-slate-300 px-2 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-                />
-              )}
-              <button
-                type="button"
-                title={linea.esManual ? 'Volver a elegir del catálogo' : 'Línea libre sin producto del catálogo (ítem B-9)'}
-                onClick={() => actualizarLinea(i, { esManual: !linea.esManual, productoId: '', varianteId: '', descripcionManual: '' })}
-                className="whitespace-nowrap text-xs font-medium text-sol-600 hover:text-sol-700 dark:text-sol-400"
-              >
-                {linea.esManual ? 'Del catálogo' : 'Producto libre'}
-              </button>
-              {lineas.length > 1 && (
-                <Button type="button" variante="secundario" onClick={() => setLineas((prev) => prev.filter((_, idx) => idx !== i))}>
-                  Quitar
-                </Button>
-              )}
-            </div>
-          ))}
-          <Button type="button" variante="secundario" onClick={() => setLineas((prev) => [...prev, LINEA_VACIA])}>
-            + Línea
-          </Button>
-        </div>
+        <Card titulo="Líneas">
+          <TablaLineasEditable
+            lineas={lineas}
+            productos={productos}
+            lineaVacia={LINEA_VACIA}
+            onActualizar={actualizarLinea}
+            onQuitar={(i) => setLineas((prev) => prev.filter((_, idx) => idx !== i))}
+            onAgregar={(vacia) => setLineas((prev) => [...prev, vacia])}
+            precioSoloManual
+          />
+        </Card>
 
         {error && <p className="text-sm text-red-600">{error}</p>}
         <Button type="submit" disabled={crear.isPending} className="w-full">
