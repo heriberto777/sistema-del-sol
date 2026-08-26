@@ -310,13 +310,16 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
       setCotizacion(null);
       setVentaConfirmada({ id: respuesta.data.id, total: respuesta.data.total });
     },
-    // Antes era un mensaje genérico ("revisá el stock") — con Bonos (Fase
-    // 4c) esta venta también puede fallar por un código de bono inválido,
-    // vencido o sin saldo, y ese mensaje real (que el backend ya arma
-    // bien) es el que el cajero necesita ver, no una excusa de stock que
-    // no aplica.
-    onError: (err: unknown) => setError(mensajeErrorApi(err, 'No se pudo registrar la venta — revisá el stock disponible.')),
+    // El error de esta mutación se muestra DENTRO de ModalCheckout (ver
+    // registrarVentaError más abajo), no acá — mientras el cajero está
+    // parado en el modal de "Cobrar" con la venta fallando (ej. stock
+    // insuficiente, bono inválido/vencido/sin saldo), el mensaje tiene
+    // que aparecer ahí mismo, no arriba de toda la pantalla detrás del
+    // overlay oscuro (bug real, reportado por el usuario). `error`
+    // (arriba de la página) queda solo para validaciones ANTES de abrir
+    // el modal (carrito vacío, sin cliente, falla al cotizar).
   });
+  const registrarVentaError = registrarVenta.error ? mensajeErrorApi(registrarVenta.error, 'No se pudo registrar la venta — revisá el stock disponible.') : null;
 
   const { data: guardadas } = useQuery({
     queryKey: ['pos-guardadas', turnoId],
@@ -806,6 +809,7 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
           cotizacion={cotizacion}
           cliente={cliente}
           registrando={registrarVenta.isPending}
+          error={registrarVentaError}
           onConfirmar={(pagos) => registrarVenta.mutate(pagos)}
           onClose={() => {
             setModalCheckout(false);
@@ -815,7 +819,12 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
       )}
 
       {modalGuardar && (
-        <ModalGuardar onGuardar={(nota) => guardarVenta.mutate(nota)} guardando={guardarVenta.isPending} onClose={() => setModalGuardar(false)} />
+        <ModalGuardar
+          onGuardar={(nota) => guardarVenta.mutate(nota)}
+          guardando={guardarVenta.isPending}
+          error={guardarVenta.error ? mensajeErrorApi(guardarVenta.error, 'No se pudo guardar la venta.') : null}
+          onClose={() => setModalGuardar(false)}
+        />
       )}
 
       {modalGuardadas && (
@@ -983,10 +992,12 @@ function ModalDescuento({
 function ModalGuardar({
   onGuardar,
   guardando,
+  error,
   onClose,
 }: {
   onGuardar: (nota: string) => void;
   guardando: boolean;
+  error: string | null;
   onClose: () => void;
 }) {
   const [nota, setNota] = useState('');
@@ -1003,6 +1014,7 @@ function ModalGuardar({
           El carrito actual se aparca — podés recuperarlo después desde "Guardadas" (⇧F12) sin perder líneas, cliente ni vendedor.
         </p>
         <FormField id="guardar-venta-nota" label="Nota (opcional)" value={nota} onChange={(e) => setNota(e.target.value)} />
+        {error && <p className="text-sm text-red-600">{error}</p>}
         <Button type="submit" disabled={guardando} className="w-full">
           {guardando ? 'Guardando…' : 'Guardar venta'}
         </Button>
@@ -1207,12 +1219,15 @@ function ModalCheckout({
   cotizacion,
   cliente,
   registrando,
+  error,
   onConfirmar,
   onClose,
 }: {
   cotizacion: { subtotal: number; descuento: number; itbis: number; total: number };
   cliente: Cliente | null;
   registrando: boolean;
+  /** Error de la mutación de registrar la venta (ej. "Stock insuficiente") — se muestra DENTRO de este modal, no en la página de atrás. */
+  error: string | null;
   onConfirmar: (pagos: { formaPagoId: string; monto: number; referencia?: string }[]) => void;
   onClose: () => void;
 }) {
@@ -1367,6 +1382,7 @@ function ModalCheckout({
           </div>
         </div>
 
+        {error && <p className="text-sm text-red-600">{error}</p>}
         <Button onClick={confirmar} disabled={!puedeConfirmar || registrando} className="w-full">
           {registrando ? 'Cobrando…' : 'Confirmar venta'}
         </Button>
