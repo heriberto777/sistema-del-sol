@@ -42,6 +42,7 @@ import { PagoExitoso } from './pages/PagoExitoso';
 import { PagoCancelado } from './pages/PagoCancelado';
 import { CobroFactura } from './pages/CobroFactura';
 import { CobroFacturaResultado } from './pages/CobroFacturaResultado';
+import { VerFactura, VerCotizacion } from './pages/VerDocumentoPublico';
 
 export const router = createBrowserRouter([
   { path: '*', element: <NoEncontrado /> },
@@ -57,6 +58,10 @@ export const router = createBrowserRouter([
   // Cobro de Factura de TENANT (ítem C-1) — distinto de /pagar/:facturaId (pasarela de PLATAFORMA).
   { path: '/pagar-factura/:facturaId', element: <CobroFactura /> },
   { path: '/pagar-factura/:facturaId/resultado', element: <CobroFacturaResultado /> },
+  // Ítem H-4 — link público de solo lectura, sin sesión (llega en el
+  // email/WhatsApp de "factura creada"/"cotización enviada").
+  { path: '/ver-factura/:id', element: <VerFactura /> },
+  { path: '/ver-cotizacion/:id', element: <VerCotizacion /> },
   {
     element: <RutaProtegidaPlataforma />,
     children: [

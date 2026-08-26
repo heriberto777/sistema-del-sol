@@ -39,6 +39,7 @@ export class ContabilidadEventosService {
         subtotal: Number(payload.subtotal),
         itbis: Number(payload.itbis),
         total: Number(payload.total),
+        recargos: Number(payload.recargos ?? '0'),
       });
     } catch (error) {
       // Un fallo contable nunca debe tumbar la venta — ya se facturó y
@@ -57,6 +58,7 @@ export class ContabilidadEventosService {
         subtotal: Number(payload.subtotal),
         itbis: Number(payload.itbis),
         total: Number(payload.total),
+        recargos: Number(payload.recargos ?? '0'),
       });
     } catch (error) {
       this.logger.error(`No se pudo generar la reversa contable de la factura ${payload.facturaId}`, error as Error);

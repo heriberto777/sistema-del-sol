@@ -30,6 +30,12 @@ export interface FacturaCreadaPayload {
   // Ítem A-1 (Comisiones de venta) — solo lo llenan ventas de POS que
   // eligen un vendedor (ítem F-2). null si no hay uno.
   vendedorEmpleadoId?: string | null;
+  // Ítem B-4 — suma cruda de los recargos (sin su ITBIS, que ya está
+  // adentro de `itbis`) — ContabilidadEventosService la necesita para no
+  // dejar el asiento desbalanceado (el recargo está incluido en `total`
+  // pero no en `subtotal`). Opcional/default 0: no todos los emisores de
+  // este evento tienen recargos que mandar.
+  recargos?: string;
 }
 
 export interface OrdenCompraRecibidaPayload {

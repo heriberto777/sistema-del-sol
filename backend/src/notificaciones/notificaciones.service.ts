@@ -18,6 +18,9 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CrearPlantillaDto } from './dto/crear-plantilla.dto';
 import { ListadoQueryDto } from '../common/dto/listado-query.dto';
 import { paginar } from '../common/types/pagina-resultado';
+import { generarDocumentoPdf } from '../common/pdf/documento-pdf';
+import { mapearFacturaAParams } from '../facturacion/mapear-factura-pdf';
+import { mapearCotizacionAParams } from '../cotizaciones/mapear-cotizacion-pdf';
 
 @Injectable()
 export class NotificacionesService {
@@ -36,6 +39,10 @@ export class NotificacionesService {
     clave: string;
     destinatario: string;
     variables: Record<string, string>;
+    // Ítem H-4 — solo tiene efecto en canal EMAIL (WhatsApp no soporta
+    // adjuntos sin usar mensajes de media de Twilio, fuera de alcance);
+    // el link `{{variables.link}}` es lo que cubre ambos canales.
+    adjuntoPdf?: { filename: string; content: Buffer };
   }) {
     const plantilla = await this.notificacionesRepository.buscarPlantilla(params.tenantId, params.canal, params.clave);
     if (!plantilla?.activa) {
@@ -56,7 +63,7 @@ export class NotificacionesService {
 
     let enviada = true;
     if (params.canal === 'EMAIL') {
-      enviada = await this.emailChannel.enviar(params.destinatario, asunto ?? '', cuerpo);
+      enviada = await this.emailChannel.enviar(params.destinatario, asunto ?? '', cuerpo, params.adjuntoPdf ? [params.adjuntoPdf] : undefined);
     } else if (params.canal === 'WHATSAPP') {
       enviada = await this.whatsAppChannel.enviar(params.destinatario, asunto ?? '', cuerpo);
     }
@@ -83,15 +90,60 @@ export class NotificacionesService {
     return { datos, total, pagina, tamanoPagina };
   }
 
+  /**
+   * Ítem H-4 — link público de solo lectura (`documentos-publicos/`, sin
+   * JWT) para que el cliente vea el documento real detrás del aviso de
+   * texto. Mismo `FRONTEND_URL` que ya arma el link de pago de plataforma
+   * (`facturas-plataforma.service.ts`).
+   */
+  private enlacePublico(tipo: 'facturas' | 'cotizaciones', id: string): string {
+    return `${process.env.FRONTEND_URL ?? 'http://localhost:5173'}/ver-${tipo === 'facturas' ? 'factura' : 'cotizacion'}/${id}`;
+  }
+
+  /**
+   * PDF adjunto (solo EMAIL — ver el comentario en `enviar()`). Nunca
+   * bloquea el envío de la notificación de texto: si algo falla acá
+   * (factura ya no existe, error de pdfkit), se loguea y se manda igual
+   * sin adjunto — el link de arriba sigue funcionando de todos modos.
+   */
+  private async generarAdjuntoFacturaPdf(facturaId: string) {
+    try {
+      const factura = await this.prisma.factura.findUnique({
+        where: { id: facturaId },
+        include: { cliente: true, lineas: { include: { producto: true } }, recargos: { orderBy: { orden: 'asc' } } },
+      });
+      if (!factura) return undefined;
+      return { filename: 'factura.pdf', content: await generarDocumentoPdf(mapearFacturaAParams(factura)) };
+    } catch (error) {
+      this.logger.warn(`No se pudo generar el PDF adjunto de la factura ${facturaId}: ${(error as Error).message}`);
+      return undefined;
+    }
+  }
+
+  private async generarAdjuntoCotizacionPdf(cotizacionId: string) {
+    try {
+      const cotizacion = await this.prisma.cotizacion.findUnique({
+        where: { id: cotizacionId },
+        include: { cliente: true, lineas: { include: { producto: true } } },
+      });
+      if (!cotizacion) return undefined;
+      return { filename: 'cotizacion.pdf', content: await generarDocumentoPdf(mapearCotizacionAParams(cotizacion)) };
+    } catch (error) {
+      this.logger.warn(`No se pudo generar el PDF adjunto de la cotización ${cotizacionId}: ${(error as Error).message}`);
+      return undefined;
+    }
+  }
+
   @OnEvent(EVENTOS.FACTURA_CREADA)
   async alFacturarse(payload: FacturaCreadaPayload) {
     const cliente = await this.prisma.cliente.findUnique({ where: { id: payload.clienteId } });
     if (!cliente) return;
 
-    const variables = { cliente_nombre: cliente.nombre, factura_total: payload.total };
+    const variables = { cliente_nombre: cliente.nombre, factura_total: payload.total, link: this.enlacePublico('facturas', payload.facturaId) };
 
     if (cliente.email) {
-      await this.enviar({ tenantId: payload.tenantId, canal: 'EMAIL', clave: 'factura_creada', destinatario: cliente.email, variables });
+      const adjuntoPdf = await this.generarAdjuntoFacturaPdf(payload.facturaId);
+      await this.enviar({ tenantId: payload.tenantId, canal: 'EMAIL', clave: 'factura_creada', destinatario: cliente.email, variables, adjuntoPdf });
     }
     // Por WhatsApp solo se envía si el tenant configuró una plantilla
     // WHATSAPP para "factura_creada" — enviar() no hace nada si no existe
@@ -106,10 +158,16 @@ export class NotificacionesService {
     const cliente = await this.prisma.cliente.findUnique({ where: { id: payload.clienteId } });
     if (!cliente) return;
 
-    const variables = { cliente_nombre: cliente.nombre, cotizacion_numero: payload.numero, cotizacion_total: payload.total };
+    const variables = {
+      cliente_nombre: cliente.nombre,
+      cotizacion_numero: payload.numero,
+      cotizacion_total: payload.total,
+      link: this.enlacePublico('cotizaciones', payload.cotizacionId),
+    };
 
     if (cliente.email) {
-      await this.enviar({ tenantId: payload.tenantId, canal: 'EMAIL', clave: 'cotizacion_enviada', destinatario: cliente.email, variables });
+      const adjuntoPdf = await this.generarAdjuntoCotizacionPdf(payload.cotizacionId);
+      await this.enviar({ tenantId: payload.tenantId, canal: 'EMAIL', clave: 'cotizacion_enviada', destinatario: cliente.email, variables, adjuntoPdf });
     }
     if (cliente.telefono) {
       await this.enviar({ tenantId: payload.tenantId, canal: 'WHATSAPP', clave: 'cotizacion_enviada', destinatario: cliente.telefono, variables });

@@ -101,7 +101,26 @@ export class AsientosContablesService {
    * reutilizar la misma fórmula de signo invierte automáticamente
    * débito/crédito sin necesitar una rama de código aparte.
    */
-  async generarDesdeFactura(params: { tenantId: string; facturaId: string; tipoFactura: string; subtotal: number; itbis: number; total: number }) {
+  /**
+   * `recargos` (ítem B-4, opcional/default 0) — cargos post-subtotal ya
+   * incluidos en `total` pero NO en `subtotal` (que sigue siendo solo las
+   * líneas de producto). Sin sumarlos acá, el asiento queda desbalanceado
+   * exactamente por ese monto: débito (Cobro, sobre `total`) > crédito
+   * (Ingresos + ITBIS, que sin esto no lo cubren) — bug real, encontrado
+   * verificando B-4 en vivo. Se acreditan a la MISMA cuenta de Ingresos
+   * por Ventas — simplificación de v1, igual criterio que "otrasDeducciones"
+   * de nómina agrupadas en una sola sub-cuenta; una cuenta de "Otros
+   * Ingresos" separada es la extensión natural si el negocio la necesita.
+   */
+  async generarDesdeFactura(params: {
+    tenantId: string;
+    facturaId: string;
+    tipoFactura: string;
+    subtotal: number;
+    itbis: number;
+    total: number;
+    recargos?: number;
+  }) {
     const [cuentaCobro, cuentaIngresos, cuentaItbis] = await Promise.all([
       this.cuentasRepository.buscarPorCodigoGlobal(params.tenantId, params.tipoFactura === 'CONTADO' ? CODIGOS_CUENTA.CAJA_BANCOS : CODIGOS_CUENTA.CUENTAS_POR_COBRAR),
       this.cuentasRepository.buscarPorCodigoGlobal(params.tenantId, CODIGOS_CUENTA.INGRESOS_POR_VENTAS),
@@ -110,7 +129,7 @@ export class AsientosContablesService {
 
     const lineas = [
       this.lineaSegunSigno(cuentaCobro.id, params.total, 'debito', `Factura ${params.facturaId}`),
-      this.lineaSegunSigno(cuentaIngresos.id, params.subtotal, 'credito', `Factura ${params.facturaId}`),
+      this.lineaSegunSigno(cuentaIngresos.id, params.subtotal + (params.recargos ?? 0), 'credito', `Factura ${params.facturaId}`),
     ];
     if (params.itbis !== 0) {
       lineas.push(this.lineaSegunSigno(cuentaItbis.id, params.itbis, 'credito', `Factura ${params.facturaId}`));
@@ -126,8 +145,22 @@ export class AsientosContablesService {
   }
 
   /** Reversa exacta del asiento de venta — misma fórmula, montos negados. */
-  async generarReversaFactura(params: { tenantId: string; facturaId: string; tipoFactura: string; subtotal: number; itbis: number; total: number }) {
-    return this.generarDesdeFactura({ ...params, subtotal: -params.subtotal, itbis: -params.itbis, total: -params.total });
+  async generarReversaFactura(params: {
+    tenantId: string;
+    facturaId: string;
+    tipoFactura: string;
+    subtotal: number;
+    itbis: number;
+    total: number;
+    recargos?: number;
+  }) {
+    return this.generarDesdeFactura({
+      ...params,
+      subtotal: -params.subtotal,
+      itbis: -params.itbis,
+      total: -params.total,
+      recargos: -(params.recargos ?? 0),
+    });
   }
 
   /** Compra recibida -> Inventario + ITBIS adelantado, contra Cuentas por Pagar. */

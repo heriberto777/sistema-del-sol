@@ -33,6 +33,7 @@ import { CorrelativosModule } from './correlativos/correlativos.module';
 import { WhatsappConfigModule } from './whatsapp-config/whatsapp-config.module';
 import { WhatsappBotModule } from './whatsapp-bot/whatsapp-bot.module';
 import { PasarelaCobroModule } from './pasarela-cobro/pasarela-cobro.module';
+import { DocumentosPublicosModule } from './documentos-publicos/documentos-publicos.module';
 import { ReportesModule } from './reportes/reportes.module';
 import { ReportesFiscalesModule } from './reportes-fiscales/reportes-fiscales.module';
 import { CotizacionesModule } from './cotizaciones/cotizaciones.module';
@@ -108,6 +109,7 @@ import { TenantMiddleware } from './common/middleware/tenant.middleware';
     WhatsappConfigModule,
     WhatsappBotModule,
     PasarelaCobroModule,
+    DocumentosPublicosModule,
     ReportesModule,
     ReportesFiscalesModule,
     CotizacionesModule,

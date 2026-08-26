@@ -33,7 +33,23 @@ describe('ContabilidadEventosService', () => {
         subtotal: 300,
         itbis: 54,
         total: 354,
+        recargos: 0,
       });
+    });
+
+    it('ítem B-4: propaga los recargos convertidos a número (sin esto, el asiento queda desbalanceado)', async () => {
+      await service.alFacturarse({
+        tenantId: 't1',
+        facturaId: 'f1',
+        clienteId: 'c1',
+        total: '412.65',
+        subtotal: '299.70',
+        itbis: '62.95',
+        tipoFactura: 'CONTADO',
+        recargos: '50',
+      });
+
+      expect(asientosContablesService.generarDesdeFactura).toHaveBeenCalledWith(expect.objectContaining({ recargos: 50 }));
     });
 
     it('no propaga el error si falla generar el asiento (la venta ya ocurrió)', async () => {
@@ -56,6 +72,7 @@ describe('ContabilidadEventosService', () => {
         subtotal: 300,
         itbis: 54,
         total: 354,
+        recargos: 0,
       });
     });
   });

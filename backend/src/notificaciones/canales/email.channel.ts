@@ -5,7 +5,16 @@ import * as nodemailer from 'nodemailer';
 export class EmailChannel {
   private readonly logger = new Logger(EmailChannel.name);
 
-  async enviar(destinatario: string, asunto: string, cuerpo: string): Promise<boolean> {
+  async enviar(
+    destinatario: string,
+    asunto: string,
+    cuerpo: string,
+    // Ítem H-4 — PDF de la Factura/Cotización adjunto (además del link
+    // `{{link}}` en el cuerpo, que además sirve para WhatsApp, sin
+    // adjunto posible ahí). Opcional: los demás envíos (stock_bajo, etc.)
+    // no mandan ninguno.
+    adjuntos?: { filename: string; content: Buffer }[],
+  ): Promise<boolean> {
     if (process.env.EMAIL_HABILITADO !== 'true') {
       this.logger.warn(`EMAIL_HABILITADO=false — notificación a ${destinatario} no enviada`);
       return false;
@@ -27,6 +36,7 @@ export class EmailChannel {
         to: destinatario,
         subject: asunto,
         html: cuerpo,
+        attachments: adjuntos,
       });
       return true;
     } catch (error) {

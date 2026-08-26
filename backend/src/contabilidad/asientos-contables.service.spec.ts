@@ -141,6 +141,21 @@ describe('AsientosContablesService', () => {
       const [llamada] = asientosRepository.crearGlobal.mock.calls[0];
       expect(llamada.lineas).toHaveLength(2);
     });
+
+    it('ítem B-4: sin `recargos`, el crédito a Ingresos NO cubre un total que sí los incluye — bug real, encontrado verificando B-4 en vivo', async () => {
+      asientosRepository.crearGlobal.mockResolvedValue({ id: 'a1' } as never);
+      // subtotal (líneas) 299.70 + itbis 62.95 (línea + recargo) + recargo crudo 50 = total 412.65
+      await service.generarDesdeFactura({ tenantId: 't1', facturaId: 'f1', tipoFactura: 'CONTADO', subtotal: 299.7, itbis: 62.95, total: 412.65, recargos: 50 });
+
+      const [llamada] = asientosRepository.crearGlobal.mock.calls[0];
+      const lineas = llamada.lineas;
+      expect(lineas).toEqual(
+        expect.arrayContaining([expect.objectContaining({ cuentaContableId: `cuenta-${CODIGOS_CUENTA.INGRESOS_POR_VENTAS}`, credito: 349.7 })]),
+      );
+      const totalDebito = lineas.reduce((acc: number, l: { debito: number }) => acc + l.debito, 0);
+      const totalCredito = lineas.reduce((acc: number, l: { credito: number }) => acc + l.credito, 0);
+      expect(totalDebito).toBeCloseTo(totalCredito, 5);
+    });
   });
 
   describe('generarReversaFactura', () => {
@@ -155,6 +170,18 @@ describe('AsientosContablesService', () => {
       expect(lineas).toEqual(
         expect.arrayContaining([expect.objectContaining({ cuentaContableId: `cuenta-${CODIGOS_CUENTA.CAJA_BANCOS}`, credito: 354 })]),
       );
+    });
+
+    it('ítem B-4: niega también los recargos, la reversa sigue balanceando', async () => {
+      asientosRepository.crearGlobal.mockResolvedValue({ id: 'a1' } as never);
+
+      await service.generarReversaFactura({ tenantId: 't1', facturaId: 'f1', tipoFactura: 'CONTADO', subtotal: 299.7, itbis: 62.95, total: 412.65, recargos: 50 });
+
+      const [llamada] = asientosRepository.crearGlobal.mock.calls[0];
+      const lineas = llamada.lineas;
+      const totalDebito = lineas.reduce((acc: number, l: { debito: number }) => acc + l.debito, 0);
+      const totalCredito = lineas.reduce((acc: number, l: { credito: number }) => acc + l.credito, 0);
+      expect(totalDebito).toBeCloseTo(totalCredito, 5);
     });
   });
 

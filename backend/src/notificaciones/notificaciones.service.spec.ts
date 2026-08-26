@@ -44,9 +44,20 @@ describe('NotificacionesService', () => {
 
       await service.enviar({ tenantId: 't1', canal: 'EMAIL', clave: 'x', destinatario: 'a@b.com', variables: {} });
 
-      expect(emailChannel.enviar).toHaveBeenCalledWith('a@b.com', 'Hola', 'Cuerpo');
+      expect(emailChannel.enviar).toHaveBeenCalledWith('a@b.com', 'Hola', 'Cuerpo', undefined);
       expect(whatsAppChannel.enviar).not.toHaveBeenCalled();
       expect(repository.marcarEstado).toHaveBeenCalledWith('n1', 'ENVIADA');
+    });
+
+    it('ítem H-4: reenvía adjuntoPdf a EmailChannel como un array de un elemento', async () => {
+      repository.buscarPlantilla.mockResolvedValue({ activa: true, asunto: 'Hola', cuerpo: 'Cuerpo' } as never);
+      repository.crearNotificacion.mockResolvedValue({ id: 'n1' } as never);
+      emailChannel.enviar.mockResolvedValue(true);
+      const adjuntoPdf = { filename: 'factura.pdf', content: Buffer.from('pdf') };
+
+      await service.enviar({ tenantId: 't1', canal: 'EMAIL', clave: 'x', destinatario: 'a@b.com', variables: {}, adjuntoPdf });
+
+      expect(emailChannel.enviar).toHaveBeenCalledWith('a@b.com', 'Hola', 'Cuerpo', [adjuntoPdf]);
     });
 
     it('canal WHATSAPP despacha por WhatsAppChannel, no por Email', async () => {
@@ -88,7 +99,7 @@ describe('NotificacionesService', () => {
 
       await service.enviar({ tenantId: 't1', canal: 'EMAIL', clave: 'x', destinatario: 'a@b.com', variables: { nombre: 'Ana', total: '100' } });
 
-      expect(emailChannel.enviar).toHaveBeenCalledWith('a@b.com', 'Hola Ana', 'Total: 100');
+      expect(emailChannel.enviar).toHaveBeenCalledWith('a@b.com', 'Hola Ana', 'Total: 100', undefined);
     });
   });
 
@@ -104,6 +115,19 @@ describe('NotificacionesService', () => {
 
       expect(repository.buscarPlantilla).toHaveBeenCalledWith('t1', 'EMAIL', 'factura_creada');
       expect(repository.buscarPlantilla).toHaveBeenCalledWith('t1', 'WHATSAPP', 'factura_creada');
+    });
+
+    it('ítem H-4: incluye el link público de la factura en las variables de AMBOS canales', async () => {
+      prisma.cliente.findUnique.mockResolvedValue({ id: 'c1', nombre: 'Cliente X', email: 'x@y.com', telefono: '+18095551234' });
+      const enviarSpy = jest.spyOn(service, 'enviar').mockResolvedValue({ id: 'n1' } as never);
+
+      await service.alFacturarse({ tenantId: 't1', facturaId: 'f1', clienteId: 'c1', total: '100', subtotal: '85', itbis: '15', tipoFactura: 'CONTADO' });
+
+      expect(enviarSpy).toHaveBeenCalledWith(expect.objectContaining({ canal: 'EMAIL', variables: expect.objectContaining({ link: expect.stringContaining('/ver-factura/f1') }) }));
+      expect(enviarSpy).toHaveBeenCalledWith(expect.objectContaining({ canal: 'WHATSAPP', variables: expect.objectContaining({ link: expect.stringContaining('/ver-factura/f1') }) }));
+      // El link no depende de la factura completa — se arma solo con el id
+      // del evento; el PDF adjunto (que sí la necesita) falla silenciosamente
+      // sin romper el envío (PrismaService solo tiene cliente/user mockeados acá).
     });
 
     it('no intenta WhatsApp si el cliente no tiene teléfono', async () => {
@@ -150,6 +174,15 @@ describe('NotificacionesService', () => {
 
       expect(repository.buscarPlantilla).toHaveBeenCalledWith('t1', 'EMAIL', 'cotizacion_enviada');
       expect(repository.buscarPlantilla).toHaveBeenCalledWith('t1', 'WHATSAPP', 'cotizacion_enviada');
+    });
+
+    it('ítem H-4: incluye el link público de la cotización en las variables', async () => {
+      prisma.cliente.findUnique.mockResolvedValue({ id: 'c1', nombre: 'Cliente X', email: 'x@y.com', telefono: '+18095551234' });
+      const enviarSpy = jest.spyOn(service, 'enviar').mockResolvedValue({ id: 'n1' } as never);
+
+      await service.alEnviarCotizacion({ tenantId: 't1', cotizacionId: 'cot1', clienteId: 'c1', numero: 'COT-001', total: '354' });
+
+      expect(enviarSpy).toHaveBeenCalledWith(expect.objectContaining({ canal: 'EMAIL', variables: expect.objectContaining({ link: expect.stringContaining('/ver-cotizacion/cot1') }) }));
     });
 
     it('no falla si el cliente ya no existe', async () => {
@@ -199,7 +232,7 @@ describe('NotificacionesService', () => {
         where: { tenantId: 't1', roles: { some: { role: { nombre: 'Admin Total' } } } },
       });
       expect(repository.buscarPlantilla).toHaveBeenCalledWith('t1', 'EMAIL', 'whatsapp_requiere_atencion');
-      expect(emailChannel.enviar).toHaveBeenCalledWith('admin@x.com', '', 'Atender WhatsApp whatsapp:+18095551234');
+      expect(emailChannel.enviar).toHaveBeenCalledWith('admin@x.com', '', 'Atender WhatsApp whatsapp:+18095551234', undefined);
     });
   });
 });

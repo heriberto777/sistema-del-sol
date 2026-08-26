@@ -394,6 +394,9 @@ describe('FacturacionService', () => {
         }),
       );
       expect(configuracionesService.buscarValor).not.toHaveBeenCalled();
+      // Sin esto, ContabilidadEventosService no sabe que el `total` del
+      // evento incluye 20 más que `subtotal`+`itbis` — asiento desbalanceado.
+      expect(eventBus.emit).toHaveBeenCalledWith(EVENTOS.FACTURA_CREADA, expect.objectContaining({ recargos: '20' }));
     });
 
     it('un recargo gravado suma ITBIS a la tasa ITBIS_GENERAL del tenant', async () => {
@@ -1141,6 +1144,7 @@ describe('FacturacionService', () => {
         ncf: 'B0200000001',
         lineas: [{ productoId: 'prod-1', cantidad: 3, producto: { tipo: 'PRODUCTO', componentes: [] } }],
         notasRelacionadas: [],
+        recargos: [],
         ...overrides,
       };
     }
@@ -1157,6 +1161,17 @@ describe('FacturacionService', () => {
         expect.objectContaining({ tenantId: 'tenant-1', facturaId: 'f1', clienteId: 'cliente-1', total: '200' }),
       );
       expect(resultado).toEqual(expect.objectContaining({ id: 'f1' }));
+    });
+
+    it('ítem B-4: suma los recargos de la factura original en el evento FACTURA_ANULADA (sin esto, la reversa contable queda desbalanceada)', async () => {
+      repository.buscarPorId.mockResolvedValue(
+        facturaExistente({ recargos: [{ concepto: 'Imprevistos', monto: 50, gravado: true }] }) as never,
+      );
+      repository.anularEnTx.mockResolvedValue(facturaCreada({ total: 200, subtotal: 200 }) as never);
+
+      await service.anular('f1', 'Motivo de prueba', 'tenant-1', 'user-1', true);
+
+      expect(eventBus.emit).toHaveBeenCalledWith(EVENTOS.FACTURA_ANULADA, expect.objectContaining({ recargos: '50' }));
     });
 
     it('D-1: no exige código de autorización si el tenant no activó la segunda capa', async () => {
@@ -1440,9 +1455,15 @@ describe('FacturacionService', () => {
       return {
         id: 'f1',
         ncf: 'B0200000001',
+        tipoFactura: 'CONTADO',
         fecha: new Date('2026-01-15'),
         cliente: { nombre: 'Cliente Demo' },
+        subtotal: 200,
+        descuento: 0,
+        itbis: 36,
         total: 236,
+        lineas: [{ producto: { nombre: 'Producto A' }, cantidad: 2, precioUnitario: 100, montoTotal: 236 }],
+        recargos: [],
       };
     }
 
@@ -1463,8 +1484,21 @@ describe('FacturacionService', () => {
 
       const [[args]] = notificacionesService.enviar.mock.calls;
       expect(args.variables).toEqual(
-        expect.objectContaining({ cliente_nombre: 'Cliente Demo', factura_ncf: 'B0200000001', factura_total: '236' }),
+        expect.objectContaining({ cliente_nombre: 'Cliente Demo', factura_ncf: 'B0200000001', factura_total: '236', link: expect.stringContaining('/ver-factura/f1') }),
       );
+      // WhatsApp no soporta adjuntos — solo el link cubre ese canal (ítem H-4).
+      expect(args.adjuntoPdf).toBeUndefined();
+    });
+
+    it('adjunta el PDF de la factura cuando el canal es EMAIL (ítem H-4)', async () => {
+      repository.buscarPorId.mockResolvedValue(facturaParaEnviar() as never);
+
+      await service.enviarRecibo('f1', { canal: 'EMAIL', destinatario: 'x@x.com' }, 'tenant-1');
+
+      const [[args]] = notificacionesService.enviar.mock.calls;
+      expect(args.adjuntoPdf).toBeDefined();
+      expect(args.adjuntoPdf?.filename).toBe('factura.pdf');
+      expect(args.adjuntoPdf?.content).toBeInstanceOf(Buffer);
     });
 
     it('devuelve enviado:false si el tenant no tiene una plantilla activa para ese canal', async () => {

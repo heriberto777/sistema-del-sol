@@ -18,7 +18,7 @@ import { LealtadService } from '../lealtad/lealtad.service';
 import { TasasCambioService } from '../tasas-cambio/tasas-cambio.service';
 import { ListarFacturasQueryDto } from './dto/listar-facturas-query.dto';
 import { paginar } from '../common/types/pagina-resultado';
-import { DocumentoPdfParams, generarDocumentoPdf } from '../common/pdf/documento-pdf';
+import { generarDocumentoPdf } from '../common/pdf/documento-pdf';
 import { generarDocumentoTicketHtml } from '../common/pdf/documento-ticket';
 import { NotificacionesService } from '../notificaciones/notificaciones.service';
 import { EnviarReciboDto } from './dto/enviar-recibo.dto';
@@ -29,13 +29,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AuthService } from '../auth/auth.service';
 import { ConfiguracionesService } from '../configuraciones/configuraciones.service';
 import { CONFIGURACIONES_BASE } from '../tenants/roles-base';
-
-const NOMBRE_TIPO_FACTURA: Record<TipoFactura, string> = {
-  CONTADO: 'Factura de venta',
-  CREDITO: 'Factura de venta',
-  NOTA_CREDITO: 'Nota de crédito',
-  NOTA_DEBITO: 'Nota de débito',
-};
+import { mapearFacturaAParams } from './mapear-factura-pdf';
 
 const NCF_POR_TIPO: Record<TipoFactura, TipoNcf> = {
   CREDITO: 'B01',
@@ -521,6 +515,8 @@ export class FacturacionService {
       // Ítem A-1 — sin esto, ComisionesEventosService no sabe a qué
       // Empleado acreditar la comisión (ver ARCHITECTURE.md).
       vendedorEmpleadoId: opciones?.vendedorEmpleadoId ?? null,
+      // Ítem B-4 — ver el comentario en FacturaCreadaPayload.
+      recargos: totalRecargos.toString(),
     });
 
     return factura;
@@ -530,31 +526,10 @@ export class FacturacionService {
     return this.facturacionRepository.buscarPorId(id);
   }
 
-  private mapearFacturaAParams(factura: Awaited<ReturnType<FacturacionRepository['buscarPorId']>>): DocumentoPdfParams {
-    return {
-      tipoDocumento: NOMBRE_TIPO_FACTURA[factura.tipoFactura],
-      numero: factura.ncf ?? factura.id,
-      fecha: factura.fecha,
-      cliente: factura.cliente.nombre,
-      lineas: factura.lineas.map((linea) => ({
-        concepto: linea.producto.nombre,
-        cantidad: linea.cantidad.toString(),
-        precioUnitario: Number(linea.precioUnitario).toFixed(2),
-        total: Number(linea.montoTotal).toFixed(2),
-      })),
-      subtotal: Number(factura.subtotal),
-      descuento: Number(factura.descuento),
-      recargos: factura.recargos.map((r) => ({ concepto: r.concepto, monto: Number(r.monto) })),
-      itbis: Number(factura.itbis),
-      total: Number(factura.total),
-      totalEnMoneda: factura.totalMoneda != null ? { moneda: factura.moneda, monto: Number(factura.totalMoneda) } : undefined,
-    };
-  }
-
   /** @deprecated usar generarImpreso — se mantiene por compatibilidad de la ruta /pdf ya existente. */
   async generarPdf(id: string) {
     const factura = await this.facturacionRepository.buscarPorId(id);
-    return generarDocumentoPdf(this.mapearFacturaAParams(factura));
+    return generarDocumentoPdf(mapearFacturaAParams(factura));
   }
 
   async generarImpreso(id: string, formatoSolicitado: FormatoImpresion | undefined, tenantId: string) {
@@ -563,7 +538,7 @@ export class FacturacionService {
       formatoSolicitado ?? resolverFormatoImpresion(this.prisma, tenantId, factura.bodegaId),
       resolverPersonalizacionDocumento(this.prisma, tenantId),
     ]);
-    const params = { ...this.mapearFacturaAParams(factura), ...personalizacion };
+    const params = { ...mapearFacturaAParams(factura), ...personalizacion };
 
     if (formato === 'TERMICA_80MM' || formato === 'TERMICA_58MM') {
       return { buffer: Buffer.from(generarDocumentoTicketHtml(params, formato), 'utf-8'), contentType: 'text/html; charset=utf-8' };
@@ -711,6 +686,9 @@ export class FacturacionService {
       subtotal: facturaAnulada.subtotal.toString(),
       itbis: facturaAnulada.itbis.toString(),
       tipoFactura: facturaAnulada.tipoFactura,
+      // Ítem B-4 — `factura` (buscarPorId, antes de la transacción) trae
+      // `recargos`; `facturaAnulada` (anularEnTx) no los vuelve a incluir.
+      recargos: factura.recargos.reduce((acc, r) => acc + Number(r.monto), 0).toString(),
     });
     return facturaAnulada;
   }
@@ -746,6 +724,12 @@ export class FacturacionService {
    */
   async enviarRecibo(id: string, dto: EnviarReciboDto, tenantId: string) {
     const factura = await this.facturacionRepository.buscarPorId(id);
+    // Ítem H-4 — mismo link/adjunto que el envío automático de
+    // alFacturarse, más barato acá: ya se tiene la factura completa (con
+    // líneas/cliente/recargos) de la línea de arriba, no hace falta un
+    // segundo findUnique.
+    const adjuntoPdf =
+      dto.canal === 'EMAIL' ? { filename: 'factura.pdf', content: await generarDocumentoPdf(mapearFacturaAParams(factura)) } : undefined;
     const enviado = await this.notificacionesService.enviar({
       tenantId,
       canal: dto.canal,
@@ -756,7 +740,9 @@ export class FacturacionService {
         factura_ncf: factura.ncf ?? '',
         factura_total: factura.total.toString(),
         factura_fecha: factura.fecha.toLocaleDateString('es-DO'),
+        link: `${process.env.FRONTEND_URL ?? 'http://localhost:5173'}/ver-factura/${factura.id}`,
       },
+      adjuntoPdf,
     });
     return { enviado: !!enviado };
   }
