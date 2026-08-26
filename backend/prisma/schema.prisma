@@ -875,30 +875,38 @@ model FacturaRecargo {
 }
 
 model LineaFactura {
-  id              String           @id @default(uuid())
-  facturaId       String
-  factura         Factura          @relation(fields: [facturaId], references: [id], onDelete: Cascade)
-  productoId      String
-  producto        Producto         @relation(fields: [productoId], references: [id])
+  id                String            @id @default(uuid())
+  facturaId         String
+  factura           Factura           @relation(fields: [facturaId], references: [id], onDelete: Cascade)
+  // Nullable (ítem B-9, plan de integración Cuadre) — null junto con
+  // `descripcionManual` no-null es una línea libre sin producto del
+  // catálogo (invariante validada en FacturacionService, no con un CHECK
+  // de Postgres). Con productoId, comportamiento intacto.
+  productoId        String?
+  producto          Producto?         @relation(fields: [productoId], references: [id])
   // Fase 3c, incremento 3: la variante realmente vendida — necesaria para
   // que anular() reintegre stock a la MISMA variante, no a "la que sea".
   // Restrict (no Cascade): perder esto sería perder a qué variante
-  // corresponde una línea fiscal ya emitida.
-  varianteId      String
-  variante        VarianteProducto @relation(fields: [varianteId], references: [id])
-  cantidad        Decimal          @db.Decimal(14, 4)
-  precioUnitario  Decimal          @db.Decimal(14, 4)
-  porcentajeItbis Decimal          @db.Decimal(5, 2)
-  descuento       Decimal          @default(0) @db.Decimal(14, 2)
-  montoItbis      Decimal          @db.Decimal(14, 2)
-  montoTotal      Decimal          @db.Decimal(14, 2)
+  // corresponde una línea fiscal ya emitida. Nullable junto con
+  // productoId (ítem B-9) — una línea manual no tiene variante.
+  varianteId        String?
+  variante          VarianteProducto? @relation(fields: [varianteId], references: [id])
+  // Ítem B-9 — texto libre cuando productoId es null (línea sin producto
+  // del catálogo, ej. "Instalación", "Servicio no catalogado").
+  descripcionManual String?
+  cantidad          Decimal           @db.Decimal(14, 4)
+  precioUnitario    Decimal           @db.Decimal(14, 4)
+  porcentajeItbis   Decimal           @db.Decimal(5, 2)
+  descuento         Decimal           @default(0) @db.Decimal(14, 2)
+  montoItbis        Decimal           @db.Decimal(14, 2)
+  montoTotal        Decimal           @db.Decimal(14, 2)
   // Ítem A-1 — false solo cuando el descuento automático de esta línea
   // vino de una Oferta con `pagaComision: false` (decisión "todo o nada":
   // si alguna oferta ganadora no paga comisión, la línea entera no genera
   // comisión). true por default: sin oferta, o con descuento manual, la
   // línea sí genera comisión normalmente. Ver
   // OfertasService.resolverDescuentoLineaConComision.
-  pagaComision    Boolean          @default(true)
+  pagaComision      Boolean           @default(true)
 
   @@map("linea_factura")
 }
@@ -945,25 +953,30 @@ model Cotizacion {
 }
 
 model LineaCotizacion {
-  id              String           @id @default(uuid())
-  cotizacionId    String
-  cotizacion      Cotizacion       @relation(fields: [cotizacionId], references: [id], onDelete: Cascade)
-  productoId      String
+  id                String            @id @default(uuid())
+  cotizacionId      String
+  cotizacion        Cotizacion        @relation(fields: [cotizacionId], references: [id], onDelete: Cascade)
+  // Nullable (ítem B-9) — ver el comentario equivalente en
+  // LineaFactura.productoId.
+  productoId        String?
   // Cascade (a diferencia de LineaFactura, que preserva historial fiscal):
   // una cotización no es un documento fiscal, y sin esto un borrado en
   // cascada del tenant puede fallar por una carrera en el orden en que
   // Postgres resuelve las cascadas de "productos" vs. "cotizaciones".
-  producto        Producto         @relation(fields: [productoId], references: [id], onDelete: Cascade)
+  producto          Producto?         @relation(fields: [productoId], references: [id], onDelete: Cascade)
   // Ver el comentario equivalente en LineaFactura.varianteId — se propaga
-  // sin cambios al convertir la cotización en factura.
-  varianteId      String
-  variante        VarianteProducto @relation(fields: [varianteId], references: [id])
-  cantidad        Decimal          @db.Decimal(14, 4)
-  precioUnitario  Decimal          @db.Decimal(14, 4)
-  porcentajeItbis Decimal          @db.Decimal(5, 2)
-  descuento       Decimal          @default(0) @db.Decimal(14, 2)
-  montoItbis      Decimal          @db.Decimal(14, 2)
-  montoTotal      Decimal          @db.Decimal(14, 2)
+  // sin cambios al convertir la cotización en factura. Nullable junto con
+  // productoId (ítem B-9).
+  varianteId        String?
+  variante          VarianteProducto? @relation(fields: [varianteId], references: [id])
+  // Ítem B-9 — ver el comentario equivalente en LineaFactura.
+  descripcionManual String?
+  cantidad          Decimal           @db.Decimal(14, 4)
+  precioUnitario    Decimal           @db.Decimal(14, 4)
+  porcentajeItbis   Decimal           @db.Decimal(5, 2)
+  descuento         Decimal           @default(0) @db.Decimal(14, 2)
+  montoItbis        Decimal           @db.Decimal(14, 2)
+  montoTotal        Decimal           @db.Decimal(14, 2)
 
   @@map("linea_cotizacion")
 }

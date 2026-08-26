@@ -70,7 +70,8 @@ describe('ComisionesService', () => {
       await service.generarDesdeFactura({ tenantId: 't1', facturaId: 'f1', vendedorEmpleadoId: 'emp-1', tipoFactura: 'CONTADO' });
 
       expect(prisma.lineaFactura.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { facturaId: 'f1', pagaComision: true } }),
+        // Ítem B-9 — una línea manual (sin productoId) también se excluye acá.
+        expect.objectContaining({ where: { facturaId: 'f1', pagaComision: true, productoId: { not: null } } }),
       );
     });
   });

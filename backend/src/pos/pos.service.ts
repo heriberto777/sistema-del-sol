@@ -149,8 +149,8 @@ export class PosService {
    * de armar los pagos, para ver el total real (ya con ofertas resueltas)
    * en vez del estimado del carrito calculado en el navegador.
    */
-  cotizar(dto: CotizarVentaPosDto) {
-    return this.facturacionService.cotizar(dto);
+  cotizar(dto: CotizarVentaPosDto, tenantId: string) {
+    return this.facturacionService.cotizar(dto, tenantId);
   }
 
   /**
@@ -166,7 +166,10 @@ export class PosService {
     // (decisión confirmada con el usuario: la restricción de catálogo es
     // exclusiva del checkout de POS, nunca de Facturación directa).
     if (turno.cajaId) {
-      await this.cajasService.validarLineasPermitidas(turno.cajaId, dto.lineas.map((l) => l.productoId));
+      // Ítem B-9 — una línea manual (sin productoId) no tiene catálogo
+      // contra qué validar; se excluye de este chequeo.
+      const productoIds = dto.lineas.map((l) => l.productoId).filter((id): id is string => !!id);
+      await this.cajasService.validarLineasPermitidas(turno.cajaId, productoIds);
     }
     // findUniqueOrThrow tenant-scoped: si alguna formaPagoId/vendedorEmpleadoId
     // es de otro tenant, 404 — mismo patrón que InventarioService.validarPertenencia.
@@ -308,7 +311,10 @@ export class PosService {
 
       return {
         productoId: linea.productoId,
-        varianteId: lineaOrigen.varianteId,
+        // Ítem B-9 — una línea manual (sin productoId) nunca hace match
+        // contra `linea.productoId` (string del DTO), así que `lineaOrigen`
+        // llegado a este punto siempre viene de una línea con producto.
+        varianteId: lineaOrigen.varianteId!,
         cantidad: linea.cantidad,
         precioUnitario: Number(lineaOrigen.precioUnitario),
         descuento,
@@ -339,13 +345,17 @@ export class PosService {
       id: factura.id,
       ncf: factura.ncf,
       clienteId: factura.clienteId,
-      lineas: factura.lineas.map((l) => ({
-        productoId: l.productoId,
-        nombre: l.producto.nombre,
-        codigo: l.producto.codigo,
-        cantidadOriginal: Number(l.cantidad),
-        disponible: disponiblePorProducto.get(l.productoId) ?? 0,
-      })),
+      // Ítem B-9 — una línea manual no es devolvible por POS (nada que
+      // reingresar a inventario, ni un producto contra qué hacer match).
+      lineas: factura.lineas
+        .filter((l) => l.productoId)
+        .map((l) => ({
+          productoId: l.productoId as string,
+          nombre: l.producto!.nombre,
+          codigo: l.producto!.codigo,
+          cantidadOriginal: Number(l.cantidad),
+          disponible: disponiblePorProducto.get(l.productoId as string) ?? 0,
+        })),
     };
   }
 
@@ -365,12 +375,14 @@ export class PosService {
    * reintegro de inventario).
    */
   private calcularDisponibleParaDevolucion(factura: {
-    lineas: { productoId: string; cantidad: unknown }[];
-    notasRelacionadas?: { lineas: { productoId: string; cantidad: unknown }[] }[];
+    lineas: { productoId: string | null; cantidad: unknown }[];
+    notasRelacionadas?: { lineas: { productoId: string | null; cantidad: unknown }[] }[];
   }) {
     const yaDevueltoPorProducto = new Map<string, number>();
     for (const nota of factura.notasRelacionadas ?? []) {
       for (const lineaNota of nota.lineas) {
+        // Ítem B-9 — una línea manual no tiene productoId contra qué acumular.
+        if (!lineaNota.productoId) continue;
         yaDevueltoPorProducto.set(
           lineaNota.productoId,
           (yaDevueltoPorProducto.get(lineaNota.productoId) ?? 0) + Number(lineaNota.cantidad),
@@ -379,6 +391,7 @@ export class PosService {
     }
     const disponiblePorProducto = new Map<string, number>();
     for (const linea of factura.lineas) {
+      if (!linea.productoId) continue;
       const cantidadOrigen = Number(linea.cantidad);
       const yaDevuelto = yaDevueltoPorProducto.get(linea.productoId) ?? 0;
       disponiblePorProducto.set(linea.productoId, cantidadOrigen - yaDevuelto);

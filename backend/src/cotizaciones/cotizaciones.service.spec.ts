@@ -11,6 +11,7 @@ import { CrearCotizacionDto } from './dto/crear-cotizacion.dto';
 import { PrismaService } from '../prisma/prisma.service';
 import { TenantPrismaService } from '../prisma/tenant-prisma.service';
 import { CorrelativosRepository } from '../correlativos/correlativos.repository';
+import { ConfiguracionesService } from '../configuraciones/configuraciones.service';
 
 describe('CotizacionesService', () => {
   let service: CotizacionesService;
@@ -23,6 +24,7 @@ describe('CotizacionesService', () => {
   let eventBus: jest.Mocked<EventBusService>;
   let prisma: jest.Mocked<PrismaService>;
   let tenantPrisma: { client: { $transaction: jest.Mock } };
+  let configuracionesService: jest.Mocked<ConfiguracionesService>;
 
   // Ver el mismo patrón en compras.service.spec.ts/facturacion.service.spec.ts:
   // un tx opaco pasado por $transaction a los métodos *EnTx.
@@ -63,6 +65,7 @@ describe('CotizacionesService', () => {
       configuracion: { findUnique: jest.fn().mockResolvedValue(null), findMany: jest.fn().mockResolvedValue([]) },
     } as unknown as jest.Mocked<PrismaService>;
     tenantPrisma = { client: { $transaction: jest.fn((cb: (tx: unknown) => unknown) => cb(TX)) } };
+    configuracionesService = { buscarValor: jest.fn().mockResolvedValue('18') } as unknown as jest.Mocked<ConfiguracionesService>;
     service = new CotizacionesService(
       repository,
       facturacionService,
@@ -73,6 +76,7 @@ describe('CotizacionesService', () => {
       eventBus,
       prisma,
       tenantPrisma as unknown as TenantPrismaService,
+      configuracionesService,
     );
   });
 
@@ -232,7 +236,7 @@ describe('CotizacionesService', () => {
       repository.obtenerProductoConPrecioVigente.mockResolvedValue(producto(18, 200) as never);
       repository.actualizar.mockResolvedValue({ id: 'c1' } as never);
 
-      await service.actualizar('c1', dto({ lineas: [{ productoId: 'prod-1', cantidad: 1 }] }));
+      await service.actualizar('c1', dto({ lineas: [{ productoId: 'prod-1', cantidad: 1 }] }), 'tenant-1');
 
       expect(repository.actualizar).toHaveBeenCalledWith(
         'c1',
@@ -243,7 +247,7 @@ describe('CotizacionesService', () => {
     it('rechaza editar una cotización que ya no está en BORRADOR', async () => {
       repository.buscarPorId.mockResolvedValue({ id: 'c1', estado: 'ENVIADA', facturaId: null } as never);
 
-      await expect(service.actualizar('c1', dto())).rejects.toThrow(BadRequestException);
+      await expect(service.actualizar('c1', dto(), 'tenant-1')).rejects.toThrow(BadRequestException);
       expect(repository.actualizar).not.toHaveBeenCalled();
     });
   });
@@ -332,6 +336,54 @@ describe('CotizacionesService', () => {
 
       await expect(
         service.convertirEnFactura('c1', { bodegaId: 'bodega-1', tipoFactura: 'CONTADO' }, 'tenant-1', 'vendedor-1'),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('propaga una línea manual de la cotización a la factura (ítem B-9)', async () => {
+      repository.buscarPorId.mockResolvedValue({
+        id: 'c1',
+        estado: 'ACEPTADA',
+        facturaId: null,
+        clienteId: 'cliente-1',
+        lineas: [{ productoId: null, descripcionManual: 'Instalación', cantidad: 1, precioUnitario: 100, descuento: 0 }],
+      } as never);
+      facturacionService.crear.mockResolvedValue({ id: 'f1', total: 118 } as never);
+
+      await service.convertirEnFactura('c1', { bodegaId: 'bodega-1', tipoFactura: 'CONTADO' }, 'tenant-1', 'vendedor-1');
+
+      expect(facturacionService.crear).toHaveBeenCalledWith(
+        expect.objectContaining({
+          lineas: [expect.objectContaining({ descripcionManual: 'Instalación', cantidad: 1, precioUnitario: 100 })],
+        }),
+        'tenant-1',
+        'vendedor-1',
+      );
+    });
+  });
+
+  describe('línea manual/libre (plan de integración Cuadre, ítem B-9)', () => {
+    it('calcula ITBIS a la tasa ITBIS_GENERAL del tenant, sin resolver producto/variante', async () => {
+      repository.crearEnTx.mockResolvedValue({ id: 'c1' } as never);
+
+      await service.crear(dto({ lineas: [{ descripcionManual: 'Instalación', cantidad: 1, precioUnitario: 100 } as never] }), 'tenant-1', 'vendedor-1');
+
+      expect(variantesService.resolverObligatoria).not.toHaveBeenCalled();
+      expect(repository.obtenerProductoConPrecioVigente).not.toHaveBeenCalled();
+      expect(configuracionesService.buscarValor).toHaveBeenCalledWith('ITBIS_GENERAL', 'tenant-1', '18');
+      expect(repository.crearEnTx).toHaveBeenCalledWith(
+        TX,
+        expect.objectContaining({
+          subtotal: 100,
+          itbis: 18,
+          total: 118,
+          lineas: [expect.objectContaining({ productoId: null, varianteId: null, descripcionManual: 'Instalación' })],
+        }),
+      );
+    });
+
+    it('rechaza una línea que trae productoId y descripcionManual a la vez', async () => {
+      await expect(
+        service.crear(dto({ lineas: [{ productoId: 'prod-1', descripcionManual: 'Instalación', cantidad: 1 } as never] }), 'tenant-1', 'vendedor-1'),
       ).rejects.toThrow(BadRequestException);
     });
   });

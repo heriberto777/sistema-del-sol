@@ -20,6 +20,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { TenantPrismaService } from '../prisma/tenant-prisma.service';
 import { FormatoImpresion } from '@prisma/client';
 import { mapearCotizacionAParams } from './mapear-cotizacion-pdf';
+import { ConfiguracionesService } from '../configuraciones/configuraciones.service';
+import { CONFIGURACIONES_BASE } from '../tenants/roles-base';
 
 /** Una cotización vigente cuya fecha de validez ya pasó se muestra como vencida sin necesidad de un job que la actualice. */
 function marcarVencidaSiAplica<T extends { estado: string; fechaVigenciaHasta: Date }>(cotizacion: T): T {
@@ -41,6 +43,7 @@ export class CotizacionesService {
     private readonly eventBus: EventBusService,
     private readonly prisma: PrismaService,
     private readonly tenantPrisma: TenantPrismaService,
+    private readonly configuracionesService: ConfiguracionesService,
   ) {}
 
   /**
@@ -51,9 +54,38 @@ export class CotizacionesService {
    * ofertas. Remisiones no lo necesita: no tiene precio ni descuento en
    * su modelo (documento sin efecto fiscal, solo cantidades).
    */
-  private async calcularLineas(lineas: CrearCotizacionDto['lineas'], listaPrecio: string) {
+  private async calcularLineas(lineas: CrearCotizacionDto['lineas'], listaPrecio: string, tenantId: string) {
+    for (const linea of lineas) {
+      if (linea.productoId && linea.descripcionManual) {
+        throw new BadRequestException('Una línea no puede tener productoId y descripcionManual a la vez');
+      }
+    }
+    // Ítem B-9 — ver el comentario equivalente en
+    // FacturacionService.calcularLineasYTotales.
+    const tasaItbisGeneralManual = lineas.some((l) => !l.productoId)
+      ? Number(await this.configuracionesService.buscarValor('ITBIS_GENERAL', tenantId, CONFIGURACIONES_BASE.ITBIS_GENERAL))
+      : 0;
+
     const lineasCalculadas = await Promise.all(
       lineas.map(async (linea) => {
+        if (!linea.productoId) {
+          const precioUnitario = linea.precioUnitario as number;
+          const descuento = linea.descuento ?? 0;
+          const totalLinea = linea.cantidad * precioUnitario - descuento;
+          const montoItbis = totalLinea * (tasaItbisGeneralManual / 100);
+
+          return {
+            productoId: null,
+            varianteId: null,
+            descripcionManual: linea.descripcionManual,
+            cantidad: linea.cantidad,
+            precioUnitario,
+            descuento,
+            porcentajeItbis: tasaItbisGeneralManual,
+            montoItbis,
+            montoTotal: totalLinea + montoItbis,
+          };
+        }
         const varianteId = await this.variantesService.resolverObligatoria(linea.productoId, linea.varianteId);
         const producto = await this.cotizacionesRepository.obtenerProductoConPrecioVigente(linea.productoId, varianteId, listaPrecio);
         const precioUnitario = linea.precioUnitario ?? Number(producto.precios[0]?.precioVenta ?? 0);
@@ -65,8 +97,9 @@ export class CotizacionesService {
         const montoItbis = totalLinea * (porcentajeItbis / 100);
 
         return {
-          productoId: linea.productoId,
-          varianteId,
+          productoId: linea.productoId as string | null,
+          varianteId: varianteId as string | null,
+          descripcionManual: undefined as string | undefined,
           cantidad: linea.cantidad,
           precioUnitario,
           descuento,
@@ -112,7 +145,7 @@ export class CotizacionesService {
 
   async crear(dto: CrearCotizacionDto, tenantId: string, vendedorId: string) {
     const listaPrecio = await this.resolverListaPrecio(dto);
-    const { lineasCalculadas, subtotal, itbis, descuentoTotal, total } = await this.calcularLineas(dto.lineas, listaPrecio);
+    const { lineasCalculadas, subtotal, itbis, descuentoTotal, total } = await this.calcularLineas(dto.lineas, listaPrecio, tenantId);
 
     return this.tenantPrisma.client.$transaction(async (tx) => {
       const numero = await this.correlativosRepository.siguienteEnTx(tx, tenantId, 'COTIZACION');
@@ -131,14 +164,14 @@ export class CotizacionesService {
     });
   }
 
-  async actualizar(id: string, dto: CrearCotizacionDto) {
+  async actualizar(id: string, dto: CrearCotizacionDto, tenantId: string) {
     const cotizacion = await this.cotizacionesRepository.buscarPorId(id);
     if (cotizacion.estado !== 'BORRADOR') {
       throw new BadRequestException('Solo se puede editar una cotización en borrador');
     }
 
     const listaPrecio = await this.resolverListaPrecio(dto);
-    const { lineasCalculadas, subtotal, itbis, descuentoTotal, total } = await this.calcularLineas(dto.lineas, listaPrecio);
+    const { lineasCalculadas, subtotal, itbis, descuentoTotal, total } = await this.calcularLineas(dto.lineas, listaPrecio, tenantId);
 
     return this.cotizacionesRepository.actualizar(id, {
       clienteId: dto.clienteId,
@@ -212,8 +245,13 @@ export class CotizacionesService {
         bodegaId: dto.bodegaId,
         tipoFactura: dto.tipoFactura,
         lineas: cotizacion.lineas.map((linea) => ({
-          productoId: linea.productoId,
-          varianteId: linea.varianteId,
+          productoId: linea.productoId ?? undefined,
+          varianteId: linea.varianteId ?? undefined,
+          // Ítem B-9 — se propaga tal cual a la factura; el ITBIS de la
+          // línea manual se recalcula en FacturacionService.crear() sobre
+          // la tasa general vigente (no se snapshotea porcentajeItbis acá,
+          // mismo criterio que el resto de la conversión).
+          descripcionManual: linea.descripcionManual ?? undefined,
           cantidad: Number(linea.cantidad),
           precioUnitario: Number(linea.precioUnitario),
           descuento: Number(linea.descuento),

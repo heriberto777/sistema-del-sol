@@ -11,11 +11,16 @@ function rangoPorDefecto(desde?: string, hasta?: string): { desde: Date; hasta: 
 
 interface LineaParaComision {
   id: string;
-  productoId: string;
+  // Nullable en el tipo de Prisma (ítem B-9) — nunca null en la práctica
+  // acá: el `where` de generarDesdeFactura ya excluye `productoId: null`.
+  productoId: string | null;
   cantidad: Prisma.Decimal;
   precioUnitario: Prisma.Decimal;
   descuento: Prisma.Decimal;
-  producto: { porcentajeComision: Prisma.Decimal | null; montoComisionFijo: Prisma.Decimal | null };
+  // Nullable en el tipo de Prisma (relación opcional, ítem B-9) — nunca
+  // null en la práctica acá: el `where` de generarDesdeFactura ya excluye
+  // `productoId: null`.
+  producto: { porcentajeComision: Prisma.Decimal | null; montoComisionFijo: Prisma.Decimal | null } | null;
 }
 
 @Injectable()
@@ -39,7 +44,10 @@ export class ComisionesService {
     if (params.tipoFactura !== 'CONTADO' && params.tipoFactura !== 'CREDITO') return;
 
     const lineas: LineaParaComision[] = await this.prisma.lineaFactura.findMany({
-      where: { facturaId: params.facturaId, pagaComision: true },
+      // Ítem B-9 — una línea manual (sin productoId) no tiene producto
+      // contra el cual resolver porcentajeComision/montoComisionFijo: se
+      // excluye acá, no genera ComisionVenta.
+      where: { facturaId: params.facturaId, pagaComision: true, productoId: { not: null } },
       select: {
         id: true,
         productoId: true,
@@ -56,7 +64,8 @@ export class ComisionesService {
       .map((x) => ({
         facturaId: params.facturaId,
         lineaFacturaId: x.linea.id,
-        productoId: x.linea.productoId,
+        // El `where` de arriba ya excluye productoId null.
+        productoId: x.linea.productoId as string,
         empleadoId: params.vendedorEmpleadoId as string,
         monto: x.monto,
       }));
@@ -71,6 +80,7 @@ export class ComisionesService {
    * `montoComisionFijo` (validado en `ProductosService`).
    */
   private calcularMontoComision(linea: LineaParaComision): number {
+    if (!linea.producto) return 0;
     if (linea.producto.porcentajeComision != null) {
       const montoNeto = Number(linea.cantidad) * Number(linea.precioUnitario) - Number(linea.descuento);
       return montoNeto * (Number(linea.producto.porcentajeComision) / 100);

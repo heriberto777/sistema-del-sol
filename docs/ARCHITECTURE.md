@@ -829,6 +829,43 @@ Ambos quedan con `facturaId` (único) apuntando a la factura resultante
 una vez convertidos, y no se pueden operar ni reconvertir después de eso
 (`validarQueSigaAbierta` en cada servicio).
 
+**Línea manual/libre (ítem B-9, 2026-08-26)**: `LineaFactura`/
+`LineaCotizacion` ganan `productoId`/`varianteId` **nullable** +
+`descripcionManual String?` — una línea sin producto del catálogo (ej.
+"Instalación", "Servicio no catalogado"). Invariante "exactamente uno de
+(`productoId`) o (`descripcionManual`)" validado en
+`FacturacionService.calcularLineasYTotales`/`CotizacionesService.
+calcularLineas` (`BadRequestException` si vienen los dos), **no** con un
+CHECK de Postgres — mismo criterio de "invariante de aplicación" que ya
+usa el proyecto para otros casos similares. Una línea manual:
+- No resuelve variante/precio/oferta/ley fiscal — `precioUnitario` y
+  `cantidad` pasan a ser explícitos y obligatorios (el DTO los exige con
+  `@ValidateIf` cuando no hay `productoId`).
+- Su ITBIS reusa el toggle `aplicaItbis` (B-7, ya existente): con
+  `aplicaItbis !== false` aplica la tasa `ITBIS_GENERAL` del tenant
+  (`ConfiguracionesService`, mismo origen que el recargo de B-4); con
+  `false`, 0% — **no se agregó ningún campo nuevo para esto**.
+- Nunca mueve inventario — `FacturacionService.crear()`/`anular()`
+  saltan la línea entera con un guard `if (!linea.productoId) continue`
+  antes de llamar a `expandirParaInventario` (mismo criterio que un
+  `Producto.tipo === 'SERVICIO'`, que tampoco mueve stock).
+- Nunca genera comisión — `ComisionesService.generarDesdeFactura` agrega
+  `productoId: { not: null }` al `where` de origen.
+- Queda fuera del reporte de rentabilidad y de las dimensiones
+  `producto`/`categoria`/`codigoAlterno` de "ventas agrupadas" (ver
+  sección de Reportes más abajo) — sin costo/variante real contra qué
+  comparar, no se inventa uno ficticio.
+- Al convertir una cotización con línea manual en factura, `descripcionManual`
+  se propaga tal cual (el ITBIS se recalcula en `crear()` sobre la tasa
+  vigente, no se snapshotea desde la cotización).
+- Fuera de alcance a propósito: **Remisión** (no tiene campo de precio,
+  no hay dónde encajar una línea manual con sentido) y el exportador
+  fiscal 606/607/608 (confirmado que no lee `LineaFactura`, usa
+  agregados de `RecepcionCompra` — cero impacto real ahí). La devolución
+  de POS (`PosService.obtenerFacturaParaDevolucion`) y `EmitirNotaForm`
+  (Nota de crédito/débito por NCF buscado) excluyen las líneas manuales
+  de sus listas — no hay match posible sin `productoId`.
+
 **Nota de mantenimiento**: agregar un permiso nuevo a `PERMISOS_BASE`
 (`backend/src/tenants/roles-base.ts`) solo afecta tenants creados
 **después** de ese cambio — los tenants ya provisionados no reciben el
@@ -866,7 +903,10 @@ por dos endpoints nuevos — trae `Factura` (solo `CONTADO`/`CREDITO`
   `LineaFactura` no snapshotea costo (solo precio de venta), así que
   reconstruir el costo histórico exacto exigiría un modelo distinto;
   documentado en la UI (`ReporteRentabilidad.tsx`) para que no se lea
-  como un número contable exacto.
+  como un número contable exacto. **Ítem B-9**: una línea manual/libre
+  (sin `productoId`) se excluye de ambos reportes en las dimensiones que
+  dependen de producto/variante — sin catálogo ni costo real contra qué
+  agrupar/comparar.
 
 Ninguno de los dos tiene exportador xlsx/pdf todavía (a diferencia de
 `reporteVentas`/`reporteInventario`/`reporteCompras`) — se dejó fuera

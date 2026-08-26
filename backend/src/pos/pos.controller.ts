@@ -91,8 +91,8 @@ export class PosController {
   // para saber el total real (con ofertas ya resueltas), ver ARCHITECTURE.md.
   @Post('cotizar')
   @Permissions('pos.editar')
-  cotizar(@Body() dto: CotizarVentaPosDto) {
-    return this.posService.cotizar(dto);
+  cotizar(@Body() dto: CotizarVentaPosDto, @CurrentUser() user: JwtPayloadUser) {
+    return this.posService.cotizar(dto, user.tenantId);
   }
 
   @Post('ventas')

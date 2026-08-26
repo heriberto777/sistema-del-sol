@@ -13,7 +13,13 @@ export interface CotizacionParaPdf {
   numero: string;
   createdAt: Date;
   cliente: { nombre: string };
-  lineas: { producto: { nombre: string }; cantidad: Prisma.Decimal; precioUnitario: Prisma.Decimal; montoTotal: Prisma.Decimal }[];
+  lineas: {
+    producto: { nombre: string } | null;
+    descripcionManual: string | null;
+    cantidad: Prisma.Decimal;
+    precioUnitario: Prisma.Decimal;
+    montoTotal: Prisma.Decimal;
+  }[];
   subtotal: Prisma.Decimal;
   descuento: Prisma.Decimal;
   itbis: Prisma.Decimal;
@@ -27,7 +33,7 @@ export function mapearCotizacionAParams(cotizacion: CotizacionParaPdf): Document
     fecha: cotizacion.createdAt,
     cliente: cotizacion.cliente.nombre,
     lineas: cotizacion.lineas.map((linea) => ({
-      concepto: linea.producto.nombre,
+      concepto: linea.producto?.nombre ?? linea.descripcionManual ?? '',
       cantidad: linea.cantidad.toString(),
       precioUnitario: Number(linea.precioUnitario).toFixed(2),
       total: Number(linea.montoTotal).toFixed(2),

@@ -7,10 +7,10 @@ import { Modal } from '../../molecules/Modal/Modal';
 import { PaginaResultado } from '../../../types/pagina-resultado';
 
 interface LineaFactura {
-  productoId: string;
-  varianteId: string;
+  productoId: string | null;
+  varianteId: string | null;
   cantidad: string;
-  producto: { nombre: string; codigo: string };
+  producto: { nombre: string; codigo: string } | null;
 }
 
 interface Factura {
@@ -56,7 +56,10 @@ export function EmitirNotaForm({ onClose }: { onClose: () => void }) {
       }
       const { data: detalle } = await apiClient.get<Factura>(`/facturas/${encontrada.id}`);
       setFacturaOrigen(detalle);
-      setCantidades(Object.fromEntries(detalle.lineas.map((l) => [l.productoId, l.cantidad])));
+      // Ítem B-9 — una línea manual (sin productoId) no se puede notar por
+      // este flujo de "buscar por NCF" (no hay contra qué hacer match);
+      // fuera de alcance, igual criterio que la devolución de POS.
+      setCantidades(Object.fromEntries(detalle.lineas.filter((l) => l.productoId).map((l) => [l.productoId as string, l.cantidad])));
     } catch {
       setError('No se pudo buscar la factura.');
     } finally {
@@ -72,11 +75,13 @@ export function EmitirNotaForm({ onClose }: { onClose: () => void }) {
         bodegaId: facturaOrigen.bodegaId,
         tipoFactura: tipoNota,
         facturaOrigenId: facturaOrigen.id,
-        lineas: facturaOrigen.lineas.map((l) => ({
-          productoId: l.productoId,
-          varianteId: l.varianteId,
-          cantidad: Number(cantidades[l.productoId] ?? l.cantidad),
-        })),
+        lineas: facturaOrigen.lineas
+          .filter((l) => l.productoId)
+          .map((l) => ({
+            productoId: l.productoId,
+            varianteId: l.varianteId,
+            cantidad: Number(cantidades[l.productoId as string] ?? l.cantidad),
+          })),
       });
     },
     onSuccess: () => {
@@ -124,22 +129,24 @@ export function EmitirNotaForm({ onClose }: { onClose: () => void }) {
           </div>
 
           <div className="space-y-2">
-            {facturaOrigen.lineas.map((linea) => (
-              <div key={linea.productoId} className="flex items-center justify-between gap-3 text-sm">
-                <span className="text-slate-700 dark:text-slate-300">
-                  {linea.producto.nombre} <span className="text-slate-400">({linea.producto.codigo})</span> — original: {linea.cantidad}
-                </span>
-                <input
-                  type="number"
-                  min={0}
-                  max={Number(linea.cantidad)}
-                  step="any"
-                  value={cantidades[linea.productoId] ?? ''}
-                  onChange={(e) => setCantidades((prev) => ({ ...prev, [linea.productoId]: e.target.value }))}
-                  className="w-24 rounded-md border border-slate-300 px-2 py-1 text-right dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-                />
-              </div>
-            ))}
+            {facturaOrigen.lineas
+              .filter((linea) => linea.productoId)
+              .map((linea) => (
+                <div key={linea.productoId} className="flex items-center justify-between gap-3 text-sm">
+                  <span className="text-slate-700 dark:text-slate-300">
+                    {linea.producto!.nombre} <span className="text-slate-400">({linea.producto!.codigo})</span> — original: {linea.cantidad}
+                  </span>
+                  <input
+                    type="number"
+                    min={0}
+                    max={Number(linea.cantidad)}
+                    step="any"
+                    value={cantidades[linea.productoId as string] ?? ''}
+                    onChange={(e) => setCantidades((prev) => ({ ...prev, [linea.productoId as string]: e.target.value }))}
+                    className="w-24 rounded-md border border-slate-300 px-2 py-1 text-right dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                  />
+                </div>
+              ))}
           </div>
 
           <Button type="submit" disabled={emitirNota.isPending} className="w-full">

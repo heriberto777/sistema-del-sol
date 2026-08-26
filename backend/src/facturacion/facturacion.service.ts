@@ -108,18 +108,59 @@ export class FacturacionService {
       descuentoGeneralMonto?: number;
     },
     cliente: { listaPrecio?: { nombre: string } | null },
+    tenantId: string,
   ) {
     if (dto.descuentoGeneralPct && dto.descuentoGeneralMonto) {
       throw new BadRequestException('Enviá descuentoGeneralPct o descuentoGeneralMonto, no ambos');
+    }
+    for (const linea of dto.lineas) {
+      if (linea.productoId && linea.descripcionManual) {
+        throw new BadRequestException('Una línea no puede tener productoId y descripcionManual a la vez');
+      }
     }
     const listaPrecio = dto.listaPrecio ?? cliente.listaPrecio?.nombre ?? 'GENERAL';
     // Ofertas (Fase 4b) solo aplican a una venta nueva — una nota de
     // crédito/débito ajusta un monto YA facturado, nunca recalcula un
     // descuento fresco sobre lo que se está devolviendo/cargando.
     const esVentaNormal = dto.tipoFactura === 'CONTADO' || dto.tipoFactura === 'CREDITO';
+    // Ítem B-9 — una sola lectura de configuración para todas las líneas
+    // manuales del documento (en vez de una por línea): default de ITBIS
+    // cuando la línea no trae `aplicaItbis: false`, mismo origen que el
+    // recargo (B-4).
+    const tasaItbisGeneralManual = dto.lineas.some((l) => !l.productoId)
+      ? Number(await this.configuracionesService.buscarValor('ITBIS_GENERAL', tenantId, CONFIGURACIONES_BASE.ITBIS_GENERAL))
+      : 0;
 
     const lineasCalculadas = await Promise.all(
       dto.lineas.map(async (linea) => {
+        // Ítem B-9 — línea libre sin producto del catálogo: no resuelve
+        // variante/precio/oferta/ley fiscal, no mueve inventario (ver los
+        // guards `!linea.productoId` en crear()) y queda fuera de
+        // comisiones (ComisionesService filtra por productoId no nulo) y
+        // del reporte de rentabilidad (sin costo real contra qué comparar).
+        if (!linea.productoId) {
+          const porcentajeItbis = linea.aplicaItbis === false ? 0 : tasaItbisGeneralManual;
+          const precioUnitario = linea.precioUnitario as number;
+          const descuento = linea.descuento ?? 0;
+          const totalLinea = linea.cantidad * precioUnitario - descuento;
+          const montoItbis = totalLinea * (porcentajeItbis / 100);
+
+          return {
+            productoId: null,
+            varianteId: null,
+            descripcionManual: linea.descripcionManual,
+            cantidad: linea.cantidad,
+            precioUnitario,
+            descuento,
+            porcentajeItbis,
+            montoItbis,
+            montoTotal: totalLinea + montoItbis,
+            pagaComision: true,
+            tipoProducto: undefined,
+            componentesCombo: [],
+            controlaVencimiento: false,
+          };
+        }
         // La variante se resuelve UNA vez por línea y se reusa tanto para el
         // precio (abajo) como para el descuento/reintegro de stock (en la
         // transacción) — así ambos operan sobre la misma variante, nunca
@@ -166,8 +207,9 @@ export class FacturacionService {
         const montoItbis = totalLinea * (porcentajeItbis / 100);
 
         return {
-          productoId: linea.productoId,
-          varianteId,
+          productoId: linea.productoId as string | null,
+          varianteId: varianteId as string | null,
+          descripcionManual: undefined as string | undefined,
           cantidad: linea.cantidad,
           precioUnitario,
           descuento,
@@ -267,16 +309,18 @@ export class FacturacionService {
    * resueltas, antes de que el cajero arme los pagos — ver
    * ARCHITECTURE.md, "Ofertas — limitación conocida").
    */
-  async cotizar(dto: { clienteId: string; lineas: LineaFacturaDto[]; listaPrecio?: string }) {
+  async cotizar(dto: { clienteId: string; lineas: LineaFacturaDto[]; listaPrecio?: string }, tenantId: string) {
     const cliente = await this.clientesService.buscarPorId(dto.clienteId);
     const { lineasCalculadas, subtotal, itbis, total, descuentoTotal } = await this.calcularLineasYTotales(
       { tipoFactura: 'CONTADO', listaPrecio: dto.listaPrecio, lineas: dto.lineas },
       cliente,
+      tenantId,
     );
     return {
       lineas: lineasCalculadas.map((l) => ({
         productoId: l.productoId,
         varianteId: l.varianteId,
+        descripcionManual: l.descripcionManual,
         cantidad: l.cantidad,
         precioUnitario: l.precioUnitario,
         descuento: l.descuento,
@@ -321,7 +365,7 @@ export class FacturacionService {
     // La sucursal de la bodega (ítem B-2) también decide de qué secuencia
     // de NCF se descuenta, más abajo.
     const bodega = await this.inventarioService.validarAccesoBodega(dto.bodegaId, vendedorId);
-    const { lineasCalculadas, subtotal, itbis, total, descuentoTotal } = await this.calcularLineasYTotales(dto, cliente);
+    const { lineasCalculadas, subtotal, itbis, total, descuentoTotal } = await this.calcularLineasYTotales(dto, cliente, tenantId);
 
     // Ítem B-4 — recargos post-subtotal (Imprevistos, Viáticos, etc.),
     // solo en ventas normales: mismo criterio que el descuento general de
@@ -398,7 +442,10 @@ export class FacturacionService {
       // descuenta.
       if (dto.tipoFactura === 'NOTA_CREDITO') {
         for (const linea of lineasCalculadas) {
-          for (const item of expandirParaInventario(linea, linea.productoId, linea.cantidad, linea.varianteId)) {
+          // Ítem B-9 — una línea manual nunca tuvo contrapartida física que
+          // reintegrar (nunca movió stock al facturarse).
+          if (!linea.productoId) continue;
+          for (const item of expandirParaInventario(linea, linea.productoId, linea.cantidad, linea.varianteId ?? undefined)) {
             // Fase 5b — solo la línea directa (no un componente de combo,
             // ver expandirParaInventario) reconstruye sola de qué lote(s)
             // salió la venta original; un componente de combo con
@@ -424,7 +471,10 @@ export class FacturacionService {
         }
       } else if (dto.tipoFactura !== 'NOTA_DEBITO' && !opciones?.sinMovimientoInventario) {
         for (const linea of lineasCalculadas) {
-          for (const item of expandirParaInventario(linea, linea.productoId, linea.cantidad, linea.varianteId)) {
+          // Ítem B-9 — línea manual sin producto del catálogo: nunca mueve
+          // inventario, mismo criterio que un Producto.tipo === 'SERVICIO'.
+          if (!linea.productoId) continue;
+          for (const item of expandirParaInventario(linea, linea.productoId, linea.cantidad, linea.varianteId ?? undefined)) {
             await this.inventarioService.verificarYDescontarStockEnTx(tx, {
               tenantId,
               productoId: item.productoId,
@@ -602,8 +652,11 @@ export class FacturacionService {
         if (factura.tipoFactura === 'NOTA_CREDITO') {
           // La nota había devuelto stock al crearse; anularla lo retira de nuevo.
           for (const linea of factura.lineas) {
-            const producto = { tipoProducto: linea.producto.tipo, componentesCombo: linea.producto.componentes };
-            for (const item of expandirParaInventario(producto, linea.productoId, Number(linea.cantidad), linea.varianteId)) {
+            // Ítem B-9 — una línea manual nunca movió stock, nada que
+            // retirar de nuevo acá.
+            if (!linea.productoId) continue;
+            const producto = { tipoProducto: linea.producto!.tipo, componentesCombo: linea.producto!.componentes };
+            for (const item of expandirParaInventario(producto, linea.productoId, Number(linea.cantidad), linea.varianteId ?? undefined)) {
               await this.inventarioService.verificarYDescontarStockEnTx(tx, {
                 tenantId,
                 productoId: item.productoId,
@@ -622,6 +675,9 @@ export class FacturacionService {
           const yaDevueltoPorProducto = new Map<string, number>();
           for (const nota of factura.notasRelacionadas ?? []) {
             for (const lineaNota of nota.lineas) {
+              // Ítem B-9 — una línea manual de la nota no corresponde a
+              // ningún productoId de la factura original, nada que sumar acá.
+              if (!lineaNota.productoId) continue;
               yaDevueltoPorProducto.set(
                 lineaNota.productoId,
                 (yaDevueltoPorProducto.get(lineaNota.productoId) ?? 0) + Number(lineaNota.cantidad),
@@ -630,11 +686,14 @@ export class FacturacionService {
           }
 
           for (const linea of factura.lineas) {
+            // Ítem B-9 — una línea manual nunca movió stock, nada que
+            // reintegrar acá.
+            if (!linea.productoId) continue;
             const yaDevuelto = yaDevueltoPorProducto.get(linea.productoId) ?? 0;
             const cantidadAReintegrar = Number(linea.cantidad) - yaDevuelto;
             if (cantidadAReintegrar > 0) {
-              const producto = { tipoProducto: linea.producto.tipo, componentesCombo: linea.producto.componentes };
-              for (const item of expandirParaInventario(producto, linea.productoId, cantidadAReintegrar, linea.varianteId)) {
+              const producto = { tipoProducto: linea.producto!.tipo, componentesCombo: linea.producto!.componentes };
+              for (const item of expandirParaInventario(producto, linea.productoId, cantidadAReintegrar, linea.varianteId ?? undefined)) {
                 await this.inventarioService.entradaStockEnTx(tx, {
                   tenantId,
                   productoId: item.productoId,

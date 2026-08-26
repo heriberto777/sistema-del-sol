@@ -27,7 +27,13 @@ export interface FacturaParaPdf {
   cliente: { nombre: string };
   moneda: string;
   totalMoneda: Prisma.Decimal | null;
-  lineas: { producto: { nombre: string }; cantidad: Prisma.Decimal; precioUnitario: Prisma.Decimal; montoTotal: Prisma.Decimal }[];
+  lineas: {
+    producto: { nombre: string } | null;
+    descripcionManual: string | null;
+    cantidad: Prisma.Decimal;
+    precioUnitario: Prisma.Decimal;
+    montoTotal: Prisma.Decimal;
+  }[];
   recargos: { concepto: string; monto: Prisma.Decimal }[];
   subtotal: Prisma.Decimal;
   descuento: Prisma.Decimal;
@@ -42,7 +48,7 @@ export function mapearFacturaAParams(factura: FacturaParaPdf): DocumentoPdfParam
     fecha: factura.fecha,
     cliente: factura.cliente.nombre,
     lineas: factura.lineas.map((linea) => ({
-      concepto: linea.producto.nombre,
+      concepto: linea.producto?.nombre ?? linea.descripcionManual ?? '',
       cantidad: linea.cantidad.toString(),
       precioUnitario: Number(linea.precioUnitario).toFixed(2),
       total: Number(linea.montoTotal).toFixed(2),

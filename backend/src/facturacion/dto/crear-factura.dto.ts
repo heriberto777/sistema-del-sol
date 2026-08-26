@@ -1,25 +1,51 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { ArrayMinSize, IsArray, IsBoolean, IsEnum, IsIn, IsNumber, IsOptional, IsPositive, IsString, IsUUID, Min, ValidateNested } from 'class-validator';
+import {
+  ArrayMinSize,
+  IsArray,
+  IsBoolean,
+  IsEnum,
+  IsIn,
+  IsNotEmpty,
+  IsNumber,
+  IsOptional,
+  IsPositive,
+  IsString,
+  IsUUID,
+  Min,
+  ValidateIf,
+  ValidateNested,
+} from 'class-validator';
 import { TipoFactura } from '@prisma/client';
 
 export class LineaFacturaDto {
-  @ApiProperty()
+  @ApiProperty({ required: false, description: 'Omitir en una línea manual/libre (ítem B-9) — mutuamente excluyente con descripcionManual' })
+  @ValidateIf((o) => !o.descripcionManual)
   @IsUUID()
-  productoId: string;
+  productoId?: string;
 
-  @ApiProperty({ required: false, description: 'Obligatorio si el producto tiene más de una variante (Fase 3c)' })
+  @ApiProperty({ required: false, description: 'Obligatorio si el producto tiene más de una variante (Fase 3c) — no aplica a una línea manual' })
   @IsOptional()
   @IsUUID()
   varianteId?: string;
+
+  @ApiProperty({
+    required: false,
+    description:
+      'Línea libre sin producto del catálogo (ítem B-9, plan de integración Cuadre, ej. "Instalación") — mutuamente excluyente con productoId. No mueve inventario ni genera comisión, y queda fuera del reporte de rentabilidad.',
+  })
+  @ValidateIf((o) => !o.productoId)
+  @IsString()
+  @IsNotEmpty()
+  descripcionManual?: string;
 
   @ApiProperty()
   @IsNumber()
   @IsPositive()
   cantidad: number;
 
-  @ApiProperty({ required: false, description: 'Si se omite, se toma el precio de venta vigente del producto' })
-  @IsOptional()
+  @ApiProperty({ required: false, description: 'Si se omite, se toma el precio de venta vigente del producto — obligatorio en una línea manual' })
+  @ValidateIf((o) => !o.productoId || o.precioUnitario !== undefined)
   @IsNumber()
   @Min(0)
   precioUnitario?: number;

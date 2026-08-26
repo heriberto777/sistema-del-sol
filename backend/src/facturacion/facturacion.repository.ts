@@ -3,8 +3,11 @@ import { TenantPrismaService } from '../prisma/tenant-prisma.service';
 import { ModalidadFacturacion, Prisma, TipoFactura, TipoNcf } from '@prisma/client';
 
 interface LineaCalculada {
-  productoId: string;
-  varianteId: string;
+  // Nullable (ítem B-9) — exactamente uno de productoId/descripcionManual,
+  // ver FacturacionService.calcularLineasYTotales.
+  productoId: string | null;
+  varianteId: string | null;
+  descripcionManual?: string;
   cantidad: number;
   precioUnitario: number;
   descuento: number;
@@ -204,6 +207,7 @@ export class FacturacionRepository {
           create: params.lineas.map((linea) => ({
             productoId: linea.productoId,
             varianteId: linea.varianteId,
+            descripcionManual: linea.descripcionManual,
             cantidad: linea.cantidad,
             precioUnitario: linea.precioUnitario,
             descuento: linea.descuento,

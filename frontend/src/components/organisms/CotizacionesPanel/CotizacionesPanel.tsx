@@ -37,9 +37,11 @@ interface Bodega {
 type EstadoCotizacion = 'BORRADOR' | 'ENVIADA' | 'ACEPTADA' | 'RECHAZADA' | 'VENCIDA';
 
 interface LineaCotizacion {
-  productoId: string;
-  varianteId: string;
+  productoId: string | null;
+  varianteId: string | null;
+  descripcionManual?: string | null;
   cantidad: string;
+  precioUnitario: string;
   producto?: { nombre: string; codigo: string };
 }
 
@@ -63,7 +65,17 @@ const TONO_POR_ESTADO: Record<EstadoCotizacion, 'exito' | 'advertencia' | 'pelig
   VENCIDA: 'peligro',
 };
 
-type LineaForm = { productoId: string; varianteId: string; cantidad: string };
+type LineaForm = {
+  productoId: string;
+  varianteId: string;
+  cantidad: string;
+  // Ítem B-9 — línea manual/libre sin producto del catálogo.
+  esManual: boolean;
+  descripcionManual: string;
+  precioUnitario: string;
+};
+
+const LINEA_VACIA: LineaForm = { productoId: '', varianteId: '', cantidad: '1', esManual: false, descripcionManual: '', precioUnitario: '' };
 
 export function CotizacionesPanel() {
   const queryClient = useQueryClient();
@@ -205,7 +217,7 @@ function ModalNuevaCotizacion({ productos, onClose }: { productos: Producto[]; o
   const queryClient = useQueryClient();
   const [cliente, setCliente] = useState<Cliente | null>(null);
   const [fechaVigenciaHasta, setFechaVigenciaHasta] = useState('');
-  const [lineas, setLineas] = useState<LineaForm[]>([{ productoId: '', varianteId: '', cantidad: '1' }]);
+  const [lineas, setLineas] = useState<LineaForm[]>([LINEA_VACIA]);
   const [error, setError] = useState<string | null>(null);
 
   const crear = useMutation({
@@ -214,8 +226,12 @@ function ModalNuevaCotizacion({ productos, onClose }: { productos: Producto[]; o
         clienteId: cliente?.id,
         fechaVigenciaHasta,
         lineas: lineas
-          .filter((l) => l.productoId)
-          .map((l) => ({ productoId: l.productoId, varianteId: l.varianteId || undefined, cantidad: Number(l.cantidad) })),
+          .filter((l) => l.productoId || (l.esManual && l.descripcionManual.trim()))
+          .map((l) =>
+            l.esManual
+              ? { descripcionManual: l.descripcionManual.trim(), cantidad: Number(l.cantidad), precioUnitario: Number(l.precioUnitario) }
+              : { productoId: l.productoId, varianteId: l.varianteId || undefined, cantidad: Number(l.cantidad) },
+          ),
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['cotizaciones'] });
@@ -233,6 +249,10 @@ function ModalNuevaCotizacion({ productos, onClose }: { productos: Producto[]; o
     setError(null);
     if (!cliente) {
       setError('Seleccioná un cliente.');
+      return;
+    }
+    if (lineas.some((l) => l.esManual && l.descripcionManual.trim() && !l.precioUnitario)) {
+      setError('Una línea de producto libre necesita un precio.');
       return;
     }
     crear.mutate();
@@ -268,13 +288,23 @@ function ModalNuevaCotizacion({ productos, onClose }: { productos: Producto[]; o
           <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Líneas</p>
           {lineas.map((linea, i) => (
             <div key={i} className="flex items-center gap-2">
-              <SelectorLineaProducto
-                productos={productos}
-                productoId={linea.productoId}
-                varianteId={linea.varianteId}
-                onChange={(productoId, varianteId) => actualizarLinea(i, { productoId, varianteId })}
-                className="flex-1"
-              />
+              {linea.esManual ? (
+                <input
+                  type="text"
+                  placeholder="Descripción — ej. Instalación"
+                  value={linea.descripcionManual}
+                  onChange={(e) => actualizarLinea(i, { descripcionManual: e.target.value })}
+                  className="flex-1 rounded-lg border border-slate-300 px-2 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                />
+              ) : (
+                <SelectorLineaProducto
+                  productos={productos}
+                  productoId={linea.productoId}
+                  varianteId={linea.varianteId}
+                  onChange={(productoId, varianteId) => actualizarLinea(i, { productoId, varianteId })}
+                  className="flex-1"
+                />
+              )}
               <input
                 type="number"
                 min={1}
@@ -283,6 +313,25 @@ function ModalNuevaCotizacion({ productos, onClose }: { productos: Producto[]; o
                 onChange={(e) => actualizarLinea(i, { cantidad: e.target.value })}
                 className="w-24 rounded-lg border border-slate-300 px-2 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
               />
+              {linea.esManual && (
+                <input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  placeholder="Precio"
+                  value={linea.precioUnitario}
+                  onChange={(e) => actualizarLinea(i, { precioUnitario: e.target.value })}
+                  className="w-28 rounded-lg border border-slate-300 px-2 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                />
+              )}
+              <button
+                type="button"
+                title={linea.esManual ? 'Volver a elegir del catálogo' : 'Línea libre sin producto del catálogo (ítem B-9)'}
+                onClick={() => actualizarLinea(i, { esManual: !linea.esManual, productoId: '', varianteId: '', descripcionManual: '' })}
+                className="whitespace-nowrap text-xs font-medium text-sol-600 hover:text-sol-700 dark:text-sol-400"
+              >
+                {linea.esManual ? 'Del catálogo' : 'Producto libre'}
+              </button>
               {lineas.length > 1 && (
                 <Button type="button" variante="secundario" onClick={() => setLineas((prev) => prev.filter((_, idx) => idx !== i))}>
                   Quitar
@@ -290,7 +339,7 @@ function ModalNuevaCotizacion({ productos, onClose }: { productos: Producto[]; o
               )}
             </div>
           ))}
-          <Button type="button" variante="secundario" onClick={() => setLineas((prev) => [...prev, { productoId: '', varianteId: '', cantidad: '1' }])}>
+          <Button type="button" variante="secundario" onClick={() => setLineas((prev) => [...prev, LINEA_VACIA])}>
             + Línea
           </Button>
         </div>
@@ -330,7 +379,14 @@ function ModalEditarCotizacion({
     setCliente({ id: detalle.clienteId, nombre: detalle.cliente.nombre });
     setValores({
       fechaVigenciaHasta: detalle.fechaVigenciaHasta.slice(0, 10),
-      lineas: detalle.lineas.map((l) => ({ productoId: l.productoId, varianteId: l.varianteId, cantidad: l.cantidad })),
+      lineas: detalle.lineas.map((l) => ({
+        productoId: l.productoId ?? '',
+        varianteId: l.varianteId ?? '',
+        cantidad: l.cantidad,
+        esManual: !l.productoId,
+        descripcionManual: l.descripcionManual ?? '',
+        precioUnitario: l.precioUnitario,
+      })),
     });
   }, [detalle]);
 
@@ -340,8 +396,12 @@ function ModalEditarCotizacion({
         clienteId: cliente?.id,
         fechaVigenciaHasta: valores!.fechaVigenciaHasta,
         lineas: valores!.lineas
-          .filter((l) => l.productoId)
-          .map((l) => ({ productoId: l.productoId, varianteId: l.varianteId || undefined, cantidad: Number(l.cantidad) })),
+          .filter((l) => l.productoId || (l.esManual && l.descripcionManual.trim()))
+          .map((l) =>
+            l.esManual
+              ? { descripcionManual: l.descripcionManual.trim(), cantidad: Number(l.cantidad), precioUnitario: Number(l.precioUnitario) }
+              : { productoId: l.productoId, varianteId: l.varianteId || undefined, cantidad: Number(l.cantidad) },
+          ),
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['cotizaciones'] });
@@ -355,6 +415,10 @@ function ModalEditarCotizacion({
     setError(null);
     if (!cliente) {
       setError('Seleccioná un cliente.');
+      return;
+    }
+    if (valores!.lineas.some((l) => l.esManual && l.descripcionManual.trim() && !l.precioUnitario)) {
+      setError('Una línea de producto libre necesita un precio.');
       return;
     }
     guardar.mutate();
@@ -401,18 +465,30 @@ function ModalEditarCotizacion({
           <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Líneas</p>
           {valores.lineas.map((linea, i) => (
             <div key={i} className="flex items-center gap-2">
-              <SelectorLineaProducto
-                productos={productos}
-                productoId={linea.productoId}
-                varianteId={linea.varianteId}
-                onChange={(productoId, varianteId) =>
-                  setValores({
-                    ...valores,
-                    lineas: valores.lineas.map((l, idx) => (idx === i ? { ...l, productoId, varianteId } : l)),
-                  })
-                }
-                className="flex-1"
-              />
+              {linea.esManual ? (
+                <input
+                  type="text"
+                  placeholder="Descripción — ej. Instalación"
+                  value={linea.descripcionManual}
+                  onChange={(e) =>
+                    setValores({ ...valores, lineas: valores.lineas.map((l, idx) => (idx === i ? { ...l, descripcionManual: e.target.value } : l)) })
+                  }
+                  className="flex-1 rounded-md border border-slate-300 px-2 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                />
+              ) : (
+                <SelectorLineaProducto
+                  productos={productos}
+                  productoId={linea.productoId}
+                  varianteId={linea.varianteId}
+                  onChange={(productoId, varianteId) =>
+                    setValores({
+                      ...valores,
+                      lineas: valores.lineas.map((l, idx) => (idx === i ? { ...l, productoId, varianteId } : l)),
+                    })
+                  }
+                  className="flex-1"
+                />
+              )}
               <input
                 type="number"
                 min={1}
@@ -423,6 +499,34 @@ function ModalEditarCotizacion({
                 }
                 className="w-24 rounded-md border border-slate-300 px-2 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
               />
+              {linea.esManual && (
+                <input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  placeholder="Precio"
+                  value={linea.precioUnitario}
+                  onChange={(e) =>
+                    setValores({ ...valores, lineas: valores.lineas.map((l, idx) => (idx === i ? { ...l, precioUnitario: e.target.value } : l)) })
+                  }
+                  className="w-28 rounded-md border border-slate-300 px-2 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                />
+              )}
+              <button
+                type="button"
+                title={linea.esManual ? 'Volver a elegir del catálogo' : 'Línea libre sin producto del catálogo (ítem B-9)'}
+                onClick={() =>
+                  setValores({
+                    ...valores,
+                    lineas: valores.lineas.map((l, idx) =>
+                      idx === i ? { ...l, esManual: !l.esManual, productoId: '', varianteId: '', descripcionManual: '' } : l,
+                    ),
+                  })
+                }
+                className="whitespace-nowrap text-xs font-medium text-sol-600 hover:text-sol-700 dark:text-sol-400"
+              >
+                {linea.esManual ? 'Del catálogo' : 'Producto libre'}
+              </button>
               {valores.lineas.length > 1 && (
                 <Button
                   type="button"
@@ -434,11 +538,7 @@ function ModalEditarCotizacion({
               )}
             </div>
           ))}
-          <Button
-            type="button"
-            variante="secundario"
-            onClick={() => setValores({ ...valores, lineas: [...valores.lineas, { productoId: '', varianteId: '', cantidad: '1' }] })}
-          >
+          <Button type="button" variante="secundario" onClick={() => setValores({ ...valores, lineas: [...valores.lineas, LINEA_VACIA] })}>
             + Línea
           </Button>
         </div>

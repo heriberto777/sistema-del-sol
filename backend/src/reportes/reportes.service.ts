@@ -234,18 +234,22 @@ export class ReportesService {
         sumar(f.formaPagoId ?? 'sin-forma-pago', f.formaPago?.nombre ?? 'Sin forma de pago', montosFactura);
       } else {
         for (const l of f.lineas) {
+          // Ítem B-9 — una línea manual no tiene producto/variante del
+          // catálogo contra qué agrupar; se excluye de estas 3
+          // dimensiones (no hay ítem equivalente para "sin categoría").
+          if (!l.productoId) continue;
           const montosLinea = {
             subtotal: Number(l.cantidad) * Number(l.precioUnitario) - Number(l.descuento),
             itbis: Number(l.montoItbis),
             total: Number(l.montoTotal),
           };
           if (dimension === 'producto') {
-            sumar(l.productoId, l.producto.nombre, montosLinea);
+            sumar(l.productoId, l.producto!.nombre, montosLinea);
           } else if (dimension === 'categoria') {
-            sumar(l.producto.categoria?.id ?? 'sin-categoria', l.producto.categoria?.nombre ?? 'Sin categoría', montosLinea);
+            sumar(l.producto!.categoria?.id ?? 'sin-categoria', l.producto!.categoria?.nombre ?? 'Sin categoría', montosLinea);
           } else if (dimension === 'codigoAlterno') {
-            if (!l.variante.codigoBarras) continue;
-            sumar(l.variante.codigoBarras, l.variante.codigoBarras, montosLinea);
+            if (!l.variante!.codigoBarras) continue;
+            sumar(l.variante!.codigoBarras, l.variante!.codigoBarras, montosLinea);
           }
         }
       }
@@ -270,10 +274,14 @@ export class ReportesService {
     const acumulado = new Map<string, { producto: string; cantidad: number; ventasNetas: number; costo: number }>();
     for (const f of facturas) {
       for (const l of f.lineas) {
+        // Ítem B-9 — una línea manual no tiene costo real (variante) contra
+        // qué comparar; se excluye del margen (limitación documentada, no
+        // se inventa un costo ficticio).
+        if (!l.productoId) continue;
         const cantidad = Number(l.cantidad);
         const ventaNeta = cantidad * Number(l.precioUnitario) - Number(l.descuento);
-        const costoUnitario = Number(l.variante.precios[0]?.costo ?? 0);
-        const actual = acumulado.get(l.productoId) ?? { producto: l.producto.nombre, cantidad: 0, ventasNetas: 0, costo: 0 };
+        const costoUnitario = Number(l.variante!.precios[0]?.costo ?? 0);
+        const actual = acumulado.get(l.productoId) ?? { producto: l.producto!.nombre, cantidad: 0, ventasNetas: 0, costo: 0 };
         actual.cantidad += cantidad;
         actual.ventasNetas += ventaNeta;
         actual.costo += cantidad * costoUnitario;

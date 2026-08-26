@@ -3,8 +3,11 @@ import { TenantPrismaService } from '../prisma/tenant-prisma.service';
 import { EstadoCotizacion, Prisma } from '@prisma/client';
 
 interface LineaCalculada {
-  productoId: string;
-  varianteId: string;
+  // Nullable (ítem B-9) — ver el comentario equivalente en
+  // FacturacionRepository.
+  productoId: string | null;
+  varianteId: string | null;
+  descripcionManual?: string;
   cantidad: number;
   precioUnitario: number;
   descuento: number;

@@ -39,8 +39,8 @@ export class CotizacionesController {
 
   @Patch(':id')
   @Permissions('cotizaciones.editar')
-  actualizar(@Param('id') id: string, @Body() dto: CrearCotizacionDto) {
-    return this.cotizacionesService.actualizar(id, dto);
+  actualizar(@Param('id') id: string, @Body() dto: CrearCotizacionDto, @CurrentUser() user: JwtPayloadUser) {
+    return this.cotizacionesService.actualizar(id, dto, user.tenantId);
   }
 
   @Patch(':id/estado')

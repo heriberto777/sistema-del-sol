@@ -448,6 +448,71 @@ describe('FacturacionService', () => {
     });
   });
 
+  describe('línea manual/libre (plan de integración Cuadre, ítem B-9)', () => {
+    it('calcula ITBIS a la tasa ITBIS_GENERAL del tenant por default, sin resolver producto/variante', async () => {
+      repository.crearFacturaEnTx.mockResolvedValue(facturaCreada() as never);
+
+      await service.crear(
+        dto({ lineas: [{ descripcionManual: 'Instalación', cantidad: 1, precioUnitario: 100 } as never] }),
+        'tenant-1',
+        'vendedor-1',
+      );
+
+      expect(variantesService.resolverObligatoria).not.toHaveBeenCalled();
+      expect(repository.obtenerProductoConPrecioVigente).not.toHaveBeenCalled();
+      expect(configuracionesService.buscarValor).toHaveBeenCalledWith('ITBIS_GENERAL', 'tenant-1', '18');
+      // subtotal 100, itbis 18% = 18, total 118
+      expect(repository.crearFacturaEnTx).toHaveBeenCalledWith(
+        TX,
+        expect.objectContaining({
+          subtotal: 100,
+          itbis: 18,
+          total: 118,
+          lineas: [expect.objectContaining({ productoId: null, varianteId: null, descripcionManual: 'Instalación', precioUnitario: 100 })],
+        }),
+      );
+    });
+
+    it('aplicaItbis:false en una línea manual fuerza 0% sin consultar la configuración del tenant', async () => {
+      repository.crearFacturaEnTx.mockResolvedValue(facturaCreada() as never);
+
+      await service.crear(
+        dto({ lineas: [{ descripcionManual: 'Servicio exento', cantidad: 1, precioUnitario: 100, aplicaItbis: false } as never] }),
+        'tenant-1',
+        'vendedor-1',
+      );
+
+      expect(repository.crearFacturaEnTx).toHaveBeenCalledWith(TX, expect.objectContaining({ subtotal: 100, itbis: 0, total: 100 }));
+    });
+
+    it('una línea manual nunca mueve inventario, aunque otras líneas de la misma factura sí', async () => {
+      repository.obtenerProductoConPrecioVigente.mockResolvedValue(producto(18, 50) as never);
+      repository.crearFacturaEnTx.mockResolvedValue(facturaCreada() as never);
+
+      await service.crear(
+        dto({
+          lineas: [{ productoId: 'prod-1', cantidad: 2 }, { descripcionManual: 'Instalación', cantidad: 1, precioUnitario: 100 } as never],
+        }),
+        'tenant-1',
+        'vendedor-1',
+      );
+
+      // Solo la línea de producto real dispara movimiento de stock.
+      expect(inventarioService.verificarYDescontarStockEnTx).toHaveBeenCalledTimes(1);
+      expect(inventarioService.verificarYDescontarStockEnTx).toHaveBeenCalledWith(TX, expect.objectContaining({ productoId: 'prod-1' }));
+    });
+
+    it('rechaza una línea que trae productoId y descripcionManual a la vez', async () => {
+      await expect(
+        service.crear(
+          dto({ lineas: [{ productoId: 'prod-1', descripcionManual: 'Instalación', cantidad: 1 } as never] }),
+          'tenant-1',
+          'vendedor-1',
+        ),
+      ).rejects.toThrow(BadRequestException);
+    });
+  });
+
   describe('ofertas automáticas (Fase 4b)', () => {
     it('aplica el descuento automático de línea que resuelve OfertasService cuando la línea no trae descuento manual', async () => {
       repository.obtenerProductoConPrecioVigente.mockResolvedValue(producto(18, 100) as never);
@@ -981,7 +1046,7 @@ describe('FacturacionService', () => {
       repository.obtenerProductoConPrecioVigente.mockResolvedValue(producto(18, 100) as never);
       ofertasService.resolverDescuentoLineaConComision.mockResolvedValue({ monto: 20, pagaComision: true });
 
-      const resultado = await service.cotizar({ clienteId: 'cliente-1', lineas: [{ productoId: 'prod-1', cantidad: 2 }] });
+      const resultado = await service.cotizar({ clienteId: 'cliente-1', lineas: [{ productoId: 'prod-1', cantidad: 2 }] }, 'tenant-1');
 
       // 2*100=200 - 20 descuento = 180 subtotal; itbis 18% de 180 = 32.4
       expect(resultado).toEqual(expect.objectContaining({ subtotal: 180, itbis: 32.4, descuento: 20, total: 212.4 }));
@@ -990,7 +1055,7 @@ describe('FacturacionService', () => {
     it('no abre transacción ni toca stock/NCF/pagos', async () => {
       repository.obtenerProductoConPrecioVigente.mockResolvedValue(producto(18, 100) as never);
 
-      await service.cotizar({ clienteId: 'cliente-1', lineas: [{ productoId: 'prod-1', cantidad: 1 }] });
+      await service.cotizar({ clienteId: 'cliente-1', lineas: [{ productoId: 'prod-1', cantidad: 1 }] }, 'tenant-1');
 
       expect(tenantPrisma.client.$transaction).not.toHaveBeenCalled();
       expect(inventarioService.verificarYDescontarStockEnTx).not.toHaveBeenCalled();

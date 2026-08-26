@@ -77,7 +77,9 @@ function ModalNuevaFactura({ onClose }: { onClose: () => void }) {
   const [tipoFactura, setTipoFactura] = useState<'CONTADO' | 'CREDITO'>('CONTADO');
   const [tipoComprobanteEspecial, setTipoComprobanteEspecial] = useState('');
   const [plazoPagoDias, setPlazoPagoDias] = useState(30);
-  const [lineas, setLineas] = useState([{ productoId: '', varianteId: '', cantidad: '1', precioUnitario: '', aplicaItbis: true }]);
+  const [lineas, setLineas] = useState([
+    { productoId: '', varianteId: '', descripcionManual: '', esManual: false, cantidad: '1', precioUnitario: '', aplicaItbis: true },
+  ]);
   const [mostrarNuevoCliente, setMostrarNuevoCliente] = useState(false);
   const [listaPrecioOverride, setListaPrecioOverride] = useState('');
   const [descuentoGeneralTipo, setDescuentoGeneralTipo] = useState<'' | 'PCT' | 'MONTO'>('');
@@ -138,14 +140,23 @@ function ModalNuevaFactura({ onClose }: { onClose: () => void }) {
           .filter((r) => r.concepto.trim() && r.monto)
           .map((r) => ({ concepto: r.concepto.trim(), monto: Number(r.monto), gravado: r.gravado })),
         lineas: lineas
-          .filter((l) => l.productoId)
-          .map((l) => ({
-            productoId: l.productoId,
-            varianteId: l.varianteId || undefined,
-            cantidad: Number(l.cantidad),
-            precioUnitario: l.precioUnitario ? Number(l.precioUnitario) : undefined,
-            aplicaItbis: l.aplicaItbis,
-          })),
+          .filter((l) => l.productoId || (l.esManual && l.descripcionManual.trim()))
+          .map((l) =>
+            l.esManual
+              ? {
+                  descripcionManual: l.descripcionManual.trim(),
+                  cantidad: Number(l.cantidad),
+                  precioUnitario: Number(l.precioUnitario),
+                  aplicaItbis: l.aplicaItbis,
+                }
+              : {
+                  productoId: l.productoId,
+                  varianteId: l.varianteId || undefined,
+                  cantidad: Number(l.cantidad),
+                  precioUnitario: l.precioUnitario ? Number(l.precioUnitario) : undefined,
+                  aplicaItbis: l.aplicaItbis,
+                },
+          ),
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['facturas'] });
@@ -161,8 +172,12 @@ function ModalNuevaFactura({ onClose }: { onClose: () => void }) {
       setError('Seleccioná un cliente.');
       return;
     }
-    if (lineas.filter((l) => l.productoId).length === 0) {
+    if (lineas.filter((l) => l.productoId || (l.esManual && l.descripcionManual.trim())).length === 0) {
       setError('Agregá al menos una línea con producto.');
+      return;
+    }
+    if (lineas.some((l) => l.esManual && l.descripcionManual.trim() && !l.precioUnitario)) {
+      setError('Una línea de producto libre necesita un precio.');
       return;
     }
     crear.mutate();
@@ -280,13 +295,23 @@ function ModalNuevaFactura({ onClose }: { onClose: () => void }) {
           <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Líneas</p>
           {lineas.map((linea, i) => (
             <div key={i} className="flex gap-2">
-              <SelectorLineaProducto
-                productos={productos ?? []}
-                productoId={linea.productoId}
-                varianteId={linea.varianteId}
-                onChange={(productoId, varianteId) => actualizarLinea(i, { productoId, varianteId })}
-                className="flex-1"
-              />
+              {linea.esManual ? (
+                <input
+                  type="text"
+                  placeholder="Descripción — ej. Instalación"
+                  value={linea.descripcionManual}
+                  onChange={(e) => actualizarLinea(i, { descripcionManual: e.target.value })}
+                  className="flex-1 rounded-md border border-slate-300 px-2 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                />
+              ) : (
+                <SelectorLineaProducto
+                  productos={productos ?? []}
+                  productoId={linea.productoId}
+                  varianteId={linea.varianteId}
+                  onChange={(productoId, varianteId) => actualizarLinea(i, { productoId, varianteId })}
+                  className="flex-1"
+                />
+              )}
               <input
                 type="number"
                 min={1}
@@ -299,7 +324,7 @@ function ModalNuevaFactura({ onClose }: { onClose: () => void }) {
                 type="number"
                 min={0}
                 step="0.01"
-                placeholder="Precio (opcional)"
+                placeholder={linea.esManual ? 'Precio' : 'Precio (opcional)'}
                 value={linea.precioUnitario}
                 onChange={(e) => actualizarLinea(i, { precioUnitario: e.target.value })}
                 className="w-32 rounded-md border border-slate-300 px-2 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
@@ -312,6 +337,16 @@ function ModalNuevaFactura({ onClose }: { onClose: () => void }) {
                 />
                 ITBIS
               </label>
+              <button
+                type="button"
+                title={linea.esManual ? 'Volver a elegir del catálogo' : 'Línea libre sin producto del catálogo (ítem B-9)'}
+                onClick={() =>
+                  actualizarLinea(i, { esManual: !linea.esManual, productoId: '', varianteId: '', descripcionManual: '' })
+                }
+                className="whitespace-nowrap text-xs font-medium text-sol-600 hover:text-sol-700 dark:text-sol-400"
+              >
+                {linea.esManual ? 'Del catálogo' : 'Producto libre'}
+              </button>
               {lineas.length > 1 && (
                 <button
                   type="button"
@@ -326,7 +361,12 @@ function ModalNuevaFactura({ onClose }: { onClose: () => void }) {
           ))}
           <button
             type="button"
-            onClick={() => setLineas((prev) => [...prev, { productoId: '', varianteId: '', cantidad: '1', precioUnitario: '', aplicaItbis: true }])}
+            onClick={() =>
+              setLineas((prev) => [
+                ...prev,
+                { productoId: '', varianteId: '', descripcionManual: '', esManual: false, cantidad: '1', precioUnitario: '', aplicaItbis: true },
+              ])
+            }
             className="text-sm font-medium text-sol-600 hover:text-sol-700 dark:text-sol-400"
           >
             + Agregar línea

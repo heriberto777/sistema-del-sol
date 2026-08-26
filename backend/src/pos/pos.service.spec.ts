@@ -203,9 +203,9 @@ describe('PosService', () => {
     it('delega en FacturacionService.cotizar sin resolver turno ni bodega (no tiene efectos secundarios)', async () => {
       facturacionService.cotizar.mockResolvedValue({ subtotal: 180, descuento: 20, itbis: 32.4, total: 212.4, lineas: [] } as never);
 
-      const resultado = await service.cotizar({ clienteId: 'c1', lineas: [{ productoId: 'p1', cantidad: 2 }] });
+      const resultado = await service.cotizar({ clienteId: 'c1', lineas: [{ productoId: 'p1', cantidad: 2 }] }, 'tenant-1');
 
-      expect(facturacionService.cotizar).toHaveBeenCalledWith({ clienteId: 'c1', lineas: [{ productoId: 'p1', cantidad: 2 }] });
+      expect(facturacionService.cotizar).toHaveBeenCalledWith({ clienteId: 'c1', lineas: [{ productoId: 'p1', cantidad: 2 }] }, 'tenant-1');
       expect(posRepository.buscarPorId).not.toHaveBeenCalled();
       expect(resultado).toEqual(expect.objectContaining({ total: 212.4 }));
     });
