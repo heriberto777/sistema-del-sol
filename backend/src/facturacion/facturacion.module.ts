@@ -14,6 +14,7 @@ import { NotificacionesModule } from '../notificaciones/notificaciones.module';
 import { AutorizacionesModule } from '../autorizaciones/autorizaciones.module';
 import { TasasCambioModule } from '../tasas-cambio/tasas-cambio.module';
 import { ConfiguracionesModule } from '../configuraciones/configuraciones.module';
+import { CorrelativosModule } from '../correlativos/correlativos.module';
 
 @Module({
   // AuthModule: FacturacionService llama a authService.verificarPin() en
@@ -24,6 +25,8 @@ import { ConfiguracionesModule } from '../configuraciones/configuraciones.module
   // AutorizacionesModule: segunda capa de autorización (ítem D-1).
   // LealtadModule: canje de puntos como forma de pago (ítem A-3).
   // TasasCambioModule: presentación en moneda extranjera (ítem C-2).
+  // CorrelativosModule: número interno de Factura, distinto del NCF —
+  // mismo mecanismo que ya usan Cotizaciones/Remisiones.
   imports: [
     InventarioModule,
     PagosModule,
@@ -37,6 +40,7 @@ import { ConfiguracionesModule } from '../configuraciones/configuraciones.module
     AutorizacionesModule,
     TasasCambioModule,
     ConfiguracionesModule,
+    CorrelativosModule,
   ],
   controllers: [FacturacionController],
   providers: [FacturacionService, FacturacionRepository],

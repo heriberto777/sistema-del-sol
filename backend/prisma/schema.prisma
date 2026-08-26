@@ -606,6 +606,11 @@ enum TipoCorrelativo {
   CAJA
   PRODUCTO
   CUENTA_CONTABLE
+  // Número interno de Factura (distinto del NCF, que es el comprobante
+  // fiscal) — brecha real encontrada al comparar contra Cuadre, que
+  // muestra ambos por separado. Agregado después de K-1 (que dejó
+  // Factura afuera a propósito, por ya tener NCF).
+  FACTURA
 }
 
 /// Correlativo automático genérico (plan de integración Cuadre, ítem de
@@ -788,6 +793,11 @@ model Factura {
   // sin esto no hay forma de saber a qué bodega devolver stock al anular.
   bodegaId           String?
   bodega             Bodega?       @relation(fields: [bodegaId], references: [id])
+  // Número interno de empresa, distinto del NCF (comprobante fiscal) —
+  // ver TipoCorrelativo.FACTURA. Nullable: las facturas creadas antes
+  // de esta columna no lo tienen (mismo criterio que bodegaId arriba),
+  // se completan mediante el script de backfill si se corre.
+  numero             String?
   ncf                String?
   tipoNcf            TipoNcf?
   tipoFactura        TipoFactura
@@ -849,6 +859,7 @@ model Factura {
   movimientosLealtad MovimientoLealtad[]
 
   @@unique([tenantId, ncf])
+  @@unique([tenantId, numero])
   @@index([tenantId, clienteId])
   @@map("facturas")
 }

@@ -136,6 +136,9 @@ export class FacturacionRepository {
       // `@default(uuid())` pasando el id explícito.
       id?: string;
       tenantId: string;
+      // Número interno de empresa, distinto del NCF — ver
+      // FacturacionService.crear().
+      numero: string;
       clienteId: string;
       vendedorId: string;
       bodegaId: string;
@@ -181,6 +184,7 @@ export class FacturacionRepository {
       data: {
         id: params.id,
         tenantId: params.tenantId,
+        numero: params.numero,
         clienteId: params.clienteId,
         vendedorId: params.vendedorId,
         bodegaId: params.bodegaId,

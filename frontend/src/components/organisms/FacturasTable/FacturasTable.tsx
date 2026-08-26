@@ -19,6 +19,7 @@ import { PaginaResultado } from '../../../types/pagina-resultado';
 
 interface Factura {
   id: string;
+  numero: string | null;
   ncf: string | null;
   tipoFactura: 'CONTADO' | 'CREDITO' | 'NOTA_DEBITO' | 'NOTA_CREDITO';
   estado: 'BORRADOR' | 'EMITIDA' | 'ANULADA';
@@ -40,6 +41,16 @@ const TONO_POR_ESTADO: Record<Factura['estado'], 'exito' | 'neutro' | 'peligro'>
   BORRADOR: 'neutro',
   ANULADA: 'peligro',
 };
+
+/**
+ * Identificador para mostrar/usar en títulos — número interno de empresa
+ * primero (distinto del NCF, que es el comprobante fiscal), con
+ * fallback a NCF y, para facturas viejas sin ninguno de los dos
+ * (backfill no corrido), al id.
+ */
+function identificadorFactura(factura: Pick<Factura, 'numero' | 'ncf' | 'id'>): string {
+  return factura.numero ?? factura.ncf ?? factura.id.slice(0, 8);
+}
 
 interface FacturasTableProps {
   /** Filtra por tipo (ej. ['NOTA_CREDITO', 'NOTA_DEBITO']) — usado por la pantalla de Notas (Fase 4a). Sin esto, trae todos los tipos. */
@@ -93,6 +104,7 @@ export function FacturasTable({ tiposFactura, titulo = 'Facturas', busquedaPlace
             <table className="w-full text-left text-sm">
               <thead className="bg-slate-50 text-slate-500 dark:bg-slate-900/60 dark:text-slate-400">
                 <tr>
+                  <th className="px-5 py-3 font-medium">Número</th>
                   <th className="px-5 py-3 font-medium">NCF</th>
                   <th className="px-5 py-3 font-medium">Cliente</th>
                   <th className="px-5 py-3 font-medium">Tipo</th>
@@ -122,7 +134,10 @@ export function FacturasTable({ tiposFactura, titulo = 'Facturas', busquedaPlace
 
                   return (
                     <tr key={factura.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                      <td className="px-5 py-3 font-mono text-xs">{factura.ncf ?? '—'}</td>
+                      <td className="px-5 py-3 font-mono text-xs font-medium text-slate-900 dark:text-slate-100">
+                        {identificadorFactura(factura)}
+                      </td>
+                      <td className="px-5 py-3 font-mono text-xs text-slate-500 dark:text-slate-400">{factura.ncf ?? '—'}</td>
                       <td className="px-5 py-3">{factura.cliente?.nombre}</td>
                       <td className="px-5 py-3">{factura.tipoFactura}</td>
                       <td className="px-5 py-3 font-medium text-slate-900 dark:text-slate-100">RD$ {Number(factura.total).toLocaleString('es-DO')}</td>
@@ -154,7 +169,7 @@ export function FacturasTable({ tiposFactura, titulo = 'Facturas', busquedaPlace
       {facturaImprimiendo && (
         <ModalImprimir
           urlBase={`/facturas/${facturaImprimiendo.id}`}
-          titulo={`Imprimir — ${facturaImprimiendo.ncf ?? facturaImprimiendo.id}`}
+          titulo={`Imprimir — ${identificadorFactura(facturaImprimiendo)}`}
           onClose={() => setFacturaImprimiendo(null)}
         />
       )}
@@ -202,7 +217,7 @@ function ModalAnularFactura({ factura, onClose }: { factura: Factura; onClose: (
   }
 
   return (
-    <Modal titulo={`Anular factura — ${factura.ncf ?? factura.id}`} onClose={onClose}>
+    <Modal titulo={`Anular factura — ${identificadorFactura(factura)}`} onClose={onClose}>
       <form onSubmit={onSubmit} className="space-y-3">
         <p className="text-sm text-slate-600 dark:text-slate-400">
           Esta acción es irreversible: la factura quedará anulada y, si corresponde, se reintegrará el inventario.
@@ -261,7 +276,7 @@ function ModalRegistrarCobro({ factura, onClose }: { factura: Factura; onClose: 
   }
 
   return (
-    <Modal titulo={`Registrar cobro — ${factura.ncf ?? factura.id}`} onClose={onClose}>
+    <Modal titulo={`Registrar cobro — ${identificadorFactura(factura)}`} onClose={onClose}>
       <div className="space-y-4">
         <div className="text-sm text-slate-600 dark:text-slate-400">
           <p>Total: RD$ {Number(factura.total).toLocaleString('es-DO')}</p>
@@ -323,7 +338,7 @@ function ModalLinkPago({ factura, onClose }: { factura: Factura; onClose: () => 
   const link = `${window.location.origin}/pagar-factura/${factura.id}`;
 
   return (
-    <Modal titulo={`Link de pago — ${factura.ncf ?? factura.id}`} onClose={onClose}>
+    <Modal titulo={`Link de pago — ${identificadorFactura(factura)}`} onClose={onClose}>
       <div className="space-y-3">
         <p className="text-sm text-slate-700 dark:text-slate-300">
           Compartí este link con el cliente para que pague esta factura en línea con tarjeta. Si el negocio no tiene una pasarela de pago

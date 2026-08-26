@@ -31,6 +31,7 @@ import { AuthService } from '../auth/auth.service';
 import { ConfiguracionesService } from '../configuraciones/configuraciones.service';
 import { CONFIGURACIONES_BASE } from '../tenants/roles-base';
 import { mapearFacturaAParams } from './mapear-factura-pdf';
+import { CorrelativosRepository } from '../correlativos/correlativos.repository';
 
 const NCF_POR_TIPO: Record<TipoFactura, TipoNcf> = {
   CREDITO: 'B01',
@@ -79,6 +80,7 @@ export class FacturacionService {
     private readonly notificacionesService: NotificacionesService,
     private readonly autorizacionesService: AutorizacionesService,
     private readonly configuracionesService: ConfiguracionesService,
+    private readonly correlativosRepository: CorrelativosRepository,
   ) {}
 
   /**
@@ -498,10 +500,17 @@ export class FacturacionService {
       if (umbralAlerta != null && restantes <= umbralAlerta) {
         this.eventBus.emit(EVENTOS.NCF_POR_AGOTARSE, { tenantId, tipoNcf, sucursalId: sucursalIdUsado, restantes, umbralAlerta });
       }
+      // Número interno de empresa, distinto del NCF — mismo mecanismo que
+      // ya usan Cotizaciones/Remisiones (ítem "consistencia visual de
+      // Ventas"). K-1 dejó Factura afuera a propósito por ya tener NCF,
+      // pero el NCF es el comprobante fiscal, no un número de referencia
+      // interno legible para el cliente/vendedor.
+      const numero = await this.correlativosRepository.siguienteEnTx(tx, tenantId, 'FACTURA');
 
       return this.facturacionRepository.crearFacturaEnTx(tx, {
         id: facturaId,
         tenantId,
+        numero,
         clienteId: dto.clienteId,
         vendedorId,
         bodegaId: dto.bodegaId,

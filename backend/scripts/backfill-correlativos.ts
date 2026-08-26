@@ -1,13 +1,15 @@
 import { PrismaClient, TipoCorrelativo } from '@prisma/client';
 
-const TIPOS: TipoCorrelativo[] = ['COTIZACION', 'REMISION', 'ORDEN_COMPRA', 'CAJA', 'PRODUCTO', 'CUENTA_CONTABLE'];
+const TIPOS: TipoCorrelativo[] = ['COTIZACION', 'REMISION', 'ORDEN_COMPRA', 'CAJA', 'PRODUCTO', 'CUENTA_CONTABLE', 'FACTURA'];
 
 /**
  * A cualquier tenant creado antes de esta feature (todos los existentes,
- * ej. "demo") le crea las 6 filas de Correlativo que le falten, con los
+ * ej. "demo") le crea las 7 filas de Correlativo que le falten, con los
  * defaults de fábrica (sin prefijo, arranca en 1, 5 dígitos) — mismos
  * defaults que TenantsRepository.crearConProvisioning siembra para
- * tenants nuevos.
+ * tenants nuevos. FACTURA se sumó después (ver
+ * backfill-numero-facturas.ts para asignarle número a facturas ya
+ * existentes).
  *
  * Idempotente: solo crea las filas (tenantId, tipo) que todavía no existan.
  *
@@ -32,7 +34,9 @@ async function main() {
     console.log(`${faltantes.length} correlativo(s) creado(s) para "${tenant.nombre}" (${faltantes.join(', ')})`);
   }
 
-  console.log(creadas > 0 ? `Listo: ${creadas} correlativo(s) creado(s) en total.` : 'Nada que hacer — todos los tenants ya tienen sus 6 correlativos.');
+  console.log(
+    creadas > 0 ? `Listo: ${creadas} correlativo(s) creado(s) en total.` : `Nada que hacer — todos los tenants ya tienen sus ${TIPOS.length} correlativos.`,
+  );
   await prisma.$disconnect();
 }
 
