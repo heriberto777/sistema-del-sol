@@ -207,20 +207,34 @@ Resumen de lo que cambió (detalle en cada ítem más abajo):
   `ModalNuevaFactura`; el POS no necesitó cambios (F-1/`ModalDescuento`
   "seleccionar todos" ya logra el mismo efecto). Sin migración. Entregado
   2026-08-24.
-- [ ] **B-9** 🟨→🟥 *(corrección de tamaño — ver nota)* — **Línea manual/
-  libre en factura**, no ligada a un producto del catálogo. *Confirmado:
-  `LineaFacturaDto.productoId` sigue siendo `@IsUUID()` obligatorio —
+- [x] **B-9** 🟨→🟥 *(corrección de tamaño — ver nota)* — **Línea manual/
+  libre en factura y cotización**, no ligada a un producto del catálogo.
+  *Confirmado: `LineaFacturaDto.productoId` era `@IsUUID()` obligatorio —
   brecha real, pero MÁS GRANDE de lo catalogado: `LineaFactura.productoId`/
-  `varianteId` son columnas `NOT NULL` con FK `RESTRICT` en el schema, un
+  `varianteId` eran columnas `NOT NULL` con FK `RESTRICT` en el schema, un
   invariante documentado a propósito en ARCHITECTURE.md/CLAUDE.md
   ("perder a qué variante corresponde una línea ya emitida sería perder
-  historial real"). Soportar una línea de verdad libre exige volverlas
-  nullable — con impacto en impresión/PDF, reportes y exportador fiscal
-  606/607/608 (todos asumen hoy que toda línea tiene producto/variante).
-  **Decisión del usuario (2026-08-24): dejar pendiente** — evaluar bien
-  cómo manejar el proceso de insertar líneas de producto sin que exista
-  un producto real, antes de decidir el diseño. No retomar sin volver a
-  traer el tema.*
+  historial real").* Resuelto: `productoId`/`varianteId` pasan a
+  nullable en `LineaFactura`/`LineaCotizacion` + `descripcionManual`
+  nuevo (invariante "exactamente uno de los dos" validada en el
+  servicio, no con un CHECK de Postgres); el ITBIS de una línea manual
+  reusa el toggle `aplicaItbis` (B-7) + `ITBIS_GENERAL` del tenant, sin
+  agregar nada nuevo para eso. Inventario, comisiones y el reporte de
+  rentabilidad la excluyen limpiamente (mismo criterio que un
+  `Producto.tipo === 'SERVICIO'` para inventario) — el exportador fiscal
+  606/607/608 no la toca (confirmado: no lee `LineaFactura`, usa
+  agregados de Compras). Remisión queda fuera a propósito (sin campo de
+  precio, no hay dónde encajar una línea manual). Alcance: solo
+  Facturación + Cotizaciones (el usuario lo confirmó así) — POS no tiene
+  UI para esto, pero al reusar `FacturacionService.crear()`/`cotizar()`
+  no queda bloqueado si algún día se necesita ahí. **Decisión del
+  usuario (2026-08-24): dejar pendiente** hasta retomarlo — retomado
+  2026-08-26 (último ítem del lote de Ventas/Facturación). Verificado en
+  vivo: factura solo con línea manual (subtotal/itbis/total correctos,
+  asiento contable balanceado, PDF genera bien); cotización con línea
+  manual → convertida en factura (mismos totales, `descripcionManual`
+  propagado); reportes de rentabilidad/ventas agrupadas no rompen con
+  facturas mixtas.*
 
 ## C — Pagos
 
@@ -1115,6 +1129,19 @@ aparte.*
   vivo: crear remisión → entregar → Kardex baja → anular → Kardex
   reintegra → crear otra, entregar, convertir a factura → stock no baja
   una segunda vez.
+- **2026-08-26**: entregado **B-9** (línea manual/libre en Factura +
+  Cotizaciones), último ítem del lote de Ventas/Facturación —
+  `productoId`/`varianteId` nullable en `LineaFactura`/`LineaCotizacion`
+  + `descripcionManual` nuevo. Inventario/comisiones/rentabilidad la
+  excluyen sin romper (guards `if (!linea.productoId) continue`, mismo
+  criterio que un `Producto.tipo === 'SERVICIO'`); `anular()`,
+  `EmitirNotaForm` y la devolución de POS también se actualizaron para
+  no asumir `producto`/`varianteId` no-nulos en una línea de Factura.
+  Verificado en vivo: factura solo con línea manual (asiento contable
+  balanceado); cotización con línea manual convertida en factura (mismos
+  totales); reportes de rentabilidad/ventas agrupadas sin romper. Con
+  esto queda **cerrado el lote completo de Ventas/Facturación**
+  (B-4, H-4, Remisión + stock, B-9).
 
 ## Sugerencia de por dónde arrancar
 
@@ -1132,13 +1159,12 @@ Consecutivos/Configuración del 2026-08-25 (G-10, G-11, G-12, K-1, H-2a),
 C-1 (AZUL/CardNet Payment Link) y H-2b (bot de WhatsApp), los tres
 retomados aparte el mismo día.
 
-**Lote en curso, 2026-08-26** (Ventas/Facturación, decidido con el
-usuario tras la auditoría Parte 8): B-4 (Recargos, entregado), H-4
-(link público + adjunto en notificaciones, entregado) y Remisión + stock
-("Marcar entregada" descuenta de verdad, entregado — hallazgo nuevo, no
-tenía ítem propio) — queda **B-9** (línea manual/libre en Factura +
-Cotizaciones, retomado — el usuario volvió a traer el tema), el más
-invasivo del lote, dejado para el final a propósito. Diseño completo en
+**Lote de Ventas/Facturación cerrado, 2026-08-26** (decidido con el
+usuario tras la auditoría Parte 8): B-4 (Recargos), H-4 (link público +
+adjunto en notificaciones), Remisión + stock ("Marcar entregada"
+descuenta de verdad — hallazgo nuevo, no tenía ítem propio) y B-9
+(línea manual/libre en Factura + Cotizaciones) — los cuatro entregados.
+Diseño completo en
 `C:\Users\longb\.claude\plans\memoized-noodling-moore.md`.
 
 Lo que queda, por categoría:
