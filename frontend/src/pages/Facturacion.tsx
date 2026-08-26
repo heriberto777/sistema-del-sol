@@ -82,6 +82,7 @@ function ModalNuevaFactura({ onClose }: { onClose: () => void }) {
   const [listaPrecioOverride, setListaPrecioOverride] = useState('');
   const [descuentoGeneralTipo, setDescuentoGeneralTipo] = useState<'' | 'PCT' | 'MONTO'>('');
   const [descuentoGeneralValor, setDescuentoGeneralValor] = useState('');
+  const [recargos, setRecargos] = useState<{ concepto: string; monto: string; gravado: boolean }[]>([]);
   const [moneda, setMoneda] = useState('DOP');
   const [error, setError] = useState<string | null>(null);
 
@@ -133,6 +134,9 @@ function ModalNuevaFactura({ onClose }: { onClose: () => void }) {
         descuentoGeneralPct: descuentoGeneralTipo === 'PCT' && descuentoGeneralValor ? Number(descuentoGeneralValor) : undefined,
         descuentoGeneralMonto: descuentoGeneralTipo === 'MONTO' && descuentoGeneralValor ? Number(descuentoGeneralValor) : undefined,
         moneda: moneda !== 'DOP' ? moneda : undefined,
+        recargos: recargos
+          .filter((r) => r.concepto.trim() && r.monto)
+          .map((r) => ({ concepto: r.concepto.trim(), monto: Number(r.monto), gravado: r.gravado })),
         lineas: lineas
           .filter((l) => l.productoId)
           .map((l) => ({
@@ -353,6 +357,58 @@ function ModalNuevaFactura({ onClose }: { onClose: () => void }) {
           </div>
           <p className="text-xs text-slate-500 dark:text-slate-400">
             Se reparte proporcionalmente entre todas las líneas (recalcula el ITBIS), además de cualquier descuento por línea u oferta automática.
+          </p>
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+            Recargos (opcional, plan de integración Cuadre, ítem B-4)
+          </label>
+          {recargos.map((recargo, i) => (
+            <div key={i} className="flex items-center gap-2">
+              <input
+                type="text"
+                placeholder="Concepto — ej. Imprevistos"
+                value={recargo.concepto}
+                onChange={(e) => setRecargos((prev) => prev.map((r, idx) => (idx === i ? { ...r, concepto: e.target.value } : r)))}
+                className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+              />
+              <input
+                type="number"
+                min={0}
+                step="0.01"
+                placeholder="RD$"
+                value={recargo.monto}
+                onChange={(e) => setRecargos((prev) => prev.map((r, idx) => (idx === i ? { ...r, monto: e.target.value } : r)))}
+                className="w-28 rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+              />
+              <label className="flex items-center gap-1 text-xs text-slate-600 dark:text-slate-400">
+                <input
+                  type="checkbox"
+                  checked={recargo.gravado}
+                  onChange={(e) => setRecargos((prev) => prev.map((r, idx) => (idx === i ? { ...r, gravado: e.target.checked } : r)))}
+                />
+                Gravado
+              </label>
+              <button
+                type="button"
+                onClick={() => setRecargos((prev) => prev.filter((_, idx) => idx !== i))}
+                className="text-red-600 hover:text-red-700"
+                aria-label="Quitar recargo"
+              >
+                ×
+              </button>
+            </div>
+          ))}
+          <button
+            type="button"
+            onClick={() => setRecargos((prev) => [...prev, { concepto: '', monto: '', gravado: false }])}
+            className="self-start text-sm font-medium text-sol-600 hover:text-sol-700 dark:text-sol-400"
+          >
+            + Agregar recargo
+          </button>
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            Cargo aparte, después del subtotal y el descuento — "Gravado" le suma ITBIS a la tasa general del tenant.
           </p>
         </div>
 

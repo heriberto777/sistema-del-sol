@@ -840,6 +840,7 @@ model Factura {
   updatedAt          DateTime      @updatedAt
 
   lineas             LineaFactura[]
+  recargos           FacturaRecargo[]
   cotizacionOrigen   Cotizacion?
   remisionOrigen     Remision?
   pagos              Pago[]
@@ -850,6 +851,27 @@ model Factura {
   @@unique([tenantId, ncf])
   @@index([tenantId, clienteId])
   @@map("facturas")
+}
+
+// Ítem B-4 — cargos post-subtotal (Imprevistos, Viáticos, etc.), fuera de
+// la lista de líneas de producto. Mismo patrón que FacturaPlataformaLinea
+// (tabla hija simple, sin catálogo reusable aparte — un recargo es texto
+// libre por factura, no una entidad de configuración): menos superficie
+// que inventar un catálogo `RecargoFactura` nuevo.
+model FacturaRecargo {
+  id        String  @id @default(uuid())
+  facturaId String
+  factura   Factura @relation(fields: [facturaId], references: [id], onDelete: Cascade)
+  concepto  String
+  monto     Decimal @db.Decimal(14, 2)
+  // Si aplica ITBIS sobre el monto del recargo (tasa general del tenant,
+  // igual que una línea manual — ver ítem B-9) o no (ej. "Anticipo").
+  gravado   Boolean @default(false)
+  // Mismo motivo que FacturaPlataformaLinea.orden: los inserts corren en
+  // la misma transacción del nested-create y comparten el mismo now().
+  orden     Int     @default(0)
+
+  @@map("factura_recargos")
 }
 
 model LineaFactura {

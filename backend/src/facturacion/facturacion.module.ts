@@ -13,6 +13,7 @@ import { AuthModule } from '../auth/auth.module';
 import { NotificacionesModule } from '../notificaciones/notificaciones.module';
 import { AutorizacionesModule } from '../autorizaciones/autorizaciones.module';
 import { TasasCambioModule } from '../tasas-cambio/tasas-cambio.module';
+import { ConfiguracionesModule } from '../configuraciones/configuraciones.module';
 
 @Module({
   // AuthModule: FacturacionService llama a authService.verificarPin() en
@@ -35,6 +36,7 @@ import { TasasCambioModule } from '../tasas-cambio/tasas-cambio.module';
     NotificacionesModule,
     AutorizacionesModule,
     TasasCambioModule,
+    ConfiguracionesModule,
   ],
   controllers: [FacturacionController],
   providers: [FacturacionService, FacturacionRepository],

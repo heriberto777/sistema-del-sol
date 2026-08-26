@@ -21,6 +21,8 @@ export interface DocumentoPdfParams {
   mostrarPrecios?: boolean;
   subtotal?: number;
   descuento?: number;
+  /** Ítem B-4 — cargos post-subtotal (Imprevistos, Viáticos, etc.), ya incluidos en `itbis`/`total`. */
+  recargos?: { concepto: string; monto: number }[];
   itbis?: number;
   total?: number;
   notas?: string;
@@ -116,6 +118,9 @@ export function generarDocumentoPdf(
       doc.font('Helvetica').fontSize(10);
       if (params.subtotal !== undefined) doc.text(`Subtotal: ${formatearMontoDop(params.subtotal)}`, { align: 'right' });
       if (params.descuento) doc.text(`Descuento: ${formatearMontoDop(params.descuento)}`, { align: 'right' });
+      for (const recargo of params.recargos ?? []) {
+        doc.text(`${recargo.concepto}: ${formatearMontoDop(recargo.monto)}`, { align: 'right' });
+      }
       if (params.itbis !== undefined) doc.text(`ITBIS: ${formatearMontoDop(params.itbis)}`, { align: 'right' });
       if (params.total !== undefined) doc.font('Helvetica-Bold').text(`Total: ${formatearMontoDop(params.total)}`, { align: 'right' });
       if (params.totalEnMoneda) {

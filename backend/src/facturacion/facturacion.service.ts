@@ -27,6 +27,8 @@ import { resolverFormatoImpresion } from '../common/impresion/resolver-formato-i
 import { resolverPersonalizacionDocumento } from '../common/impresion/resolver-personalizacion-documento';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthService } from '../auth/auth.service';
+import { ConfiguracionesService } from '../configuraciones/configuraciones.service';
+import { CONFIGURACIONES_BASE } from '../tenants/roles-base';
 
 const NOMBRE_TIPO_FACTURA: Record<TipoFactura, string> = {
   CONTADO: 'Factura de venta',
@@ -114,6 +116,7 @@ export class FacturacionService {
     private readonly authService: AuthService,
     private readonly notificacionesService: NotificacionesService,
     private readonly autorizacionesService: AutorizacionesService,
+    private readonly configuracionesService: ConfiguracionesService,
   ) {}
 
   /**
@@ -350,6 +353,22 @@ export class FacturacionService {
     // de NCF se descuenta, más abajo.
     const bodega = await this.inventarioService.validarAccesoBodega(dto.bodegaId, vendedorId);
     const { lineasCalculadas, subtotal, itbis, total, descuentoTotal } = await this.calcularLineasYTotales(dto, cliente);
+
+    // Ítem B-4 — recargos post-subtotal (Imprevistos, Viáticos, etc.),
+    // solo en ventas normales: mismo criterio que el descuento general de
+    // documento (B-8) — una nota de crédito/débito ajusta un monto YA
+    // facturado, no admite cargos nuevos. Se calculan acá (no dentro de
+    // `calcularLineasYTotales`) porque ni `cotizar()` ni el POS los usan
+    // — solo Facturación directa.
+    const recargosDto = dto.tipoFactura === 'CONTADO' || dto.tipoFactura === 'CREDITO' ? (dto.recargos ?? []) : [];
+    const totalRecargos = recargosDto.reduce((acc, r) => acc + r.monto, 0);
+    let itbisRecargos = 0;
+    if (recargosDto.some((r) => r.gravado)) {
+      const tasaItbisGeneral = Number(await this.configuracionesService.buscarValor('ITBIS_GENERAL', tenantId, CONFIGURACIONES_BASE.ITBIS_GENERAL));
+      itbisRecargos = recargosDto.filter((r) => r.gravado).reduce((acc, r) => acc + r.monto * (tasaItbisGeneral / 100), 0);
+    }
+    const itbisConRecargos = itbis + itbisRecargos;
+    const totalConRecargos = total + totalRecargos + itbisRecargos;
     // Ítem C-2 (multi-moneda) — subtotal/itbis/total de arriba siguen
     // siendo SIEMPRE DOP (stock/NCF/contabilidad/pagos operan sobre
     // ellos sin cambios); esto solo agrega el equivalente en la moneda
@@ -365,14 +384,15 @@ export class FacturacionService {
     const EPSILON_PAGOS = 0.005;
     if (opciones?.pagos?.length) {
       const sumaPagos = opciones.pagos.reduce((acc, p) => acc + p.monto, 0);
-      if (Math.abs(sumaPagos - total) > EPSILON_PAGOS) {
+      if (Math.abs(sumaPagos - totalConRecargos) > EPSILON_PAGOS) {
         throw new BadRequestException(
-          `La suma de los pagos (RD$ ${sumaPagos.toFixed(2)}) no coincide con el total de la venta (RD$ ${total.toFixed(2)})`,
+          `La suma de los pagos (RD$ ${sumaPagos.toFixed(2)}) no coincide con el total de la venta (RD$ ${totalConRecargos.toFixed(2)})`,
         );
       }
     }
     const pagosResueltos =
-      opciones?.pagos ?? (opciones?.formaPagoId ? [{ formaPagoId: opciones.formaPagoId, monto: total, referencia: opciones.referenciaPago }] : []);
+      opciones?.pagos ??
+      (opciones?.formaPagoId ? [{ formaPagoId: opciones.formaPagoId, monto: totalConRecargos, referencia: opciones.referenciaPago }] : []);
     const formaPagoPrincipal = pagosResueltos.length
       ? pagosResueltos.reduce((max, p) => (Math.abs(p.monto) > Math.abs(max.monto) ? p : max))
       : undefined;
@@ -478,14 +498,15 @@ export class FacturacionService {
         pagos: pagosResueltos,
         subtotal,
         descuento: descuentoTotal,
-        itbis,
-        total,
+        itbis: itbisConRecargos,
+        total: totalConRecargos,
         moneda,
         tasaCambio: tasaCambio ?? undefined,
         subtotalMoneda: montoMoneda(subtotal),
-        itbisMoneda: montoMoneda(itbis),
-        totalMoneda: montoMoneda(total),
+        itbisMoneda: montoMoneda(itbisConRecargos),
+        totalMoneda: montoMoneda(totalConRecargos),
         lineas: lineasCalculadas,
+        recargos: recargosDto.length ? recargosDto.map((r) => ({ concepto: r.concepto, monto: r.monto, gravado: r.gravado ?? false })) : undefined,
       });
     });
 
@@ -523,6 +544,7 @@ export class FacturacionService {
       })),
       subtotal: Number(factura.subtotal),
       descuento: Number(factura.descuento),
+      recargos: factura.recargos.map((r) => ({ concepto: r.concepto, monto: Number(r.monto) })),
       itbis: Number(factura.itbis),
       total: Number(factura.total),
       totalEnMoneda: factura.totalMoneda != null ? { moneda: factura.moneda, monto: Number(factura.totalMoneda) } : undefined,

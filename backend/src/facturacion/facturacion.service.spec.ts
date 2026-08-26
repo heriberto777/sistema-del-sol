@@ -17,6 +17,7 @@ import { TasasCambioService } from '../tasas-cambio/tasas-cambio.service';
 import { AuthService } from '../auth/auth.service';
 import { NotificacionesService } from '../notificaciones/notificaciones.service';
 import { AutorizacionesService } from '../autorizaciones/autorizaciones.service';
+import { ConfiguracionesService } from '../configuraciones/configuraciones.service';
 
 describe('FacturacionService', () => {
   let service: FacturacionService;
@@ -35,6 +36,7 @@ describe('FacturacionService', () => {
   let authService: jest.Mocked<AuthService>;
   let notificacionesService: jest.Mocked<NotificacionesService>;
   let autorizacionesService: jest.Mocked<AutorizacionesService>;
+  let configuracionesService: jest.Mocked<ConfiguracionesService>;
 
   // Un tx opaco: crear()/anular() abren la transacción con tenantPrisma.client.$transaction
   // y pasan este objeto a los métodos *EnTx — para las pruebas basta con que sea el mismo
@@ -121,6 +123,9 @@ describe('FacturacionService', () => {
       verificar: jest.fn().mockResolvedValue(undefined),
       solicitar: jest.fn(),
     } as unknown as jest.Mocked<AutorizacionesService>;
+    configuracionesService = {
+      buscarValor: jest.fn().mockResolvedValue('18'),
+    } as unknown as jest.Mocked<ConfiguracionesService>;
     service = new FacturacionService(
       repository,
       inventarioService,
@@ -137,6 +142,7 @@ describe('FacturacionService', () => {
       authService,
       notificacionesService,
       autorizacionesService,
+      configuracionesService,
     );
   });
 
@@ -364,6 +370,78 @@ describe('FacturacionService', () => {
       );
 
       expect(repository.crearFacturaEnTx).toHaveBeenCalledWith(TX, expect.objectContaining({ subtotal: -100 }));
+    });
+  });
+
+  describe('recargos (plan de integración Cuadre, ítem B-4)', () => {
+    it('un recargo no gravado se suma al total sin afectar el ITBIS', async () => {
+      repository.obtenerProductoConPrecioVigente.mockResolvedValue(producto(18, 100) as never);
+      repository.crearFacturaEnTx.mockResolvedValue(facturaCreada() as never);
+
+      await service.crear(
+        dto({ lineas: [{ productoId: 'prod-1', cantidad: 1 }], recargos: [{ concepto: 'Anticipo', monto: 20, gravado: false }] }),
+        'tenant-1',
+        'vendedor-1',
+      );
+
+      // subtotal 100, itbis 18% = 18, total base 118 + recargo 20 = 138
+      expect(repository.crearFacturaEnTx).toHaveBeenCalledWith(
+        TX,
+        expect.objectContaining({
+          itbis: 18,
+          total: 138,
+          recargos: [{ concepto: 'Anticipo', monto: 20, gravado: false }],
+        }),
+      );
+      expect(configuracionesService.buscarValor).not.toHaveBeenCalled();
+    });
+
+    it('un recargo gravado suma ITBIS a la tasa ITBIS_GENERAL del tenant', async () => {
+      repository.obtenerProductoConPrecioVigente.mockResolvedValue(producto(18, 100) as never);
+      repository.crearFacturaEnTx.mockResolvedValue(facturaCreada() as never);
+      configuracionesService.buscarValor.mockResolvedValue('16');
+
+      await service.crear(
+        dto({ lineas: [{ productoId: 'prod-1', cantidad: 1 }], recargos: [{ concepto: 'Imprevistos', monto: 50, gravado: true }] }),
+        'tenant-1',
+        'vendedor-1',
+      );
+
+      // itbis línea 18 + itbis recargo (16% de 50 = 8) = 26; total 100+18+50+8 = 176
+      expect(repository.crearFacturaEnTx).toHaveBeenCalledWith(TX, expect.objectContaining({ itbis: 26, total: 176 }));
+      expect(configuracionesService.buscarValor).toHaveBeenCalledWith('ITBIS_GENERAL', 'tenant-1', '18');
+    });
+
+    it('valida los pagos divididos contra el total YA con recargos', async () => {
+      repository.obtenerProductoConPrecioVigente.mockResolvedValue(producto(18, 100) as never);
+      repository.crearFacturaEnTx.mockResolvedValue(facturaCreada() as never);
+
+      await expect(
+        service.crear(
+          dto({ lineas: [{ productoId: 'prod-1', cantidad: 1 }], recargos: [{ concepto: 'Anticipo', monto: 20, gravado: false }] }),
+          'tenant-1',
+          'vendedor-1',
+          { pagos: [{ formaPagoId: 'fp-1', monto: 118 }] }, // falta el recargo de 20
+        ),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('una NOTA_CREDITO/NOTA_DEBITO ignora cualquier recargo enviado (ajustan un monto ya facturado)', async () => {
+      repository.obtenerProductoConPrecioVigente.mockResolvedValue(producto(18, 100) as never);
+      repository.crearFacturaEnTx.mockResolvedValue(facturaCreada() as never);
+
+      await service.crear(
+        dto({
+          tipoFactura: 'NOTA_CREDITO',
+          facturaOrigenId: 'f-orig',
+          lineas: [{ productoId: 'prod-1', cantidad: 1 }],
+          recargos: [{ concepto: 'Imprevistos', monto: 50, gravado: true }],
+        }),
+        'tenant-1',
+        'vendedor-1',
+      );
+
+      expect(repository.crearFacturaEnTx).toHaveBeenCalledWith(TX, expect.objectContaining({ recargos: undefined }));
     });
   });
 
@@ -1316,6 +1394,7 @@ describe('FacturacionService', () => {
         itbis: 36,
         total: 236,
         lineas: [{ producto: { nombre: 'Producto A' }, cantidad: 2, precioUnitario: 100, montoTotal: 236 }],
+        recargos: [],
       } as never);
 
       const buffer = await service.generarPdf('f1');
@@ -1339,6 +1418,7 @@ describe('FacturacionService', () => {
         itbis: 36,
         total: 236,
         lineas: [{ producto: { nombre: 'Producto A' }, cantidad: 2, precioUnitario: 100, montoTotal: 236 }],
+        recargos: [],
       } as never);
       (prisma.configuracion.findMany as jest.Mock).mockResolvedValue([
         { clave: 'DOCUMENTO_LOGO', valor: 'data:image/png;base64,abc' },

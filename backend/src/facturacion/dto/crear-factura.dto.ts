@@ -41,6 +41,22 @@ export class LineaFacturaDto {
   aplicaItbis?: boolean;
 }
 
+export class RecargoFacturaDto {
+  @ApiProperty({ description: 'Texto libre — no hay catálogo reusable, un recargo es puntual por factura (ej. "Imprevistos", "Viáticos")' })
+  @IsString()
+  concepto: string;
+
+  @ApiProperty()
+  @IsNumber()
+  @IsPositive()
+  monto: number;
+
+  @ApiProperty({ required: false, default: false, description: 'Si aplica ITBIS (tasa general del tenant) sobre el monto del recargo' })
+  @IsOptional()
+  @IsBoolean()
+  gravado?: boolean;
+}
+
 export class CrearFacturaDto {
   @ApiProperty()
   @IsUUID()
@@ -124,4 +140,15 @@ export class CrearFacturaDto {
   @IsOptional()
   @IsString()
   moneda?: string;
+
+  @ApiProperty({
+    required: false,
+    type: [RecargoFacturaDto],
+    description: 'Cargos post-subtotal (plan de integración Cuadre, ítem B-4) — se suman después del descuento general de documento, antes del total.',
+  })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => RecargoFacturaDto)
+  recargos?: RecargoFacturaDto[];
 }

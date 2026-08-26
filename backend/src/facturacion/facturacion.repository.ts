@@ -169,6 +169,9 @@ export class FacturacionRepository {
       itbisMoneda?: number;
       totalMoneda?: number;
       lineas: LineaCalculada[];
+      // Ítem B-4 — ya incluidos en `itbis`/`total` de arriba, calculados
+      // por FacturacionService.crear() antes de llamar acá.
+      recargos?: { concepto: string; monto: number; gravado: boolean }[];
     },
   ) {
     return tx.factura.create({
@@ -217,6 +220,13 @@ export class FacturacionRepository {
               },
             }
           : {}),
+        ...(params.recargos?.length
+          ? {
+              recargos: {
+                create: params.recargos.map((r, i) => ({ concepto: r.concepto, monto: r.monto, gravado: r.gravado, orden: i })),
+              },
+            }
+          : {}),
       },
       include: { lineas: true },
     });
@@ -227,6 +237,7 @@ export class FacturacionRepository {
       where: { id },
       include: {
         lineas: { include: { producto: { include: { componentes: { include: { componente: true } } } } } },
+        recargos: { orderBy: { orden: 'asc' } },
         cliente: true,
         // Necesario para anular(): si ya se emitieron notas de crédito
         // parciales contra esta factura, solo hay que reintegrar lo que
