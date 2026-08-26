@@ -1105,6 +1105,16 @@ aparte.*
   la verificación en vivo de H-4). Ambos verificados en vivo (factura
   de prueba con recargo → totales/asiento exactos contra la base de
   datos; página pública `/ver-factura/:id` sin sesión + PDF vía curl).
+- **2026-08-26**: entregado **Remisión + stock** ("Marcar entregada"
+  ahora descuenta stock de verdad, vía las mismas primitivas de
+  `InventarioService` que ya usa Facturación — `verificarYDescontarStockEnTx`
+  al entregar, `entradaStockEnTx` al anular desde ENTREGADA). Conversión a
+  factura de una remisión ya entregada no vuelve a mover stock (flag
+  `sinMovimientoInventario` nuevo, opcional, en `FacturacionService.crear()` —
+  sin cambio de comportamiento para ningún otro llamador). Verificado en
+  vivo: crear remisión → entregar → Kardex baja → anular → Kardex
+  reintegra → crear otra, entregar, convertir a factura → stock no baja
+  una segunda vez.
 
 ## Sugerencia de por dónde arrancar
 
@@ -1123,14 +1133,13 @@ C-1 (AZUL/CardNet Payment Link) y H-2b (bot de WhatsApp), los tres
 retomados aparte el mismo día.
 
 **Lote en curso, 2026-08-26** (Ventas/Facturación, decidido con el
-usuario tras la auditoría Parte 8): B-4 (Recargos, entregado) y H-4
-(link público + adjunto en notificaciones, entregado) — quedan
-Remisión + stock ("Marcar entregada" pasa a descontar de verdad —
-hallazgo nuevo, no tenía ítem propio) y B-9 (línea manual/libre,
-retomado — el usuario volvió a traer el tema). Diseño completo en
-`C:\Users\longb\.claude\plans\memoized-noodling-moore.md` — orden
-sugerido: Remisión+stock → B-9 (riesgo creciente, lo más invasivo al
-final).
+usuario tras la auditoría Parte 8): B-4 (Recargos, entregado), H-4
+(link público + adjunto en notificaciones, entregado) y Remisión + stock
+("Marcar entregada" descuenta de verdad, entregado — hallazgo nuevo, no
+tenía ítem propio) — queda **B-9** (línea manual/libre en Factura +
+Cotizaciones, retomado — el usuario volvió a traer el tema), el más
+invasivo del lote, dejado para el final a propósito. Diseño completo en
+`C:\Users\longb\.claude\plans\memoized-noodling-moore.md`.
 
 Lo que queda, por categoría:
 - **No bloqueante, sin implementar**: E-1 (Patrón Borrador→Confirmado en
