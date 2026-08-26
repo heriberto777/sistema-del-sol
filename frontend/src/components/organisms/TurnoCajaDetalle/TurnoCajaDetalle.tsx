@@ -464,6 +464,13 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
           ...(l.descuento > 0 ? { descuento: l.descuento } : {}),
         })),
       });
+      // Sin esto, el error de un intento de cobro anterior (ej. "Stock
+      // insuficiente") quedaba pegado en pantalla aunque el cajero ya
+      // hubiera sacado el producto problemático del carrito y volviera a
+      // abrir "Cobrar" — `registrarVenta.error` (react-query) no se limpia
+      // solo, sigue ahí hasta el próximo `.mutate()` (bug real, reportado
+      // por el usuario).
+      registrarVenta.reset();
       setCotizacion(resultado);
       setModalCheckout(true);
     } catch (err) {
@@ -471,6 +478,12 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
     } finally {
       setCotizando(false);
     }
+  }
+
+  /** Mismo motivo que el `registrarVenta.reset()` de arriba — sin esto, un error de un intento anterior de "Guardar venta" quedaría pegado la próxima vez que se abre el modal. */
+  function abrirModalGuardar() {
+    guardarVenta.reset();
+    setModalGuardar(true);
   }
 
   const puedeVender = !!data && data.estado === 'ABIERTO';
@@ -486,7 +499,7 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
       F8: () => carrito.length > 0 && setModalDescuento(true),
       F9: () => setModalCerrarTurno(true),
       F10: () => onAbrirCheckout(),
-      F12: () => carrito.length > 0 && setModalGuardar(true),
+      F12: () => carrito.length > 0 && abrirModalGuardar(),
       'Shift+F12': () => setModalGuardadas(true),
     },
     pantallaCompleta && puedeVender,
@@ -707,7 +720,7 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
                 Devolución (F4)
               </Button>
             )}
-            <Button variante="secundario" onClick={() => setModalGuardar(true)} disabled={carrito.length === 0}>
+            <Button variante="secundario" onClick={abrirModalGuardar} disabled={carrito.length === 0}>
               Guardar venta (F12)
             </Button>
             <Button variante="secundario" onClick={() => setModalGuardadas(true)}>
