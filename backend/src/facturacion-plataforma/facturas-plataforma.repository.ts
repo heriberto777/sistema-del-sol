@@ -83,4 +83,21 @@ export class FacturasPlataformaRepository {
       include: { suscripcion: true, tenant: true },
     });
   }
+
+  /** Fase 4 — universo de facturas evaluables por las reglas de notificación de vencimiento: ni pagadas ni anuladas todavía. */
+  listarPendientesOVencidas() {
+    return this.prisma.facturaPlataforma.findMany({
+      where: { estado: { in: ['PENDIENTE', 'VENCIDA'] } },
+    });
+  }
+
+  /** Fase 4 — auto-suspensión: tenants con alguna factura VENCIDA hace más de `diasMora` días. */
+  listarMorosasVencidasHace(diasMora: number, hoy: Date) {
+    const limite = new Date(hoy.getTime() - diasMora * 24 * 60 * 60 * 1000);
+    return this.prisma.facturaPlataforma.findMany({
+      where: { estado: 'VENCIDA', fechaVencimiento: { lt: limite } },
+      distinct: ['tenantId'],
+      select: { tenantId: true },
+    });
+  }
 }

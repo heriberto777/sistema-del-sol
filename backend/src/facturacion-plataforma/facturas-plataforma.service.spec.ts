@@ -2,12 +2,14 @@ import { BadRequestException } from '@nestjs/common';
 import { FacturasPlataformaService } from './facturas-plataforma.service';
 import { FacturasPlataformaRepository } from './facturas-plataforma.repository';
 import { EmailChannel } from '../notificaciones/canales/email.channel';
+import { PlataformaWebhookChannel } from '../plataforma-config/plataforma-webhook.channel';
 import { PrismaService } from '../prisma/prisma.service';
 
 describe('FacturasPlataformaService', () => {
   let service: FacturasPlataformaService;
   let repo: jest.Mocked<FacturasPlataformaRepository>;
   let emailChannel: jest.Mocked<EmailChannel>;
+  let plataformaWebhookChannel: jest.Mocked<PlataformaWebhookChannel>;
   let prisma: { user: { findFirst: jest.Mock }; suscripcion: { findUnique: jest.Mock } };
 
   beforeEach(() => {
@@ -21,11 +23,12 @@ describe('FacturasPlataformaService', () => {
       listarVencidasPendientes: jest.fn(),
     } as unknown as jest.Mocked<FacturasPlataformaRepository>;
     emailChannel = { enviar: jest.fn().mockResolvedValue(true) } as unknown as jest.Mocked<EmailChannel>;
+    plataformaWebhookChannel = { enviar: jest.fn().mockResolvedValue(true) } as unknown as jest.Mocked<PlataformaWebhookChannel>;
     prisma = {
       user: { findFirst: jest.fn().mockResolvedValue({ email: 'admin@tenant.com' }) },
       suscripcion: { findUnique: jest.fn().mockResolvedValue({ id: 's1', tenantId: 't1' }) },
     };
-    service = new FacturasPlataformaService(repo, emailChannel, prisma as unknown as PrismaService);
+    service = new FacturasPlataformaService(repo, emailChannel, plataformaWebhookChannel, prisma as unknown as PrismaService);
   });
 
   describe('generarDesdeSuscripcion', () => {
@@ -163,6 +166,43 @@ describe('FacturasPlataformaService', () => {
 
       expect(repo.actualizar).toHaveBeenCalledWith('f1', { montoMora: 50, total: 1050 });
       expect(repo.marcarEstado).toHaveBeenCalledWith('f1', 'VENCIDA');
+    });
+  });
+
+  describe('notificarPorRegla (Fase 4)', () => {
+    const factura = { id: 'f1', tenantId: 't1', concepto: 'Suscripción X', total: 1000, fechaVencimiento: new Date('2026-03-01T00:00:00Z') };
+
+    it('canal WEBHOOK delega en PlataformaWebhookChannel con el payload de la factura, sin tocar email', async () => {
+      repo.buscarPorId.mockResolvedValue(factura as never);
+
+      await service.notificarPorRegla('f1', -3, 'WEBHOOK');
+
+      expect(plataformaWebhookChannel.enviar).toHaveBeenCalledWith(
+        expect.objectContaining({ facturaId: 'f1', tenantId: 't1', concepto: 'Suscripción X', total: '1000', offsetDias: -3 }),
+      );
+      expect(emailChannel.enviar).not.toHaveBeenCalled();
+      expect(prisma.user.findFirst).not.toHaveBeenCalled();
+    });
+
+    it('canal EMAIL busca el Admin Total más antiguo del tenant y le envía el aviso', async () => {
+      repo.buscarPorId.mockResolvedValue(factura as never);
+
+      await service.notificarPorRegla('f1', 5, 'EMAIL');
+
+      expect(prisma.user.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({ where: expect.objectContaining({ tenantId: 't1' }), orderBy: { createdAt: 'asc' } }),
+      );
+      expect(emailChannel.enviar).toHaveBeenCalledWith('admin@tenant.com', expect.any(String), expect.stringContaining('Suscripción X'));
+      expect(plataformaWebhookChannel.enviar).not.toHaveBeenCalled();
+    });
+
+    it('canal EMAIL sin ningún Admin Total en el tenant no envía nada (solo loguea)', async () => {
+      repo.buscarPorId.mockResolvedValue(factura as never);
+      prisma.user.findFirst.mockResolvedValue(null);
+
+      await service.notificarPorRegla('f1', 5, 'EMAIL');
+
+      expect(emailChannel.enviar).not.toHaveBeenCalled();
     });
   });
 });

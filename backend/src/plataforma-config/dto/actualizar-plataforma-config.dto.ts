@@ -97,4 +97,10 @@ export class ActualizarPlataformaConfigDto {
   @IsOptional()
   @IsBoolean()
   webhookActivo?: boolean;
+
+  // Fase 4 — auto-suspensión de tenants morosos
+  @ApiProperty({ required: false, description: 'Días de mora (factura VENCIDA sin pago) antes de suspender automáticamente el tenant' })
+  @IsOptional()
+  @IsInt()
+  diasParaAutoSuspender?: number;
 }

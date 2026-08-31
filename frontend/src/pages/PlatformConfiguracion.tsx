@@ -37,11 +37,22 @@ interface ConfiguracionPlataforma {
     activo: boolean;
     secretConfigurado: boolean;
   };
+  autoSuspension: {
+    diasParaAutoSuspender: number;
+  };
+}
+
+// Fase 4 — reglas de notificación de vencimiento configurables.
+interface ReglaNotificacion {
+  id: string;
+  offsetDias: number;
+  canal: 'EMAIL' | 'WEBHOOK';
+  activa: boolean;
 }
 
 const PLACEHOLDER_CONFIGURADO = '•••••••• (configurado)';
 
-const TABS = ['General', 'Notificaciones', 'Pasarela de pago', 'Webhook'] as const;
+const TABS = ['General', 'Notificaciones', 'Pasarela de pago', 'Webhook', 'Vencimientos'] as const;
 type Tab = (typeof TABS)[number];
 
 export function PlatformConfiguracion() {
@@ -88,6 +99,7 @@ export function PlatformConfiguracion() {
           {tab === 'Notificaciones' && <SeccionNotificaciones config={config} guardar={guardar} />}
           {tab === 'Pasarela de pago' && <SeccionPasarela config={config} guardar={guardar} />}
           {tab === 'Webhook' && <SeccionWebhook config={config} guardar={guardar} />}
+          {tab === 'Vencimientos' && <SeccionVencimientos config={config} guardar={guardar} />}
         </>
       )}
     </div>
@@ -330,7 +342,10 @@ function SeccionWebhook({ config, guardar }: SeccionProps) {
   }
 
   return (
-    <Card titulo="Webhook (n8n u otro sistema externo)" descripcion="Solo guarda el dato de conexión — el disparo de eventos hacia este webhook se conecta en una fase posterior.">
+    <Card
+      titulo="Webhook (n8n u otro sistema externo)"
+      descripcion="Destino de las reglas de notificación de vencimiento con canal Webhook — ver la pestaña Vencimientos."
+    >
       <form onSubmit={onSubmit} className="max-w-md space-y-3">
         <div className="flex items-center justify-between">
           <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Activo</span>
@@ -356,5 +371,141 @@ function SeccionWebhook({ config, guardar }: SeccionProps) {
         </Button>
       </form>
     </Card>
+  );
+}
+
+/** Fase 4 — reglas de notificación de vencimiento + umbral de auto-suspensión (días de mora). */
+function SeccionVencimientos({ config, guardar }: SeccionProps) {
+  const queryClient = useQueryClient();
+  const [diasParaAutoSuspender, setDiasParaAutoSuspender] = useState(String(config.autoSuspension.diasParaAutoSuspender));
+
+  useEffect(() => {
+    setDiasParaAutoSuspender(String(config.autoSuspension.diasParaAutoSuspender));
+  }, [config.autoSuspension.diasParaAutoSuspender]);
+
+  function onSubmitSuspension(e: FormEvent) {
+    e.preventDefault();
+    guardar.mutate({ diasParaAutoSuspender: Number(diasParaAutoSuspender) });
+  }
+
+  const { data: reglas } = useQuery({
+    queryKey: ['reglas-notificacion-vencimiento'],
+    queryFn: async () => (await platformApiClient.get<ReglaNotificacion[]>('/platform/configuracion/reglas-notificacion')).data,
+  });
+
+  const [offsetDias, setOffsetDias] = useState('');
+  const [canal, setCanal] = useState<'EMAIL' | 'WEBHOOK'>('EMAIL');
+
+  const crearRegla = useMutation({
+    mutationFn: async () => platformApiClient.post('/platform/configuracion/reglas-notificacion', { offsetDias: Number(offsetDias), canal }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['reglas-notificacion-vencimiento'] });
+      setOffsetDias('');
+    },
+  });
+
+  const toggleRegla = useMutation({
+    mutationFn: async ({ id, activa }: { id: string; activa: boolean }) =>
+      platformApiClient.patch(`/platform/configuracion/reglas-notificacion/${id}`, { activa }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['reglas-notificacion-vencimiento'] }),
+  });
+
+  const eliminarRegla = useMutation({
+    mutationFn: async (id: string) => platformApiClient.delete(`/platform/configuracion/reglas-notificacion/${id}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['reglas-notificacion-vencimiento'] }),
+  });
+
+  function onSubmitRegla(e: FormEvent) {
+    e.preventDefault();
+    if (!offsetDias) return;
+    crearRegla.mutate();
+  }
+
+  return (
+    <div className="space-y-6">
+      <Card
+        titulo="Auto-suspensión de tenants morosos"
+        descripcion="Días de mora (factura vencida sin pago) antes de suspender automáticamente el acceso del tenant."
+      >
+        <form onSubmit={onSubmitSuspension} className="flex max-w-xs items-end gap-2">
+          <FormField
+            id="diasParaAutoSuspender"
+            label="Días de mora"
+            type="number"
+            min={1}
+            value={diasParaAutoSuspender}
+            onChange={(e) => setDiasParaAutoSuspender(e.target.value)}
+          />
+          <Button type="submit" disabled={guardar.isPending}>
+            {guardar.isPending ? 'Guardando…' : 'Guardar'}
+          </Button>
+        </form>
+      </Card>
+
+      <Card
+        titulo="Reglas de notificación de vencimiento"
+        descripcion='Offset negativo = aviso antes del vencimiento; positivo = después (mora). Ej. "-3" avisa 3 días antes; "5" avisa 5 días después de vencida.'
+      >
+        <div className="space-y-4">
+          <form onSubmit={onSubmitRegla} className="flex items-end gap-2">
+            <FormField
+              id="regla-offset"
+              label="Offset (días)"
+              type="number"
+              value={offsetDias}
+              onChange={(e) => setOffsetDias(e.target.value)}
+              placeholder="ej. -3"
+            />
+            <div className="flex flex-col gap-1">
+              <label htmlFor="regla-canal" className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                Canal
+              </label>
+              <Select id="regla-canal" value={canal} onChange={(e) => setCanal(e.target.value as 'EMAIL' | 'WEBHOOK')}>
+                <option value="EMAIL">Email</option>
+                <option value="WEBHOOK">Webhook</option>
+              </Select>
+            </div>
+            <Button type="submit" disabled={crearRegla.isPending}>
+              {crearRegla.isPending ? 'Agregando…' : 'Agregar regla'}
+            </Button>
+          </form>
+
+          {reglas?.length === 0 ? (
+            <p className="text-sm text-slate-500">Sin reglas configuradas — no se envía ningún aviso de vencimiento.</p>
+          ) : (
+            <table className="w-full max-w-xl text-left text-sm">
+              <thead className="text-slate-500 dark:text-slate-400">
+                <tr>
+                  <th className="py-1.5 font-medium">Offset</th>
+                  <th className="py-1.5 font-medium">Canal</th>
+                  <th className="py-1.5 font-medium">Activa</th>
+                  <th className="py-1.5" />
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                {reglas?.map((regla) => (
+                  <tr key={regla.id}>
+                    <td className="py-1.5">{regla.offsetDias < 0 ? `${Math.abs(regla.offsetDias)} día(s) antes` : regla.offsetDias === 0 ? 'El mismo día' : `${regla.offsetDias} día(s) después`}</td>
+                    <td className="py-1.5">{regla.canal === 'EMAIL' ? 'Email' : 'Webhook'}</td>
+                    <td className="py-1.5">
+                      <Switch activo={regla.activa} onChange={(v) => toggleRegla.mutate({ id: regla.id, activa: v })} />
+                    </td>
+                    <td className="py-1.5 text-right">
+                      <button
+                        type="button"
+                        onClick={() => eliminarRegla.mutate(regla.id)}
+                        className="text-xs font-medium text-red-600 hover:underline dark:text-red-400"
+                      >
+                        Eliminar
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </Card>
+    </div>
   );
 }

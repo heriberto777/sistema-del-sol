@@ -325,6 +325,7 @@ model FacturaPlataforma {
 
   pagos  PagoPlataforma[]
   lineas FacturaPlataformaLinea[]
+  notificacionesVencimientoEnviadas NotificacionVencimientoEnviada[]
 
   @@map("facturas_plataforma")
 }
@@ -400,13 +401,59 @@ model PlataformaConfiguracion {
   stripeWebhookSecretCifrado String?
   stripeCurrency             String?
 
-  // Webhook de plataforma (n8n u otro receptor) — solo dato configurable
-  // todavía, sin disparador de eventos conectado (ver Fase 4 del roadmap).
+  // Webhook de plataforma (n8n u otro receptor) — Fase 4: disparado ahora
+  // por las reglas de notificación de vencimiento (ver
+  // ReglaNotificacionVencimiento / PlataformaWebhookChannel).
   webhookUrl           String?
   webhookSecretCifrado String?
   webhookActivo        Boolean @default(false)
 
+  // Fase 4 (última) del roadmap de suscripciones — días de mora (factura
+  // en VENCIDA sin pago) antes de suspender automáticamente el tenant.
+  // Configurable a pedido del usuario (el roadmap original lo fijaba en
+  // 10). Ver FacturasPlataformaCronService.suspenderTenantsMorosos.
+  diasParaAutoSuspender Int @default(10)
+
   @@map("plataforma_configuracion")
+}
+
+// Fase 4 — reglas de notificación de vencimiento configurables: N reglas,
+// cada una "avisar X días antes/después del vencimiento, por este canal".
+// Primera tabla de este tipo en el proyecto (antes solo existía un aviso
+// fijo por email — ver RecordatoriosService, del lado de tenant). Enum
+// propio (no CanalNotificacion, que ya tiene una rama WEBHOOK/IN_APP
+// declarada pero nunca implementada en NotificacionesService.enviar) para
+// no heredar ese bug latente.
+enum CanalNotificacionVencimiento {
+  EMAIL
+  WEBHOOK
+}
+
+model ReglaNotificacionVencimiento {
+  id         String                       @id @default(uuid())
+  // Negativo = aviso ANTES del vencimiento; positivo = después (mora).
+  offsetDias Int
+  canal      CanalNotificacionVencimiento
+  activa     Boolean                      @default(true)
+  createdAt  DateTime                     @default(now())
+
+  notificacionesEnviadas NotificacionVencimientoEnviada[]
+
+  @@map("reglas_notificacion_vencimiento")
+}
+
+// Idempotencia — sin esto, si el cron corre dos veces el mismo día (o se
+// reinicia el proceso a mitad de la corrida) se reenviaría el mismo aviso.
+model NotificacionVencimientoEnviada {
+  id                  String                       @id @default(uuid())
+  facturaPlataformaId String
+  facturaPlataforma   FacturaPlataforma            @relation(fields: [facturaPlataformaId], references: [id], onDelete: Cascade)
+  reglaId             String
+  regla               ReglaNotificacionVencimiento @relation(fields: [reglaId], references: [id], onDelete: Cascade)
+  fecha               DateTime                     @default(now())
+
+  @@unique([facturaPlataformaId, reglaId])
+  @@map("notificaciones_vencimiento_enviadas")
 }
 
 // ============================================================

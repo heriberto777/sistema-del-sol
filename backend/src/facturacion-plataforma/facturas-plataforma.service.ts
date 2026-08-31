@@ -1,9 +1,10 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
-import { Suscripcion, Plan } from '@prisma/client';
+import { Suscripcion, Plan, CanalNotificacionVencimiento } from '@prisma/client';
 import { FacturasPlataformaRepository } from './facturas-plataforma.repository';
 import { ActualizarFacturaPlataformaDto } from './dto/actualizar-factura-plataforma.dto';
 import { CrearFacturaPlataformaManualDto } from './dto/crear-factura-plataforma-manual.dto';
 import { EmailChannel } from '../notificaciones/canales/email.channel';
+import { PlataformaWebhookChannel } from '../plataforma-config/plataforma-webhook.channel';
 import { PrismaService } from '../prisma/prisma.service';
 
 const CICLO_ES: Record<string, string> = { MENSUAL: 'mensual', ANUAL: 'anual' };
@@ -15,6 +16,7 @@ export class FacturasPlataformaService {
   constructor(
     private readonly facturasPlataformaRepository: FacturasPlataformaRepository,
     private readonly emailChannel: EmailChannel,
+    private readonly plataformaWebhookChannel: PlataformaWebhookChannel,
     private readonly prisma: PrismaService,
   ) {}
 
@@ -127,6 +129,46 @@ export class FacturasPlataformaService {
     await this.facturasPlataformaRepository.actualizar(id, { montoMora, total });
     await this.facturasPlataformaRepository.marcarEstado(id, 'VENCIDA');
     await this.notificarFactura(factura.tenantId, id, 'vencida');
+  }
+
+  /**
+   * Fase 4 — despacho de un aviso configurable (ReglaNotificacionVencimiento)
+   * para UNA factura. El canal EMAIL reusa el mismo destinatario/mecanismo
+   * que `notificarFactura` (Admin Total más antiguo, HTML inline); WEBHOOK
+   * delega en `PlataformaWebhookChannel` (URL/secret ya configurados en
+   * /plataforma/configuracion). Llamado desde
+   * FacturasPlataformaCronService.enviarNotificacionesVencimiento, una vez
+   * por (factura, regla) que matchee la fecha de hoy.
+   */
+  async notificarPorRegla(facturaId: string, offsetDias: number, canal: CanalNotificacionVencimiento) {
+    const factura = await this.facturasPlataformaRepository.buscarPorId(facturaId);
+    const payload = {
+      facturaId: factura.id,
+      tenantId: factura.tenantId,
+      concepto: factura.concepto,
+      total: factura.total.toString(),
+      fechaVencimiento: factura.fechaVencimiento.toISOString(),
+      offsetDias,
+    };
+
+    if (canal === 'WEBHOOK') {
+      await this.plataformaWebhookChannel.enviar(payload);
+      return;
+    }
+
+    const admin = await this.prisma.user.findFirst({
+      where: { tenantId: factura.tenantId, roles: { some: { role: { nombre: 'Admin Total' } } } },
+      orderBy: { createdAt: 'asc' },
+    });
+    if (!admin) {
+      this.logger.warn(`Sin usuario Admin Total en tenant ${factura.tenantId} — no se pudo enviar el aviso de vencimiento de la factura ${facturaId}`);
+      return;
+    }
+
+    const enlacePago = `${process.env.FRONTEND_URL ?? 'http://localhost:5173'}/pagar/${factura.id}`;
+    const asunto = offsetDias < 0 ? 'Tu factura está por vencer — El Sistema del Sol' : 'Tu factura sigue vencida — El Sistema del Sol';
+    const cuerpo = `<p>Factura: <strong>${factura.concepto}</strong>.</p><p>Total: RD$ ${Number(factura.total).toLocaleString('es-DO')} — vence el ${factura.fechaVencimiento.toLocaleDateString('es-DO')}.</p><p><a href="${enlacePago}">Pagar en línea</a></p>`;
+    await this.emailChannel.enviar(admin.email, asunto, cuerpo);
   }
 
   /** Igual criterio que PlatformAuthService.olvidePassword: HTML inline, sin plantillas por-tenant (eso es NotificacionesService, tenant-scoped). */

@@ -42,6 +42,7 @@ export class PlataformaConfigService implements OnModuleInit {
     if (dto.stripeCurrency !== undefined) data.stripeCurrency = dto.stripeCurrency;
     if (dto.webhookUrl !== undefined) data.webhookUrl = dto.webhookUrl;
     if (dto.webhookActivo !== undefined) data.webhookActivo = dto.webhookActivo;
+    if (dto.diasParaAutoSuspender !== undefined) data.diasParaAutoSuspender = dto.diasParaAutoSuspender;
 
     this.aplicarCampoSecreto(data, 'smtpPasswordCifrado', dto.smtpPassword);
     this.aplicarCampoSecreto(data, 'twilioAuthTokenCifrado', dto.twilioAuthToken);
@@ -115,6 +116,9 @@ export class PlataformaConfigService implements OnModuleInit {
         url: config.webhookUrl,
         activo: config.webhookActivo,
         secretConfigurado: Boolean(config.webhookSecretCifrado),
+      },
+      autoSuspension: {
+        diasParaAutoSuspender: config.diasParaAutoSuspender,
       },
     };
   }
