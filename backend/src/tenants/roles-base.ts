@@ -3,6 +3,7 @@
 // TenantsService.crear). Vive en un solo lugar para que ambos no diverjan.
 export const PERMISOS_BASE = [
   'facturacion.crear', 'facturacion.anular', 'facturacion.cobrar', 'facturacion.ver', 'facturacion.imprimir',
+  'cuentasporcobrar.ver',
   'cotizaciones.crear', 'cotizaciones.editar', 'cotizaciones.ver',
   'remisiones.crear', 'remisiones.editar', 'remisiones.ver',
   'contabilidad.ver', 'contabilidad.editar', 'contabilidad.anular', 'contabilidad.cerrarperiodo', 'contabilidad.conciliar',

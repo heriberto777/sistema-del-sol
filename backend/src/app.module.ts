@@ -11,6 +11,7 @@ import { EventBusModule } from './event-bus/event-bus.module';
 import { PluginsModule } from './plugins/plugins.module';
 import { AuthModule } from './auth/auth.module';
 import { FacturacionModule } from './facturacion/facturacion.module';
+import { CuentasPorCobrarModule } from './cuentas-por-cobrar/cuentas-por-cobrar.module';
 import { InventarioModule } from './inventario/inventario.module';
 import { ProductosModule } from './productos/productos.module';
 import { PreciosModule } from './precios/precios.module';
@@ -86,6 +87,7 @@ import { TenantMiddleware } from './common/middleware/tenant.middleware';
     PluginsModule,
     AuthModule,
     FacturacionModule,
+    CuentasPorCobrarModule,
     SucursalesModule,
     InventarioModule,
     ProductosModule,

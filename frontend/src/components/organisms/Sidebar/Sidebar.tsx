@@ -23,6 +23,7 @@ import {
   Truck,
   Users,
   Wallet,
+  WalletCards,
 } from 'lucide-react';
 import { useAuth } from '../../../hooks/useAuth';
 
@@ -58,6 +59,19 @@ const GRUPOS: Grupo[] = [
       // Sirve tanto a Ventas (clientes) como a Compras (proveedores) —
       // se prioriza acá por ser el uso más frecuente.
       { ruta: '/contactos', etiqueta: 'Contactos', icono: Contact, permisos: ['clientes.ver', 'compras.ver'] },
+    ],
+  },
+  {
+    id: 'cobranza',
+    etiqueta: 'Cobranza',
+    items: [
+      {
+        ruta: '/cuentas-por-cobrar',
+        etiqueta: 'Cuentas por cobrar',
+        icono: WalletCards,
+        permisos: ['cuentasporcobrar.ver'],
+        modulo: 'facturacion',
+      },
     ],
   },
   {
