@@ -67,6 +67,7 @@ model Tenant {
   tasasCambio               TasaCambio[]
   proveedores               Proveedor[]
   ordenesCompra             OrdenCompra[]
+  ajustesInventario         AjusteInventario[]
   webhooks                  Webhook[]
   notificaciones            Notificacion[]
   plantillasNotificacion    NotificacionPlantilla[]
@@ -437,6 +438,7 @@ model User {
   facturasVendedor               Factura[]              @relation("FacturaVendedor")
   movimientosInventario          MovimientoInventario[]
   ordenesCompra                  OrdenCompra[]
+  ajustesInventario              AjusteInventario[]
   cotizaciones                   Cotizacion[]
   remisiones                     Remision[]
   turnosCaja                     TurnoCaja[]
@@ -611,6 +613,11 @@ enum TipoCorrelativo {
   // muestra ambos por separado. Agregado después de K-1 (que dejó
   // Factura afuera a propósito, por ya tener NCF).
   FACTURA
+  // Ítem E-1 — Ajustes de inventario ganan su propio documento con número
+  // (antes era solo un movimiento instantáneo sin cabecera, ver
+  // AjusteInventario). Transferencias sigue el mismo criterio en una
+  // pieza aparte.
+  AJUSTE
 }
 
 /// Correlativo automático genérico (plan de integración Cuadre, ítem de
@@ -2124,6 +2131,7 @@ model Producto {
   lineasRemision         LineaRemision[]
   lineasDevolucionCompra LineaDevolucionCompra[]
   lineasVentaAparcada    VentaAparcadaLinea[]
+  lineasAjusteInventario LineaAjusteInventario[]
   // Componentes de ESTE producto cuando `tipo: COMBO`.
   componentes            ComponenteCombo[]       @relation("ComboComponentes")
   // Combos de los que este producto forma parte (como componente).
@@ -2186,6 +2194,7 @@ model VarianteProducto {
   lineasRecepcion        LineaRecepcion[]
   lineasDevolucionCompra LineaDevolucionCompra[]
   lineasVentaAparcada    VentaAparcadaLinea[]
+  lineasAjusteInventario LineaAjusteInventario[]
 
   @@unique([tenantId, codigoBarras])
   @@map("variantes_producto")
@@ -2314,6 +2323,7 @@ model Bodega {
   turnosCaja   TurnoCaja[]
   devoluciones DevolucionCompra[]
   cajas        Caja[]
+  ajustesInventario AjusteInventario[]
 
   @@unique([tenantId, nombre])
   @@map("bodegas")
@@ -2568,6 +2578,61 @@ model LineaOc {
   cantidadRecibida Decimal          @default(0) @db.Decimal(14, 4)
 
   @@map("linea_oc")
+}
+
+// Ítem E-1 — activa el patrón Borrador→Confirmado para Ajustes de
+// inventario: hasta ahora un ajuste era una escritura instantánea sobre
+// MovimientoInventario (ver InventarioService.ajustarStock), sin cabecera
+// ni forma de revisarlo antes de aplicarlo. AjusteInventario.confirmar()
+// (backend/src/inventario/ajustes-inventario/) reusa
+// InventarioRepository.ajustarCantidadEnTx tal cual, una vez por línea —
+// el único movimiento nuevo de stock real sigue siendo ese método.
+enum EstadoAjusteInventario {
+  BORRADOR
+  CONFIRMADO
+  CANCELADO
+}
+
+model AjusteInventario {
+  id        String                 @id @default(uuid())
+  tenantId  String
+  tenant    Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  numero    String
+  bodegaId  String
+  bodega    Bodega                 @relation(fields: [bodegaId], references: [id])
+  estado    EstadoAjusteInventario @default(BORRADOR)
+  fecha     DateTime               @default(now())
+  userId    String
+  user      User                   @relation(fields: [userId], references: [id])
+  createdAt DateTime               @default(now())
+
+  lineas LineaAjusteInventario[]
+
+  @@unique([tenantId, numero])
+  @@map("ajuste_inventario")
+}
+
+model LineaAjusteInventario {
+  id       String           @id @default(uuid())
+  ajusteId String
+  ajuste   AjusteInventario @relation(fields: [ajusteId], references: [id], onDelete: Cascade)
+  productoId String
+  producto Producto         @relation(fields: [productoId], references: [id], onDelete: Cascade)
+  varianteId String
+  variante VarianteProducto @relation(fields: [varianteId], references: [id])
+  // Positivo = entrada, negativo = salida — mismo criterio que
+  // InventarioService.ajustarStock hoy.
+  cantidad     Decimal                 @db.Decimal(14, 4)
+  motivoAjuste MotivoAjusteInventario?
+  motivo       String?
+  // Solo si el producto controla vencimiento — mismo par de campos que
+  // AjustarStockDto: numeroLote/fechaVencimiento en una entrada, loteId en
+  // una salida (siempre explícito, nunca FEFO en un ajuste manual).
+  numeroLote       String?
+  fechaVencimiento DateTime?
+  loteId           String?
+
+  @@map("linea_ajuste_inventario")
 }
 
 model RecepcionCompra {

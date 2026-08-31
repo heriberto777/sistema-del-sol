@@ -52,7 +52,7 @@ export class ComprasService {
   }
 
   /** Ítem E-1 — solo se puede editar una OC en BORRADOR, mismo guard que CotizacionesService.actualizar. */
-  async actualizar(id: string, dto: EditarOrdenCompraDto, tenantId: string) {
+  async actualizar(id: string, dto: EditarOrdenCompraDto) {
     const orden = await this.comprasRepository.buscarPorId(id);
     if (orden.estado !== 'BORRADOR') {
       throw new BadRequestException('Solo se puede editar una orden de compra en borrador');
@@ -73,7 +73,7 @@ export class ComprasService {
    * vestigiales en el enum hasta ahora (ver docs/cuadre-plan-integracion.md).
    * No se cancela una OC con mercancía ya recibida — para eso existe `devolver()`.
    */
-  async cambiarEstado(id: string, estado: 'ENVIADA' | 'CANCELADA', tenantId: string) {
+  async cambiarEstado(id: string, estado: 'ENVIADA' | 'CANCELADA') {
     const orden = await this.comprasRepository.buscarPorId(id);
     if (estado === 'ENVIADA' && orden.estado !== 'BORRADOR') {
       throw new BadRequestException('Solo se puede confirmar una orden de compra en borrador');

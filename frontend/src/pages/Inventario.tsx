@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 import clsx from 'clsx';
 import { apiClient } from '../lib/api-client';
+import { Badge } from '../components/atoms/Badge/Badge';
 import { Button } from '../components/atoms/Button/Button';
 import { Card } from '../components/atoms/Card/Card';
 import { Select } from '../components/atoms/Select/Select';
@@ -61,6 +62,29 @@ interface ProductoParaAjuste {
   valoresAtributo: { atributo: string; valor: string }[];
 }
 
+// Ítem E-1 — documento Borrador→Confirmado de ajustes de inventario.
+interface AjusteInventario {
+  id: string;
+  numero: string;
+  estado: 'BORRADOR' | 'CONFIRMADO' | 'CANCELADO';
+  fecha: string;
+  bodega: { nombre: string };
+}
+
+interface LineaAjusteDetalle {
+  productoId: string;
+  varianteId: string;
+  cantidad: string;
+  motivoAjuste: string;
+  motivo: string | null;
+  producto: Producto;
+}
+
+interface AjusteInventarioDetalle extends AjusteInventario {
+  bodegaId: string;
+  lineas: LineaAjusteDetalle[];
+}
+
 export function Inventario() {
   const { tienePermiso } = useAuth();
   const tienePermisoAjustar = tienePermiso('inventario.ajustar');
@@ -77,6 +101,10 @@ export function Inventario() {
   const [busquedaStock, setBusquedaStock] = useState('');
   const [paginaStock, setPaginaStock] = useState(1);
   const busquedaStockDebounced = useDebouncedValue(busquedaStock);
+  const [ajusteViendo, setAjusteViendo] = useState<AjusteInventario | null>(null);
+  const [ajusteEditando, setAjusteEditando] = useState<AjusteInventario | null>(null);
+  const [ajusteConfirmando, setAjusteConfirmando] = useState<AjusteInventario | null>(null);
+  const [paginaAjustes, setPaginaAjustes] = useState(1);
 
   useEffect(() => {
     if (searchParams.get('crear') === '1') {
@@ -100,6 +128,21 @@ export function Inventario() {
           params: { pagina: paginaStock, busqueda: busquedaStockDebounced || undefined },
         })
       ).data,
+  });
+
+  const { data: ajustes } = useQuery({
+    queryKey: ['ajustes-inventario', paginaAjustes],
+    queryFn: async () => (await apiClient.get<PaginaResultado<AjusteInventario>>('/ajustes-inventario', { params: { pagina: paginaAjustes } })).data,
+  });
+
+  const queryClient = useQueryClient();
+  const cambiarEstadoAjuste = useMutation({
+    mutationFn: async ({ id, estado }: { id: string; estado: 'CONFIRMADO' | 'CANCELADO' }) =>
+      apiClient.patch(`/ajustes-inventario/${id}/estado`, { estado }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ajustes-inventario'] });
+      queryClient.invalidateQueries({ queryKey: ['stock'] });
+    },
   });
 
   const bodegaSeleccionada = bodegas?.find((b) => b.id === bodegaSeleccionadaId) ?? null;
@@ -255,9 +298,74 @@ export function Inventario() {
             )}
           </Card>
         )}
+        <Card
+          sinPadding
+          titulo="Ajustes de inventario"
+          descripcion={ajustes ? `${ajustes.total} ajuste(s) — ítem E-1, Borrador→Confirmado` : undefined}
+        >
+          {ajustes?.datos.length === 0 ? (
+            <p className="p-5 text-sm text-slate-500">
+              Todavía no hay ajustes registrados — usá "Ajustar stock" desde una fila de la tabla de arriba para crear el primero.
+            </p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead className="bg-slate-50 text-slate-500 dark:bg-slate-900/60 dark:text-slate-400">
+                  <tr>
+                    <th className="px-5 py-3 font-medium">Número</th>
+                    <th className="px-5 py-3 font-medium">Bodega</th>
+                    <th className="px-5 py-3 font-medium">Fecha</th>
+                    <th className="px-5 py-3 font-medium">Estado</th>
+                    <th className="px-5 py-3" />
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {ajustes?.datos.map((aj) => (
+                    <tr key={aj.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                      <td className="px-5 py-3">{aj.numero}</td>
+                      <td className="px-5 py-3">{aj.bodega.nombre}</td>
+                      <td className="px-5 py-3">{new Date(aj.fecha).toLocaleDateString('es-DO')}</td>
+                      <td className="px-5 py-3">
+                        <Badge tono={aj.estado === 'CONFIRMADO' ? 'exito' : aj.estado === 'CANCELADO' ? 'peligro' : 'neutro'}>{aj.estado}</Badge>
+                      </td>
+                      <td className="px-5 py-3 text-right">
+                        <RowActionsMenu
+                          acciones={[
+                            { etiqueta: 'Ver detalle', onClick: () => setAjusteViendo(aj) },
+                            ...(aj.estado === 'BORRADOR' && tienePermisoAjustar
+                              ? [
+                                  { etiqueta: 'Editar', onClick: () => setAjusteEditando(aj) },
+                                  { etiqueta: 'Confirmar', onClick: () => setAjusteConfirmando(aj) },
+                                  {
+                                    etiqueta: 'Cancelar',
+                                    tono: 'peligro' as const,
+                                    onClick: () => {
+                                      if (confirm(`¿Cancelar el ajuste ${aj.numero}?`)) cambiarEstadoAjuste.mutate({ id: aj.id, estado: 'CANCELADO' });
+                                    },
+                                  },
+                                ]
+                              : []),
+                          ]}
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          {ajustes && (
+            <div className="px-5 py-3">
+              <Paginacion pagina={ajustes.pagina} tamanoPagina={ajustes.tamanoPagina} total={ajustes.total} onCambiarPagina={setPaginaAjustes} />
+            </div>
+          )}
+        </Card>
       </RequierePermiso>
 
       {modalNuevaBodega && <ModalNuevaBodega onClose={() => setModalNuevaBodega(false)} />}
+      {ajusteViendo && <ModalVerAjuste ajuste={ajusteViendo} onClose={() => setAjusteViendo(null)} />}
+      {ajusteEditando && <ModalEditarAjuste ajuste={ajusteEditando} onClose={() => setAjusteEditando(null)} />}
+      {ajusteConfirmando && <ModalConfirmarAjuste ajuste={ajusteConfirmando} onClose={() => setAjusteConfirmando(null)} />}
       {bodegaEditandoFormato && (
         <ModalEditarFormatoBodega bodega={bodegaEditandoFormato} onClose={() => setBodegaEditandoFormato(null)} />
       )}
@@ -399,27 +507,33 @@ function ModalAjustarStock({
   const [numeroLote, setNumeroLote] = useState('');
   const [fechaVencimiento, setFechaVencimiento] = useState('');
   const [loteId, setLoteId] = useState('');
-  const [pin, setPin] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   const controlaVencimiento = stockInicial.producto.controlaVencimiento;
   const esEntrada = Number(cantidad) > 0;
 
-  const ajustar = useMutation({
+  // Ítem E-1 — ya no aplica el stock de una: crea un AjusteInventario en
+  // BORRADOR con esta única línea (mismo formulario de siempre). El PIN de
+  // Fase 9 se movió a "Confirmar" (nivel documento, no por línea) — ver
+  // ModalConfirmarAjuste.
+  const guardarBorrador = useMutation({
     mutationFn: async () =>
-      apiClient.post('/inventario/ajustar', {
-        productoId: stockInicial.producto.id,
-        varianteId: stockInicial.varianteId,
+      apiClient.post('/ajustes-inventario', {
         bodegaId,
-        cantidad: Number(cantidad),
-        motivoAjuste,
-        motivo: motivo || undefined,
-        ...(controlaVencimiento && esEntrada ? { numeroLote, fechaVencimiento } : {}),
-        ...(controlaVencimiento && !esEntrada ? { loteId } : {}),
-        ...(!esEntrada ? { pin: pin || undefined } : {}),
+        lineas: [
+          {
+            productoId: stockInicial.producto.id,
+            varianteId: stockInicial.varianteId,
+            cantidad: Number(cantidad),
+            motivoAjuste,
+            motivo: motivo || undefined,
+            ...(controlaVencimiento && esEntrada ? { numeroLote, fechaVencimiento } : {}),
+            ...(controlaVencimiento && !esEntrada ? { loteId } : {}),
+          },
+        ],
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['stock', bodegaId] });
+      queryClient.invalidateQueries({ queryKey: ['ajustes-inventario'] });
       onClose();
     },
     onError: (err: unknown) => {
@@ -427,18 +541,18 @@ function ModalAjustarStock({
         err && typeof err === 'object' && 'response' in err
           ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
           : undefined;
-      setError(mensaje ?? 'No se pudo ajustar el stock. Revisa los datos.');
+      setError(mensaje ?? 'No se pudo guardar el ajuste. Revisa los datos.');
     },
   });
 
   function onSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
-    ajustar.mutate();
+    guardarBorrador.mutate();
   }
 
   return (
-    <Modal titulo="Ajustar stock" onClose={onClose}>
+    <Modal titulo="Nuevo ajuste de inventario" onClose={onClose}>
       <form onSubmit={onSubmit} className="space-y-3">
         <div className="flex flex-col gap-1">
           <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Producto</label>
@@ -489,12 +603,212 @@ function ModalAjustarStock({
           </Select>
         </div>
         <FormField id="ajuste-motivo" label="Detalle (opcional)" value={motivo} onChange={(e) => setMotivo(e.target.value)} />
-        {cantidad !== '' && !esEntrada && <CampoPin value={pin} onChange={setPin} id="ajuste-pin" />}
         {error && <p className="text-sm text-red-600">{error}</p>}
-        <Button type="submit" disabled={ajustar.isPending} className="w-full">
-          {ajustar.isPending ? 'Ajustando…' : 'Ajustar'}
+        <Button type="submit" disabled={guardarBorrador.isPending} className="w-full">
+          {guardarBorrador.isPending ? 'Guardando…' : 'Guardar borrador'}
         </Button>
       </form>
+    </Modal>
+  );
+}
+
+function ModalVerAjuste({ ajuste, onClose }: { ajuste: AjusteInventario; onClose: () => void }) {
+  const { data } = useQuery({
+    queryKey: ['ajuste-inventario', ajuste.id],
+    queryFn: async () => (await apiClient.get<AjusteInventarioDetalle>(`/ajustes-inventario/${ajuste.id}`)).data,
+  });
+
+  return (
+    <Modal titulo={`Ajuste de inventario — ${ajuste.numero}`} onClose={onClose}>
+      {!data ? (
+        <p className="text-sm text-slate-400">Cargando…</p>
+      ) : (
+        <div className="space-y-4">
+          <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm dark:bg-slate-800/60">
+            <p>
+              Bodega: <span className="font-medium">{data.bodega.nombre}</span>
+            </p>
+            <p className="text-slate-500 dark:text-slate-400">
+              Fecha: {new Date(data.fecha).toLocaleDateString('es-DO')} — Estado: <Badge>{data.estado}</Badge>
+            </p>
+          </div>
+          <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-slate-50 text-slate-500 dark:bg-slate-900/60 dark:text-slate-400">
+                <tr>
+                  <th className="px-3 py-2">Producto</th>
+                  <th className="px-3 py-2">Cantidad</th>
+                  <th className="px-3 py-2">Motivo</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                {data.lineas.map((linea, i) => (
+                  <tr key={i}>
+                    <td className="px-3 py-2">
+                      {linea.producto.codigo} — {linea.producto.nombre}
+                    </td>
+                    <td className="px-3 py-2">{Number(linea.cantidad)}</td>
+                    <td className="px-3 py-2">{linea.motivo ?? linea.motivoAjuste}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </Modal>
+  );
+}
+
+/** Ítem E-1 — editar un ajuste en BORRADOR (la bodega no se puede cambiar, solo la cantidad/motivo de cada línea). */
+function ModalEditarAjuste({ ajuste, onClose }: { ajuste: AjusteInventario; onClose: () => void }) {
+  const queryClient = useQueryClient();
+  const [lineas, setLineas] = useState<{ productoId: string; cantidad: string; motivoAjuste: string; motivo: string; nombreProducto: string }[]>([]);
+  const [error, setError] = useState<string | null>(null);
+
+  const { data: detalle } = useQuery({
+    queryKey: ['ajuste-inventario', ajuste.id],
+    queryFn: async () => (await apiClient.get<AjusteInventarioDetalle>(`/ajustes-inventario/${ajuste.id}`)).data,
+  });
+
+  useEffect(() => {
+    if (detalle && lineas.length === 0) {
+      setLineas(
+        detalle.lineas.map((l) => ({
+          productoId: l.productoId,
+          cantidad: String(l.cantidad),
+          motivoAjuste: l.motivoAjuste,
+          motivo: l.motivo ?? '',
+          nombreProducto: `${l.producto.codigo} — ${l.producto.nombre}`,
+        })),
+      );
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [detalle]);
+
+  function actualizarLinea(i: number, cambios: Partial<(typeof lineas)[number]>) {
+    setLineas((prev) => prev.map((l, idx) => (idx === i ? { ...l, ...cambios } : l)));
+  }
+
+  const guardar = useMutation({
+    mutationFn: async () =>
+      apiClient.patch(`/ajustes-inventario/${ajuste.id}`, {
+        lineas: lineas.map((l) => ({
+          productoId: l.productoId,
+          cantidad: Number(l.cantidad),
+          motivoAjuste: l.motivoAjuste,
+          motivo: l.motivo || undefined,
+        })),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ajustes-inventario'] });
+      queryClient.invalidateQueries({ queryKey: ['ajuste-inventario', ajuste.id] });
+      onClose();
+    },
+    onError: () => setError('No se pudo guardar el ajuste. Revisa los datos.'),
+  });
+
+  function onSubmit(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    guardar.mutate();
+  }
+
+  return (
+    <Modal titulo={`Editar ajuste — ${ajuste.numero}`} onClose={onClose}>
+      {!detalle ? (
+        <p className="text-sm text-slate-400">Cargando…</p>
+      ) : (
+        <form onSubmit={onSubmit} className="space-y-3">
+          {lineas.map((linea, i) => (
+            <div key={i} className="space-y-2 rounded-lg border border-slate-200 p-3 dark:border-slate-800">
+              <p className="text-sm font-medium text-slate-700 dark:text-slate-300">{linea.nombreProducto}</p>
+              <div className="flex gap-2">
+                <input
+                  type="number"
+                  placeholder="Cantidad"
+                  value={linea.cantidad}
+                  onChange={(e) => actualizarLinea(i, { cantidad: e.target.value })}
+                  className="w-28 rounded-md border border-slate-300 px-2 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                />
+                <Select value={linea.motivoAjuste} onChange={(e) => actualizarLinea(i, { motivoAjuste: e.target.value })} required>
+                  <option value="MERMA">Merma</option>
+                  <option value="ROBO_PERDIDA">Robo o pérdida</option>
+                  <option value="DANO">Daño</option>
+                  <option value="VENCIMIENTO">Vencimiento</option>
+                  <option value="CORRECCION_CONTEO">Corrección de conteo</option>
+                  <option value="OTRO">Otro</option>
+                </Select>
+              </div>
+              <FormField
+                id={`ajuste-editar-motivo-${i}`}
+                label="Detalle (opcional)"
+                value={linea.motivo}
+                onChange={(e) => actualizarLinea(i, { motivo: e.target.value })}
+              />
+            </div>
+          ))}
+          {error && <p className="text-sm text-red-600">{error}</p>}
+          <Button type="submit" disabled={guardar.isPending} className="w-full">
+            {guardar.isPending ? 'Guardando…' : 'Guardar cambios'}
+          </Button>
+        </form>
+      )}
+    </Modal>
+  );
+}
+
+/** Ítem E-1 — Confirmar dispara el movimiento real de stock; pide PIN (Fase 9) solo si alguna línea es una salida (cantidad negativa). */
+function ModalConfirmarAjuste({ ajuste, onClose }: { ajuste: AjusteInventario; onClose: () => void }) {
+  const queryClient = useQueryClient();
+  const [pin, setPin] = useState('');
+  const [error, setError] = useState<string | null>(null);
+
+  const { data: detalle } = useQuery({
+    queryKey: ['ajuste-inventario', ajuste.id],
+    queryFn: async () => (await apiClient.get<AjusteInventarioDetalle>(`/ajustes-inventario/${ajuste.id}`)).data,
+  });
+
+  const tieneSalida = detalle?.lineas.some((l) => Number(l.cantidad) < 0) ?? false;
+
+  const confirmar = useMutation({
+    mutationFn: async () => apiClient.patch(`/ajustes-inventario/${ajuste.id}/estado`, { estado: 'CONFIRMADO', pin: pin || undefined }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ajustes-inventario'] });
+      queryClient.invalidateQueries({ queryKey: ['stock'] });
+      onClose();
+    },
+    onError: (err: unknown) => {
+      const mensaje =
+        err && typeof err === 'object' && 'response' in err
+          ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
+          : undefined;
+      setError(mensaje ?? 'No se pudo confirmar el ajuste.');
+    },
+  });
+
+  function onSubmit(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    confirmar.mutate();
+  }
+
+  return (
+    <Modal titulo={`Confirmar ajuste — ${ajuste.numero}`} onClose={onClose}>
+      {!detalle ? (
+        <p className="text-sm text-slate-400">Cargando…</p>
+      ) : (
+        <form onSubmit={onSubmit} className="space-y-3">
+          <p className="text-sm text-slate-600 dark:text-slate-400">
+            Al confirmar, este ajuste se aplica de verdad al stock de {detalle.bodega.nombre} — ya no se podrá editar.
+          </p>
+          {tieneSalida && <CampoPin value={pin} onChange={setPin} id="ajuste-confirmar-pin" />}
+          {error && <p className="text-sm text-red-600">{error}</p>}
+          <Button type="submit" disabled={confirmar.isPending} className="w-full">
+            {confirmar.isPending ? 'Confirmando…' : 'Confirmar ajuste'}
+          </Button>
+        </form>
+      )}
     </Modal>
   );
 }

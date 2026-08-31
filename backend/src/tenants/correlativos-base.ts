@@ -7,4 +7,13 @@ import { TipoCorrelativo } from '@prisma/client';
  * admin ajusta prefijo/próximo número/dígitos por tipo después, desde
  * Admin → Consecutivos.
  */
-export const CORRELATIVOS_BASE: TipoCorrelativo[] = ['COTIZACION', 'REMISION', 'ORDEN_COMPRA', 'CAJA', 'PRODUCTO', 'CUENTA_CONTABLE', 'FACTURA'];
+export const CORRELATIVOS_BASE: TipoCorrelativo[] = [
+  'COTIZACION',
+  'REMISION',
+  'ORDEN_COMPRA',
+  'CAJA',
+  'PRODUCTO',
+  'CUENTA_CONTABLE',
+  'FACTURA',
+  'AJUSTE',
+];

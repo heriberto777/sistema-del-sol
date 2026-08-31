@@ -13,7 +13,7 @@ import { AuthService } from '../auth/auth.service';
 // Plan de integración de brechas Cuadre, ítem E-2: etiqueta legible para
 // cuando el cajero deja "motivo" (detalle libre) en blanco — el Kardex/
 // historial nunca queda sin una descripción humana del ajuste.
-const ETIQUETA_MOTIVO_AJUSTE: Record<MotivoAjusteInventario, string> = {
+export const ETIQUETA_MOTIVO_AJUSTE: Record<MotivoAjusteInventario, string> = {
   MERMA: 'Merma',
   ROBO_PERDIDA: 'Robo o pérdida',
   DANO: 'Daño',
@@ -341,6 +341,18 @@ export class InventarioService {
           : undefined,
       loteIdSalida: params.cantidad < 0 ? params.loteId : undefined,
     });
+  }
+
+  /**
+   * Ítem E-1 — punto de entrada público para que AjustesInventarioService
+   * (otro módulo) dispare el movimiento real de stock al confirmar un
+   * `AjusteInventario`, sin tener que importar `InventarioRepository`
+   * directo (esa capa es privada de este módulo, ver convención
+   * Controller→Service→Repository). Reusa `ajustarCantidadEnTx` tal cual
+   * — el `controlaVencimiento`/lotes ya vienen resueltos por el caller.
+   */
+  ajustarCantidadEnTx(tx: Prisma.TransactionClient, params: Parameters<InventarioRepository['ajustarCantidadEnTx']>[1]) {
+    return this.inventarioRepository.ajustarCantidadEnTx(tx, params);
   }
 
   async transferirStock(params: {

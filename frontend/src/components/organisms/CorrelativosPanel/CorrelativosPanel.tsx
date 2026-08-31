@@ -6,7 +6,7 @@ import { Card } from '../../atoms/Card/Card';
 import { FormField } from '../../molecules/FormField/FormField';
 import { Modal } from '../../molecules/Modal/Modal';
 
-type TipoCorrelativo = 'COTIZACION' | 'REMISION' | 'ORDEN_COMPRA' | 'CAJA' | 'PRODUCTO' | 'CUENTA_CONTABLE' | 'FACTURA';
+type TipoCorrelativo = 'COTIZACION' | 'REMISION' | 'ORDEN_COMPRA' | 'CAJA' | 'PRODUCTO' | 'CUENTA_CONTABLE' | 'FACTURA' | 'AJUSTE';
 
 interface Correlativo {
   id: string | null;
@@ -26,6 +26,8 @@ const ETIQUETA_TIPO: Record<TipoCorrelativo, string> = {
   // Número interno de Factura, distinto del NCF (comprobante fiscal) —
   // agregado después de K-1, que había dejado Facturación afuera.
   FACTURA: 'Facturación',
+  // Ítem E-1 — documento nuevo de Ajustes de inventario (Borrador→Confirmado).
+  AJUSTE: 'Ajustes de inventario',
 };
 
 /**

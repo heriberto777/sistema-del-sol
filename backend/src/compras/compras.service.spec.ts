@@ -297,7 +297,7 @@ describe('ComprasService', () => {
     it('rechaza editar una orden que no está en BORRADOR', async () => {
       repository.buscarPorId.mockResolvedValue({ estado: 'ENVIADA' } as never);
 
-      await expect(service.actualizar('oc-1', dtoEditar as never, 'tenant-1')).rejects.toThrow(BadRequestException);
+      await expect(service.actualizar('oc-1', dtoEditar as never)).rejects.toThrow(BadRequestException);
       expect(repository.actualizar).not.toHaveBeenCalled();
     });
 
@@ -305,7 +305,7 @@ describe('ComprasService', () => {
       repository.buscarPorId.mockResolvedValue({ estado: 'BORRADOR' } as never);
       repository.actualizar.mockResolvedValue({ id: 'oc-1' } as never);
 
-      await service.actualizar('oc-1', dtoEditar as never, 'tenant-1');
+      await service.actualizar('oc-1', dtoEditar as never);
 
       expect(repository.actualizar).toHaveBeenCalledWith('oc-1', {
         total: 30,
@@ -318,7 +318,7 @@ describe('ComprasService', () => {
     it('confirma (BORRADOR→ENVIADA) una orden en borrador', async () => {
       repository.buscarPorId.mockResolvedValue({ estado: 'BORRADOR', recepciones: [] } as never);
 
-      await service.cambiarEstado('oc-1', 'ENVIADA', 'tenant-1');
+      await service.cambiarEstado('oc-1', 'ENVIADA');
 
       expect(repository.actualizarEstado).toHaveBeenCalledWith(TX, 'oc-1', 'ENVIADA');
     });
@@ -326,13 +326,13 @@ describe('ComprasService', () => {
     it('rechaza confirmar una orden que ya no está en BORRADOR', async () => {
       repository.buscarPorId.mockResolvedValue({ estado: 'ENVIADA', recepciones: [] } as never);
 
-      await expect(service.cambiarEstado('oc-1', 'ENVIADA', 'tenant-1')).rejects.toThrow(BadRequestException);
+      await expect(service.cambiarEstado('oc-1', 'ENVIADA')).rejects.toThrow(BadRequestException);
     });
 
     it('cancela una orden en BORRADOR o ENVIADA sin recepciones', async () => {
       repository.buscarPorId.mockResolvedValue({ estado: 'ENVIADA', recepciones: [] } as never);
 
-      await service.cambiarEstado('oc-1', 'CANCELADA', 'tenant-1');
+      await service.cambiarEstado('oc-1', 'CANCELADA');
 
       expect(repository.actualizarEstado).toHaveBeenCalledWith(TX, 'oc-1', 'CANCELADA');
     });
@@ -340,14 +340,14 @@ describe('ComprasService', () => {
     it('rechaza cancelar una orden que ya tiene mercancía recibida', async () => {
       repository.buscarPorId.mockResolvedValue({ estado: 'RECIBIDA_PARCIAL', recepciones: [{ id: 'rec-1' }] } as never);
 
-      await expect(service.cambiarEstado('oc-1', 'CANCELADA', 'tenant-1')).rejects.toThrow(BadRequestException);
+      await expect(service.cambiarEstado('oc-1', 'CANCELADA')).rejects.toThrow(BadRequestException);
       expect(repository.actualizarEstado).not.toHaveBeenCalled();
     });
 
     it('rechaza cancelar una orden ya cancelada', async () => {
       repository.buscarPorId.mockResolvedValue({ estado: 'CANCELADA', recepciones: [] } as never);
 
-      await expect(service.cambiarEstado('oc-1', 'CANCELADA', 'tenant-1')).rejects.toThrow(BadRequestException);
+      await expect(service.cambiarEstado('oc-1', 'CANCELADA')).rejects.toThrow(BadRequestException);
     });
   });
 

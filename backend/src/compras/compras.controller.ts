@@ -40,14 +40,14 @@ export class ComprasController {
 
   @Patch(':id')
   @Permissions('compras.editar')
-  actualizar(@Param('id') id: string, @Body() dto: EditarOrdenCompraDto, @CurrentUser() user: JwtPayloadUser) {
-    return this.comprasService.actualizar(id, dto, user.tenantId);
+  actualizar(@Param('id') id: string, @Body() dto: EditarOrdenCompraDto) {
+    return this.comprasService.actualizar(id, dto);
   }
 
   @Patch(':id/estado')
   @Permissions('compras.editar')
-  cambiarEstado(@Param('id') id: string, @Body() dto: CambiarEstadoOrdenCompraDto, @CurrentUser() user: JwtPayloadUser) {
-    return this.comprasService.cambiarEstado(id, dto.estado, user.tenantId);
+  cambiarEstado(@Param('id') id: string, @Body() dto: CambiarEstadoOrdenCompraDto) {
+    return this.comprasService.cambiarEstado(id, dto.estado);
   }
 
   @Post(':id/recibir')
