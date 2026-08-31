@@ -21,7 +21,7 @@ BEGIN
       'ncf_asignados', 'facturas',
       'productos', 'bodegas', 'movimiento_inventario',
       'proveedores', 'orden_compra', 'recepcion_compra',
-      'ajuste_inventario',
+      'ajuste_inventario', 'transferencia_inventario',
       'clientes',
       'webhooks',
       'notificacion_plantillas', 'notificaciones',

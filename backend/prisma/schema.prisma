@@ -68,6 +68,7 @@ model Tenant {
   proveedores               Proveedor[]
   ordenesCompra             OrdenCompra[]
   ajustesInventario         AjusteInventario[]
+  transferenciasInventario  TransferenciaInventario[]
   webhooks                  Webhook[]
   notificaciones            Notificacion[]
   plantillasNotificacion    NotificacionPlantilla[]
@@ -439,6 +440,7 @@ model User {
   movimientosInventario          MovimientoInventario[]
   ordenesCompra                  OrdenCompra[]
   ajustesInventario              AjusteInventario[]
+  transferenciasInventario       TransferenciaInventario[]
   cotizaciones                   Cotizacion[]
   remisiones                     Remision[]
   turnosCaja                     TurnoCaja[]
@@ -613,11 +615,11 @@ enum TipoCorrelativo {
   // muestra ambos por separado. Agregado después de K-1 (que dejó
   // Factura afuera a propósito, por ya tener NCF).
   FACTURA
-  // Ítem E-1 — Ajustes de inventario ganan su propio documento con número
-  // (antes era solo un movimiento instantáneo sin cabecera, ver
-  // AjusteInventario). Transferencias sigue el mismo criterio en una
-  // pieza aparte.
+  // Ítem E-1 — Ajustes/Transferencias de inventario ganan su propio
+  // documento con número (antes eran solo un movimiento instantáneo sin
+  // cabecera, ver AjusteInventario/TransferenciaInventario).
   AJUSTE
+  TRANSFERENCIA
 }
 
 /// Correlativo automático genérico (plan de integración Cuadre, ítem de
@@ -2132,6 +2134,7 @@ model Producto {
   lineasDevolucionCompra LineaDevolucionCompra[]
   lineasVentaAparcada    VentaAparcadaLinea[]
   lineasAjusteInventario LineaAjusteInventario[]
+  lineasTransferenciaInventario LineaTransferenciaInventario[]
   // Componentes de ESTE producto cuando `tipo: COMBO`.
   componentes            ComponenteCombo[]       @relation("ComboComponentes")
   // Combos de los que este producto forma parte (como componente).
@@ -2195,6 +2198,7 @@ model VarianteProducto {
   lineasDevolucionCompra LineaDevolucionCompra[]
   lineasVentaAparcada    VentaAparcadaLinea[]
   lineasAjusteInventario LineaAjusteInventario[]
+  lineasTransferenciaInventario LineaTransferenciaInventario[]
 
   @@unique([tenantId, codigoBarras])
   @@map("variantes_producto")
@@ -2324,6 +2328,8 @@ model Bodega {
   devoluciones DevolucionCompra[]
   cajas        Caja[]
   ajustesInventario AjusteInventario[]
+  transferenciasOrigen  TransferenciaInventario[] @relation("TransferenciaOrigen")
+  transferenciasDestino TransferenciaInventario[] @relation("TransferenciaDestino")
 
   @@unique([tenantId, nombre])
   @@map("bodegas")
@@ -2633,6 +2639,50 @@ model LineaAjusteInventario {
   loteId           String?
 
   @@map("linea_ajuste_inventario")
+}
+
+// Ítem E-1 — mismo patrón que AjusteInventario, para Transferencias entre
+// bodegas. confirmar() reusa InventarioService.transferirStockEnTx (=
+// InventarioRepository.transferirEnTx) tal cual — ya resuelve FEFO/lotes
+// internamente, sin necesitar nada extra por línea.
+enum EstadoTransferenciaInventario {
+  BORRADOR
+  CONFIRMADO
+  CANCELADO
+}
+
+model TransferenciaInventario {
+  id              String                        @id @default(uuid())
+  tenantId        String
+  tenant          Tenant                        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  numero          String
+  bodegaOrigenId  String
+  bodegaOrigen    Bodega                        @relation("TransferenciaOrigen", fields: [bodegaOrigenId], references: [id])
+  bodegaDestinoId String
+  bodegaDestino   Bodega                        @relation("TransferenciaDestino", fields: [bodegaDestinoId], references: [id])
+  estado          EstadoTransferenciaInventario @default(BORRADOR)
+  fecha           DateTime                      @default(now())
+  userId          String
+  user            User                          @relation(fields: [userId], references: [id])
+  createdAt       DateTime                      @default(now())
+
+  lineas LineaTransferenciaInventario[]
+
+  @@unique([tenantId, numero])
+  @@map("transferencia_inventario")
+}
+
+model LineaTransferenciaInventario {
+  id              String                  @id @default(uuid())
+  transferenciaId String
+  transferencia   TransferenciaInventario @relation(fields: [transferenciaId], references: [id], onDelete: Cascade)
+  productoId      String
+  producto        Producto                @relation(fields: [productoId], references: [id], onDelete: Cascade)
+  varianteId      String
+  variante        VarianteProducto        @relation(fields: [varianteId], references: [id])
+  cantidad        Decimal                 @db.Decimal(14, 4)
+
+  @@map("linea_transferencia_inventario")
 }
 
 model RecepcionCompra {

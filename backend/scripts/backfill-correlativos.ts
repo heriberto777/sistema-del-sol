@@ -1,6 +1,6 @@
 import { PrismaClient, TipoCorrelativo } from '@prisma/client';
 
-const TIPOS: TipoCorrelativo[] = ['COTIZACION', 'REMISION', 'ORDEN_COMPRA', 'CAJA', 'PRODUCTO', 'CUENTA_CONTABLE', 'FACTURA', 'AJUSTE'];
+const TIPOS: TipoCorrelativo[] = ['COTIZACION', 'REMISION', 'ORDEN_COMPRA', 'CAJA', 'PRODUCTO', 'CUENTA_CONTABLE', 'FACTURA', 'AJUSTE', 'TRANSFERENCIA'];
 
 /**
  * A cualquier tenant creado antes de esta feature (todos los existentes,

@@ -14,6 +14,7 @@ import { FacturacionModule } from './facturacion/facturacion.module';
 import { CuentasPorCobrarModule } from './cuentas-por-cobrar/cuentas-por-cobrar.module';
 import { InventarioModule } from './inventario/inventario.module';
 import { AjustesInventarioModule } from './inventario/ajustes-inventario/ajustes-inventario.module';
+import { TransferenciasInventarioModule } from './inventario/transferencias-inventario/transferencias-inventario.module';
 import { ProductosModule } from './productos/productos.module';
 import { PreciosModule } from './precios/precios.module';
 import { ComprasModule } from './compras/compras.module';
@@ -92,6 +93,7 @@ import { TenantMiddleware } from './common/middleware/tenant.middleware';
     SucursalesModule,
     InventarioModule,
     AjustesInventarioModule,
+    TransferenciasInventarioModule,
     ProductosModule,
     PreciosModule,
     ComprasModule,

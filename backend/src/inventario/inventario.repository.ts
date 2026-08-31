@@ -404,7 +404,7 @@ export class InventarioRepository {
    * sin el chequeo, una transferencia podía dejar `cantidadActual`
    * negativo en la bodega origen incluso sin concurrencia de por medio.
    */
-  async transferir(params: {
+  transferir(params: {
     tenantId: string;
     productoId: string;
     varianteId: string;
@@ -414,38 +414,58 @@ export class InventarioRepository {
     userId: string;
     controlaVencimiento?: boolean;
   }) {
-    return this.db.$transaction(async (tx) => {
-      const origen = await this.descontarStockCondicionalEnTx(tx, {
-        tenantId: params.tenantId,
-        productoId: params.productoId,
-        varianteId: params.varianteId,
-        bodegaId: params.bodegaOrigenId,
-        cantidad: params.cantidad,
-        tipo: 'TRANSFERENCIA',
-        userId: params.userId,
-        motivo: `Transferencia hacia bodega ${params.bodegaDestinoId}`,
-        controlaVencimiento: params.controlaVencimiento,
-      });
-      if (!origen) {
-        throw new BadRequestException(
-          `Stock insuficiente en la bodega de origen para transferir el producto ${params.productoId}`,
-        );
-      }
-      // El lote (número + vencimiento) viaja intacto a la bodega destino —
-      // FEFO ya decidió en origen de cuál(es) sale, acá solo se preserva su
-      // identidad (Fase 5b).
-      return this.ajustarCantidadEnTx(tx, {
-        tenantId: params.tenantId,
-        productoId: params.productoId,
-        varianteId: params.varianteId,
-        bodegaId: params.bodegaDestinoId,
-        delta: params.cantidad,
-        tipo: 'TRANSFERENCIA',
-        userId: params.userId,
-        motivo: `Transferencia desde bodega ${params.bodegaOrigenId}`,
-        controlaVencimiento: params.controlaVencimiento,
-        lotesEntrada: origen.consumos.map((c) => ({ numeroLote: c.numeroLote, fechaVencimiento: c.fechaVencimiento, cantidad: c.cantidad })),
-      });
+    return this.db.$transaction((tx) => this.transferirEnTx(tx, params));
+  }
+
+  /**
+   * Ítem E-1 — separada de `transferir` (que ahora solo abre la transacción
+   * y delega acá) para que `TransferenciasInventarioService.confirmar` pueda
+   * mover varias líneas en UNA sola transacción junto con el cambio de
+   * estado del documento, mismo criterio que `ajustarCantidadEnTx`.
+   */
+  async transferirEnTx(
+    tx: Prisma.TransactionClient,
+    params: {
+      tenantId: string;
+      productoId: string;
+      varianteId: string;
+      bodegaOrigenId: string;
+      bodegaDestinoId: string;
+      cantidad: number;
+      userId: string;
+      controlaVencimiento?: boolean;
+    },
+  ) {
+    const origen = await this.descontarStockCondicionalEnTx(tx, {
+      tenantId: params.tenantId,
+      productoId: params.productoId,
+      varianteId: params.varianteId,
+      bodegaId: params.bodegaOrigenId,
+      cantidad: params.cantidad,
+      tipo: 'TRANSFERENCIA',
+      userId: params.userId,
+      motivo: `Transferencia hacia bodega ${params.bodegaDestinoId}`,
+      controlaVencimiento: params.controlaVencimiento,
+    });
+    if (!origen) {
+      throw new BadRequestException(
+        `Stock insuficiente en la bodega de origen para transferir el producto ${params.productoId}`,
+      );
+    }
+    // El lote (número + vencimiento) viaja intacto a la bodega destino —
+    // FEFO ya decidió en origen de cuál(es) sale, acá solo se preserva su
+    // identidad (Fase 5b).
+    return this.ajustarCantidadEnTx(tx, {
+      tenantId: params.tenantId,
+      productoId: params.productoId,
+      varianteId: params.varianteId,
+      bodegaId: params.bodegaDestinoId,
+      delta: params.cantidad,
+      tipo: 'TRANSFERENCIA',
+      userId: params.userId,
+      motivo: `Transferencia desde bodega ${params.bodegaOrigenId}`,
+      controlaVencimiento: params.controlaVencimiento,
+      lotesEntrada: origen.consumos.map((c) => ({ numeroLote: c.numeroLote, fechaVencimiento: c.fechaVencimiento, cantidad: c.cantidad })),
     });
   }
 

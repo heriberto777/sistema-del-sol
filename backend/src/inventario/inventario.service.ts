@@ -379,6 +379,32 @@ export class InventarioService {
   }
 
   /**
+   * Ítem E-1 — variante de `transferirStock` que participa en una
+   * transacción abierta por OTRO servicio (ver
+   * TransferenciasInventarioService.confirmar), para mover varias líneas
+   * junto con el cambio de estado del documento, todo o nada.
+   */
+  async transferirStockEnTx(
+    tx: Prisma.TransactionClient,
+    params: {
+      tenantId: string;
+      productoId: string;
+      varianteId?: string;
+      bodegaOrigenId: string;
+      bodegaDestinoId: string;
+      cantidad: number;
+      userId: string;
+    },
+  ) {
+    const [{ producto }] = await Promise.all([
+      this.validarPertenencia({ productoId: params.productoId, bodegaId: params.bodegaOrigenId, userId: params.userId }, tx),
+      this.validarPertenencia({ bodegaId: params.bodegaDestinoId, userId: params.userId }, tx),
+    ]);
+    const varianteId = await this.variantesService.resolverObligatoria(params.productoId, params.varianteId);
+    return this.inventarioRepository.transferirEnTx(tx, { ...params, varianteId, controlaVencimiento: producto!.controlaVencimiento });
+  }
+
+  /**
    * Historial cronológico de una variante en una bodega, con saldo
    * corriente — molde calcado de `EstadosFinancierosService.libroMayor()`
    * (Fase 5a): sin paginar (ningún reporte de este proyecto pagina), las

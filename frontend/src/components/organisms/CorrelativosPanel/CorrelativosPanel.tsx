@@ -6,7 +6,7 @@ import { Card } from '../../atoms/Card/Card';
 import { FormField } from '../../molecules/FormField/FormField';
 import { Modal } from '../../molecules/Modal/Modal';
 
-type TipoCorrelativo = 'COTIZACION' | 'REMISION' | 'ORDEN_COMPRA' | 'CAJA' | 'PRODUCTO' | 'CUENTA_CONTABLE' | 'FACTURA' | 'AJUSTE';
+type TipoCorrelativo = 'COTIZACION' | 'REMISION' | 'ORDEN_COMPRA' | 'CAJA' | 'PRODUCTO' | 'CUENTA_CONTABLE' | 'FACTURA' | 'AJUSTE' | 'TRANSFERENCIA';
 
 interface Correlativo {
   id: string | null;
@@ -28,6 +28,7 @@ const ETIQUETA_TIPO: Record<TipoCorrelativo, string> = {
   FACTURA: 'Facturación',
   // Ítem E-1 — documento nuevo de Ajustes de inventario (Borrador→Confirmado).
   AJUSTE: 'Ajustes de inventario',
+  TRANSFERENCIA: 'Transferencias de inventario',
 };
 
 /**
