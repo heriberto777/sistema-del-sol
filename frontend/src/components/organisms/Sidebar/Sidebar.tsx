@@ -10,6 +10,7 @@ import {
   CalendarClock,
   Contact,
   FileText,
+  HandCoins,
   LayoutDashboard,
   Landmark,
   type LucideIcon,
@@ -80,6 +81,13 @@ const GRUPOS: Grupo[] = [
     items: [
       { ruta: '/inventario', etiqueta: 'Inventario', icono: Boxes, permisos: ['inventario.ver'], modulo: 'inventario' },
       { ruta: '/compras', etiqueta: 'Compras', icono: ShoppingBag, permisos: ['compras.ver'], modulo: 'compras' },
+      {
+        ruta: '/cuentas-por-pagar',
+        etiqueta: 'Cuentas por pagar',
+        icono: HandCoins,
+        permisos: ['cuentasporpagar.ver'],
+        modulo: 'compras',
+      },
       { ruta: '/productos', etiqueta: 'Productos', icono: Tag, permisos: ['precios.ver'], modulo: 'productos' },
       // Sin `modulo`: Sucursales no es gateable por plan, es plomería de
       // ubicación compartida (mismo criterio que Contabilidad/Contactos).

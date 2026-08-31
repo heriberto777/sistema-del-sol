@@ -40,6 +40,7 @@ interface Proveedor {
   rnc: string | null;
   email: string | null;
   telefono: string | null;
+  plazoPagoDias: number;
 }
 
 interface ClienteFormValues {
@@ -59,6 +60,7 @@ interface ProveedorFormValues {
   rnc: string;
   email: string;
   telefono: string;
+  plazoPagoDias: string;
 }
 
 const CLIENTE_VACIO: ClienteFormValues = {
@@ -73,7 +75,7 @@ const CLIENTE_VACIO: ClienteFormValues = {
   comprobantePorDefecto: '',
 };
 
-const PROVEEDOR_VACIO: ProveedorFormValues = { nombre: '', rnc: '', email: '', telefono: '' };
+const PROVEEDOR_VACIO: ProveedorFormValues = { nombre: '', rnc: '', email: '', telefono: '', plazoPagoDias: '30' };
 
 type Pestana = 'clientes' | 'proveedores';
 
@@ -421,6 +423,7 @@ function ListaProveedores({ busqueda, setBusqueda, pagina, setPagina, busquedaDe
                   <th className="px-5 py-3 font-medium">RNC</th>
                   <th className="px-5 py-3 font-medium">Email</th>
                   <th className="px-5 py-3 font-medium">Teléfono</th>
+                  <th className="px-5 py-3 font-medium">Plazo de pago</th>
                   <th className="px-5 py-3" />
                 </tr>
               </thead>
@@ -431,6 +434,7 @@ function ListaProveedores({ busqueda, setBusqueda, pagina, setPagina, busquedaDe
                     <td className="px-5 py-3">{proveedor.rnc ?? '—'}</td>
                     <td className="px-5 py-3">{proveedor.email ?? '—'}</td>
                     <td className="px-5 py-3">{proveedor.telefono ?? '—'}</td>
+                    <td className="px-5 py-3">{proveedor.plazoPagoDias} días</td>
                     <td className="px-5 py-3 text-right">
                       <RowActionsMenu acciones={[{ etiqueta: 'Editar', onClick: () => onEditar(proveedor) }]} />
                     </td>
@@ -593,6 +597,7 @@ function FormularioProveedor({ proveedor, onGuardado }: { proveedor: Proveedor |
           rnc: proveedor.rnc ?? '',
           email: proveedor.email ?? '',
           telefono: proveedor.telefono ?? '',
+          plazoPagoDias: String(proveedor.plazoPagoDias),
         }
       : PROVEEDOR_VACIO,
   );
@@ -604,6 +609,7 @@ function FormularioProveedor({ proveedor, onGuardado }: { proveedor: Proveedor |
       rnc: valores.rnc || undefined,
       email: valores.email || undefined,
       telefono: valores.telefono || undefined,
+      plazoPagoDias: valores.plazoPagoDias ? Number(valores.plazoPagoDias) : undefined,
     };
   }
 
@@ -650,6 +656,14 @@ function FormularioProveedor({ proveedor, onGuardado }: { proveedor: Proveedor |
         label="Teléfono"
         value={valores.telefono}
         onChange={(e) => setValores((v) => ({ ...v, telefono: e.target.value }))}
+      />
+      <FormField
+        id="proveedor-plazo-pago"
+        label="Plazo de pago (días)"
+        type="number"
+        min={1}
+        value={valores.plazoPagoDias}
+        onChange={(e) => setValores((v) => ({ ...v, plazoPagoDias: e.target.value }))}
       />
       {error && <p className="text-sm text-red-600">{error}</p>}
       <Button type="submit" disabled={guardar.isPending} className="w-full">

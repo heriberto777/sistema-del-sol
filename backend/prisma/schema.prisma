@@ -2572,6 +2572,12 @@ model Proveedor {
   email    String?
   telefono String?
   activo   Boolean @default(true)
+  // Crédito general con este proveedor (ítem Cuentas por Pagar) — a
+  // diferencia de Factura.plazoPagoDias (snapshot por documento),
+  // OrdenCompra no tiene plazo propio: todas sus órdenes heredan este
+  // valor en vivo al calcular vencimiento/antigüedad (decisión explícita
+  // del usuario, ver CuentasPorPagarService).
+  plazoPagoDias Int @default(30)
 
   ordenesCompra OrdenCompra[]
 

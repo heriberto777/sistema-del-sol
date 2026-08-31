@@ -12,6 +12,7 @@ import { PluginsModule } from './plugins/plugins.module';
 import { AuthModule } from './auth/auth.module';
 import { FacturacionModule } from './facturacion/facturacion.module';
 import { CuentasPorCobrarModule } from './cuentas-por-cobrar/cuentas-por-cobrar.module';
+import { CuentasPorPagarModule } from './cuentas-por-pagar/cuentas-por-pagar.module';
 import { InventarioModule } from './inventario/inventario.module';
 import { AjustesInventarioModule } from './inventario/ajustes-inventario/ajustes-inventario.module';
 import { TransferenciasInventarioModule } from './inventario/transferencias-inventario/transferencias-inventario.module';
@@ -97,6 +98,7 @@ import { TenantMiddleware } from './common/middleware/tenant.middleware';
     ProductosModule,
     PreciosModule,
     ComprasModule,
+    CuentasPorPagarModule,
     ClientesModule,
     ProveedoresModule,
     NotificacionesModule,
