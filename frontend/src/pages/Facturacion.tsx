@@ -16,6 +16,7 @@ import { useAuth } from '../hooks/useAuth';
 import { useListasPrecio } from '../hooks/useListasPrecio';
 import { TablaLineasEditable, LineaEditable } from '../components/molecules/TablaLineasEditable/TablaLineasEditable';
 import { SelectorBodega } from '../components/molecules/SelectorBodega/SelectorBodega';
+import { SelectFormaPago } from '../components/molecules/SelectFormaPago/SelectFormaPago';
 import { PaginaResultado } from '../types/pagina-resultado';
 
 interface Cliente {
@@ -78,6 +79,10 @@ function ModalNuevaFactura({ onClose }: { onClose: () => void }) {
   const [tipoFactura, setTipoFactura] = useState<'CONTADO' | 'CREDITO'>('CONTADO');
   const [tipoComprobanteEspecial, setTipoComprobanteEspecial] = useState('');
   const [plazoPagoDias, setPlazoPagoDias] = useState(30);
+  // Ítem Cobranza — captura el cobro al crear una factura CONTADO fuera de
+  // POS (igual que POS), para que quede un registro de pago y la factura
+  // salga marcada como pagada.
+  const [formaPagoId, setFormaPagoId] = useState('');
   const LINEA_VACIA: LineaEditable = { productoId: '', varianteId: '', descripcionManual: '', esManual: false, cantidad: '1', precioUnitario: '', aplicaItbis: true };
   const [lineas, setLineas] = useState<LineaEditable[]>([LINEA_VACIA]);
   const [mostrarNuevoCliente, setMostrarNuevoCliente] = useState(false);
@@ -133,6 +138,7 @@ function ModalNuevaFactura({ onClose }: { onClose: () => void }) {
         tipoComprobanteEspecial: tipoComprobanteEspecial || undefined,
         listaPrecio: listaPrecioOverride || undefined,
         plazoPagoDias: tipoFactura === 'CREDITO' ? plazoPagoDias : undefined,
+        formaPagoId: tipoFactura === 'CONTADO' ? formaPagoId || undefined : undefined,
         descuentoGeneralPct: descuentoGeneralTipo === 'PCT' && descuentoGeneralValor ? Number(descuentoGeneralValor) : undefined,
         descuentoGeneralMonto: descuentoGeneralTipo === 'MONTO' && descuentoGeneralValor ? Number(descuentoGeneralValor) : undefined,
         moneda: moneda !== 'DOP' ? moneda : undefined,
@@ -178,6 +184,10 @@ function ModalNuevaFactura({ onClose }: { onClose: () => void }) {
     }
     if (lineas.some((l) => l.esManual && l.descripcionManual.trim() && !l.precioUnitario)) {
       setError('Una línea de producto libre necesita un precio.');
+      return;
+    }
+    if (tipoFactura === 'CONTADO' && !formaPagoId) {
+      setError('Seleccioná la forma de pago.');
       return;
     }
     crear.mutate();
@@ -250,6 +260,13 @@ function ModalNuevaFactura({ onClose }: { onClose: () => void }) {
               <option value="GUBERNAMENTAL">Gubernamental (B15)</option>
             </Select>
           </div>
+
+          {tipoFactura === 'CONTADO' && (
+            <div className="flex flex-col gap-1">
+              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Forma de pago</label>
+              <SelectFormaPago value={formaPagoId} onChange={setFormaPagoId} />
+            </div>
+          )}
 
           {tipoFactura === 'CREDITO' && (
             <>

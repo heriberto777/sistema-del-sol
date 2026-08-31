@@ -954,6 +954,35 @@ describe('FacturacionService', () => {
     });
   });
 
+  describe('pagada al crear (ítem Cobranza)', () => {
+    it('CONTADO con el total cubierto por opciones.pagos queda pagada, con fechaPago', async () => {
+      repository.obtenerProductoConPrecioVigente.mockResolvedValue(producto(18, 100) as never);
+      repository.crearFacturaEnTx.mockResolvedValue(facturaCreada({ total: 236 }) as never);
+
+      await service.crear(dto({ tipoFactura: 'CONTADO' }), 'tenant-1', 'vendedor-1', { formaPagoId: 'fp1' });
+
+      expect(repository.crearFacturaEnTx).toHaveBeenCalledWith(TX, expect.objectContaining({ pagada: true, fechaPago: expect.any(Date) }));
+    });
+
+    it('CONTADO sin ningún pago (ni formaPagoId ni pagos) no queda pagada', async () => {
+      repository.obtenerProductoConPrecioVigente.mockResolvedValue(producto(18, 100) as never);
+      repository.crearFacturaEnTx.mockResolvedValue(facturaCreada({ total: 236 }) as never);
+
+      await service.crear(dto({ tipoFactura: 'CONTADO' }), 'tenant-1', 'vendedor-1');
+
+      expect(repository.crearFacturaEnTx).toHaveBeenCalledWith(TX, expect.objectContaining({ pagada: false, fechaPago: undefined }));
+    });
+
+    it('CREDITO nunca queda pagada al crear, aunque se pase formaPagoId (sigue su flujo de cobro post-hoc)', async () => {
+      repository.obtenerProductoConPrecioVigente.mockResolvedValue(producto(18, 100) as never);
+      repository.crearFacturaEnTx.mockResolvedValue(facturaCreada({ tipoFactura: 'CREDITO', total: 236 }) as never);
+
+      await service.crear(dto({ tipoFactura: 'CREDITO' }), 'tenant-1', 'vendedor-1', { formaPagoId: 'fp1' });
+
+      expect(repository.crearFacturaEnTx).toHaveBeenCalledWith(TX, expect.objectContaining({ pagada: false, fechaPago: undefined }));
+    });
+  });
+
   describe('canje de Bono (Fase 4c)', () => {
     it('llama BonosService.procesarPagoEnTx una vez por cada pago, antes de tocar inventario', async () => {
       repository.obtenerProductoConPrecioVigente.mockResolvedValue(producto(18, 100) as never);

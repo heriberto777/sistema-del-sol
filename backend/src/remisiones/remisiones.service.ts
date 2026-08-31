@@ -153,7 +153,11 @@ export class RemisionesService {
       // (ver cambiarEstado) — crear() no debe volver a hacerlo. Si se
       // convierte directo desde BORRADOR (nunca entregada), crear() mueve
       // stock como siempre — cero cambio de comportamiento para ese camino.
-      { sinMovimientoInventario: remision.estado === 'ENTREGADA' },
+      {
+        sinMovimientoInventario: remision.estado === 'ENTREGADA',
+        formaPagoId: dto.formaPagoId,
+        referenciaPago: dto.referenciaPago,
+      },
     );
 
     await this.remisionesRepository.marcarFacturada(id, factura.id);

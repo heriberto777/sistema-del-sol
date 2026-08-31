@@ -23,7 +23,10 @@ export class FacturacionController {
   @Post()
   @Permissions('facturacion.crear')
   crear(@Body() dto: CrearFacturaDto, @CurrentUser() user: JwtPayloadUser) {
-    return this.facturacionService.crear(dto, user.tenantId, user.userId);
+    return this.facturacionService.crear(dto, user.tenantId, user.userId, {
+      formaPagoId: dto.formaPagoId,
+      referenciaPago: dto.referenciaPago,
+    });
   }
 
   @Get()

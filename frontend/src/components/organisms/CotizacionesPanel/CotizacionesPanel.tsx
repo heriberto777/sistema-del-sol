@@ -17,6 +17,7 @@ import { SelectorLineaProducto } from '../../molecules/SelectorLineaProducto/Sel
 import { TablaLineasEditable } from '../../molecules/TablaLineasEditable/TablaLineasEditable';
 import { TablaArticulosDocumento } from '../../molecules/TablaArticulosDocumento/TablaArticulosDocumento';
 import { BloqueTotalesDocumento } from '../../molecules/BloqueTotalesDocumento/BloqueTotalesDocumento';
+import { SelectFormaPago } from '../../molecules/SelectFormaPago/SelectFormaPago';
 import { useDebouncedValue } from '../../../hooks/useDebouncedValue';
 import { useAuth } from '../../../hooks/useAuth';
 import { PaginaResultado } from '../../../types/pagina-resultado';
@@ -602,6 +603,7 @@ function ModalConvertirCotizacion({ cotizacion, onClose }: { cotizacion: Cotizac
   const queryClient = useQueryClient();
   const [bodegaId, setBodegaId] = useState('');
   const [tipoFactura, setTipoFactura] = useState<'CONTADO' | 'CREDITO'>('CONTADO');
+  const [formaPagoId, setFormaPagoId] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   const { data: bodegas } = useQuery({
@@ -610,7 +612,12 @@ function ModalConvertirCotizacion({ cotizacion, onClose }: { cotizacion: Cotizac
   });
 
   const convertir = useMutation({
-    mutationFn: async () => apiClient.post(`/cotizaciones/${cotizacion.id}/convertir`, { bodegaId, tipoFactura }),
+    mutationFn: async () =>
+      apiClient.post(`/cotizaciones/${cotizacion.id}/convertir`, {
+        bodegaId,
+        tipoFactura,
+        formaPagoId: tipoFactura === 'CONTADO' ? formaPagoId || undefined : undefined,
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['cotizaciones'] });
       onClose();
@@ -621,6 +628,10 @@ function ModalConvertirCotizacion({ cotizacion, onClose }: { cotizacion: Cotizac
   function onSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
+    if (tipoFactura === 'CONTADO' && !formaPagoId) {
+      setError('Seleccioná la forma de pago.');
+      return;
+    }
     convertir.mutate();
   }
 
@@ -645,6 +656,12 @@ function ModalConvertirCotizacion({ cotizacion, onClose }: { cotizacion: Cotizac
             <option value="CREDITO">Crédito</option>
           </Select>
         </div>
+        {tipoFactura === 'CONTADO' && (
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Forma de pago</label>
+            <SelectFormaPago value={formaPagoId} onChange={setFormaPagoId} />
+          </div>
+        )}
         {error && <p className="text-sm text-red-600">{error}</p>}
         <Button type="submit" disabled={convertir.isPending} className="w-full">
           {convertir.isPending ? 'Convirtiendo…' : 'Convertir en factura'}

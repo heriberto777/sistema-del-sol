@@ -259,6 +259,7 @@ export class CotizacionesService {
       },
       tenantId,
       vendedorId,
+      { formaPagoId: dto.formaPagoId, referenciaPago: dto.referenciaPago },
     );
 
     await this.cotizacionesRepository.marcarConvertida(id, factura.id);

@@ -411,6 +411,14 @@ export class FacturacionService {
     const formaPagoPrincipal = pagosResueltos.length
       ? pagosResueltos.reduce((max, p) => (Math.abs(p.monto) > Math.abs(max.monto) ? p : max))
       : undefined;
+    // Hasta ahora un pago capturado acá (POS, y desde este ítem también
+    // Factura/conversión CONTADO directa) solo dejaba fila en PagoVenta sin
+    // marcar la factura como pagada — únicamente el cobro post-hoc de
+    // CRÉDITO (PagosRepository.marcarFacturaPagada) lo hacía. Si ya se
+    // capturó el total al crear, se marca acá mismo (fix compartido, sin
+    // tocar PosService).
+    const montoPagadoAlCrear = pagosResueltos.reduce((acc, p) => acc + p.monto, 0);
+    const pagadaAlCrear = dto.tipoFactura !== 'CREDITO' && montoPagadoAlCrear >= totalConRecargos - EPSILON_PAGOS && montoPagadoAlCrear > 0;
 
     const modalidad = await this.facturacionRepository.obtenerModalidadFacturacion(tenantId);
     const especial = dto.tipoComprobanteEspecial && (dto.tipoFactura === 'CONTADO' || dto.tipoFactura === 'CREDITO')
@@ -524,6 +532,8 @@ export class FacturacionService {
         vendedorEmpleadoId: opciones?.vendedorEmpleadoId,
         plazoPagoDias: dto.plazoPagoDias,
         pagos: pagosResueltos,
+        pagada: pagadaAlCrear,
+        fechaPago: pagadaAlCrear ? new Date() : undefined,
         subtotal,
         descuento: descuentoTotal,
         itbis: itbisConRecargos,

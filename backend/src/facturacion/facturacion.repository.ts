@@ -163,6 +163,12 @@ export class FacturacionRepository {
       // RecordatoriosService (fecha + plazoPagoDias) desde antes de este
       // ítem; lo que faltaba era poder ELEGIRLO al crear la factura.
       plazoPagoDias?: number;
+      // Ítem Cobranza — si el total se cubrió con `pagos` al crear (CONTADO
+      // directo/conversión, y ahora también POS), FacturacionService.crear()
+      // ya resuelve estos dos igual que PagosRepository.marcarFacturaPagada
+      // lo hace para el cobro post-hoc de CRÉDITO.
+      pagada?: boolean;
+      fechaPago?: Date;
       subtotal: number;
       descuento: number;
       itbis: number;
@@ -197,6 +203,8 @@ export class FacturacionRepository {
         turnoCajaId: params.turnoCajaId,
         vendedorEmpleadoId: params.vendedorEmpleadoId,
         plazoPagoDias: params.plazoPagoDias,
+        pagada: params.pagada,
+        fechaPago: params.fechaPago,
         estado: 'EMITIDA',
         subtotal: params.subtotal,
         descuento: params.descuento,

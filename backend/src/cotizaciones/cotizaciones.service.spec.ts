@@ -318,6 +318,7 @@ describe('CotizacionesService', () => {
         }),
         'tenant-1',
         'vendedor-1',
+        { formaPagoId: undefined, referenciaPago: undefined },
       );
       expect(repository.marcarConvertida).toHaveBeenCalledWith('c1', 'f1');
     });
@@ -357,6 +358,7 @@ describe('CotizacionesService', () => {
         }),
         'tenant-1',
         'vendedor-1',
+        { formaPagoId: undefined, referenciaPago: undefined },
       );
     });
   });

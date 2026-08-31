@@ -14,6 +14,7 @@ import { SearchInput } from '../../molecules/SearchInput/SearchInput';
 import { Paginacion } from '../../molecules/Paginacion/Paginacion';
 import { SelectorLineaProducto } from '../../molecules/SelectorLineaProducto/SelectorLineaProducto';
 import { TablaArticulosDocumento } from '../../molecules/TablaArticulosDocumento/TablaArticulosDocumento';
+import { SelectFormaPago } from '../../molecules/SelectFormaPago/SelectFormaPago';
 import { useDebouncedValue } from '../../../hooks/useDebouncedValue';
 import { useAuth } from '../../../hooks/useAuth';
 import { PaginaResultado } from '../../../types/pagina-resultado';
@@ -569,10 +570,15 @@ function ModalEditarRemision({
 function ModalConvertirRemision({ remision, onClose }: { remision: Remision; onClose: () => void }) {
   const queryClient = useQueryClient();
   const [tipoFactura, setTipoFactura] = useState<'CONTADO' | 'CREDITO'>('CONTADO');
+  const [formaPagoId, setFormaPagoId] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   const convertir = useMutation({
-    mutationFn: async () => apiClient.post(`/remisiones/${remision.id}/convertir`, { tipoFactura }),
+    mutationFn: async () =>
+      apiClient.post(`/remisiones/${remision.id}/convertir`, {
+        tipoFactura,
+        formaPagoId: tipoFactura === 'CONTADO' ? formaPagoId || undefined : undefined,
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['remisiones'] });
       onClose();
@@ -583,6 +589,10 @@ function ModalConvertirRemision({ remision, onClose }: { remision: Remision; onC
   function onSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
+    if (tipoFactura === 'CONTADO' && !formaPagoId) {
+      setError('Seleccioná la forma de pago.');
+      return;
+    }
     convertir.mutate();
   }
 
@@ -596,6 +606,12 @@ function ModalConvertirRemision({ remision, onClose }: { remision: Remision; onC
             <option value="CREDITO">Crédito</option>
           </Select>
         </div>
+        {tipoFactura === 'CONTADO' && (
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Forma de pago</label>
+            <SelectFormaPago value={formaPagoId} onChange={setFormaPagoId} />
+          </div>
+        )}
         {error && <p className="text-sm text-red-600">{error}</p>}
         <Button type="submit" disabled={convertir.isPending} className="w-full">
           {convertir.isPending ? 'Convirtiendo…' : 'Convertir en factura'}

@@ -177,4 +177,18 @@ export class CrearFacturaDto {
   @ValidateNested({ each: true })
   @Type(() => RecargoFacturaDto)
   recargos?: RecargoFacturaDto[];
+
+  @ApiProperty({
+    required: false,
+    description:
+      'Forma de pago al crear una factura CONTADO (fuera de POS) — captura el cobro de una vez por el total, igual que POS. Sin efecto en CREDITO (sigue su flujo de cobro post-hoc).',
+  })
+  @IsOptional()
+  @IsUUID()
+  formaPagoId?: string;
+
+  @ApiProperty({ required: false, description: 'Referencia del pago (ej. últimos 4 dígitos, número de transferencia) — solo junto a formaPagoId' })
+  @IsOptional()
+  @IsString()
+  referenciaPago?: string;
 }
