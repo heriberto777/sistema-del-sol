@@ -1,5 +1,6 @@
 import { CorrelativosRepository } from './correlativos.repository';
 import { TenantPrismaService } from '../prisma/tenant-prisma.service';
+import { CORRELATIVOS_BASE } from '../tenants/correlativos-base';
 
 describe('CorrelativosRepository', () => {
   let repository: CorrelativosRepository;
@@ -54,12 +55,12 @@ describe('CorrelativosRepository', () => {
   });
 
   describe('listar', () => {
-    it('devuelve las 7 filas (una por TipoCorrelativo), rellenando con defaults las que el tenant no tenga', async () => {
+    it('devuelve una fila por cada TipoCorrelativo (CORRELATIVOS_BASE), rellenando con defaults las que el tenant no tenga', async () => {
       db.correlativo.findMany.mockResolvedValue([{ id: 'c1', tipo: 'COTIZACION', prefijo: 'COT-', siguienteNumero: 5, digitos: 5 }]);
 
       const filas = await repository.listar();
 
-      expect(filas).toHaveLength(7);
+      expect(filas).toHaveLength(CORRELATIVOS_BASE.length);
       expect(filas.find((f) => f.tipo === 'COTIZACION')).toEqual({ id: 'c1', tipo: 'COTIZACION', prefijo: 'COT-', siguienteNumero: 5, digitos: 5 });
       expect(filas.find((f) => f.tipo === 'PRODUCTO')).toEqual({ id: null, tipo: 'PRODUCTO', prefijo: '', digitos: 5, siguienteNumero: 1 });
     });
