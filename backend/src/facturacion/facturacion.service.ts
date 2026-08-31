@@ -18,6 +18,7 @@ import { BonosService } from '../bonos/bonos.service';
 import { LealtadService } from '../lealtad/lealtad.service';
 import { TasasCambioService } from '../tasas-cambio/tasas-cambio.service';
 import { ListarFacturasQueryDto } from './dto/listar-facturas-query.dto';
+import { ListadoQueryDto } from '../common/dto/listado-query.dto';
 import { paginar } from '../common/types/pagina-resultado';
 import { generarDocumentoPdf } from '../common/pdf/documento-pdf';
 import { generarDocumentoTicketHtml } from '../common/pdf/documento-ticket';
@@ -356,6 +357,30 @@ export class FacturacionService {
       sinMovimientoInventario?: boolean;
     },
   ) {
+    // Mejora "Emitir nota" — antes `facturaOrigenId` se usaba a ciegas
+    // (ni se validaba que existiera/perteneciera al tenant, ni si la
+    // factura ya tenía un cobro registrado). "Tiene cobro" = al menos una
+    // fila en `Pago` (cobro post-hoc de CRÉDITO vía Cuentas por Cobrar) —
+    // deliberadamente NO `Factura.pagada`/`PagoVenta`: una venta CONTADO/
+    // POS siempre queda pagada al crearse y aun así debe poder notarse
+    // (ver PosService.registrarDevolucion, que emite una NOTA_CREDITO
+    // contra una factura CONTADO y maneja el reembolso ahí mismo) — con
+    // este criterio la regla es pareja en todo el sistema sin romper esa
+    // devolución, que nunca deja fila en `Pago`.
+    if (dto.tipoFactura === 'NOTA_CREDITO' || dto.tipoFactura === 'NOTA_DEBITO') {
+      if (!dto.facturaOrigenId) {
+        throw new BadRequestException('facturaOrigenId es requerido para notas de crédito/débito');
+      }
+      // findUniqueOrThrow tenant-scoped: 404 si la factura origen es de otro tenant.
+      await this.facturacionRepository.buscarPorId(dto.facturaOrigenId);
+      const montoPagado = await this.pagosService.sumaPagosFactura(dto.facturaOrigenId);
+      if (montoPagado > 0) {
+        throw new BadRequestException(
+          `No se puede emitir una nota sobre una factura con cobro registrado (RD$ ${montoPagado.toFixed(2)} ya cobrados) — revertí el cobro antes de emitirla.`,
+        );
+      }
+    }
+
     // findUniqueOrThrow tenant-scoped: si clienteId es de otro tenant, 404 —
     // mismo patrón de prevención de IDOR ya documentado para FKs
     // cliente-suministradas. De paso resuelve el nivel de precio del
@@ -600,6 +625,24 @@ export class FacturacionService {
       tiposFactura: query.tipoFactura,
     });
     return { datos, total, pagina, tamanoPagina };
+  }
+
+  /**
+   * Mejora "Emitir nota" — buscador de factura origen con `tieneCobro`
+   * por fila (misma regla que `crear()`: al menos una fila en `Pago`),
+   * para que el frontend pueda mostrar/bloquear antes de que el usuario
+   * ni siquiera intente seleccionarla.
+   */
+  async buscarParaNota(query: ListadoQueryDto) {
+    const { pagina, tamanoPagina, skip, take } = paginar(query.pagina, query.tamanoPagina);
+    const [datos, total] = await this.facturacionRepository.buscarParaNota({ skip, take, busqueda: query.busqueda });
+    const pagadoPorFactura = await this.pagosService.sumaPagosPorFacturas(datos.map((f) => f.id));
+    return {
+      datos: datos.map((f) => ({ ...f, tieneCobro: (pagadoPorFactura.get(f.id) ?? 0) > 0 })),
+      total,
+      pagina,
+      tamanoPagina,
+    };
   }
 
   /** Misma razón que en `crear()`: la reintegración/re-descuento de stock y el cambio de estado de la factura corren en una sola transacción. */

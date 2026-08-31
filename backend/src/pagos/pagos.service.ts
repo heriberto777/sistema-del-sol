@@ -105,6 +105,22 @@ export class PagosService {
     return pago;
   }
 
+  /**
+   * Passthrough de `PagosRepository` — expuesto para que otros módulos
+   * (ej. FacturacionService, al validar si una factura "tiene cobro
+   * registrado" antes de emitirle una nota) no tengan que importar el
+   * repositorio de este módulo directo, mismo criterio
+   * Controller→Service→Repository del resto del proyecto.
+   */
+  sumaPagosFactura(facturaId: string) {
+    return this.pagosRepository.sumaPagosFactura(facturaId);
+  }
+
+  async sumaPagosPorFacturas(facturaIds: string[]): Promise<Map<string, number>> {
+    const filas = await this.pagosRepository.sumaPagosPorFacturas(facturaIds);
+    return new Map(filas.map((f) => [f.facturaId as string, Number(f._sum.monto ?? 0)]));
+  }
+
   async listarPorFactura(facturaId: string) {
     const [pagos, totalPagado] = await Promise.all([
       this.pagosRepository.listarPorFactura(facturaId),

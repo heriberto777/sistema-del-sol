@@ -74,6 +74,7 @@ describe('FacturacionService', () => {
       crearFacturaEnTx: jest.fn(),
       buscarPorId: jest.fn(),
       listar: jest.fn(),
+      buscarParaNota: jest.fn().mockResolvedValue([[], 0]),
       anularEnTx: jest.fn(),
     } as unknown as jest.Mocked<FacturacionRepository>;
     inventarioService = {
@@ -89,6 +90,8 @@ describe('FacturacionService', () => {
       registrarPagoOrdenCompra: jest.fn(),
       listarPorFactura: jest.fn(),
       listarPorOrdenCompra: jest.fn(),
+      sumaPagosFactura: jest.fn().mockResolvedValue(0),
+      sumaPagosPorFacturas: jest.fn().mockResolvedValue(new Map()),
     } as unknown as jest.Mocked<PagosService>;
     prisma = {
       bodega: { findFirst: jest.fn().mockResolvedValue(null) },
@@ -636,7 +639,7 @@ describe('FacturacionService', () => {
     repository.obtenerProductoConPrecioVigente.mockResolvedValue(producto(18, 100) as never);
     repository.crearFacturaEnTx.mockResolvedValue(facturaCreada() as never);
 
-    await service.crear(dto({ tipoFactura: tipoFactura as CrearFacturaDto['tipoFactura'] }), 'tenant-1', 'vendedor-1');
+    await service.crear(dto({ tipoFactura: tipoFactura as CrearFacturaDto['tipoFactura'], facturaOrigenId: 'f-original' }), 'tenant-1', 'vendedor-1');
 
     expect(repository.siguienteNcfEnTx).toHaveBeenCalledWith(TX, tipoNcfEsperado, 's1');
   });
@@ -651,7 +654,7 @@ describe('FacturacionService', () => {
     repository.obtenerModalidadFacturacion.mockResolvedValue('ECF' as never);
     repository.crearFacturaEnTx.mockResolvedValue(facturaCreada() as never);
 
-    await service.crear(dto({ tipoFactura: tipoFactura as CrearFacturaDto['tipoFactura'] }), 'tenant-1', 'vendedor-1');
+    await service.crear(dto({ tipoFactura: tipoFactura as CrearFacturaDto['tipoFactura'], facturaOrigenId: 'f-original' }), 'tenant-1', 'vendedor-1');
 
     expect(repository.siguienteNcfEnTx).toHaveBeenCalledWith(TX, tipoEcfEsperado, 's1');
   });
@@ -1133,6 +1136,44 @@ describe('FacturacionService', () => {
     });
   });
 
+  describe('mejora "Emitir nota" — validación de cobro registrado en la factura origen', () => {
+    it('rechaza NOTA_CREDITO/NOTA_DEBITO sin facturaOrigenId', async () => {
+      await expect(service.crear(dto({ tipoFactura: 'NOTA_CREDITO' }), 'tenant-1', 'vendedor-1')).rejects.toThrow(BadRequestException);
+      await expect(service.crear(dto({ tipoFactura: 'NOTA_DEBITO' }), 'tenant-1', 'vendedor-1')).rejects.toThrow(BadRequestException);
+      expect(repository.crearFacturaEnTx).not.toHaveBeenCalled();
+    });
+
+    it('rechaza con 400 si la factura origen tiene cobro registrado (fila en Pago)', async () => {
+      pagosService.sumaPagosFactura.mockResolvedValue(500);
+
+      await expect(
+        service.crear(dto({ tipoFactura: 'NOTA_CREDITO', facturaOrigenId: 'f-original' }), 'tenant-1', 'vendedor-1'),
+      ).rejects.toThrow(BadRequestException);
+      expect(pagosService.sumaPagosFactura).toHaveBeenCalledWith('f-original');
+      expect(repository.crearFacturaEnTx).not.toHaveBeenCalled();
+    });
+
+    it('permite la nota si la factura origen NO tiene fila en Pago, aunque esté pagada (venta CONTADO/POS, PagoVenta)', async () => {
+      repository.obtenerProductoConPrecioVigente.mockResolvedValue(producto(18, 100) as never);
+      repository.crearFacturaEnTx.mockResolvedValue(facturaCreada({ id: 'nc1', total: -118 }) as never);
+      pagosService.sumaPagosFactura.mockResolvedValue(0);
+
+      await service.crear(dto({ tipoFactura: 'NOTA_CREDITO', facturaOrigenId: 'f-original' }), 'tenant-1', 'vendedor-1');
+
+      expect(repository.crearFacturaEnTx).toHaveBeenCalled();
+    });
+
+    it('valida que la factura origen pertenezca al tenant antes de emitir la nota', async () => {
+      repository.buscarPorId.mockRejectedValue(new Error('no encontrada'));
+
+      await expect(
+        service.crear(dto({ tipoFactura: 'NOTA_CREDITO', facturaOrigenId: 'f-de-otro-tenant' }), 'tenant-1', 'vendedor-1'),
+      ).rejects.toThrow('no encontrada');
+      expect(repository.buscarPorId).toHaveBeenCalledWith('f-de-otro-tenant');
+      expect(repository.crearFacturaEnTx).not.toHaveBeenCalled();
+    });
+  });
+
   describe('notas de crédito y débito', () => {
     it('NOTA_CREDITO devuelve stock (entradaStockEnTx) en vez de descontarlo', async () => {
       repository.obtenerProductoConPrecioVigente.mockResolvedValue(producto(18, 100) as never);
@@ -1152,7 +1193,7 @@ describe('FacturacionService', () => {
       repository.crearFacturaEnTx.mockResolvedValue(facturaCreada({ id: 'nc1', total: -118 }) as never);
 
       // 1 * 100 = 100 subtotal; itbis 18% = 18; total 118 -> negativo
-      await service.crear(dto({ tipoFactura: 'NOTA_CREDITO', lineas: [{ productoId: 'prod-1', cantidad: 1 }] }), 'tenant-1', 'vendedor-1');
+      await service.crear(dto({ tipoFactura: 'NOTA_CREDITO', facturaOrigenId: 'f-original', lineas: [{ productoId: 'prod-1', cantidad: 1 }] }), 'tenant-1', 'vendedor-1');
 
       expect(repository.crearFacturaEnTx).toHaveBeenCalledWith(
         TX,
@@ -1641,6 +1682,28 @@ describe('FacturacionService', () => {
       await service.listar({} as never);
 
       expect(repository.listar).toHaveBeenCalledWith(expect.objectContaining({ tiposFactura: undefined }));
+    });
+  });
+
+  describe('buscarParaNota (mejora "Emitir nota")', () => {
+    it('agrega tieneCobro:true a las facturas con al menos un cobro registrado', async () => {
+      repository.buscarParaNota.mockResolvedValue([
+        [
+          { id: 'f1', numero: '00001' },
+          { id: 'f2', numero: '00002' },
+        ],
+        2,
+      ] as never);
+      pagosService.sumaPagosPorFacturas.mockResolvedValue(new Map([['f1', 300]]));
+
+      const resultado = await service.buscarParaNota({ busqueda: '00' } as never);
+
+      expect(pagosService.sumaPagosPorFacturas).toHaveBeenCalledWith(['f1', 'f2']);
+      expect(resultado.datos).toEqual([
+        expect.objectContaining({ id: 'f1', tieneCobro: true }),
+        expect.objectContaining({ id: 'f2', tieneCobro: false }),
+      ]);
+      expect(resultado.total).toBe(2);
     });
   });
 });

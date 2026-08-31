@@ -20,6 +20,7 @@ describe('PagosService', () => {
       listarPorOrdenCompra: jest.fn(),
       sumaPagosFactura: jest.fn().mockResolvedValue(0),
       sumaPagosOrdenCompra: jest.fn().mockResolvedValue(0),
+      sumaPagosPorFacturas: jest.fn().mockResolvedValue([]),
       marcarFacturaPagada: jest.fn(),
       marcarOrdenCompraPagada: jest.fn(),
     } as unknown as jest.Mocked<PagosRepository>;
@@ -136,6 +137,26 @@ describe('PagosService', () => {
 
       await expect(service.registrarPagoOrdenCompra(orden, dtoConFecha, 'user-1', 'tenant-1')).rejects.toThrow(BadRequestException);
       expect(repository.crear).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('sumaPagosPorFacturas (mejora "Emitir nota")', () => {
+    it('arma un Map facturaId -> monto a partir de las filas del groupBy', async () => {
+      repository.sumaPagosPorFacturas.mockResolvedValue([
+        { facturaId: 'f1', _sum: { monto: 300 } },
+        { facturaId: 'f2', _sum: { monto: 0 } },
+      ] as never);
+
+      const resultado = await service.sumaPagosPorFacturas(['f1', 'f2']);
+
+      expect(resultado.get('f1')).toBe(300);
+      expect(resultado.get('f2')).toBe(0);
+      expect(repository.sumaPagosPorFacturas).toHaveBeenCalledWith(['f1', 'f2']);
+    });
+
+    it('sin facturas, devuelve un Map vacío', async () => {
+      const resultado = await service.sumaPagosPorFacturas([]);
+      expect(resultado.size).toBe(0);
     });
   });
 });

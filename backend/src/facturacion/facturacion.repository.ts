@@ -271,12 +271,45 @@ export class FacturacionRepository {
       ...(params.busqueda
         ? {
             OR: [
+              { numero: { contains: params.busqueda, mode: 'insensitive' as const } },
               { ncf: { contains: params.busqueda, mode: 'insensitive' as const } },
               { cliente: { nombre: { contains: params.busqueda, mode: 'insensitive' as const } } },
             ],
           }
         : {}),
       ...(params.tiposFactura?.length ? { tipoFactura: { in: params.tiposFactura } } : {}),
+    };
+    return Promise.all([
+      this.db.factura.findMany({
+        where,
+        skip: params.skip,
+        take: params.take,
+        orderBy: { createdAt: 'desc' },
+        include: { cliente: true },
+      }),
+      this.db.factura.count({ where }),
+    ]);
+  }
+
+  /**
+   * Mejora "Emitir nota" — buscador de la factura de origen: solo
+   * facturas EMITIDA de tipo CONTADO/CREDITO (una NOTA_CREDITO/
+   * NOTA_DEBITO o una BORRADOR/ANULADA nunca son un origen válido), por
+   * número interno, NCF o nombre de cliente.
+   */
+  buscarParaNota(params: { skip?: number; take?: number; busqueda?: string }) {
+    const where = {
+      estado: 'EMITIDA' as const,
+      tipoFactura: { in: ['CONTADO', 'CREDITO'] as TipoFactura[] },
+      ...(params.busqueda
+        ? {
+            OR: [
+              { numero: { contains: params.busqueda, mode: 'insensitive' as const } },
+              { ncf: { contains: params.busqueda, mode: 'insensitive' as const } },
+              { cliente: { nombre: { contains: params.busqueda, mode: 'insensitive' as const } } },
+            ],
+          }
+        : {}),
     };
     return Promise.all([
       this.db.factura.findMany({

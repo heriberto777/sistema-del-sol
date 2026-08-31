@@ -45,6 +45,12 @@ export class PagosRepository {
     return Number(_sum.monto ?? 0);
   }
 
+  /** Versión bulk de `sumaPagosFactura` — evita N+1 al chequear varias facturas a la vez (ver FacturacionService.buscarParaNota). */
+  sumaPagosPorFacturas(facturaIds: string[]) {
+    if (!facturaIds.length) return Promise.resolve([]);
+    return this.db.pago.groupBy({ by: ['facturaId'], where: { facturaId: { in: facturaIds } }, _sum: { monto: true } });
+  }
+
   async sumaPagosOrdenCompra(ordenCompraId: string): Promise<number> {
     const { _sum } = await this.db.pago.aggregate({ where: { ordenCompraId }, _sum: { monto: true } });
     return Number(_sum.monto ?? 0);

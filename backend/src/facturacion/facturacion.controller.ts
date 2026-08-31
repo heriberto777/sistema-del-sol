@@ -10,6 +10,7 @@ import { RequiereModulo } from '../common/decorators/requiere-modulo.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtPayloadUser } from '../common/types/authenticated-request';
 import { ListarFacturasQueryDto } from './dto/listar-facturas-query.dto';
+import { ListadoQueryDto } from '../common/dto/listado-query.dto';
 import { ImprimirDocumentoQueryDto } from '../common/impresion/dto/imprimir-documento-query.dto';
 import { EnviarReciboDto } from './dto/enviar-recibo.dto';
 
@@ -33,6 +34,15 @@ export class FacturacionController {
   @Permissions('facturacion.ver')
   listar(@Query() query: ListarFacturasQueryDto) {
     return this.facturacionService.listar(query);
+  }
+
+  // Antes de ':id' a propósito — si no, Nest matchea "buscar-para-nota"
+  // como si fuera un :id (mismo cuidado de orden que el resto de rutas
+  // literales de este controller, ej. ':id/pdf').
+  @Get('buscar-para-nota')
+  @Permissions('facturacion.crear')
+  buscarParaNota(@Query() query: ListadoQueryDto) {
+    return this.facturacionService.buscarParaNota(query);
   }
 
   @Get(':id')
