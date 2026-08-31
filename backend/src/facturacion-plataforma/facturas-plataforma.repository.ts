@@ -91,13 +91,20 @@ export class FacturasPlataformaRepository {
     });
   }
 
-  /** Fase 4 — auto-suspensión: tenants con alguna factura VENCIDA hace más de `diasMora` días. */
+  /**
+   * Fase 4 — auto-suspensión: una fila por tenant con alguna factura VENCIDA
+   * hace más de `diasMora` días (la más antigua de esas, para notificar con
+   * un concepto/monto concreto — ver FacturasPlataformaCronService.suspenderTenantsMorosos).
+   */
   listarMorosasVencidasHace(diasMora: number, hoy: Date) {
     const limite = new Date(hoy.getTime() - diasMora * 24 * 60 * 60 * 1000);
     return this.prisma.facturaPlataforma.findMany({
-      where: { estado: 'VENCIDA', fechaVencimiento: { lt: limite } },
+      // Tenant ya ACTIVO: uno ya SUSPENDIDO/CANCELADO no se vuelve a
+      // "suspender" (ni se le reenvía el aviso) cada día que corre el cron.
+      where: { estado: 'VENCIDA', fechaVencimiento: { lt: limite }, tenant: { estado: 'ACTIVO' } },
       distinct: ['tenantId'],
-      select: { tenantId: true },
+      orderBy: { fechaVencimiento: 'asc' },
+      select: { id: true, tenantId: true },
     });
   }
 }

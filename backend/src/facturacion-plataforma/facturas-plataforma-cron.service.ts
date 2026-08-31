@@ -4,6 +4,8 @@ import { SuscripcionesRepository } from './suscripciones.repository';
 import { FacturasPlataformaRepository } from './facturas-plataforma.repository';
 import { FacturasPlataformaService } from './facturas-plataforma.service';
 import { ReglasNotificacionRepository } from './reglas-notificacion/reglas-notificacion.repository';
+import { PlataformaConfigRepository } from '../plataforma-config/plataforma-config.repository';
+import { TenantsService } from '../tenants/tenants.service';
 import { sumarCiclo } from './sumar-ciclo.util';
 
 const MS_POR_DIA = 24 * 60 * 60 * 1000;
@@ -26,6 +28,8 @@ export class FacturasPlataformaCronService {
     private readonly facturasPlataformaRepository: FacturasPlataformaRepository,
     private readonly facturasPlataformaService: FacturasPlataformaService,
     private readonly reglasNotificacionRepository: ReglasNotificacionRepository,
+    private readonly plataformaConfigRepository: PlataformaConfigRepository,
+    private readonly tenantsService: TenantsService,
   ) {}
 
   @Cron(CronExpression.EVERY_DAY_AT_8AM)
@@ -89,5 +93,28 @@ export class FacturasPlataformaCronService {
 
     this.logger.log(`Notificaciones de vencimiento: ${enviadas} enviada(s)`);
     return enviadas;
+  }
+
+  /**
+   * Fase 4 (última) — auto-suspensión: un tenant ACTIVO con alguna factura
+   * VENCIDA hace más de `diasParaAutoSuspender` días (configurable en
+   * /plataforma/configuracion, default 10) pasa a SUSPENDIDO. Reusa
+   * TenantsRepository.actualizar (mismo mecanismo que el botón manual
+   * "Suspender" de /plataforma/tenants) y notifica con el mismo criterio
+   * que las demás notificaciones de FacturasPlataformaService.
+   */
+  @Cron(CronExpression.EVERY_DAY_AT_8AM)
+  async suspenderTenantsMorosos() {
+    const hoy = new Date();
+    const { diasParaAutoSuspender } = await this.plataformaConfigRepository.obtenerOCrear();
+    const morosas = await this.facturasPlataformaRepository.listarMorosasVencidasHace(diasParaAutoSuspender, hoy);
+
+    for (const factura of morosas) {
+      await this.tenantsService.actualizar(factura.tenantId, { estado: 'SUSPENDIDO' });
+      await this.facturasPlataformaService.notificarFactura(factura.tenantId, factura.id, 'auto_suspendido');
+    }
+
+    this.logger.log(`Auto-suspensión: ${morosas.length} tenant(s) suspendido(s) por mora`);
+    return morosas.length;
   }
 }

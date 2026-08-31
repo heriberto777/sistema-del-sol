@@ -172,7 +172,7 @@ export class FacturasPlataformaService {
   }
 
   /** Igual criterio que PlatformAuthService.olvidePassword: HTML inline, sin plantillas por-tenant (eso es NotificacionesService, tenant-scoped). */
-  private async notificarFactura(tenantId: string, facturaId: string, motivo: 'generada' | 'vencida' | 'manual') {
+  async notificarFactura(tenantId: string, facturaId: string, motivo: 'generada' | 'vencida' | 'manual' | 'auto_suspendido') {
     const admin = await this.prisma.user.findFirst({
       where: { tenantId, roles: { some: { role: { nombre: 'Admin Total' } } } },
       orderBy: { createdAt: 'asc' },
@@ -188,11 +188,13 @@ export class FacturasPlataformaService {
       generada: 'Nueva factura de tu suscripción — El Sistema del Sol',
       vencida: 'Factura vencida — El Sistema del Sol',
       manual: 'Nuevo cargo — El Sistema del Sol',
+      auto_suspendido: 'Tu cuenta fue suspendida por falta de pago — El Sistema del Sol',
     };
     const CUERPOS: Record<typeof motivo, string> = {
       generada: `<p>Se generó una nueva factura por tu suscripción: <strong>${factura.concepto}</strong>.</p><p>Total: RD$ ${Number(factura.total).toLocaleString('es-DO')}, vence el ${factura.fechaVencimiento.toLocaleDateString('es-DO')}.</p><p><a href="${enlacePago}">Pagar en línea</a></p>`,
       vencida: `<p>Tu factura <strong>${factura.concepto}</strong> venció sin pago registrado y se le aplicó un cargo por mora.</p><p>Nuevo total: RD$ ${Number(factura.total).toLocaleString('es-DO')}.</p><p><a href="${enlacePago}">Pagar en línea</a></p>`,
       manual: `<p>Se generó un cargo puntual: <strong>${factura.concepto}</strong>.</p><p>Total: RD$ ${Number(factura.total).toLocaleString('es-DO')}, vence el ${factura.fechaVencimiento.toLocaleDateString('es-DO')}.</p><p><a href="${enlacePago}">Pagar en línea</a></p>`,
+      auto_suspendido: `<p>Tu cuenta fue suspendida automáticamente por tener la factura <strong>${factura.concepto}</strong> vencida sin pago registrado.</p><p>Total pendiente: RD$ ${Number(factura.total).toLocaleString('es-DO')}.</p><p><a href="${enlacePago}">Pagar en línea para reactivar</a></p>`,
     };
     const asunto = ASUNTOS[motivo];
     const cuerpo = CUERPOS[motivo];

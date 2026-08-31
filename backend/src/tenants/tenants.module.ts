@@ -8,5 +8,8 @@ import { PlatformAuthModule } from '../platform-auth/platform-auth.module';
   imports: [PlatformAuthModule],
   controllers: [TenantsController],
   providers: [TenantsService, TenantsRepository],
+  // Fase 4 (auto-suspensión) — FacturacionPlataformaModule necesita marcar
+  // Tenant.estado = SUSPENDIDO desde su cron.
+  exports: [TenantsService],
 })
 export class TenantsModule {}

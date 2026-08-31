@@ -3,6 +3,8 @@ import { SuscripcionesRepository } from './suscripciones.repository';
 import { FacturasPlataformaRepository } from './facturas-plataforma.repository';
 import { FacturasPlataformaService } from './facturas-plataforma.service';
 import { ReglasNotificacionRepository } from './reglas-notificacion/reglas-notificacion.repository';
+import { PlataformaConfigRepository } from '../plataforma-config/plataforma-config.repository';
+import { TenantsService } from '../tenants/tenants.service';
 
 describe('FacturasPlataformaCronService', () => {
   let cron: FacturasPlataformaCronService;
@@ -10,6 +12,8 @@ describe('FacturasPlataformaCronService', () => {
   let facturasRepo: jest.Mocked<FacturasPlataformaRepository>;
   let facturasService: jest.Mocked<FacturasPlataformaService>;
   let reglasNotificacionRepo: jest.Mocked<ReglasNotificacionRepository>;
+  let plataformaConfigRepo: jest.Mocked<PlataformaConfigRepository>;
+  let tenantsService: jest.Mocked<TenantsService>;
 
   beforeEach(() => {
     suscripcionesRepo = {
@@ -19,18 +23,31 @@ describe('FacturasPlataformaCronService', () => {
     facturasRepo = {
       listarVencidasPendientes: jest.fn().mockResolvedValue([]),
       listarPendientesOVencidas: jest.fn().mockResolvedValue([]),
+      listarMorosasVencidasHace: jest.fn().mockResolvedValue([]),
     } as unknown as jest.Mocked<FacturasPlataformaRepository>;
     facturasService = {
       generarDesdeSuscripcion: jest.fn(),
       marcarVencidaConMora: jest.fn(),
       notificarPorRegla: jest.fn(),
+      notificarFactura: jest.fn(),
     } as unknown as jest.Mocked<FacturasPlataformaService>;
     reglasNotificacionRepo = {
       listarActivas: jest.fn().mockResolvedValue([]),
       yaFueEnviada: jest.fn().mockResolvedValue(null),
       registrarEnviada: jest.fn(),
     } as unknown as jest.Mocked<ReglasNotificacionRepository>;
-    cron = new FacturasPlataformaCronService(suscripcionesRepo, facturasRepo, facturasService, reglasNotificacionRepo);
+    plataformaConfigRepo = {
+      obtenerOCrear: jest.fn().mockResolvedValue({ diasParaAutoSuspender: 10 }),
+    } as unknown as jest.Mocked<PlataformaConfigRepository>;
+    tenantsService = { actualizar: jest.fn() } as unknown as jest.Mocked<TenantsService>;
+    cron = new FacturasPlataformaCronService(
+      suscripcionesRepo,
+      facturasRepo,
+      facturasService,
+      reglasNotificacionRepo,
+      plataformaConfigRepo,
+      tenantsService,
+    );
   });
 
   describe('generarFacturasDelDia', () => {
@@ -131,6 +148,33 @@ describe('FacturasPlataformaCronService', () => {
       expect(total).toBe(2);
       expect(facturasService.notificarPorRegla).toHaveBeenCalledWith('f1', -3, 'EMAIL');
       expect(facturasService.notificarPorRegla).toHaveBeenCalledWith('f2', 5, 'WEBHOOK');
+    });
+  });
+
+  describe('suspenderTenantsMorosos (Fase 4, última)', () => {
+    it('suspende cada tenant devuelto por listarMorosasVencidasHace usando el umbral configurado y notifica', async () => {
+      plataformaConfigRepo.obtenerOCrear.mockResolvedValue({ diasParaAutoSuspender: 15 } as never);
+      facturasRepo.listarMorosasVencidasHace.mockResolvedValue([
+        { id: 'f1', tenantId: 't1' },
+        { id: 'f2', tenantId: 't2' },
+      ] as never);
+
+      const total = await cron.suspenderTenantsMorosos();
+
+      expect(total).toBe(2);
+      expect(facturasRepo.listarMorosasVencidasHace).toHaveBeenCalledWith(15, expect.any(Date));
+      expect(tenantsService.actualizar).toHaveBeenCalledWith('t1', { estado: 'SUSPENDIDO' });
+      expect(tenantsService.actualizar).toHaveBeenCalledWith('t2', { estado: 'SUSPENDIDO' });
+      expect(facturasService.notificarFactura).toHaveBeenCalledWith('t1', 'f1', 'auto_suspendido');
+      expect(facturasService.notificarFactura).toHaveBeenCalledWith('t2', 'f2', 'auto_suspendido');
+    });
+
+    it('no suspende nada si no hay tenants morosos más allá del umbral', async () => {
+      const total = await cron.suspenderTenantsMorosos();
+
+      expect(total).toBe(0);
+      expect(tenantsService.actualizar).not.toHaveBeenCalled();
+      expect(facturasService.notificarFactura).not.toHaveBeenCalled();
     });
   });
 });
