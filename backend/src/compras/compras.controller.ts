@@ -1,7 +1,9 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { ComprasService } from './compras.service';
 import { CrearOrdenCompraDto } from './dto/crear-orden-compra.dto';
+import { EditarOrdenCompraDto } from './dto/editar-orden-compra.dto';
+import { CambiarEstadoOrdenCompraDto } from './dto/cambiar-estado-orden-compra.dto';
 import { RecibirOrdenCompraDto } from './dto/recibir-orden-compra.dto';
 import { DevolverOrdenCompraDto } from './dto/devolver-orden-compra.dto';
 import { CrearPagoOrdenCompraDto } from './dto/crear-pago-orden-compra.dto';
@@ -34,6 +36,18 @@ export class ComprasController {
   @Permissions('compras.ver')
   buscarPorId(@Param('id') id: string) {
     return this.comprasService.buscarPorId(id);
+  }
+
+  @Patch(':id')
+  @Permissions('compras.editar')
+  actualizar(@Param('id') id: string, @Body() dto: EditarOrdenCompraDto, @CurrentUser() user: JwtPayloadUser) {
+    return this.comprasService.actualizar(id, dto, user.tenantId);
+  }
+
+  @Patch(':id/estado')
+  @Permissions('compras.editar')
+  cambiarEstado(@Param('id') id: string, @Body() dto: CambiarEstadoOrdenCompraDto, @CurrentUser() user: JwtPayloadUser) {
+    return this.comprasService.cambiarEstado(id, dto.estado, user.tenantId);
   }
 
   @Post(':id/recibir')

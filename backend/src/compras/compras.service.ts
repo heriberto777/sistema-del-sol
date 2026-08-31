@@ -6,6 +6,7 @@ import { TenantPrismaService } from '../prisma/tenant-prisma.service';
 import { EventBusService } from '../event-bus/event-bus.service';
 import { EVENTOS } from '../event-bus/events';
 import { CrearOrdenCompraDto } from './dto/crear-orden-compra.dto';
+import { EditarOrdenCompraDto } from './dto/editar-orden-compra.dto';
 import { RecibirOrdenCompraDto } from './dto/recibir-orden-compra.dto';
 import { DevolverOrdenCompraDto } from './dto/devolver-orden-compra.dto';
 import { CrearPagoOrdenCompraDto } from './dto/crear-pago-orden-compra.dto';
@@ -50,6 +51,44 @@ export class ComprasService {
     });
   }
 
+  /** Ítem E-1 — solo se puede editar una OC en BORRADOR, mismo guard que CotizacionesService.actualizar. */
+  async actualizar(id: string, dto: EditarOrdenCompraDto, tenantId: string) {
+    const orden = await this.comprasRepository.buscarPorId(id);
+    if (orden.estado !== 'BORRADOR') {
+      throw new BadRequestException('Solo se puede editar una orden de compra en borrador');
+    }
+
+    const total = dto.lineas.reduce((acc, l) => acc + l.cantidad * l.costoUnitario, 0);
+    const lineas = await Promise.all(
+      dto.lineas.map(async (linea) => ({
+        ...linea,
+        varianteId: await this.variantesService.resolverObligatoria(linea.productoId, linea.varianteId),
+      })),
+    );
+    return this.comprasRepository.actualizar(id, { total, lineas });
+  }
+
+  /**
+   * Ítem E-1 — activa BORRADOR→ENVIADA (confirmar) y BORRADOR|ENVIADA→CANCELADA,
+   * vestigiales en el enum hasta ahora (ver docs/cuadre-plan-integracion.md).
+   * No se cancela una OC con mercancía ya recibida — para eso existe `devolver()`.
+   */
+  async cambiarEstado(id: string, estado: 'ENVIADA' | 'CANCELADA', tenantId: string) {
+    const orden = await this.comprasRepository.buscarPorId(id);
+    if (estado === 'ENVIADA' && orden.estado !== 'BORRADOR') {
+      throw new BadRequestException('Solo se puede confirmar una orden de compra en borrador');
+    }
+    if (estado === 'CANCELADA') {
+      if (orden.estado === 'CANCELADA') {
+        throw new BadRequestException('Esta orden ya está cancelada');
+      }
+      if (orden.recepciones.length > 0) {
+        throw new BadRequestException('No se puede cancelar una orden con mercancía ya recibida — usá "Devolver a proveedor"');
+      }
+    }
+    return this.tenantPrisma.client.$transaction((tx) => this.comprasRepository.actualizarEstado(tx, id, estado));
+  }
+
   async listar(query: ListadoQueryDto) {
     const { pagina, tamanoPagina, skip, take } = paginar(query.pagina, query.tamanoPagina);
     const [datos, total] = await this.comprasRepository.listar({ skip, take, busqueda: query.busqueda });
@@ -72,6 +111,9 @@ export class ComprasService {
     // Fase 9: enforcement real de acceso por sucursal (Fase 8 solo filtraba la UX).
     await this.inventarioService.validarAccesoBodega(dto.bodegaId, userId);
     const orden = await this.comprasRepository.buscarPorId(ordenCompraId);
+    if (orden.estado === 'CANCELADA') {
+      throw new BadRequestException('No se puede recibir mercancía de una orden cancelada');
+    }
     // La variante de cada línea es la que ya quedó fija al crear la OC —
     // no se vuelve a pedir/resolver al recibir (mismo criterio que
     // costoUnitario en devolver(): se lee de la línea original, no del DTO).

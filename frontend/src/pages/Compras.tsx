@@ -90,6 +90,12 @@ interface OrdenCompraDetalle {
 // desde la UI (bug real preexistente, encontrado al verificar Fase 5b).
 const ESTADOS_RECIBIBLES = ['BORRADOR', 'ENVIADA', 'RECIBIDA_PARCIAL'];
 const ESTADOS_CON_MERCANCIA_RECIBIDA = ['RECIBIDA_PARCIAL', 'RECIBIDA_TOTAL'];
+// Ítem E-1 — activa el flujo Borrador→Confirmado que el enum ya sugería:
+// Editar/Confirmar solo tienen sentido en BORRADOR; Cancelar se bloquea en
+// el backend si ya hay mercancía recibida (ahí corresponde "Devolver a
+// proveedor" en su lugar), así que acá alcanza con excluir los 3 estados
+// terminales/ya-recibidos.
+const ESTADOS_CANCELABLES = ['BORRADOR', 'ENVIADA'];
 
 export function Compras() {
   const { tienePermiso } = useAuth();
@@ -102,6 +108,14 @@ export function Compras() {
   const [ordenPagando, setOrdenPagando] = useState<OrdenCompra | null>(null);
   const [ordenDevolviendo, setOrdenDevolviendo] = useState<OrdenCompra | null>(null);
   const [ordenViendo, setOrdenViendo] = useState<OrdenCompra | null>(null);
+  const [ordenEditando, setOrdenEditando] = useState<OrdenCompra | null>(null);
+  const queryClient = useQueryClient();
+
+  const cambiarEstado = useMutation({
+    mutationFn: async ({ id, estado }: { id: string; estado: 'ENVIADA' | 'CANCELADA' }) =>
+      apiClient.patch(`/compras/${id}/estado`, { estado }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['ordenes-compra'] }),
+  });
 
   useEffect(() => {
     if (searchParams.get('crear') === '1') {
@@ -173,6 +187,12 @@ export function Compras() {
                   {data?.datos.map((oc) => {
                     const acciones = [
                       { etiqueta: 'Ver detalle', onClick: () => setOrdenViendo(oc) },
+                      ...(oc.estado === 'BORRADOR' && tienePermiso('compras.editar')
+                        ? [{ etiqueta: 'Editar', onClick: () => setOrdenEditando(oc) }]
+                        : []),
+                      ...(oc.estado === 'BORRADOR' && tienePermiso('compras.editar')
+                        ? [{ etiqueta: 'Confirmar', onClick: () => cambiarEstado.mutate({ id: oc.id, estado: 'ENVIADA' }) }]
+                        : []),
                       ...(ESTADOS_RECIBIBLES.includes(oc.estado) && tienePermiso('compras.recibir')
                         ? [{ etiqueta: 'Recibir', onClick: () => setOrdenRecibiendo(oc) }]
                         : []),
@@ -181,6 +201,17 @@ export function Compras() {
                         : []),
                       ...(ESTADOS_CON_MERCANCIA_RECIBIDA.includes(oc.estado) && tienePermiso('compras.recibir')
                         ? [{ etiqueta: 'Devolver a proveedor', onClick: () => setOrdenDevolviendo(oc) }]
+                        : []),
+                      ...(ESTADOS_CANCELABLES.includes(oc.estado) && tienePermiso('compras.editar')
+                        ? [
+                            {
+                              etiqueta: 'Cancelar',
+                              tono: 'peligro' as const,
+                              onClick: () => {
+                                if (confirm(`¿Cancelar la orden ${oc.numero}?`)) cambiarEstado.mutate({ id: oc.id, estado: 'CANCELADA' });
+                              },
+                            },
+                          ]
                         : []),
                     ];
 
@@ -210,6 +241,7 @@ export function Compras() {
       </RequierePermiso>
 
       {modalNuevaOc && <ModalNuevaOrdenCompra onClose={() => setModalNuevaOc(false)} />}
+      {ordenEditando && <ModalEditarOrdenCompra orden={ordenEditando} onClose={() => setOrdenEditando(null)} />}
       {ordenRecibiendo && (
         <ModalRecibirOrden orden={ordenRecibiendo} onClose={() => setOrdenRecibiendo(null)} />
       )}
@@ -434,6 +466,144 @@ function ModalNuevaOrdenCompra({ onClose }: { onClose: () => void }) {
           {crear.isPending ? 'Creando…' : 'Crear orden de compra'}
         </Button>
       </form>
+    </Modal>
+  );
+}
+
+/** Ítem E-1 — editar una OC en BORRADOR (el proveedor no se puede cambiar, solo las líneas). */
+function ModalEditarOrdenCompra({ orden, onClose }: { orden: OrdenCompra; onClose: () => void }) {
+  const queryClient = useQueryClient();
+  const [lineas, setLineas] = useState<{ productoId: string; varianteId: string; cantidad: string; costoUnitario: string }[]>([]);
+  const [error, setError] = useState<string | null>(null);
+
+  const { data: detalle } = useQuery({
+    queryKey: ['orden-compra', orden.id],
+    queryFn: async () => (await apiClient.get<OrdenCompraDetalle>(`/compras/${orden.id}`)).data,
+  });
+  const { data: productos } = useQuery({
+    queryKey: ['productos-select'],
+    queryFn: async () => (await apiClient.get<PaginaResultado<Producto>>('/productos', { params: { tamanoPagina: 100 } })).data.datos,
+  });
+
+  useEffect(() => {
+    if (detalle && lineas.length === 0) {
+      setLineas(
+        detalle.lineas.map((l) => ({
+          productoId: l.productoId,
+          varianteId: l.varianteId,
+          cantidad: String(l.cantidad),
+          costoUnitario: String(l.costoUnitario),
+        })),
+      );
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [detalle]);
+
+  const total = lineas.reduce((acc, l) => acc + Number(l.cantidad || 0) * Number(l.costoUnitario || 0), 0);
+
+  function actualizarLinea(i: number, cambios: Partial<(typeof lineas)[number]>) {
+    setLineas((prev) => prev.map((l, idx) => (idx === i ? { ...l, ...cambios } : l)));
+  }
+
+  const guardar = useMutation({
+    mutationFn: async () =>
+      apiClient.patch(`/compras/${orden.id}`, {
+        lineas: lineas
+          .filter((l) => l.productoId)
+          .map((l) => ({
+            productoId: l.productoId,
+            varianteId: l.varianteId || undefined,
+            cantidad: Number(l.cantidad),
+            costoUnitario: Number(l.costoUnitario),
+          })),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ordenes-compra'] });
+      queryClient.invalidateQueries({ queryKey: ['orden-compra', orden.id] });
+      onClose();
+    },
+    onError: () => setError('No se pudo guardar la orden de compra. Revisa los datos.'),
+  });
+
+  function onSubmit(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    if (lineas.filter((l) => l.productoId).length === 0) {
+      setError('Agregá al menos una línea con producto.');
+      return;
+    }
+    guardar.mutate();
+  }
+
+  return (
+    <Modal titulo={`Editar orden de compra — ${orden.numero}`} onClose={onClose}>
+      {!detalle ? (
+        <p className="text-sm text-slate-400">Cargando…</p>
+      ) : (
+        <form onSubmit={onSubmit} className="space-y-3">
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            Proveedor: <span className="font-medium text-slate-700 dark:text-slate-300">{orden.proveedor?.nombre}</span>
+          </p>
+
+          <div className="space-y-2">
+            <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Líneas</p>
+            {lineas.map((linea, i) => (
+              <div key={i} className="flex gap-2">
+                <SelectorLineaProducto
+                  productos={productos ?? []}
+                  productoId={linea.productoId}
+                  varianteId={linea.varianteId}
+                  onChange={(productoId, varianteId) => actualizarLinea(i, { productoId, varianteId })}
+                  className="flex-1"
+                />
+                <input
+                  type="number"
+                  min={1}
+                  placeholder="Cant."
+                  value={linea.cantidad}
+                  onChange={(e) => actualizarLinea(i, { cantidad: e.target.value })}
+                  className="w-20 rounded-md border border-slate-300 px-2 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                />
+                <input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  placeholder="Costo"
+                  value={linea.costoUnitario}
+                  onChange={(e) => actualizarLinea(i, { costoUnitario: e.target.value })}
+                  className="w-24 rounded-md border border-slate-300 px-2 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                />
+                {lineas.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => setLineas((prev) => prev.filter((_, idx) => idx !== i))}
+                    className="text-red-600 hover:text-red-700"
+                    aria-label="Quitar línea"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+            ))}
+            <button
+              type="button"
+              onClick={() => setLineas((prev) => [...prev, { productoId: '', varianteId: '', cantidad: '1', costoUnitario: '' }])}
+              className="text-sm font-medium text-sol-600 hover:text-sol-700 dark:text-sol-400"
+            >
+              + Agregar línea
+            </button>
+          </div>
+
+          <p className="text-right text-sm font-medium text-slate-700 dark:text-slate-300">
+            Total: RD$ {total.toLocaleString('es-DO')}
+          </p>
+
+          {error && <p className="text-sm text-red-600">{error}</p>}
+          <Button type="submit" disabled={guardar.isPending} className="w-full">
+            {guardar.isPending ? 'Guardando…' : 'Guardar cambios'}
+          </Button>
+        </form>
+      )}
     </Modal>
   );
 }

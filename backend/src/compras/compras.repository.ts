@@ -35,6 +35,18 @@ export class ComprasRepository {
     });
   }
 
+  /** Reemplaza líneas por completo (delete+recreate) — solo se permite en BORRADOR, ver ComprasService.actualizar. El número asignado al crear no se toca acá. */
+  actualizar(id: string, params: { total: number; lineas: { productoId: string; varianteId: string; cantidad: number; costoUnitario: number }[] }) {
+    return this.db.$transaction(async (tx) => {
+      await tx.lineaOc.deleteMany({ where: { ordenCompraId: id } });
+      return tx.ordenCompra.update({
+        where: { id },
+        data: { total: params.total, lineas: { create: params.lineas } },
+        include: { lineas: true },
+      });
+    });
+  }
+
   buscarPorId(id: string) {
     return this.db.ordenCompra.findUniqueOrThrow({
       where: { id },

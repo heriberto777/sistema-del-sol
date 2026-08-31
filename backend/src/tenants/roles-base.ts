@@ -21,7 +21,7 @@ export const PERMISOS_BASE = [
   'comisiones.ver',
   'lealtad.ver', 'lealtad.editar',
   'bonos.ver', 'bonos.editar',
-  'compras.crear', 'compras.recibir', 'compras.pagar', 'compras.ver',
+  'compras.crear', 'compras.editar', 'compras.recibir', 'compras.pagar', 'compras.ver',
   'clientes.crear', 'clientes.editar', 'clientes.ver',
   'reportes.ver',
   'admin.configuracion', 'admin.usuarios',
