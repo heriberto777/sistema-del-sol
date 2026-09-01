@@ -318,6 +318,10 @@ model FacturaPlataforma {
   monto            Decimal                 @db.Decimal(14, 2)
   descuento        Decimal                 @default(0) @db.Decimal(14, 2)
   montoMora        Decimal                 @default(0) @db.Decimal(14, 2)
+  // Ítem "ITBIS en la facturación SaaS" — forward-only, default 0 =
+  // facturas de antes de esta columna (sin recalcular). Calculado sobre
+  // (monto - descuento); la mora nunca lleva ITBIS.
+  itbis            Decimal                 @default(0) @db.Decimal(14, 2)
   total            Decimal                 @db.Decimal(14, 2)
   moneda           String                  @default("DOP")
   estado           EstadoFacturaPlataforma @default(PENDIENTE)
@@ -425,6 +429,12 @@ model PlataformaConfiguracion {
   // (ModalidadFacturacion), la firma/envío real a la DGII para e-CF
   // sigue sin implementarse (ver TipoNcf, NcfPlataforma más abajo).
   modalidadFacturacion ModalidadFacturacion @default(NCF)
+
+  // Ítem "ITBIS en la facturación SaaS" — % aplicado sobre cada
+  // FacturaPlataforma nueva (monto - descuento; la mora no lleva ITBIS).
+  // 0 = sin ITBIS, no hace falta un booleano aparte. Forward-only: las
+  // facturas ya generadas quedan con itbis=0 sin recalcular.
+  porcentajeItbis Decimal @default(18) @db.Decimal(5, 2)
 
   // Notificaciones — email (SMTP)
   emailHabilitado     Boolean?

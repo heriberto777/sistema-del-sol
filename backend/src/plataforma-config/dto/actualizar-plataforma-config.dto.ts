@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { ModalidadFacturacion } from '@prisma/client';
-import { IsBoolean, IsEnum, IsInt, IsOptional, IsString } from 'class-validator';
+import { IsBoolean, IsEnum, IsInt, IsNumber, IsOptional, IsString, Max, Min } from 'class-validator';
 
 /**
  * Todos los campos opcionales — solo se actualiza lo que venga. Para los
@@ -40,6 +40,13 @@ export class ActualizarPlataformaConfigDto {
   @IsOptional()
   @IsEnum(ModalidadFacturacion)
   modalidadFacturacion?: ModalidadFacturacion;
+
+  @ApiProperty({ required: false, description: '% de ITBIS aplicado a cada FacturaPlataforma nueva (0 = sin ITBIS)' })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Max(100)
+  porcentajeItbis?: number;
 
   // Notificaciones — email
   @ApiProperty({ required: false })

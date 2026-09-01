@@ -21,6 +21,7 @@ interface FacturaPlataforma {
   monto: string;
   descuento: string;
   montoMora: string;
+  itbis: string;
   total: string;
   estado: EstadoFactura;
   ncf: string | null;
@@ -121,6 +122,11 @@ function PanelFactura({ factura, onClose }: { factura: FacturaPlataforma; onClos
           <p>
             NCF: <span className="font-mono">{factura.ncf ?? 'Sin NCF asignado'}</span>
           </p>
+          {Number(factura.itbis) > 0 && (
+            <p className="text-slate-500 dark:text-slate-400">
+              Subtotal: RD$ {Number(factura.monto).toLocaleString('es-DO')} — ITBIS: RD$ {Number(factura.itbis).toLocaleString('es-DO')}
+            </p>
+          )}
           <p>
             Total: RD$ {Number(factura.total).toLocaleString('es-DO')} — Pagado: RD$ {totalPagado.toLocaleString('es-DO')} —
             Pendiente: RD$ {Math.max(pendiente, 0).toLocaleString('es-DO')}

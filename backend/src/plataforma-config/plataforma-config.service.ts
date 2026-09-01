@@ -36,6 +36,7 @@ export class PlataformaConfigService implements OnModuleInit {
     if (dto.telefono !== undefined) data.telefono = dto.telefono;
     if (dto.email !== undefined) data.email = dto.email;
     if (dto.modalidadFacturacion !== undefined) data.modalidadFacturacion = dto.modalidadFacturacion;
+    if (dto.porcentajeItbis !== undefined) data.porcentajeItbis = dto.porcentajeItbis;
     if (dto.emailHabilitado !== undefined) data.emailHabilitado = dto.emailHabilitado;
     if (dto.smtpHost !== undefined) data.smtpHost = dto.smtpHost;
     if (dto.smtpPort !== undefined) data.smtpPort = dto.smtpPort;
@@ -102,6 +103,7 @@ export class PlataformaConfigService implements OnModuleInit {
         telefono: config.telefono,
         email: config.email,
         modalidadFacturacion: config.modalidadFacturacion,
+        porcentajeItbis: Number(config.porcentajeItbis),
       },
       notificaciones: {
         email: {

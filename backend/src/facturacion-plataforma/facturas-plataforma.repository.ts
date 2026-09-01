@@ -50,6 +50,7 @@ export class FacturasPlataformaRepository {
     suscripcionId: string;
     concepto: string;
     monto: number;
+    itbis?: number;
     total: number;
     fechaEmision: Date;
     fechaVencimiento: Date;
@@ -67,7 +68,7 @@ export class FacturasPlataformaRepository {
     });
   }
 
-  actualizar(id: string, data: { concepto?: string; descuento?: number; montoMora?: number; total?: number; fechaVencimiento?: Date }) {
+  actualizar(id: string, data: { concepto?: string; descuento?: number; montoMora?: number; itbis?: number; total?: number; fechaVencimiento?: Date }) {
     return this.prisma.facturaPlataforma.update({ where: { id }, data, include: INCLUDE_FACTURA });
   }
 

@@ -28,7 +28,10 @@ describe('FacturasPlataformaService', () => {
     } as unknown as jest.Mocked<FacturasPlataformaRepository>;
     emailChannel = { enviar: jest.fn().mockResolvedValue(true) } as unknown as jest.Mocked<EmailChannel>;
     plataformaWebhookChannel = { enviar: jest.fn().mockResolvedValue(true) } as unknown as jest.Mocked<PlataformaWebhookChannel>;
-    plataformaConfigRepository = { obtenerOCrear: jest.fn(), actualizar: jest.fn() } as unknown as jest.Mocked<PlataformaConfigRepository>;
+    plataformaConfigRepository = {
+      obtenerOCrear: jest.fn().mockResolvedValue({ porcentajeItbis: 0 }),
+      actualizar: jest.fn(),
+    } as unknown as jest.Mocked<PlataformaConfigRepository>;
     ncfPlataformaService = { asignarSiguiente: jest.fn().mockResolvedValue(null) } as unknown as jest.Mocked<NcfPlataformaService>;
     prisma = {
       user: { findFirst: jest.fn().mockResolvedValue({ email: 'admin@tenant.com' }) },
@@ -96,6 +99,20 @@ describe('FacturasPlataformaService', () => {
       const [args] = repo.crear.mock.calls[0];
       expect(args.ncf).toBeUndefined();
     });
+
+    it('calcula itbis sobre el precio del plan y lo suma al total, con porcentajeItbis configurado', async () => {
+      plataformaConfigRepository.obtenerOCrear.mockResolvedValue({ porcentajeItbis: 18 } as never);
+      const suscripcion = { id: 's1', tenantId: 't1', plan: { nombre: 'Premium', precio: 1500, cicloFacturacion: 'MENSUAL' } } as never;
+      repo.crear.mockResolvedValue({ id: 'f1' } as never);
+      repo.buscarPorId.mockResolvedValue({ id: 'f1', concepto: 'x', total: 1770, fechaVencimiento: new Date() } as never);
+
+      await service.generarDesdeSuscripcion(suscripcion);
+
+      const [args] = repo.crear.mock.calls[0];
+      expect(args.monto).toBe(1500);
+      expect(args.itbis).toBe(270);
+      expect(args.total).toBe(1770);
+    });
   });
 
   describe('crearManual', () => {
@@ -152,7 +169,8 @@ describe('FacturasPlataformaService', () => {
       monto: 1500,
       descuento: 0,
       montoMora: 0,
-      total: 1500,
+      itbis: 270,
+      total: 1770,
       fechaEmision: new Date('2026-01-15'),
       tenant: { nombre: 'Tenant Demo', rnc: '131234567' },
       lineas: [],
@@ -198,6 +216,25 @@ describe('FacturasPlataformaService', () => {
     it('rechaza un descuento que deje el total negativo', async () => {
       repo.buscarPorId.mockResolvedValue({ id: 'f1', estado: 'PENDIENTE', monto: 500, descuento: 0, montoMora: 0 } as never);
       await expect(service.actualizar('f1', { descuento: 600 })).rejects.toThrow(BadRequestException);
+    });
+
+    it('no agrega itbis a una factura vieja (itbis: 0) aunque se le cambie el descuento — forward-only', async () => {
+      plataformaConfigRepository.obtenerOCrear.mockResolvedValue({ porcentajeItbis: 18 } as never);
+      repo.buscarPorId.mockResolvedValue({ id: 'f1', estado: 'PENDIENTE', monto: 1000, descuento: 0, montoMora: 0, itbis: 0 } as never);
+
+      await service.actualizar('f1', { descuento: 100 });
+
+      expect(repo.actualizar).toHaveBeenCalledWith('f1', expect.objectContaining({ itbis: 0, total: 900 }));
+    });
+
+    it('recalcula itbis sobre el neto si la factura ya tenía itbis al crearse', async () => {
+      plataformaConfigRepository.obtenerOCrear.mockResolvedValue({ porcentajeItbis: 18 } as never);
+      repo.buscarPorId.mockResolvedValue({ id: 'f1', estado: 'PENDIENTE', monto: 1000, descuento: 0, montoMora: 0, itbis: 180 } as never);
+
+      await service.actualizar('f1', { descuento: 100 });
+
+      // subtotalNeto = 900, itbis = 162, total = 900 + 162 + 0
+      expect(repo.actualizar).toHaveBeenCalledWith('f1', expect.objectContaining({ itbis: 162, total: 1062 }));
     });
   });
 

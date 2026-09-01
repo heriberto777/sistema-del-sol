@@ -117,7 +117,8 @@ export function PlatformPlanes() {
                     {plan.descripcion && <p className="text-xs text-slate-500 dark:text-slate-400">{plan.descripcion}</p>}
                   </td>
                   <td className="px-5 py-3">
-                    RD$ {Number(plan.precio).toLocaleString('es-DO')} / {ETIQUETA_CICLO[plan.cicloFacturacion]}
+                    RD$ {Number(plan.precio).toLocaleString('es-DO')} / {ETIQUETA_CICLO[plan.cicloFacturacion]}{' '}
+                    <span className="text-xs text-slate-400">+ ITBIS</span>
                   </td>
                   <td className="px-5 py-3">
                     <div className="flex flex-wrap gap-1">

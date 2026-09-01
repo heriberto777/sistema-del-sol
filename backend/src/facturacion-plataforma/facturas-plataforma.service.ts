@@ -48,14 +48,15 @@ export class FacturasPlataformaService {
     const ahora = new Date();
     const periodo = ahora.toLocaleDateString('es-DO', { month: 'long', year: 'numeric' });
     const monto = Number(suscripcion.plan.precio);
-    const asignacionNcf = await this.ncfPlataformaService.asignarSiguiente();
+    const [asignacionNcf, itbis] = await Promise.all([this.ncfPlataformaService.asignarSiguiente(), this.calcularItbis(monto)]);
 
     const factura = await this.facturasPlataformaRepository.crear({
       tenantId: suscripcion.tenantId,
       suscripcionId: suscripcion.id,
       concepto: `Suscripción ${suscripcion.plan.nombre} (${CICLO_ES[suscripcion.plan.cicloFacturacion] ?? suscripcion.plan.cicloFacturacion}) — ${periodo}`,
       monto,
-      total: monto,
+      itbis,
+      total: monto + itbis,
       // Vence el mismo día que se emite (sin período de gracia) — el
       // admin puede moverla con PATCH si hace falta dar más plazo.
       fechaEmision: ahora,
@@ -77,14 +78,15 @@ export class FacturasPlataformaService {
     const monto = dto.lineas.reduce((acc, l) => acc + l.monto, 0);
     const ahora = new Date();
     const concepto = dto.lineas.length === 1 ? dto.lineas[0].concepto : `${dto.lineas[0].concepto} (+${dto.lineas.length - 1} más)`;
-    const asignacionNcf = await this.ncfPlataformaService.asignarSiguiente();
+    const [asignacionNcf, itbis] = await Promise.all([this.ncfPlataformaService.asignarSiguiente(), this.calcularItbis(monto)]);
 
     const factura = await this.facturasPlataformaRepository.crear({
       tenantId: dto.tenantId,
       suscripcionId: suscripcion.id,
       concepto,
       monto,
-      total: monto,
+      itbis,
+      total: monto + itbis,
       fechaEmision: ahora,
       fechaVencimiento: dto.fechaVencimiento ? new Date(dto.fechaVencimiento) : ahora,
       lineas: dto.lineas,
@@ -104,7 +106,12 @@ export class FacturasPlataformaService {
     const monto = Number(factura.monto);
     const descuento = dto.descuento ?? Number(factura.descuento);
     const montoMora = dto.montoMora ?? Number(factura.montoMora);
-    const total = monto - descuento + montoMora;
+    const subtotalNeto = monto - descuento;
+    // Forward-only: una factura vieja (itbis=0, de antes de esta pieza)
+    // nunca gana ITBIS retroactivo solo por editarle el descuento — solo
+    // se recalcula si YA tenía ITBIS al crearse.
+    const itbis = Number(factura.itbis) > 0 ? await this.calcularItbis(subtotalNeto) : 0;
+    const total = subtotalNeto + itbis + montoMora;
     if (total < 0) {
       throw new BadRequestException('El descuento no puede superar el monto + la mora');
     }
@@ -113,9 +120,16 @@ export class FacturasPlataformaService {
       concepto: dto.concepto,
       descuento: dto.descuento,
       montoMora: dto.montoMora,
+      itbis,
       total,
       fechaVencimiento: dto.fechaVencimiento ? new Date(dto.fechaVencimiento) : undefined,
     });
+  }
+
+  /** Ítem "ITBIS en la facturación SaaS" — % global de plataforma, 0 = sin ITBIS. Nunca aplica sobre la mora. */
+  private async calcularItbis(base: number) {
+    const config = await this.plataformaConfigRepository.obtenerOCrear();
+    return Math.round(base * (Number(config.porcentajeItbis) / 100) * 100) / 100;
   }
 
   async anular(id: string) {

@@ -1,4 +1,4 @@
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import { UseMutationResult, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { platformApiClient } from '../../../lib/platform-api-client';
 import { FormField } from '../../molecules/FormField/FormField';
@@ -21,12 +21,14 @@ interface NcfPlataforma {
 const TIPOS_NCF = ['B01', 'B02', 'E31', 'E32'];
 
 interface NcfPlataformaPanelProps {
-  config: { general: { modalidadFacturacion: 'NCF' | 'ECF' } };
+  config: { general: { modalidadFacturacion: 'NCF' | 'ECF'; porcentajeItbis: number } };
   guardar: UseMutationResult<unknown, unknown, Record<string, unknown>>;
 }
 
 export function NcfPlataformaPanel({ config, guardar }: NcfPlataformaPanelProps) {
   const queryClient = useQueryClient();
+  const [porcentajeItbis, setPorcentajeItbis] = useState(String(config.general.porcentajeItbis));
+  useEffect(() => setPorcentajeItbis(String(config.general.porcentajeItbis)), [config.general.porcentajeItbis]);
   const [tipoNcf, setTipoNcf] = useState('B01');
   const [secuenciaFinal, setSecuenciaFinal] = useState('');
   const [vigenciaHasta, setVigenciaHasta] = useState('');
@@ -66,8 +68,31 @@ export function NcfPlataformaPanel({ config, guardar }: NcfPlataformaPanelProps)
     crear.mutate();
   }
 
+  function onSubmitItbis(e: FormEvent) {
+    e.preventDefault();
+    guardar.mutate({ porcentajeItbis: Number(porcentajeItbis) });
+  }
+
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+      <Card className="lg:col-span-3" titulo="ITBIS" descripcion="Se aplica sobre cada factura nueva (monto − descuento); la mora nunca lleva ITBIS. 0 = sin ITBIS.">
+        <form onSubmit={onSubmitItbis} className="flex max-w-xs items-end gap-2">
+          <FormField
+            id="porcentajeItbis"
+            label="Porcentaje de ITBIS"
+            type="number"
+            min="0"
+            max="100"
+            step="0.01"
+            value={porcentajeItbis}
+            onChange={(e) => setPorcentajeItbis(e.target.value)}
+          />
+          <Button type="submit" disabled={guardar.isPending}>
+            {guardar.isPending ? 'Guardando…' : 'Guardar'}
+          </Button>
+        </form>
+      </Card>
+
       <Card className="lg:col-span-3" titulo="Modalidad de facturación de la plataforma">
         <p className="text-sm text-slate-500 dark:text-slate-400">
           NCF tradicional o e-CF (comprobante electrónico DGII) para las facturas que la plataforma le cobra a cada

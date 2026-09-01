@@ -17,6 +17,7 @@ export interface ConfiguracionPlataforma {
     telefono: string | null;
     email: string | null;
     modalidadFacturacion: 'NCF' | 'ECF';
+    porcentajeItbis: number;
   };
   notificaciones: {
     email: {

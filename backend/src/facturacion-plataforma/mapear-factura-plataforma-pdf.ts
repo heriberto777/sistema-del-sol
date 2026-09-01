@@ -9,6 +9,7 @@ export interface FacturaPlataformaParaPdf {
   monto: Prisma.Decimal;
   descuento: Prisma.Decimal;
   montoMora: Prisma.Decimal;
+  itbis: Prisma.Decimal;
   total: Prisma.Decimal;
   fechaEmision: Date;
   tenant: { nombre: string; rnc: string | null };
@@ -22,6 +23,7 @@ export function mapearFacturaPlataformaAParams(factura: FacturaPlataformaParaPdf
       : [{ concepto: factura.concepto, cantidad: '1', precioUnitario: Number(factura.monto).toFixed(2), total: Number(factura.monto).toFixed(2) }];
 
   const montoMora = Number(factura.montoMora);
+  const itbis = Number(factura.itbis);
 
   return {
     tipoDocumento: 'Factura',
@@ -33,6 +35,7 @@ export function mapearFacturaPlataformaAParams(factura: FacturaPlataformaParaPdf
     subtotal: Number(factura.monto),
     descuento: Number(factura.descuento),
     recargos: montoMora > 0 ? [{ concepto: 'Mora', monto: montoMora }] : [],
+    itbis: itbis > 0 ? itbis : undefined,
     total: Number(factura.total),
   };
 }
