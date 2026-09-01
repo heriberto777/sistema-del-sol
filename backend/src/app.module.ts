@@ -35,6 +35,7 @@ import { TenantsModule } from './tenants/tenants.module';
 import { PlatformAuditLogModule } from './platform-audit-log/platform-audit-log.module';
 import { NcfModule } from './ncf/ncf.module';
 import { TenantEmpresaModule } from './tenant-empresa/tenant-empresa.module';
+import { EmisionECfModule } from './emision-ecf/emision-ecf.module';
 import { NcfPlataformaModule } from './ncf-plataforma/ncf-plataforma.module';
 import { CorrelativosModule } from './correlativos/correlativos.module';
 import { WhatsappConfigModule } from './whatsapp-config/whatsapp-config.module';
@@ -119,6 +120,7 @@ import { TenantMiddleware } from './common/middleware/tenant.middleware';
     NcfModule,
     NcfPlataformaModule,
     TenantEmpresaModule,
+    EmisionECfModule,
     CorrelativosModule,
     WhatsappConfigModule,
     WhatsappBotModule,

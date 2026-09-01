@@ -13,13 +13,17 @@ import { ListarFacturasQueryDto } from './dto/listar-facturas-query.dto';
 import { ListadoQueryDto } from '../common/dto/listado-query.dto';
 import { ImprimirDocumentoQueryDto } from '../common/impresion/dto/imprimir-documento-query.dto';
 import { EnviarReciboDto } from './dto/enviar-recibo.dto';
+import { EmisionECfService } from '../emision-ecf/emision-ecf.service';
 
 @ApiBearerAuth()
 @ApiTags('facturacion')
 @RequiereModulo('facturacion')
 @Controller('facturas')
 export class FacturacionController {
-  constructor(private readonly facturacionService: FacturacionService) {}
+  constructor(
+    private readonly facturacionService: FacturacionService,
+    private readonly emisionECfService: EmisionECfService,
+  ) {}
 
   @Post()
   @Permissions('facturacion.crear')
@@ -49,6 +53,13 @@ export class FacturacionController {
   @Permissions('facturacion.ver')
   buscarPorId(@Param('id') id: string) {
     return this.facturacionService.buscarPorId(id);
+  }
+
+  // Ítem "e-CF real" (pieza 2) — refresca el estado consultando a Alanube.
+  @Get(':id/ecf-estado')
+  @Permissions('facturacion.ver')
+  consultarEstadoECf(@Param('id') id: string, @CurrentUser() user: JwtPayloadUser) {
+    return this.emisionECfService.consultarEstado(user.tenantId, id);
   }
 
   @Get(':id/pdf')

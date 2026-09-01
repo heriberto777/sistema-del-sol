@@ -15,6 +15,7 @@ import { AutorizacionesModule } from '../autorizaciones/autorizaciones.module';
 import { TasasCambioModule } from '../tasas-cambio/tasas-cambio.module';
 import { ConfiguracionesModule } from '../configuraciones/configuraciones.module';
 import { CorrelativosModule } from '../correlativos/correlativos.module';
+import { EmisionECfModule } from '../emision-ecf/emision-ecf.module';
 
 @Module({
   // AuthModule: FacturacionService llama a authService.verificarPin() en
@@ -41,6 +42,7 @@ import { CorrelativosModule } from '../correlativos/correlativos.module';
     TasasCambioModule,
     ConfiguracionesModule,
     CorrelativosModule,
+    EmisionECfModule,
   ],
   controllers: [FacturacionController],
   providers: [FacturacionService, FacturacionRepository],

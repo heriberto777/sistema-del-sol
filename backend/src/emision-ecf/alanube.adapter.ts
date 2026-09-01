@@ -14,6 +14,16 @@ const RUTA_POR_TIPO: Record<TipoDocumentoECf, string> = {
   E34: 'credit-notes',
 };
 
+/** Compartido con AlanubeWebhookController — mismo mapeo tanto si el estado llega por GET como por webhook. */
+export function mapearEstadoAlanube(status: string | undefined): EstadoECfResultado['estado'] {
+  const ESTADOS: Record<string, EstadoECfResultado['estado']> = {
+    accepted: 'ACEPTADO',
+    conditionally_accepted: 'ACEPTADO_CONDICIONAL',
+    rejected: 'RECHAZADO',
+  };
+  return ESTADOS[status ?? ''] ?? 'EN_PROCESO';
+}
+
 /**
  * `fetch` nativo directo contra la API REST de Alanube (PSFE certificado
  * por la DGII) — mismo criterio que StripeAdapter/IaClientService: sin
@@ -125,11 +135,6 @@ export class AlanubeAdapter implements EmisorECfAdapter {
     }
 
     const datos = (await respuesta.json()) as { status?: string; message?: string };
-    const ESTADOS: Record<string, EstadoECfResultado['estado']> = {
-      accepted: 'ACEPTADO',
-      conditionally_accepted: 'ACEPTADO_CONDICIONAL',
-      rejected: 'RECHAZADO',
-    };
-    return { estado: ESTADOS[datos.status ?? ''] ?? 'EN_PROCESO', mensaje: datos.message };
+    return { estado: mapearEstadoAlanube(datos.status), mensaje: datos.message };
   }
 }

@@ -686,6 +686,16 @@ enum ModalidadFacturacion {
   ECF
 }
 
+// Ítem "e-CF real" (pieza 2) — resultado real de la DGII vía un
+// proveedor certificado (ver backend/src/emision-ecf/). EN_PROCESO =
+// enviado, todavía sin confirmación; ver EmisorECfAdapter.consultarEstado.
+enum EstadoECf {
+  ACEPTADO
+  ACEPTADO_CONDICIONAL
+  RECHAZADO
+  EN_PROCESO
+}
+
 enum TipoFactura {
   CONTADO
   CREDITO
@@ -917,6 +927,13 @@ model Factura {
   numero             String?
   ncf                String?
   tipoNcf            TipoNcf?
+  // Ítem "e-CF real" (pieza 2) — solo se llenan cuando tipoNcf es E3x
+  // (modalidadFacturacion ECF) y EmisionECfEventosService pudo emitir
+  // de verdad contra Alanube. Null = no aplica o todavía no se intentó
+  // con éxito (nunca bloquea la venta — ver EmisionECfService).
+  eCfEstado          EstadoECf?
+  eCfIdExterno       String?       @unique
+  eCfMensajeError    String?
   tipoFactura        TipoFactura
   estado             EstadoFactura @default(BORRADOR)
   motivoAnulacion    String?
