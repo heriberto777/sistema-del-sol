@@ -20,7 +20,19 @@ export class TenantsRepository {
     return this.prisma.tenant.findUniqueOrThrow({ where: { id } });
   }
 
-  async actualizar(id: string, data: { nombre?: string; estado?: EstadoTenant; planId?: string; rnc?: string; subdominio?: string }) {
+  async actualizar(
+    id: string,
+    data: {
+      nombre?: string;
+      estado?: EstadoTenant;
+      planId?: string;
+      rnc?: string;
+      subdominio?: string;
+      direccion?: string;
+      telefono?: string;
+      email?: string;
+    },
+  ) {
     return this.prisma.$transaction(async (tx) => {
       const tenant = await tx.tenant.update({ where: { id }, data });
       // Si cambia de plan, la suscripción debe cobrar el precio del plan
@@ -44,6 +56,9 @@ export class TenantsRepository {
     nombre: string;
     subdominio: string;
     rnc?: string;
+    direccion?: string;
+    telefono?: string;
+    email?: string;
     planId: string;
     adminEmail: string;
     adminNombre: string;
@@ -59,6 +74,9 @@ export class TenantsRepository {
           nombre: params.nombre,
           subdominio: params.subdominio,
           rnc: params.rnc,
+          direccion: params.direccion,
+          telefono: params.telefono,
+          email: params.email,
           planId: params.planId,
           settings: { create: {} },
           configuraciones: {

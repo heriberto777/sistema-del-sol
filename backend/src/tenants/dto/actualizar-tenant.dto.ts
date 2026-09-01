@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { EstadoTenant } from '@prisma/client';
-import { IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
+import { IsEmail, IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
 
 export class ActualizarTenantDto {
   @ApiProperty({ required: false })
@@ -27,4 +27,19 @@ export class ActualizarTenantDto {
   @IsOptional()
   @IsString()
   subdominio?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  direccion?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  telefono?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsEmail()
+  email?: string;
 }

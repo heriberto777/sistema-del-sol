@@ -15,6 +15,9 @@ interface Tenant {
   nombre: string;
   subdominio: string;
   rnc: string | null;
+  direccion: string | null;
+  telefono: string | null;
+  email: string | null;
   estado: 'ACTIVO' | 'SUSPENDIDO' | 'CANCELADO';
   planId: string | null;
   plan: { id: string; nombre: string } | null;
@@ -331,6 +334,9 @@ function ModalNuevoTenant({ planes, onClose }: { planes: Plan[]; onClose: () => 
   const [nombre, setNombre] = useState('');
   const [subdominio, setSubdominio] = useState('');
   const [rnc, setRnc] = useState('');
+  const [direccion, setDireccion] = useState('');
+  const [telefono, setTelefono] = useState('');
+  const [email, setEmail] = useState('');
   const [planId, setPlanId] = useState('');
   const [adminEmail, setAdminEmail] = useState('');
   const [adminNombre, setAdminNombre] = useState('');
@@ -343,6 +349,9 @@ function ModalNuevoTenant({ planes, onClose }: { planes: Plan[]; onClose: () => 
         nombre,
         subdominio,
         rnc: rnc || undefined,
+        direccion: direccion || undefined,
+        telefono: telefono || undefined,
+        email: email || undefined,
         planId,
         adminEmail,
         adminNombre,
@@ -367,6 +376,9 @@ function ModalNuevoTenant({ planes, onClose }: { planes: Plan[]; onClose: () => 
         <FormField id="nombre" label="Nombre de la empresa" value={nombre} onChange={(e) => setNombre(e.target.value)} required />
         <FormField id="subdominio" label="Subdominio" value={subdominio} onChange={(e) => setSubdominio(e.target.value)} required />
         <FormField id="rnc" label="RNC (opcional)" value={rnc} onChange={(e) => setRnc(e.target.value)} />
+        <FormField id="direccion" label="Dirección (opcional)" value={direccion} onChange={(e) => setDireccion(e.target.value)} />
+        <FormField id="telefono" label="Teléfono (opcional)" value={telefono} onChange={(e) => setTelefono(e.target.value)} />
+        <FormField id="email" label="Correo de la empresa (opcional)" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
         <div>
           <label htmlFor="plan" className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
             Plan
@@ -401,11 +413,21 @@ function ModalEditarTenant({ tenant, onClose }: { tenant: Tenant; onClose: () =>
   const [nombre, setNombre] = useState(tenant.nombre);
   const [subdominio, setSubdominio] = useState(tenant.subdominio);
   const [rnc, setRnc] = useState(tenant.rnc ?? '');
+  const [direccion, setDireccion] = useState(tenant.direccion ?? '');
+  const [telefono, setTelefono] = useState(tenant.telefono ?? '');
+  const [email, setEmail] = useState(tenant.email ?? '');
   const [error, setError] = useState<string | null>(null);
 
   const guardar = useMutation({
     mutationFn: async () =>
-      platformApiClient.patch(`/platform/tenants/${tenant.id}`, { nombre, subdominio, rnc: rnc || undefined }),
+      platformApiClient.patch(`/platform/tenants/${tenant.id}`, {
+        nombre,
+        subdominio,
+        rnc: rnc || undefined,
+        direccion: direccion || undefined,
+        telefono: telefono || undefined,
+        email: email || undefined,
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['platform-tenants'] });
       onClose();
@@ -425,6 +447,9 @@ function ModalEditarTenant({ tenant, onClose }: { tenant: Tenant; onClose: () =>
         <FormField id="editar-nombre" label="Nombre de la empresa" value={nombre} onChange={(e) => setNombre(e.target.value)} required />
         <FormField id="editar-subdominio" label="Subdominio" value={subdominio} onChange={(e) => setSubdominio(e.target.value)} required />
         <FormField id="editar-rnc" label="RNC (opcional)" value={rnc} onChange={(e) => setRnc(e.target.value)} />
+        <FormField id="editar-direccion" label="Dirección (opcional)" value={direccion} onChange={(e) => setDireccion(e.target.value)} />
+        <FormField id="editar-telefono" label="Teléfono (opcional)" value={telefono} onChange={(e) => setTelefono(e.target.value)} />
+        <FormField id="editar-email" label="Correo de la empresa (opcional)" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
         {error && <p className="text-sm text-red-600">{error}</p>}
         <Button type="submit" disabled={guardar.isPending} className="w-full">
           {guardar.isPending ? 'Guardando…' : 'Guardar cambios'}

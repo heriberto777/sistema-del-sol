@@ -20,6 +20,21 @@ export class CrearTenantDto {
   @IsString()
   rnc?: string;
 
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  direccion?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  telefono?: string;
+
+  @ApiProperty({ required: false, description: 'Correo de la empresa (distinto del correo del admin inicial)' })
+  @IsOptional()
+  @IsEmail()
+  email?: string;
+
   @ApiProperty({ example: 'admin@distribuidora-ejemplo.com' })
   @IsEmail()
   adminEmail: string;
