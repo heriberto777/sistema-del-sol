@@ -54,7 +54,7 @@ export interface ConfiguracionPlataforma {
 interface ReglaNotificacion {
   id: string;
   offsetDias: number;
-  canal: 'EMAIL' | 'WEBHOOK';
+  canal: 'EMAIL' | 'WEBHOOK' | 'WHATSAPP';
   activa: boolean;
 }
 
@@ -417,7 +417,7 @@ function SeccionVencimientos({ config, guardar }: SeccionProps) {
   });
 
   const [offsetDias, setOffsetDias] = useState('');
-  const [canal, setCanal] = useState<'EMAIL' | 'WEBHOOK'>('EMAIL');
+  const [canal, setCanal] = useState<'EMAIL' | 'WEBHOOK' | 'WHATSAPP'>('EMAIL');
 
   const crearRegla = useMutation({
     mutationFn: async () => platformApiClient.post('/platform/configuracion/reglas-notificacion', { offsetDias: Number(offsetDias), canal }),
@@ -483,8 +483,9 @@ function SeccionVencimientos({ config, guardar }: SeccionProps) {
               <label htmlFor="regla-canal" className="text-sm font-medium text-slate-700 dark:text-slate-300">
                 Canal
               </label>
-              <Select id="regla-canal" value={canal} onChange={(e) => setCanal(e.target.value as 'EMAIL' | 'WEBHOOK')}>
+              <Select id="regla-canal" value={canal} onChange={(e) => setCanal(e.target.value as 'EMAIL' | 'WEBHOOK' | 'WHATSAPP')}>
                 <option value="EMAIL">Email</option>
+                <option value="WHATSAPP">WhatsApp</option>
                 <option value="WEBHOOK">Webhook</option>
               </Select>
             </div>
@@ -509,7 +510,7 @@ function SeccionVencimientos({ config, guardar }: SeccionProps) {
                 {reglas?.map((regla) => (
                   <tr key={regla.id}>
                     <td className="py-1.5">{regla.offsetDias < 0 ? `${Math.abs(regla.offsetDias)} día(s) antes` : regla.offsetDias === 0 ? 'El mismo día' : `${regla.offsetDias} día(s) después`}</td>
-                    <td className="py-1.5">{regla.canal === 'EMAIL' ? 'Email' : 'Webhook'}</td>
+                    <td className="py-1.5">{regla.canal === 'EMAIL' ? 'Email' : regla.canal === 'WHATSAPP' ? 'WhatsApp' : 'Webhook'}</td>
                     <td className="py-1.5">
                       <Switch activo={regla.activa} onChange={(v) => toggleRegla.mutate({ id: regla.id, activa: v })} />
                     </td>

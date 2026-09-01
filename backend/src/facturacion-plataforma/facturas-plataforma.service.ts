@@ -4,6 +4,7 @@ import { FacturasPlataformaRepository } from './facturas-plataforma.repository';
 import { ActualizarFacturaPlataformaDto } from './dto/actualizar-factura-plataforma.dto';
 import { CrearFacturaPlataformaManualDto } from './dto/crear-factura-plataforma-manual.dto';
 import { EmailChannel } from '../notificaciones/canales/email.channel';
+import { WhatsAppChannel } from '../notificaciones/canales/whatsapp.channel';
 import { PlataformaWebhookChannel } from '../plataforma-config/plataforma-webhook.channel';
 import { PlataformaConfigRepository } from '../plataforma-config/plataforma-config.repository';
 import { NcfPlataformaService } from '../ncf-plataforma/ncf-plataforma.service';
@@ -21,6 +22,7 @@ export class FacturasPlataformaService {
   constructor(
     private readonly facturasPlataformaRepository: FacturasPlataformaRepository,
     private readonly emailChannel: EmailChannel,
+    private readonly whatsAppChannel: WhatsAppChannel,
     private readonly plataformaWebhookChannel: PlataformaWebhookChannel,
     private readonly plataformaConfigRepository: PlataformaConfigRepository,
     private readonly ncfPlataformaService: NcfPlataformaService,
@@ -197,6 +199,22 @@ export class FacturasPlataformaService {
       return;
     }
 
+    const enlacePago = `${process.env.FRONTEND_URL ?? 'http://localhost:5173'}/pagar/${factura.id}`;
+    const porVencer = offsetDias < 0;
+
+    if (canal === 'WHATSAPP') {
+      // Va al teléfono de la EMPRESA (Tenant.telefono) — no hay teléfono
+      // por usuario individual, decisión confirmada con el usuario.
+      const tenant = await this.prisma.tenant.findUnique({ where: { id: factura.tenantId }, select: { telefono: true } });
+      if (!tenant?.telefono) {
+        this.logger.warn(`Tenant ${factura.tenantId} sin teléfono configurado — no se pudo enviar el aviso de vencimiento por WhatsApp de la factura ${facturaId}`);
+        return;
+      }
+      const mensaje = `${porVencer ? 'Tu factura está por vencer' : 'Tu factura sigue vencida'}: ${factura.concepto}. Total: RD$ ${Number(factura.total).toLocaleString('es-DO')}, vence el ${factura.fechaVencimiento.toLocaleDateString('es-DO')}. Pagar en línea: ${enlacePago}`;
+      await this.whatsAppChannel.enviar(tenant.telefono, '', mensaje);
+      return;
+    }
+
     const admin = await this.prisma.user.findFirst({
       where: { tenantId: factura.tenantId, roles: { some: { role: { nombre: 'Admin Total' } } } },
       orderBy: { createdAt: 'asc' },
@@ -206,8 +224,7 @@ export class FacturasPlataformaService {
       return;
     }
 
-    const enlacePago = `${process.env.FRONTEND_URL ?? 'http://localhost:5173'}/pagar/${factura.id}`;
-    const asunto = offsetDias < 0 ? 'Tu factura está por vencer — El Sistema del Sol' : 'Tu factura sigue vencida — El Sistema del Sol';
+    const asunto = porVencer ? 'Tu factura está por vencer — El Sistema del Sol' : 'Tu factura sigue vencida — El Sistema del Sol';
     const cuerpo = `<p>Factura: <strong>${factura.concepto}</strong>.</p><p>Total: RD$ ${Number(factura.total).toLocaleString('es-DO')} — vence el ${factura.fechaVencimiento.toLocaleDateString('es-DO')}.</p><p><a href="${enlacePago}">Pagar en línea</a></p>`;
     await this.emailChannel.enviar(admin.email, asunto, cuerpo);
   }

@@ -494,6 +494,9 @@ model PlataformaConfiguracion {
 enum CanalNotificacionVencimiento {
   EMAIL
   WEBHOOK
+  // Va al Tenant.telefono (empresa) — no hay teléfono por usuario, ver
+  // FacturasPlataformaService.notificarPorRegla.
+  WHATSAPP
 }
 
 model ReglaNotificacionVencimiento {

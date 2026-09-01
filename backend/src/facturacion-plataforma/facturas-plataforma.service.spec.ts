@@ -2,6 +2,7 @@ import { BadRequestException } from '@nestjs/common';
 import { FacturasPlataformaService } from './facturas-plataforma.service';
 import { FacturasPlataformaRepository } from './facturas-plataforma.repository';
 import { EmailChannel } from '../notificaciones/canales/email.channel';
+import { WhatsAppChannel } from '../notificaciones/canales/whatsapp.channel';
 import { PlataformaWebhookChannel } from '../plataforma-config/plataforma-webhook.channel';
 import { PlataformaConfigRepository } from '../plataforma-config/plataforma-config.repository';
 import { NcfPlataformaService } from '../ncf-plataforma/ncf-plataforma.service';
@@ -12,11 +13,12 @@ describe('FacturasPlataformaService', () => {
   let service: FacturasPlataformaService;
   let repo: jest.Mocked<FacturasPlataformaRepository>;
   let emailChannel: jest.Mocked<EmailChannel>;
+  let whatsAppChannel: jest.Mocked<WhatsAppChannel>;
   let plataformaWebhookChannel: jest.Mocked<PlataformaWebhookChannel>;
   let plataformaConfigRepository: jest.Mocked<PlataformaConfigRepository>;
   let ncfPlataformaService: jest.Mocked<NcfPlataformaService>;
   let emisionECfService: jest.Mocked<EmisionECfService>;
-  let prisma: { user: { findFirst: jest.Mock }; suscripcion: { findUnique: jest.Mock } };
+  let prisma: { user: { findFirst: jest.Mock }; suscripcion: { findUnique: jest.Mock }; tenant: { findUnique: jest.Mock } };
 
   beforeEach(() => {
     repo = {
@@ -29,6 +31,7 @@ describe('FacturasPlataformaService', () => {
       listarVencidasPendientes: jest.fn(),
     } as unknown as jest.Mocked<FacturasPlataformaRepository>;
     emailChannel = { enviar: jest.fn().mockResolvedValue(true) } as unknown as jest.Mocked<EmailChannel>;
+    whatsAppChannel = { enviar: jest.fn().mockResolvedValue(true) } as unknown as jest.Mocked<WhatsAppChannel>;
     plataformaWebhookChannel = { enviar: jest.fn().mockResolvedValue(true) } as unknown as jest.Mocked<PlataformaWebhookChannel>;
     plataformaConfigRepository = {
       obtenerOCrear: jest.fn().mockResolvedValue({ porcentajeItbis: 0 }),
@@ -39,10 +42,12 @@ describe('FacturasPlataformaService', () => {
     prisma = {
       user: { findFirst: jest.fn().mockResolvedValue({ email: 'admin@tenant.com' }) },
       suscripcion: { findUnique: jest.fn().mockResolvedValue({ id: 's1', tenantId: 't1' }) },
+      tenant: { findUnique: jest.fn().mockResolvedValue({ telefono: '+18095551234' }) },
     };
     service = new FacturasPlataformaService(
       repo,
       emailChannel,
+      whatsAppChannel,
       plataformaWebhookChannel,
       plataformaConfigRepository,
       ncfPlataformaService,
@@ -324,6 +329,26 @@ describe('FacturasPlataformaService', () => {
       await service.notificarPorRegla('f1', 5, 'EMAIL');
 
       expect(emailChannel.enviar).not.toHaveBeenCalled();
+    });
+
+    it('canal WHATSAPP envía al teléfono del Tenant (empresa), no a un usuario', async () => {
+      repo.buscarPorId.mockResolvedValue(factura as never);
+
+      await service.notificarPorRegla('f1', -3, 'WHATSAPP');
+
+      expect(prisma.tenant.findUnique).toHaveBeenCalledWith({ where: { id: 't1' }, select: { telefono: true } });
+      expect(whatsAppChannel.enviar).toHaveBeenCalledWith('+18095551234', '', expect.stringContaining('Suscripción X'));
+      expect(emailChannel.enviar).not.toHaveBeenCalled();
+      expect(plataformaWebhookChannel.enviar).not.toHaveBeenCalled();
+    });
+
+    it('canal WHATSAPP sin teléfono configurado en el tenant no envía nada (solo loguea)', async () => {
+      repo.buscarPorId.mockResolvedValue(factura as never);
+      prisma.tenant.findUnique.mockResolvedValue({ telefono: null });
+
+      await service.notificarPorRegla('f1', -3, 'WHATSAPP');
+
+      expect(whatsAppChannel.enviar).not.toHaveBeenCalled();
     });
   });
 });
