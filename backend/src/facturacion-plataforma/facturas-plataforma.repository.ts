@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import { EstadoFacturaPlataforma } from '@prisma/client';
+import { EstadoFacturaPlataforma, TipoNcf } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { paginar } from '../common/types/pagina-resultado';
 
-const INCLUDE_FACTURA = { tenant: { select: { id: true, nombre: true } } } as const;
+const INCLUDE_FACTURA = { tenant: { select: { id: true, nombre: true, rnc: true } } } as const;
 
 @Injectable()
 export class FacturasPlataformaRepository {
@@ -53,6 +53,8 @@ export class FacturasPlataformaRepository {
     total: number;
     fechaEmision: Date;
     fechaVencimiento: Date;
+    ncf?: string;
+    tipoNcf?: TipoNcf;
     lineas?: { concepto: string; monto: number }[];
   }) {
     const { lineas, ...resto } = data;

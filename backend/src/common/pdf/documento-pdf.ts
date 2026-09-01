@@ -11,11 +11,20 @@ export interface LineaDocumentoPdf {
   total?: string;
 }
 
+export interface EmisorDocumentoPdf {
+  nombre: string;
+  rnc?: string;
+  direccion?: string;
+  telefono?: string;
+}
+
 export interface DocumentoPdfParams {
   tipoDocumento: string;
   numero: string;
   fecha: Date;
   cliente: string;
+  /** Datos de la empresa emisora — hoy solo lo usa FacturaPlataforma (ver mapear-factura-plataforma-pdf.ts); el lado tenant no lo pasa. */
+  emisor?: EmisorDocumentoPdf;
   lineas: LineaDocumentoPdf[];
   /** Si es false (ej. remisiones, que no guardan precio), omite las columnas de precio/total y el resumen final. */
   mostrarPrecios?: boolean;
@@ -64,6 +73,16 @@ export function generarDocumentoPdf(
     }
 
     doc.font('Helvetica-Bold').fontSize(18).text(params.tipoDocumento, { width: anchoUtil });
+
+    if (params.emisor) {
+      doc.font('Helvetica').fontSize(9);
+      doc.text(params.emisor.nombre);
+      if (params.emisor.rnc) doc.text(`RNC: ${params.emisor.rnc}`);
+      if (params.emisor.direccion) doc.text(params.emisor.direccion);
+      if (params.emisor.telefono) doc.text(`Tel: ${params.emisor.telefono}`);
+      doc.moveDown(0.5);
+    }
+
     doc.font('Helvetica').fontSize(10);
     doc.text(`Número: ${params.numero}`);
     doc.text(`Fecha: ${params.fecha.toLocaleDateString('es-DO')}`);

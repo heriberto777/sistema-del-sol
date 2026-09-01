@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsBoolean, IsInt, IsOptional, IsString } from 'class-validator';
+import { ModalidadFacturacion } from '@prisma/client';
+import { IsBoolean, IsEnum, IsInt, IsOptional, IsString } from 'class-validator';
 
 /**
  * Todos los campos opcionales — solo se actualiza lo que venga. Para los
@@ -13,6 +14,32 @@ export class ActualizarPlataformaConfigDto {
   @IsOptional()
   @IsString()
   nombreNegocio?: string;
+
+  // Datos de la empresa emisora — ítem "Facturación con NCF real"
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  rnc?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  direccion?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  telefono?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  email?: string;
+
+  @ApiProperty({ required: false, enum: ModalidadFacturacion, description: 'NCF tradicional o e-CF para las facturas que la plataforma emite a cada tenant' })
+  @IsOptional()
+  @IsEnum(ModalidadFacturacion)
+  modalidadFacturacion?: ModalidadFacturacion;
 
   // Notificaciones — email
   @ApiProperty({ required: false })

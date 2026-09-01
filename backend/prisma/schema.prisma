@@ -321,6 +321,13 @@ model FacturaPlataforma {
   total            Decimal                 @db.Decimal(14, 2)
   moneda           String                  @default("DOP")
   estado           EstadoFacturaPlataforma @default(PENDIENTE)
+  // Ítem "Facturación con NCF real" — nullable/forward-only: las
+  // facturas generadas antes de esta columna quedan sin NCF (decisión
+  // explícita del usuario, sin conversión retroactiva). Ver
+  // NcfPlataformaService.asignarSiguiente — null también cuando no hay
+  // secuencia activa/agotada, sin bloquear la generación.
+  ncf              String?
+  tipoNcf          TipoNcf?
   fechaEmision     DateTime                @default(now())
   fechaVencimiento DateTime
   fechaPago        DateTime?
@@ -332,6 +339,24 @@ model FacturaPlataforma {
   notificacionesVencimientoEnviadas NotificacionVencimientoEnviada[]
 
   @@map("facturas_plataforma")
+}
+
+// Secuencias de NCF/e-CF de la propia plataforma (lo que le factura a
+// cada tenant) — mirror de NcfAsignado sin tenantId/sucursalId (la
+// plataforma es una sola entidad). "A lo sumo una activa por tipo" se
+// valida en código (NcfPlataformaService), igual criterio que
+// NcfAsignado (Postgres no deduplica combinaciones por su cuenta).
+model NcfPlataforma {
+  id              String   @id @default(uuid())
+  tipoNcf         TipoNcf
+  secuenciaActual Int
+  secuenciaFinal  Int
+  vigenciaHasta   DateTime
+  umbralAlerta    Int?
+  activo          Boolean  @default(true)
+  createdAt       DateTime @default(now())
+
+  @@map("ncf_plataforma")
 }
 
 // Desglose opcional de una FacturaPlataforma: vacío en las generadas
@@ -385,6 +410,21 @@ model PlataformaConfiguracion {
 
   // General
   nombreNegocio String?
+
+  // Datos de la empresa emisora — ítem "Facturación con NCF real"
+  // (Administración de Tenants, última pieza). Sin cifrar, no son
+  // secretos. Se usan para imprimir el emisor en el PDF de
+  // FacturaPlataforma (ver mapear-factura-plataforma-pdf.ts).
+  rnc       String?
+  direccion String?
+  telefono  String?
+  email     String?
+
+  // NCF tradicional o e-CF para las FacturaPlataforma que la propia
+  // plataforma emite a cada tenant — mismo enum que el lado tenant
+  // (ModalidadFacturacion), la firma/envío real a la DGII para e-CF
+  // sigue sin implementarse (ver TipoNcf, NcfPlataforma más abajo).
+  modalidadFacturacion ModalidadFacturacion @default(NCF)
 
   // Notificaciones — email (SMTP)
   emailHabilitado     Boolean?

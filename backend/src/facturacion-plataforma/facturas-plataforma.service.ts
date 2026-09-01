@@ -5,6 +5,10 @@ import { ActualizarFacturaPlataformaDto } from './dto/actualizar-factura-platafo
 import { CrearFacturaPlataformaManualDto } from './dto/crear-factura-plataforma-manual.dto';
 import { EmailChannel } from '../notificaciones/canales/email.channel';
 import { PlataformaWebhookChannel } from '../plataforma-config/plataforma-webhook.channel';
+import { PlataformaConfigRepository } from '../plataforma-config/plataforma-config.repository';
+import { NcfPlataformaService } from '../ncf-plataforma/ncf-plataforma.service';
+import { generarDocumentoPdf } from '../common/pdf/documento-pdf';
+import { mapearFacturaPlataformaAParams } from './mapear-factura-plataforma-pdf';
 import { PrismaService } from '../prisma/prisma.service';
 
 const CICLO_ES: Record<string, string> = { MENSUAL: 'mensual', ANUAL: 'anual' };
@@ -17,6 +21,8 @@ export class FacturasPlataformaService {
     private readonly facturasPlataformaRepository: FacturasPlataformaRepository,
     private readonly emailChannel: EmailChannel,
     private readonly plataformaWebhookChannel: PlataformaWebhookChannel,
+    private readonly plataformaConfigRepository: PlataformaConfigRepository,
+    private readonly ncfPlataformaService: NcfPlataformaService,
     private readonly prisma: PrismaService,
   ) {}
 
@@ -42,6 +48,7 @@ export class FacturasPlataformaService {
     const ahora = new Date();
     const periodo = ahora.toLocaleDateString('es-DO', { month: 'long', year: 'numeric' });
     const monto = Number(suscripcion.plan.precio);
+    const asignacionNcf = await this.ncfPlataformaService.asignarSiguiente();
 
     const factura = await this.facturasPlataformaRepository.crear({
       tenantId: suscripcion.tenantId,
@@ -53,6 +60,7 @@ export class FacturasPlataformaService {
       // admin puede moverla con PATCH si hace falta dar más plazo.
       fechaEmision: ahora,
       fechaVencimiento: ahora,
+      ...(asignacionNcf ?? {}),
     });
 
     await this.notificarFactura(suscripcion.tenantId, factura.id, 'generada');
@@ -69,6 +77,7 @@ export class FacturasPlataformaService {
     const monto = dto.lineas.reduce((acc, l) => acc + l.monto, 0);
     const ahora = new Date();
     const concepto = dto.lineas.length === 1 ? dto.lineas[0].concepto : `${dto.lineas[0].concepto} (+${dto.lineas.length - 1} más)`;
+    const asignacionNcf = await this.ncfPlataformaService.asignarSiguiente();
 
     const factura = await this.facturasPlataformaRepository.crear({
       tenantId: dto.tenantId,
@@ -79,6 +88,7 @@ export class FacturasPlataformaService {
       fechaEmision: ahora,
       fechaVencimiento: dto.fechaVencimiento ? new Date(dto.fechaVencimiento) : ahora,
       lineas: dto.lineas,
+      ...(asignacionNcf ?? {}),
     });
 
     await this.notificarFactura(dto.tenantId, factura.id, 'manual');
@@ -121,6 +131,14 @@ export class FacturasPlataformaService {
       throw new BadRequestException('No se puede anular una factura con pagos parciales registrados');
     }
     return this.facturasPlataformaRepository.marcarEstado(id, 'ANULADA');
+  }
+
+  async generarPdf(id: string) {
+    const [factura, config] = await Promise.all([this.facturasPlataformaRepository.buscarPorId(id), this.plataformaConfigRepository.obtenerOCrear()]);
+    const emisor = config.nombreNegocio
+      ? { nombre: config.nombreNegocio, rnc: config.rnc ?? undefined, direccion: config.direccion ?? undefined, telefono: config.telefono ?? undefined }
+      : undefined;
+    return generarDocumentoPdf(mapearFacturaPlataformaAParams(factura, emisor));
   }
 
   async marcarPagada(id: string, fechaPago: Date) {

@@ -1,5 +1,6 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, Res, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { Response } from 'express';
 import { FacturasPlataformaService } from './facturas-plataforma.service';
 import { PagosPlataformaService } from './pagos-plataforma.service';
 import { ListarFacturasPlataformaQueryDto } from './dto/listar-facturas-plataforma-query.dto';
@@ -46,6 +47,14 @@ export class FacturasPlataformaController {
   @PlatformPermissions('platform.facturacion.gestionar')
   actualizar(@Param('id') id: string, @Body() dto: ActualizarFacturaPlataformaDto) {
     return this.facturasPlataformaService.actualizar(id, dto);
+  }
+
+  @Get(':id/pdf')
+  @PlatformPermissions('platform.facturacion.ver')
+  async pdf(@Param('id') id: string, @Res() res: Response) {
+    const buffer = await this.facturasPlataformaService.generarPdf(id);
+    res.set({ 'Content-Type': 'application/pdf', 'Content-Disposition': 'inline; filename="factura.pdf"' });
+    res.send(buffer);
   }
 
   @Post(':id/anular')

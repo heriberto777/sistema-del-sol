@@ -7,9 +7,17 @@ import { Button } from '../components/atoms/Button/Button';
 import { Card } from '../components/atoms/Card/Card';
 import { Select } from '../components/atoms/Select/Select';
 import { Switch } from '../components/atoms/Switch/Switch';
+import { NcfPlataformaPanel } from '../components/organisms/NcfPlataformaPanel/NcfPlataformaPanel';
 
-interface ConfiguracionPlataforma {
-  general: { nombreNegocio: string | null };
+export interface ConfiguracionPlataforma {
+  general: {
+    nombreNegocio: string | null;
+    rnc: string | null;
+    direccion: string | null;
+    telefono: string | null;
+    email: string | null;
+    modalidadFacturacion: 'NCF' | 'ECF';
+  };
   notificaciones: {
     email: {
       habilitado: boolean | null;
@@ -51,7 +59,7 @@ interface ReglaNotificacion {
 
 const PLACEHOLDER_CONFIGURADO = '•••••••• (configurado)';
 
-const TABS = ['General', 'Notificaciones', 'Pasarela de pago', 'Webhook', 'Vencimientos'] as const;
+const TABS = ['General', 'NCF / e-CF', 'Notificaciones', 'Pasarela de pago', 'Webhook', 'Vencimientos'] as const;
 type Tab = (typeof TABS)[number];
 
 export function PlatformConfiguracion() {
@@ -95,6 +103,7 @@ export function PlatformConfiguracion() {
       ) : (
         <>
           {tab === 'General' && <SeccionGeneral config={config} guardar={guardar} />}
+          {tab === 'NCF / e-CF' && <NcfPlataformaPanel config={config} guardar={guardar} />}
           {tab === 'Notificaciones' && <SeccionNotificaciones config={config} guardar={guardar} />}
           {tab === 'Pasarela de pago' && <SeccionPasarela config={config} guardar={guardar} />}
           {tab === 'Webhook' && <SeccionWebhook config={config} guardar={guardar} />}
@@ -105,34 +114,48 @@ export function PlatformConfiguracion() {
   );
 }
 
-interface SeccionProps {
+export interface SeccionProps {
   config: ConfiguracionPlataforma;
   guardar: ReturnType<typeof useMutation<unknown, unknown, Record<string, unknown>>>;
 }
 
 function SeccionGeneral({ config, guardar }: SeccionProps) {
   const [nombreNegocio, setNombreNegocio] = useState(config.general.nombreNegocio ?? '');
+  const [rnc, setRnc] = useState(config.general.rnc ?? '');
+  const [direccion, setDireccion] = useState(config.general.direccion ?? '');
+  const [telefono, setTelefono] = useState(config.general.telefono ?? '');
+  const [email, setEmail] = useState(config.general.email ?? '');
 
-  useEffect(() => setNombreNegocio(config.general.nombreNegocio ?? ''), [config.general.nombreNegocio]);
+  useEffect(() => {
+    setNombreNegocio(config.general.nombreNegocio ?? '');
+    setRnc(config.general.rnc ?? '');
+    setDireccion(config.general.direccion ?? '');
+    setTelefono(config.general.telefono ?? '');
+    setEmail(config.general.email ?? '');
+  }, [config.general.nombreNegocio, config.general.rnc, config.general.direccion, config.general.telefono, config.general.email]);
 
   function onSubmit(e: FormEvent) {
     e.preventDefault();
-    guardar.mutate({ nombreNegocio });
+    guardar.mutate({ nombreNegocio, rnc, direccion, telefono, email });
   }
 
   return (
     <Card
-      titulo="Datos generales"
-      descripcion="Nombre de la plataforma usado en correos y comunicaciones (ej. recuperación de contraseña)."
+      titulo="Datos de mi empresa"
+      descripcion="Empresa que opera la plataforma — aparece como emisora en las facturas que se le cobran a cada tenant y en correos/comunicaciones."
     >
       <form onSubmit={onSubmit} className="max-w-md space-y-3">
         <FormField
           id="nombreNegocio"
-          label="Nombre de la plataforma"
+          label="Nombre de la empresa"
           value={nombreNegocio}
           onChange={(e) => setNombreNegocio(e.target.value)}
           placeholder="El Sistema del Sol"
         />
+        <FormField id="rnc" label="RNC" value={rnc} onChange={(e) => setRnc(e.target.value)} />
+        <FormField id="direccion" label="Dirección" value={direccion} onChange={(e) => setDireccion(e.target.value)} />
+        <FormField id="telefono" label="Teléfono" value={telefono} onChange={(e) => setTelefono(e.target.value)} />
+        <FormField id="email" label="Correo" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
         <Button type="submit" disabled={guardar.isPending}>
           {guardar.isPending ? 'Guardando…' : 'Guardar'}
         </Button>

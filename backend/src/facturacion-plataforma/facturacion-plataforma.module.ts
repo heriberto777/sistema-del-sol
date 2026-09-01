@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { NotificacionesModule } from '../notificaciones/notificaciones.module';
 import { PlataformaConfigModule } from '../plataforma-config/plataforma-config.module';
+import { NcfPlataformaModule } from '../ncf-plataforma/ncf-plataforma.module';
 import { ReglasNotificacionModule } from './reglas-notificacion/reglas-notificacion.module';
 import { TenantsModule } from '../tenants/tenants.module';
 import { SuscripcionController } from './suscripcion.controller';
@@ -19,7 +20,7 @@ import { AzulAdapter } from './pasarela/azul.adapter';
 import { CardNetAdapter } from './pasarela/cardnet.adapter';
 
 @Module({
-  imports: [NotificacionesModule, PlataformaConfigModule, ReglasNotificacionModule, TenantsModule],
+  imports: [NotificacionesModule, PlataformaConfigModule, NcfPlataformaModule, ReglasNotificacionModule, TenantsModule],
   controllers: [SuscripcionController, FacturasPlataformaController, PagoPublicoController],
   providers: [
     SuscripcionesService,

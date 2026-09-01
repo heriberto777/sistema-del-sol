@@ -10,6 +10,7 @@ import { Modal } from '../components/molecules/Modal/Modal';
 import { Paginacion } from '../components/molecules/Paginacion/Paginacion';
 import { PaginaResultado } from '../types/pagina-resultado';
 import { usePlatformAuth } from '../hooks/usePlatformAuth';
+import { abrirBlob } from '../lib/descargar-archivo';
 
 type EstadoFactura = 'PENDIENTE' | 'PAGADA' | 'VENCIDA' | 'ANULADA';
 
@@ -22,6 +23,7 @@ interface FacturaPlataforma {
   montoMora: string;
   total: string;
   estado: EstadoFactura;
+  ncf: string | null;
   fechaEmision: string;
   fechaVencimiento: string;
 }
@@ -104,12 +106,20 @@ function PanelFactura({ factura, onClose }: { factura: FacturaPlataforma; onClos
   const pendiente = Number(factura.total) - totalPagado;
   const editable = factura.estado === 'PENDIENTE' || factura.estado === 'VENCIDA';
 
+  async function descargarPdf() {
+    const respuesta = await platformApiClient.get(`/platform/facturas/${factura.id}/pdf`, { responseType: 'blob' });
+    abrirBlob(new Blob([respuesta.data], { type: 'application/pdf' }));
+  }
+
   return (
     <Modal titulo={factura.concepto} onClose={onClose}>
       <div className="space-y-4">
         <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm dark:bg-slate-800/60">
           <p>
             Tenant: <span className="font-medium">{factura.tenant.nombre}</span>
+          </p>
+          <p>
+            NCF: <span className="font-mono">{factura.ncf ?? 'Sin NCF asignado'}</span>
           </p>
           <p>
             Total: RD$ {Number(factura.total).toLocaleString('es-DO')} — Pagado: RD$ {totalPagado.toLocaleString('es-DO')} —
@@ -120,6 +130,10 @@ function PanelFactura({ factura, onClose }: { factura: FacturaPlataforma; onClos
             <Badge tono={TONO_POR_ESTADO[factura.estado]}>{factura.estado}</Badge>
           </p>
         </div>
+
+        <Button variante="secundario" onClick={descargarPdf} className="w-full">
+          Descargar PDF
+        </Button>
 
         {editable && puedeGestionar && (
           <div className="space-y-3">
@@ -250,6 +264,7 @@ export function PlatformFacturas() {
               <tr>
                 <th className="px-5 py-3 font-medium">Tenant</th>
                 <th className="px-5 py-3 font-medium">Concepto</th>
+                <th className="px-5 py-3 font-medium">NCF</th>
                 <th className="px-5 py-3 font-medium">Total</th>
                 <th className="px-5 py-3 font-medium">Estado</th>
                 <th className="px-5 py-3 font-medium">Vence</th>
@@ -261,6 +276,7 @@ export function PlatformFacturas() {
                 <tr key={factura.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
                   <td className="px-5 py-3">{factura.tenant.nombre}</td>
                   <td className="px-5 py-3">{factura.concepto}</td>
+                  <td className="px-5 py-3 font-mono text-xs">{factura.ncf ?? <span className="text-slate-400">—</span>}</td>
                   <td className="px-5 py-3">RD$ {Number(factura.total).toLocaleString('es-DO')}</td>
                   <td className="px-5 py-3">
                     <Badge tono={TONO_POR_ESTADO[factura.estado]}>{factura.estado}</Badge>
@@ -277,7 +293,7 @@ export function PlatformFacturas() {
               ))}
               {facturas?.datos.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-5 py-6 text-center text-slate-400">
+                  <td colSpan={7} className="px-5 py-6 text-center text-slate-400">
                     No hay facturas con ese filtro.
                   </td>
                 </tr>
