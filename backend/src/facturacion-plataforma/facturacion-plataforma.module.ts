@@ -34,5 +34,8 @@ import { CardNetAdapter } from './pasarela/cardnet.adapter';
     AzulAdapter,
     CardNetAdapter,
   ],
+  // Ítem "dashboard de plataforma" — PlatformDashboardModule necesita la
+  // cartera pendiente/vencida.
+  exports: [FacturasPlataformaService],
 })
 export class FacturacionPlataformaModule {}

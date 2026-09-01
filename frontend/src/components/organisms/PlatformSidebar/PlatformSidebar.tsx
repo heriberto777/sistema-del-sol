@@ -1,6 +1,16 @@
 import { NavLink } from 'react-router-dom';
 import clsx from 'clsx';
-import { Activity, Building2, CreditCard, Receipt, Settings, ShieldCheck, UserCog, type LucideIcon } from 'lucide-react';
+import {
+  Activity,
+  Building2,
+  CreditCard,
+  LayoutDashboard,
+  Receipt,
+  Settings,
+  ShieldCheck,
+  UserCog,
+  type LucideIcon,
+} from 'lucide-react';
 import { usePlatformAuth } from '../../../hooks/usePlatformAuth';
 
 interface Enlace {
@@ -11,6 +21,7 @@ interface Enlace {
 }
 
 const ENLACES: Enlace[] = [
+  { ruta: '/plataforma/dashboard', etiqueta: 'Dashboard', icono: LayoutDashboard, permiso: 'platform.tenants.ver' },
   { ruta: '/plataforma/tenants', etiqueta: 'Tenants', icono: Building2, permiso: 'platform.tenants.ver' },
   { ruta: '/plataforma/planes', etiqueta: 'Planes', icono: CreditCard, permiso: 'platform.planes.ver' },
   { ruta: '/plataforma/facturas', etiqueta: 'Facturas', icono: Receipt, permiso: 'platform.facturacion.ver' },

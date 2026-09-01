@@ -28,6 +28,11 @@ export class FacturasPlataformaService {
     return this.facturasPlataformaRepository.buscarPorId(id);
   }
 
+  /** Ítem "dashboard de plataforma" — mismo universo que ya usa el cron para las reglas de notificación. */
+  listarPendientesOVencidas() {
+    return this.facturasPlataformaRepository.listarPendientesOVencidas();
+  }
+
   /**
    * Reutilizado tanto por el cron diario (facturación recurrente) como
    * por "generar factura ahora" manual — una sola fuente de verdad para

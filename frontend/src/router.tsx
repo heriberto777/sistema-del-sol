@@ -33,6 +33,7 @@ import { Bancos } from './pages/Bancos';
 import { GastosMenores } from './pages/GastosMenores';
 import { Admin } from './pages/Admin';
 import { PlatformLogin } from './pages/PlatformLogin';
+import { PlatformDashboard } from './pages/PlatformDashboard';
 import { PlatformTenants } from './pages/PlatformTenants';
 import { PlatformPlanes } from './pages/PlatformPlanes';
 import { PlatformRoles } from './pages/PlatformRoles';
@@ -71,6 +72,8 @@ export const router = createBrowserRouter([
       {
         element: <PlatformLayout />,
         children: [
+          { path: '/plataforma', element: <Navigate to="/plataforma/dashboard" replace /> },
+          { path: '/plataforma/dashboard', element: <PlatformDashboard /> },
           { path: '/plataforma/tenants', element: <PlatformTenants /> },
           { path: '/plataforma/planes', element: <PlatformPlanes /> },
           { path: '/plataforma/roles', element: <PlatformRoles /> },

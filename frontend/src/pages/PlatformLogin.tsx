@@ -17,7 +17,7 @@ export function PlatformLogin() {
     setError(null);
     try {
       await login(email, password);
-      navigate('/plataforma/tenants');
+      navigate('/plataforma/dashboard');
     } catch {
       setError('Credenciales inválidas');
     }

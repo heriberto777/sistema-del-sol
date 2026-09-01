@@ -27,6 +27,7 @@ import { UsuariosModule } from './usuarios/usuarios.module';
 import { PlanesModule } from './planes/planes.module';
 import { PlatformAdminsModule } from './platform-admins/platform-admins.module';
 import { FacturacionPlataformaModule } from './facturacion-plataforma/facturacion-plataforma.module';
+import { PlatformDashboardModule } from './platform-dashboard/platform-dashboard.module';
 import { PlataformaConfigModule } from './plataforma-config/plataforma-config.module';
 import { ConfiguracionesModule } from './configuraciones/configuraciones.module';
 import { PlatformAuthModule } from './platform-auth/platform-auth.module';
@@ -107,6 +108,7 @@ import { TenantMiddleware } from './common/middleware/tenant.middleware';
     PlanesModule,
     PlatformAdminsModule,
     FacturacionPlataformaModule,
+    PlatformDashboardModule,
     PlataformaConfigModule,
     ConfiguracionesModule,
     PlatformAuthModule,
