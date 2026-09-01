@@ -106,6 +106,7 @@ model Tenant {
   whatsappMensajes          WhatsappMensaje[]
   pasarelaConfig            PasarelaConfigTenant?
   sesionesCobroFactura      SesionCobroFactura[]
+  pedidosTienda             PedidoTienda[]
 
   @@map("tenants")
 }
@@ -898,6 +899,29 @@ model SesionCobroFactura {
   @@unique([pasarela, referenciaExterna])
   @@index([facturaId])
   @@map("sesiones_cobro_factura")
+}
+
+/// Wrapper de un pedido de la Tienda Online (plugin e-commerce, Fase 3)
+/// sobre una Factura ya creada — igual criterio que SesionCobroFactura:
+/// `facturaId` sin `@relation` a Factura a propósito (evita tocar ese
+/// modelo gigante por cada tabla nueva que lo referencia; la integridad
+/// la garantiza que solo `EcommerceService.crearPedido` la escribe, justo
+/// después de crear la Factura). Guarda los datos de contacto/entrega del
+/// comprador guest que ni Factura ni el "Consumidor Final" genérico
+/// tienen forma de guardar hoy.
+model PedidoTienda {
+  id               String   @id @default(uuid())
+  tenantId         String
+  tenant           Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  facturaId        String   @unique
+  clienteNombre    String
+  clienteTelefono  String
+  clienteEmail     String?
+  direccionEntrega String
+  notas            String?
+  createdAt        DateTime @default(now())
+
+  @@map("pedidos_tienda")
 }
 
 model NcfAsignado {

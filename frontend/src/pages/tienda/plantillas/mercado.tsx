@@ -203,9 +203,9 @@ function MercadoCarrito({ config, subdominio, carrito }: PropsCarrito) {
             <p className="text-lg font-bold" style={{ fontFamily: FONT_DISPLAY }}>
               Total: {formatearPrecio(carrito.total)}
             </p>
-            <button type="button" disabled className="cursor-not-allowed rounded-full px-6 py-3 text-sm font-bold text-white opacity-60" style={{ background: accent }}>
-              Finalizar compra (próximamente)
-            </button>
+            <Link to={`/tienda/${subdominio}/checkout`} className="rounded-full px-6 py-3 text-sm font-bold text-white" style={{ background: accent }}>
+              Finalizar compra
+            </Link>
           </div>
         )}
       </div>

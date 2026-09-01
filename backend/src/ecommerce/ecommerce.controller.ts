@@ -1,8 +1,10 @@
-import { Controller, Get, Param, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query, Req } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { EcommerceService } from './ecommerce.service';
 import { CatalogoTiendaQueryDto } from './dto/catalogo-tienda-query.dto';
+import { CrearPedidoTiendaDto } from './dto/crear-pedido-tienda.dto';
 import { Public } from '../common/decorators/public.decorator';
+import { AuthenticatedRequest } from '../common/types/authenticated-request';
 
 /**
  * Storefront público de la Tienda Online (plugin e-commerce v1) — sin
@@ -30,5 +32,10 @@ export class EcommerceController {
   @Get('productos/:productoId')
   producto(@Param('subdominio') subdominio: string, @Param('productoId') productoId: string) {
     return this.ecommerceService.producto(subdominio, productoId);
+  }
+
+  @Post('pedidos')
+  crearPedido(@Param('subdominio') subdominio: string, @Body() dto: CrearPedidoTiendaDto, @Req() request: AuthenticatedRequest) {
+    return this.ecommerceService.crearPedido(subdominio, dto, request);
   }
 }

@@ -51,6 +51,7 @@ import { VerFactura, VerCotizacion } from './pages/VerDocumentoPublico';
 import { TiendaHome } from './pages/tienda/TiendaHome';
 import { TiendaProducto } from './pages/tienda/TiendaProducto';
 import { TiendaCarrito } from './pages/tienda/TiendaCarrito';
+import { TiendaCheckout } from './pages/tienda/TiendaCheckout';
 
 export const router = createBrowserRouter([
   { path: '*', element: <NoEncontrado /> },
@@ -74,6 +75,7 @@ export const router = createBrowserRouter([
   { path: '/tienda/:subdominio', element: <TiendaHome /> },
   { path: '/tienda/:subdominio/producto/:productoId', element: <TiendaProducto /> },
   { path: '/tienda/:subdominio/carrito', element: <TiendaCarrito /> },
+  { path: '/tienda/:subdominio/checkout', element: <TiendaCheckout /> },
   {
     element: <RutaProtegidaPlataforma />,
     children: [

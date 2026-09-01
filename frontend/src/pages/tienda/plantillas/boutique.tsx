@@ -179,9 +179,9 @@ function BoutiqueCarrito({ config, subdominio, carrito }: PropsCarrito) {
             <p className="text-xl font-semibold" style={{ fontFamily: FONT_DISPLAY }}>
               Total: {formatearPrecio(carrito.total)}
             </p>
-            <button type="button" disabled className="cursor-not-allowed border px-8 py-3 text-[11px] font-semibold uppercase tracking-widest opacity-50" style={{ borderColor: accent, color: accent }}>
-              Finalizar compra (próximamente)
-            </button>
+            <Link to={`/tienda/${subdominio}/checkout`} className="border px-8 py-3 text-[11px] font-semibold uppercase tracking-widest" style={{ borderColor: accent, color: accent }}>
+              Finalizar compra
+            </Link>
           </div>
         )}
       </div>

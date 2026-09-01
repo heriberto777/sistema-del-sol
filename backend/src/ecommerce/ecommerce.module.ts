@@ -1,7 +1,11 @@
 import { Module } from '@nestjs/common';
 import { EcommerceController } from './ecommerce.controller';
+import { EcommercePedidosController } from './ecommerce-pedidos.controller';
 import { EcommerceService } from './ecommerce.service';
 import { EcommerceRepository } from './ecommerce.repository';
+import { PedidosTiendaRepository } from './pedidos-tienda.repository';
+import { FacturacionModule } from '../facturacion/facturacion.module';
+import { ClientesModule } from '../clientes/clientes.module';
 
 /**
  * Plugin "Tienda Online" (catálogo en `plugins/ecommerce/plugin.json`,
@@ -14,7 +18,8 @@ import { EcommerceRepository } from './ecommerce.repository';
  * real y funcional tiene que estar acá para que `nest build` lo levante.
  */
 @Module({
-  controllers: [EcommerceController],
-  providers: [EcommerceService, EcommerceRepository],
+  imports: [FacturacionModule, ClientesModule],
+  controllers: [EcommerceController, EcommercePedidosController],
+  providers: [EcommerceService, EcommerceRepository, PedidosTiendaRepository],
 })
 export class EcommerceModule {}

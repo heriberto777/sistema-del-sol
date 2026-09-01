@@ -10,6 +10,33 @@ export class EcommerceRepository {
     return this.prisma.tenant.findUnique({ where: { subdominio } });
   }
 
+  /** El "Admin Total" más antiguo del tenant, atribuido como vendedor del pedido — mismo criterio que FacturasPlataformaService.notificarPorRegla para acciones sin un usuario real detrás. */
+  buscarAdminMasAntiguo(tenantId: string) {
+    return this.prisma.user.findFirst({
+      where: { tenantId, roles: { some: { role: { nombre: 'Admin Total' } } } },
+      orderBy: { createdAt: 'asc' },
+    });
+  }
+
+  /**
+   * `PrismaService` global con `tenantId` explícito, mismo criterio que
+   * `SesionesCobroRepository.crear` — este repositorio ya opera fuera de
+   * request-scoping (rutas públicas), y `crearPedido` en el servicio se
+   * llama DESPUÉS de que `FacturacionService.crear()` ya confirmó la
+   * Factura, así que esta fila nunca precede a la venta real.
+   */
+  crearPedido(data: {
+    tenantId: string;
+    facturaId: string;
+    clienteNombre: string;
+    clienteTelefono: string;
+    clienteEmail?: string;
+    direccionEntrega: string;
+    notas?: string;
+  }) {
+    return this.prisma.pedidoTienda.create({ data });
+  }
+
   private whereCatalogo(tenantId: string, busqueda?: string, categoriaId?: string) {
     return {
       tenantId,

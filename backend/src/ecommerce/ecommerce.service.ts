@@ -1,16 +1,25 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { EcommerceRepository } from './ecommerce.repository';
+import { PedidosTiendaRepository } from './pedidos-tienda.repository';
 import { resolverConfigTienda } from './resolver-config-tienda';
 import { moduloEstaActivo } from '../planes/resolver-modulos-activos';
 import { paginar } from '../common/types/pagina-resultado';
 import { PrismaService } from '../prisma/prisma.service';
 import { CatalogoTiendaQueryDto } from './dto/catalogo-tienda-query.dto';
+import { CrearPedidoTiendaDto } from './dto/crear-pedido-tienda.dto';
+import { ListadoQueryDto } from '../common/dto/listado-query.dto';
+import { ClientesService } from '../clientes/clientes.service';
+import { FacturacionService } from '../facturacion/facturacion.service';
+import { AuthenticatedRequest, JwtPayloadUser } from '../common/types/authenticated-request';
 
 @Injectable()
 export class EcommerceService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly ecommerceRepository: EcommerceRepository,
+    private readonly pedidosTiendaRepository: PedidosTiendaRepository,
+    private readonly clientesService: ClientesService,
+    private readonly facturacionService: FacturacionService,
   ) {}
 
   /**
@@ -71,5 +80,68 @@ export class EcommerceService {
     const producto = await this.ecommerceRepository.buscarProductoPublico(tenant.id, productoId, config.bodegaId);
     if (!producto) throw new NotFoundException('Producto no encontrado');
     return producto;
+  }
+
+  /**
+   * Crea el pedido = crea una Factura CONTADO real (mismo motor que
+   * Facturación/POS — ITBIS/stock/NCF sin duplicar nada) y la envuelve en
+   * un `PedidoTienda` con los datos de contacto/entrega del guest. Sin
+   * `formaPagoId`/`pagos`, la Factura queda EMITIDA sin pagar — lista
+   * para el checkout público YA existente
+   * (`cobros-publicos.service.ts.crearCheckout`, que exige exactamente
+   * ese estado). `request` se "forja" con el tenant/vendedor resueltos
+   * para reusar `ClientesService`/`FacturacionService` (request-scoped
+   * vía `TenantPrismaService`) tal cual — mismo patrón documentado en
+   * `CobrosPublicosService.procesarRetorno`.
+   */
+  async crearPedido(subdominio: string, dto: CrearPedidoTiendaDto, request: AuthenticatedRequest) {
+    const { tenant, config } = await this.resolverTiendaPublica(subdominio);
+    if (!config.bodegaId) {
+      throw new ServiceUnavailableException('Esta tienda no tiene una bodega configurada — contactá al negocio');
+    }
+
+    const vendedor = await this.ecommerceRepository.buscarAdminMasAntiguo(tenant.id);
+    if (!vendedor) {
+      throw new ServiceUnavailableException('Esta tienda no puede procesar pedidos en este momento');
+    }
+
+    request.user = { tenantId: tenant.id, userId: vendedor.id, email: '', roles: [], permisos: [] } as JwtPayloadUser;
+
+    const consumidorFinal = await this.clientesService.buscarConsumidorFinal();
+    if (!consumidorFinal) {
+      throw new ServiceUnavailableException('Esta tienda no puede procesar pedidos en este momento');
+    }
+
+    const factura = await this.facturacionService.crear(
+      {
+        clienteId: consumidorFinal.id,
+        bodegaId: config.bodegaId,
+        tipoFactura: 'CONTADO',
+        lineas: dto.lineas.map((l) => ({ productoId: l.productoId, varianteId: l.varianteId, cantidad: l.cantidad })),
+      },
+      tenant.id,
+      vendedor.id,
+    );
+
+    await this.ecommerceRepository.crearPedido({
+      tenantId: tenant.id,
+      facturaId: factura.id,
+      clienteNombre: dto.clienteNombre,
+      clienteTelefono: dto.clienteTelefono,
+      clienteEmail: dto.clienteEmail,
+      direccionEntrega: dto.direccionEntrega,
+      notas: dto.notas,
+    });
+
+    return { facturaId: factura.id };
+  }
+
+  async listarPedidos(query: ListadoQueryDto) {
+    const { pagina, tamanoPagina, skip, take } = paginar(query.pagina, query.tamanoPagina);
+    const [pedidos, total] = await this.pedidosTiendaRepository.listar({ skip, take });
+    const facturas = await this.pedidosTiendaRepository.facturasPorIds(pedidos.map((p) => p.facturaId));
+    const facturasPorId = new Map(facturas.map((f) => [f.id, f]));
+    const datos = pedidos.map((p) => ({ ...p, factura: facturasPorId.get(p.facturaId) ?? null }));
+    return { datos, total, pagina, tamanoPagina };
   }
 }
