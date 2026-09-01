@@ -7,6 +7,7 @@ import { WhatsappConfigPanel } from '../components/organisms/WhatsappConfigPanel
 import { BandejaWhatsappPanel } from '../components/organisms/BandejaWhatsappPanel/BandejaWhatsappPanel';
 import { ConfiguracionesPanel } from '../components/organisms/ConfiguracionesPanel/ConfiguracionesPanel';
 import { NcfPanel } from '../components/organisms/NcfPanel/NcfPanel';
+import { TenantEmpresaPanel } from '../components/organisms/TenantEmpresaPanel/TenantEmpresaPanel';
 import { CorrelativosPanel } from '../components/organisms/CorrelativosPanel/CorrelativosPanel';
 import { PasarelaCobroConfigPanel } from '../components/organisms/PasarelaCobroConfigPanel/PasarelaCobroConfigPanel';
 import { FormasPagoPanel } from '../components/organisms/FormasPagoPanel/FormasPagoPanel';
@@ -53,6 +54,7 @@ const CATEGORIAS: Categoria[] = [
     etiqueta: 'Facturación',
     descripcion: 'Numeraciones de NCF (comprobantes fiscales), formas de pago y bonos.',
     pestanas: [
+      { id: 'empresa-fiscal', etiqueta: 'Datos de mi empresa', permiso: 'admin.configuracion', panel: TenantEmpresaPanel },
       { id: 'ncf', etiqueta: 'NCF', permiso: 'admin.configuracion', panel: NcfPanel },
       { id: 'consecutivos', etiqueta: 'Consecutivos', permiso: 'admin.configuracion', panel: CorrelativosPanel },
       { id: 'formas-pago', etiqueta: 'Formas de pago', permiso: 'admin.configuracion', panel: FormasPagoPanel },

@@ -21,6 +21,13 @@ model Tenant {
   id                   String               @id @default(uuid())
   nombre               String
   rnc                  String?
+  // Ítem "e-CF real" — datos del emisor que el propio tenant edita
+  // self-service (ver TenantEmpresaController), obligatorios para
+  // `sender` en el payload de Alanube. Antes de esto Tenant solo tenía
+  // `rnc` (editable únicamente por el super admin de plataforma).
+  direccion            String?
+  telefono             String?
+  email                String?
   subdominio           String               @unique
   estado               EstadoTenant         @default(ACTIVO)
   // Qué módulos tiene disponibles este tenant — ver ModuloActivoGuard.
