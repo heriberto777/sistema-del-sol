@@ -21,6 +21,7 @@ export const MODULOS_BASE: { clave: string; nombre: string }[] = [
   { clave: 'gastosmenores', nombre: 'Gastos menores' },
   { clave: 'ia', nombre: 'IA' },
   { clave: 'inmobiliaria', nombre: 'Inmobiliaria (plugin)' },
+  { clave: 'ecommerce', nombre: 'Tienda Online (plugin)' },
 ];
 
 export const PLANES_BASE: Record<string, { descripcion: string; modulos: string[] }> = {
@@ -36,7 +37,7 @@ export const PLANES_BASE: Record<string, { descripcion: string; modulos: string[
     descripcion: 'Todo lo anterior + nómina, IA y plugins.',
     modulos: [
       'facturacion', 'cotizaciones', 'remisiones', 'inventario', 'compras', 'productos',
-      'pos', 'bancos', 'gastosmenores', 'nomina', 'ia', 'inmobiliaria',
+      'pos', 'bancos', 'gastosmenores', 'nomina', 'ia', 'inmobiliaria', 'ecommerce',
     ],
   },
 };

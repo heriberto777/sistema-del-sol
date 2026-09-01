@@ -10,6 +10,7 @@ import {
   CalendarClock,
   Contact,
   FileText,
+  Globe,
   HandCoins,
   LayoutDashboard,
   Landmark,
@@ -57,6 +58,7 @@ const GRUPOS: Grupo[] = [
       { ruta: '/remisiones', etiqueta: 'Remisiones', icono: Truck, permisos: ['remisiones.ver'], modulo: 'remisiones' },
       { ruta: '/notas-credito', etiqueta: 'Notas de crédito/débito', icono: RotateCcw, permisos: ['facturacion.ver'], modulo: 'facturacion' },
       { ruta: '/pos', etiqueta: 'Punto de venta', icono: Store, permisos: ['pos.ver'], modulo: 'pos' },
+      { ruta: '/tienda-online', etiqueta: 'Tienda Online', icono: Globe, permisos: ['admin.configuracion'], modulo: 'ecommerce' },
       // Sirve tanto a Ventas (clientes) como a Compras (proveedores) —
       // se prioriza acá por ser el uso más frecuente.
       { ruta: '/contactos', etiqueta: 'Contactos', icono: Contact, permisos: ['clientes.ver', 'compras.ver'] },

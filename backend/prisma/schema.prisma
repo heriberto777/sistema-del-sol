@@ -2236,6 +2236,12 @@ model Producto {
   precioVariable      Boolean              @default(false)
   esIngrediente       Boolean              @default(false)
   permiteDevolucion   Boolean              @default(true)
+  // Opt-out (plan "Tienda Online", plugin e-commerce v1) — catálogo
+  // existente visible por defecto en la tienda pública para no exigirle
+  // a un tenant marcar producto por producto; se apaga puntualmente para
+  // ocultar algo del storefront sin tocar Producto.activo (que también
+  // afecta Facturación/POS/Compras).
+  visibleEnTienda     Boolean              @default(true)
   // Comisión de venta (plan de integración Cuadre, ítem A-1) — mutuamente
   // excluyentes (validado en ProductosService, no en el schema, mismo
   // criterio que Oferta.valor/comprarCantidad): `porcentajeComision` (%

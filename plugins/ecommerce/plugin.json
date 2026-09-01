@@ -1,0 +1,6 @@
+{
+  "key": "ecommerce",
+  "nombre": "Tienda Online",
+  "version": "0.1.0",
+  "descripcion": "Storefront público (catálogo + carrito + checkout) sobre el mismo dominio, con plantilla fija seleccionable. Implementación real en backend/src/ecommerce/ — ver README.md."
+}

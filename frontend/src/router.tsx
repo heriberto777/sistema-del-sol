@@ -31,6 +31,7 @@ import { Ia } from './pages/Ia';
 import { Notificaciones } from './pages/Notificaciones';
 import { Bancos } from './pages/Bancos';
 import { GastosMenores } from './pages/GastosMenores';
+import { TiendaOnline } from './pages/TiendaOnline';
 import { Admin } from './pages/Admin';
 import { PlatformLogin } from './pages/PlatformLogin';
 import { PlatformDashboard } from './pages/PlatformDashboard';
@@ -111,6 +112,7 @@ export const router = createBrowserRouter([
           { path: '/contabilidad', element: <Contabilidad /> },
           { path: '/bancos', element: <Bancos /> },
           { path: '/gastos-menores', element: <GastosMenores /> },
+          { path: '/tienda-online', element: <TiendaOnline /> },
           { path: '/nomina', element: <Nomina /> },
           { path: '/rrhh', element: <RRHH /> },
           { path: '/pos', element: <Pos /> },
