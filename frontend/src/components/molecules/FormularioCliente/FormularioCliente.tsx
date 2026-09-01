@@ -8,7 +8,11 @@ import { SelectListaPrecio } from '../SelectListaPrecio/SelectListaPrecio';
 import { SelectCategoriaCliente } from '../SelectCategoriaCliente/SelectCategoriaCliente';
 
 export type TipoCliente = 'PERSONA_FISICA' | 'PERSONA_JURIDICA';
-export type ComprobantePorDefecto = 'CONTADO' | 'CREDITO' | 'REGIMEN_ESPECIAL' | 'GUBERNAMENTAL';
+// Ítem "separar Comprobante Fiscal de Opción de Pago" — antes un solo
+// enum (ComprobantePorDefecto) mezclaba los dos conceptos. Un cliente
+// puede necesitar Crédito Fiscal (B01) aunque pague de contado.
+export type TipoComprobanteFiscal = 'CONSUMO' | 'CREDITO_FISCAL' | 'REGIMEN_ESPECIAL' | 'GUBERNAMENTAL';
+export type CondicionPago = 'CONTADO' | 'CREDITO';
 
 export interface Cliente {
   id: string;
@@ -21,7 +25,9 @@ export interface Cliente {
   listaPrecioId: string | null;
   listaPrecio: { id: string; nombre: string } | null;
   categoriaId: string | null;
-  comprobantePorDefecto: ComprobantePorDefecto | null;
+  comprobanteFiscalPorDefecto: TipoComprobanteFiscal | null;
+  condicionPagoPorDefecto: CondicionPago | null;
+  plazoPagoDias: number;
   puntosLealtad: number;
 }
 
@@ -34,7 +40,9 @@ export interface ClienteFormValues {
   limiteCredito: string;
   listaPrecioId: string;
   categoriaId: string;
-  comprobantePorDefecto: ComprobantePorDefecto | '';
+  comprobanteFiscalPorDefecto: TipoComprobanteFiscal | '';
+  condicionPagoPorDefecto: CondicionPago | '';
+  plazoPagoDias: string;
 }
 
 export const CLIENTE_VACIO: ClienteFormValues = {
@@ -46,7 +54,9 @@ export const CLIENTE_VACIO: ClienteFormValues = {
   limiteCredito: '',
   listaPrecioId: '',
   categoriaId: '',
-  comprobantePorDefecto: '',
+  comprobanteFiscalPorDefecto: '',
+  condicionPagoPorDefecto: '',
+  plazoPagoDias: '30',
 };
 
 /**
@@ -71,7 +81,9 @@ export function FormularioCliente({ cliente, onGuardado }: { cliente: Cliente | 
           limiteCredito: cliente.limiteCredito ?? '',
           listaPrecioId: cliente.listaPrecioId ?? '',
           categoriaId: cliente.categoriaId ?? '',
-          comprobantePorDefecto: cliente.comprobantePorDefecto ?? '',
+          comprobanteFiscalPorDefecto: cliente.comprobanteFiscalPorDefecto ?? '',
+          condicionPagoPorDefecto: cliente.condicionPagoPorDefecto ?? '',
+          plazoPagoDias: String(cliente.plazoPagoDias),
         }
       : CLIENTE_VACIO,
   );
@@ -87,7 +99,9 @@ export function FormularioCliente({ cliente, onGuardado }: { cliente: Cliente | 
       limiteCredito: valores.limiteCredito ? Number(valores.limiteCredito) : undefined,
       listaPrecioId: valores.listaPrecioId || null,
       categoriaId: valores.categoriaId || null,
-      comprobantePorDefecto: valores.comprobantePorDefecto || null,
+      comprobanteFiscalPorDefecto: valores.comprobanteFiscalPorDefecto || null,
+      condicionPagoPorDefecto: valores.condicionPagoPorDefecto || null,
+      plazoPagoDias: valores.plazoPagoDias ? Number(valores.plazoPagoDias) : undefined,
     };
   }
 
@@ -174,18 +188,43 @@ export function FormularioCliente({ cliente, onGuardado }: { cliente: Cliente | 
           onChange={(id) => setValores((v) => ({ ...v, categoriaId: id }))}
         />
       </div>
+
+      {/* Ítem "separar Comprobante Fiscal de Opción de Pago" — dos campos
+          independientes: qué NCF emite la DGII, y si se cobra al crear o
+          queda pendiente en Cuentas por Cobrar. Ambos autoseleccionan sus
+          respectivos campos al facturarle a este cliente, sin depender
+          uno del otro. */}
       <SelectField
-        id="cliente-comprobante-defecto"
+        id="cliente-comprobante-fiscal"
         label="Comprobante fiscal por defecto (opcional)"
-        value={valores.comprobantePorDefecto}
-        onChange={(e) => setValores((v) => ({ ...v, comprobantePorDefecto: e.target.value as ComprobantePorDefecto | '' }))}
+        value={valores.comprobanteFiscalPorDefecto}
+        onChange={(e) => setValores((v) => ({ ...v, comprobanteFiscalPorDefecto: e.target.value as TipoComprobanteFiscal | '' }))}
+      >
+        <option value="">Sin default — elegir cada vez al facturar</option>
+        <option value="CONSUMO">Consumo (B02)</option>
+        <option value="CREDITO_FISCAL">Crédito Fiscal (B01)</option>
+        <option value="REGIMEN_ESPECIAL">Régimen Especial (B14)</option>
+        <option value="GUBERNAMENTAL">Gubernamental (B15)</option>
+      </SelectField>
+      <SelectField
+        id="cliente-condicion-pago"
+        label="Opción de pago por defecto (opcional)"
+        value={valores.condicionPagoPorDefecto}
+        onChange={(e) => setValores((v) => ({ ...v, condicionPagoPorDefecto: e.target.value as CondicionPago | '' }))}
       >
         <option value="">Sin default — elegir cada vez al facturar</option>
         <option value="CONTADO">Contado</option>
         <option value="CREDITO">Crédito</option>
-        <option value="REGIMEN_ESPECIAL">Régimen Especial (B14)</option>
-        <option value="GUBERNAMENTAL">Gubernamental (B15)</option>
       </SelectField>
+      <FormField
+        id="cliente-plazo-pago"
+        label="Días de crédito"
+        type="number"
+        min={1}
+        value={valores.plazoPagoDias}
+        onChange={(e) => setValores((v) => ({ ...v, plazoPagoDias: e.target.value }))}
+      />
+
       {error && <p className="text-sm text-red-600">{error}</p>}
       <Button type="submit" disabled={guardar.isPending} className="w-full">
         {guardar.isPending ? 'Guardando…' : 'Guardar'}

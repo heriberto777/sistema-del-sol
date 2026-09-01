@@ -23,7 +23,9 @@ interface Cliente {
   id: string;
   nombre: string;
   listaPrecio: { id: string; nombre: string } | null;
-  comprobantePorDefecto: 'CONTADO' | 'CREDITO' | 'REGIMEN_ESPECIAL' | 'GUBERNAMENTAL' | null;
+  comprobanteFiscalPorDefecto: 'CONSUMO' | 'CREDITO_FISCAL' | 'REGIMEN_ESPECIAL' | 'GUBERNAMENTAL' | null;
+  condicionPagoPorDefecto: 'CONTADO' | 'CREDITO' | null;
+  plazoPagoDias: number;
 }
 
 interface Producto {
@@ -77,7 +79,7 @@ function ModalNuevaFactura({ onClose }: { onClose: () => void }) {
   const [cliente, setCliente] = useState<Cliente | null>(null);
   const [bodegaId, setBodegaId] = useState('');
   const [tipoFactura, setTipoFactura] = useState<'CONTADO' | 'CREDITO'>('CONTADO');
-  const [tipoComprobanteEspecial, setTipoComprobanteEspecial] = useState('');
+  const [comprobanteFiscal, setComprobanteFiscal] = useState<'CONSUMO' | 'CREDITO_FISCAL' | 'REGIMEN_ESPECIAL' | 'GUBERNAMENTAL'>('CONSUMO');
   const [plazoPagoDias, setPlazoPagoDias] = useState(30);
   // Ítem Cobranza — captura el cobro al crear una factura CONTADO fuera de
   // POS (igual que POS), para que quede un registro de pago y la factura
@@ -104,21 +106,15 @@ function ModalNuevaFactura({ onClose }: { onClose: () => void }) {
   const { data: listasPrecio } = useListasPrecio();
   const listaPrecioResuelta = cliente?.listaPrecio?.nombre ?? 'GENERAL';
 
-  // Comprobante fiscal por defecto del cliente (plan de integración Cuadre,
-  // ítem E-5) — autoselecciona tipoFactura + tipoComprobanteEspecial al
-  // elegir el cliente; el usuario puede cambiarlo igual después, es solo un
-  // valor inicial. CONTADO/CREDITO fijan tipoFactura y limpian el especial;
-  // REGIMEN_ESPECIAL/GUBERNAMENTAL solo fijan el especial (tipoFactura queda
-  // en lo que ya estuviera — ver TIPO_NCF_ESPECIAL en facturacion.service.ts).
+  // Comprobante fiscal y opción de pago por defecto del cliente (ítem
+  // "separar Comprobante Fiscal de Opción de Pago") — autoseleccionan,
+  // cada uno por su lado, al elegir el cliente; el usuario puede cambiar
+  // cualquiera de los dos después, son solo valores iniciales. Antes un
+  // solo campo (comprobantePorDefecto) mezclaba ambos conceptos.
   useEffect(() => {
-    const defecto = cliente?.comprobantePorDefecto;
-    if (!defecto) return;
-    if (defecto === 'CONTADO' || defecto === 'CREDITO') {
-      setTipoFactura(defecto);
-      setTipoComprobanteEspecial('');
-    } else {
-      setTipoComprobanteEspecial(defecto);
-    }
+    if (cliente?.condicionPagoPorDefecto) setTipoFactura(cliente.condicionPagoPorDefecto);
+    if (cliente?.comprobanteFiscalPorDefecto) setComprobanteFiscal(cliente.comprobanteFiscalPorDefecto);
+    if (cliente) setPlazoPagoDias(cliente.plazoPagoDias);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cliente?.id]);
   const { data: productos } = useQuery({
@@ -135,7 +131,7 @@ function ModalNuevaFactura({ onClose }: { onClose: () => void }) {
         clienteId: cliente?.id,
         bodegaId,
         tipoFactura,
-        tipoComprobanteEspecial: tipoComprobanteEspecial || undefined,
+        comprobanteFiscal,
         listaPrecio: listaPrecioOverride || undefined,
         plazoPagoDias: tipoFactura === 'CREDITO' ? plazoPagoDias : undefined,
         formaPagoId: tipoFactura === 'CONTADO' ? formaPagoId || undefined : undefined,
@@ -245,7 +241,7 @@ function ModalNuevaFactura({ onClose }: { onClose: () => void }) {
           </div>
 
           <div className="flex flex-col gap-1">
-            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Tipo</label>
+            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Opción de pago</label>
             <Select value={tipoFactura} onChange={(e) => setTipoFactura(e.target.value as 'CONTADO' | 'CREDITO')}>
               <option value="CONTADO">Contado</option>
               <option value="CREDITO">Crédito</option>
@@ -253,9 +249,13 @@ function ModalNuevaFactura({ onClose }: { onClose: () => void }) {
           </div>
 
           <div className="flex flex-col gap-1">
-            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Tipo de comprobante</label>
-            <Select value={tipoComprobanteEspecial} onChange={(e) => setTipoComprobanteEspecial(e.target.value)}>
-              <option value="">Normal</option>
+            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Comprobante fiscal</label>
+            <Select
+              value={comprobanteFiscal}
+              onChange={(e) => setComprobanteFiscal(e.target.value as typeof comprobanteFiscal)}
+            >
+              <option value="CONSUMO">Consumo (B02)</option>
+              <option value="CREDITO_FISCAL">Crédito Fiscal (B01)</option>
               <option value="REGIMEN_ESPECIAL">Régimen Especial (B14)</option>
               <option value="GUBERNAMENTAL">Gubernamental (B15)</option>
             </Select>

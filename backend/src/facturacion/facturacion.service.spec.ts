@@ -659,16 +659,18 @@ describe('FacturacionService', () => {
     expect(repository.siguienteNcfEnTx).toHaveBeenCalledWith(TX, tipoEcfEsperado, 's1');
   });
 
-  describe('tipoComprobanteEspecial (plan de integración Cuadre, ítem B-1)', () => {
+  describe('comprobanteFiscal (ítem "separar Comprobante Fiscal de Opción de Pago")', () => {
     it.each([
       ['REGIMEN_ESPECIAL', 'B14'],
       ['GUBERNAMENTAL', 'B15'],
-    ])('%s en una venta CONTADO usa %s en vez del NCF normal', async (tipoComprobanteEspecial, tipoNcfEsperado) => {
+      ['CREDITO_FISCAL', 'B01'],
+      ['CONSUMO', 'B02'],
+    ])('%s en una venta CONTADO usa %s en vez del NCF normal', async (comprobanteFiscal, tipoNcfEsperado) => {
       repository.obtenerProductoConPrecioVigente.mockResolvedValue(producto(18, 100) as never);
       repository.crearFacturaEnTx.mockResolvedValue(facturaCreada() as never);
 
       await service.crear(
-        dto({ tipoFactura: 'CONTADO', tipoComprobanteEspecial: tipoComprobanteEspecial as never }),
+        dto({ tipoFactura: 'CONTADO', comprobanteFiscal: comprobanteFiscal as never }),
         'tenant-1',
         'vendedor-1',
       );
@@ -679,13 +681,13 @@ describe('FacturacionService', () => {
     it.each([
       ['REGIMEN_ESPECIAL', 'E44'],
       ['GUBERNAMENTAL', 'E45'],
-    ])('%s en modalidad ECF usa %s en vez del e-NCF normal', async (tipoComprobanteEspecial, tipoEcfEsperado) => {
+    ])('%s en modalidad ECF usa %s en vez del e-NCF normal', async (comprobanteFiscal, tipoEcfEsperado) => {
       repository.obtenerProductoConPrecioVigente.mockResolvedValue(producto(18, 100) as never);
       repository.obtenerModalidadFacturacion.mockResolvedValue('ECF' as never);
       repository.crearFacturaEnTx.mockResolvedValue(facturaCreada() as never);
 
       await service.crear(
-        dto({ tipoFactura: 'CREDITO', tipoComprobanteEspecial: tipoComprobanteEspecial as never }),
+        dto({ tipoFactura: 'CREDITO', comprobanteFiscal: comprobanteFiscal as never }),
         'tenant-1',
         'vendedor-1',
       );
@@ -693,17 +695,41 @@ describe('FacturacionService', () => {
       expect(repository.siguienteNcfEnTx).toHaveBeenCalledWith(TX, tipoEcfEsperado, 's1');
     });
 
-    it('se ignora en una Nota de Crédito — siempre usa B04, nunca un tipo especial', async () => {
+    it('se ignora en una Nota de Crédito — siempre usa B04, nunca un comprobante fiscal elegido', async () => {
       repository.obtenerProductoConPrecioVigente.mockResolvedValue(producto(18, 100) as never);
       repository.crearFacturaEnTx.mockResolvedValue(facturaCreada({ id: 'nc1', total: -118 }) as never);
 
       await service.crear(
-        dto({ tipoFactura: 'NOTA_CREDITO', facturaOrigenId: 'f-original', tipoComprobanteEspecial: 'GUBERNAMENTAL' as never }),
+        dto({ tipoFactura: 'NOTA_CREDITO', facturaOrigenId: 'f-original', comprobanteFiscal: 'GUBERNAMENTAL' as never }),
         'tenant-1',
         'vendedor-1',
       );
 
       expect(repository.siguienteNcfEnTx).toHaveBeenCalledWith(TX, 'B04', 's1');
+    });
+
+    it('sin comprobanteFiscal explícito, sigue derivando de tipoFactura como antes (retrocompatible con POS/conversión)', async () => {
+      repository.obtenerProductoConPrecioVigente.mockResolvedValue(producto(18, 100) as never);
+      repository.crearFacturaEnTx.mockResolvedValue(facturaCreada() as never);
+
+      await service.crear(dto({ tipoFactura: 'CONTADO' }), 'tenant-1', 'vendedor-1');
+
+      expect(repository.siguienteNcfEnTx).toHaveBeenCalledWith(TX, 'B02', 's1');
+    });
+
+    it('el caso que motivó el cambio: CONTADO + Crédito Fiscal (B01) — usa B01 y sigue quedando pagada al crear', async () => {
+      repository.obtenerProductoConPrecioVigente.mockResolvedValue(producto(18, 100) as never);
+      repository.crearFacturaEnTx.mockResolvedValue(facturaCreada() as never);
+
+      await service.crear(
+        dto({ tipoFactura: 'CONTADO', comprobanteFiscal: 'CREDITO_FISCAL' as never }),
+        'tenant-1',
+        'vendedor-1',
+        { formaPagoId: 'fp1' },
+      );
+
+      expect(repository.siguienteNcfEnTx).toHaveBeenCalledWith(TX, 'B01', 's1');
+      expect(repository.crearFacturaEnTx).toHaveBeenCalledWith(TX, expect.objectContaining({ pagada: true }));
     });
   });
 

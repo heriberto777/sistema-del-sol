@@ -261,7 +261,7 @@ export class PosRepository {
     vendedorEmpleadoId?: string;
     listaPrecio?: string;
     tipoFactura?: string;
-    tipoComprobanteEspecial?: string;
+    comprobanteFiscal?: string;
     lineas: unknown;
   }) {
     const datosComunes = {
@@ -269,7 +269,7 @@ export class PosRepository {
       vendedorEmpleadoId: params.vendedorEmpleadoId ?? null,
       listaPrecio: params.listaPrecio ?? null,
       tipoFactura: params.tipoFactura ?? null,
-      tipoComprobanteEspecial: params.tipoComprobanteEspecial ?? null,
+      comprobanteFiscal: params.comprobanteFiscal ?? null,
       lineas: params.lineas as Prisma.InputJsonValue,
     };
     return this.db.carritoBorrador.upsert({

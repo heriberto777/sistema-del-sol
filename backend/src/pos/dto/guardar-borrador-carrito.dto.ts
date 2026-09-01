@@ -83,7 +83,7 @@ export class GuardarBorradorCarritoDto {
   @ApiProperty({ required: false })
   @IsOptional()
   @IsString()
-  tipoComprobanteEspecial?: string;
+  comprobanteFiscal?: string;
 
   @ApiProperty({ type: [LineaBorradorCarritoDto] })
   @IsArray()

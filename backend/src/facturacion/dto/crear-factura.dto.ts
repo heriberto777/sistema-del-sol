@@ -119,13 +119,13 @@ export class CrearFacturaDto {
 
   @ApiProperty({
     required: false,
-    enum: ['REGIMEN_ESPECIAL', 'GUBERNAMENTAL'],
+    enum: ['CONSUMO', 'CREDITO_FISCAL', 'REGIMEN_ESPECIAL', 'GUBERNAMENTAL'],
     description:
-      'Solo si tipoFactura es CONTADO/CREDITO — usa B14/B15 (o su e-CF) en vez del NCF normal (plan de integración Cuadre, ítem B-1). Una Nota de Crédito/Débito siempre usa B03/B04, sin importar este campo.',
+      'Comprobante fiscal real de DGII, independiente de tipoFactura (que solo decide si se cobra al crear o queda pendiente) — solo aplica si tipoFactura es CONTADO/CREDITO. Sin mandarlo, se deriva de tipoFactura (CONTADO→CONSUMO/B02, CREDITO→CREDITO_FISCAL/B01), igual que antes de este ítem. Una Nota de Crédito/Débito siempre usa B03/B04, sin importar este campo.',
   })
   @IsOptional()
-  @IsEnum(['REGIMEN_ESPECIAL', 'GUBERNAMENTAL'])
-  tipoComprobanteEspecial?: 'REGIMEN_ESPECIAL' | 'GUBERNAMENTAL';
+  @IsEnum(['CONSUMO', 'CREDITO_FISCAL', 'REGIMEN_ESPECIAL', 'GUBERNAMENTAL'])
+  comprobanteFiscal?: 'CONSUMO' | 'CREDITO_FISCAL' | 'REGIMEN_ESPECIAL' | 'GUBERNAMENTAL';
 
   @ApiProperty({
     required: false,

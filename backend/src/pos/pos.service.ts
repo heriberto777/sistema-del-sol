@@ -210,7 +210,7 @@ export class PosService {
         clienteId: dto.clienteId,
         bodegaId: turno.bodegaId,
         tipoFactura: dto.tipoFactura ?? 'CONTADO',
-        tipoComprobanteEspecial: dto.tipoComprobanteEspecial,
+        comprobanteFiscal: dto.comprobanteFiscal,
         lineas: dto.lineas,
         listaPrecio: dto.listaPrecio,
       },

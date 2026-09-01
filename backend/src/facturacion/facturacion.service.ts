@@ -51,13 +51,19 @@ const ECF_POR_TIPO: Record<TipoFactura, TipoNcf> = {
   NOTA_CREDITO: 'E34',
 };
 
-// Plan de integración de brechas Cuadre, ítem B-1: hasta ahora B14/B15
-// estaban en el enum TipoNcf pero ningún flujo los podía seleccionar — el
-// NCF se derivaba siempre de tipoFactura, sin que el usuario elija el tipo
-// de comprobante. Solo aplica a ventas normales (CONTADO/CREDITO); una
-// Nota de Crédito/Débito sigue siendo siempre B03/B04 (o su e-CF), nunca
-// un tipo especial — reversar un documento no cambia de "régimen".
-const TIPO_NCF_ESPECIAL: Record<'REGIMEN_ESPECIAL' | 'GUBERNAMENTAL', { ncf: TipoNcf; ecf: TipoNcf }> = {
+// Ítem "separar Comprobante Fiscal de Opción de Pago" — el comprobante
+// fiscal real (qué NCF emite la DGII) pasa a ser independiente de
+// tipoFactura (que de acá en más solo significa "opción de pago": si se
+// cobra al crear o queda pendiente en Cuentas por Cobrar). Antes,
+// Contado/Crédito forzaban B02/B01 sin poder desacoplarse — un cliente
+// empresa que paga de contado pero necesita Crédito Fiscal (B01) para su
+// propia declaración de ITBIS no tenía forma de pedirlo. Solo aplica a
+// ventas normales (CONTADO/CREDITO); una Nota de Crédito/Débito sigue
+// siendo siempre B03/B04 (o su e-CF) — reversar un documento no elige
+// comprobante fiscal.
+const TIPO_NCF_COMPLETO: Record<'CONSUMO' | 'CREDITO_FISCAL' | 'REGIMEN_ESPECIAL' | 'GUBERNAMENTAL', { ncf: TipoNcf; ecf: TipoNcf }> = {
+  CONSUMO: { ncf: 'B02', ecf: 'E32' },
+  CREDITO_FISCAL: { ncf: 'B01', ecf: 'E31' },
   REGIMEN_ESPECIAL: { ncf: 'B14', ecf: 'E44' },
   GUBERNAMENTAL: { ncf: 'B15', ecf: 'E45' },
 };
@@ -446,10 +452,19 @@ export class FacturacionService {
     const pagadaAlCrear = dto.tipoFactura !== 'CREDITO' && montoPagadoAlCrear >= totalConRecargos - EPSILON_PAGOS && montoPagadoAlCrear > 0;
 
     const modalidad = await this.facturacionRepository.obtenerModalidadFacturacion(tenantId);
-    const especial = dto.tipoComprobanteEspecial && (dto.tipoFactura === 'CONTADO' || dto.tipoFactura === 'CREDITO')
-      ? TIPO_NCF_ESPECIAL[dto.tipoComprobanteEspecial]
-      : undefined;
-    const tipoNcf = especial ? (modalidad === 'ECF' ? especial.ecf : especial.ncf) : (modalidad === 'ECF' ? ECF_POR_TIPO : NCF_POR_TIPO)[dto.tipoFactura];
+    let tipoNcf: TipoNcf;
+    if (dto.tipoFactura === 'NOTA_CREDITO' || dto.tipoFactura === 'NOTA_DEBITO') {
+      tipoNcf = (modalidad === 'ECF' ? ECF_POR_TIPO : NCF_POR_TIPO)[dto.tipoFactura];
+    } else {
+      // Comprobante fiscal explícito (independiente de tipoFactura) o,
+      // si no se manda, el que corresponde por defecto según la opción
+      // de pago — mismo comportamiento de siempre para quien todavía no
+      // manda `comprobanteFiscal` (POS, conversión de Cotizaciones/
+      // Remisiones).
+      const comprobanteFiscal = dto.comprobanteFiscal ?? (dto.tipoFactura === 'CONTADO' ? 'CONSUMO' : 'CREDITO_FISCAL');
+      const mapa = TIPO_NCF_COMPLETO[comprobanteFiscal];
+      tipoNcf = modalidad === 'ECF' ? mapa.ecf : mapa.ncf;
+    }
     // Generado ANTES de la transacción: el descuento/reintegro de stock
     // (abajo) necesita `referenciaId` para vincular cada movimiento de lote
     // a ESTA factura (Fase 5b) — pero la factura recién se crea al final de

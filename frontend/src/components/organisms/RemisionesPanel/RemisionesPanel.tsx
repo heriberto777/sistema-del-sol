@@ -600,7 +600,7 @@ function ModalConvertirRemision({ remision, onClose }: { remision: Remision; onC
     <Modal titulo={`Convertir en factura — ${remision.numero}`} onClose={onClose}>
       <form onSubmit={onSubmit} className="space-y-3">
         <div className="flex flex-col gap-1">
-          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Tipo de factura</label>
+          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Opción de pago</label>
           <Select value={tipoFactura} onChange={(e) => setTipoFactura(e.target.value as 'CONTADO' | 'CREDITO')}>
             <option value="CONTADO">Contado</option>
             <option value="CREDITO">Crédito</option>

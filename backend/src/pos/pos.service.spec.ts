@@ -231,7 +231,7 @@ describe('PosService', () => {
       );
     });
 
-    it('propaga tipoFactura y tipoComprobanteEspecial cuando vienen en el DTO (plan de integración Cuadre, ítem F-2)', async () => {
+    it('propaga tipoFactura y comprobanteFiscal cuando vienen en el DTO (ítem "separar Comprobante Fiscal de Opción de Pago")', async () => {
       posRepository.buscarPorId.mockResolvedValue({ id: 't1', estado: 'ABIERTO', bodegaId: 'b1' } as never);
       facturacionService.crear.mockResolvedValue({ id: 'f1' } as never);
 
@@ -242,14 +242,14 @@ describe('PosService', () => {
           pagos: [{ formaPagoId: 'fp1', monto: 177 }],
           lineas: [{ productoId: 'p1', cantidad: 1 }],
           tipoFactura: 'CREDITO',
-          tipoComprobanteEspecial: 'GUBERNAMENTAL',
+          comprobanteFiscal: 'GUBERNAMENTAL',
         },
         'tenant-1',
         'cajero-1',
       );
 
       expect(facturacionService.crear).toHaveBeenCalledWith(
-        expect.objectContaining({ tipoFactura: 'CREDITO', tipoComprobanteEspecial: 'GUBERNAMENTAL' }),
+        expect.objectContaining({ tipoFactura: 'CREDITO', comprobanteFiscal: 'GUBERNAMENTAL' }),
         'tenant-1',
         'cajero-1',
         expect.anything(),

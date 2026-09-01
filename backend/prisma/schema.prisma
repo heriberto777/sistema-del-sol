@@ -2038,7 +2038,7 @@ model CarritoBorrador {
   // venta, no una referencia estructural.
   listaPrecio             String?
   tipoFactura             String?
-  tipoComprobanteEspecial String?
+  comprobanteFiscal       String?
   lineas                  Json
   actualizadoEn           DateTime  @updatedAt
 
@@ -2885,13 +2885,21 @@ model Cliente {
   // efecto en precios/permisos, a diferencia de listaPrecioId).
   categoriaId           String?
   categoria             CategoriaCliente?      @relation(fields: [categoriaId], references: [id], onDelete: SetNull)
-  // Comprobante fiscal por defecto (ítem E-5) — autoselecciona tipoFactura
-  // + tipoComprobanteEspecial (ítem B-1) al elegir este cliente en el
-  // formulario de Facturación; el usuario puede cambiarlo igual antes de
-  // guardar, no es una restricción, solo un valor inicial. Ver
-  // ModalNuevaFactura (frontend) para el mapeo exacto.
-  comprobantePorDefecto ComprobantePorDefecto?
-  createdAt             DateTime               @default(now())
+  // Comprobante fiscal y condición de pago por defecto (ítem E-5,
+  // separados a propósito — ver TipoComprobanteFiscal/CondicionPago):
+  // autoseleccionan, cada uno por su lado, el comprobante fiscal y el
+  // tipoFactura al elegir este cliente en Facturación/POS; el usuario
+  // puede cambiar cualquiera de los dos antes de guardar, no es una
+  // restricción, solo un valor inicial. Ver ModalNuevaFactura
+  // (frontend) para el mapeo exacto.
+  comprobanteFiscalPorDefecto TipoComprobanteFiscal?
+  condicionPagoPorDefecto     CondicionPago?
+  // Crédito general con este cliente (mismo criterio que
+  // Proveedor.plazoPagoDias de Cuentas por Pagar) — precarga "Condición
+  // de pago" (días de crédito) al facturarle a este cliente cuando la
+  // condición de pago es CREDITO.
+  plazoPagoDias               Int                    @default(30)
+  createdAt                   DateTime               @default(now())
   // Ítem A-3 (Lealtad/puntos) — saldo denormalizado, mismo criterio que
   // `Stock.cantidadActual`: la fuente de verdad es la suma de
   // `MovimientoLealtad`, esto es una caché mantenida por
@@ -2927,14 +2935,27 @@ model CategoriaCliente {
   @@map("categorias_cliente")
 }
 
-/// Los 4 valores seleccionables hoy al facturar (tipoFactura CONTADO/
-/// CREDITO + tipoComprobanteEspecial REGIMEN_ESPECIAL/GUBERNAMENTAL del
-/// ítem B-1) — ver Cliente.comprobantePorDefecto.
-enum ComprobantePorDefecto {
-  CONTADO
-  CREDITO
+/// Comprobante fiscal real de DGII — independiente de la condición de
+/// pago (ver CondicionPago). Un cliente puede necesitar Crédito Fiscal
+/// (B01) aunque pague de contado (lo necesita para su propia
+/// declaración de ITBIS) — antes de este ítem, un solo campo
+/// (ComprobantePorDefecto, ya eliminado) mezclaba los dos conceptos.
+enum TipoComprobanteFiscal {
+  CONSUMO
+  CREDITO_FISCAL
   REGIMEN_ESPECIAL
   GUBERNAMENTAL
+}
+
+/// Si la venta se cobra al crearla (CONTADO) o queda pendiente en
+/// Cuentas por Cobrar (CREDITO) — ver Factura.tipoFactura, que sigue
+/// siendo el campo real que usa FacturacionService/CuentasPorCobrar/
+/// Recordatorios; este enum es solo para los campos "por defecto" del
+/// Cliente (dedicado, no reusa TipoFactura porque ese también tiene
+/// NOTA_CREDITO/NOTA_DEBITO, que no aplican acá).
+enum CondicionPago {
+  CONTADO
+  CREDITO
 }
 
 model DireccionCliente {

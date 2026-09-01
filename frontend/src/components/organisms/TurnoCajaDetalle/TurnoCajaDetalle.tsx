@@ -33,13 +33,16 @@ const TONO_ESTADO_TURNO: Record<EstadoTurno, 'exito' | 'advertencia' | 'neutro'>
   CERRADO: 'neutro',
 };
 
-type ComprobantePorDefecto = 'CONTADO' | 'CREDITO' | 'REGIMEN_ESPECIAL' | 'GUBERNAMENTAL';
+type TipoComprobanteFiscal = 'CONSUMO' | 'CREDITO_FISCAL' | 'REGIMEN_ESPECIAL' | 'GUBERNAMENTAL';
+type CondicionPago = 'CONTADO' | 'CREDITO';
 
 interface Cliente {
   id: string;
   nombre: string;
   listaPrecio: { id: string; nombre: string } | null;
-  comprobantePorDefecto?: ComprobantePorDefecto | null;
+  comprobanteFiscalPorDefecto?: TipoComprobanteFiscal | null;
+  condicionPagoPorDefecto?: CondicionPago | null;
+  plazoPagoDias?: number;
   puntosLealtad?: number;
 }
 
@@ -110,7 +113,7 @@ interface CarritoBorradorApi {
   vendedorEmpleado: Vendedor | null;
   listaPrecio: string | null;
   tipoFactura: 'CONTADO' | 'CREDITO' | null;
-  tipoComprobanteEspecial: string | null;
+  comprobanteFiscal: string | null;
   lineas: LineaCarrito[];
 }
 
@@ -119,7 +122,7 @@ interface BorradorPayload {
   vendedorEmpleadoId?: string;
   listaPrecio?: string;
   tipoFactura?: string;
-  tipoComprobanteEspecial?: string;
+  comprobanteFiscal?: string;
   lineas: LineaCarrito[];
 }
 
@@ -249,7 +252,7 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
   const [vendedor, setVendedor] = useState<Vendedor | null>(null);
   const [listaPrecioOverride, setListaPrecioOverride] = useState('');
   const [tipoFactura, setTipoFactura] = useState<'CONTADO' | 'CREDITO'>('CONTADO');
-  const [tipoComprobanteEspecial, setTipoComprobanteEspecial] = useState('');
+  const [comprobanteFiscal, setComprobanteFiscal] = useState<TipoComprobanteFiscal>('CONSUMO');
   const [mostrarNuevoCliente, setMostrarNuevoCliente] = useState(false);
   const { data: listasPrecio } = useListasPrecio();
   const listaPrecioResuelta = cliente?.listaPrecio?.nombre ?? 'GENERAL';
@@ -273,18 +276,13 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
   const restoBorradorAplicadoRef = useRef(false);
   const huboBorradorRef = useRef(false);
 
-  // Comprobante fiscal por defecto del cliente (plan de integración Cuadre,
-  // ítem E-5) — mismo criterio que ModalNuevaFactura en Facturacion.tsx:
-  // autoselecciona al elegir cliente, el cajero lo puede cambiar después.
+  // Comprobante fiscal y opción de pago por defecto del cliente (ítem
+  // "separar Comprobante Fiscal de Opción de Pago") — mismo criterio que
+  // ModalNuevaFactura en Facturacion.tsx: cada uno autoselecciona su
+  // propio campo, el cajero puede cambiar cualquiera después.
   useEffect(() => {
-    const defecto = cliente?.comprobantePorDefecto;
-    if (!defecto) return;
-    if (defecto === 'CONTADO' || defecto === 'CREDITO') {
-      setTipoFactura(defecto);
-      setTipoComprobanteEspecial('');
-    } else {
-      setTipoComprobanteEspecial(defecto);
-    }
+    if (cliente?.condicionPagoPorDefecto) setTipoFactura(cliente.condicionPagoPorDefecto);
+    if (cliente?.comprobanteFiscalPorDefecto) setComprobanteFiscal(cliente.comprobanteFiscalPorDefecto);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cliente?.id]);
 
@@ -322,7 +320,7 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
     if (borradorRemoto.vendedorEmpleado) setVendedor(borradorRemoto.vendedorEmpleado);
     if (borradorRemoto.listaPrecio) setListaPrecioOverride(borradorRemoto.listaPrecio);
     if (borradorRemoto.tipoFactura) setTipoFactura(borradorRemoto.tipoFactura);
-    if (borradorRemoto.tipoComprobanteEspecial) setTipoComprobanteEspecial(borradorRemoto.tipoComprobanteEspecial);
+    if (borradorRemoto.comprobanteFiscal) setComprobanteFiscal(borradorRemoto.comprobanteFiscal as TipoComprobanteFiscal);
     setAvisoBorrador('Se restauró un carrito sin terminar que había quedado pendiente en este turno.');
   }, [borradorFetched, borradorRemoto]);
 
@@ -343,7 +341,7 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
     vendedorEmpleadoId: vendedor?.id,
     listaPrecio: listaPrecioOverride || undefined,
     tipoFactura,
-    tipoComprobanteEspecial: tipoComprobanteEspecial || undefined,
+    comprobanteFiscal,
     lineas: carrito,
   });
   const borradorSnapshotDebounced = useDebouncedValue(borradorSnapshot, 800);
@@ -379,7 +377,7 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
         vendedorEmpleadoId: vendedor?.id,
         listaPrecio: listaPrecioOverride || undefined,
         tipoFactura,
-        tipoComprobanteEspecial: tipoComprobanteEspecial || undefined,
+        comprobanteFiscal,
         pagos,
         // `descuento` solo se manda si el cajero realmente lo tocó con F8
         // (Descuento) — mandar siempre 0 por defecto bloqueaba las ofertas
@@ -401,7 +399,7 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
       setVendedor(null);
       setListaPrecioOverride('');
       setTipoFactura('CONTADO');
-      setTipoComprobanteEspecial('');
+      setComprobanteFiscal('CONSUMO');
       setError(null);
       setModalCheckout(false);
       setCotizacion(null);
@@ -722,16 +720,17 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
 
                   <div className="grid grid-cols-2 gap-2">
                     <div className="flex flex-col gap-1">
-                      <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Tipo</label>
+                      <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Opción de pago</label>
                       <Select value={tipoFactura} onChange={(e) => setTipoFactura(e.target.value as 'CONTADO' | 'CREDITO')}>
                         <option value="CONTADO">Contado</option>
                         <option value="CREDITO">Crédito</option>
                       </Select>
                     </div>
                     <div className="flex flex-col gap-1">
-                      <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Comprobante</label>
-                      <Select value={tipoComprobanteEspecial} onChange={(e) => setTipoComprobanteEspecial(e.target.value)}>
-                        <option value="">Normal</option>
+                      <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Comprobante fiscal</label>
+                      <Select value={comprobanteFiscal} onChange={(e) => setComprobanteFiscal(e.target.value as TipoComprobanteFiscal)}>
+                        <option value="CONSUMO">Consumo (B02)</option>
+                        <option value="CREDITO_FISCAL">Crédito Fiscal (B01)</option>
                         <option value="REGIMEN_ESPECIAL">Régimen Especial (B14)</option>
                         <option value="GUBERNAMENTAL">Gubernamental (B15)</option>
                       </Select>

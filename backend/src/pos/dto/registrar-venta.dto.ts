@@ -72,10 +72,10 @@ export class RegistrarVentaPosDto {
 
   @ApiProperty({
     required: false,
-    enum: ['REGIMEN_ESPECIAL', 'GUBERNAMENTAL'],
-    description: 'Igual que en Facturación (ítem B-1) — usa B14/B15 (o su e-CF) en vez del NCF normal.',
+    enum: ['CONSUMO', 'CREDITO_FISCAL', 'REGIMEN_ESPECIAL', 'GUBERNAMENTAL'],
+    description: 'Igual que en Facturación (ítem "separar Comprobante Fiscal de Opción de Pago") — comprobante fiscal real, independiente de tipoFactura.',
   })
   @IsOptional()
-  @IsEnum(['REGIMEN_ESPECIAL', 'GUBERNAMENTAL'])
-  tipoComprobanteEspecial?: 'REGIMEN_ESPECIAL' | 'GUBERNAMENTAL';
+  @IsEnum(['CONSUMO', 'CREDITO_FISCAL', 'REGIMEN_ESPECIAL', 'GUBERNAMENTAL'])
+  comprobanteFiscal?: 'CONSUMO' | 'CREDITO_FISCAL' | 'REGIMEN_ESPECIAL' | 'GUBERNAMENTAL';
 }

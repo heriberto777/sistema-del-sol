@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { ComprobantePorDefecto, TipoCliente } from '@prisma/client';
-import { IsEmail, IsEnum, IsNumber, IsOptional, IsString, IsUUID, Min } from 'class-validator';
+import { CondicionPago, TipoCliente, TipoComprobanteFiscal } from '@prisma/client';
+import { IsEmail, IsEnum, IsInt, IsNumber, IsOptional, IsString, IsUUID, Min } from 'class-validator';
 
 export class CrearClienteDto {
   @ApiProperty()
@@ -44,11 +44,29 @@ export class CrearClienteDto {
 
   @ApiProperty({
     required: false,
-    enum: ComprobantePorDefecto,
-    description:
-      'Comprobante fiscal por defecto (ítem E-5) — autoselecciona tipoFactura + tipoComprobanteEspecial al elegir este cliente en Facturación.',
+    enum: TipoComprobanteFiscal,
+    description: 'Comprobante fiscal por defecto (ítem E-5) — independiente de la condición de pago, ver condicionPagoPorDefecto.',
   })
   @IsOptional()
-  @IsEnum(ComprobantePorDefecto)
-  comprobantePorDefecto?: ComprobantePorDefecto | null;
+  @IsEnum(TipoComprobanteFiscal)
+  comprobanteFiscalPorDefecto?: TipoComprobanteFiscal | null;
+
+  @ApiProperty({
+    required: false,
+    enum: CondicionPago,
+    description: 'Si este cliente paga de contado o a crédito por defecto — autoselecciona tipoFactura al elegirlo en Facturación/POS.',
+  })
+  @IsOptional()
+  @IsEnum(CondicionPago)
+  condicionPagoPorDefecto?: CondicionPago | null;
+
+  @ApiProperty({
+    required: false,
+    default: 30,
+    description: 'Crédito general con este cliente (ítem Cuentas por Pagar/Cobrar) — precarga los días de crédito al facturarle a crédito.',
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  plazoPagoDias?: number;
 }
