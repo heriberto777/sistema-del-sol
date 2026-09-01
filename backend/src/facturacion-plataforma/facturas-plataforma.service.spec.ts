@@ -5,6 +5,7 @@ import { EmailChannel } from '../notificaciones/canales/email.channel';
 import { PlataformaWebhookChannel } from '../plataforma-config/plataforma-webhook.channel';
 import { PlataformaConfigRepository } from '../plataforma-config/plataforma-config.repository';
 import { NcfPlataformaService } from '../ncf-plataforma/ncf-plataforma.service';
+import { EmisionECfService } from '../emision-ecf/emision-ecf.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 describe('FacturasPlataformaService', () => {
@@ -14,6 +15,7 @@ describe('FacturasPlataformaService', () => {
   let plataformaWebhookChannel: jest.Mocked<PlataformaWebhookChannel>;
   let plataformaConfigRepository: jest.Mocked<PlataformaConfigRepository>;
   let ncfPlataformaService: jest.Mocked<NcfPlataformaService>;
+  let emisionECfService: jest.Mocked<EmisionECfService>;
   let prisma: { user: { findFirst: jest.Mock }; suscripcion: { findUnique: jest.Mock } };
 
   beforeEach(() => {
@@ -33,6 +35,7 @@ describe('FacturasPlataformaService', () => {
       actualizar: jest.fn(),
     } as unknown as jest.Mocked<PlataformaConfigRepository>;
     ncfPlataformaService = { asignarSiguiente: jest.fn().mockResolvedValue(null) } as unknown as jest.Mocked<NcfPlataformaService>;
+    emisionECfService = { emitirParaFacturaPlataforma: jest.fn().mockResolvedValue(undefined) } as unknown as jest.Mocked<EmisionECfService>;
     prisma = {
       user: { findFirst: jest.fn().mockResolvedValue({ email: 'admin@tenant.com' }) },
       suscripcion: { findUnique: jest.fn().mockResolvedValue({ id: 's1', tenantId: 't1' }) },
@@ -43,6 +46,7 @@ describe('FacturasPlataformaService', () => {
       plataformaWebhookChannel,
       plataformaConfigRepository,
       ncfPlataformaService,
+      emisionECfService,
       prisma as unknown as PrismaService,
     );
   });
@@ -86,6 +90,16 @@ describe('FacturasPlataformaService', () => {
       const [args] = repo.crear.mock.calls[0];
       expect(args.ncf).toBe('B0100000005');
       expect(args.tipoNcf).toBe('B01');
+    });
+
+    it('llama a EmisionECfService.emitirParaFacturaPlataforma con el id de la factura recién creada', async () => {
+      const suscripcion = { id: 's1', tenantId: 't1', plan: { nombre: 'Premium', precio: 1500, cicloFacturacion: 'MENSUAL' } } as never;
+      repo.crear.mockResolvedValue({ id: 'f1' } as never);
+      repo.buscarPorId.mockResolvedValue({ id: 'f1', concepto: 'x', total: 1500, fechaVencimiento: new Date() } as never);
+
+      await service.generarDesdeSuscripcion(suscripcion);
+
+      expect(emisionECfService.emitirParaFacturaPlataforma).toHaveBeenCalledWith('f1');
     });
 
     it('crea la factura sin ncf si NcfPlataformaService no pudo asignar ninguno (sin secuencia configurada)', async () => {

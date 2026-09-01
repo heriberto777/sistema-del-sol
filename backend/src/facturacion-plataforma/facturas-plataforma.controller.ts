@@ -13,6 +13,7 @@ import { PlatformAuthGuard } from '../platform-auth/guards/platform-auth.guard';
 import { PlatformPermissionsGuard } from '../common/guards/platform-permissions.guard';
 import { CurrentPlatformAdmin } from '../platform-auth/current-platform-admin.decorator';
 import { PlatformAdminPayload } from '../platform-auth/platform-authenticated-request';
+import { EmisionECfService } from '../emision-ecf/emision-ecf.service';
 
 @ApiBearerAuth()
 @ApiTags('platform-facturas')
@@ -23,6 +24,7 @@ export class FacturasPlataformaController {
   constructor(
     private readonly facturasPlataformaService: FacturasPlataformaService,
     private readonly pagosPlataformaService: PagosPlataformaService,
+    private readonly emisionECfService: EmisionECfService,
   ) {}
 
   @Get()
@@ -47,6 +49,13 @@ export class FacturasPlataformaController {
   @PlatformPermissions('platform.facturacion.gestionar')
   actualizar(@Param('id') id: string, @Body() dto: ActualizarFacturaPlataformaDto) {
     return this.facturasPlataformaService.actualizar(id, dto);
+  }
+
+  // Ítem "e-CF real" (pieza 3) — refresca el estado consultando a Alanube.
+  @Get(':id/ecf-estado')
+  @PlatformPermissions('platform.facturacion.ver')
+  consultarEstadoECf(@Param('id') id: string) {
+    return this.emisionECfService.consultarEstadoPlataforma(id);
   }
 
   @Get(':id/pdf')

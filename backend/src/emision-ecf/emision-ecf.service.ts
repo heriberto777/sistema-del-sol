@@ -1,5 +1,6 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { PlataformaConfigRepository } from '../plataforma-config/plataforma-config.repository';
 import { AlanubeAdapter } from './alanube.adapter';
 import { TipoDocumentoECf, EmisorECfLinea } from './emisor-ecf-adapter.interface';
 
@@ -10,10 +11,13 @@ function esTipoDocumentoECf(tipo: string | null): tipo is TipoDocumentoECf {
 }
 
 /**
- * Corre fuera de un request HTTP (llamado desde EmisionECfEventosService,
- * un listener del Event Bus) — usa PrismaService global + tenantId
- * explícito, nunca TenantPrismaService (request-scoped), mismo criterio
- * que ContabilidadEventosService/NotificacionesService.
+ * Compartido entre Facturación de tenant (pieza 2, llamado desde
+ * EmisionECfEventosService vía Event Bus) y Facturación de plataforma
+ * (pieza 3, llamado directo desde FacturasPlataformaService — la
+ * plataforma no tiene Event Bus propio, es un flujo de cron/manual).
+ * Corre fuera de un request HTTP — usa PrismaService global +
+ * tenantId explícito, nunca TenantPrismaService (request-scoped),
+ * mismo criterio que ContabilidadEventosService/NotificacionesService.
  */
 @Injectable()
 export class EmisionECfService {
@@ -22,6 +26,7 @@ export class EmisionECfService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly alanubeAdapter: AlanubeAdapter,
+    private readonly plataformaConfigRepository: PlataformaConfigRepository,
   ) {}
 
   /**
@@ -98,13 +103,85 @@ export class EmisionECfService {
     return { eCfEstado: resultado.estado, eCfMensajeError: resultado.mensaje ?? null };
   }
 
+  /**
+   * Ítem "e-CF real" (pieza 3) — mismo flujo que emitirParaFactura,
+   * para lo que la plataforma le cobra a cada tenant. Llamado directo
+   * desde FacturasPlataformaService (sin Event Bus, no aplica acá) al
+   * final de generarDesdeSuscripcion()/crearManual(), después de que
+   * NcfPlataformaService ya asignó el NCF. Solo E31 (Crédito Fiscal) —
+   * la plataforma nunca emite Consumo/Notas de Crédito/Débito hacia
+   * un tenant. Mapeo calcado de mapear-factura-plataforma-pdf.ts.
+   */
+  async emitirParaFacturaPlataforma(facturaPlataformaId: string): Promise<void> {
+    const factura = await this.prisma.facturaPlataforma.findUnique({
+      where: { id: facturaPlataformaId },
+      include: { tenant: true, lineas: { orderBy: { orden: 'asc' } } },
+    });
+    if (!factura) return;
+    if (factura.tipoNcf !== 'E31' || !factura.ncf) return;
+    if (factura.eCfEstado) return;
+
+    const config = await this.plataformaConfigRepository.obtenerOCrear();
+    if (!config.rnc || !config.direccion || !config.nombreNegocio) {
+      this.logger.warn(`Faltan datos de la empresa emisora en /plataforma/configuracion — no se puede emitir el e-CF de la factura de plataforma ${facturaPlataformaId}`);
+      return;
+    }
+
+    const secuencia = await this.prisma.ncfPlataforma.findFirst({ where: { tipoNcf: 'E31' }, orderBy: { vigenciaHasta: 'desc' } });
+    if (!secuencia) {
+      this.logger.warn(`No hay NcfPlataforma de E31 — no se puede armar sequenceDueDate del e-CF de la factura de plataforma ${facturaPlataformaId}`);
+      return;
+    }
+
+    const lineas: EmisorECfLinea[] =
+      factura.lineas.length > 0
+        ? factura.lineas.map((l, i) => ({ numero: i + 1, descripcion: l.concepto, cantidad: 1, precioUnitario: Number(l.monto), montoTotal: Number(l.monto) }))
+        : [{ numero: 1, descripcion: factura.concepto, cantidad: 1, precioUnitario: Number(factura.monto), montoTotal: Number(factura.monto) }];
+
+    try {
+      const resultado = await this.alanubeAdapter.emitir({
+        tipo: 'E31',
+        encf: factura.ncf,
+        fechaVencimientoSecuencia: secuencia.vigenciaHasta,
+        emisor: { rnc: config.rnc, razonSocial: config.nombreNegocio, direccion: config.direccion },
+        receptor: { rnc: factura.tenant.rnc ?? undefined, razonSocial: factura.tenant.nombre },
+        lineas,
+        montoTotal: Number(factura.total),
+        itbisTotal: Number(factura.itbis),
+      });
+      await this.prisma.facturaPlataforma.update({
+        where: { id: facturaPlataformaId },
+        data: { eCfEstado: 'EN_PROCESO', eCfIdExterno: resultado.idExterno },
+      });
+    } catch (error) {
+      this.logger.warn(`No se pudo emitir el e-CF de la factura de plataforma ${facturaPlataformaId}: ${(error as Error).message}`);
+    }
+  }
+
+  /** Sin scoping de tenant — lo llama un endpoint de plataforma, ya protegido por PlatformPermissionsGuard. */
+  async consultarEstadoPlataforma(facturaPlataformaId: string) {
+    const factura = await this.prisma.facturaPlataforma.findUniqueOrThrow({ where: { id: facturaPlataformaId } });
+    if (factura.tipoNcf !== 'E31' || !factura.eCfIdExterno) {
+      return { eCfEstado: factura.eCfEstado, eCfMensajeError: factura.eCfMensajeError };
+    }
+
+    const resultado = await this.alanubeAdapter.consultarEstado(factura.eCfIdExterno, 'E31');
+    await this.prisma.facturaPlataforma.update({
+      where: { id: facturaPlataformaId },
+      data: { eCfEstado: resultado.estado, eCfMensajeError: resultado.mensaje },
+    });
+    return { eCfEstado: resultado.estado, eCfMensajeError: resultado.mensaje ?? null };
+  }
+
   /** Ver AlanubeWebhookController — payload/firma sin confirmar contra documentación real de Alanube todavía (best-effort). */
   async actualizarPorWebhook(idExterno: string, estado: string, mensaje?: string) {
     const ESTADOS = ['ACEPTADO', 'ACEPTADO_CONDICIONAL', 'RECHAZADO', 'EN_PROCESO'];
     if (!ESTADOS.includes(estado)) return;
-    await this.prisma.factura.updateMany({
-      where: { eCfIdExterno: idExterno },
-      data: { eCfEstado: estado as 'ACEPTADO' | 'ACEPTADO_CONDICIONAL' | 'RECHAZADO' | 'EN_PROCESO', eCfMensajeError: mensaje },
-    });
+    const data = { eCfEstado: estado as 'ACEPTADO' | 'ACEPTADO_CONDICIONAL' | 'RECHAZADO' | 'EN_PROCESO', eCfMensajeError: mensaje };
+    // El id externo es único de Alanube — a lo sumo una de las dos tablas tendrá una fila con ese id, la otra es un no-op.
+    await Promise.all([
+      this.prisma.factura.updateMany({ where: { eCfIdExterno: idExterno }, data }),
+      this.prisma.facturaPlataforma.updateMany({ where: { eCfIdExterno: idExterno }, data }),
+    ]);
   }
 }

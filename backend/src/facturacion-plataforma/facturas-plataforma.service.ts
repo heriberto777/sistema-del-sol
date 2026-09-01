@@ -7,6 +7,7 @@ import { EmailChannel } from '../notificaciones/canales/email.channel';
 import { PlataformaWebhookChannel } from '../plataforma-config/plataforma-webhook.channel';
 import { PlataformaConfigRepository } from '../plataforma-config/plataforma-config.repository';
 import { NcfPlataformaService } from '../ncf-plataforma/ncf-plataforma.service';
+import { EmisionECfService } from '../emision-ecf/emision-ecf.service';
 import { generarDocumentoPdf } from '../common/pdf/documento-pdf';
 import { mapearFacturaPlataformaAParams } from './mapear-factura-plataforma-pdf';
 import { PrismaService } from '../prisma/prisma.service';
@@ -23,6 +24,7 @@ export class FacturasPlataformaService {
     private readonly plataformaWebhookChannel: PlataformaWebhookChannel,
     private readonly plataformaConfigRepository: PlataformaConfigRepository,
     private readonly ncfPlataformaService: NcfPlataformaService,
+    private readonly emisionECfService: EmisionECfService,
     private readonly prisma: PrismaService,
   ) {}
 
@@ -64,6 +66,7 @@ export class FacturasPlataformaService {
       ...(asignacionNcf ?? {}),
     });
 
+    await this.emisionECfService.emitirParaFacturaPlataforma(factura.id);
     await this.notificarFactura(suscripcion.tenantId, factura.id, 'generada');
     return factura;
   }
@@ -93,6 +96,7 @@ export class FacturasPlataformaService {
       ...(asignacionNcf ?? {}),
     });
 
+    await this.emisionECfService.emitirParaFacturaPlataforma(factura.id);
     await this.notificarFactura(dto.tenantId, factura.id, 'manual');
     return factura;
   }

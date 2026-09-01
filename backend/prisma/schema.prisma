@@ -339,6 +339,12 @@ model FacturaPlataforma {
   // secuencia activa/agotada, sin bloquear la generación.
   ncf              String?
   tipoNcf          TipoNcf?
+  // Ítem "e-CF real" (pieza 3) — mismo criterio que Factura (tenant):
+  // null = no aplica (modalidad NCF) o no se pudo emitir todavía, nunca
+  // bloquea la generación de la factura de plataforma.
+  eCfEstado        EstadoECf?
+  eCfIdExterno     String?                 @unique
+  eCfMensajeError  String?
   fechaEmision     DateTime                @default(now())
   fechaVencimiento DateTime
   fechaPago        DateTime?
