@@ -1,5 +1,6 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { AppLayout } from './components/templates/AppLayout/AppLayout';
+import { PlatformLayout } from './components/templates/PlatformLayout/PlatformLayout';
 import { NoEncontrado } from './pages/NoEncontrado';
 import { RutaProtegida } from './components/organisms/RutaProtegida/RutaProtegida';
 import { RutaProtegidaPlataforma } from './components/organisms/RutaProtegidaPlataforma/RutaProtegidaPlataforma';
@@ -67,13 +68,18 @@ export const router = createBrowserRouter([
   {
     element: <RutaProtegidaPlataforma />,
     children: [
-      { path: '/plataforma/tenants', element: <PlatformTenants /> },
-      { path: '/plataforma/planes', element: <PlatformPlanes /> },
-      { path: '/plataforma/roles', element: <PlatformRoles /> },
-      { path: '/plataforma/admins', element: <PlatformAdmins /> },
-      { path: '/plataforma/facturas', element: <PlatformFacturas /> },
-      { path: '/plataforma/actividad', element: <PlatformActividad /> },
-      { path: '/plataforma/configuracion', element: <PlatformConfiguracion /> },
+      {
+        element: <PlatformLayout />,
+        children: [
+          { path: '/plataforma/tenants', element: <PlatformTenants /> },
+          { path: '/plataforma/planes', element: <PlatformPlanes /> },
+          { path: '/plataforma/roles', element: <PlatformRoles /> },
+          { path: '/plataforma/admins', element: <PlatformAdmins /> },
+          { path: '/plataforma/facturas', element: <PlatformFacturas /> },
+          { path: '/plataforma/actividad', element: <PlatformActividad /> },
+          { path: '/plataforma/configuracion', element: <PlatformConfiguracion /> },
+        ],
+      },
     ],
   },
   {

@@ -7,7 +7,6 @@ import { Badge } from '../components/atoms/Badge/Badge';
 import { Card } from '../components/atoms/Card/Card';
 import { Select } from '../components/atoms/Select/Select';
 import { Modal } from '../components/molecules/Modal/Modal';
-import { PlatformHeader } from '../components/organisms/PlatformHeader/PlatformHeader';
 import { Paginacion } from '../components/molecules/Paginacion/Paginacion';
 import { PaginaResultado } from '../types/pagina-resultado';
 import { usePlatformAuth } from '../hooks/usePlatformAuth';
@@ -213,8 +212,8 @@ export function PlatformFacturas() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 p-6 dark:bg-slate-950">
-      <PlatformHeader titulo="Facturas" />
+    <div className="space-y-6">
+      <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Facturas</h1>
 
       <Card
         sinPadding

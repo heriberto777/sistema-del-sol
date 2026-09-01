@@ -8,7 +8,6 @@ import { Card } from '../components/atoms/Card/Card';
 import { Select } from '../components/atoms/Select/Select';
 import { Switch } from '../components/atoms/Switch/Switch';
 import { Modal } from '../components/molecules/Modal/Modal';
-import { PlatformHeader } from '../components/organisms/PlatformHeader/PlatformHeader';
 
 interface Tenant {
   id: string;
@@ -274,8 +273,8 @@ export function PlatformTenants() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 p-6 dark:bg-slate-950">
-      <PlatformHeader titulo="Tenants" />
+    <div className="space-y-6">
+      <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Tenants</h1>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <Card className="lg:col-span-1" titulo="Nuevo tenant" descripcion="Provisiona una empresa nueva con su admin inicial.">

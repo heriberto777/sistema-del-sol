@@ -6,7 +6,6 @@ import { Button } from '../components/atoms/Button/Button';
 import { Badge } from '../components/atoms/Badge/Badge';
 import { Card } from '../components/atoms/Card/Card';
 import { Select } from '../components/atoms/Select/Select';
-import { PlatformHeader } from '../components/organisms/PlatformHeader/PlatformHeader';
 import { SearchInput } from '../components/molecules/SearchInput/SearchInput';
 import { Paginacion } from '../components/molecules/Paginacion/Paginacion';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
@@ -89,8 +88,8 @@ export function PlatformAdmins() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 p-6 dark:bg-slate-950">
-      <PlatformHeader titulo="Admins" />
+    <div className="space-y-6">
+      <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Admins</h1>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         {puedeGestionar && (

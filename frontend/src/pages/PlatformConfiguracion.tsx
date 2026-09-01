@@ -7,7 +7,6 @@ import { Button } from '../components/atoms/Button/Button';
 import { Card } from '../components/atoms/Card/Card';
 import { Select } from '../components/atoms/Select/Select';
 import { Switch } from '../components/atoms/Switch/Switch';
-import { PlatformHeader } from '../components/organisms/PlatformHeader/PlatformHeader';
 
 interface ConfiguracionPlataforma {
   general: { nombreNegocio: string | null };
@@ -70,8 +69,8 @@ export function PlatformConfiguracion() {
   });
 
   return (
-    <div className="min-h-screen bg-slate-50 p-6 dark:bg-slate-950">
-      <PlatformHeader titulo="Configuración" />
+    <div className="space-y-6">
+      <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Configuración</h1>
 
       <div className="mb-6 flex gap-1 border-b border-slate-200 dark:border-slate-800">
         {TABS.map((t) => (

@@ -3,7 +3,6 @@ import { useQuery } from '@tanstack/react-query';
 import { platformApiClient } from '../lib/platform-api-client';
 import { Badge } from '../components/atoms/Badge/Badge';
 import { Card } from '../components/atoms/Card/Card';
-import { PlatformHeader } from '../components/organisms/PlatformHeader/PlatformHeader';
 import { Paginacion } from '../components/molecules/Paginacion/Paginacion';
 import { PaginaResultado } from '../types/pagina-resultado';
 
@@ -38,8 +37,8 @@ export function PlatformActividad() {
   });
 
   return (
-    <div className="min-h-screen bg-slate-50 p-6 dark:bg-slate-950">
-      <PlatformHeader titulo="Actividad" />
+    <div className="space-y-6">
+      <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Actividad</h1>
 
       <Card sinPadding titulo="Actividad reciente" descripcion="Bitácora de acciones realizadas desde la plataforma.">
         <div className="overflow-x-auto">
