@@ -17,4 +17,14 @@ export class ActualizarTenantDto {
   @IsOptional()
   @IsUUID()
   planId?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  rnc?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  subdominio?: string;
 }

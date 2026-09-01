@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { CicloFacturacion } from '@prisma/client';
-import { IsArray, IsEnum, IsNumber, IsOptional, IsString, Min } from 'class-validator';
+import { IsArray, IsBoolean, IsEnum, IsNumber, IsOptional, IsString, Min } from 'class-validator';
 
 export class ActualizarPlanDto {
   @ApiProperty({ required: false })
@@ -29,4 +29,9 @@ export class ActualizarPlanDto {
   @IsArray()
   @IsString({ each: true })
   modulos?: string[];
+
+  @ApiProperty({ required: false, description: 'Un plan inactivo no se puede asignar a un tenant nuevo — los que ya lo tienen lo conservan.' })
+  @IsOptional()
+  @IsBoolean()
+  activo?: boolean;
 }

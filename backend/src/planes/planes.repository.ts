@@ -42,7 +42,14 @@ export class PlanesRepository {
 
   async actualizar(
     id: string,
-    params: { nombre?: string; descripcion?: string; precio?: number; cicloFacturacion?: CicloFacturacion; modulos?: string[] },
+    params: {
+      nombre?: string;
+      descripcion?: string;
+      precio?: number;
+      cicloFacturacion?: CicloFacturacion;
+      modulos?: string[];
+      activo?: boolean;
+    },
   ) {
     if (params.modulos) {
       const modulosDb = await this.prisma.modulo.findMany({ where: { clave: { in: params.modulos } } });
@@ -56,6 +63,7 @@ export class PlanesRepository {
         descripcion: params.descripcion,
         precio: params.precio,
         cicloFacturacion: params.cicloFacturacion,
+        activo: params.activo,
       },
       include: INCLUDE_PLAN,
     });

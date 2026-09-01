@@ -216,6 +216,10 @@ model Plan {
   descripcion      String?
   precio           Decimal          @default(0) @db.Decimal(12, 2)
   cicloFacturacion CicloFacturacion @default(MENSUAL)
+  // Ítem "Planes en modales" — un plan inactivo no se puede asignar a un
+  // tenant nuevo (ver PlatformTenants.tsx), pero los tenants que ya lo
+  // tenían lo conservan sin cambios.
+  activo           Boolean          @default(true)
   createdAt        DateTime         @default(now())
 
   modulos       PlanModulo[]

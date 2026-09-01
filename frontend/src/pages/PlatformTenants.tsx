@@ -8,11 +8,13 @@ import { Card } from '../components/atoms/Card/Card';
 import { Select } from '../components/atoms/Select/Select';
 import { Switch } from '../components/atoms/Switch/Switch';
 import { Modal } from '../components/molecules/Modal/Modal';
+import { RowActionsMenu } from '../components/molecules/RowActionsMenu/RowActionsMenu';
 
 interface Tenant {
   id: string;
   nombre: string;
   subdominio: string;
+  rnc: string | null;
   estado: 'ACTIVO' | 'SUSPENDIDO' | 'CANCELADO';
   planId: string | null;
   plan: { id: string; nombre: string } | null;
@@ -23,6 +25,7 @@ interface Plan {
   id: string;
   nombre: string;
   descripcion: string | null;
+  activo: boolean;
 }
 
 interface ModuloTenant {
@@ -209,14 +212,8 @@ function PanelModulosTenant({ tenant, onClose }: { tenant: Tenant; onClose: () =
 export function PlatformTenants() {
   const queryClient = useQueryClient();
 
-  const [nombre, setNombre] = useState('');
-  const [subdominio, setSubdominio] = useState('');
-  const [rnc, setRnc] = useState('');
-  const [planId, setPlanId] = useState('');
-  const [adminEmail, setAdminEmail] = useState('');
-  const [adminNombre, setAdminNombre] = useState('');
-  const [adminPassword, setAdminPassword] = useState('');
-  const [error, setError] = useState<string | null>(null);
+  const [modalNuevoAbierto, setModalNuevoAbierto] = useState(false);
+  const [tenantEditando, setTenantEditando] = useState<Tenant | null>(null);
   const [tenantModulos, setTenantModulos] = useState<Tenant | null>(null);
   const [tenantSuscripcion, setTenantSuscripcion] = useState<Tenant | null>(null);
 
@@ -229,6 +226,116 @@ export function PlatformTenants() {
     queryKey: ['platform-planes'],
     queryFn: async () => (await platformApiClient.get<Plan[]>('/platform/planes')).data,
   });
+
+  const planesAsignables = (planes ?? []).filter((p) => p.activo);
+
+  const cambiarEstado = useMutation({
+    mutationFn: async ({ id, estado }: { id: string; estado: Tenant['estado'] }) =>
+      platformApiClient.patch(`/platform/tenants/${id}`, { estado }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['platform-tenants'] }),
+  });
+
+  const cambiarPlan = useMutation({
+    mutationFn: async ({ id, planId: nuevoPlanId }: { id: string; planId: string }) =>
+      platformApiClient.patch(`/platform/tenants/${id}`, { planId: nuevoPlanId }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['platform-tenants'] }),
+  });
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Tenants</h1>
+        <Button onClick={() => setModalNuevoAbierto(true)}>Nuevo tenant</Button>
+      </div>
+
+      <Card sinPadding titulo="Tenants" descripcion={tenants ? `${tenants.length} empresa(s) registradas` : undefined}>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-slate-50 text-slate-500 dark:bg-slate-900/60 dark:text-slate-400">
+              <tr>
+                <th className="px-5 py-3 font-medium">Nombre</th>
+                <th className="px-5 py-3 font-medium">Subdominio</th>
+                <th className="px-5 py-3 font-medium">Plan</th>
+                <th className="px-5 py-3 font-medium">Estado</th>
+                <th className="px-5 py-3"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+              {tenants?.map((tenant) => (
+                <tr key={tenant.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                  <td className="px-5 py-3">{tenant.nombre}</td>
+                  <td className="px-5 py-3 font-mono text-xs">{tenant.subdominio}</td>
+                  <td className="px-5 py-3">
+                    <Select
+                      value={tenant.planId ?? ''}
+                      disabled={cambiarPlan.isPending}
+                      onChange={(e) => cambiarPlan.mutate({ id: tenant.id, planId: e.target.value })}
+                      className="!w-auto py-1"
+                    >
+                      <option value="" disabled>
+                        Sin plan
+                      </option>
+                      {planesAsignables.map((plan) => (
+                        <option key={plan.id} value={plan.id}>
+                          {plan.nombre}
+                        </option>
+                      ))}
+                      {tenant.plan && !planesAsignables.some((p) => p.id === tenant.plan!.id) && (
+                        <option value={tenant.plan.id}>{tenant.plan.nombre} (inactivo)</option>
+                      )}
+                    </Select>
+                  </td>
+                  <td className="px-5 py-3">
+                    <Badge tono={TONO_POR_ESTADO[tenant.estado]}>{tenant.estado}</Badge>
+                  </td>
+                  <td className="px-5 py-3 text-right">
+                    <RowActionsMenu
+                      acciones={[
+                        { etiqueta: 'Editar', onClick: () => setTenantEditando(tenant) },
+                        { etiqueta: 'Suscripción', onClick: () => setTenantSuscripcion(tenant) },
+                        { etiqueta: 'Ver módulos', onClick: () => setTenantModulos(tenant) },
+                        tenant.estado === 'ACTIVO'
+                          ? {
+                              etiqueta: 'Suspender',
+                              tono: 'peligro' as const,
+                              onClick: () => cambiarEstado.mutate({ id: tenant.id, estado: 'SUSPENDIDO' }),
+                            }
+                          : { etiqueta: 'Reactivar', onClick: () => cambiarEstado.mutate({ id: tenant.id, estado: 'ACTIVO' }) },
+                      ]}
+                    />
+                  </td>
+                </tr>
+              ))}
+              {tenants?.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="px-5 py-6 text-center text-slate-400">
+                    Todavía no hay tenants creados.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+
+      {modalNuevoAbierto && <ModalNuevoTenant planes={planesAsignables} onClose={() => setModalNuevoAbierto(false)} />}
+      {tenantEditando && <ModalEditarTenant tenant={tenantEditando} onClose={() => setTenantEditando(null)} />}
+      {tenantModulos && <PanelModulosTenant tenant={tenantModulos} onClose={() => setTenantModulos(null)} />}
+      {tenantSuscripcion && <PanelSuscripcionTenant tenant={tenantSuscripcion} onClose={() => setTenantSuscripcion(null)} />}
+    </div>
+  );
+}
+
+function ModalNuevoTenant({ planes, onClose }: { planes: Plan[]; onClose: () => void }) {
+  const queryClient = useQueryClient();
+  const [nombre, setNombre] = useState('');
+  const [subdominio, setSubdominio] = useState('');
+  const [rnc, setRnc] = useState('');
+  const [planId, setPlanId] = useState('');
+  const [adminEmail, setAdminEmail] = useState('');
+  const [adminNombre, setAdminNombre] = useState('');
+  const [adminPassword, setAdminPassword] = useState('');
+  const [error, setError] = useState<string | null>(null);
 
   const crearTenant = useMutation({
     mutationFn: async () =>
@@ -243,149 +350,86 @@ export function PlatformTenants() {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['platform-tenants'] });
-      setNombre('');
-      setSubdominio('');
-      setRnc('');
-      setPlanId('');
-      setAdminEmail('');
-      setAdminNombre('');
-      setAdminPassword('');
-      setError(null);
+      onClose();
     },
     onError: () => setError('No se pudo crear el tenant. Revisa que el subdominio no esté repetido y que el plan sea válido.'),
   });
 
-  const cambiarEstado = useMutation({
-    mutationFn: async ({ id, estado }: { id: string; estado: Tenant['estado'] }) =>
-      platformApiClient.patch(`/platform/tenants/${id}`, { estado }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['platform-tenants'] }),
-  });
-
-  const cambiarPlan = useMutation({
-    mutationFn: async ({ id, planId: nuevoPlanId }: { id: string; planId: string }) =>
-      platformApiClient.patch(`/platform/tenants/${id}`, { planId: nuevoPlanId }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['platform-tenants'] }),
-  });
-
   function onSubmit(e: FormEvent) {
     e.preventDefault();
+    setError(null);
     crearTenant.mutate();
   }
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Tenants</h1>
+    <Modal titulo="Nuevo tenant" onClose={onClose}>
+      <form onSubmit={onSubmit} className="space-y-3">
+        <FormField id="nombre" label="Nombre de la empresa" value={nombre} onChange={(e) => setNombre(e.target.value)} required />
+        <FormField id="subdominio" label="Subdominio" value={subdominio} onChange={(e) => setSubdominio(e.target.value)} required />
+        <FormField id="rnc" label="RNC (opcional)" value={rnc} onChange={(e) => setRnc(e.target.value)} />
+        <div>
+          <label htmlFor="plan" className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+            Plan
+          </label>
+          <Select id="plan" value={planId} onChange={(e) => setPlanId(e.target.value)} required>
+            <option value="" disabled>
+              Selecciona un plan
+            </option>
+            {planes.map((plan) => (
+              <option key={plan.id} value={plan.id}>
+                {plan.nombre}
+              </option>
+            ))}
+          </Select>
+        </div>
+        <hr className="border-slate-200 dark:border-slate-800" />
+        <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Usuario administrador inicial</p>
+        <FormField id="adminNombre" label="Nombre" value={adminNombre} onChange={(e) => setAdminNombre(e.target.value)} required />
+        <FormField id="adminEmail" label="Email" type="email" value={adminEmail} onChange={(e) => setAdminEmail(e.target.value)} required />
+        <FormField id="adminPassword" label="Contraseña" type="password" value={adminPassword} onChange={(e) => setAdminPassword(e.target.value)} required minLength={8} />
+        {error && <p className="text-sm text-red-600">{error}</p>}
+        <Button type="submit" disabled={crearTenant.isPending} className="w-full">
+          {crearTenant.isPending ? 'Creando…' : 'Crear tenant'}
+        </Button>
+      </form>
+    </Modal>
+  );
+}
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <Card className="lg:col-span-1" titulo="Nuevo tenant" descripcion="Provisiona una empresa nueva con su admin inicial.">
-          <form onSubmit={onSubmit} className="space-y-3">
-            <FormField id="nombre" label="Nombre de la empresa" value={nombre} onChange={(e) => setNombre(e.target.value)} required />
-            <FormField id="subdominio" label="Subdominio" value={subdominio} onChange={(e) => setSubdominio(e.target.value)} required />
-            <FormField id="rnc" label="RNC (opcional)" value={rnc} onChange={(e) => setRnc(e.target.value)} />
-            <div>
-              <label htmlFor="plan" className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
-                Plan
-              </label>
-              <Select id="plan" value={planId} onChange={(e) => setPlanId(e.target.value)} required>
-                <option value="" disabled>
-                  Selecciona un plan
-                </option>
-                {planes?.map((plan) => (
-                  <option key={plan.id} value={plan.id}>
-                    {plan.nombre}
-                  </option>
-                ))}
-              </Select>
-            </div>
-            <hr className="border-slate-200 dark:border-slate-800" />
-            <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Usuario administrador inicial</p>
-            <FormField id="adminNombre" label="Nombre" value={adminNombre} onChange={(e) => setAdminNombre(e.target.value)} required />
-            <FormField id="adminEmail" label="Email" type="email" value={adminEmail} onChange={(e) => setAdminEmail(e.target.value)} required />
-            <FormField id="adminPassword" label="Contraseña" type="password" value={adminPassword} onChange={(e) => setAdminPassword(e.target.value)} required minLength={8} />
-            {error && <p className="text-sm text-red-600">{error}</p>}
-            <Button type="submit" disabled={crearTenant.isPending} className="w-full">
-              {crearTenant.isPending ? 'Creando…' : 'Crear tenant'}
-            </Button>
-          </form>
-        </Card>
+function ModalEditarTenant({ tenant, onClose }: { tenant: Tenant; onClose: () => void }) {
+  const queryClient = useQueryClient();
+  const [nombre, setNombre] = useState(tenant.nombre);
+  const [subdominio, setSubdominio] = useState(tenant.subdominio);
+  const [rnc, setRnc] = useState(tenant.rnc ?? '');
+  const [error, setError] = useState<string | null>(null);
 
-        <Card
-          className="lg:col-span-2"
-          sinPadding
-          titulo="Tenants"
-          descripcion={tenants ? `${tenants.length} empresa(s) registradas` : undefined}
-        >
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-slate-50 text-slate-500 dark:bg-slate-900/60 dark:text-slate-400">
-                <tr>
-                  <th className="px-5 py-3 font-medium">Nombre</th>
-                  <th className="px-5 py-3 font-medium">Subdominio</th>
-                  <th className="px-5 py-3 font-medium">Plan</th>
-                  <th className="px-5 py-3 font-medium">Estado</th>
-                  <th className="px-5 py-3"></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {tenants?.map((tenant) => (
-                  <tr key={tenant.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                    <td className="px-5 py-3">{tenant.nombre}</td>
-                    <td className="px-5 py-3 font-mono text-xs">{tenant.subdominio}</td>
-                    <td className="px-5 py-3">
-                      <Select
-                        value={tenant.planId ?? ''}
-                        disabled={cambiarPlan.isPending}
-                        onChange={(e) => cambiarPlan.mutate({ id: tenant.id, planId: e.target.value })}
-                        className="!w-auto py-1"
-                      >
-                        <option value="" disabled>
-                          Sin plan
-                        </option>
-                        {planes?.map((plan) => (
-                          <option key={plan.id} value={plan.id}>
-                            {plan.nombre}
-                          </option>
-                        ))}
-                      </Select>
-                    </td>
-                    <td className="px-5 py-3">
-                      <Badge tono={TONO_POR_ESTADO[tenant.estado]}>{tenant.estado}</Badge>
-                    </td>
-                    <td className="px-5 py-3">
-                      <div className="flex items-center gap-2">
-                        <Button variante="secundario" onClick={() => setTenantSuscripcion(tenant)}>
-                          Suscripción
-                        </Button>
-                        <Button variante="secundario" onClick={() => setTenantModulos(tenant)}>
-                          Ver módulos
-                        </Button>
-                        {tenant.estado === 'ACTIVO' ? (
-                          <Button
-                            variante="peligro"
-                            onClick={() => cambiarEstado.mutate({ id: tenant.id, estado: 'SUSPENDIDO' })}
-                          >
-                            Suspender
-                          </Button>
-                        ) : (
-                          <Button
-                            variante="secundario"
-                            onClick={() => cambiarEstado.mutate({ id: tenant.id, estado: 'ACTIVO' })}
-                          >
-                            Reactivar
-                          </Button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Card>
-      </div>
+  const guardar = useMutation({
+    mutationFn: async () =>
+      platformApiClient.patch(`/platform/tenants/${tenant.id}`, { nombre, subdominio, rnc: rnc || undefined }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['platform-tenants'] });
+      onClose();
+    },
+    onError: () => setError('No se pudo guardar. Revisa que el subdominio no esté repetido.'),
+  });
 
-      {tenantModulos && <PanelModulosTenant tenant={tenantModulos} onClose={() => setTenantModulos(null)} />}
-      {tenantSuscripcion && <PanelSuscripcionTenant tenant={tenantSuscripcion} onClose={() => setTenantSuscripcion(null)} />}
-    </div>
+  function onSubmit(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    guardar.mutate();
+  }
+
+  return (
+    <Modal titulo={`Editar "${tenant.nombre}"`} onClose={onClose}>
+      <form onSubmit={onSubmit} className="space-y-3">
+        <FormField id="editar-nombre" label="Nombre de la empresa" value={nombre} onChange={(e) => setNombre(e.target.value)} required />
+        <FormField id="editar-subdominio" label="Subdominio" value={subdominio} onChange={(e) => setSubdominio(e.target.value)} required />
+        <FormField id="editar-rnc" label="RNC (opcional)" value={rnc} onChange={(e) => setRnc(e.target.value)} />
+        {error && <p className="text-sm text-red-600">{error}</p>}
+        <Button type="submit" disabled={guardar.isPending} className="w-full">
+          {guardar.isPending ? 'Guardando…' : 'Guardar cambios'}
+        </Button>
+      </form>
+    </Modal>
   );
 }

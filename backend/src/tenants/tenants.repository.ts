@@ -20,7 +20,7 @@ export class TenantsRepository {
     return this.prisma.tenant.findUniqueOrThrow({ where: { id } });
   }
 
-  async actualizar(id: string, data: { nombre?: string; estado?: EstadoTenant; planId?: string }) {
+  async actualizar(id: string, data: { nombre?: string; estado?: EstadoTenant; planId?: string; rnc?: string; subdominio?: string }) {
     return this.prisma.$transaction(async (tx) => {
       const tenant = await tx.tenant.update({ where: { id }, data });
       // Si cambia de plan, la suscripción debe cobrar el precio del plan
