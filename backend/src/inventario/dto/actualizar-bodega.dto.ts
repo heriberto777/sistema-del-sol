@@ -1,13 +1,28 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEnum, IsOptional } from 'class-validator';
+import { IsBoolean, IsEnum, IsOptional, IsString } from 'class-validator';
 import { FormatoImpresion } from '@prisma/client';
 
-/**
- * Solo el override de formato de impresión — editar nombre/dirección/
- * activa queda fuera de alcance (no pedido, ver plan de impresión
- * multi-formato). null = quitar el override, heredar el default del tenant.
- */
 export class ActualizarBodegaDto {
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  nombre?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  direccion?: string;
+
+  @ApiProperty({ required: false, description: 'Mover esta bodega a otra sucursal.' })
+  @IsOptional()
+  @IsString()
+  sucursalId?: string;
+
+  @ApiProperty({ required: false, description: 'Inactivarla la saca de los selectores de bodega de toda la app (GET /inventario/bodegas).' })
+  @IsOptional()
+  @IsBoolean()
+  activa?: boolean;
+
   @ApiProperty({ enum: FormatoImpresion, required: false, nullable: true })
   @IsOptional()
   @IsEnum(FormatoImpresion)

@@ -488,11 +488,16 @@ export class InventarioRepository {
     return this.db.bodega.findMany({ where: { activa: true } });
   }
 
+  /** Ítem "gestión de bodegas" — a diferencia de listarBodegas(), incluye inactivas (para poder reactivarlas) y el nombre de su sucursal. */
+  listarTodasBodegas() {
+    return this.db.bodega.findMany({ include: { sucursal: { select: { nombre: true } } }, orderBy: { nombre: 'asc' } });
+  }
+
   crearBodega(tenantId: string, sucursalId: string, nombre: string, direccion?: string) {
     return this.db.bodega.create({ data: { tenantId, sucursalId, nombre, direccion } });
   }
 
-  actualizarBodega(id: string, data: { formatoImpresion?: FormatoImpresion | null }) {
+  actualizarBodega(id: string, data: { nombre?: string; direccion?: string; sucursalId?: string; activa?: boolean; formatoImpresion?: FormatoImpresion | null }) {
     return this.db.bodega.update({ where: { id }, data });
   }
 }

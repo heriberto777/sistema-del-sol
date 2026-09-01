@@ -29,6 +29,9 @@ interface Bodega {
   nombre: string;
   direccion: string | null;
   formatoImpresion: FormatoImpresion | null;
+  sucursalId: string;
+  activa: boolean;
+  sucursal?: { nombre: string };
 }
 
 interface Producto {
@@ -108,19 +111,24 @@ interface TransferenciaInventarioDetalle extends TransferenciaInventario {
   lineas: LineaTransferenciaDetalle[];
 }
 
+type PestanaInventario = 'stock' | 'ajustes' | 'transferencias';
+
 export function Inventario() {
   const { tienePermiso } = useAuth();
   const tienePermisoAjustar = tienePermiso('inventario.ajustar');
   const tienePermisoTransferir = tienePermiso('inventario.transferir');
+  const tienePermisoAdmin = tienePermiso('admin.configuracion');
   const [searchParams, setSearchParams] = useSearchParams();
+  const [pestana, setPestana] = useState<PestanaInventario>('stock');
   const [bodegaSeleccionadaId, setBodegaSeleccionadaId] = useState<string | null>(null);
   const [modalNuevaBodega, setModalNuevaBodega] = useState(false);
+  const [mostrarInactivas, setMostrarInactivas] = useState(false);
   const [stockAjustando, setStockAjustando] = useState<Stock | null>(null);
   const [agregandoProducto, setAgregandoProducto] = useState(false);
   const [stockTransfiriendo, setStockTransfiriendo] = useState<Stock | null>(null);
   const [stockVerKardex, setStockVerKardex] = useState<Stock | null>(null);
   const [modalVencimientos, setModalVencimientos] = useState(false);
-  const [bodegaEditandoFormato, setBodegaEditandoFormato] = useState<Bodega | null>(null);
+  const [bodegaEditando, setBodegaEditando] = useState<Bodega | null>(null);
   const [busquedaStock, setBusquedaStock] = useState('');
   const [paginaStock, setPaginaStock] = useState(1);
   const busquedaStockDebounced = useDebouncedValue(busquedaStock);
@@ -141,8 +149,9 @@ export function Inventario() {
   }, []);
 
   const { data: bodegas } = useQuery({
-    queryKey: ['bodegas'],
-    queryFn: async () => (await apiClient.get<Bodega[]>('/inventario/bodegas')).data,
+    queryKey: ['bodegas', mostrarInactivas],
+    queryFn: async () =>
+      (await apiClient.get<Bodega[]>(mostrarInactivas ? '/inventario/bodegas/todas' : '/inventario/bodegas')).data,
   });
 
   const { data: stock } = useQuery({
@@ -212,7 +221,35 @@ export function Inventario() {
         </div>
       </div>
 
+      <div className="flex gap-2 border-b border-slate-200 dark:border-slate-800">
+        {([
+          { clave: 'stock', etiqueta: 'Stock' },
+          { clave: 'ajustes', etiqueta: 'Ajustes' },
+          { clave: 'transferencias', etiqueta: 'Transferencias' },
+        ] as const).map((t) => (
+          <button
+            key={t.clave}
+            onClick={() => setPestana(t.clave)}
+            className={
+              'px-3 py-2 text-sm font-medium border-b-2 -mb-px ' +
+              (pestana === t.clave
+                ? 'border-sol-500 text-sol-700 dark:text-sol-300'
+                : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400')
+            }
+          >
+            {t.etiqueta}
+          </button>
+        ))}
+      </div>
+
+      {pestana === 'stock' && (
       <RequierePermiso permiso="inventario.ver">
+        {tienePermisoAdmin && (
+          <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+            <input type="checkbox" checked={mostrarInactivas} onChange={(e) => setMostrarInactivas(e.target.checked)} />
+            Mostrar bodegas inactivas
+          </label>
+        )}
         {bodegas?.length === 0 ? (
           <EstadoVacio
             titulo="Todavía no hay bodegas"
@@ -236,23 +273,22 @@ export function Inventario() {
                     : 'border-slate-200 bg-white hover:border-sol-300 dark:border-slate-800 dark:bg-slate-900',
                 )}
               >
-                <p className="font-medium text-slate-900 dark:text-slate-100">{bodega.nombre}</p>
-                {bodega.direccion && <p className="text-sm text-slate-500 dark:text-slate-400">{bodega.direccion}</p>}
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <p className="font-medium text-slate-900 dark:text-slate-100">{bodega.nombre}</p>
+                    {bodega.sucursal && <p className="text-xs text-slate-400">{bodega.sucursal.nombre}</p>}
+                    {bodega.direccion && <p className="text-sm text-slate-500 dark:text-slate-400">{bodega.direccion}</p>}
+                  </div>
+                  {!bodega.activa && <Badge tono="peligro">Inactiva</Badge>}
+                </div>
                 <div className="mt-2 flex items-center justify-between">
                   <p className="text-xs text-slate-400">
                     {FORMATOS_IMPRESION.find((f) => f.value === bodega.formatoImpresion)?.label ?? 'Formato de la empresa'}
                   </p>
                   <RequierePermiso permiso="admin.configuracion">
-                    <button
-                      type="button"
-                      className="text-xs text-sol-600 hover:underline dark:text-sol-400"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setBodegaEditandoFormato(bodega);
-                      }}
-                    >
-                      Editar formato
-                    </button>
+                    <div onClick={(e) => e.stopPropagation()}>
+                      <RowActionsMenu acciones={[{ etiqueta: 'Editar', onClick: () => setBodegaEditando(bodega) }]} />
+                    </div>
                   </RequierePermiso>
                 </div>
               </div>
@@ -338,6 +374,11 @@ export function Inventario() {
             )}
           </Card>
         )}
+      </RequierePermiso>
+      )}
+
+      {pestana === 'ajustes' && (
+      <RequierePermiso permiso="inventario.ver">
         <Card
           sinPadding
           titulo="Ajustes de inventario"
@@ -400,7 +441,11 @@ export function Inventario() {
             </div>
           )}
         </Card>
+      </RequierePermiso>
+      )}
 
+      {pestana === 'transferencias' && (
+      <RequierePermiso permiso="inventario.ver">
         <Card
           sinPadding
           titulo="Transferencias de inventario"
@@ -475,6 +520,7 @@ export function Inventario() {
           )}
         </Card>
       </RequierePermiso>
+      )}
 
       {modalNuevaBodega && <ModalNuevaBodega onClose={() => setModalNuevaBodega(false)} />}
       {ajusteViendo && <ModalVerAjuste ajuste={ajusteViendo} onClose={() => setAjusteViendo(null)} />}
@@ -482,9 +528,7 @@ export function Inventario() {
       {ajusteConfirmando && <ModalConfirmarAjuste ajuste={ajusteConfirmando} onClose={() => setAjusteConfirmando(null)} />}
       {transferenciaViendo && <ModalVerTransferencia transferencia={transferenciaViendo} onClose={() => setTransferenciaViendo(null)} />}
       {transferenciaEditando && <ModalEditarTransferencia transferencia={transferenciaEditando} onClose={() => setTransferenciaEditando(null)} />}
-      {bodegaEditandoFormato && (
-        <ModalEditarFormatoBodega bodega={bodegaEditandoFormato} onClose={() => setBodegaEditandoFormato(null)} />
-      )}
+      {bodegaEditando && <ModalEditarBodega bodega={bodegaEditando} onClose={() => setBodegaEditando(null)} />}
       {stockAjustando && bodegaSeleccionadaId && (
         <ModalAjustarStock
           bodegaId={bodegaSeleccionadaId}
@@ -575,30 +619,74 @@ function ModalNuevaBodega({ onClose }: { onClose: () => void }) {
   );
 }
 
-function ModalEditarFormatoBodega({ bodega, onClose }: { bodega: Bodega; onClose: () => void }) {
+function ModalEditarBodega({ bodega, onClose }: { bodega: Bodega; onClose: () => void }) {
   const queryClient = useQueryClient();
+  const [nombre, setNombre] = useState(bodega.nombre);
+  const [direccion, setDireccion] = useState(bodega.direccion ?? '');
+  const [sucursalId, setSucursalId] = useState(bodega.sucursalId);
+  const [activa, setActiva] = useState(bodega.activa);
   const [formatoImpresion, setFormatoImpresion] = useState(bodega.formatoImpresion ?? '');
+  const [error, setError] = useState<string | null>(null);
+
+  const { data: sucursales } = useQuery({
+    queryKey: ['sucursales'],
+    queryFn: async () => (await apiClient.get<{ id: string; nombre: string }[]>('/sucursales')).data,
+  });
 
   const guardar = useMutation({
     mutationFn: async () =>
-      apiClient.patch(`/inventario/bodegas/${bodega.id}`, { formatoImpresion: formatoImpresion || null }),
+      apiClient.patch(`/inventario/bodegas/${bodega.id}`, {
+        nombre,
+        direccion: direccion || undefined,
+        sucursalId,
+        activa,
+        formatoImpresion: formatoImpresion || null,
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['bodegas'] });
       onClose();
     },
+    onError: () => setError('No se pudo guardar la bodega.'),
   });
 
   return (
-    <Modal titulo={`Formato de impresión — ${bodega.nombre}`} onClose={onClose}>
+    <Modal titulo={`Editar bodega — ${bodega.nombre}`} onClose={onClose}>
       <div className="space-y-3">
-        <Select value={formatoImpresion} onChange={(e) => setFormatoImpresion(e.target.value)}>
-          <option value="">Usar el default de la empresa</option>
-          {FORMATOS_IMPRESION.map((f) => (
-            <option key={f.value} value={f.value}>
-              {f.label}
-            </option>
-          ))}
-        </Select>
+        <FormField id="editar-bodega-nombre" label="Nombre" value={nombre} onChange={(e) => setNombre(e.target.value)} required />
+        <FormField id="editar-bodega-direccion" label="Dirección" value={direccion} onChange={(e) => setDireccion(e.target.value)} />
+        <div className="flex flex-col gap-1">
+          <label htmlFor="editar-bodega-sucursal" className="text-sm font-medium text-slate-700 dark:text-slate-300">
+            Sucursal
+          </label>
+          <Select id="editar-bodega-sucursal" value={sucursalId} onChange={(e) => setSucursalId(e.target.value)}>
+            {sucursales?.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.nombre}
+              </option>
+            ))}
+          </Select>
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Formato de impresión</label>
+          <Select value={formatoImpresion} onChange={(e) => setFormatoImpresion(e.target.value)}>
+            <option value="">Usar el default de la empresa</option>
+            {FORMATOS_IMPRESION.map((f) => (
+              <option key={f.value} value={f.value}>
+                {f.label}
+              </option>
+            ))}
+          </Select>
+        </div>
+        <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
+          <input type="checkbox" checked={activa} onChange={(e) => setActiva(e.target.checked)} />
+          Bodega activa
+        </label>
+        {!activa && (
+          <p className="text-xs text-amber-600 dark:text-amber-400">
+            Inactivarla la saca de los selectores de bodega en toda la app (Facturación, Compras, POS, etc.) — no borra su stock ni su historial.
+          </p>
+        )}
+        {error && <p className="text-sm text-red-600">{error}</p>}
         <Button onClick={() => guardar.mutate()} disabled={guardar.isPending} className="w-full">
           {guardar.isPending ? 'Guardando…' : 'Guardar'}
         </Button>

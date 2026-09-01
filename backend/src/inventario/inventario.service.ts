@@ -499,6 +499,10 @@ export class InventarioService {
     return this.inventarioRepository.listarBodegas();
   }
 
+  listarTodasBodegas() {
+    return this.inventarioRepository.listarTodasBodegas();
+  }
+
   async crearBodega(tenantId: string, sucursalId: string, nombre: string, direccion?: string) {
     // Valida que la sucursal pertenezca al tenant antes de colgarle una
     // bodega — mismo patrón IDOR-safe que validarPertenencia() de arriba.
@@ -506,7 +510,13 @@ export class InventarioService {
     return this.inventarioRepository.crearBodega(tenantId, sucursalId, nombre, direccion);
   }
 
-  actualizarBodega(id: string, data: { formatoImpresion?: FormatoImpresion | null }) {
+  async actualizarBodega(
+    id: string,
+    data: { nombre?: string; direccion?: string; sucursalId?: string; activa?: boolean; formatoImpresion?: FormatoImpresion | null },
+  ) {
+    // Mismo chequeo IDOR-safe que crearBodega — mover una bodega a una
+    // sucursal de otro tenant no debería ser posible.
+    if (data.sucursalId) await this.sucursalesRepository.buscarPorId(data.sucursalId);
     return this.inventarioRepository.actualizarBodega(id, data);
   }
 }

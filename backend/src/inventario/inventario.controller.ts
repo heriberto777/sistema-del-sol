@@ -31,6 +31,15 @@ export class InventarioController {
     return this.inventarioService.listarBodegas();
   }
 
+  // Ítem "gestión de bodegas" — a diferencia de GET bodegas (activas,
+  // sin permiso, usada como selector en toda la app), esta trae también
+  // las inactivas + su sucursal, solo para la pantalla de administración.
+  @Get('bodegas/todas')
+  @Permissions('admin.configuracion')
+  listarTodasBodegas() {
+    return this.inventarioService.listarTodasBodegas();
+  }
+
   @Post('bodegas')
   @Permissions('admin.configuracion')
   crearBodega(@Body() dto: CrearBodegaDto, @CurrentUser() user: JwtPayloadUser) {
