@@ -41,6 +41,7 @@ describe('PosService', () => {
       guardarVenta: jest.fn(),
       listarGuardadas: jest.fn(),
       eliminarGuardada: jest.fn(),
+      buscarParaDevolver: jest.fn(),
     } as unknown as jest.Mocked<PosRepository>;
     facturacionService = { crear: jest.fn(), buscarPorId: jest.fn(), cotizar: jest.fn() } as unknown as jest.Mocked<FacturacionService>;
     configuracionesService = { buscarValor: jest.fn().mockResolvedValue('50') } as unknown as jest.Mocked<ConfiguracionesService>;
@@ -820,7 +821,7 @@ describe('PosService', () => {
 
       const resultado = await service.obtenerMensajeCajas('tenant-1');
 
-      expect(redis.obtenerJson).toHaveBeenCalledWith('pos:mensaje-cajas:tenant-1');
+      expect(redis.obtenerJson).toHaveBeenCalledWith('pos:mensaje-cajas:tenant-1:todas');
       expect(resultado).toBeNull();
     });
 
@@ -828,7 +829,7 @@ describe('PosService', () => {
       const resultado = await service.publicarMensajeCajas('tenant-1', 'Cierre anticipado hoy');
 
       expect(redis.guardarJson).toHaveBeenCalledWith(
-        'pos:mensaje-cajas:tenant-1',
+        'pos:mensaje-cajas:tenant-1:todas',
         expect.objectContaining({ texto: 'Cierre anticipado hoy' }),
         8 * 60 * 60,
       );
@@ -838,7 +839,83 @@ describe('PosService', () => {
     it('borrarMensajeCajas elimina la clave de Redis del tenant', async () => {
       await service.borrarMensajeCajas('tenant-1');
 
-      expect(redis.eliminar).toHaveBeenCalledWith('pos:mensaje-cajas:tenant-1');
+      expect(redis.eliminar).toHaveBeenCalledWith('pos:mensaje-cajas:tenant-1:todas');
+    });
+
+    it('publicarMensajeCajas con turnoCajaId guarda en la clave dirigida a esa caja', async () => {
+      await service.publicarMensajeCajas('tenant-1', 'Cierre anticipado hoy', 'turno-1');
+
+      expect(redis.guardarJson).toHaveBeenCalledWith(
+        'pos:mensaje-cajas:tenant-1:turno-1',
+        expect.objectContaining({ texto: 'Cierre anticipado hoy' }),
+        8 * 60 * 60,
+      );
+    });
+
+    it('obtenerMensajeCajas con turnoCajaId devuelve el mensaje dirigido si existe, sin consultar el general', async () => {
+      redis.obtenerJson.mockResolvedValueOnce({ texto: 'Para esta caja', fecha: '2026-01-01' });
+
+      const resultado = await service.obtenerMensajeCajas('tenant-1', 'turno-1');
+
+      expect(redis.obtenerJson).toHaveBeenCalledWith('pos:mensaje-cajas:tenant-1:turno-1');
+      expect(redis.obtenerJson).toHaveBeenCalledTimes(1);
+      expect(resultado).toEqual({ texto: 'Para esta caja', fecha: '2026-01-01' });
+    });
+
+    it('obtenerMensajeCajas con turnoCajaId cae al mensaje general si esa caja no tiene uno propio', async () => {
+      redis.obtenerJson.mockResolvedValueOnce(null).mockResolvedValueOnce({ texto: 'Para todas', fecha: '2026-01-01' });
+
+      const resultado = await service.obtenerMensajeCajas('tenant-1', 'turno-1');
+
+      expect(redis.obtenerJson).toHaveBeenNthCalledWith(1, 'pos:mensaje-cajas:tenant-1:turno-1');
+      expect(redis.obtenerJson).toHaveBeenNthCalledWith(2, 'pos:mensaje-cajas:tenant-1:todas');
+      expect(resultado).toEqual({ texto: 'Para todas', fecha: '2026-01-01' });
+    });
+
+    it('borrarMensajeCajas con turnoCajaId elimina solo la clave dirigida a esa caja', async () => {
+      await service.borrarMensajeCajas('tenant-1', 'turno-1');
+
+      expect(redis.eliminar).toHaveBeenCalledWith('pos:mensaje-cajas:tenant-1:turno-1');
+    });
+  });
+
+  describe('buscarPorId — marca de nota aplicada (ítem "marcar factura devuelta")', () => {
+    it('mapea _count.notasRelacionadas de cada factura del turno a tieneNotaAplicada', async () => {
+      posRepository.buscarPorId.mockResolvedValue({
+        id: 't1',
+        estado: 'ABIERTO',
+        facturas: [
+          { id: 'f1', _count: { notasRelacionadas: 1 } },
+          { id: 'f2', _count: { notasRelacionadas: 0 } },
+        ],
+      } as never);
+
+      const resultado = await service.buscarPorId('t1');
+
+      expect(resultado.facturas).toEqual([
+        expect.objectContaining({ id: 'f1', tieneNotaAplicada: true }),
+        expect.objectContaining({ id: 'f2', tieneNotaAplicada: false }),
+      ]);
+    });
+  });
+
+  describe('buscarParaDevolver (ítem "buscador de Devolución")', () => {
+    it('agrega tieneNotaAplicada:true a las ventas con al menos una nota de crédito emitida', async () => {
+      posRepository.buscarParaDevolver.mockResolvedValue([
+        [
+          { id: 'f1', numero: '00001', _count: { notasRelacionadas: 1 } },
+          { id: 'f2', numero: '00002', _count: { notasRelacionadas: 0 } },
+        ],
+        2,
+      ] as never);
+
+      const resultado = await service.buscarParaDevolver({ busqueda: '00' } as never);
+
+      expect(resultado.datos).toEqual([
+        expect.objectContaining({ id: 'f1', tieneNotaAplicada: true }),
+        expect.objectContaining({ id: 'f2', tieneNotaAplicada: false }),
+      ]);
+      expect(resultado.total).toBe(2);
     });
   });
 });

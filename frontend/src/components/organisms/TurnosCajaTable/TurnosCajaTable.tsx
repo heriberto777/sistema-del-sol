@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../../lib/api-client';
 import { AbrirTurnoForm } from '../AbrirTurnoForm/AbrirTurnoForm';
@@ -48,12 +49,8 @@ interface TurnoCaja {
   cerradoPor: Cajero | null;
 }
 
-interface TurnosCajaTableProps {
-  seleccionadoId: string | null;
-  onSeleccionar: (id: string) => void;
-}
-
-export function TurnosCajaTable({ seleccionadoId, onSeleccionar }: TurnosCajaTableProps) {
+export function TurnosCajaTable() {
+  const navigate = useNavigate();
   const { tienePermiso } = useAuth();
   const queryClient = useQueryClient();
   const [pagina, setPagina] = useState(1);
@@ -176,10 +173,7 @@ export function TurnosCajaTable({ seleccionadoId, onSeleccionar }: TurnosCajaTab
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {data.datos.map((turno) => (
-                  <tr
-                    key={turno.id}
-                    className={turno.id === seleccionadoId ? 'bg-sol-50 dark:bg-sol-900/20' : 'hover:bg-slate-50 dark:hover:bg-slate-800/40'}
-                  >
+                  <tr key={turno.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
                     <td className="px-5 py-3">{bodegas?.find((b) => b.id === turno.bodegaId)?.nombre ?? turno.bodegaId}</td>
                     <td className="px-5 py-3">
                       {turno.cajero.nombre}
@@ -194,8 +188,8 @@ export function TurnosCajaTable({ seleccionadoId, onSeleccionar }: TurnosCajaTab
                     <td className="px-5 py-3">{new Date(turno.abiertoEn).toLocaleString('es-DO')}</td>
                     <td className="px-5 py-3">
                       <div className="flex gap-2">
-                        <Button variante="secundario" onClick={() => onSeleccionar(turno.id)}>
-                          Ver detalle
+                        <Button variante="secundario" onClick={() => navigate(`/pos/caja/${turno.id}`)}>
+                          {turno.estado === 'ABIERTO' ? 'Entrar a la caja' : 'Ver detalle'}
                         </Button>
                         {turno.estado === 'PENDIENTE_REVISION' && tienePermiso('pos.supervisar') && (
                           <Button disabled={revisar.isPending} onClick={() => revisar.mutate(turno.id)}>
@@ -219,7 +213,7 @@ export function TurnosCajaTable({ seleccionadoId, onSeleccionar }: TurnosCajaTab
           onClose={() => setModalAbrirTurno(false)}
           onAbierto={(turnoId) => {
             setModalAbrirTurno(false);
-            onSeleccionar(turnoId);
+            navigate(`/pos/caja/${turnoId}`);
           }}
         />
       )}

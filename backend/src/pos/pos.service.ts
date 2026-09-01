@@ -17,6 +17,7 @@ import { GuardarVentaDto } from './dto/guardar-venta.dto';
 import { GuardarBorradorCarritoDto } from './dto/guardar-borrador-carrito.dto';
 import { RegistrarDevolucionDto } from './dto/registrar-devolucion.dto';
 import { ListarTurnosQueryDto } from './dto/listar-turnos-query.dto';
+import { ListadoQueryDto } from '../common/dto/listado-query.dto';
 import { paginar } from '../common/types/pagina-resultado';
 import { CONFIGURACIONES_BASE } from '../tenants/roles-base';
 import { MotivoMovimientoCaja } from '@prisma/client';
@@ -30,8 +31,16 @@ const CLAVE_TOLERANCIA_ARQUEO = 'POS_TOLERANCIA_ARQUEO';
 // efímero (turno a turno), no un dato de negocio que necesite historial ni
 // aislamiento por sucursal — un TTL largo (8h, una jornada laboral) evita
 // que quede "pegado" si alguien olvida borrarlo.
-const CLAVE_MENSAJE_CAJAS = (tenantId: string) => `pos:mensaje-cajas:${tenantId}`;
+// `turnoCajaId` opcional (ítem "Mensaje a cajas por caja puntual") — sin
+// él, cae en la clave de broadcast ('todas'), igual que siempre.
+const CLAVE_MENSAJE_CAJAS = (tenantId: string, turnoCajaId?: string) => `pos:mensaje-cajas:${tenantId}:${turnoCajaId ?? 'todas'}`;
 const TTL_MENSAJE_CAJAS_SEGUNDOS = 8 * 60 * 60;
+
+/** Ítem "marcar factura devuelta" — mismo criterio que FacturacionService.listar()/buscarParaNota. */
+function mapearFacturaTurno<T extends { _count?: { notasRelacionadas: number } }>(factura: T): Omit<T, '_count'> & { tieneNotaAplicada: boolean } {
+  const { _count, ...resto } = factura;
+  return { ...resto, tieneNotaAplicada: (_count?.notasRelacionadas ?? 0) > 0 };
+}
 
 // Plan de integración de brechas Cuadre, ítem F-5: etiqueta legible para
 // cuando el cajero deja "concepto" (detalle libre) en blanco.
@@ -62,20 +71,30 @@ export class PosService {
     return this.empleadosRepository.listarVendedores(busqueda);
   }
 
-  /** "Mensaje a cajas" (ítem J-3) — cualquier POS con turno activo lo consulta por polling. */
-  async obtenerMensajeCajas(tenantId: string) {
-    const mensaje = await this.redis.obtenerJson<{ texto: string; fecha: string }>(CLAVE_MENSAJE_CAJAS(tenantId));
-    return mensaje ?? null;
+  /**
+   * "Mensaje a cajas" (ítem J-3) — cualquier POS con turno activo lo
+   * consulta por polling. Si se pasa `turnoCajaId` y esa caja tiene un
+   * mensaje dirigido, gana sobre el broadcast general — si no, cae al
+   * de "todas" (mismo comportamiento de siempre para quien no pase
+   * `turnoCajaId`, o para una caja sin mensaje propio).
+   */
+  async obtenerMensajeCajas(tenantId: string, turnoCajaId?: string) {
+    if (turnoCajaId) {
+      const dirigido = await this.redis.obtenerJson<{ texto: string; fecha: string }>(CLAVE_MENSAJE_CAJAS(tenantId, turnoCajaId));
+      if (dirigido) return dirigido;
+    }
+    const general = await this.redis.obtenerJson<{ texto: string; fecha: string }>(CLAVE_MENSAJE_CAJAS(tenantId));
+    return general ?? null;
   }
 
-  async publicarMensajeCajas(tenantId: string, texto: string) {
+  async publicarMensajeCajas(tenantId: string, texto: string, turnoCajaId?: string) {
     const mensaje = { texto, fecha: new Date().toISOString() };
-    await this.redis.guardarJson(CLAVE_MENSAJE_CAJAS(tenantId), mensaje, TTL_MENSAJE_CAJAS_SEGUNDOS);
+    await this.redis.guardarJson(CLAVE_MENSAJE_CAJAS(tenantId, turnoCajaId), mensaje, TTL_MENSAJE_CAJAS_SEGUNDOS);
     return mensaje;
   }
 
-  async borrarMensajeCajas(tenantId: string) {
-    await this.redis.eliminar(CLAVE_MENSAJE_CAJAS(tenantId));
+  async borrarMensajeCajas(tenantId: string, turnoCajaId?: string) {
+    await this.redis.eliminar(CLAVE_MENSAJE_CAJAS(tenantId, turnoCajaId));
   }
 
   async abrirTurno(dto: AbrirTurnoDto, tenantId: string, cajeroId: string) {
@@ -99,8 +118,16 @@ export class PosService {
     return this.posRepository.crearTurno({ tenantId, bodegaId: dto.bodegaId, cajaId: dto.cajaId, cajeroId, montoInicial: dto.montoInicial });
   }
 
-  buscarPorId(id: string) {
-    return this.posRepository.buscarPorId(id);
+  async buscarPorId(id: string) {
+    const turno = await this.posRepository.buscarPorId(id);
+    return { ...turno, facturas: turno.facturas.map(mapearFacturaTurno) };
+  }
+
+  /** Ítem "buscador de Devolución" — ver PosRepository.buscarParaDevolver. */
+  async buscarParaDevolver(query: ListadoQueryDto) {
+    const { pagina, tamanoPagina, skip, take } = paginar(query.pagina, query.tamanoPagina);
+    const [datos, total] = await this.posRepository.buscarParaDevolver({ skip, take, busqueda: query.busqueda });
+    return { datos: datos.map(mapearFacturaTurno), total, pagina, tamanoPagina };
   }
 
   async listar(query: ListarTurnosQueryDto) {

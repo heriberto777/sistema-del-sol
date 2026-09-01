@@ -18,6 +18,10 @@ const INCLUDE_TURNO = {
       // las formas de pago (ítem E-6, antes solo se distinguía efectivo).
       // Ver calcularMovimientoEfectivo.
       pagosVenta: { select: { monto: true, formaPago: { select: { id: true, nombre: true, esEfectivo: true } } } },
+      // Ítem "marcar factura devuelta" — mismo criterio que
+      // FacturacionRepository.listar(), para que "Ventas del turno"
+      // marque la venta original que ya tiene una nota de crédito.
+      _count: { select: { notasRelacionadas: { where: { tipoFactura: 'NOTA_CREDITO', estado: 'EMITIDA' } } } },
     },
   },
   cajero: { select: { id: true, nombre: true } },
@@ -72,6 +76,42 @@ export class PosRepository {
     return Promise.all([
       this.db.turnoCaja.findMany({ where, orderBy: { abiertoEn: 'desc' }, skip: params.skip, take: params.take, include: INCLUDE_TURNO }),
       this.db.turnoCaja.count({ where }),
+    ]);
+  }
+
+  /**
+   * Ítem "buscador de Devolución" — a diferencia del listado de
+   * `data.facturas` de un turno puntual, esto busca en TODO el tenant
+   * (backend de `registrarDevolucion` ya lo permitía sin restricción de
+   * turno) las ventas CONTADO emitidas por número/NCF/cliente. Mismo
+   * patrón que `FacturacionRepository.buscarParaNota`.
+   */
+  buscarParaDevolver(params: { skip?: number; take?: number; busqueda?: string }) {
+    const where = {
+      estado: 'EMITIDA' as const,
+      tipoFactura: 'CONTADO' as const,
+      ...(params.busqueda
+        ? {
+            OR: [
+              { numero: { contains: params.busqueda, mode: 'insensitive' as const } },
+              { ncf: { contains: params.busqueda, mode: 'insensitive' as const } },
+              { cliente: { nombre: { contains: params.busqueda, mode: 'insensitive' as const } } },
+            ],
+          }
+        : {}),
+    };
+    return Promise.all([
+      this.db.factura.findMany({
+        where,
+        skip: params.skip,
+        take: params.take,
+        orderBy: { createdAt: 'desc' as const },
+        include: {
+          cliente: { select: { nombre: true } },
+          _count: { select: { notasRelacionadas: { where: { tipoFactura: 'NOTA_CREDITO', estado: 'EMITIDA' } } } },
+        },
+      }),
+      this.db.factura.count({ where }),
     ]);
   }
 

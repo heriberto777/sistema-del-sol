@@ -31,6 +31,7 @@ interface Factura {
   pagada: boolean;
   fecha: string;
   cliente: { nombre: string };
+  tieneNotaAplicada: boolean;
 }
 
 interface FacturaDetalle extends Factura {
@@ -160,6 +161,11 @@ export function FacturasTable({ tiposFactura, titulo = 'Facturas', busquedaPlace
                       <td className="px-5 py-3 font-medium text-slate-900 dark:text-slate-100">RD$ {Number(factura.total).toLocaleString('es-DO')}</td>
                       <td className="px-5 py-3">
                         <Badge tono={TONO_POR_ESTADO[factura.estado]}>{factura.estado}</Badge>
+                        {factura.tieneNotaAplicada && (
+                          <span className="ml-2 inline-block">
+                            <Badge tono="advertencia">Nota aplicada</Badge>
+                          </span>
+                        )}
                         {factura.tipoFactura === 'CREDITO' && factura.estado === 'EMITIDA' && (
                           <span className="ml-2 text-xs text-slate-400">{factura.pagada ? 'pagada' : 'pendiente de cobro'}</span>
                         )}

@@ -14,6 +14,8 @@ import { CampoPin } from '../../molecules/CampoPin/CampoPin';
 import { CampoCodigoAutorizacion } from '../../molecules/CampoCodigoAutorizacion/CampoCodigoAutorizacion';
 import { SelectFormaPago, type FormaPago } from '../../molecules/SelectFormaPago/SelectFormaPago';
 import { Select } from '../../atoms/Select/Select';
+import { SearchInput } from '../../molecules/SearchInput/SearchInput';
+import { FormularioCliente } from '../../molecules/FormularioCliente/FormularioCliente';
 import { useAuth } from '../../../hooks/useAuth';
 import { useAtajosTeclado } from '../../../hooks/useAtajosTeclado';
 import { useListasPrecio } from '../../../hooks/useListasPrecio';
@@ -134,6 +136,7 @@ interface FacturaTurno {
   vendedorEmpleado: { nombre: string } | null;
   pagosVenta: PagoVentaResumen[];
   estado: string;
+  tieneNotaAplicada: boolean;
 }
 
 interface Cajero {
@@ -687,12 +690,15 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
               </div>
 
               {mostrarNuevoCliente && (
-                <NuevoClienteInlinePos
-                  onCreado={(c) => {
-                    setCliente(c);
-                    setMostrarNuevoCliente(false);
-                  }}
-                />
+                <Modal titulo="Nuevo cliente" onClose={() => setMostrarNuevoCliente(false)}>
+                  <FormularioCliente
+                    cliente={null}
+                    onGuardado={(c) => {
+                      setCliente(c);
+                      setMostrarNuevoCliente(false);
+                    }}
+                  />
+                </Modal>
               )}
 
               <details className="group rounded-lg border border-slate-200 dark:border-slate-800">
@@ -882,6 +888,12 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
                 {f.pagosVenta.length > 1 && ` (+${f.pagosVenta.length - 1} forma${f.pagosVenta.length > 2 ? 's' : ''} más)`}
                 {f.vendedorEmpleado && ` — vendedor: ${f.vendedorEmpleado.nombre}`}{' '}
                 <Badge tono={f.estado === 'EMITIDA' ? 'exito' : 'neutro'}>{f.estado}</Badge>
+                {f.tieneNotaAplicada && (
+                  <>
+                    {' '}
+                    <Badge tono="advertencia">Devuelta</Badge>
+                  </>
+                )}
               </span>
               <span className="flex items-center gap-3">
                 <button
@@ -967,7 +979,6 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
       {modalDevolucion && (
         <ModalDevolucion
           turnoCajaId={turnoId}
-          facturas={data.facturas.filter((f) => f.estado === 'EMITIDA')}
           onDevuelta={() => {
             invalidar();
             setModalDevolucion(false);
@@ -1021,34 +1032,6 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
       )}
       </div>
     </Card>
-  );
-}
-
-/** Alta rápida de cliente sin salir de la venta (plan de integración Cuadre, ítem F-2) — mismo criterio que NuevoClienteInline en Facturacion.tsx. */
-function NuevoClienteInlinePos({ onCreado }: { onCreado: (c: Cliente) => void }) {
-  const queryClient = useQueryClient();
-  const [nombre, setNombre] = useState('');
-  const [error, setError] = useState<string | null>(null);
-
-  const crear = useMutation({
-    mutationFn: async () => (await apiClient.post<Cliente>('/clientes', { nombre, tipo: 'PERSONA_FISICA' })).data,
-    onSuccess: (cliente) => {
-      queryClient.invalidateQueries({ queryKey: ['clientes-consumidor-final'] });
-      onCreado(cliente);
-    },
-    onError: () => setError('No se pudo crear el cliente.'),
-  });
-
-  return (
-    <div className="mt-1 flex items-end gap-2 rounded-md border border-slate-200 p-2 dark:border-slate-800">
-      <div className="flex-1">
-        <FormField id="pos-nuevo-cliente-nombre" label="Nombre del cliente" value={nombre} onChange={(e) => setNombre(e.target.value)} />
-        {error && <p className="text-xs text-red-600">{error}</p>}
-      </div>
-      <Button type="button" disabled={!nombre || crear.isPending} onClick={() => crear.mutate()}>
-        {crear.isPending ? 'Creando…' : 'Crear'}
-      </Button>
-    </div>
   );
 }
 
@@ -1202,24 +1185,50 @@ interface FacturaParaDevolucion {
   lineas: LineaFacturaDevolucion[];
 }
 
-/** Devolución parcial (F4) — reusa Nota de Crédito en el backend, ver ARCHITECTURE.md. Solo lista ventas EMITIDA de este turno. */
+interface FacturaParaDevolver {
+  id: string;
+  numero: string | null;
+  ncf: string | null;
+  total: string;
+  cliente: { nombre: string };
+  tieneNotaAplicada: boolean;
+}
+
+/**
+ * Devolución parcial (F4) — reusa Nota de Crédito en el backend, ver
+ * ARCHITECTURE.md. Buscador de "venta a devolver" en vez de un select
+ * limitado a las ventas del turno actual (ítem "buscador de
+ * Devolución") — mismo patrón que EmitirNotaForm.tsx.
+ */
 function ModalDevolucion({
   turnoCajaId,
-  facturas,
   onDevuelta,
   onClose,
 }: {
   turnoCajaId: string;
-  facturas: FacturaTurno[];
   onDevuelta: () => void;
   onClose: () => void;
 }) {
   const { usuario } = useAuth();
+  const [busqueda, setBusqueda] = useState('');
+  const busquedaDebounced = useDebouncedValue(busqueda);
   const [facturaId, setFacturaId] = useState('');
+  const [facturaSeleccionada, setFacturaSeleccionada] = useState<FacturaParaDevolver | null>(null);
   const [cantidades, setCantidades] = useState<Record<string, string>>({});
   const [formaPagoId, setFormaPagoId] = useState('');
   const [codigoAutorizacion, setCodigoAutorizacion] = useState('');
   const [error, setError] = useState<string | null>(null);
+
+  const { data: resultados, isFetching: buscando } = useQuery({
+    queryKey: ['pos-facturas-para-devolver', busquedaDebounced],
+    queryFn: async () =>
+      (
+        await apiClient.get<PaginaResultado<FacturaParaDevolver>>('/pos/facturas-para-devolver', {
+          params: { busqueda: busquedaDebounced || undefined },
+        })
+      ).data,
+    enabled: !facturaId,
+  });
 
   const { data: factura, isLoading } = useQuery({
     queryKey: ['pos-factura-devolucion', facturaId],
@@ -1259,27 +1268,65 @@ function ModalDevolucion({
     devolver.mutate();
   }
 
+  function elegirFactura(f: FacturaParaDevolver) {
+    setFacturaSeleccionada(f);
+    setFacturaId(f.id);
+    setCantidades({});
+  }
+
+  function volverABuscar() {
+    setFacturaId('');
+    setFacturaSeleccionada(null);
+    setCantidades({});
+    setError(null);
+  }
+
   return (
     <Modal titulo="Devolución" onClose={onClose}>
       <div className="space-y-3">
-        <div className="flex flex-col gap-1">
-          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Venta a devolver</label>
-          <select
-            value={facturaId}
-            onChange={(e) => {
-              setFacturaId(e.target.value);
-              setCantidades({});
-            }}
-            className="rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-          >
-            <option value="">Seleccionar…</option>
-            {facturas.map((f) => (
-              <option key={f.id} value={f.id}>
-                {f.ncf ?? f.id} — {formatoRD(f.total)}
-              </option>
-            ))}
-          </select>
-        </div>
+        {!facturaId && (
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Venta a devolver</label>
+            <SearchInput value={busqueda} onChange={setBusqueda} placeholder="Buscar por número, NCF o cliente…" />
+            <div className="mt-1 max-h-64 divide-y divide-slate-200 overflow-y-auto rounded-md border border-slate-200 dark:divide-slate-800 dark:border-slate-800">
+              {buscando && <p className="px-3 py-4 text-center text-sm text-slate-500">Buscando…</p>}
+              {!buscando && resultados?.datos.length === 0 && (
+                <p className="px-3 py-4 text-center text-sm text-slate-500">No se encontraron ventas.</p>
+              )}
+              {resultados?.datos.map((f) => (
+                <button
+                  key={f.id}
+                  type="button"
+                  onClick={() => elegirFactura(f)}
+                  className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm hover:bg-slate-50 dark:hover:bg-slate-800/60"
+                >
+                  <span className="min-w-0">
+                    <span className="block font-medium text-slate-900 dark:text-slate-100">
+                      {f.numero ?? f.id.slice(0, 8)} {f.ncf ? <span className="text-slate-400">· {f.ncf}</span> : null}
+                    </span>
+                    <span className="block truncate text-slate-500 dark:text-slate-400">{f.cliente.nombre}</span>
+                  </span>
+                  <span className="flex shrink-0 flex-col items-end gap-1">
+                    <span className="font-medium text-slate-900 dark:text-slate-100">{formatoRD(f.total)}</span>
+                    {f.tieneNotaAplicada && <Badge tono="advertencia">Nota aplicada</Badge>}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {facturaId && facturaSeleccionada && (
+          <div className="flex items-center justify-between gap-3 rounded-md bg-slate-50 px-3 py-2 text-sm dark:bg-slate-900/40">
+            <span className="text-slate-700 dark:text-slate-300">
+              {facturaSeleccionada.numero ?? facturaSeleccionada.id.slice(0, 8)}
+              {facturaSeleccionada.ncf ? ` · ${facturaSeleccionada.ncf}` : ''} — {facturaSeleccionada.cliente.nombre}
+            </span>
+            <Button type="button" variante="secundario" onClick={volverABuscar}>
+              Cambiar
+            </Button>
+          </div>
+        )}
 
         {isLoading && <p className="text-sm text-slate-500">Cargando líneas…</p>}
 

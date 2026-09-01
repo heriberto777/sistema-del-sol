@@ -285,7 +285,9 @@ export class FacturacionRepository {
         skip: params.skip,
         take: params.take,
         orderBy: { createdAt: 'desc' },
-        include: { cliente: true },
+        // _count filtrado — para que el frontend marque "nota aplicada"
+        // (ítem "marcar factura devuelta") sin traer las notas completas.
+        include: { cliente: true, _count: { select: { notasRelacionadas: { where: { tipoFactura: 'NOTA_CREDITO', estado: 'EMITIDA' } } } } },
       }),
       this.db.factura.count({ where }),
     ]);

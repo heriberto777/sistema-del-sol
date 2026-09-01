@@ -624,7 +624,13 @@ export class FacturacionService {
       busqueda: query.busqueda,
       tiposFactura: query.tipoFactura,
     });
-    return { datos, total, pagina, tamanoPagina };
+    return {
+      // Ítem "marcar factura devuelta" — informativo, no bloquea nada.
+      datos: datos.map(({ _count, ...f }) => ({ ...f, tieneNotaAplicada: (_count?.notasRelacionadas ?? 0) > 0 })),
+      total,
+      pagina,
+      tamanoPagina,
+    };
   }
 
   /**

@@ -13,6 +13,7 @@ import { SolicitarAutorizacionDevolucionDto } from './dto/solicitar-autorizacion
 import { ListarTurnosQueryDto } from './dto/listar-turnos-query.dto';
 import { ReporteCierresQueryDto } from './dto/reporte-cierres-query.dto';
 import { PublicarMensajeCajasDto } from './dto/publicar-mensaje-cajas.dto';
+import { ListadoQueryDto } from '../common/dto/listado-query.dto';
 import { Permissions } from '../common/decorators/permissions.decorator';
 import { RequiereModulo } from '../common/decorators/requiere-modulo.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -115,6 +116,14 @@ export class PosController {
     return this.posService.registrarDevolucion(dto, user.tenantId, user.userId);
   }
 
+  // Ítem "buscador de Devolución" — mismo permiso que el resto del flujo
+  // de devolución, no facturacion.ver (Cajero/Vendedor no lo tienen).
+  @Get('facturas-para-devolver')
+  @Permissions('facturacion.anular')
+  buscarParaDevolver(@Query() query: ListadoQueryDto) {
+    return this.posService.buscarParaDevolver(query);
+  }
+
   // Sin facturacion.ver a propósito — Cajero/Vendedor no lo tienen (ver
   // ARCHITECTURE.md, "Vendedor solo vende por POS"), pero sí necesitan ver
   // el detalle de una venta del turno para armar la Devolución (F4).
@@ -168,19 +177,19 @@ export class PosController {
   // poder verlo, no solo quien lo publica.
   @Get('mensaje-cajas')
   @Permissions('pos.ver')
-  obtenerMensajeCajas(@CurrentUser() user: JwtPayloadUser) {
-    return this.posService.obtenerMensajeCajas(user.tenantId);
+  obtenerMensajeCajas(@CurrentUser() user: JwtPayloadUser, @Query('turnoCajaId') turnoCajaId?: string) {
+    return this.posService.obtenerMensajeCajas(user.tenantId, turnoCajaId);
   }
 
   @Post('mensaje-cajas')
   @Permissions('pos.supervisar')
   publicarMensajeCajas(@Body() dto: PublicarMensajeCajasDto, @CurrentUser() user: JwtPayloadUser) {
-    return this.posService.publicarMensajeCajas(user.tenantId, dto.texto);
+    return this.posService.publicarMensajeCajas(user.tenantId, dto.texto, dto.turnoCajaId);
   }
 
   @Delete('mensaje-cajas')
   @Permissions('pos.supervisar')
-  borrarMensajeCajas(@CurrentUser() user: JwtPayloadUser) {
-    return this.posService.borrarMensajeCajas(user.tenantId);
+  borrarMensajeCajas(@CurrentUser() user: JwtPayloadUser, @Query('turnoCajaId') turnoCajaId?: string) {
+    return this.posService.borrarMensajeCajas(user.tenantId, turnoCajaId);
   }
 }

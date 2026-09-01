@@ -9,13 +9,18 @@ interface MensajeCajas {
 
 const INTERVALO_POLLING_MS = 30_000;
 
-/** "Mensaje a cajas" (plan de integración Cuadre, ítem J-3) — banner con polling, visible en toda sesión de POS activa. */
-export function MensajeCajasBanner() {
+/**
+ * "Mensaje a cajas" (plan de integración Cuadre, ítem J-3) — banner con
+ * polling, visible en toda sesión de POS activa. `turnoCajaId` (ítem
+ * "por caja puntual"): si esta caja tiene un mensaje dirigido, gana
+ * sobre el broadcast general — ver `PosService.obtenerMensajeCajas`.
+ */
+export function MensajeCajasBanner({ turnoCajaId }: { turnoCajaId: string }) {
   const [descartadoFecha, setDescartadoFecha] = useState<string | null>(null);
 
   const { data } = useQuery({
-    queryKey: ['pos-mensaje-cajas'],
-    queryFn: async () => (await apiClient.get<MensajeCajas | null>('/pos/mensaje-cajas')).data,
+    queryKey: ['pos-mensaje-cajas', turnoCajaId],
+    queryFn: async () => (await apiClient.get<MensajeCajas | null>('/pos/mensaje-cajas', { params: { turnoCajaId } })).data,
     refetchInterval: INTERVALO_POLLING_MS,
   });
 

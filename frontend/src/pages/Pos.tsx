@@ -23,8 +23,6 @@ interface TurnoCajaResumen {
 
 export function Pos() {
   const { usuario, tienePermiso } = useAuth();
-  const navigate = useNavigate();
-  const [seleccionadoId, setSeleccionadoId] = useState<string | null>(null);
   const esCajero = esCajeroPuro(usuario);
 
   if (esCajero) return <PosCajero />;
@@ -35,12 +33,7 @@ export function Pos() {
       <RequierePermiso permiso="pos.ver">
         {tienePermiso('pos.supervisar') && <MensajeCajasSupervisorPanel />}
         {tienePermiso('pos.supervisar') && <CierresCajaDashboard />}
-        <TurnosCajaTable seleccionadoId={seleccionadoId} onSeleccionar={setSeleccionadoId} />
-        {seleccionadoId && (
-          <div className="flex justify-end">
-            <Button onClick={() => navigate(`/pos/caja/${seleccionadoId}`)}>Entrar a la caja →</Button>
-          </div>
-        )}
+        <TurnosCajaTable />
       </RequierePermiso>
     </div>
   );
@@ -51,14 +44,38 @@ interface MensajeCajas {
   fecha: string;
 }
 
-/** "Mensaje a cajas" (plan de integración Cuadre, ítem J-3) — publicar/borrar el aviso que ven todos los terminales POS (`pos.supervisar`). */
+interface TurnoAbierto {
+  id: string;
+  bodegaId: string;
+  cajero: { nombre: string };
+}
+
+/**
+ * "Mensaje a cajas" (plan de integración Cuadre, ítem J-3) —
+ * publicar/borrar el aviso que ven los terminales POS (`pos.supervisar`).
+ * Destino: "Todas las cajas" (broadcast, default) o una caja/turno
+ * ABIERTO puntual — ver `PosService.obtenerMensajeCajas`.
+ */
 function MensajeCajasSupervisorPanel() {
   const queryClient = useQueryClient();
   const [texto, setTexto] = useState('');
+  const [turnoCajaId, setTurnoCajaId] = useState('');
+
+  const { data: bodegas } = useQuery({
+    queryKey: ['inventario-bodegas'],
+    queryFn: async () => (await apiClient.get<Bodega[]>('/inventario/bodegas')).data,
+  });
+
+  const { data: turnosAbiertos } = useQuery({
+    queryKey: ['pos-turnos-abiertos'],
+    queryFn: async () =>
+      (await apiClient.get<PaginaResultado<TurnoAbierto>>('/pos/turnos', { params: { estado: 'ABIERTO', tamanoPagina: 100 } })).data.datos,
+  });
 
   const { data: mensajeActual } = useQuery({
-    queryKey: ['pos-mensaje-cajas'],
-    queryFn: async () => (await apiClient.get<MensajeCajas | null>('/pos/mensaje-cajas')).data,
+    queryKey: ['pos-mensaje-cajas', turnoCajaId],
+    queryFn: async () =>
+      (await apiClient.get<MensajeCajas | null>('/pos/mensaje-cajas', { params: { turnoCajaId: turnoCajaId || undefined } })).data,
   });
 
   function invalidar() {
@@ -66,7 +83,7 @@ function MensajeCajasSupervisorPanel() {
   }
 
   const publicar = useMutation({
-    mutationFn: async () => apiClient.post('/pos/mensaje-cajas', { texto }),
+    mutationFn: async () => apiClient.post('/pos/mensaje-cajas', { texto, turnoCajaId: turnoCajaId || undefined }),
     onSuccess: () => {
       invalidar();
       setTexto('');
@@ -74,13 +91,28 @@ function MensajeCajasSupervisorPanel() {
   });
 
   const borrar = useMutation({
-    mutationFn: async () => apiClient.delete('/pos/mensaje-cajas'),
+    mutationFn: async () => apiClient.delete('/pos/mensaje-cajas', { params: { turnoCajaId: turnoCajaId || undefined } }),
     onSuccess: invalidar,
   });
 
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
       <p className="mb-2 text-sm font-medium text-slate-700 dark:text-slate-300">Mensaje a cajas</p>
+      <div className="mb-2 flex flex-col gap-1">
+        <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Destino</label>
+        <select
+          value={turnoCajaId}
+          onChange={(e) => setTurnoCajaId(e.target.value)}
+          className="w-full max-w-xs rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+        >
+          <option value="">Todas las cajas</option>
+          {turnosAbiertos?.map((t) => (
+            <option key={t.id} value={t.id}>
+              {bodegas?.find((b) => b.id === t.bodegaId)?.nombre ?? t.bodegaId} — {t.cajero.nombre}
+            </option>
+          ))}
+        </select>
+      </div>
       {mensajeActual && (
         <div className="mb-3 flex items-center justify-between gap-3 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:bg-amber-900/30 dark:text-amber-200">
           <span>Activo: {mensajeActual.texto}</span>

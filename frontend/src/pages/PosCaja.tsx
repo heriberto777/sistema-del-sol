@@ -80,7 +80,7 @@ export function PosCaja() {
         </div>
       </header>
 
-      <MensajeCajasBanner />
+      <MensajeCajasBanner turnoCajaId={turnoId} />
 
       <main className="flex-1 overflow-y-auto p-5">
         <TurnoCajaDetalle turnoId={turnoId} pantallaCompleta onCerrado={() => navigate('/pos')} />
