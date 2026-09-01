@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { ExternalLink } from 'lucide-react';
 import { apiClient } from '../../../lib/api-client';
 import { CampoImagen } from '../../molecules/CampoImagen/CampoImagen';
 import { SelectorBodega } from '../../molecules/SelectorBodega/SelectorBodega';
@@ -7,6 +8,7 @@ import { Card } from '../../atoms/Card/Card';
 import { Button } from '../../atoms/Button/Button';
 import { Select } from '../../atoms/Select/Select';
 import { FormField } from '../../molecules/FormField/FormField';
+import { useAuth } from '../../../hooks/useAuth';
 
 interface Configuracion {
   clave: string;
@@ -35,6 +37,7 @@ const PLANTILLAS = [
  * valores vía `EcommerceService.obtenerConfig`.
  */
 export function TiendaOnlineConfigPanel() {
+  const { usuario } = useAuth();
   const queryClient = useQueryClient();
   const [activa, setActiva] = useState(false);
   const [nombre, setNombre] = useState('');
@@ -75,12 +78,45 @@ export function TiendaOnlineConfigPanel() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin-configuraciones'] }),
   });
 
+  // Estado ya GUARDADO (no el del formulario sin guardar) — el enlace solo
+  // debe habilitarse cuando de verdad va a responder 200, no cuando el
+  // usuario recién tildó el checkbox sin haber apretado "Guardar" todavía.
+  const activaGuardada = configuraciones?.find((c) => c.clave === CLAVE_ACTIVA)?.valor === 'true';
+  const subdominio = usuario?.tenant?.subdominio;
+  const urlTienda = subdominio ? `${window.location.origin}/tienda/${subdominio}` : null;
+
   return (
     <Card
       titulo="Tienda Online"
       descripcion="Storefront público de tu catálogo, sobre el mismo dominio — activalo y elegí una plantilla."
     >
       <div className="space-y-4">
+        {urlTienda && (
+          <div className="flex flex-col gap-1 rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800/50">
+            <span className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
+              Enlace de tu tienda
+            </span>
+            {activaGuardada ? (
+              <a
+                href={urlTienda}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center gap-1.5 text-sm font-medium text-sol-600 hover:underline dark:text-sol-400"
+              >
+                {urlTienda}
+                <ExternalLink size={14} />
+              </a>
+            ) : (
+              <>
+                <span className="text-sm text-slate-500 dark:text-slate-400">{urlTienda}</span>
+                <span className="text-xs text-amber-600 dark:text-amber-400">
+                  Marcá "Tienda activa" y guardá para que este enlace funcione.
+                </span>
+              </>
+            )}
+          </div>
+        )}
+
         <label className="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-300">
           <input type="checkbox" checked={activa} onChange={(e) => setActiva(e.target.checked)} className="h-4 w-4 rounded" />
           Tienda activa
