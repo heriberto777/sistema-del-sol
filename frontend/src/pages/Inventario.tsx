@@ -135,9 +135,11 @@ export function Inventario() {
   const [ajusteViendo, setAjusteViendo] = useState<AjusteInventario | null>(null);
   const [ajusteEditando, setAjusteEditando] = useState<AjusteInventario | null>(null);
   const [ajusteConfirmando, setAjusteConfirmando] = useState<AjusteInventario | null>(null);
+  const [ajusteNuevo, setAjusteNuevo] = useState(false);
   const [paginaAjustes, setPaginaAjustes] = useState(1);
   const [transferenciaViendo, setTransferenciaViendo] = useState<TransferenciaInventario | null>(null);
   const [transferenciaEditando, setTransferenciaEditando] = useState<TransferenciaInventario | null>(null);
+  const [transferenciaNueva, setTransferenciaNueva] = useState(false);
   const [paginaTransferencias, setPaginaTransferencias] = useState(1);
 
   useEffect(() => {
@@ -383,10 +385,11 @@ export function Inventario() {
           sinPadding
           titulo="Ajustes de inventario"
           descripcion={ajustes ? `${ajustes.total} ajuste(s) — ítem E-1, Borrador→Confirmado` : undefined}
+          acciones={tienePermisoAjustar && <Button onClick={() => setAjusteNuevo(true)}>Nuevo ajuste</Button>}
         >
           {ajustes?.datos.length === 0 ? (
             <p className="p-5 text-sm text-slate-500">
-              Todavía no hay ajustes registrados — usá "Ajustar stock" desde una fila de la tabla de arriba para crear el primero.
+              Todavía no hay ajustes registrados — usá el botón "Nuevo ajuste" de arriba para crear el primero.
             </p>
           ) : (
             <div className="overflow-x-auto">
@@ -450,10 +453,11 @@ export function Inventario() {
           sinPadding
           titulo="Transferencias de inventario"
           descripcion={transferencias ? `${transferencias.total} transferencia(s) — ítem E-1, Borrador→Confirmado` : undefined}
+          acciones={tienePermisoTransferir && <Button onClick={() => setTransferenciaNueva(true)}>Nueva transferencia</Button>}
         >
           {transferencias?.datos.length === 0 ? (
             <p className="p-5 text-sm text-slate-500">
-              Todavía no hay transferencias registradas — usá "Transferir stock" desde una fila de la tabla de arriba para crear la primera.
+              Todavía no hay transferencias registradas — usá el botón "Nueva transferencia" de arriba para crear la primera.
             </p>
           ) : (
             <div className="overflow-x-auto">
@@ -526,6 +530,8 @@ export function Inventario() {
       {ajusteViendo && <ModalVerAjuste ajuste={ajusteViendo} onClose={() => setAjusteViendo(null)} />}
       {ajusteEditando && <ModalEditarAjuste ajuste={ajusteEditando} onClose={() => setAjusteEditando(null)} />}
       {ajusteConfirmando && <ModalConfirmarAjuste ajuste={ajusteConfirmando} onClose={() => setAjusteConfirmando(null)} />}
+      {ajusteNuevo && <ModalNuevoAjuste bodegas={bodegas ?? []} onClose={() => setAjusteNuevo(false)} />}
+      {transferenciaNueva && <ModalNuevaTransferencia bodegas={bodegas ?? []} onClose={() => setTransferenciaNueva(false)} />}
       {transferenciaViendo && <ModalVerTransferencia transferencia={transferenciaViendo} onClose={() => setTransferenciaViendo(null)} />}
       {transferenciaEditando && <ModalEditarTransferencia transferencia={transferenciaEditando} onClose={() => setTransferenciaEditando(null)} />}
       {bodegaEditando && <ModalEditarBodega bodega={bodegaEditando} onClose={() => setBodegaEditando(null)} />}
@@ -1237,7 +1243,7 @@ function ModalTransferirStock({
 }: {
   bodegaOrigenId: string;
   bodegas: Bodega[];
-  stockInicial: Stock;
+  stockInicial: ProductoParaAjuste;
   onClose: () => void;
 }) {
   const queryClient = useQueryClient();
@@ -1296,5 +1302,137 @@ function ModalTransferirStock({
         </Button>
       </form>
     </Modal>
+  );
+}
+
+/**
+ * "Nuevo ajuste" desde el propio tab Ajustes (sin pasar por Stock) — antes
+ * solo se podía arrancar un ajuste desde el ⋮ de una fila del tab Stock, lo
+ * cual dejaba a los tabs Ajustes/Transferencias sin ninguna forma de crear
+ * un documento nuevo. Mismo patrón que `ModalAgregarProductoStock`, con un
+ * paso más: acá también hay que elegir la bodega (Agregar producto ya vive
+ * dentro del contexto de una bodega seleccionada, este modal no).
+ */
+function ModalNuevoAjuste({ bodegas, onClose }: { bodegas: Bodega[]; onClose: () => void }) {
+  const { data: productos } = useQuery({
+    queryKey: ['productos-select'],
+    queryFn: async () => (await apiClient.get<PaginaResultado<Producto>>('/productos', { params: { tamanoPagina: 100 } })).data.datos,
+  });
+  const [bodegaId, setBodegaId] = useState('');
+  const [productoId, setProductoId] = useState('');
+  const [varianteId, setVarianteId] = useState('');
+  const { data: variantes } = useVariantesProducto(productoId || undefined);
+
+  const productoElegido = productos?.find((p) => p.id === productoId);
+  const varianteElegida = variantes?.find((v) => v.id === varianteId);
+
+  if (!bodegaId || !productoElegido || !varianteId) {
+    return (
+      <Modal titulo="Nuevo ajuste de inventario" onClose={onClose}>
+        <div className="space-y-3">
+          <p className="text-sm text-slate-500 dark:text-slate-400">Elegí la bodega y el producto (y su variante, si tiene más de una) a ajustar.</p>
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Bodega</label>
+            <Select value={bodegaId} onChange={(e) => setBodegaId(e.target.value)} required>
+              <option value="">Seleccionar…</option>
+              {bodegas
+                .filter((b) => b.activa)
+                .map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.nombre}
+                  </option>
+                ))}
+            </Select>
+          </div>
+          {bodegaId && (
+            <SelectorLineaProducto
+              productos={productos ?? []}
+              productoId={productoId}
+              varianteId={varianteId}
+              onChange={(p, v) => {
+                setProductoId(p);
+                setVarianteId(v);
+              }}
+            />
+          )}
+        </div>
+      </Modal>
+    );
+  }
+
+  return (
+    <ModalAjustarStock
+      bodegaId={bodegaId}
+      stockInicial={{
+        producto: productoElegido,
+        varianteId,
+        valoresAtributo:
+          varianteElegida?.valoresAtributo.map((va) => ({ atributo: va.valorAtributo.atributo.nombre, valor: va.valorAtributo.valor })) ?? [],
+      }}
+      onClose={onClose}
+    />
+  );
+}
+
+/** "Nueva transferencia" desde el propio tab Transferencias — mismo criterio que `ModalNuevoAjuste`: elige bodega origen + producto acá, y reusa `ModalTransferirStock` (que ya resuelve bodega destino + cantidad) tal cual. */
+function ModalNuevaTransferencia({ bodegas, onClose }: { bodegas: Bodega[]; onClose: () => void }) {
+  const { data: productos } = useQuery({
+    queryKey: ['productos-select'],
+    queryFn: async () => (await apiClient.get<PaginaResultado<Producto>>('/productos', { params: { tamanoPagina: 100 } })).data.datos,
+  });
+  const [bodegaOrigenId, setBodegaOrigenId] = useState('');
+  const [productoId, setProductoId] = useState('');
+  const [varianteId, setVarianteId] = useState('');
+  const { data: variantes } = useVariantesProducto(productoId || undefined);
+
+  const productoElegido = productos?.find((p) => p.id === productoId);
+  const varianteElegida = variantes?.find((v) => v.id === varianteId);
+
+  if (!bodegaOrigenId || !productoElegido || !varianteId) {
+    return (
+      <Modal titulo="Nueva transferencia de inventario" onClose={onClose}>
+        <div className="space-y-3">
+          <p className="text-sm text-slate-500 dark:text-slate-400">Elegí la bodega de origen y el producto (y su variante, si tiene más de una) a transferir.</p>
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Bodega origen</label>
+            <Select value={bodegaOrigenId} onChange={(e) => setBodegaOrigenId(e.target.value)} required>
+              <option value="">Seleccionar…</option>
+              {bodegas
+                .filter((b) => b.activa)
+                .map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.nombre}
+                  </option>
+                ))}
+            </Select>
+          </div>
+          {bodegaOrigenId && (
+            <SelectorLineaProducto
+              productos={productos ?? []}
+              productoId={productoId}
+              varianteId={varianteId}
+              onChange={(p, v) => {
+                setProductoId(p);
+                setVarianteId(v);
+              }}
+            />
+          )}
+        </div>
+      </Modal>
+    );
+  }
+
+  return (
+    <ModalTransferirStock
+      bodegaOrigenId={bodegaOrigenId}
+      bodegas={bodegas}
+      stockInicial={{
+        producto: productoElegido,
+        varianteId,
+        valoresAtributo:
+          varianteElegida?.valoresAtributo.map((va) => ({ atributo: va.valorAtributo.atributo.nombre, valor: va.valorAtributo.valor })) ?? [],
+      }}
+      onClose={onClose}
+    />
   );
 }
