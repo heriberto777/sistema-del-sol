@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Minus, Plus, Search, Trash2 } from 'lucide-react';
 import { formatearPrecio } from '../../../hooks/useTienda';
@@ -108,12 +109,31 @@ function BoutiqueHome({ config, subdominio, carrito, productos, cargando, busque
 function BoutiqueProducto({ config, subdominio, carrito, producto, varianteSeleccionada, onSeleccionarVariante, cantidad, onCantidadChange, onAgregar }: PropsProducto) {
   const accent = config.colorAcento || ACCENT_DEFAULT;
   const debeElegirVariante = producto.variantes.length > 1;
+  const galeria = [producto.imagen, ...producto.imagenesAdicionales].filter((img): img is string => !!img);
+  const [imagenActiva, setImagenActiva] = useState(galeria[0] ?? null);
   return (
     <div className="min-h-screen bg-[#211d19] text-[#f4ede3]" style={{ fontFamily: FONT_BODY }}>
       <Nav nombre={config.nombre} logo={config.logo} subdominio={subdominio} cantidadCarrito={carrito.cantidadTotal} accent={accent} />
       <div className="mx-auto grid max-w-4xl gap-10 px-8 py-14 sm:grid-cols-2 sm:px-12">
-        <div className="aspect-[4/5]" style={{ background: 'linear-gradient(160deg,#3a332b,#211d19)' }}>
-          {producto.imagen && <img src={producto.imagen} alt={producto.nombre} className="h-full w-full object-cover" />}
+        <div>
+          <div className="aspect-[4/5]" style={{ background: 'linear-gradient(160deg,#3a332b,#211d19)' }}>
+            {imagenActiva && <img src={imagenActiva} alt={producto.nombre} className="h-full w-full object-cover" />}
+          </div>
+          {galeria.length > 1 && (
+            <div className="mt-3 flex justify-center gap-2 sm:justify-start">
+              {galeria.map((img, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => setImagenActiva(img)}
+                  className="h-14 w-14 overflow-hidden border"
+                  style={{ borderColor: imagenActiva === img ? accent : '#37312a' }}
+                >
+                  <img src={img} alt="" className="h-full w-full object-cover" />
+                </button>
+              ))}
+            </div>
+          )}
         </div>
         <div className="text-center sm:text-left">
           {producto.categoria && <div className="text-[10px] uppercase tracking-widest text-[#8a8073]">{producto.categoria.nombre}</div>}
@@ -123,6 +143,7 @@ function BoutiqueProducto({ config, subdominio, carrito, producto, varianteSelec
           <p className="mb-4 text-xl tracking-wide" style={{ color: accent }}>
             {varianteSeleccionada ? formatearPrecio(varianteSeleccionada.precio) : 'Elegí una opción'}
           </p>
+          {producto.descripcionTienda && <p className="mb-5 text-sm leading-relaxed text-[#bdb2a1]">{producto.descripcionTienda}</p>}
 
           {debeElegirVariante && (
             <div className="mb-6 flex flex-col gap-2">

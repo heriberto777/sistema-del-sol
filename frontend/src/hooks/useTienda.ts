@@ -46,6 +46,9 @@ export interface ProductoTiendaDetalle {
   porcentajeItbis: string;
   tipo: string;
   categoria: { id: string; nombre: string } | null;
+  descripcionTienda: string | null;
+  /** Fotos adicionales a la portada (`imagen`) — Fase 5. */
+  imagenesAdicionales: string[];
   /** Siempre al menos 1 (todo producto real tiene una variante, aunque nunca haya usado atributos). */
   variantes: VarianteTienda[];
 }

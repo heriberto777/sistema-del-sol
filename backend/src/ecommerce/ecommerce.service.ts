@@ -105,7 +105,8 @@ export class EcommerceService {
       stock: config.bodegaId && 'existencia' in v ? v.existencia : null,
     }));
 
-    return { ...producto, variantes };
+    const { imagenesAdicionales, ...datosProducto } = producto;
+    return { ...datosProducto, imagenesAdicionales: imagenesAdicionales.map((i) => i.imagen), variantes };
   }
 
   /**

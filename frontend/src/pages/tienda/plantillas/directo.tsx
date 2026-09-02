@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Minus, Plus, Search, ShoppingCart, Trash2 } from 'lucide-react';
 import { formatearPrecio } from '../../../hooks/useTienda';
@@ -117,12 +118,31 @@ function DirectoHome({ config, subdominio, carrito, productos, cargando, busqued
 function DirectoProducto({ config, subdominio, carrito, producto, varianteSeleccionada, onSeleccionarVariante, cantidad, onCantidadChange, onAgregar }: PropsProducto) {
   const accent = config.colorAcento || ACCENT_DEFAULT;
   const debeElegirVariante = producto.variantes.length > 1;
+  const galeria = [producto.imagen, ...producto.imagenesAdicionales].filter((img): img is string => !!img);
+  const [imagenActiva, setImagenActiva] = useState(galeria[0] ?? null);
   return (
     <div className="min-h-screen bg-[#faf7f2] text-[#1c1a17] dark:bg-[#17140f] dark:text-[#f1ece2]" style={{ fontFamily: FONT_BODY }}>
       <Nav nombre={config.nombre} logo={config.logo} subdominio={subdominio} cantidadCarrito={carrito.cantidadTotal} accent={accent} />
       <div className="mx-auto grid max-w-4xl gap-8 px-6 py-12 sm:grid-cols-2 sm:px-10">
-        <div className="aspect-square overflow-hidden rounded-xl bg-gradient-to-br from-[#f1e9da] to-[#e3d5ba]">
-          {producto.imagen && <img src={producto.imagen} alt={producto.nombre} className="h-full w-full object-cover" />}
+        <div>
+          <div className="aspect-square overflow-hidden rounded-xl bg-gradient-to-br from-[#f1e9da] to-[#e3d5ba]">
+            {imagenActiva && <img src={imagenActiva} alt={producto.nombre} className="h-full w-full object-cover" />}
+          </div>
+          {galeria.length > 1 && (
+            <div className="mt-3 flex gap-2">
+              {galeria.map((img, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => setImagenActiva(img)}
+                  className="h-14 w-14 overflow-hidden rounded-lg border"
+                  style={{ borderColor: imagenActiva === img ? accent : '#eae3d6' }}
+                >
+                  <img src={img} alt="" className="h-full w-full object-cover" />
+                </button>
+              ))}
+            </div>
+          )}
         </div>
         <div>
           {producto.categoria && <div className="text-xs font-bold uppercase tracking-wide text-[#7a7266]">{producto.categoria.nombre}</div>}
@@ -132,6 +152,7 @@ function DirectoProducto({ config, subdominio, carrito, producto, varianteSelecc
           <p className="mb-4 text-2xl font-extrabold" style={{ fontFamily: FONT_DISPLAY, color: accent }}>
             {varianteSeleccionada ? formatearPrecio(varianteSeleccionada.precio) : 'Elegí una opción'}
           </p>
+          {producto.descripcionTienda && <p className="mb-5 text-sm leading-relaxed text-[#7a7266] dark:text-[#b6ab97]">{producto.descripcionTienda}</p>}
 
           {debeElegirVariante && (
             <div className="mb-5 flex flex-col gap-2">

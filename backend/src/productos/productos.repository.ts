@@ -23,7 +23,7 @@ export class ProductosRepository {
     // `atributos` no es una columna de Producto — se ignora al crear (ver
     // el comentario equivalente en `actualizar()`); un producto nuevo
     // siempre arranca con su variante "por defecto" sin atributos.
-    const { componentes, atributos, ...datosProducto } = dto;
+    const { componentes, atributos, imagenesAdicionales, ...datosProducto } = dto;
     void atributos;
     return this.db.$transaction(async (tx) => {
       const producto = await tx.producto.create({ data: { ...datosProducto, tenantId } });
@@ -31,6 +31,11 @@ export class ProductosRepository {
       if (componentes?.length) {
         await tx.componenteCombo.createMany({
           data: componentes.map((c) => ({ comboId: producto.id, componenteId: c.productoId, cantidad: c.cantidad })),
+        });
+      }
+      if (imagenesAdicionales?.length) {
+        await tx.imagenProducto.createMany({
+          data: imagenesAdicionales.map((img, orden) => ({ productoId: producto.id, imagen: img.imagen, orden })),
         });
       }
       return producto;
@@ -125,7 +130,11 @@ export class ProductosRepository {
   buscarPorId(id: string) {
     return this.db.producto.findUniqueOrThrow({
       where: { id },
-      include: { componentes: { include: { componente: true } }, categoria: { select: { id: true, nombre: true } } },
+      include: {
+        componentes: { include: { componente: true } },
+        categoria: { select: { id: true, nombre: true } },
+        imagenesAdicionales: { orderBy: { orden: 'asc' } },
+      },
     });
   }
 
@@ -187,7 +196,7 @@ export class ProductosRepository {
     // `atributos` no es una columna de Producto — ya se procesó aparte en
     // ProductosService.actualizar() (ver VariantesService.generarCombinaciones)
     // antes de llegar acá.
-    const { componentes, atributos, ...datosProducto } = dto;
+    const { componentes, atributos, imagenesAdicionales, ...datosProducto } = dto;
     void atributos;
     return this.db.$transaction(async (tx) => {
       const producto = await tx.producto.update({ where: { id }, data: datosProducto });
@@ -196,6 +205,14 @@ export class ProductosRepository {
         if (componentes.length) {
           await tx.componenteCombo.createMany({
             data: componentes.map((c) => ({ comboId: id, componenteId: c.productoId, cantidad: c.cantidad })),
+          });
+        }
+      }
+      if (imagenesAdicionales !== undefined) {
+        await tx.imagenProducto.deleteMany({ where: { productoId: id } });
+        if (imagenesAdicionales.length) {
+          await tx.imagenProducto.createMany({
+            data: imagenesAdicionales.map((img, orden) => ({ productoId: id, imagen: img.imagen, orden })),
           });
         }
       }

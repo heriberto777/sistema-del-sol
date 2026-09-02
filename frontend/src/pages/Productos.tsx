@@ -7,6 +7,7 @@ import { Button } from '../components/atoms/Button/Button';
 import { Card } from '../components/atoms/Card/Card';
 import { Select } from '../components/atoms/Select/Select';
 import { CampoImagen } from '../components/molecules/CampoImagen/CampoImagen';
+import { GaleriaImagenes } from '../components/molecules/GaleriaImagenes/GaleriaImagenes';
 import { FormField } from '../components/molecules/FormField/FormField';
 import { Modal } from '../components/molecules/Modal/Modal';
 import { SearchInput } from '../components/molecules/SearchInput/SearchInput';
@@ -54,6 +55,8 @@ interface ProductoDetalle extends Producto {
   componentes: ComponenteComboDetalle[];
   imagen: string | null;
   imagenAjuste: AjusteImagen;
+  descripcionTienda: string | null;
+  imagenesAdicionales: { imagen: string }[];
 }
 
 interface Precio {
@@ -74,6 +77,8 @@ interface ProductoFormValues {
   tipo: TipoProducto;
   imagen: string | null;
   imagenAjuste: AjusteImagen;
+  descripcionTienda: string;
+  imagenesAdicionales: string[];
   controlaVencimiento: boolean;
   precioVariable: boolean;
   esIngrediente: boolean;
@@ -111,6 +116,8 @@ const PRODUCTO_VACIO: ProductoFormValues = {
   tipo: 'PRODUCTO',
   imagen: null,
   imagenAjuste: 'COVER',
+  descripcionTienda: '',
+  imagenesAdicionales: [],
   controlaVencimiento: false,
   precioVariable: false,
   esIngrediente: false,
@@ -338,6 +345,8 @@ function FormularioProducto({ producto, onGuardado }: { producto: Producto | nul
           tipo: producto.tipo,
           imagen: null,
           imagenAjuste: 'COVER',
+          descripcionTienda: '',
+          imagenesAdicionales: [],
           controlaVencimiento: producto.controlaVencimiento,
           precioVariable: producto.precioVariable,
           esIngrediente: producto.esIngrediente,
@@ -356,7 +365,13 @@ function FormularioProducto({ producto, onGuardado }: { producto: Producto | nul
   useEffect(() => {
     if (!producto) return;
     apiClient.get<ProductoDetalle>(`/productos/${producto.id}`).then(({ data }) => {
-      setValores((v) => ({ ...v, imagen: data.imagen, imagenAjuste: data.imagenAjuste }));
+      setValores((v) => ({
+        ...v,
+        imagen: data.imagen,
+        imagenAjuste: data.imagenAjuste,
+        descripcionTienda: data.descripcionTienda ?? '',
+        imagenesAdicionales: data.imagenesAdicionales.map((i) => i.imagen),
+      }));
       if (data.tipo === 'COMBO') {
         setComponentes(data.componentes.map((c) => ({ productoId: c.componente.id, cantidad: c.cantidad })));
       }
@@ -386,6 +401,8 @@ function FormularioProducto({ producto, onGuardado }: { producto: Producto | nul
       tipo: valores.tipo,
       imagen: valores.imagen,
       imagenAjuste: valores.imagenAjuste,
+      descripcionTienda: valores.descripcionTienda || null,
+      imagenesAdicionales: valores.imagenesAdicionales.map((imagen) => ({ imagen })),
       controlaVencimiento: valores.tipo === 'PRODUCTO' ? valores.controlaVencimiento : false,
       precioVariable: valores.precioVariable,
       esIngrediente: valores.esIngrediente,
@@ -431,6 +448,23 @@ function FormularioProducto({ producto, onGuardado }: { producto: Producto | nul
         ajuste={valores.imagenAjuste}
         onChangeAjuste={(imagenAjuste) => setValores((v) => ({ ...v, imagenAjuste }))}
       />
+      <GaleriaImagenes
+        valores={valores.imagenesAdicionales}
+        onChange={(imagenesAdicionales) => setValores((v) => ({ ...v, imagenesAdicionales }))}
+      />
+      <div className="flex flex-col gap-1">
+        <label htmlFor="producto-descripcion-tienda" className="text-sm font-medium text-slate-700 dark:text-slate-300">
+          Descripción para la Tienda Online
+        </label>
+        <textarea
+          id="producto-descripcion-tienda"
+          value={valores.descripcionTienda}
+          onChange={(e) => setValores((v) => ({ ...v, descripcionTienda: e.target.value }))}
+          rows={3}
+          placeholder="Detalle del producto que ve el comprador en el storefront público (opcional)"
+          className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+        />
+      </div>
       <div className="flex flex-col gap-1">
         <label htmlFor="producto-tipo" className="text-sm font-medium text-slate-700 dark:text-slate-300">
           Tipo

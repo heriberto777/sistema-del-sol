@@ -2282,6 +2282,10 @@ model Producto {
   // para no inflar la página normal con blobs — ver ProductosRepository.
   imagen              String?              @db.Text
   imagenAjuste        AjusteImagenProducto @default(COVER)
+  // Copy de marketing para la Tienda Online (Fase 5, plugin e-commerce)
+  // — el resto del sistema (Facturación/POS/Compras) nunca tuvo ni
+  // necesita esto, es puramente para el storefront público.
+  descripcionTienda   String?
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
 
@@ -2299,6 +2303,9 @@ model Producto {
   lineasVentaAparcada    VentaAparcadaLinea[]
   lineasAjusteInventario LineaAjusteInventario[]
   lineasTransferenciaInventario LineaTransferenciaInventario[]
+  // Fotos adicionales para la Tienda Online (Fase 5) — `imagen` sigue
+  // siendo la portada, esto es la galería que se suma abajo.
+  imagenesAdicionales    ImagenProducto[]
   // Componentes de ESTE producto cuando `tipo: COMBO`.
   componentes            ComponenteCombo[]       @relation("ComboComponentes")
   // Combos de los que este producto forma parte (como componente).
@@ -2310,6 +2317,26 @@ model Producto {
 
   @@unique([tenantId, codigo])
   @@map("productos")
+}
+
+/// Galería de fotos adicionales de un Producto para la Tienda Online
+/// (Fase 5, plugin e-commerce) — `imagen` en Producto sigue siendo la
+/// portada (todo el resto del sistema — catálogo/POS/facturas — la
+/// sigue leyendo igual, sin saber que esto existe). Tabla "hija" sin
+/// tenantId propio (mismo patrón que ComponenteCombo/FacturaRecargo) —
+/// su aislamiento depende de llegar siempre vía un Producto ya resuelto
+/// contra el tenant. `orden` (mismo criterio que FacturaRecargo/
+/// FacturaPlataformaLinea) se setea por índice del array al guardar —
+/// reemplazo total (borrar todas + recrear), nunca "mover de posición".
+model ImagenProducto {
+  id         String   @id @default(uuid())
+  productoId String
+  producto   Producto @relation(fields: [productoId], references: [id], onDelete: Cascade)
+  imagen     String   @db.Text
+  orden      Int      @default(0)
+  createdAt  DateTime @default(now())
+
+  @@map("imagenes_producto")
 }
 
 // Tabla "hija" sin tenantId propio (mismo patrón que LineaFactura/Stock/

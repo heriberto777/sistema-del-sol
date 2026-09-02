@@ -118,7 +118,7 @@ describe('EcommerceService', () => {
     });
 
     it('devuelve solo las variantes activas, con etiqueta/precio/stock resueltos (Fase 4)', async () => {
-      ecommerceRepository.buscarProductoPublico.mockResolvedValue({ id: 'p1', nombre: 'Camisa' } as never);
+      ecommerceRepository.buscarProductoPublico.mockResolvedValue({ id: 'p1', nombre: 'Camisa', imagenesAdicionales: [] } as never);
       variantesService.listarPorProducto.mockResolvedValue([
         {
           id: 'v1',

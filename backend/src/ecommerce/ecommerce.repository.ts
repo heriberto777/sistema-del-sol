@@ -118,7 +118,9 @@ export class EcommerceRepository {
         imagenAjuste: true,
         porcentajeItbis: true,
         tipo: true,
+        descripcionTienda: true,
         categoria: { select: { id: true, nombre: true } },
+        imagenesAdicionales: { orderBy: { orden: 'asc' }, select: { imagen: true } },
       },
     });
   }

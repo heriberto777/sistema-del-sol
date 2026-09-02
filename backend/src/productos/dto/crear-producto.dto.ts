@@ -17,6 +17,14 @@ export class ComponenteComboDto {
   cantidad: number;
 }
 
+export class ImagenProductoDto {
+  @ApiProperty({ description: 'Data URI completa (data:image/...;base64,...), misma validación que `imagen`.' })
+  @IsString()
+  @Matches(/^data:image\/(jpeg|jpg|png|webp);base64,/, { message: 'imagen debe ser una data URI de imagen (jpeg/png/webp)' })
+  @MaxLength(2_000_000, { message: 'La imagen es demasiado pesada — comprimila antes de subirla' })
+  imagen: string;
+}
+
 export class SeleccionAtributoDto {
   @ApiProperty()
   @IsUUID()
@@ -145,6 +153,27 @@ export class CrearProductoDto {
   @IsOptional()
   @IsEnum(AjusteImagenProducto)
   imagenAjuste?: AjusteImagenProducto;
+
+  @ApiProperty({
+    required: false,
+    nullable: true,
+    description: 'Copy de marketing para la Tienda Online (Fase 5, plugin e-commerce) — sin efecto en Facturación/POS/Compras. null explícito lo quita.',
+  })
+  @IsOptional()
+  @IsString()
+  descripcionTienda?: string | null;
+
+  @ApiProperty({
+    type: [ImagenProductoDto],
+    required: false,
+    description:
+      'Fotos adicionales para la Tienda Online (Fase 5) — `imagen` sigue siendo la portada. Sin enviar el campo, la galería existente queda igual; `[]` la vacía; con elementos, la reemplaza por completo.',
+  })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ImagenProductoDto)
+  imagenesAdicionales?: ImagenProductoDto[];
 
   @ApiProperty({
     type: [SeleccionAtributoDto],
