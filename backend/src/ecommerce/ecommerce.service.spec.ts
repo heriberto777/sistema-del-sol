@@ -1,4 +1,5 @@
-import { NotFoundException, ServiceUnavailableException } from '@nestjs/common';
+import { NotFoundException, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
 import { EcommerceService } from './ecommerce.service';
 import { EcommerceRepository } from './ecommerce.repository';
 import { PedidosTiendaRepository } from './pedidos-tienda.repository';
@@ -7,14 +8,14 @@ import { FacturacionService } from '../facturacion/facturacion.service';
 import { VariantesService } from '../variantes/variantes.service';
 import { AuthenticatedRequest } from '../common/types/authenticated-request';
 
-const TENANT_ACTIVO = { id: 't1', nombre: 'Tenant Demo', estado: 'ACTIVO' };
+const TENANT_ACTIVO = { id: 't1', nombre: 'Tenant Demo', estado: 'ACTIVO', plan: { modulos: [{ modulo: { clave: 'ecommerce' } }] } };
 const VENDEDOR = { id: 'u1' };
 const CONSUMIDOR_FINAL = { id: 'cf1' };
 const FACTURA_CREADA = { id: 'f1', total: 100 };
 
-function requestFalso(): AuthenticatedRequest {
+function requestFalso(authorization?: string): AuthenticatedRequest {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return {} as any;
+  return { headers: { authorization } } as any;
 }
 
 describe('EcommerceService', () => {
@@ -29,10 +30,11 @@ describe('EcommerceService', () => {
   let clientesService: jest.Mocked<ClientesService>;
   let facturacionService: jest.Mocked<FacturacionService>;
   let variantesService: jest.Mocked<VariantesService>;
+  let jwtService: jest.Mocked<JwtService>;
 
   beforeEach(() => {
     prisma = {
-      tenant: { findUnique: jest.fn().mockResolvedValue({ ...TENANT_ACTIVO, plan: { modulos: [{ modulo: { clave: 'ecommerce' } }] } }) },
+      tenant: { findUnique: jest.fn().mockResolvedValue(TENANT_ACTIVO) },
       tenantModuloOverride: { findFirst: jest.fn().mockResolvedValue(null) },
       configuracion: {
         findMany: jest.fn().mockResolvedValue([
@@ -43,12 +45,12 @@ describe('EcommerceService', () => {
       },
     };
     ecommerceRepository = {
-      buscarTenantPorSubdominio: jest.fn().mockResolvedValue(TENANT_ACTIVO),
       catalogo: jest.fn().mockResolvedValue([[], 0]),
       buscarProductoPublico: jest.fn().mockResolvedValue(null),
       buscarAdminMasAntiguo: jest.fn().mockResolvedValue(VENDEDOR),
       crearPedido: jest.fn().mockResolvedValue({ id: 'pt1' }),
       preciosPorVariantes: jest.fn().mockResolvedValue([]),
+      misPedidos: jest.fn().mockResolvedValue([]),
     } as unknown as jest.Mocked<EcommerceRepository>;
     pedidosTiendaRepository = {
       listar: jest.fn().mockResolvedValue([[], 0]),
@@ -63,6 +65,10 @@ describe('EcommerceService', () => {
     variantesService = {
       listarPorProducto: jest.fn().mockResolvedValue([]),
     } as unknown as jest.Mocked<VariantesService>;
+    jwtService = {
+      verify: jest.fn(),
+      sign: jest.fn(),
+    } as unknown as jest.Mocked<JwtService>;
 
     service = new EcommerceService(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -72,17 +78,18 @@ describe('EcommerceService', () => {
       clientesService,
       facturacionService,
       variantesService,
+      jwtService,
     );
   });
 
   describe('resolverTiendaPublica', () => {
     it('404 si el tenant no existe', async () => {
-      ecommerceRepository.buscarTenantPorSubdominio.mockResolvedValue(null);
+      prisma.tenant.findUnique.mockResolvedValue(null);
       await expect(service.resolverTiendaPublica('inexistente')).rejects.toThrow(NotFoundException);
     });
 
     it('404 si el tenant no está ACTIVO (suspendido/cancelado)', async () => {
-      ecommerceRepository.buscarTenantPorSubdominio.mockResolvedValue({ ...TENANT_ACTIVO, estado: 'SUSPENDIDO' } as never);
+      prisma.tenant.findUnique.mockResolvedValue({ ...TENANT_ACTIVO, estado: 'SUSPENDIDO' });
       await expect(service.resolverTiendaPublica('demo')).rejects.toThrow(NotFoundException);
     });
 
@@ -185,6 +192,34 @@ describe('EcommerceService', () => {
       await expect(service.crearPedido('demo', DTO, requestFalso())).rejects.toThrow(ServiceUnavailableException);
       expect(facturacionService.crear).not.toHaveBeenCalled();
     });
+
+    it('Fase 6 — usa el clienteId del token de sesión en vez de Consumidor Final cuando es válido y del mismo tenant', async () => {
+      jwtService.verify.mockReturnValue({ clienteId: 'cliente-real', tenantId: 't1', email: 'a@a.com' });
+
+      await service.crearPedido('demo', DTO, requestFalso('Bearer token-valido'));
+
+      expect(jwtService.verify).toHaveBeenCalledWith('token-valido', expect.objectContaining({ secret: expect.any(String) }));
+      expect(facturacionService.crear).toHaveBeenCalledWith(expect.objectContaining({ clienteId: 'cliente-real' }), 't1', 'u1');
+      expect(clientesService.buscarConsumidorFinal).not.toHaveBeenCalled();
+    });
+
+    it('Fase 6 — cae a Consumidor Final si el token es de OTRO tenant', async () => {
+      jwtService.verify.mockReturnValue({ clienteId: 'cliente-ajeno', tenantId: 'otro-tenant', email: 'a@a.com' });
+
+      await service.crearPedido('demo', DTO, requestFalso('Bearer token-de-otro-tenant'));
+
+      expect(facturacionService.crear).toHaveBeenCalledWith(expect.objectContaining({ clienteId: 'cf1' }), 't1', 'u1');
+    });
+
+    it('Fase 6 — cae a Consumidor Final si el token es inválido/vencido, sin romper el checkout guest', async () => {
+      jwtService.verify.mockImplementation(() => {
+        throw new Error('jwt expired');
+      });
+
+      await service.crearPedido('demo', DTO, requestFalso('Bearer token-vencido'));
+
+      expect(facturacionService.crear).toHaveBeenCalledWith(expect.objectContaining({ clienteId: 'cf1' }), 't1', 'u1');
+    });
   });
 
   describe('listarPedidos', () => {
@@ -196,6 +231,24 @@ describe('EcommerceService', () => {
 
       expect(resultado.datos[0].factura).toEqual(expect.objectContaining({ id: 'f1', numero: '000001' }));
       expect(resultado.total).toBe(1);
+    });
+  });
+
+  describe('misPedidos', () => {
+    it('devuelve los pedidos del cliente autenticado cuando el subdominio corresponde a su tenant', async () => {
+      ecommerceRepository.misPedidos.mockResolvedValue([{ factura: { id: 'f1' }, pedido: null }] as never);
+
+      const resultado = await service.misPedidos('demo', { clienteId: 'c1', tenantId: 't1', email: 'a@a.com' });
+
+      expect(ecommerceRepository.misPedidos).toHaveBeenCalledWith('t1', 'c1');
+      expect(resultado).toEqual([{ factura: { id: 'f1' }, pedido: null }]);
+    });
+
+    it('rechaza si el token es de un tenant distinto al del subdominio pedido', async () => {
+      await expect(service.misPedidos('demo', { clienteId: 'c1', tenantId: 'otro-tenant', email: 'a@a.com' })).rejects.toThrow(
+        UnauthorizedException,
+      );
+      expect(ecommerceRepository.misPedidos).not.toHaveBeenCalled();
     });
   });
 });

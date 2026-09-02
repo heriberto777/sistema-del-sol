@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Minus, Plus, Search, ShoppingCart, Trash2 } from 'lucide-react';
+import { Minus, Plus, Search, ShoppingCart, Trash2, User } from 'lucide-react';
 import { formatearPrecio } from '../../../hooks/useTienda';
+import { useClienteTienda } from '../../../hooks/useClienteTienda';
 import type { Plantilla, PropsCarrito, PropsHome, PropsProducto } from './tipos';
 
 const ACCENT_DEFAULT = '#c77d2e';
@@ -9,18 +10,28 @@ const FONT_DISPLAY = "'Manrope', sans-serif";
 const FONT_BODY = "'Karla', sans-serif";
 
 function Nav({ nombre, logo, subdominio, cantidadCarrito, accent }: { nombre: string; logo: string | null; subdominio: string; cantidadCarrito: number; accent: string }) {
+  const { autenticado } = useClienteTienda(subdominio);
   return (
     <div className="flex items-center justify-between border-b border-[#eae3d6] px-6 py-4 dark:border-[#332c22] sm:px-10">
       <Link to={`/tienda/${subdominio}`} className="flex items-center gap-2" style={{ fontFamily: FONT_DISPLAY }}>
         {logo && <img src={logo} alt={nombre} className="h-8 w-8 rounded object-cover" />}
         <span className="text-lg font-extrabold tracking-tight text-[#1c1a17] dark:text-[#f1ece2]">{nombre}</span>
       </Link>
-      <Link to={`/tienda/${subdominio}/carrito`} className="flex items-center gap-2 text-sm font-bold text-[#1c1a17] dark:text-[#f1ece2]">
-        <ShoppingCart size={18} />
-        <span className="flex h-5 w-5 items-center justify-center rounded-full text-[11px] text-white" style={{ background: accent }}>
-          {cantidadCarrito}
-        </span>
-      </Link>
+      <div className="flex items-center gap-5">
+        <Link
+          to={`/tienda/${subdominio}/${autenticado ? 'mis-pedidos' : 'login'}`}
+          className="flex items-center gap-1.5 text-sm font-bold text-[#1c1a17] dark:text-[#f1ece2]"
+        >
+          <User size={16} />
+          {autenticado ? 'Mi cuenta' : 'Iniciar sesión'}
+        </Link>
+        <Link to={`/tienda/${subdominio}/carrito`} className="flex items-center gap-2 text-sm font-bold text-[#1c1a17] dark:text-[#f1ece2]">
+          <ShoppingCart size={18} />
+          <span className="flex h-5 w-5 items-center justify-center rounded-full text-[11px] text-white" style={{ background: accent }}>
+            {cantidadCarrito}
+          </span>
+        </Link>
+      </div>
     </div>
   );
 }

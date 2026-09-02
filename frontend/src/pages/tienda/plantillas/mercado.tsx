@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Minus, Plus, Search, ShoppingCart, Trash2 } from 'lucide-react';
+import { Minus, Plus, Search, ShoppingCart, Trash2, User } from 'lucide-react';
 import { formatearPrecio } from '../../../hooks/useTienda';
+import { useClienteTienda } from '../../../hooks/useClienteTienda';
 import type { Plantilla, PropsCarrito, PropsHome, PropsProducto } from './tipos';
 
 const ACCENT_DEFAULT = '#ff6b45';
@@ -10,6 +11,7 @@ const FONT_DISPLAY = "'Fraunces', serif";
 const FONT_BODY = "'Work Sans', sans-serif";
 
 function Nav({ nombre, logo, subdominio, cantidadCarrito, accent }: { nombre: string; logo: string | null; subdominio: string; cantidadCarrito: number; accent: string }) {
+  const { autenticado } = useClienteTienda(subdominio);
   return (
     <>
       <div className="py-1.5 text-center text-xs font-semibold text-white" style={{ background: BG_OSCURO }}>
@@ -20,14 +22,20 @@ function Nav({ nombre, logo, subdominio, cantidadCarrito, accent }: { nombre: st
           {logo && <img src={logo} alt={nombre} className="h-8 w-8 rounded-full object-cover" />}
           <span className="text-xl font-bold">{nombre}</span>
         </Link>
-        <Link
-          to={`/tienda/${subdominio}/carrito`}
-          className="flex items-center gap-2 rounded-full px-4 py-2 text-xs font-bold text-white"
-          style={{ background: accent }}
-        >
-          <ShoppingCart size={15} />
-          Carrito · {cantidadCarrito}
-        </Link>
+        <div className="flex items-center gap-4">
+          <Link to={`/tienda/${subdominio}/${autenticado ? 'mis-pedidos' : 'login'}`} className="flex items-center gap-1.5 text-sm font-semibold" style={{ color: BG_OSCURO }}>
+            <User size={16} />
+            {autenticado ? 'Mi cuenta' : 'Iniciar sesión'}
+          </Link>
+          <Link
+            to={`/tienda/${subdominio}/carrito`}
+            className="flex items-center gap-2 rounded-full px-4 py-2 text-xs font-bold text-white"
+            style={{ background: accent }}
+          >
+            <ShoppingCart size={15} />
+            Carrito · {cantidadCarrito}
+          </Link>
+        </div>
       </div>
     </>
   );

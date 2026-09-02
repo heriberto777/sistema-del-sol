@@ -77,6 +77,26 @@ export function useTiendaProducto(subdominio: string, productoId: string) {
   });
 }
 
+export interface PedidoConFactura {
+  factura: { id: string; numero: string | null; ncf: string | null; total: string; estado: string; pagada: boolean; fecha: string };
+  pedido: { direccionEntrega: string; notas: string | null; createdAt: string } | null;
+}
+
+/** Requiere sesión de cliente (Fase 6) — `enabled: !!token` evita pedirlo antes de tener uno. `retry: false`: un 401 acá es real (token vencido/inválido), no un hipo de red. */
+export function useMisPedidos(subdominio: string, token: string | null) {
+  return useQuery({
+    queryKey: ['tienda-mis-pedidos', subdominio, token],
+    queryFn: async () =>
+      (
+        await tiendaApiClient.get<PedidoConFactura[]>(`/tienda/${subdominio}/mis-pedidos`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+      ).data,
+    enabled: !!token,
+    retry: false,
+  });
+}
+
 export function formatearPrecio(precio: string | number | null): string {
   return `RD$ ${Number(precio ?? 0).toLocaleString('es-DO')}`;
 }

@@ -5,6 +5,7 @@ import { isAxiosError } from 'axios';
 import { formatearPrecio, useTiendaConfig } from '../../hooks/useTienda';
 import { tiendaApiClient } from '../../lib/tienda-api-client';
 import { useCarritoTienda } from '../../hooks/useCarritoTienda';
+import { useClienteTienda } from '../../hooks/useClienteTienda';
 import { TiendaCargando, TiendaNoEncontrada } from './TiendaNoEncontrada';
 
 /**
@@ -19,23 +20,31 @@ export function TiendaCheckout() {
   const navigate = useNavigate();
   const carrito = useCarritoTienda(subdominio);
   const { data: config, isLoading, isError } = useTiendaConfig(subdominio);
+  const { cliente, token } = useClienteTienda(subdominio);
 
-  const [clienteNombre, setClienteNombre] = useState('');
-  const [clienteTelefono, setClienteTelefono] = useState('');
-  const [clienteEmail, setClienteEmail] = useState('');
+  // Con sesión, precarga los datos del perfil — igual editables, se
+  // mandan igual que en modo guest (el backend no distingue el DTO).
+  const [clienteNombre, setClienteNombre] = useState(cliente?.nombre ?? '');
+  const [clienteTelefono, setClienteTelefono] = useState(cliente?.telefono ?? '');
+  const [clienteEmail, setClienteEmail] = useState(cliente?.email ?? '');
   const [direccionEntrega, setDireccionEntrega] = useState('');
   const [notas, setNotas] = useState('');
 
   const crearPedido = useMutation({
     mutationFn: async () => {
-      const { data } = await tiendaApiClient.post<{ facturaId: string }>(`/tienda/${subdominio}/pedidos`, {
-        lineas: carrito.items.map((i) => ({ productoId: i.productoId, varianteId: i.varianteId, cantidad: i.cantidad })),
-        clienteNombre,
-        clienteTelefono,
-        clienteEmail: clienteEmail || undefined,
-        direccionEntrega,
-        notas: notas || undefined,
-      });
+      const { data } = await tiendaApiClient.post<{ facturaId: string }>(
+        `/tienda/${subdominio}/pedidos`,
+        {
+          lineas: carrito.items.map((i) => ({ productoId: i.productoId, varianteId: i.varianteId, cantidad: i.cantidad })),
+          clienteNombre,
+          clienteTelefono,
+          clienteEmail: clienteEmail || undefined,
+          direccionEntrega,
+          notas: notas || undefined,
+        },
+        // Con sesión, la Factura sale a nombre del cliente real (aparece en "Mis pedidos") — sin token, sigue siendo guest tal cual la Fase 3.
+        token ? { headers: { Authorization: `Bearer ${token}` } } : undefined,
+      );
       return data;
     },
     onSuccess: ({ facturaId }) => {

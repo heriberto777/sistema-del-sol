@@ -52,6 +52,9 @@ import { TiendaHome } from './pages/tienda/TiendaHome';
 import { TiendaProducto } from './pages/tienda/TiendaProducto';
 import { TiendaCarrito } from './pages/tienda/TiendaCarrito';
 import { TiendaCheckout } from './pages/tienda/TiendaCheckout';
+import { TiendaLogin } from './pages/tienda/TiendaLogin';
+import { TiendaRegistro } from './pages/tienda/TiendaRegistro';
+import { TiendaMisPedidos } from './pages/tienda/TiendaMisPedidos';
 
 export const router = createBrowserRouter([
   { path: '*', element: <NoEncontrado /> },
@@ -76,6 +79,9 @@ export const router = createBrowserRouter([
   { path: '/tienda/:subdominio/producto/:productoId', element: <TiendaProducto /> },
   { path: '/tienda/:subdominio/carrito', element: <TiendaCarrito /> },
   { path: '/tienda/:subdominio/checkout', element: <TiendaCheckout /> },
+  { path: '/tienda/:subdominio/login', element: <TiendaLogin /> },
+  { path: '/tienda/:subdominio/registro', element: <TiendaRegistro /> },
+  { path: '/tienda/:subdominio/mis-pedidos', element: <TiendaMisPedidos /> },
   {
     element: <RutaProtegidaPlataforma />,
     children: [

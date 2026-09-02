@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Minus, Plus, Search, Trash2 } from 'lucide-react';
 import { formatearPrecio } from '../../../hooks/useTienda';
+import { useClienteTienda } from '../../../hooks/useClienteTienda';
 import type { Plantilla, PropsCarrito, PropsHome, PropsProducto } from './tipos';
 
 const ACCENT_DEFAULT = '#c9a27e';
@@ -9,15 +10,21 @@ const FONT_DISPLAY = "'Cormorant Garamond', serif";
 const FONT_BODY = "'Jost', sans-serif";
 
 function Nav({ nombre, logo, subdominio, cantidadCarrito, accent }: { nombre: string; logo: string | null; subdominio: string; cantidadCarrito: number; accent: string }) {
+  const { autenticado } = useClienteTienda(subdominio);
   return (
     <div className="flex items-center justify-between border-b border-[#37312a] px-8 py-5 sm:px-12">
       <Link to={`/tienda/${subdominio}`} className="flex items-center gap-2 text-[#f4ede3]" style={{ fontFamily: FONT_DISPLAY }}>
         {logo && <img src={logo} alt={nombre} className="h-8 w-8 rounded-full object-cover" />}
         <span className="text-2xl font-semibold tracking-wide">{nombre}</span>
       </Link>
-      <Link to={`/tienda/${subdominio}/carrito`} className="text-[11px] font-semibold uppercase tracking-widest" style={{ color: accent }}>
-        Bolsa ({cantidadCarrito})
-      </Link>
+      <div className="flex items-center gap-6">
+        <Link to={`/tienda/${subdominio}/${autenticado ? 'mis-pedidos' : 'login'}`} className="text-[11px] font-semibold uppercase tracking-widest text-[#bdb2a1]">
+          {autenticado ? 'Mi cuenta' : 'Iniciar sesión'}
+        </Link>
+        <Link to={`/tienda/${subdominio}/carrito`} className="text-[11px] font-semibold uppercase tracking-widest" style={{ color: accent }}>
+          Bolsa ({cantidadCarrito})
+        </Link>
+      </div>
     </div>
   );
 }

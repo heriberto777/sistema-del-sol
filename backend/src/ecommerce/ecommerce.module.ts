@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { JwtModule } from '@nestjs/jwt';
 import { EcommerceController } from './ecommerce.controller';
 import { EcommercePedidosController } from './ecommerce-pedidos.controller';
 import { EcommerceService } from './ecommerce.service';
@@ -19,7 +20,13 @@ import { VariantesModule } from '../variantes/variantes.module';
  * real y funcional tiene que estar acá para que `nest build` lo levante.
  */
 @Module({
-  imports: [FacturacionModule, ClientesModule, VariantesModule],
+  // JwtModule.register({}) vacío — igual criterio que platform-auth/
+  // cliente-tienda-auth: el secreto (CLIENTE_TIENDA_JWT_SECRET) se pasa
+  // por-llamada en EcommerceService.resolverClienteId, no acá. Se
+  // registra local en vez de importar ClienteTiendaAuthModule a
+  // propósito: evita acoplar los dos módulos entre sí por un JwtService
+  // que de todos modos no comparte estado (ver ese archivo).
+  imports: [FacturacionModule, ClientesModule, VariantesModule, JwtModule.register({})],
   controllers: [EcommerceController, EcommercePedidosController],
   providers: [EcommerceService, EcommerceRepository, PedidosTiendaRepository],
 })

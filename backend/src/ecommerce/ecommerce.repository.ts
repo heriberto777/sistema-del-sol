@@ -5,11 +5,6 @@ import { PrismaService } from '../prisma/prisma.service';
 export class EcommerceRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  /** Sin tenant-scoping (no hay JWT en rutas públicas) — filtra a mano por subdominio, igual que AuthService.login. */
-  buscarTenantPorSubdominio(subdominio: string) {
-    return this.prisma.tenant.findUnique({ where: { subdominio } });
-  }
-
   /** El "Admin Total" más antiguo del tenant, atribuido como vendedor del pedido — mismo criterio que FacturasPlataformaService.notificarPorRegla para acciones sin un usuario real detrás. */
   buscarAdminMasAntiguo(tenantId: string) {
     return this.prisma.user.findFirst({
@@ -132,5 +127,17 @@ export class EcommerceRepository {
       where: { varianteId: { in: varianteIds }, listaPrecio: 'GENERAL', vigenteHasta: null },
       select: { varianteId: true, precioVenta: true },
     });
+  }
+
+  /** "Mis pedidos" (Fase 6) — Facturas del cliente autenticado, con su PedidoTienda (dirección/notas del guest) si la tuvo. Mismo join manual que PedidosTiendaRepository.facturasPorIds — PedidoTienda.facturaId no tiene `@relation` a Factura. */
+  async misPedidos(tenantId: string, clienteId: string) {
+    const facturas = await this.prisma.factura.findMany({
+      where: { tenantId, clienteId },
+      orderBy: { fecha: 'desc' },
+      select: { id: true, numero: true, ncf: true, total: true, estado: true, pagada: true, fecha: true },
+    });
+    const pedidos = await this.prisma.pedidoTienda.findMany({ where: { facturaId: { in: facturas.map((f) => f.id) } } });
+    const pedidoPorFactura = new Map(pedidos.map((p) => [p.facturaId, p]));
+    return facturas.map((factura) => ({ factura, pedido: pedidoPorFactura.get(factura.id) ?? null }));
   }
 }

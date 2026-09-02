@@ -3019,6 +3019,16 @@ model Cliente {
   // por defecto en la venta rápida, para no exigir elegir un cliente
   // real en cada venta de mostrador.
   esConsumidorFinal     Boolean                @default(false)
+  // Cuenta de comprador de la Tienda Online (Fase 6, plugin
+  // e-commerce) — null significa "no es una cuenta de tienda" (el caso
+  // de siempre: Consumidor Final y clientes cargados a mano desde el
+  // admin). Mirror de `User.passwordHash` (mismo hashing,
+  // `bcrypt.hash(x, 10)`) — sin `@@unique` en `email` a propósito: esa
+  // columna nunca fue única en este modelo, así que la unicidad
+  // "email con contraseña" se valida a nivel de servicio
+  // (ClienteTiendaAuthService.registro), no con un constraint de DB
+  // que podría chocar con datos viejos.
+  passwordHash          String?
   // Nivel de precio por defecto de este cliente (Fase 3b de adopción de
   // Cuadre) — null resuelve a "GENERAL" (ver FacturacionService.crear).
   // Se puede sobreescribir puntualmente al facturar/cotizar/vender en POS.

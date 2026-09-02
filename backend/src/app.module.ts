@@ -31,6 +31,7 @@ import { PlatformDashboardModule } from './platform-dashboard/platform-dashboard
 import { PlataformaConfigModule } from './plataforma-config/plataforma-config.module';
 import { ConfiguracionesModule } from './configuraciones/configuraciones.module';
 import { PlatformAuthModule } from './platform-auth/platform-auth.module';
+import { ClienteTiendaAuthModule } from './cliente-tienda-auth/cliente-tienda-auth.module';
 import { TenantsModule } from './tenants/tenants.module';
 import { PlatformAuditLogModule } from './platform-audit-log/platform-audit-log.module';
 import { NcfModule } from './ncf/ncf.module';
@@ -155,6 +156,7 @@ import { TenantMiddleware } from './common/middleware/tenant.middleware';
     TasasCambioModule,
     BonosModule,
     EcommerceModule,
+    ClienteTiendaAuthModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

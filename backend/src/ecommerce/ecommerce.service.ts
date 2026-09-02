@@ -1,8 +1,8 @@
-import { Injectable, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
+import { Injectable, NotFoundException, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
 import { EcommerceRepository } from './ecommerce.repository';
 import { PedidosTiendaRepository } from './pedidos-tienda.repository';
-import { resolverConfigTienda } from './resolver-config-tienda';
-import { moduloEstaActivo } from '../planes/resolver-modulos-activos';
+import { resolverTiendaPublica } from './resolver-tienda-publica';
 import { paginar } from '../common/types/pagina-resultado';
 import { PrismaService } from '../prisma/prisma.service';
 import { CatalogoTiendaQueryDto } from './dto/catalogo-tienda-query.dto';
@@ -12,6 +12,8 @@ import { ClientesService } from '../clientes/clientes.service';
 import { FacturacionService } from '../facturacion/facturacion.service';
 import { VariantesService } from '../variantes/variantes.service';
 import { AuthenticatedRequest, JwtPayloadUser } from '../common/types/authenticated-request';
+import { CLIENTE_TIENDA_JWT_SECRET } from '../cliente-tienda-auth/cliente-tienda-jwt.constants';
+import { ClienteTiendaPayload } from '../cliente-tienda-auth/cliente-tienda-authenticated-request';
 
 @Injectable()
 export class EcommerceService {
@@ -22,34 +24,11 @@ export class EcommerceService {
     private readonly clientesService: ClientesService,
     private readonly facturacionService: FacturacionService,
     private readonly variantesService: VariantesService,
+    private readonly jwtService: JwtService,
   ) {}
 
-  /**
-   * Resuelve tenant + config a partir del `:subdominio` de la URL — sin
-   * JWT, así que ninguna de estas condiciones puede delegarse en
-   * ModuloActivoGuard (que se auto-desactiva sin `request.user`, ver
-   * modulo-activo.guard.ts). Un 404 parejo para tenant inexistente,
-   * suspendido, sin el módulo "ecommerce" activo, o con la tienda
-   * desactivada — no se distingue el motivo al público, igual que
-   * cualquier otro recurso que no existe.
-   */
-  async resolverTiendaPublica(subdominio: string) {
-    const tenant = await this.ecommerceRepository.buscarTenantPorSubdominio(subdominio);
-    if (!tenant || tenant.estado !== 'ACTIVO') {
-      throw new NotFoundException('Tienda no encontrada');
-    }
-
-    const moduloActivo = await moduloEstaActivo(this.prisma, tenant.id, 'ecommerce');
-    if (!moduloActivo) {
-      throw new NotFoundException('Tienda no encontrada');
-    }
-
-    const config = await resolverConfigTienda(this.prisma, tenant.id);
-    if (!config.activa) {
-      throw new NotFoundException('Tienda no encontrada');
-    }
-
-    return { tenant, config };
+  resolverTiendaPublica(subdominio: string) {
+    return resolverTiendaPublica(this.prisma, subdominio);
   }
 
   async obtenerConfig(subdominio: string) {
@@ -134,14 +113,11 @@ export class EcommerceService {
 
     request.user = { tenantId: tenant.id, userId: vendedor.id, email: '', roles: [], permisos: [] } as JwtPayloadUser;
 
-    const consumidorFinal = await this.clientesService.buscarConsumidorFinal();
-    if (!consumidorFinal) {
-      throw new ServiceUnavailableException('Esta tienda no puede procesar pedidos en este momento');
-    }
+    const clienteId = await this.resolverClienteId(request, tenant.id);
 
     const factura = await this.facturacionService.crear(
       {
-        clienteId: consumidorFinal.id,
+        clienteId,
         bodegaId: config.bodegaId,
         tipoFactura: 'CONTADO',
         lineas: dto.lineas.map((l) => ({ productoId: l.productoId, varianteId: l.varianteId, cantidad: l.cantidad })),
@@ -170,5 +146,46 @@ export class EcommerceService {
     const facturasPorId = new Map(facturas.map((f) => [f.id, f]));
     const datos = pedidos.map((p) => ({ ...p, factura: facturasPorId.get(p.facturaId) ?? null }));
     return { datos, total, pagina, tamanoPagina };
+  }
+
+  /**
+   * Fase 6 — si el `Authorization: Bearer` trae un token de cliente de
+   * tienda válido Y para ESTE tenant, la Factura sale a nombre del
+   * cliente real (aparece en su "Mis pedidos") en vez de "Consumidor
+   * Final". El checkout sigue funcionando 100% sin sesión (token
+   * ausente/inválido/vencido/de otro tenant) — esto es aditivo, nunca
+   * bloquea la compra de un guest.
+   */
+  private async resolverClienteId(request: AuthenticatedRequest, tenantId: string): Promise<string> {
+    const header = request.headers.authorization;
+    if (header?.startsWith('Bearer ')) {
+      try {
+        const payload = this.jwtService.verify<ClienteTiendaPayload>(header.slice('Bearer '.length), {
+          secret: CLIENTE_TIENDA_JWT_SECRET,
+        });
+        if (payload.tenantId === tenantId) return payload.clienteId;
+      } catch {
+        // token inválido/vencido — sigue como guest.
+      }
+    }
+    const consumidorFinal = await this.clientesService.buscarConsumidorFinal();
+    if (!consumidorFinal) {
+      throw new ServiceUnavailableException('Esta tienda no puede procesar pedidos en este momento');
+    }
+    return consumidorFinal.id;
+  }
+
+  /**
+   * "Mis pedidos" del cliente autenticado — el `:subdominio` de la URL
+   * debe corresponder al MISMO tenant del token (evita que un token
+   * válido de otro tenant, aunque nadie lo emitiría así, sirva para leer
+   * pedidos de una tienda ajena solo por cambiar la URL).
+   */
+  async misPedidos(subdominio: string, cliente: ClienteTiendaPayload) {
+    const { tenant } = await this.resolverTiendaPublica(subdominio);
+    if (tenant.id !== cliente.tenantId) {
+      throw new UnauthorizedException('Sesión inválida para esta tienda');
+    }
+    return this.ecommerceRepository.misPedidos(tenant.id, cliente.clienteId);
   }
 }
