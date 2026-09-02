@@ -30,8 +30,8 @@ export class EcommerceController {
   }
 
   @Get('productos/:productoId')
-  producto(@Param('subdominio') subdominio: string, @Param('productoId') productoId: string) {
-    return this.ecommerceService.producto(subdominio, productoId);
+  producto(@Param('subdominio') subdominio: string, @Param('productoId') productoId: string, @Req() request: AuthenticatedRequest) {
+    return this.ecommerceService.producto(subdominio, productoId, request);
   }
 
   @Post('pedidos')

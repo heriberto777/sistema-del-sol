@@ -60,6 +60,9 @@ export class EcommerceRepository {
    * stock de esa variante en la bodega configurada de la tienda
    * (`bodegaId`, puede venir `undefined` si el tenant no configuró
    * ninguna — en ese caso no se filtra por stock, queda en null).
+   * `tieneVariantes` (Fase 4) es liviano (`_count`, no trae las filas)
+   * — el frontend lo usa para decidir si el "+" de la grilla agrega
+   * directo o manda al detalle a elegir talla/color.
    */
   async catalogo(params: { tenantId: string; bodegaId?: string; skip: number; take: number; busqueda?: string; categoriaId?: string }) {
     const where = this.whereCatalogo(params.tenantId, params.busqueda, params.categoriaId);
@@ -72,10 +75,12 @@ export class EcommerceRepository {
       porcentajeItbis: true,
       tipo: true,
       categoria: { select: { id: true, nombre: true } },
+      _count: { select: { variantes: true } },
       variantes: {
         take: 1,
         orderBy: { createdAt: 'asc' as const },
         select: {
+          id: true,
           precios: { where: { listaPrecio: 'GENERAL', vigenteHasta: null }, select: { precioVenta: true }, take: 1 },
           stock: params.bodegaId ? { where: { bodegaId: params.bodegaId }, select: { cantidadActual: true } } : false,
         },
@@ -85,16 +90,25 @@ export class EcommerceRepository {
       this.prisma.producto.findMany({ where, orderBy: { nombre: 'asc' }, skip: params.skip, take: params.take, select }),
       this.prisma.producto.count({ where }),
     ]);
-    const datos = filas.map(({ variantes, ...producto }) => ({
+    const datos = filas.map(({ variantes, _count, ...producto }) => ({
       ...producto,
+      // Solo tiene sentido usarlo para agregar directo cuando NO tieneVariantes (una sola variante real) — con >1, el frontend manda al detalle a elegir en vez de usar este id.
+      varianteId: variantes[0]?.id ?? null,
       precio: variantes[0]?.precios[0]?.precioVenta ?? null,
       stock: params.bodegaId ? Number(variantes[0]?.stock?.[0]?.cantidadActual ?? 0) : null,
+      tieneVariantes: _count.variantes > 1,
     }));
     return [datos, total] as const;
   }
 
-  async buscarProductoPublico(tenantId: string, productoId: string, bodegaId?: string) {
-    const producto = await this.prisma.producto.findFirst({
+  /**
+   * Datos de producto SOLOS (sin variantes) — las variantes con sus
+   * atributos/precio/stock se resuelven aparte vía
+   * `VariantesService.listarPorProducto` (Fase 4), reusado tal cual en
+   * vez de reescribir esa query acá.
+   */
+  buscarProductoPublico(tenantId: string, productoId: string) {
+    return this.prisma.producto.findFirst({
       where: { id: productoId, tenantId, activo: true, visibleEnTienda: true },
       select: {
         id: true,
@@ -105,25 +119,16 @@ export class EcommerceRepository {
         porcentajeItbis: true,
         tipo: true,
         categoria: { select: { id: true, nombre: true } },
-        variantes: {
-          take: 1,
-          orderBy: { createdAt: 'asc' },
-          select: {
-            id: true,
-            precios: { where: { listaPrecio: 'GENERAL', vigenteHasta: null }, select: { precioVenta: true }, take: 1 },
-            stock: bodegaId ? { where: { bodegaId }, select: { cantidadActual: true } } : false,
-          },
-        },
       },
     });
-    if (!producto) return null;
+  }
 
-    const { variantes, ...resto } = producto;
-    return {
-      ...resto,
-      varianteId: variantes[0]?.id ?? null,
-      precio: variantes[0]?.precios[0]?.precioVenta ?? null,
-      stock: bodegaId ? Number(variantes[0]?.stock?.[0]?.cantidadActual ?? 0) : null,
-    };
+  /** Precio GENERAL vigente de cada variante — `Precio` no tiene tenantId propio (hija de VarianteProducto, ya validada contra el tenant antes de llegar acá). */
+  preciosPorVariantes(varianteIds: string[]) {
+    if (!varianteIds.length) return Promise.resolve([]);
+    return this.prisma.precio.findMany({
+      where: { varianteId: { in: varianteIds }, listaPrecio: 'GENERAL', vigenteHasta: null },
+      select: { varianteId: true, precioVenta: true },
+    });
   }
 }

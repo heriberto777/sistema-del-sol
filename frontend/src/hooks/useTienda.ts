@@ -23,10 +23,31 @@ export interface ProductoTienda {
   categoria: { id: string; nombre: string } | null;
   precio: string | null;
   stock: number | null;
+  /** Solo útil para agregar directo cuando `tieneVariantes` es false — con más de una variante, ver el detalle antes de decidir cuál. */
+  varianteId: string | null;
+  /** Fase 4 — si tiene más de una variante (ej. Talla/Color), la grilla no puede agregar directo, hay que elegir en el detalle. */
+  tieneVariantes: boolean;
 }
 
-export interface ProductoTiendaDetalle extends ProductoTienda {
-  varianteId: string | null;
+export interface VarianteTienda {
+  id: string;
+  /** Ej. "Talla: M, Color: Rojo" — vacío si el producto nunca usó atributos (una sola variante "por defecto"). */
+  etiqueta: string;
+  precio: string | null;
+  stock: number | null;
+}
+
+export interface ProductoTiendaDetalle {
+  id: string;
+  codigo: string;
+  nombre: string;
+  imagen: string | null;
+  imagenAjuste: string;
+  porcentajeItbis: string;
+  tipo: string;
+  categoria: { id: string; nombre: string } | null;
+  /** Siempre al menos 1 (todo producto real tiene una variante, aunque nunca haya usado atributos). */
+  variantes: VarianteTienda[];
 }
 
 /** `retry: false` — un 404 acá es real (tienda inexistente/inactiva), no un hipo de red que valga reintentar. */

@@ -78,13 +78,21 @@ function BoutiqueHome({ config, subdominio, carrito, productos, cargando, busque
                 <button
                   type="button"
                   onClick={(e) => {
+                    if (p.tieneVariantes || !p.varianteId) return;
                     e.preventDefault();
-                    carrito.agregar({ productoId: p.id, nombre: p.nombre, precio: Number(p.precio ?? 0), imagen: p.imagen });
+                    carrito.agregar({
+                      productoId: p.id,
+                      varianteId: p.varianteId,
+                      varianteEtiqueta: '',
+                      nombre: p.nombre,
+                      precio: Number(p.precio ?? 0),
+                      imagen: p.imagen,
+                    });
                   }}
                   className="mt-3 border px-4 py-1.5 text-[10px] font-semibold uppercase tracking-widest"
                   style={{ borderColor: accent, color: accent }}
                 >
-                  Agregar
+                  {p.tieneVariantes ? 'Ver opciones' : 'Agregar'}
                 </button>
               </div>
             </Link>
@@ -97,8 +105,9 @@ function BoutiqueHome({ config, subdominio, carrito, productos, cargando, busque
   );
 }
 
-function BoutiqueProducto({ config, subdominio, carrito, producto, cantidad, onCantidadChange, onAgregar }: PropsProducto) {
+function BoutiqueProducto({ config, subdominio, carrito, producto, varianteSeleccionada, onSeleccionarVariante, cantidad, onCantidadChange, onAgregar }: PropsProducto) {
   const accent = config.colorAcento || ACCENT_DEFAULT;
+  const debeElegirVariante = producto.variantes.length > 1;
   return (
     <div className="min-h-screen bg-[#211d19] text-[#f4ede3]" style={{ fontFamily: FONT_BODY }}>
       <Nav nombre={config.nombre} logo={config.logo} subdominio={subdominio} cantidadCarrito={carrito.cantidadTotal} accent={accent} />
@@ -111,10 +120,34 @@ function BoutiqueProducto({ config, subdominio, carrito, producto, cantidad, onC
           <h1 className="my-3 text-3xl font-semibold" style={{ fontFamily: FONT_DISPLAY }}>
             {producto.nombre}
           </h1>
-          <p className="mb-6 text-xl tracking-wide" style={{ color: accent }}>
-            {formatearPrecio(producto.precio)}
+          <p className="mb-4 text-xl tracking-wide" style={{ color: accent }}>
+            {varianteSeleccionada ? formatearPrecio(varianteSeleccionada.precio) : 'Elegí una opción'}
           </p>
-          {producto.stock !== null && <p className="mb-6 text-xs uppercase tracking-widest text-[#8a8073]">{producto.stock > 0 ? `${producto.stock} disponibles` : 'Sin stock'}</p>}
+
+          {debeElegirVariante && (
+            <div className="mb-6 flex flex-col gap-2">
+              {producto.variantes.map((v) => (
+                <button
+                  key={v.id}
+                  type="button"
+                  onClick={() => onSeleccionarVariante(v.id)}
+                  disabled={v.stock !== null && v.stock <= 0}
+                  className="flex items-center justify-between border px-4 py-2 text-left text-sm uppercase tracking-wide disabled:cursor-not-allowed disabled:opacity-40"
+                  style={{ borderColor: varianteSeleccionada?.id === v.id ? accent : '#37312a', color: varianteSeleccionada?.id === v.id ? accent : '#f4ede3' }}
+                >
+                  <span className="flex flex-col normal-case">
+                    <span>{v.etiqueta || '(sin atributos)'}</span>
+                    {v.stock !== null && <span className="text-[10px] uppercase tracking-widest text-[#8a8073]">{v.stock > 0 ? `${v.stock} disponibles` : 'Sin existencia'}</span>}
+                  </span>
+                  <span>{formatearPrecio(v.precio)}</span>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {varianteSeleccionada && varianteSeleccionada.stock !== null && (
+            <p className="mb-6 text-xs uppercase tracking-widest text-[#8a8073]">{varianteSeleccionada.stock > 0 ? `${varianteSeleccionada.stock} disponibles` : 'Sin stock'}</p>
+          )}
           <div className="mb-6 flex items-center justify-center gap-3 sm:justify-start">
             <button type="button" onClick={() => onCantidadChange(Math.max(1, cantidad - 1))} className="flex h-9 w-9 items-center justify-center border border-[#37312a]">
               <Minus size={14} />
@@ -124,7 +157,13 @@ function BoutiqueProducto({ config, subdominio, carrito, producto, cantidad, onC
               <Plus size={14} />
             </button>
           </div>
-          <button type="button" onClick={onAgregar} className="border px-8 py-3 text-[11px] font-semibold uppercase tracking-widest" style={{ borderColor: accent, color: accent }}>
+          <button
+            type="button"
+            onClick={onAgregar}
+            disabled={!varianteSeleccionada}
+            className="border px-8 py-3 text-[11px] font-semibold uppercase tracking-widest disabled:cursor-not-allowed disabled:opacity-50"
+            style={{ borderColor: accent, color: accent }}
+          >
             Agregar a la bolsa
           </button>
         </div>
@@ -146,7 +185,7 @@ function BoutiqueCarrito({ config, subdominio, carrito }: PropsCarrito) {
         {carrito.items.length === 0 && <p className="text-center text-sm text-[#8a8073]">Tu bolsa está vacía.</p>}
         <div className="flex flex-col gap-4">
           {carrito.items.map((item) => (
-            <div key={item.productoId} className="flex items-center gap-4 border border-[#37312a] p-3">
+            <div key={item.varianteId} className="flex items-center gap-4 border border-[#37312a] p-3">
               <div className="h-16 w-16 shrink-0" style={{ background: 'linear-gradient(160deg,#3a332b,#211d19)' }}>
                 {item.imagen && <img src={item.imagen} alt={item.nombre} className="h-full w-full object-cover" />}
               </div>
@@ -154,21 +193,22 @@ function BoutiqueCarrito({ config, subdominio, carrito }: PropsCarrito) {
                 <p className="text-sm font-medium" style={{ fontFamily: FONT_DISPLAY }}>
                   {item.nombre}
                 </p>
+                {item.varianteEtiqueta && <p className="text-xs uppercase tracking-wide text-[#8a8073]">{item.varianteEtiqueta}</p>}
                 <p className="text-xs uppercase tracking-wide text-[#8a8073]">{formatearPrecio(item.precio)} c/u</p>
               </div>
               <div className="flex items-center gap-2">
-                <button type="button" onClick={() => carrito.actualizarCantidad(item.productoId, item.cantidad - 1)} className="flex h-7 w-7 items-center justify-center border border-[#37312a]">
+                <button type="button" onClick={() => carrito.actualizarCantidad(item.varianteId, item.cantidad - 1)} className="flex h-7 w-7 items-center justify-center border border-[#37312a]">
                   <Minus size={12} />
                 </button>
                 <span className="w-5 text-center text-sm">{item.cantidad}</span>
-                <button type="button" onClick={() => carrito.actualizarCantidad(item.productoId, item.cantidad + 1)} className="flex h-7 w-7 items-center justify-center border border-[#37312a]">
+                <button type="button" onClick={() => carrito.actualizarCantidad(item.varianteId, item.cantidad + 1)} className="flex h-7 w-7 items-center justify-center border border-[#37312a]">
                   <Plus size={12} />
                 </button>
               </div>
               <span className="w-20 text-right text-sm" style={{ color: accent }}>
                 {formatearPrecio(item.precio * item.cantidad)}
               </span>
-              <button type="button" onClick={() => carrito.quitar(item.productoId)} className="text-[#8a8073] hover:text-red-400">
+              <button type="button" onClick={() => carrito.quitar(item.varianteId)} className="text-[#8a8073] hover:text-red-400">
                 <Trash2 size={16} />
               </button>
             </div>

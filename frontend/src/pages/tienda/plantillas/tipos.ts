@@ -1,4 +1,4 @@
-import { ConfigTienda, ProductoTienda, ProductoTiendaDetalle } from '../../../hooks/useTienda';
+import { ConfigTienda, ProductoTienda, ProductoTiendaDetalle, VarianteTienda } from '../../../hooks/useTienda';
 import { CarritoTienda } from '../../../hooks/useCarritoTienda';
 
 export interface PropsBase {
@@ -16,6 +16,9 @@ export interface PropsHome extends PropsBase {
 
 export interface PropsProducto extends PropsBase {
   producto: ProductoTiendaDetalle;
+  /** null mientras el producto tenga más de una variante y todavía no se eligió ninguna. */
+  varianteSeleccionada: VarianteTienda | null;
+  onSeleccionarVariante: (varianteId: string) => void;
   cantidad: number;
   onCantidadChange: (cantidad: number) => void;
   onAgregar: () => void;

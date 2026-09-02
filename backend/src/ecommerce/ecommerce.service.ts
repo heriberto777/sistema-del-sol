@@ -10,6 +10,7 @@ import { CrearPedidoTiendaDto } from './dto/crear-pedido-tienda.dto';
 import { ListadoQueryDto } from '../common/dto/listado-query.dto';
 import { ClientesService } from '../clientes/clientes.service';
 import { FacturacionService } from '../facturacion/facturacion.service';
+import { VariantesService } from '../variantes/variantes.service';
 import { AuthenticatedRequest, JwtPayloadUser } from '../common/types/authenticated-request';
 
 @Injectable()
@@ -20,6 +21,7 @@ export class EcommerceService {
     private readonly pedidosTiendaRepository: PedidosTiendaRepository,
     private readonly clientesService: ClientesService,
     private readonly facturacionService: FacturacionService,
+    private readonly variantesService: VariantesService,
   ) {}
 
   /**
@@ -75,11 +77,35 @@ export class EcommerceService {
     return { datos, total, pagina, tamanoPagina };
   }
 
-  async producto(subdominio: string, productoId: string) {
+  /**
+   * `VarianteProducto.activa` (Fase 4) — primer punto del sistema que
+   * de verdad lo filtra (hoy no lo usa nadie más, ver
+   * VariantesRepository/VariantesProductoPanel: existe en el schema
+   * pero nunca se filtró en ningún lado). `request` se forja con el
+   * tenant resuelto para reusar `VariantesService.listarPorProducto`
+   * (request-scoped vía `TenantPrismaService`) tal cual, en vez de
+   * reescribir esa query — mismo patrón que `crearPedido`, acá sin
+   * vendedor real porque es solo lectura.
+   */
+  async producto(subdominio: string, productoId: string, request: AuthenticatedRequest) {
     const { tenant, config } = await this.resolverTiendaPublica(subdominio);
-    const producto = await this.ecommerceRepository.buscarProductoPublico(tenant.id, productoId, config.bodegaId);
+    const producto = await this.ecommerceRepository.buscarProductoPublico(tenant.id, productoId);
     if (!producto) throw new NotFoundException('Producto no encontrado');
-    return producto;
+
+    request.user = { tenantId: tenant.id, userId: 'tienda-online', email: '', roles: [], permisos: [] } as JwtPayloadUser;
+    const variantesCrudas = await this.variantesService.listarPorProducto(productoId, config.bodegaId);
+    const activas = variantesCrudas.filter((v) => v.activa);
+    const precios = await this.ecommerceRepository.preciosPorVariantes(activas.map((v) => v.id));
+    const precioPorVariante = new Map(precios.map((p) => [p.varianteId, p.precioVenta]));
+
+    const variantes = activas.map((v) => ({
+      id: v.id,
+      etiqueta: v.valoresAtributo.map((va) => `${va.valorAtributo.atributo.nombre}: ${va.valorAtributo.valor}`).join(', '),
+      precio: precioPorVariante.get(v.id) ?? null,
+      stock: config.bodegaId && 'existencia' in v ? v.existencia : null,
+    }));
+
+    return { ...producto, variantes };
   }
 
   /**

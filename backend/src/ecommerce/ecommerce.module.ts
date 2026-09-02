@@ -6,6 +6,7 @@ import { EcommerceRepository } from './ecommerce.repository';
 import { PedidosTiendaRepository } from './pedidos-tienda.repository';
 import { FacturacionModule } from '../facturacion/facturacion.module';
 import { ClientesModule } from '../clientes/clientes.module';
+import { VariantesModule } from '../variantes/variantes.module';
 
 /**
  * Plugin "Tienda Online" (catálogo en `plugins/ecommerce/plugin.json`,
@@ -18,7 +19,7 @@ import { ClientesModule } from '../clientes/clientes.module';
  * real y funcional tiene que estar acá para que `nest build` lo levante.
  */
 @Module({
-  imports: [FacturacionModule, ClientesModule],
+  imports: [FacturacionModule, ClientesModule, VariantesModule],
   controllers: [EcommerceController, EcommercePedidosController],
   providers: [EcommerceService, EcommerceRepository, PedidosTiendaRepository],
 })

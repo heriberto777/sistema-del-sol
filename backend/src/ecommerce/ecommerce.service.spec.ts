@@ -4,6 +4,7 @@ import { EcommerceRepository } from './ecommerce.repository';
 import { PedidosTiendaRepository } from './pedidos-tienda.repository';
 import { ClientesService } from '../clientes/clientes.service';
 import { FacturacionService } from '../facturacion/facturacion.service';
+import { VariantesService } from '../variantes/variantes.service';
 import { AuthenticatedRequest } from '../common/types/authenticated-request';
 
 const TENANT_ACTIVO = { id: 't1', nombre: 'Tenant Demo', estado: 'ACTIVO' };
@@ -27,6 +28,7 @@ describe('EcommerceService', () => {
   let pedidosTiendaRepository: jest.Mocked<PedidosTiendaRepository>;
   let clientesService: jest.Mocked<ClientesService>;
   let facturacionService: jest.Mocked<FacturacionService>;
+  let variantesService: jest.Mocked<VariantesService>;
 
   beforeEach(() => {
     prisma = {
@@ -46,6 +48,7 @@ describe('EcommerceService', () => {
       buscarProductoPublico: jest.fn().mockResolvedValue(null),
       buscarAdminMasAntiguo: jest.fn().mockResolvedValue(VENDEDOR),
       crearPedido: jest.fn().mockResolvedValue({ id: 'pt1' }),
+      preciosPorVariantes: jest.fn().mockResolvedValue([]),
     } as unknown as jest.Mocked<EcommerceRepository>;
     pedidosTiendaRepository = {
       listar: jest.fn().mockResolvedValue([[], 0]),
@@ -57,6 +60,9 @@ describe('EcommerceService', () => {
     facturacionService = {
       crear: jest.fn().mockResolvedValue(FACTURA_CREADA),
     } as unknown as jest.Mocked<FacturacionService>;
+    variantesService = {
+      listarPorProducto: jest.fn().mockResolvedValue([]),
+    } as unknown as jest.Mocked<VariantesService>;
 
     service = new EcommerceService(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -65,6 +71,7 @@ describe('EcommerceService', () => {
       pedidosTiendaRepository,
       clientesService,
       facturacionService,
+      variantesService,
     );
   });
 
@@ -107,7 +114,30 @@ describe('EcommerceService', () => {
 
   describe('producto', () => {
     it('404 si el producto no existe o no es visible en la tienda', async () => {
-      await expect(service.producto('demo', 'p1')).rejects.toThrow(NotFoundException);
+      await expect(service.producto('demo', 'p1', requestFalso())).rejects.toThrow(NotFoundException);
+    });
+
+    it('devuelve solo las variantes activas, con etiqueta/precio/stock resueltos (Fase 4)', async () => {
+      ecommerceRepository.buscarProductoPublico.mockResolvedValue({ id: 'p1', nombre: 'Camisa' } as never);
+      variantesService.listarPorProducto.mockResolvedValue([
+        {
+          id: 'v1',
+          activa: true,
+          existencia: 5,
+          valoresAtributo: [{ valorAtributo: { valor: 'M', atributo: { nombre: 'Talla' } } }],
+        },
+        {
+          id: 'v2',
+          activa: false,
+          existencia: 3,
+          valoresAtributo: [{ valorAtributo: { valor: 'L', atributo: { nombre: 'Talla' } } }],
+        },
+      ] as never);
+      ecommerceRepository.preciosPorVariantes.mockResolvedValue([{ varianteId: 'v1', precioVenta: 500 }] as never);
+
+      const resultado = await service.producto('demo', 'p1', requestFalso());
+
+      expect(resultado.variantes).toEqual([{ id: 'v1', etiqueta: 'Talla: M', precio: 500, stock: 5 }]);
     });
   });
 

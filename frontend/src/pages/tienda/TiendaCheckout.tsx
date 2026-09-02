@@ -29,7 +29,7 @@ export function TiendaCheckout() {
   const crearPedido = useMutation({
     mutationFn: async () => {
       const { data } = await tiendaApiClient.post<{ facturaId: string }>(`/tienda/${subdominio}/pedidos`, {
-        lineas: carrito.items.map((i) => ({ productoId: i.productoId, cantidad: i.cantidad })),
+        lineas: carrito.items.map((i) => ({ productoId: i.productoId, varianteId: i.varianteId, cantidad: i.cantidad })),
         clienteNombre,
         clienteTelefono,
         clienteEmail: clienteEmail || undefined,
@@ -75,7 +75,7 @@ export function TiendaCheckout() {
 
         <div className="mb-6 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
           {carrito.items.map((item) => (
-            <div key={item.productoId} className="flex justify-between py-1 text-sm">
+            <div key={item.varianteId} className="flex justify-between py-1 text-sm">
               <span className="text-slate-700 dark:text-slate-300">
                 {item.cantidad} × {item.nombre}
               </span>

@@ -86,8 +86,17 @@ function DirectoHome({ config, subdominio, carrito, productos, cargando, busqued
                 <button
                   type="button"
                   onClick={(e) => {
+                    // Con más de una variante (talla/color), no hay forma de saber cuál sin ir al detalle — se deja navegar el <Link>.
+                    if (p.tieneVariantes || !p.varianteId) return;
                     e.preventDefault();
-                    carrito.agregar({ productoId: p.id, nombre: p.nombre, precio: Number(p.precio ?? 0), imagen: p.imagen });
+                    carrito.agregar({
+                      productoId: p.id,
+                      varianteId: p.varianteId,
+                      varianteEtiqueta: '',
+                      nombre: p.nombre,
+                      precio: Number(p.precio ?? 0),
+                      imagen: p.imagen,
+                    });
                   }}
                   className="flex h-7 w-7 items-center justify-center rounded-lg text-white"
                   style={{ background: accent }}
@@ -105,8 +114,9 @@ function DirectoHome({ config, subdominio, carrito, productos, cargando, busqued
   );
 }
 
-function DirectoProducto({ config, subdominio, carrito, producto, cantidad, onCantidadChange, onAgregar }: PropsProducto) {
+function DirectoProducto({ config, subdominio, carrito, producto, varianteSeleccionada, onSeleccionarVariante, cantidad, onCantidadChange, onAgregar }: PropsProducto) {
   const accent = config.colorAcento || ACCENT_DEFAULT;
+  const debeElegirVariante = producto.variantes.length > 1;
   return (
     <div className="min-h-screen bg-[#faf7f2] text-[#1c1a17] dark:bg-[#17140f] dark:text-[#f1ece2]" style={{ fontFamily: FONT_BODY }}>
       <Nav nombre={config.nombre} logo={config.logo} subdominio={subdominio} cantidadCarrito={carrito.cantidadTotal} accent={accent} />
@@ -119,11 +129,39 @@ function DirectoProducto({ config, subdominio, carrito, producto, cantidad, onCa
           <h1 className="my-2 text-2xl font-extrabold" style={{ fontFamily: FONT_DISPLAY }}>
             {producto.nombre}
           </h1>
-          <p className="mb-6 text-2xl font-extrabold" style={{ fontFamily: FONT_DISPLAY, color: accent }}>
-            {formatearPrecio(producto.precio)}
+          <p className="mb-4 text-2xl font-extrabold" style={{ fontFamily: FONT_DISPLAY, color: accent }}>
+            {varianteSeleccionada ? formatearPrecio(varianteSeleccionada.precio) : 'Elegí una opción'}
           </p>
-          {producto.stock !== null && (
-            <p className="mb-6 text-sm text-[#7a7266]">{producto.stock > 0 ? `${producto.stock} disponibles` : 'Sin stock'}</p>
+
+          {debeElegirVariante && (
+            <div className="mb-5 flex flex-col gap-2">
+              {producto.variantes.map((v) => (
+                <button
+                  key={v.id}
+                  type="button"
+                  onClick={() => onSeleccionarVariante(v.id)}
+                  disabled={v.stock !== null && v.stock <= 0}
+                  className={`flex items-center justify-between rounded-lg border px-3 py-2 text-left text-sm disabled:cursor-not-allowed disabled:opacity-40 ${
+                    varianteSeleccionada?.id === v.id ? 'border-current' : 'border-[#eae3d6] dark:border-[#332c22]'
+                  }`}
+                  style={varianteSeleccionada?.id === v.id ? { color: accent, borderColor: accent } : undefined}
+                >
+                  <span className="flex flex-col text-[#1c1a17] dark:text-[#f1ece2]">
+                    <span>{v.etiqueta || '(sin atributos)'}</span>
+                    {v.stock !== null && (
+                      <span className="text-xs text-[#7a7266]">{v.stock > 0 ? `${v.stock} disponibles` : 'Sin existencia'}</span>
+                    )}
+                  </span>
+                  <span className="font-bold" style={{ color: accent }}>
+                    {formatearPrecio(v.precio)}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {varianteSeleccionada && varianteSeleccionada.stock !== null && (
+            <p className="mb-6 text-sm text-[#7a7266]">{varianteSeleccionada.stock > 0 ? `${varianteSeleccionada.stock} disponibles` : 'Sin stock'}</p>
           )}
           <div className="mb-5 flex items-center gap-3">
             <button type="button" onClick={() => onCantidadChange(Math.max(1, cantidad - 1))} className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#eae3d6] dark:border-[#332c22]">
@@ -134,7 +172,13 @@ function DirectoProducto({ config, subdominio, carrito, producto, cantidad, onCa
               <Plus size={14} />
             </button>
           </div>
-          <button type="button" onClick={onAgregar} className="rounded-lg px-6 py-3 text-sm font-bold text-white" style={{ background: accent }}>
+          <button
+            type="button"
+            onClick={onAgregar}
+            disabled={!varianteSeleccionada}
+            className="rounded-lg px-6 py-3 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
+            style={{ background: accent }}
+          >
             Agregar al carrito
           </button>
         </div>
@@ -156,25 +200,26 @@ function DirectoCarrito({ config, subdominio, carrito }: PropsCarrito) {
         {carrito.items.length === 0 && <p className="text-sm text-[#7a7266]">Tu carrito está vacío.</p>}
         <div className="flex flex-col gap-4">
           {carrito.items.map((item) => (
-            <div key={item.productoId} className="flex items-center gap-4 rounded-xl border border-[#eae3d6] bg-white p-3 dark:border-[#332c22] dark:bg-[#1f1b15]">
+            <div key={item.varianteId} className="flex items-center gap-4 rounded-xl border border-[#eae3d6] bg-white p-3 dark:border-[#332c22] dark:bg-[#1f1b15]">
               <div className="h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-gradient-to-br from-[#f1e9da] to-[#e3d5ba]">
                 {item.imagen && <img src={item.imagen} alt={item.nombre} className="h-full w-full object-cover" />}
               </div>
               <div className="flex-1">
                 <p className="text-sm font-semibold">{item.nombre}</p>
+                {item.varianteEtiqueta && <p className="text-xs text-[#7a7266]">{item.varianteEtiqueta}</p>}
                 <p className="text-xs text-[#7a7266]">{formatearPrecio(item.precio)} c/u</p>
               </div>
               <div className="flex items-center gap-2">
-                <button type="button" onClick={() => carrito.actualizarCantidad(item.productoId, item.cantidad - 1)} className="flex h-7 w-7 items-center justify-center rounded-lg border border-[#eae3d6] dark:border-[#332c22]">
+                <button type="button" onClick={() => carrito.actualizarCantidad(item.varianteId, item.cantidad - 1)} className="flex h-7 w-7 items-center justify-center rounded-lg border border-[#eae3d6] dark:border-[#332c22]">
                   <Minus size={13} />
                 </button>
                 <span className="w-5 text-center text-sm">{item.cantidad}</span>
-                <button type="button" onClick={() => carrito.actualizarCantidad(item.productoId, item.cantidad + 1)} className="flex h-7 w-7 items-center justify-center rounded-lg border border-[#eae3d6] dark:border-[#332c22]">
+                <button type="button" onClick={() => carrito.actualizarCantidad(item.varianteId, item.cantidad + 1)} className="flex h-7 w-7 items-center justify-center rounded-lg border border-[#eae3d6] dark:border-[#332c22]">
                   <Plus size={13} />
                 </button>
               </div>
               <span className="w-20 text-right text-sm font-bold">{formatearPrecio(item.precio * item.cantidad)}</span>
-              <button type="button" onClick={() => carrito.quitar(item.productoId)} className="text-[#7a7266] hover:text-red-600">
+              <button type="button" onClick={() => carrito.quitar(item.varianteId)} className="text-[#7a7266] hover:text-red-600">
                 <Trash2 size={16} />
               </button>
             </div>

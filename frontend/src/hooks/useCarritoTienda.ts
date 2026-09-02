@@ -2,7 +2,10 @@ import { useCallback, useState } from 'react';
 
 export interface ItemCarritoTienda {
   productoId: string;
+  varianteId: string;
   nombre: string;
+  /** Ej. "Talla: M, Color: Rojo" — vacío si el producto nunca usó atributos. */
+  varianteEtiqueta: string;
   precio: number;
   imagen: string | null;
   cantidad: number;
@@ -33,7 +36,9 @@ function escribir(subdominio: string, items: ItemCarritoTienda[]) {
  * Carrito 100% del lado del cliente (localStorage, por subdominio) —
  * conveniencia de recarga, no fuente de verdad: crear el pedido (Fase 3)
  * revalida stock/precio contra el catálogo real, nunca confía en lo que
- * haya guardado el navegador.
+ * haya guardado el navegador. Cada línea se identifica por `varianteId`
+ * (Fase 4) — ya identifica sin ambigüedad producto+variante, así que no
+ * hace falta una clave compuesta con `productoId`.
  *
  * Escribe en localStorage de forma incondicional ANTES de llamar a
  * `setState`, nunca dentro del *updater* funcional de `setState` ni en
@@ -54,9 +59,9 @@ export function useCarritoTienda(subdominio: string) {
 
   const agregar = useCallback(
     (item: Omit<ItemCarritoTienda, 'cantidad'>, cantidad = 1) => {
-      const existente = items.find((i) => i.productoId === item.productoId);
+      const existente = items.find((i) => i.varianteId === item.varianteId);
       const siguiente = existente
-        ? items.map((i) => (i.productoId === item.productoId ? { ...i, cantidad: i.cantidad + cantidad } : i))
+        ? items.map((i) => (i.varianteId === item.varianteId ? { ...i, cantidad: i.cantidad + cantidad } : i))
         : [...items, { ...item, cantidad }];
       escribir(subdominio, siguiente);
       setItems(siguiente);
@@ -65,9 +70,9 @@ export function useCarritoTienda(subdominio: string) {
   );
 
   const actualizarCantidad = useCallback(
-    (productoId: string, cantidad: number) => {
+    (varianteId: string, cantidad: number) => {
       const siguiente =
-        cantidad <= 0 ? items.filter((i) => i.productoId !== productoId) : items.map((i) => (i.productoId === productoId ? { ...i, cantidad } : i));
+        cantidad <= 0 ? items.filter((i) => i.varianteId !== varianteId) : items.map((i) => (i.varianteId === varianteId ? { ...i, cantidad } : i));
       escribir(subdominio, siguiente);
       setItems(siguiente);
     },
@@ -75,8 +80,8 @@ export function useCarritoTienda(subdominio: string) {
   );
 
   const quitar = useCallback(
-    (productoId: string) => {
-      const siguiente = items.filter((i) => i.productoId !== productoId);
+    (varianteId: string) => {
+      const siguiente = items.filter((i) => i.varianteId !== varianteId);
       escribir(subdominio, siguiente);
       setItems(siguiente);
     },
