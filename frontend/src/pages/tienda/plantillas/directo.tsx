@@ -1,8 +1,13 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Minus, Plus, Search, ShoppingCart, Trash2, User } from 'lucide-react';
-import { formatearPrecio } from '../../../hooks/useTienda';
+import { formatearPrecio, useOfertasTienda, useProductosDestacados } from '../../../hooks/useTienda';
 import { useClienteTienda } from '../../../hooks/useClienteTienda';
+import { useCarritoDrawer } from '../CarritoDrawerContext';
+import { BannerAnuncio } from '../BannerAnuncio';
+import { SeccionDestacados } from '../SeccionDestacados';
+import { SeccionOfertas } from '../SeccionOfertas';
+import { ProductosRelacionados } from '../ProductosRelacionados';
 import type { Plantilla, PropsCarrito, PropsHome, PropsProducto } from './tipos';
 
 const ACCENT_DEFAULT = '#c77d2e';
@@ -11,6 +16,7 @@ const FONT_BODY = "'Karla', sans-serif";
 
 function Nav({ nombre, logo, subdominio, cantidadCarrito, accent }: { nombre: string; logo: string | null; subdominio: string; cantidadCarrito: number; accent: string }) {
   const { autenticado } = useClienteTienda(subdominio);
+  const { abrir } = useCarritoDrawer();
   return (
     <div className="flex items-center justify-between border-b border-[#eae3d6] px-6 py-4 dark:border-[#332c22] sm:px-10">
       <Link to={`/tienda/${subdominio}`} className="flex items-center gap-2" style={{ fontFamily: FONT_DISPLAY }}>
@@ -25,12 +31,12 @@ function Nav({ nombre, logo, subdominio, cantidadCarrito, accent }: { nombre: st
           <User size={16} />
           {autenticado ? 'Mi cuenta' : 'Iniciar sesión'}
         </Link>
-        <Link to={`/tienda/${subdominio}/carrito`} className="flex items-center gap-2 text-sm font-bold text-[#1c1a17] dark:text-[#f1ece2]">
+        <button type="button" onClick={abrir} className="flex items-center gap-2 text-sm font-bold text-[#1c1a17] dark:text-[#f1ece2]">
           <ShoppingCart size={18} />
           <span className="flex h-5 w-5 items-center justify-center rounded-full text-[11px] text-white" style={{ background: accent }}>
             {cantidadCarrito}
           </span>
-        </Link>
+        </button>
       </div>
     </div>
   );
@@ -47,8 +53,11 @@ function Footer({ nombre }: { nombre: string }) {
 
 function DirectoHome({ config, subdominio, carrito, productos, cargando, busqueda, onBuscar }: PropsHome) {
   const accent = config.colorAcento || ACCENT_DEFAULT;
+  const { data: destacados = [] } = useProductosDestacados(subdominio);
+  const { data: ofertas = [] } = useOfertasTienda(subdominio);
   return (
     <div className="min-h-screen bg-[#faf7f2] font-['Karla'] text-[#1c1a17] dark:bg-[#17140f] dark:text-[#f1ece2]" style={{ fontFamily: FONT_BODY }}>
+      <BannerAnuncio texto={config.bannerTexto} />
       <Nav nombre={config.nombre} logo={config.logo} subdominio={subdominio} cantidadCarrito={carrito.cantidadTotal} accent={accent} />
 
       <div className="max-w-xl px-6 pb-14 pt-16 sm:px-10">
@@ -60,6 +69,9 @@ function DirectoHome({ config, subdominio, carrito, productos, cargando, busqued
         </h1>
         <p className="text-sm leading-relaxed text-[#7a7266] dark:text-[#b6ab97]">Catálogo completo, con precio y disponibilidad reales.</p>
       </div>
+
+      <SeccionDestacados productos={destacados} subdominio={subdominio} />
+      <SeccionOfertas ofertas={ofertas} />
 
       <div className="flex items-baseline justify-between px-6 pb-4 sm:px-10">
         <h2 className="text-lg font-extrabold" style={{ fontFamily: FONT_DISPLAY }}>
@@ -215,6 +227,7 @@ function DirectoProducto({ config, subdominio, carrito, producto, varianteSelecc
           </button>
         </div>
       </div>
+      <ProductosRelacionados productos={producto.relacionados} subdominio={subdominio} />
       <Footer nombre={config.nombre} />
     </div>
   );

@@ -1,9 +1,13 @@
-import { Body, Controller, Param, Post } from '@nestjs/common';
+import { Body, Controller, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { ClienteTiendaAuthService } from './cliente-tienda-auth.service';
 import { RegistroClienteTiendaDto } from './dto/registro-cliente-tienda.dto';
 import { LoginClienteTiendaDto } from './dto/login-cliente-tienda.dto';
+import { CambiarPasswordClienteTiendaDto } from './dto/cambiar-password-cliente-tienda.dto';
 import { Public } from '../common/decorators/public.decorator';
+import { ClienteTiendaAuthGuard } from './guards/cliente-tienda-auth.guard';
+import { CurrentClienteTienda } from './current-cliente-tienda.decorator';
+import { ClienteTiendaPayload } from './cliente-tienda-authenticated-request';
 
 /** Registro/login de compradores del storefront — mismo criterio de resolución de tenant (:subdominio explícito, sin JWT) que EcommerceController. */
 @ApiTags('tienda-auth')
@@ -20,5 +24,15 @@ export class ClienteTiendaAuthController {
   @Post('login')
   login(@Param('subdominio') subdominio: string, @Body() dto: LoginClienteTiendaDto) {
     return this.clienteTiendaAuthService.login(subdominio, dto);
+  }
+
+  @Patch('password')
+  @UseGuards(ClienteTiendaAuthGuard)
+  cambiarPassword(
+    @Param('subdominio') subdominio: string,
+    @CurrentClienteTienda() cliente: ClienteTiendaPayload,
+    @Body() dto: CambiarPasswordClienteTiendaDto,
+  ) {
+    return this.clienteTiendaAuthService.cambiarPassword(subdominio, cliente, dto);
   }
 }

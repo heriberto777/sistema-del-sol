@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useTiendaConfig, useTiendaProducto } from '../../hooks/useTienda';
-import { useCarritoTienda } from '../../hooks/useCarritoTienda';
+import { useCarritoTiendaContext } from './CarritoTiendaContext';
 import { PLANTILLAS } from './plantillas';
 import { TiendaCargando, TiendaNoEncontrada } from './TiendaNoEncontrada';
 
@@ -9,7 +9,7 @@ export function TiendaProducto() {
   const { subdominio = '', productoId = '' } = useParams();
   const [varianteId, setVarianteId] = useState<string | null>(null);
   const [cantidad, setCantidad] = useState(1);
-  const carrito = useCarritoTienda(subdominio);
+  const carrito = useCarritoTiendaContext();
 
   const { data: config, isLoading: cargandoConfig, isError: errorConfig } = useTiendaConfig(subdominio);
   const { data: producto, isLoading: cargandoProducto, isError: errorProducto } = useTiendaProducto(subdominio, productoId);

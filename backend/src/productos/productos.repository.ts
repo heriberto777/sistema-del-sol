@@ -87,6 +87,7 @@ export class ProductosRepository {
       porcentajeComision: true,
       montoComisionFijo: true,
       controlaVencimiento: true,
+      destacado: true,
     } as const;
     return Promise.all([
       this.db.producto.findMany({ where, orderBy: { nombre: 'asc' }, skip: params.skip, take: params.take, select }),

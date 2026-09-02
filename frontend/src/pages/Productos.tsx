@@ -44,6 +44,7 @@ interface Producto {
   permiteDevolucion: boolean;
   porcentajeComision: string | null;
   montoComisionFijo: string | null;
+  destacado: boolean;
 }
 
 interface ComponenteComboDetalle {
@@ -85,6 +86,7 @@ interface ProductoFormValues {
   permiteDevolucion: boolean;
   porcentajeComision: string;
   montoComisionFijo: string;
+  destacado: boolean;
 }
 
 /** Plan de integración Cuadre, ítem E-8 — lista cerrada (antes texto libre sin validar), igual orden que UNIDADES_MEDIDA en el backend. */
@@ -124,6 +126,7 @@ const PRODUCTO_VACIO: ProductoFormValues = {
   permiteDevolucion: true,
   porcentajeComision: '',
   montoComisionFijo: '',
+  destacado: false,
 };
 
 const ETIQUETA_TIPO: Record<TipoProducto, string> = { PRODUCTO: 'Producto', SERVICIO: 'Servicio', COMBO: 'Combo' };
@@ -353,6 +356,7 @@ function FormularioProducto({ producto, onGuardado }: { producto: Producto | nul
           permiteDevolucion: producto.permiteDevolucion,
           porcentajeComision: producto.porcentajeComision ?? '',
           montoComisionFijo: producto.montoComisionFijo ?? '',
+          destacado: producto.destacado,
         }
       : PRODUCTO_VACIO,
   );
@@ -409,6 +413,7 @@ function FormularioProducto({ producto, onGuardado }: { producto: Producto | nul
       permiteDevolucion: valores.permiteDevolucion,
       porcentajeComision: valores.porcentajeComision ? Number(valores.porcentajeComision) : null,
       montoComisionFijo: valores.montoComisionFijo ? Number(valores.montoComisionFijo) : null,
+      destacado: valores.destacado,
       componentes:
         valores.tipo === 'COMBO'
           ? componentes.filter((c) => c.productoId).map((c) => ({ productoId: c.productoId, cantidad: Number(c.cantidad) || 1 }))
@@ -465,6 +470,15 @@ function FormularioProducto({ producto, onGuardado }: { producto: Producto | nul
           className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
         />
       </div>
+      <label className="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-300">
+        <input
+          type="checkbox"
+          checked={valores.destacado}
+          onChange={(e) => setValores((v) => ({ ...v, destacado: e.target.checked }))}
+          className="h-4 w-4 rounded"
+        />
+        Destacar en la Tienda Online
+      </label>
       <div className="flex flex-col gap-1">
         <label htmlFor="producto-tipo" className="text-sm font-medium text-slate-700 dark:text-slate-300">
           Tipo

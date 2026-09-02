@@ -46,11 +46,22 @@ describe('EcommerceService', () => {
     };
     ecommerceRepository = {
       catalogo: jest.fn().mockResolvedValue([[], 0]),
+      ofertasVigentesPublicas: jest.fn().mockResolvedValue([]),
+      productosRelacionados: jest.fn().mockResolvedValue([]),
       buscarProductoPublico: jest.fn().mockResolvedValue(null),
       buscarAdminMasAntiguo: jest.fn().mockResolvedValue(VENDEDOR),
       crearPedido: jest.fn().mockResolvedValue({ id: 'pt1' }),
       preciosPorVariantes: jest.fn().mockResolvedValue([]),
       misPedidos: jest.fn().mockResolvedValue([]),
+      detallePedido: jest.fn().mockResolvedValue(null),
+      miPerfil: jest.fn().mockResolvedValue({ id: 'c1', nombre: 'Ana', email: 'ana@ejemplo.com', telefono: null, puntosLealtad: 0 }),
+      actualizarPerfil: jest.fn().mockResolvedValue({ id: 'c1', nombre: 'Ana', email: 'ana@ejemplo.com', telefono: null, puntosLealtad: 0 }),
+      buscarClientePorEmail: jest.fn().mockResolvedValue(null),
+      misDirecciones: jest.fn().mockResolvedValue([]),
+      buscarDireccion: jest.fn().mockResolvedValue(null),
+      crearDireccion: jest.fn().mockResolvedValue({ id: 'd1' }),
+      actualizarDireccion: jest.fn().mockResolvedValue({ id: 'd1' }),
+      eliminarDireccion: jest.fn().mockResolvedValue({ id: 'd1' }),
     } as unknown as jest.Mocked<EcommerceRepository>;
     pedidosTiendaRepository = {
       listar: jest.fn().mockResolvedValue([[], 0]),
@@ -145,6 +156,47 @@ describe('EcommerceService', () => {
       const resultado = await service.producto('demo', 'p1', requestFalso());
 
       expect(resultado.variantes).toEqual([{ id: 'v1', etiqueta: 'Talla: M', precio: 500, stock: 5 }]);
+    });
+
+    it('Fase 11 — sin categoría, no busca relacionados y devuelve la lista vacía', async () => {
+      ecommerceRepository.buscarProductoPublico.mockResolvedValue({ id: 'p1', nombre: 'Camisa', imagenesAdicionales: [], categoria: null } as never);
+
+      const resultado = await service.producto('demo', 'p1', requestFalso());
+
+      expect(ecommerceRepository.productosRelacionados).not.toHaveBeenCalled();
+      expect(resultado.relacionados).toEqual([]);
+    });
+
+    it('Fase 11 — con categoría, pide relacionados de la MISMA categoría excluyendo el propio producto', async () => {
+      ecommerceRepository.buscarProductoPublico.mockResolvedValue({
+        id: 'p1',
+        nombre: 'Camisa',
+        imagenesAdicionales: [],
+        categoria: { id: 'cat1', nombre: 'Camisas' },
+      } as never);
+      ecommerceRepository.productosRelacionados.mockResolvedValue([{ id: 'p2', nombre: 'Camisa azul' }] as never);
+
+      const resultado = await service.producto('demo', 'p1', requestFalso());
+
+      expect(ecommerceRepository.productosRelacionados).toHaveBeenCalledWith({
+        tenantId: 't1',
+        categoriaId: 'cat1',
+        excluirProductoId: 'p1',
+        bodegaId: 'b1',
+        limit: 4,
+      });
+      expect(resultado.relacionados).toEqual([{ id: 'p2', nombre: 'Camisa azul' }]);
+    });
+  });
+
+  describe('ofertas', () => {
+    it('Fase 11 — resuelve la tienda y delega en el repositorio las ofertas vigentes del tenant', async () => {
+      ecommerceRepository.ofertasVigentesPublicas.mockResolvedValue([{ id: 'o1', nombre: '20% en Camisas' }] as never);
+
+      const resultado = await service.ofertas('demo');
+
+      expect(ecommerceRepository.ofertasVigentesPublicas).toHaveBeenCalledWith('t1');
+      expect(resultado).toEqual([{ id: 'o1', nombre: '20% en Camisas' }]);
     });
   });
 
@@ -249,6 +301,62 @@ describe('EcommerceService', () => {
         UnauthorizedException,
       );
       expect(ecommerceRepository.misPedidos).not.toHaveBeenCalled();
+    });
+  });
+
+  const CLIENTE = { clienteId: 'c1', tenantId: 't1', email: 'ana@ejemplo.com' };
+
+  describe('detallePedido', () => {
+    it('404 si la factura no existe o no pertenece a este tenant+cliente (el repositorio ya filtra por ambos)', async () => {
+      ecommerceRepository.detallePedido.mockResolvedValue(null);
+      await expect(service.detallePedido('demo', CLIENTE, 'f-ajena')).rejects.toThrow(NotFoundException);
+    });
+
+    it('devuelve el detalle cuando la factura sí pertenece al cliente', async () => {
+      const detalle = { factura: { id: 'f1' }, pedido: null, lineas: [{ nombre: 'Producto X', cantidad: 1, precioUnitario: 100, montoTotal: 100 }] };
+      ecommerceRepository.detallePedido.mockResolvedValue(detalle as never);
+      await expect(service.detallePedido('demo', CLIENTE, 'f1')).resolves.toEqual(detalle);
+      expect(ecommerceRepository.detallePedido).toHaveBeenCalledWith('t1', 'c1', 'f1');
+    });
+  });
+
+  describe('actualizarPerfil', () => {
+    it('rechaza el email si ya lo usa OTRA cuenta con contraseña de este tenant', async () => {
+      ecommerceRepository.buscarClientePorEmail.mockResolvedValue({ id: 'otro-cliente' } as never);
+      await expect(service.actualizarPerfil('demo', CLIENTE, { email: 'ya-usado@ejemplo.com' })).rejects.toThrow();
+      expect(ecommerceRepository.actualizarPerfil).not.toHaveBeenCalled();
+    });
+
+    it('permite conservar el propio email (el "existente" encontrado es uno mismo)', async () => {
+      ecommerceRepository.buscarClientePorEmail.mockResolvedValue({ id: 'c1' } as never);
+      await expect(service.actualizarPerfil('demo', CLIENTE, { email: 'ana@ejemplo.com', nombre: 'Ana T.' })).resolves.toBeDefined();
+      expect(ecommerceRepository.actualizarPerfil).toHaveBeenCalledWith('c1', { email: 'ana@ejemplo.com', nombre: 'Ana T.' });
+    });
+  });
+
+  describe('direcciones — IDOR', () => {
+    it('actualizarDireccion: 404 si la dirección no existe', async () => {
+      ecommerceRepository.buscarDireccion.mockResolvedValue(null);
+      await expect(service.actualizarDireccion('demo', CLIENTE, 'd-inexistente', { ciudad: 'Santiago' })).rejects.toThrow(NotFoundException);
+      expect(ecommerceRepository.actualizarDireccion).not.toHaveBeenCalled();
+    });
+
+    it('actualizarDireccion: 404 si la dirección pertenece a OTRO cliente', async () => {
+      ecommerceRepository.buscarDireccion.mockResolvedValue({ id: 'd1', clienteId: 'otro-cliente' } as never);
+      await expect(service.actualizarDireccion('demo', CLIENTE, 'd1', { ciudad: 'Santiago' })).rejects.toThrow(NotFoundException);
+      expect(ecommerceRepository.actualizarDireccion).not.toHaveBeenCalled();
+    });
+
+    it('eliminarDireccion: 404 si la dirección pertenece a OTRO cliente', async () => {
+      ecommerceRepository.buscarDireccion.mockResolvedValue({ id: 'd1', clienteId: 'otro-cliente' } as never);
+      await expect(service.eliminarDireccion('demo', CLIENTE, 'd1')).rejects.toThrow(NotFoundException);
+      expect(ecommerceRepository.eliminarDireccion).not.toHaveBeenCalled();
+    });
+
+    it('actualizarDireccion: procede cuando la dirección sí es del cliente autenticado', async () => {
+      ecommerceRepository.buscarDireccion.mockResolvedValue({ id: 'd1', clienteId: 'c1' } as never);
+      await expect(service.actualizarDireccion('demo', CLIENTE, 'd1', { esPrincipal: true })).resolves.toBeDefined();
+      expect(ecommerceRepository.actualizarDireccion).toHaveBeenCalledWith('d1', 'c1', { esPrincipal: true });
     });
   });
 });

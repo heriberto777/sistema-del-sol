@@ -1,10 +1,10 @@
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
 import { isAxiosError } from 'axios';
-import { formatearPrecio, useTiendaConfig } from '../../hooks/useTienda';
+import { formatearPrecio, useMisDirecciones, useTiendaConfig } from '../../hooks/useTienda';
 import { tiendaApiClient } from '../../lib/tienda-api-client';
-import { useCarritoTienda } from '../../hooks/useCarritoTienda';
+import { useCarritoTiendaContext } from './CarritoTiendaContext';
 import { useClienteTienda } from '../../hooks/useClienteTienda';
 import { TiendaCargando, TiendaNoEncontrada } from './TiendaNoEncontrada';
 
@@ -18,9 +18,10 @@ import { TiendaCargando, TiendaNoEncontrada } from './TiendaNoEncontrada';
 export function TiendaCheckout() {
   const { subdominio = '' } = useParams();
   const navigate = useNavigate();
-  const carrito = useCarritoTienda(subdominio);
+  const carrito = useCarritoTiendaContext();
   const { data: config, isLoading, isError } = useTiendaConfig(subdominio);
   const { cliente, token } = useClienteTienda(subdominio);
+  const { data: direcciones } = useMisDirecciones(subdominio, token);
 
   // Con sesión, precarga los datos del perfil — igual editables, se
   // mandan igual que en modo guest (el backend no distingue el DTO).
@@ -29,6 +30,16 @@ export function TiendaCheckout() {
   const [clienteEmail, setClienteEmail] = useState(cliente?.email ?? '');
   const [direccionEntrega, setDireccionEntrega] = useState('');
   const [notas, setNotas] = useState('');
+
+  // Fase 10 — si tiene direcciones guardadas, autocompleta con la
+  // principal (sigue editable después) sin bloquear al guest ni al
+  // cliente que todavía no guardó ninguna.
+  useEffect(() => {
+    if (!direcciones?.length || direccionEntrega) return;
+    const principal = direcciones.find((d) => d.esPrincipal) ?? direcciones[0];
+    setDireccionEntrega(principal.direccion);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [direcciones]);
 
   const crearPedido = useMutation({
     mutationFn: async () => {
@@ -136,6 +147,33 @@ export function TiendaCheckout() {
               className="rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
             />
           </div>
+
+          {!!direcciones?.length && (
+            <div className="flex flex-col gap-1">
+              <label htmlFor="checkout-direccion-guardada" className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                Dirección guardada
+              </label>
+              <select
+                id="checkout-direccion-guardada"
+                defaultValue=""
+                onChange={(e) => {
+                  const elegida = direcciones.find((d) => d.id === e.target.value);
+                  if (elegida) setDireccionEntrega(elegida.direccion);
+                }}
+                className="rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+              >
+                <option value="" disabled>
+                  Elegí una dirección guardada o escribí una nueva abajo
+                </option>
+                {direcciones.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.direccion}
+                    {d.esPrincipal ? ' (principal)' : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <div className="flex flex-col gap-1">
             <label htmlFor="checkout-direccion" className="text-sm font-medium text-slate-700 dark:text-slate-300">

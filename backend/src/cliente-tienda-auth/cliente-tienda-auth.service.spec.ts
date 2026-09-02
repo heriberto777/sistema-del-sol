@@ -1,4 +1,4 @@
-import { ConflictException, UnauthorizedException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import { ClienteTiendaAuthService } from './cliente-tienda-auth.service';
@@ -12,7 +12,7 @@ describe('ClienteTiendaAuthService', () => {
     tenant: { findUnique: jest.Mock };
     tenantModuloOverride: { findFirst: jest.Mock };
     configuracion: { findMany: jest.Mock };
-    cliente: { findFirst: jest.Mock; create: jest.Mock };
+    cliente: { findFirst: jest.Mock; create: jest.Mock; findUniqueOrThrow: jest.Mock; update: jest.Mock };
   };
 
   beforeEach(() => {
@@ -20,7 +20,7 @@ describe('ClienteTiendaAuthService', () => {
       tenant: { findUnique: jest.fn().mockResolvedValue(TENANT_ACTIVO) },
       tenantModuloOverride: { findFirst: jest.fn().mockResolvedValue(null) },
       configuracion: { findMany: jest.fn().mockResolvedValue([{ clave: 'TIENDA_ACTIVA', valor: 'true' }]) },
-      cliente: { findFirst: jest.fn(), create: jest.fn() },
+      cliente: { findFirst: jest.fn(), create: jest.fn(), findUniqueOrThrow: jest.fn(), update: jest.fn() },
     };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     service = new ClienteTiendaAuthService(prisma as any, new JwtService());
@@ -101,6 +101,33 @@ describe('ClienteTiendaAuthService', () => {
     it('registro y login fallan igual que cualquier otra ruta pública si la tienda no existe', async () => {
       prisma.tenant.findUnique.mockResolvedValue(null);
       await expect(service.login('no-existe', { email: 'a@a.com', password: 'clave1234' })).rejects.toThrow();
+    });
+  });
+
+  describe('cambiarPassword', () => {
+    const CLIENTE = { clienteId: 'c1', tenantId: 't1', email: 'ana@ejemplo.com' };
+    const dto = { passwordActual: 'clave1234', passwordNueva: 'claveNueva123' };
+
+    it('rechaza (403, no 401) si la contraseña actual no coincide', async () => {
+      const passwordHash = await bcrypt.hash('otra-clave', 10);
+      prisma.cliente.findUniqueOrThrow.mockResolvedValue({ id: 'c1', passwordHash });
+      await expect(service.cambiarPassword('demo', CLIENTE, dto)).rejects.toThrow(ForbiddenException);
+      expect(prisma.cliente.update).not.toHaveBeenCalled();
+    });
+
+    it('actualiza el passwordHash (bcrypt) cuando la actual coincide', async () => {
+      const passwordHash = await bcrypt.hash(dto.passwordActual, 10);
+      prisma.cliente.findUniqueOrThrow.mockResolvedValue({ id: 'c1', passwordHash });
+
+      await service.cambiarPassword('demo', CLIENTE, dto);
+
+      const [{ data }] = prisma.cliente.update.mock.calls[0];
+      expect(await bcrypt.compare(dto.passwordNueva, data.passwordHash)).toBe(true);
+    });
+
+    it('rechaza si el token es de un tenant distinto al del subdominio pedido', async () => {
+      await expect(service.cambiarPassword('demo', { ...CLIENTE, tenantId: 'otro-tenant' }, dto)).rejects.toThrow(UnauthorizedException);
+      expect(prisma.cliente.findUniqueOrThrow).not.toHaveBeenCalled();
     });
   });
 });

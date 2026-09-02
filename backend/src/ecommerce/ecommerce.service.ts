@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { EcommerceRepository } from './ecommerce.repository';
 import { PedidosTiendaRepository } from './pedidos-tienda.repository';
@@ -7,6 +7,8 @@ import { paginar } from '../common/types/pagina-resultado';
 import { PrismaService } from '../prisma/prisma.service';
 import { CatalogoTiendaQueryDto } from './dto/catalogo-tienda-query.dto';
 import { CrearPedidoTiendaDto } from './dto/crear-pedido-tienda.dto';
+import { ActualizarPerfilClienteTiendaDto } from './dto/actualizar-perfil-cliente-tienda.dto';
+import { ActualizarDireccionClienteDto, CrearDireccionClienteDto } from './dto/direccion-cliente.dto';
 import { ListadoQueryDto } from '../common/dto/listado-query.dto';
 import { ClientesService } from '../clientes/clientes.service';
 import { FacturacionService } from '../facturacion/facturacion.service';
@@ -39,7 +41,15 @@ export class EcommerceService {
       logo: config.logo ?? null,
       banner: config.banner ?? null,
       colorAcento: config.colorAcento ?? null,
+      tema: config.tema,
+      bannerTexto: config.bannerTexto ?? null,
     };
+  }
+
+  /** Fase 11 — ofertas vigentes ahora mismo, para la sección "Ofertas" del storefront. */
+  async ofertas(subdominio: string) {
+    const { tenant } = await this.resolverTiendaPublica(subdominio);
+    return this.ecommerceRepository.ofertasVigentesPublicas(tenant.id);
   }
 
   async catalogo(subdominio: string, query: CatalogoTiendaQueryDto) {
@@ -52,6 +62,7 @@ export class EcommerceService {
       take,
       busqueda: query.busqueda,
       categoriaId: query.categoriaId,
+      destacado: query.destacado === 'true' ? true : undefined,
     });
     return { datos, total, pagina, tamanoPagina };
   }
@@ -84,8 +95,18 @@ export class EcommerceService {
       stock: config.bodegaId && 'existencia' in v ? v.existencia : null,
     }));
 
+    const relacionados = producto.categoria
+      ? await this.ecommerceRepository.productosRelacionados({
+          tenantId: tenant.id,
+          categoriaId: producto.categoria.id,
+          excluirProductoId: producto.id,
+          bodegaId: config.bodegaId,
+          limit: 4,
+        })
+      : [];
+
     const { imagenesAdicionales, ...datosProducto } = producto;
-    return { ...datosProducto, imagenesAdicionales: imagenesAdicionales.map((i) => i.imagen), variantes };
+    return { ...datosProducto, imagenesAdicionales: imagenesAdicionales.map((i) => i.imagen), variantes, relacionados };
   }
 
   /**
@@ -187,5 +208,66 @@ export class EcommerceService {
       throw new UnauthorizedException('Sesión inválida para esta tienda');
     }
     return this.ecommerceRepository.misPedidos(tenant.id, cliente.clienteId);
+  }
+
+  /** Fase 10 — "Ver detalle" de un pedido puntual (líneas de producto). Mismo chequeo de tenant que `misPedidos`; el 404 de "no pertenece" lo resuelve el repositorio (`findFirst` con `clienteId` incluido en el where, nunca solo por id). */
+  async detallePedido(subdominio: string, cliente: ClienteTiendaPayload, facturaId: string) {
+    const { tenant } = await this.resolverTiendaPublica(subdominio);
+    if (tenant.id !== cliente.tenantId) throw new UnauthorizedException('Sesión inválida para esta tienda');
+    const detalle = await this.ecommerceRepository.detallePedido(tenant.id, cliente.clienteId, facturaId);
+    if (!detalle) throw new NotFoundException('Pedido no encontrado');
+    return detalle;
+  }
+
+  async miPerfil(subdominio: string, cliente: ClienteTiendaPayload) {
+    const { tenant } = await this.resolverTiendaPublica(subdominio);
+    if (tenant.id !== cliente.tenantId) throw new UnauthorizedException('Sesión inválida para esta tienda');
+    return this.ecommerceRepository.miPerfil(cliente.clienteId);
+  }
+
+  /** Mismo criterio de unicidad "email con contraseña" que `ClienteTiendaAuthService.registro` — si el nuevo email ya lo usa OTRA cuenta con password de este tenant, no se permite. */
+  async actualizarPerfil(subdominio: string, cliente: ClienteTiendaPayload, dto: ActualizarPerfilClienteTiendaDto) {
+    const { tenant } = await this.resolverTiendaPublica(subdominio);
+    if (tenant.id !== cliente.tenantId) throw new UnauthorizedException('Sesión inválida para esta tienda');
+    if (dto.email) {
+      const existente = await this.ecommerceRepository.buscarClientePorEmail(tenant.id, dto.email);
+      if (existente && existente.id !== cliente.clienteId) {
+        throw new ConflictException('Ya existe una cuenta con ese correo en esta tienda');
+      }
+    }
+    return this.ecommerceRepository.actualizarPerfil(cliente.clienteId, dto);
+  }
+
+  async misDirecciones(subdominio: string, cliente: ClienteTiendaPayload) {
+    const { tenant } = await this.resolverTiendaPublica(subdominio);
+    if (tenant.id !== cliente.tenantId) throw new UnauthorizedException('Sesión inválida para esta tienda');
+    return this.ecommerceRepository.misDirecciones(cliente.clienteId);
+  }
+
+  async crearDireccion(subdominio: string, cliente: ClienteTiendaPayload, dto: CrearDireccionClienteDto) {
+    const { tenant } = await this.resolverTiendaPublica(subdominio);
+    if (tenant.id !== cliente.tenantId) throw new UnauthorizedException('Sesión inválida para esta tienda');
+    return this.ecommerceRepository.crearDireccion(cliente.clienteId, dto);
+  }
+
+  /** IDOR-safe: resuelve la dirección por id y valida que sea del cliente autenticado ANTES de tocarla — nunca confiar en el id de la URL. */
+  private async direccionDelCliente(direccionId: string, clienteId: string) {
+    const direccion = await this.ecommerceRepository.buscarDireccion(direccionId);
+    if (!direccion || direccion.clienteId !== clienteId) throw new NotFoundException('Dirección no encontrada');
+    return direccion;
+  }
+
+  async actualizarDireccion(subdominio: string, cliente: ClienteTiendaPayload, direccionId: string, dto: ActualizarDireccionClienteDto) {
+    const { tenant } = await this.resolverTiendaPublica(subdominio);
+    if (tenant.id !== cliente.tenantId) throw new UnauthorizedException('Sesión inválida para esta tienda');
+    await this.direccionDelCliente(direccionId, cliente.clienteId);
+    return this.ecommerceRepository.actualizarDireccion(direccionId, cliente.clienteId, dto);
+  }
+
+  async eliminarDireccion(subdominio: string, cliente: ClienteTiendaPayload, direccionId: string) {
+    const { tenant } = await this.resolverTiendaPublica(subdominio);
+    if (tenant.id !== cliente.tenantId) throw new UnauthorizedException('Sesión inválida para esta tienda');
+    await this.direccionDelCliente(direccionId, cliente.clienteId);
+    return this.ecommerceRepository.eliminarDireccion(direccionId);
   }
 }

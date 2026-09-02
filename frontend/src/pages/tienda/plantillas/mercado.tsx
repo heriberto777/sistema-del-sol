@@ -1,8 +1,13 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Minus, Plus, Search, ShoppingCart, Trash2, User } from 'lucide-react';
-import { formatearPrecio } from '../../../hooks/useTienda';
+import { formatearPrecio, useOfertasTienda, useProductosDestacados } from '../../../hooks/useTienda';
 import { useClienteTienda } from '../../../hooks/useClienteTienda';
+import { useCarritoDrawer } from '../CarritoDrawerContext';
+import { BannerAnuncio } from '../BannerAnuncio';
+import { SeccionDestacados } from '../SeccionDestacados';
+import { SeccionOfertas } from '../SeccionOfertas';
+import { ProductosRelacionados } from '../ProductosRelacionados';
 import type { Plantilla, PropsCarrito, PropsHome, PropsProducto } from './tipos';
 
 const ACCENT_DEFAULT = '#ff6b45';
@@ -12,6 +17,7 @@ const FONT_BODY = "'Work Sans', sans-serif";
 
 function Nav({ nombre, logo, subdominio, cantidadCarrito, accent }: { nombre: string; logo: string | null; subdominio: string; cantidadCarrito: number; accent: string }) {
   const { autenticado } = useClienteTienda(subdominio);
+  const { abrir } = useCarritoDrawer();
   return (
     <>
       <div className="py-1.5 text-center text-xs font-semibold text-white" style={{ background: BG_OSCURO }}>
@@ -27,14 +33,15 @@ function Nav({ nombre, logo, subdominio, cantidadCarrito, accent }: { nombre: st
             <User size={16} />
             {autenticado ? 'Mi cuenta' : 'Iniciar sesión'}
           </Link>
-          <Link
-            to={`/tienda/${subdominio}/carrito`}
+          <button
+            type="button"
+            onClick={abrir}
             className="flex items-center gap-2 rounded-full px-4 py-2 text-xs font-bold text-white"
             style={{ background: accent }}
           >
             <ShoppingCart size={15} />
             Carrito · {cantidadCarrito}
-          </Link>
+          </button>
         </div>
       </div>
     </>
@@ -52,8 +59,11 @@ function Footer({ nombre }: { nombre: string }) {
 
 function MercadoHome({ config, subdominio, carrito, productos, cargando, busqueda, onBuscar }: PropsHome) {
   const accent = config.colorAcento || ACCENT_DEFAULT;
+  const { data: destacados = [] } = useProductosDestacados(subdominio);
+  const { data: ofertas = [] } = useOfertasTienda(subdominio);
   return (
     <div className="min-h-screen bg-[#fff6ec] text-[#0d5c58] dark:bg-[#0b1a19] dark:text-[#e7f3f1]" style={{ fontFamily: FONT_BODY }}>
+      <BannerAnuncio texto={config.bannerTexto} />
       <Nav nombre={config.nombre} logo={config.logo} subdominio={subdominio} cantidadCarrito={carrito.cantidadTotal} accent={accent} />
 
       <div className="mx-6 mb-10 grid gap-6 rounded-3xl p-8 text-white sm:mx-10 sm:grid-cols-2 sm:p-11" style={{ background: BG_OSCURO }}>
@@ -73,6 +83,9 @@ function MercadoHome({ config, subdominio, carrito, productos, cargando, busqued
           />
         )}
       </div>
+
+      <SeccionDestacados productos={destacados} subdominio={subdominio} />
+      <SeccionOfertas ofertas={ofertas} />
 
       <div className="mx-6 mb-6 flex items-end justify-between sm:mx-10">
         <div>
@@ -225,6 +238,7 @@ function MercadoProducto({ config, subdominio, carrito, producto, varianteSelecc
           </button>
         </div>
       </div>
+      <ProductosRelacionados productos={producto.relacionados} subdominio={subdominio} />
       <Footer nombre={config.nombre} />
     </div>
   );

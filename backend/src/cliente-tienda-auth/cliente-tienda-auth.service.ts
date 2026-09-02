@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../prisma/prisma.service';
@@ -7,8 +7,9 @@ import { ClienteTiendaPayload } from './cliente-tienda-authenticated-request';
 import { CLIENTE_TIENDA_JWT_EXPIRATION, CLIENTE_TIENDA_JWT_SECRET } from './cliente-tienda-jwt.constants';
 import { RegistroClienteTiendaDto } from './dto/registro-cliente-tienda.dto';
 import { LoginClienteTiendaDto } from './dto/login-cliente-tienda.dto';
+import { CambiarPasswordClienteTiendaDto } from './dto/cambiar-password-cliente-tienda.dto';
 
-type ClienteBasico = { id: string; nombre: string; email: string | null; telefono: string | null };
+type ClienteBasico = { id: string; nombre: string; email: string | null; telefono: string | null; puntosLealtad: number };
 
 /**
  * Tercer dominio de auth, completo y paralelo al de tenants
@@ -65,11 +66,32 @@ export class ClienteTiendaAuthService {
     return this.emitirToken(cliente, tenant.id);
   }
 
+  /**
+   * Cambiar contraseña SABIENDO la actual (cliente ya logueado) — distinto
+   * del flujo "olvidé mi contraseña" (fuera de alcance, ver cabecera de
+   * este archivo). Mirror de `AuthService.establecerPin`: `ForbiddenException`
+   * (403, no 401) si la actual no matchea, para no confundirlo con una
+   * sesión vencida.
+   */
+  async cambiarPassword(subdominio: string, clienteAuth: ClienteTiendaPayload, dto: CambiarPasswordClienteTiendaDto) {
+    const { tenant } = await resolverTiendaPublica(this.prisma, subdominio);
+    if (tenant.id !== clienteAuth.tenantId) throw new UnauthorizedException();
+
+    const cliente = await this.prisma.cliente.findUniqueOrThrow({ where: { id: clienteAuth.clienteId } });
+    if (!cliente.passwordHash || !(await bcrypt.compare(dto.passwordActual, cliente.passwordHash))) {
+      throw new ForbiddenException('Contraseña actual incorrecta');
+    }
+
+    const passwordHash = await bcrypt.hash(dto.passwordNueva, 10);
+    await this.prisma.cliente.update({ where: { id: cliente.id }, data: { passwordHash } });
+    return { ok: true };
+  }
+
   private emitirToken(cliente: ClienteBasico, tenantId: string) {
     const payload: ClienteTiendaPayload = { clienteId: cliente.id, tenantId, email: cliente.email ?? '' };
     return {
       accessToken: this.jwtService.sign(payload, { secret: CLIENTE_TIENDA_JWT_SECRET, expiresIn: CLIENTE_TIENDA_JWT_EXPIRATION }),
-      cliente: { id: cliente.id, nombre: cliente.nombre, email: cliente.email, telefono: cliente.telefono },
+      cliente: { id: cliente.id, nombre: cliente.nombre, email: cliente.email, telefono: cliente.telefono, puntosLealtad: cliente.puntosLealtad },
     };
   }
 }

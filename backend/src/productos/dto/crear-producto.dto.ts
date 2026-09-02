@@ -164,6 +164,15 @@ export class CrearProductoDto {
   descripcionTienda?: string | null;
 
   @ApiProperty({
+    required: false,
+    default: false,
+    description: 'Opt-in manual (Fase 11, plugin e-commerce) — aparece en la sección "Destacados" del storefront público. Nadie se destaca automáticamente por ventas/fecha.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  destacado?: boolean;
+
+  @ApiProperty({
     type: [ImagenProductoDto],
     required: false,
     description:

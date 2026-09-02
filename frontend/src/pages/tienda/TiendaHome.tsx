@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useTiendaCatalogo, useTiendaConfig } from '../../hooks/useTienda';
-import { useCarritoTienda } from '../../hooks/useCarritoTienda';
+import { useCarritoTiendaContext } from './CarritoTiendaContext';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import { PLANTILLAS } from './plantillas';
 import { TiendaCargando, TiendaNoEncontrada } from './TiendaNoEncontrada';
@@ -10,7 +10,7 @@ export function TiendaHome() {
   const { subdominio = '' } = useParams();
   const [busqueda, setBusqueda] = useState('');
   const busquedaDebounced = useDebouncedValue(busqueda);
-  const carrito = useCarritoTienda(subdominio);
+  const carrito = useCarritoTiendaContext();
 
   const { data: config, isLoading, isError } = useTiendaConfig(subdominio);
   const { data: pagina, isLoading: cargandoCatalogo } = useTiendaCatalogo(subdominio, { busqueda: busquedaDebounced || undefined });

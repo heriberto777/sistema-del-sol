@@ -48,6 +48,7 @@ import { PagoCancelado } from './pages/PagoCancelado';
 import { CobroFactura } from './pages/CobroFactura';
 import { CobroFacturaResultado } from './pages/CobroFacturaResultado';
 import { VerFactura, VerCotizacion } from './pages/VerDocumentoPublico';
+import { TiendaLayout } from './pages/tienda/TiendaLayout';
 import { TiendaHome } from './pages/tienda/TiendaHome';
 import { TiendaProducto } from './pages/tienda/TiendaProducto';
 import { TiendaCarrito } from './pages/tienda/TiendaCarrito';
@@ -75,13 +76,20 @@ export const router = createBrowserRouter([
   { path: '/ver-factura/:id', element: <VerFactura /> },
   { path: '/ver-cotizacion/:id', element: <VerCotizacion /> },
   // Storefront público del plugin Tienda Online (Fase 2) — sin AppLayout/auth, resuelto por subdominio en la URL.
-  { path: '/tienda/:subdominio', element: <TiendaHome /> },
-  { path: '/tienda/:subdominio/producto/:productoId', element: <TiendaProducto /> },
-  { path: '/tienda/:subdominio/carrito', element: <TiendaCarrito /> },
-  { path: '/tienda/:subdominio/checkout', element: <TiendaCheckout /> },
-  { path: '/tienda/:subdominio/login', element: <TiendaLogin /> },
-  { path: '/tienda/:subdominio/registro', element: <TiendaRegistro /> },
-  { path: '/tienda/:subdominio/mis-pedidos', element: <TiendaMisPedidos /> },
+  // Anidadas bajo TiendaLayout (Fase 9) para que el drawer de carrito se pueda abrir desde cualquiera de ellas.
+  {
+    path: '/tienda/:subdominio',
+    element: <TiendaLayout />,
+    children: [
+      { index: true, element: <TiendaHome /> },
+      { path: 'producto/:productoId', element: <TiendaProducto /> },
+      { path: 'carrito', element: <TiendaCarrito /> },
+      { path: 'checkout', element: <TiendaCheckout /> },
+      { path: 'login', element: <TiendaLogin /> },
+      { path: 'registro', element: <TiendaRegistro /> },
+      { path: 'mis-pedidos', element: <TiendaMisPedidos /> },
+    ],
+  },
   {
     element: <RutaProtegidaPlataforma />,
     children: [

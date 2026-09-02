@@ -2266,6 +2266,11 @@ model Producto {
   // ocultar algo del storefront sin tocar Producto.activo (que también
   // afecta Facturación/POS/Compras).
   visibleEnTienda     Boolean              @default(true)
+  // Opt-in manual (Fase 11, plugin e-commerce) — sección "Destacados" del
+  // storefront público; a diferencia de `visibleEnTienda` (opt-out), nadie
+  // aparece destacado automáticamente por ventas/fecha, lo marca el admin
+  // producto por producto.
+  destacado           Boolean              @default(false)
   // Comisión de venta (plan de integración Cuadre, ítem A-1) — mutuamente
   // excluyentes (validado en ProductosService, no en el schema, mismo
   // criterio que Oferta.valor/comprarCantidad): `porcentajeComision` (%

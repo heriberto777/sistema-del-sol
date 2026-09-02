@@ -1,9 +1,20 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Minus, Plus, Search, Trash2 } from 'lucide-react';
-import { formatearPrecio } from '../../../hooks/useTienda';
+import { formatearPrecio, useOfertasTienda, useProductosDestacados } from '../../../hooks/useTienda';
 import { useClienteTienda } from '../../../hooks/useClienteTienda';
+import { useCarritoDrawer } from '../CarritoDrawerContext';
+import { BannerAnuncio } from '../BannerAnuncio';
+import { SeccionDestacados } from '../SeccionDestacados';
+import { SeccionOfertas } from '../SeccionOfertas';
+import { ProductosRelacionados } from '../ProductosRelacionados';
 import type { Plantilla, PropsCarrito, PropsHome, PropsProducto } from './tipos';
+
+// Boutique es oscura y sin tokens (Fase 7) — los componentes compartidos
+// necesitan sus propios colores de respaldo para no quedar con una
+// tarjeta blanca sobre este fondo casi negro (Directo/Mercado, claras,
+// funcionan bien con el default de esos componentes).
+const DEFAULTS_COMPARTIDOS = { superficie: '#2b241e', texto: '#f4ede3' };
 
 const ACCENT_DEFAULT = '#c9a27e';
 const FONT_DISPLAY = "'Cormorant Garamond', serif";
@@ -11,6 +22,7 @@ const FONT_BODY = "'Jost', sans-serif";
 
 function Nav({ nombre, logo, subdominio, cantidadCarrito, accent }: { nombre: string; logo: string | null; subdominio: string; cantidadCarrito: number; accent: string }) {
   const { autenticado } = useClienteTienda(subdominio);
+  const { abrir } = useCarritoDrawer();
   return (
     <div className="flex items-center justify-between border-b border-[#37312a] px-8 py-5 sm:px-12">
       <Link to={`/tienda/${subdominio}`} className="flex items-center gap-2 text-[#f4ede3]" style={{ fontFamily: FONT_DISPLAY }}>
@@ -21,9 +33,9 @@ function Nav({ nombre, logo, subdominio, cantidadCarrito, accent }: { nombre: st
         <Link to={`/tienda/${subdominio}/${autenticado ? 'mis-pedidos' : 'login'}`} className="text-[11px] font-semibold uppercase tracking-widest text-[#bdb2a1]">
           {autenticado ? 'Mi cuenta' : 'Iniciar sesión'}
         </Link>
-        <Link to={`/tienda/${subdominio}/carrito`} className="text-[11px] font-semibold uppercase tracking-widest" style={{ color: accent }}>
+        <button type="button" onClick={abrir} className="text-[11px] font-semibold uppercase tracking-widest" style={{ color: accent }}>
           Bolsa ({cantidadCarrito})
-        </Link>
+        </button>
       </div>
     </div>
   );
@@ -40,8 +52,11 @@ function Footer({ nombre }: { nombre: string }) {
 
 function BoutiqueHome({ config, subdominio, carrito, productos, cargando, busqueda, onBuscar }: PropsHome) {
   const accent = config.colorAcento || ACCENT_DEFAULT;
+  const { data: destacados = [] } = useProductosDestacados(subdominio);
+  const { data: ofertas = [] } = useOfertasTienda(subdominio);
   return (
     <div className="min-h-screen bg-[#211d19] text-[#f4ede3]" style={{ fontFamily: FONT_BODY }}>
+      <BannerAnuncio texto={config.bannerTexto} colorAcento={accent} />
       <Nav nombre={config.nombre} logo={config.logo} subdominio={subdominio} cantidadCarrito={carrito.cantidadTotal} accent={accent} />
 
       <div className="px-8 py-16 text-center sm:py-20">
@@ -65,6 +80,9 @@ function BoutiqueHome({ config, subdominio, carrito, productos, cargando, busque
           />
         </div>
       </div>
+
+      <SeccionDestacados productos={destacados} subdominio={subdominio} defaults={{ acento: accent, ...DEFAULTS_COMPARTIDOS }} />
+      <SeccionOfertas ofertas={ofertas} defaults={{ acento: accent, ...DEFAULTS_COMPARTIDOS }} />
 
       {cargando && <p className="pb-16 text-center text-sm text-[#8a8073]">Cargando…</p>}
       {!cargando && productos.length === 0 && <p className="pb-16 text-center text-sm text-[#8a8073]">No hay productos.</p>}
@@ -196,6 +214,7 @@ function BoutiqueProducto({ config, subdominio, carrito, producto, varianteSelec
           </button>
         </div>
       </div>
+      <ProductosRelacionados productos={producto.relacionados} subdominio={subdominio} defaults={{ acento: accent, ...DEFAULTS_COMPARTIDOS }} />
       <Footer nombre={config.nombre} />
     </div>
   );

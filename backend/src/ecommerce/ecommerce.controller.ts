@@ -1,8 +1,10 @@
-import { Body, Controller, Get, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { EcommerceService } from './ecommerce.service';
 import { CatalogoTiendaQueryDto } from './dto/catalogo-tienda-query.dto';
 import { CrearPedidoTiendaDto } from './dto/crear-pedido-tienda.dto';
+import { ActualizarPerfilClienteTiendaDto } from './dto/actualizar-perfil-cliente-tienda.dto';
+import { ActualizarDireccionClienteDto, CrearDireccionClienteDto } from './dto/direccion-cliente.dto';
 import { Public } from '../common/decorators/public.decorator';
 import { AuthenticatedRequest } from '../common/types/authenticated-request';
 import { ClienteTiendaAuthGuard } from '../cliente-tienda-auth/guards/cliente-tienda-auth.guard';
@@ -32,6 +34,11 @@ export class EcommerceController {
     return this.ecommerceService.catalogo(subdominio, query);
   }
 
+  @Get('ofertas')
+  ofertas(@Param('subdominio') subdominio: string) {
+    return this.ecommerceService.ofertas(subdominio);
+  }
+
   @Get('productos/:productoId')
   producto(@Param('subdominio') subdominio: string, @Param('productoId') productoId: string, @Req() request: AuthenticatedRequest) {
     return this.ecommerceService.producto(subdominio, productoId, request);
@@ -53,5 +60,60 @@ export class EcommerceController {
   @UseGuards(ClienteTiendaAuthGuard)
   misPedidos(@Param('subdominio') subdominio: string, @CurrentClienteTienda() cliente: ClienteTiendaPayload) {
     return this.ecommerceService.misPedidos(subdominio, cliente);
+  }
+
+  @Get('mis-pedidos/:facturaId')
+  @UseGuards(ClienteTiendaAuthGuard)
+  detallePedido(@Param('subdominio') subdominio: string, @Param('facturaId') facturaId: string, @CurrentClienteTienda() cliente: ClienteTiendaPayload) {
+    return this.ecommerceService.detallePedido(subdominio, cliente, facturaId);
+  }
+
+  @Get('mi-perfil')
+  @UseGuards(ClienteTiendaAuthGuard)
+  miPerfil(@Param('subdominio') subdominio: string, @CurrentClienteTienda() cliente: ClienteTiendaPayload) {
+    return this.ecommerceService.miPerfil(subdominio, cliente);
+  }
+
+  @Patch('mi-perfil')
+  @UseGuards(ClienteTiendaAuthGuard)
+  actualizarPerfil(
+    @Param('subdominio') subdominio: string,
+    @CurrentClienteTienda() cliente: ClienteTiendaPayload,
+    @Body() dto: ActualizarPerfilClienteTiendaDto,
+  ) {
+    return this.ecommerceService.actualizarPerfil(subdominio, cliente, dto);
+  }
+
+  @Get('mis-direcciones')
+  @UseGuards(ClienteTiendaAuthGuard)
+  misDirecciones(@Param('subdominio') subdominio: string, @CurrentClienteTienda() cliente: ClienteTiendaPayload) {
+    return this.ecommerceService.misDirecciones(subdominio, cliente);
+  }
+
+  @Post('mis-direcciones')
+  @UseGuards(ClienteTiendaAuthGuard)
+  crearDireccion(
+    @Param('subdominio') subdominio: string,
+    @CurrentClienteTienda() cliente: ClienteTiendaPayload,
+    @Body() dto: CrearDireccionClienteDto,
+  ) {
+    return this.ecommerceService.crearDireccion(subdominio, cliente, dto);
+  }
+
+  @Patch('mis-direcciones/:id')
+  @UseGuards(ClienteTiendaAuthGuard)
+  actualizarDireccion(
+    @Param('subdominio') subdominio: string,
+    @Param('id') id: string,
+    @CurrentClienteTienda() cliente: ClienteTiendaPayload,
+    @Body() dto: ActualizarDireccionClienteDto,
+  ) {
+    return this.ecommerceService.actualizarDireccion(subdominio, cliente, id, dto);
+  }
+
+  @Delete('mis-direcciones/:id')
+  @UseGuards(ClienteTiendaAuthGuard)
+  eliminarDireccion(@Param('subdominio') subdominio: string, @Param('id') id: string, @CurrentClienteTienda() cliente: ClienteTiendaPayload) {
+    return this.ecommerceService.eliminarDireccion(subdominio, cliente, id);
   }
 }

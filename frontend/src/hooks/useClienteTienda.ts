@@ -6,6 +6,7 @@ export interface ClienteTiendaSesion {
   nombre: string;
   email: string | null;
   telefono: string | null;
+  puntosLealtad: number;
 }
 
 function claveToken(subdominio: string): string {
@@ -81,7 +82,24 @@ export function useClienteTienda(subdominio: string) {
     [subdominio, guardarSesion],
   );
 
-  return { token, cliente, autenticado: !!token, registro, login, cerrarSesion };
+  /** Actualiza el perfil cacheado en localStorage tras un `PATCH /mi-perfil` exitoso, sin pedir un nuevo login — Nav/checkout de todas las plantillas leen `cliente.nombre` de acá. */
+  const actualizarPerfilLocal = useCallback(
+    (perfil: Partial<ClienteTiendaSesion>) => {
+      setCliente((actual) => {
+        if (!actual) return actual;
+        const siguiente = { ...actual, ...perfil };
+        try {
+          localStorage.setItem(claveCliente(subdominio), JSON.stringify(siguiente));
+        } catch {
+          // localStorage lleno/deshabilitado — el cambio sigue reflejado en memoria para esta pestaña.
+        }
+        return siguiente;
+      });
+    },
+    [subdominio],
+  );
+
+  return { token, cliente, autenticado: !!token, registro, login, cerrarSesion, actualizarPerfilLocal };
 }
 
 export type ClienteTienda = ReturnType<typeof useClienteTienda>;
