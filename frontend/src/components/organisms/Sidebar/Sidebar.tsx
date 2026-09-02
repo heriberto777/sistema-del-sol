@@ -9,6 +9,7 @@ import {
   Building2,
   CalendarClock,
   Contact,
+  ExternalLink,
   FileText,
   Globe,
   HandCoins,
@@ -28,6 +29,7 @@ import {
   WalletCards,
 } from 'lucide-react';
 import { useAuth } from '../../../hooks/useAuth';
+import { useUrlTiendaPublica } from '../../../hooks/useUrlTiendaPublica';
 
 interface Enlace {
   ruta: string;
@@ -139,6 +141,23 @@ function esVisible(
   return !enlace.permisos || enlace.permisos.some(tienePermiso);
 }
 
+/** Atajo directo a la tienda pública, sin pasar por la pantalla de Configuración — se muestra solo cuando "Tienda Online" ya es visible para este usuario Y la tienda está activada. */
+function EnlaceTiendaExterno() {
+  const urlTienda = useUrlTiendaPublica();
+  if (!urlTienda) return null;
+  return (
+    <a
+      href={urlTienda}
+      target="_blank"
+      rel="noreferrer"
+      title="Ver mi tienda"
+      className="rounded-md p-1.5 text-slate-400 hover:bg-slate-100 hover:text-sol-600 dark:hover:bg-slate-900 dark:hover:text-sol-400"
+    >
+      <ExternalLink size={14} />
+    </a>
+  );
+}
+
 function grupoDeRuta(pathname: string): string | null {
   const grupo = GRUPOS.find((g) => g.items.some((item) => item.ruta === pathname));
   return grupo?.id ?? null;
@@ -214,12 +233,22 @@ export function Sidebar() {
             </button>
             {abierto && (
               <div className="flex flex-col gap-0.5">
-                {grupo.items.map((enlace) => (
-                  <NavLink key={enlace.ruta} to={enlace.ruta} className={enlaceClase}>
-                    <enlace.icono size={17} className="shrink-0" />
-                    {enlace.etiqueta}
-                  </NavLink>
-                ))}
+                {grupo.items.map((enlace) =>
+                  enlace.ruta === '/tienda-online' ? (
+                    <div key={enlace.ruta} className="flex items-center gap-0.5">
+                      <NavLink to={enlace.ruta} className={(p) => clsx(enlaceClase(p), 'flex-1')}>
+                        <enlace.icono size={17} className="shrink-0" />
+                        {enlace.etiqueta}
+                      </NavLink>
+                      <EnlaceTiendaExterno />
+                    </div>
+                  ) : (
+                    <NavLink key={enlace.ruta} to={enlace.ruta} className={enlaceClase}>
+                      <enlace.icono size={17} className="shrink-0" />
+                      {enlace.etiqueta}
+                    </NavLink>
+                  ),
+                )}
               </div>
             )}
           </div>
