@@ -35,6 +35,16 @@ jobs:
           --health-retries 10
     env:
       DATABASE_URL: postgresql://sol:sol@localhost:5432/sistema_del_sol_test
+      # AppPrismaService (rol restringido de RLS en prod) lee esta variable
+      # directo de process.env — sin ConfigModule de por medio, no hay
+      # fallback. En CI no existe un rol `sol_app` separado (no se corre
+      # db:app-role/db:rls acá) así que apunta a la MISMA base con el mismo
+      # rol que DATABASE_URL — sin esto, TenantPrismaService lee/escribe
+      # contra lo que sea que resuelva APP_DATABASE_URL fuera de este job
+      # (bug real encontrado corriendo el e2e contra una base vacía por
+      # primera vez: pasaba 84/180 con fallos sin sentido — CADA query
+      # tenant-scoped iba a una base equivocada).
+      APP_DATABASE_URL: postgresql://sol:sol@localhost:5432/sistema_del_sol_test
       REDIS_URL: redis://localhost:6379
       JWT_SECRET: test-secret
     steps:
