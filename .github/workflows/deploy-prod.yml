@@ -35,6 +35,12 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # El driver "docker" (default) no soporta exportar caché a
+      # type=gha — buildx falla con "Cache export is not supported for
+      # the docker driver". Este paso crea un builder con el driver
+      # "docker-container", que sí lo soporta.
+      - uses: docker/setup-buildx-action@v3
+
       - uses: docker/build-push-action@v6
         with:
           # Contexto = ./<target>, no la raíz — ver el comentario en
