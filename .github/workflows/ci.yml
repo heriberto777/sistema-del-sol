@@ -34,7 +34,15 @@ jobs:
           --health-timeout 5s
           --health-retries 10
     env:
-      DATABASE_URL: postgresql://sol:sol@localhost:5432/sistema_del_sol_test
+      # connection_limit=20: sin esto, Prisma abre por defecto solo
+      # `2 × núcleos + 1` conexiones — en el runner de 2 núcleos de GitHub
+      # Actions son ~5, insuficientes para el test de concurrencia (10
+      # facturas creadas con transacciones interactivas en paralelo, ver
+      # app.e2e-spec.ts "reciben NCF únicos"): el resto hace cola esperando
+      # conexión y excede el timeout de 5s de la transacción interactiva
+      # (P2028 "Unable to start a transaction in the given time"). postgres:16
+      # trae max_connections=100 por defecto, de sobra para 20.
+      DATABASE_URL: postgresql://sol:sol@localhost:5432/sistema_del_sol_test?connection_limit=20
       # AppPrismaService (rol restringido de RLS en prod) lee esta variable
       # directo de process.env — sin ConfigModule de por medio, no hay
       # fallback. En CI no existe un rol `sol_app` separado (no se corre
@@ -44,7 +52,7 @@ jobs:
       # (bug real encontrado corriendo el e2e contra una base vacía por
       # primera vez: pasaba 84/180 con fallos sin sentido — CADA query
       # tenant-scoped iba a una base equivocada).
-      APP_DATABASE_URL: postgresql://sol:sol@localhost:5432/sistema_del_sol_test
+      APP_DATABASE_URL: postgresql://sol:sol@localhost:5432/sistema_del_sol_test?connection_limit=20
       REDIS_URL: redis://localhost:6379
       JWT_SECRET: test-secret
     steps:
