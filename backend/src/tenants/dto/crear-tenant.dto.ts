@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEmail, IsOptional, IsString, IsUUID, Matches, MinLength } from 'class-validator';
+import { IsEmail, IsNotIn, IsOptional, IsString, IsUUID, Matches, MinLength } from 'class-validator';
+import { SUBDOMINIOS_RESERVADOS } from '../subdominios-reservados';
 
 export class CrearTenantDto {
   @ApiProperty({ description: 'Id del Plan a asignar — ver GET /platform/planes' })
@@ -13,6 +14,7 @@ export class CrearTenantDto {
   @ApiProperty({ example: 'distribuidora-ejemplo', description: 'Subdominio único, solo minúsculas/números/guiones' })
   @IsString()
   @Matches(/^[a-z0-9-]+$/, { message: 'El subdominio solo puede tener minúsculas, números y guiones' })
+  @IsNotIn(SUBDOMINIOS_RESERVADOS, { message: 'Ese subdominio está reservado para infraestructura del sistema — elegí otro' })
   subdominio: string;
 
   @ApiProperty({ required: false })

@@ -240,6 +240,23 @@ describe('Plataforma (e2e)', () => {
       expect(consumidorFinal?.nombre).toBe('Consumidor Final');
     });
 
+    it('rechaza un subdominio reservado para infraestructura (ej. "app", fijo para el panel de admin de todos los tenants)', async () => {
+      const tokenPlataforma = await loginPlataforma();
+
+      await request(app.getHttpServer())
+        .post('/api/platform/tenants')
+        .set('Authorization', `Bearer ${tokenPlataforma}`)
+        .send({
+          nombre: 'E2E Tenant Con Subdominio Reservado',
+          subdominio: 'app',
+          planId,
+          adminEmail: 'admin@e2e-reservado.com',
+          adminNombre: 'Admin Reservado',
+          adminPassword: 'Reservado123!',
+        })
+        .expect(400);
+    });
+
     it('el usuario admin del tenant recién creado puede hacer login normal', async () => {
       const respuesta = await request(app.getHttpServer())
         .post('/api/auth/login')
