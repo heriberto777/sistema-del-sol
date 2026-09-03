@@ -1,0 +1,31 @@
+# Imagen de producción — build estático servido por nginx, separada de
+# Dockerfile (dev, Vite dev server). Contexto = ./frontend (igual que
+# Dockerfile de dev) — a diferencia de backend/, este paquete no tiene un
+# pnpm-lock.yaml propio (solo existe el de la raíz del workspace), así que
+# usa `pnpm install` normal en vez de --frozen-lockfile — mismo criterio
+# que ya usa Dockerfile de dev, sin fijar versión de lockfile.
+#
+# El frontend no lee ninguna variable VITE_* en build time (todas sus
+# llamadas a la API son rutas relativas /api/**, resueltas en runtime por
+# el proxy de nginx.conf).
+
+FROM node:20-alpine AS build
+
+WORKDIR /app
+RUN npm install -g pnpm@9.7.0
+
+COPY package.json ./
+RUN pnpm install
+
+COPY . .
+RUN pnpm build
+
+FROM nginx:1.27-alpine AS runtime
+
+COPY --from=build /app/dist /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+EXPOSE 80
+
+HEALTHCHECK --interval=30s --timeout=10s --retries=3 --start-period=10s \
+  CMD wget --quiet --tries=1 --spider http://localhost/ || exit 1

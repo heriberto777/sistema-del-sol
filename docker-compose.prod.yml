@@ -1,0 +1,52 @@
+name: sistema-del-sol
+
+# Despliegue de producción — mismo patrón que bonifapp/ciguacash/ciguainv en
+# este servidor: imágenes ya construidas y publicadas en GHCR por CI (ver
+# .github/workflows/deploy-prod.yml), NO build local. Postgres/Redis viven
+# en el stack aparte (prop-db) — este compose no los declara, solo se
+# conecta a ellos vía las URLs que trae `.env` (mismo criterio que
+# ciguacash: DATABASE_URL/REDIS_URL llegan completas desde afuera, no se
+# arman a partir de nombres de servicio).
+#
+# Uso en el servidor:
+#   cp .env.example .env   # completar con los valores reales de producción
+#   docker compose -f docker-compose.prod.yml up -d
+#   docker compose -f docker-compose.prod.yml exec api pnpm prisma:migrate:deploy
+#
+# El `api` NO publica puerto al host — solo Nginx Proxy Manager (u otro
+# proxy en la misma red del servidor) llega a él a través de `web`, que sí
+# publica 8291 y hace de reverse proxy hacia /api (ver frontend/nginx.conf).
+
+services:
+  api:
+    image: ${REGISTRY:-ghcr.io}/${GITHUB_REPOSITORY_OWNER:-heriberto777}/sistema-del-sol-backend:${IMAGE_TAG:-latest}
+    container_name: sistema-del-sol-backend
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      # Fijo a propósito, igual que en docker-compose.yml de dev: el
+      # puerto DENTRO del contenedor siempre es 3000 (coincide con el
+      # EXPOSE/HEALTHCHECK del Dockerfile.prod), sin importar qué puerto
+      # de host use el resto de la infraestructura.
+      BACKEND_PORT: 3000
+    expose:
+      - "3000"
+    networks:
+      - sistema_del_sol_internal
+
+  web:
+    image: ${REGISTRY:-ghcr.io}/${GITHUB_REPOSITORY_OWNER:-heriberto777}/sistema-del-sol-frontend:${IMAGE_TAG:-latest}
+    container_name: sistema-del-sol-frontend
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT_HOST:-8291}:80"
+    networks:
+      - sistema_del_sol_internal
+    depends_on:
+      - api
+
+networks:
+  sistema_del_sol_internal:
+    driver: bridge

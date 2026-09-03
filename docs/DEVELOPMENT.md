@@ -190,3 +190,62 @@ pnpm --filter ./backend prisma:studio
 
 Sigue el patrón de `plugins/inmobiliaria/` — ver su `README.md` y
 `docs/ARCHITECTURE.md` (sección "Plugin system").
+
+## Despliegue a producción
+
+Mismo patrón que las otras apps del servidor (bonifapp/ciguacash/
+ciguainv): imágenes construidas y publicadas a GHCR por CI
+(`.github/workflows/deploy-prod.yml`, dispara al terminar CI en `main`),
+`docker-compose.prod.yml` en el servidor solo las descarga (nunca
+`build:` local) — Postgres/Redis viven en el stack `prop-db` aparte, no
+en este compose; `DATABASE_URL`/`APP_DATABASE_URL`/`REDIS_URL` en `.env`
+deben apuntar a donde sea que ese stack los exponga.
+
+`api` no publica puerto al host (`expose` solamente) — `web` sí, en
+`FRONTEND_PORT_HOST` (8291 en este servidor), y hace de reverse proxy de
+`/api/**` hacia `api` dentro de la misma red de compose
+(`frontend/nginx.conf`). Nginx Proxy Manager (u otro proxy externo) solo
+necesita apuntar a ese puerto — un único Proxy Host con dominio
+`app.ciguadev.com` + wildcard `*.ciguadev.com` (ver "Subdominios de
+tenant" más abajo), ambos al mismo puerto 8291.
+
+```bash
+# en el servidor, primera vez
+cp .env.example .env   # completar con los valores reales de producción
+docker compose -f docker-compose.prod.yml up -d
+
+# tras cada deploy con migración nueva
+docker compose -f docker-compose.prod.yml pull
+docker compose -f docker-compose.prod.yml up -d
+docker compose -f docker-compose.prod.yml exec api pnpm prisma:migrate:deploy
+```
+
+La imagen de `api` lleva `node_modules` completo (con devDependencies) a
+propósito — permite correr cualquier script operativo
+(`prisma:seed`, `platform:bootstrap-admin`, los `*:backfill`) igual que
+en dev, vía `docker compose -f docker-compose.prod.yml exec api pnpm
+<script>`, sin reconstruir nada. Ver el comentario en
+`backend/Dockerfile.prod`.
+
+### Subdominios de tenant
+
+`app.ciguadev.com` es la entrada fija de login para todos los
+tenants (`HOSTS_ADMIN` en `frontend/src/router.tsx`, junto con `www`).
+Cualquier otro subdominio de primer nivel (`<subdominio>.ciguadev.com`)
+sirve la tienda pública de ese tenant directamente en `/` — sin el
+`/tienda/:subdominio` de la URL de desarrollo, que sigue funcionando
+igual en `localhost` (`resolverContextoTienda()` devuelve `null` para
+`localhost`/`127.0.0.1`, para un dominio con menos de 3 labels, y para
+`app`/`www`; cualquier otro primer label se usa como subdominio del
+tenant). El subdominio de un tenant no puede coincidir con
+`SUBDOMINIOS_RESERVADOS` (`backend/src/tenants/subdominios-reservados.ts`)
+— validado al crear/editar en `/platform/tenants`.
+
+En Cloudflare (DNS) y en Nginx Proxy Manager hace falta un registro/
+Proxy Host wildcard (`*.ciguadev.com`, además de `app.ciguadev.com`) y
+el certificado SSL correspondiente (Let's Encrypt vía DNS Challenge en
+NPM, ya que un wildcard no se puede validar por HTTP) para que un
+tenant nuevo (ej. `emelinda`) funcione en `emelinda.ciguadev.com` sin
+tocar configuración de servidor — el enrutamiento por hostname es
+enteramente responsabilidad del frontend, la API no cambia nada según
+el `Host` de la petición.

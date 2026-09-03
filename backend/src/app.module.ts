@@ -6,6 +6,7 @@ import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { RedisModule } from './redis/redis.module';
 import { RedisService } from './redis/redis.service';
 import { RedisThrottlerStorage } from './redis/redis-throttler-storage.service';
+import { HealthModule } from './health/health.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { EventBusModule } from './event-bus/event-bus.module';
 import { PluginsModule } from './plugins/plugins.module';
@@ -91,6 +92,7 @@ import { TenantMiddleware } from './common/middleware/tenant.middleware';
         storage: new RedisThrottlerStorage(redis),
       }),
     }),
+    HealthModule,
     PrismaModule,
     EventBusModule,
     PluginsModule,

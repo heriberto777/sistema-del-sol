@@ -1,0 +1,38 @@
+# Imagen de producción — separada de Dockerfile (dev, watch mode) para no
+# tocar el flujo de docker-compose.yml local. Contexto = ./backend (igual
+# que Dockerfile de dev): backend/pnpm-lock.yaml es un lockfile standalone
+# propio (no el de la raíz del workspace pnpm), así que --frozen-lockfile
+# funciona igual que en dev sin necesitar los demás package.json del
+# workspace.
+#
+# Se lleva node_modules COMPLETO (con devDependencies) a propósito, no solo
+# lo que instalaría "--prod": este backend tiene ~15 scripts operativos
+# (prisma:migrate:deploy, prisma:seed, platform:bootstrap-admin, y los
+# backfill-*.ts) que corren vía `ts-node` (devDependency) contra el
+# ambiente real, ejecutados con `docker compose -f docker-compose.prod.yml
+# exec api pnpm <script>` — una imagen "solo prod" los dejaría
+# inutilizables. El tamaño extra de imagen no es un problema a esta escala.
+
+FROM node:20-slim
+
+# node:20-slim (Debian/glibc), no alpine: el motor de Prisma para linux-musl
+# requiere libssl.so.1.1, que las imágenes alpine recientes ya no traen
+# (mismo motivo que Dockerfile de dev).
+RUN apt-get update && apt-get install -y --no-install-recommends openssl wget && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+RUN npm install -g pnpm@9.7.0
+
+COPY package.json pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile
+
+COPY . .
+RUN pnpm prisma:generate
+RUN pnpm build
+
+EXPOSE 3000
+
+HEALTHCHECK --interval=30s --timeout=10s --retries=3 --start-period=20s \
+  CMD wget --quiet --tries=1 --spider http://localhost:3000/api/health || exit 1
+
+CMD ["pnpm", "start:prod"]
