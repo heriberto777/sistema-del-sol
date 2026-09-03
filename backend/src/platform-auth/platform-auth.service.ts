@@ -7,6 +7,7 @@ import { PlatformLoginDto } from './dto/platform-login.dto';
 import { OlvidePasswordPlataformaDto } from './dto/olvide-password-plataforma.dto';
 import { RestablecerPasswordPlataformaDto } from './dto/restablecer-password-plataforma.dto';
 import { generarTokenReset, hashearTokenReset, RESET_PASSWORD_TTL_MS } from '../common/utils/password-reset-token';
+import { obtenerSecretoJwt } from '../common/utils/jwt-secret.util';
 import { EmailChannel } from '../notificaciones/canales/email.channel';
 
 const RESPUESTA_GENERICA_OLVIDE = {
@@ -36,7 +37,7 @@ export class PlatformAuthService {
     const payload: PlatformAdminPayload = { adminId: admin.id, email: admin.email, permisos };
     return {
       accessToken: this.jwtService.sign(payload, {
-        secret: process.env.PLATFORM_JWT_SECRET ?? 'cambia-este-secreto-de-plataforma-en-produccion',
+        secret: obtenerSecretoJwt('PLATFORM_JWT_SECRET'),
         expiresIn: process.env.PLATFORM_JWT_EXPIRATION ?? '12h',
       }),
       admin: { id: admin.id, nombre: admin.nombre, email: admin.email, permisos },

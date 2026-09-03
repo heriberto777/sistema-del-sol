@@ -1,5 +1,6 @@
 import { Body, Controller, Delete, Post, Put } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
+import { limiteLogin } from '../common/utils/limite-login.util';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
@@ -17,7 +18,11 @@ import { JwtPayloadUser } from '../common/types/authenticated-request';
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
+  // Freno de fuerza bruta (auditoría de seguridad) — antes solo lo cubría
+  // el límite global de la app (120 req/min por IP), generoso para
+  // probar contraseñas. Mismo criterio de límite que resolver-empresas.
   @Public()
+  @Throttle({ default: { limit: limiteLogin(10), ttl: 15 * 60 * 1000 } })
   @Post('login')
   login(@Body() dto: LoginDto) {
     return this.authService.login(dto);

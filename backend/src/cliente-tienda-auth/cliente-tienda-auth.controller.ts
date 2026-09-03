@@ -1,4 +1,6 @@
 import { Body, Controller, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
+import { limiteLogin } from '../common/utils/limite-login.util';
 import { ApiTags } from '@nestjs/swagger';
 import { ClienteTiendaAuthService } from './cliente-tienda-auth.service';
 import { RegistroClienteTiendaDto } from './dto/registro-cliente-tienda.dto';
@@ -21,6 +23,8 @@ export class ClienteTiendaAuthController {
     return this.clienteTiendaAuthService.registro(subdominio, dto);
   }
 
+  // Freno de fuerza bruta (auditoría de seguridad) — mismo criterio que auth/login.
+  @Throttle({ default: { limit: limiteLogin(10), ttl: 15 * 60 * 1000 } })
   @Post('login')
   login(@Param('subdominio') subdominio: string, @Body() dto: LoginClienteTiendaDto) {
     return this.clienteTiendaAuthService.login(subdominio, dto);

@@ -5,12 +5,13 @@ import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { NotificacionesModule } from '../notificaciones/notificaciones.module';
+import { obtenerSecretoJwt } from '../common/utils/jwt-secret.util';
 
 @Module({
   imports: [
     PassportModule,
     JwtModule.register({
-      secret: process.env.JWT_SECRET ?? 'cambia-este-secreto-en-produccion',
+      secret: obtenerSecretoJwt('JWT_SECRET'),
       signOptions: { expiresIn: process.env.JWT_EXPIRATION ?? '24h' },
     }),
     NotificacionesModule,
