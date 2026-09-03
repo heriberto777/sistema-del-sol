@@ -1,13 +1,15 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Minus, Plus, Search, ShoppingCart, Trash2, User } from 'lucide-react';
-import { formatearPrecio, useOfertasTienda, useProductosDestacados } from '../../../hooks/useTienda';
+import { formatearPrecio, useOfertasTienda, useProductosDestacados, useSeccionesTienda } from '../../../hooks/useTienda';
 import { useClienteTienda } from '../../../hooks/useClienteTienda';
 import { useCarritoDrawer } from '../CarritoDrawerContext';
 import { BannerAnuncio } from '../BannerAnuncio';
 import { SeccionDestacados } from '../SeccionDestacados';
 import { SeccionOfertas } from '../SeccionOfertas';
+import { SeccionesDinamicas } from '../SeccionesDinamicas';
 import { ProductosRelacionados } from '../ProductosRelacionados';
+import { FilaPrecioOferta, InsigniaOferta, precioOriginalParaCarrito, precioParaCarrito } from '../OfertaEnTarjeta';
 import type { Plantilla, PropsCarrito, PropsHome, PropsProducto } from './tipos';
 
 const ACCENT_DEFAULT = '#c77d2e';
@@ -55,6 +57,7 @@ function DirectoHome({ config, subdominio, carrito, productos, cargando, busqued
   const accent = config.colorAcento || ACCENT_DEFAULT;
   const { data: destacados = [] } = useProductosDestacados(subdominio);
   const { data: ofertas = [] } = useOfertasTienda(subdominio);
+  const { data: secciones = [] } = useSeccionesTienda(subdominio);
   return (
     <div className="min-h-screen bg-[#faf7f2] font-['Karla'] text-[#1c1a17] dark:bg-[#17140f] dark:text-[#f1ece2]" style={{ fontFamily: FONT_BODY }}>
       <BannerAnuncio texto={config.bannerTexto} />
@@ -67,15 +70,16 @@ function DirectoHome({ config, subdominio, carrito, productos, cargando, busqued
         <h1 className="mb-4 text-4xl font-extrabold leading-tight tracking-tight" style={{ fontFamily: FONT_DISPLAY }}>
           {config.nombre}
         </h1>
-        <p className="text-sm leading-relaxed text-[#7a7266] dark:text-[#b6ab97]">Catálogo completo, con precio y disponibilidad reales.</p>
+        <p className="text-sm leading-relaxed text-[#7a7266] dark:text-[#b6ab97]">Todo el surtido, con precio y disponibilidad reales.</p>
       </div>
 
-      <SeccionDestacados productos={destacados} subdominio={subdominio} />
-      <SeccionOfertas ofertas={ofertas} />
+      <SeccionDestacados productos={destacados} subdominio={subdominio} estiloInsignia={config.tema.estiloInsigniaOferta} />
+      <SeccionOfertas ofertas={ofertas} mostrar={config.tema.mostrarSeccionOfertas} />
+      <SeccionesDinamicas secciones={secciones} subdominio={subdominio} estiloInsignia={config.tema.estiloInsigniaOferta} />
 
       <div className="flex items-baseline justify-between px-6 pb-4 sm:px-10">
         <h2 className="text-lg font-extrabold" style={{ fontFamily: FONT_DISPLAY }}>
-          Catálogo
+          Productos
         </h2>
         <div className="relative">
           <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#7a7266]" />
@@ -97,16 +101,23 @@ function DirectoHome({ config, subdominio, carrito, productos, cargando, busqued
             to={`/tienda/${subdominio}/producto/${p.id}`}
             className="overflow-hidden rounded-xl border border-[#eae3d6] bg-white dark:border-[#332c22] dark:bg-[#1f1b15]"
           >
-            <div className="aspect-square bg-gradient-to-br from-[#f1e9da] to-[#e3d5ba]">
+            <div className="relative aspect-square bg-gradient-to-br from-[#f1e9da] to-[#e3d5ba]">
               {p.imagen && <img src={p.imagen} alt={p.nombre} className="h-full w-full object-cover" />}
+              <InsigniaOferta oferta={p.oferta} estilo={config.tema.estiloInsigniaOferta} colorAcento={accent} />
             </div>
             <div className="p-3">
               {p.categoria && <div className="text-[10px] font-bold uppercase tracking-wide text-[#7a7266]">{p.categoria.nombre}</div>}
               <h3 className="my-1.5 text-sm font-semibold">{p.nombre}</h3>
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-extrabold" style={{ fontFamily: FONT_DISPLAY }}>
-                  {formatearPrecio(p.precio)}
-                </span>
+              <div className="flex items-center justify-between gap-1.5">
+                {p.oferta ? (
+                  <span style={{ fontFamily: FONT_DISPLAY }}>
+                    <FilaPrecioOferta precio={p.precio} oferta={p.oferta} estilo={config.tema.estiloInsigniaOferta} tamano="0.875em" colorAcento={accent} />
+                  </span>
+                ) : (
+                  <span className="text-sm font-extrabold" style={{ fontFamily: FONT_DISPLAY }}>
+                    {formatearPrecio(p.precio)}
+                  </span>
+                )}
                 <button
                   type="button"
                   onClick={(e) => {
@@ -118,7 +129,7 @@ function DirectoHome({ config, subdominio, carrito, productos, cargando, busqued
                       varianteId: p.varianteId,
                       varianteEtiqueta: '',
                       nombre: p.nombre,
-                      precio: Number(p.precio ?? 0),
+                      precio: precioParaCarrito(p.precio, p.oferta), precioOriginal: precioOriginalParaCarrito(p.precio, p.oferta),
                       imagen: p.imagen,
                     });
                   }}
@@ -172,9 +183,13 @@ function DirectoProducto({ config, subdominio, carrito, producto, varianteSelecc
           <h1 className="my-2 text-2xl font-extrabold" style={{ fontFamily: FONT_DISPLAY }}>
             {producto.nombre}
           </h1>
-          <p className="mb-4 text-2xl font-extrabold" style={{ fontFamily: FONT_DISPLAY, color: accent }}>
-            {varianteSeleccionada ? formatearPrecio(varianteSeleccionada.precio) : 'Elegí una opción'}
-          </p>
+          <div className="mb-4" style={{ fontFamily: FONT_DISPLAY }}>
+            {varianteSeleccionada ? (
+              <FilaPrecioOferta precio={varianteSeleccionada.precio} oferta={varianteSeleccionada.oferta} estilo={config.tema.estiloInsigniaOferta} tamano="1.5em" colorAcento={accent} />
+            ) : (
+              <p className="text-2xl font-extrabold" style={{ color: accent }}>Elegí una opción</p>
+            )}
+          </div>
           {producto.descripcionTienda && <p className="mb-5 text-sm leading-relaxed text-[#7a7266] dark:text-[#b6ab97]">{producto.descripcionTienda}</p>}
 
           {debeElegirVariante && (
@@ -227,7 +242,7 @@ function DirectoProducto({ config, subdominio, carrito, producto, varianteSelecc
           </button>
         </div>
       </div>
-      <ProductosRelacionados productos={producto.relacionados} subdominio={subdominio} />
+      <ProductosRelacionados productos={producto.relacionados} subdominio={subdominio} estiloInsignia={config.tema.estiloInsigniaOferta} />
       <Footer nombre={config.nombre} />
     </div>
   );

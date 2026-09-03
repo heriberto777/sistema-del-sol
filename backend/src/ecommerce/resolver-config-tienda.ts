@@ -25,6 +25,9 @@ export const PLANTILLAS_TIENDA = [
   'DISTRITO',
   'ATELIER',
   'OFICIO',
+  'BAZAR',
+  'VITRINA',
+  'SOLMARKET',
 ] as const;
 export type PlantillaTienda = (typeof PLANTILLAS_TIENDA)[number];
 
@@ -88,6 +91,17 @@ export type RadioTarjetaTienda = (typeof RADIOS_TARJETA_TIENDA)[number];
 export const PROPORCIONES_IMAGEN_TIENDA = ['CUADRADA', 'VERTICAL', 'PANORAMICA'] as const;
 export type ProporcionImagenTienda = (typeof PROPORCIONES_IMAGEN_TIENDA)[number];
 
+/**
+ * Fase 13 — cómo se muestra en la tarjeta de producto una oferta
+ * PORCENTAJE/MONTO_FIJO o BOGO vigente para ese producto (estilo Amazon:
+ * insignia + precio, no una sección "Ofertas" aparte). `CLASICO` = insignia
+ * sólida + precio tachado + "Ahorrás X"; `AHORRO` = insignia neutra
+ * "Oferta" + el número fuerte es el ahorro; `CINTA` = insignia tipo cinta
+ * en el borde, sin línea de ahorro (más discreta).
+ */
+export const ESTILOS_INSIGNIA_OFERTA_TIENDA = ['CLASICO', 'AHORRO', 'CINTA'] as const;
+export type EstiloInsigniaOfertaTienda = (typeof ESTILOS_INSIGNIA_OFERTA_TIENDA)[number];
+
 export const CLAVES_MENU_TIENDA = ['inicio', 'categorias', 'carrito', 'cuenta'] as const;
 export type ClaveMenuTienda = (typeof CLAVES_MENU_TIENDA)[number];
 
@@ -109,6 +123,10 @@ export interface TemaTienda {
   sombraTarjeta: boolean;
   proporcionImagen: ProporcionImagenTienda;
   menu: ItemMenuTienda[];
+  /** Fase 13 — default CLASICO si el tenant nunca lo configuró. */
+  estiloInsigniaOferta: EstiloInsigniaOfertaTienda;
+  /** Fase 16 — sección "Ofertas" informativa del Home (chips agregados, alcance CARRITO incluido) — default `true`. Independiente de la insignia por producto (Fase 13), que sigue mostrándose siempre que haya oferta vigente. */
+  mostrarSeccionOfertas: boolean;
 }
 
 const MENU_DEFAULT: ItemMenuTienda[] = CLAVES_MENU_TIENDA.map((clave) => ({ clave, visible: true }));
@@ -165,6 +183,10 @@ export function resolverTemaTienda(valorJson: string | undefined, colorAcentoLeg
       ? (bruto.proporcionImagen as ProporcionImagenTienda)
       : 'CUADRADA',
     menu: menuValido(bruto.menu),
+    estiloInsigniaOferta: (ESTILOS_INSIGNIA_OFERTA_TIENDA as readonly string[]).includes(bruto.estiloInsigniaOferta as string)
+      ? (bruto.estiloInsigniaOferta as EstiloInsigniaOfertaTienda)
+      : 'CLASICO',
+    mostrarSeccionOfertas: typeof bruto.mostrarSeccionOfertas === 'boolean' ? bruto.mostrarSeccionOfertas : true,
   };
 }
 

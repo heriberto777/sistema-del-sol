@@ -1,4 +1,5 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { tiendaApiClient } from '../lib/tienda-api-client';
 
 export interface ItemCarritoTienda {
   productoId: string;
@@ -6,7 +7,10 @@ export interface ItemCarritoTienda {
   nombre: string;
   /** Ej. "Talla: M, Color: Rojo" — vacío si el producto nunca usó atributos. */
   varianteEtiqueta: string;
+  /** Precio ya con descuento aplicado si el producto tenía una oferta al momento de agregarlo (ver `precioParaCarrito`) — es el que realmente se cobra. */
   precio: number;
+  /** Fase 16 — precio de lista ANTES del descuento, solo presente si hubo oferta al agregar. Puramente informativo (mostrar tachado en el carrito); nunca se usa para calcular el total. */
+  precioOriginal?: number;
   imagen: string | null;
   cantidad: number;
 }
@@ -32,13 +36,35 @@ function escribir(subdominio: string, items: ItemCarritoTienda[]) {
   }
 }
 
+/** Suma cantidades de las variantes que están en ambos carritos, agrega las que solo están en uno — nunca se pierde una línea de ninguno de los dos lados. */
+function combinarCarritos(local: ItemCarritoTienda[], remoto: ItemCarritoTienda[]): ItemCarritoTienda[] {
+  const resultado = [...local];
+  for (const item of remoto) {
+    const i = resultado.findIndex((x) => x.varianteId === item.varianteId);
+    if (i >= 0) resultado[i] = { ...resultado[i], cantidad: resultado[i].cantidad + item.cantidad };
+    else resultado.push(item);
+  }
+  return resultado;
+}
+
+/** Fire-and-forget — un fallo de red/token vencido no debe romper la compra, el carrito ya quedó bien en localStorage; se reintenta solo en la próxima mutación. */
+function sincronizarServidor(subdominio: string, token: string | null, items: ItemCarritoTienda[]) {
+  if (!token) return;
+  tiendaApiClient.put(`/tienda/${subdominio}/mi-carrito`, { items }, { headers: { Authorization: `Bearer ${token}` } }).catch(() => {});
+}
+
 /**
- * Carrito 100% del lado del cliente (localStorage, por subdominio) —
- * conveniencia de recarga, no fuente de verdad: crear el pedido (Fase 3)
- * revalida stock/precio contra el catálogo real, nunca confía en lo que
- * haya guardado el navegador. Cada línea se identifica por `varianteId`
- * (Fase 4) — ya identifica sin ambigüedad producto+variante, así que no
- * hace falta una clave compuesta con `productoId`.
+ * Carrito del lado del cliente (localStorage, por subdominio) — sigue
+ * siendo la fuente de verdad LOCAL (conveniencia de recarga, nunca del
+ * pedido: crear el pedido, Fase 3, revalida stock/precio contra el
+ * catálogo real). Cada línea se identifica por `varianteId` (Fase 4).
+ *
+ * Fase 16 — si `token` (sesión de cliente logueado, ver `useClienteTienda`)
+ * está presente, además se sincroniza con `CarritoClienteTienda` en la
+ * base de datos: al iniciar sesión se trae el carrito guardado y se
+ * FUSIONA con el local (nunca se descarta ninguno de los dos lados —
+ * `combinarCarritos`), y cada mutación posterior se re-sube. Cerrar
+ * sesión NO borra el carrito local — sigue funcionando como guest.
  *
  * Escribe en localStorage de forma incondicional ANTES de llamar a
  * `setState`, nunca dentro del *updater* funcional de `setState` ni en
@@ -46,27 +72,48 @@ function escribir(subdominio: string, items: ItemCarritoTienda[]) {
  * por un `navigate()` (el caso real de `TiendaCheckout` al confirmar un
  * pedido) puede desmontar este hook antes de que React llegue a
  * ejecutar ese updater o efecto (bug real, encontrado en la
- * verificación en vivo de la Fase 3: el carrito no se vaciaba tras
- * crear el pedido, ni con la persistencia por `useEffect` original ni
- * con un primer intento de escribir dentro del *updater*). Como cada
- * mutador captura `items` directo del cierre de este render (sin la
- * forma funcional de `setState`), estos mutadores deben recrearse en
- * cada render — de ahí `items` en las dependencias de `useCallback` en
- * vez de memoizarlos una sola vez.
+ * verificación en vivo de la Fase 3). El `PUT` de sincronización es
+ * fire-and-forget fuera del ciclo de React, así que no lo afecta ese
+ * mismo problema. Como cada mutador captura `items` directo del cierre
+ * de este render, deben recrearse en cada render — de ahí `items` en
+ * las dependencias de `useCallback` en vez de memoizarlos una sola vez.
  */
-export function useCarritoTienda(subdominio: string) {
+export function useCarritoTienda(subdominio: string, token: string | null = null) {
   const [items, setItems] = useState<ItemCarritoTienda[]>(() => leer(subdominio));
+  const yaFusionoEsteToken = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!token || yaFusionoEsteToken.current === token) return;
+    yaFusionoEsteToken.current = token;
+    (async () => {
+      try {
+        const { data } = await tiendaApiClient.get<{ items: ItemCarritoTienda[] }>(`/tienda/${subdominio}/mi-carrito`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        setItems((actual) => {
+          const combinado = combinarCarritos(actual, data.items ?? []);
+          escribir(subdominio, combinado);
+          sincronizarServidor(subdominio, token, combinado);
+          return combinado;
+        });
+      } catch {
+        // sin conexión o token inválido/vencido — el carrito local sigue funcionando igual, se reintenta en el próximo login.
+      }
+    })();
+  }, [subdominio, token]);
 
   const agregar = useCallback(
     (item: Omit<ItemCarritoTienda, 'cantidad'>, cantidad = 1) => {
       const existente = items.find((i) => i.varianteId === item.varianteId);
+      // Al fusionar, prevalecen los datos NUEVOS (precio/precioOriginal pueden haber cambiado — ej. una oferta que arrancó después del primer agregado) — solo la cantidad se acumula sobre la ya existente.
       const siguiente = existente
-        ? items.map((i) => (i.varianteId === item.varianteId ? { ...i, cantidad: i.cantidad + cantidad } : i))
+        ? items.map((i) => (i.varianteId === item.varianteId ? { ...item, cantidad: i.cantidad + cantidad } : i))
         : [...items, { ...item, cantidad }];
       escribir(subdominio, siguiente);
       setItems(siguiente);
+      sincronizarServidor(subdominio, token, siguiente);
     },
-    [subdominio, items],
+    [subdominio, items, token],
   );
 
   const actualizarCantidad = useCallback(
@@ -75,8 +122,9 @@ export function useCarritoTienda(subdominio: string) {
         cantidad <= 0 ? items.filter((i) => i.varianteId !== varianteId) : items.map((i) => (i.varianteId === varianteId ? { ...i, cantidad } : i));
       escribir(subdominio, siguiente);
       setItems(siguiente);
+      sincronizarServidor(subdominio, token, siguiente);
     },
-    [subdominio, items],
+    [subdominio, items, token],
   );
 
   const quitar = useCallback(
@@ -84,14 +132,16 @@ export function useCarritoTienda(subdominio: string) {
       const siguiente = items.filter((i) => i.varianteId !== varianteId);
       escribir(subdominio, siguiente);
       setItems(siguiente);
+      sincronizarServidor(subdominio, token, siguiente);
     },
-    [subdominio, items],
+    [subdominio, items, token],
   );
 
   const vaciar = useCallback(() => {
     escribir(subdominio, []);
     setItems([]);
-  }, [subdominio]);
+    sincronizarServidor(subdominio, token, []);
+  }, [subdominio, token]);
 
   const cantidadTotal = items.reduce((acc, i) => acc + i.cantidad, 0);
   const total = items.reduce((acc, i) => acc + i.precio * i.cantidad, 0);

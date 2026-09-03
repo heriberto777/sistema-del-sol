@@ -1,4 +1,4 @@
-import { ConfigTienda, ProductoTienda, ProductoTiendaDetalle, VarianteTienda } from '../../../hooks/useTienda';
+import { CategoriaTienda, ConfigTienda, ProductoTienda, ProductoTiendaDetalle, VarianteTienda } from '../../../hooks/useTienda';
 import { CarritoTienda } from '../../../hooks/useCarritoTienda';
 
 export interface PropsBase {
@@ -12,6 +12,10 @@ export interface PropsHome extends PropsBase {
   cargando: boolean;
   busqueda: string;
   onBuscar: (valor: string) => void;
+  /** Fase 12 — chips de categoría (plantillas "marketplace"); las demás plantillas los ignoran sin problema. */
+  categorias: CategoriaTienda[];
+  categoriaId?: string;
+  onCategoriaSeleccionar: (categoriaId: string | undefined) => void;
 }
 
 export interface PropsProducto extends PropsBase {

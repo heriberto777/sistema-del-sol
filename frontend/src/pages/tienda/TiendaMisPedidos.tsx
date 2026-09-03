@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link } from 'react-router-dom';
+import { useSubdominioTienda } from '../../hooks/useSubdominioTienda';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { isAxiosError } from 'axios';
 import clsx from 'clsx';
@@ -37,7 +38,7 @@ function mensajeError(error: unknown, fallback: string): string {
 
 /** Genérico, no una piel más por plantilla — mismo criterio que TiendaCheckout/TiendaLogin. "Mi cuenta": Perfil/Contraseña/Direcciones/Pedidos (Fase 10) — sigue viviendo en esta misma ruta para no romper el link "Mi cuenta" ya presente en las 14 plantillas. */
 export function TiendaMisPedidos() {
-  const { subdominio = '' } = useParams();
+  const subdominio = useSubdominioTienda();
   const [tab, setTab] = useState<Tab>('pedidos');
   const { data: config, isLoading: cargandoConfig, isError: errorConfig } = useTiendaConfig(subdominio);
   const clienteTienda = useClienteTienda(subdominio);

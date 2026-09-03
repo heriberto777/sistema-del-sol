@@ -207,6 +207,20 @@ export class EcommerceRepository {
     return this.prisma.cliente.findFirst({ where: { tenantId, email, passwordHash: { not: null } } });
   }
 
+  /** Fase 16 — carrito persistente del cliente logueado, `null` si nunca guardó ninguno (comprador nuevo o que solo compró como guest). */
+  obtenerCarrito(clienteId: string) {
+    return this.prisma.carritoClienteTienda.findUnique({ where: { clienteId } });
+  }
+
+  /** Upsert simple — un solo blob por cliente, se pisa entero en cada guardado (mismo criterio que `TIENDA_TEMA`: no hay consulta por campo individual que justifique un modelo de líneas). */
+  guardarCarrito(clienteId: string, itemsJson: string) {
+    return this.prisma.carritoClienteTienda.upsert({
+      where: { clienteId },
+      create: { clienteId, itemsJson },
+      update: { itemsJson },
+    });
+  }
+
   misDirecciones(clienteId: string) {
     return this.prisma.direccionCliente.findMany({ where: { clienteId }, orderBy: { esPrincipal: 'desc' } });
   }
@@ -264,48 +278,173 @@ export class EcommerceRepository {
         comprarCantidad: true,
         llevarCantidad: true,
         porcentajeDescuentoLlevar: true,
+        fechaFin: true,
         producto: { select: { nombre: true } },
         categoria: { select: { nombre: true } },
       },
     });
   }
 
-  /** "También te puede interesar" (Fase 11) — misma categoría, excluye el producto actual, mismo shape/criterio que `catalogo()` (variante representativa + precio + stock de la bodega de la tienda). */
-  async productosRelacionados(params: { tenantId: string; categoriaId: string; excluirProductoId: string; bodegaId?: string; limit: number }) {
-    const where = {
-      tenantId: params.tenantId,
-      activo: true,
-      visibleEnTienda: true,
-      categoriaId: params.categoriaId,
-      id: { not: params.excluirProductoId },
-    };
-    const select = {
-      id: true,
-      codigo: true,
-      nombre: true,
-      imagen: true,
-      imagenAjuste: true,
-      porcentajeItbis: true,
-      tipo: true,
-      categoria: { select: { id: true, nombre: true } },
-      _count: { select: { variantes: true } },
-      variantes: {
-        take: 1,
-        orderBy: { createdAt: 'asc' as const },
+  /**
+   * Categorías con al menos un producto visible en la tienda (Fase 12,
+   * plantillas "marketplace") — no existía ningún listado público de
+   * categorías todavía, solo el filtro `categoriaId` puntual de
+   * `catalogo()`. `groupBy` sobre `Producto` (no `Categoria.findMany`
+   * directo) para no listar categorías vacías o con solo productos
+   * ocultos/inactivos.
+   */
+  async categoriasPublicas(tenantId: string) {
+    const grupos = await this.prisma.producto.groupBy({
+      by: ['categoriaId'],
+      where: { tenantId, activo: true, visibleEnTienda: true, categoriaId: { not: null } },
+      _count: { _all: true },
+    });
+    if (!grupos.length) return [];
+    const categorias = await this.prisma.categoria.findMany({
+      where: { id: { in: grupos.map((g) => g.categoriaId as string) } },
+      select: { id: true, nombre: true },
+    });
+    const nombrePorId = new Map(categorias.map((c) => [c.id, c.nombre]));
+    return grupos
+      .map((g) => ({ id: g.categoriaId as string, nombre: nombrePorId.get(g.categoriaId as string) ?? '—', cantidad: g._count._all }))
+      .sort((a, b) => a.nombre.localeCompare(b.nombre));
+  }
+
+  /**
+   * "También te puede interesar" (Fase 11, ampliado Fase 16) — prioriza la
+   * MISMA categoría, pero nunca deja la sección vacía solo porque el
+   * producto no tiene categoría o su categoría no tiene más productos:
+   * si faltan para completar `limit`, rellena con cualquier otro
+   * producto visible del tenant (excluyendo los ya elegidos y el propio
+   * producto). `categoriaId` ahora es opcional — `null` salta directo al
+   * relleno. Mismo shape/criterio que `catalogo()` (variante
+   * representativa + precio + stock de la bodega de la tienda).
+   */
+  async productosRelacionados(params: { tenantId: string; categoriaId: string | null; excluirProductoId: string; bodegaId?: string; limit: number }) {
+    const baseWhere = { tenantId: params.tenantId, activo: true, visibleEnTienda: true };
+    const buscar = (where: object, take: number) =>
+      this.prisma.producto.findMany({
+        where,
+        orderBy: { nombre: 'asc' as const },
+        take,
         select: {
           id: true,
-          precios: { where: { listaPrecio: 'GENERAL', vigenteHasta: null }, select: { precioVenta: true }, take: 1 },
-          stock: params.bodegaId ? { where: { bodegaId: params.bodegaId }, select: { cantidadActual: true } } : false,
+          codigo: true,
+          nombre: true,
+          imagen: true,
+          imagenAjuste: true,
+          porcentajeItbis: true,
+          tipo: true,
+          categoria: { select: { id: true, nombre: true } },
+          _count: { select: { variantes: true } },
+          variantes: {
+            take: 1,
+            orderBy: { createdAt: 'asc' as const },
+            select: {
+              id: true,
+              precios: { where: { listaPrecio: 'GENERAL', vigenteHasta: null }, select: { precioVenta: true }, take: 1 },
+              stock: params.bodegaId ? { where: { bodegaId: params.bodegaId }, select: { cantidadActual: true } } : false,
+            },
+          },
         },
-      },
-    } as const;
-    const filas = await this.prisma.producto.findMany({ where, orderBy: { nombre: 'asc' }, take: params.limit, select });
+      });
+
+    const excluidos = [params.excluirProductoId];
+    let filas = params.categoriaId
+      ? await buscar({ ...baseWhere, categoriaId: params.categoriaId, id: { notIn: excluidos } }, params.limit)
+      : [];
+    excluidos.push(...filas.map((f) => f.id));
+
+    if (filas.length < params.limit) {
+      const relleno = await buscar({ ...baseWhere, id: { notIn: excluidos } }, params.limit - filas.length);
+      filas = [...filas, ...relleno];
+    }
+
     return filas.map(({ variantes, _count, ...producto }) => ({
       ...producto,
       varianteId: variantes[0]?.id ?? null,
       precio: variantes[0]?.precios[0]?.precioVenta ?? null,
       stock: params.bodegaId ? Number(variantes[0]?.stock?.[0]?.cantidadActual ?? 0) : null,
       tieneVariantes: _count.variantes > 1,
+    }));
+  }
+
+  /** Mismo `select`/shape que `catalogo()`/`productosRelacionados()` — reusado acá para resolver los productos elegidos a mano de una sección (Fase 17), en el orden pedido en `ids`. Un producto que dejó de estar activo/visible simplemente no aparece — ver `seccionesActivasPublicas`. */
+  private async productosPorIds(tenantId: string, ids: string[], bodegaId?: string) {
+    const filas = ids.length
+      ? await this.prisma.producto.findMany({
+          where: { id: { in: ids }, tenantId, activo: true, visibleEnTienda: true },
+          select: {
+            id: true,
+            codigo: true,
+            nombre: true,
+            imagen: true,
+            imagenAjuste: true,
+            porcentajeItbis: true,
+            tipo: true,
+            categoria: { select: { id: true, nombre: true } },
+            _count: { select: { variantes: true } },
+            variantes: {
+              take: 1,
+              orderBy: { createdAt: 'asc' as const },
+              select: {
+                id: true,
+                precios: { where: { listaPrecio: 'GENERAL', vigenteHasta: null }, select: { precioVenta: true }, take: 1 },
+                stock: bodegaId ? { where: { bodegaId }, select: { cantidadActual: true } } : false,
+              },
+            },
+          },
+        })
+      : [];
+    const datos = filas.map(({ variantes, _count, ...producto }) => ({
+      ...producto,
+      varianteId: variantes[0]?.id ?? null,
+      precio: variantes[0]?.precios[0]?.precioVenta ?? null,
+      stock: bodegaId ? Number(variantes[0]?.stock?.[0]?.cantidadActual ?? 0) : null,
+      tieneVariantes: _count.variantes > 1,
+    }));
+    return new Map(datos.map((d) => [d.id, d]));
+  }
+
+  /**
+   * Fase 17, "Secciones Dinámicas" — secciones del Home en el orden que
+   * definió el admin, solo `activa: true` (el listado completo, con
+   * borradores/desactivadas, es `SeccionesTiendaRepository.listar()` del
+   * lado admin). `BANNER` reusa la misma tabla `productos` que
+   * `PRODUCTOS` — la única diferencia es de renderizado (slideshow vs.
+   * grilla), decidida en el frontend según `tipo`.
+   */
+  async seccionesActivasPublicas(tenantId: string, bodegaId?: string) {
+    const secciones = await this.prisma.seccionTienda.findMany({
+      where: { tenantId, activa: true },
+      orderBy: { orden: 'asc' },
+      select: {
+        id: true,
+        tipo: true,
+        titulo: true,
+        subtitulo: true,
+        ctaTexto: true,
+        imagen: true,
+        color: true,
+        categoria: { select: { id: true, nombre: true } },
+        categorias: { orderBy: { orden: 'asc' }, select: { categoria: { select: { id: true, nombre: true } } } },
+        productos: { orderBy: { orden: 'asc' }, select: { productoId: true } },
+      },
+    });
+    const idsProductos = [...new Set(secciones.flatMap((s) => s.productos.map((p) => p.productoId)))];
+    const productosPorId = await this.productosPorIds(tenantId, idsProductos, bodegaId);
+
+    return secciones.map((s) => ({
+      id: s.id,
+      tipo: s.tipo,
+      titulo: s.titulo,
+      subtitulo: s.subtitulo,
+      ctaTexto: s.ctaTexto,
+      imagen: s.imagen,
+      color: s.color,
+      categoria: s.categoria,
+      categorias: s.categorias.map((c) => c.categoria),
+      productos: s.productos.map((p) => productosPorId.get(p.productoId)).filter((p): p is NonNullable<typeof p> => !!p),
     }));
   }
 }

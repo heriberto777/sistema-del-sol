@@ -23,6 +23,17 @@ const ANCHOS = { lg: 'max-w-lg', xl: 'max-w-4xl', '2xl': 'max-w-5xl' } as const;
  * fijos arriba (`shrink-0`). Sin esto, un formulario largo simplemente
  * empujaba el modal fuera de la pantalla sin ninguna forma de llegar al
  * final.
+ *
+ * `overflow-x-hidden` en el body es una red de seguridad, no el fix en sí
+ * — un contenido interno (ej. una grilla densa de inputs, como pasó en
+ * ModalCerrarTurno de TurnoCajaDetalle.tsx) que no cede al ancho del panel
+ * generaba un scroll horizontal ahí mismo con columnas cortadas/
+ * desalineadas, porque `overflow-y-auto` sin `overflow-x` explícito hace
+ * que el navegador trate el eje X también como `auto` (regla CSS: si un
+ * eje es `visible` y el otro no, el `visible` se computa como `auto`). El
+ * fix real sigue siendo que cada modal haga que su contenido quepa/ceda;
+ * esto solo evita que un caso no detectado se vea roto en vez de, en el
+ * peor caso, recortado.
  */
 export function Modal({ titulo, onClose, children, ancho = 'lg' }: ModalProps) {
   return (
@@ -45,7 +56,7 @@ export function Modal({ titulo, onClose, children, ancho = 'lg' }: ModalProps) {
             <X className="h-5 w-5" />
           </button>
         </div>
-        <div className="overflow-y-auto p-6">{children}</div>
+        <div className="overflow-x-hidden overflow-y-auto p-6">{children}</div>
       </div>
     </div>
   );

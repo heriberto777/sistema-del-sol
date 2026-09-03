@@ -20,6 +20,8 @@ describe('resolverTemaTienda', () => {
         { clave: 'carrito', visible: true },
         { clave: 'cuenta', visible: true },
       ],
+      estiloInsigniaOferta: 'CLASICO',
+      mostrarSeccionOfertas: true,
     });
   });
 
@@ -45,6 +47,8 @@ describe('resolverTemaTienda', () => {
         { clave: 'carrito', visible: true },
         { clave: 'cuenta', visible: true },
       ],
+      estiloInsigniaOferta: 'CINTA',
+      mostrarSeccionOfertas: false,
     });
     const tema = resolverTemaTienda(valorJson, '#000000');
     expect(tema.colorAcento).toBe('#c66b78');
@@ -55,6 +59,17 @@ describe('resolverTemaTienda', () => {
     expect(tema.sombraTarjeta).toBe(false);
     expect(tema.proporcionImagen).toBe('VERTICAL');
     expect(tema.menu[0]).toEqual({ clave: 'categorias', visible: true });
+    expect(tema.estiloInsigniaOferta).toBe('CINTA');
+    expect(tema.mostrarSeccionOfertas).toBe(false);
+  });
+
+  it('con estiloInsigniaOferta fuera de las opciones válidas, cae a CLASICO', () => {
+    const tema = resolverTemaTienda(JSON.stringify({ estiloInsigniaOferta: 'DORADA' }), undefined);
+    expect(tema.estiloInsigniaOferta).toBe('CLASICO');
+  });
+
+  it('sin mostrarSeccionOfertas guardado, el default es true', () => {
+    expect(resolverTemaTienda(undefined, undefined).mostrarSeccionOfertas).toBe(true);
   });
 
   it('con JSON corrupto (no parseable), cae a los defaults sin lanzar', () => {

@@ -72,7 +72,12 @@ export function CarritoDrawer({ subdominio }: { subdominio: string }) {
                   </div>
                 </div>
                 <div className="flex flex-col items-end gap-1.5">
-                  <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">{formatearPrecio(item.precio * item.cantidad)}</span>
+                  <span className="flex items-baseline gap-1.5">
+                    <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">{formatearPrecio(item.precio * item.cantidad)}</span>
+                    {item.precioOriginal != null && (
+                      <span className="text-xs text-slate-400 line-through dark:text-slate-500">{formatearPrecio(item.precioOriginal * item.cantidad)}</span>
+                    )}
+                  </span>
                   <button type="button" onClick={() => carrito.quitar(item.varianteId)} className="text-slate-400 hover:text-red-600">
                     <Trash2 size={15} />
                   </button>

@@ -2,9 +2,11 @@ import { useState } from 'react';
 import clsx from 'clsx';
 import { TiendaOnlineConfigPanel } from '../components/organisms/TiendaOnlineConfigPanel/TiendaOnlineConfigPanel';
 import { PedidosTiendaPanel } from '../components/organisms/PedidosTiendaPanel/PedidosTiendaPanel';
+import { SeccionesTiendaPanel } from '../components/organisms/SeccionesTiendaPanel/SeccionesTiendaPanel';
 
 const PESTANAS = [
   { id: 'configuracion', etiqueta: 'Configuración' },
+  { id: 'secciones', etiqueta: 'Secciones del Home' },
   { id: 'pedidos', etiqueta: 'Pedidos' },
 ] as const;
 
@@ -35,7 +37,9 @@ export function TiendaOnline() {
         ))}
       </div>
 
-      {pestana === 'configuracion' ? <TiendaOnlineConfigPanel /> : <PedidosTiendaPanel />}
+      {pestana === 'configuracion' && <TiendaOnlineConfigPanel />}
+      {pestana === 'secciones' && <SeccionesTiendaPanel />}
+      {pestana === 'pedidos' && <PedidosTiendaPanel />}
     </div>
   );
 }

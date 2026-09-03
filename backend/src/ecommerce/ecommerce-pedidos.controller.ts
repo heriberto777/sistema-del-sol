@@ -1,4 +1,4 @@
-import { Controller, Get, Query } from '@nestjs/common';
+import { Controller, Get, Param, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { EcommerceService } from './ecommerce.service';
 import { Permissions } from '../common/decorators/permissions.decorator';
@@ -15,5 +15,11 @@ export class EcommercePedidosController {
   @Permissions('admin.configuracion')
   listarPedidos(@Query() query: ListadoQueryDto) {
     return this.ecommerceService.listarPedidos(query);
+  }
+
+  @Get('pedidos/:facturaId')
+  @Permissions('admin.configuracion')
+  detallePedido(@Param('facturaId') facturaId: string) {
+    return this.ecommerceService.detallePedidoAdmin(facturaId);
   }
 }

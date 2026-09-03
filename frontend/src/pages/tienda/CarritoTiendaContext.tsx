@@ -1,5 +1,6 @@
 import { createContext, ReactNode, useContext } from 'react';
 import { CarritoTienda, useCarritoTienda } from '../../hooks/useCarritoTienda';
+import { useClienteTienda } from '../../hooks/useClienteTienda';
 
 const CarritoTiendaContext = createContext<CarritoTienda | null>(null);
 
@@ -11,9 +12,15 @@ const CarritoTiendaContext = createContext<CarritoTienda | null>(null);
  * del `Outlet`, dos instancias independientes divergían (localStorage
  * se actualizaba bien, pero el estado de React de una no se enteraba de
  * los cambios de la otra). Provisto una sola vez acá.
+ *
+ * Fase 16 — también resuelve acá el `token` de `useClienteTienda` (si
+ * hay sesión) y se lo pasa a `useCarritoTienda` para la sincronización
+ * con la base de datos — un solo lugar, en vez de que cada plantilla
+ * tenga que acordarse de conectarlo.
  */
 export function CarritoTiendaProvider({ subdominio, children }: { subdominio: string; children: ReactNode }) {
-  const carrito = useCarritoTienda(subdominio);
+  const { token } = useClienteTienda(subdominio);
+  const carrito = useCarritoTienda(subdominio, token);
   return <CarritoTiendaContext.Provider value={carrito}>{children}</CarritoTiendaContext.Provider>;
 }
 

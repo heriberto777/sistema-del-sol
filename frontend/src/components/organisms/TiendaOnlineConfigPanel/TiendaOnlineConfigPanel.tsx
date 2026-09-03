@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
+import { CSSProperties, ReactNode, useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import clsx from 'clsx';
 import { ExternalLink, ChevronDown, ChevronUp } from 'lucide-react';
 import { apiClient } from '../../../lib/api-client';
 import { CampoImagen } from '../../molecules/CampoImagen/CampoImagen';
@@ -9,15 +10,22 @@ import { Button } from '../../atoms/Button/Button';
 import { Select } from '../../atoms/Select/Select';
 import { FormField } from '../../molecules/FormField/FormField';
 import { useAuth } from '../../../hooks/useAuth';
+import { construirUrlTienda } from '../../../hooks/useUrlTiendaPublica';
 import {
   FUENTES_TIENDA,
   TAMANOS_FUENTE_TIENDA,
   RADIOS_TARJETA_TIENDA,
   PROPORCIONES_IMAGEN_TIENDA,
+  ESTILOS_INSIGNIA_OFERTA_TIENDA,
   MENU_DEFAULT,
   TemaTienda,
   ClaveMenuTienda,
+  variablesCssTema,
+  DefaultsTemaPlantilla,
 } from '../../../pages/tienda/tema';
+import { TarjetaProductoTienda } from '../../../pages/tienda/TarjetaProductoTienda';
+import { CarritoTiendaProvider } from '../../../pages/tienda/CarritoTiendaContext';
+import { ProductoTienda } from '../../../hooks/useTienda';
 
 interface Configuracion {
   clave: string;
@@ -49,6 +57,9 @@ const PLANTILLAS = [
   { value: 'DISTRITO', label: 'Distrito (Ropa · Departamental premium)' },
   { value: 'ATELIER', label: 'Atelier (Ropa · Alta costura)' },
   { value: 'OFICIO', label: 'Oficio (Ropa · Corporativo)' },
+  { value: 'BAZAR', label: 'Bazar Central (Marketplace · estilo Amazon)' },
+  { value: 'VITRINA', label: 'Vitrina Abierta (Marketplace · estilo eBay)' },
+  { value: 'SOLMARKET', label: 'Sol Market (Marketplace · dirección propia)' },
 ];
 
 const ETIQUETA_MENU: Record<ClaveMenuTienda, string> = {
@@ -70,7 +81,64 @@ const TEMA_DEFAULT: TemaTienda = {
   sombraTarjeta: true,
   proporcionImagen: 'CUADRADA',
   menu: MENU_DEFAULT,
+  estiloInsigniaOferta: 'CLASICO',
+  mostrarSeccionOfertas: true,
 };
+
+const ETIQUETA_ESTILO_INSIGNIA: Record<TemaTienda['estiloInsigniaOferta'], string> = {
+  CLASICO: 'Clásico',
+  AHORRO: 'Ahorro explícito',
+  CINTA: 'Cinta de esquina',
+};
+
+/** Defaults neutros solo para el preview del panel — no tienen relación con ninguna de las 17 plantillas reales. */
+const PREVIEW_DEFAULTS: DefaultsTemaPlantilla = {
+  colorAcento: '#c4472b',
+  colorFondo: '#f7f6f3',
+  colorSuperficie: '#ffffff',
+  colorTexto: '#171512',
+  fuenteDisplay: 'DM Sans',
+  fuenteBody: 'DM Sans',
+};
+
+const PRODUCTO_PREVIEW_BASE = {
+  codigo: 'DEMO',
+  imagen: null,
+  imagenAjuste: 'CUBRIR',
+  porcentajeItbis: '18',
+  tipo: 'PRODUCTO',
+  categoria: null,
+  stock: 10,
+  varianteId: 'preview',
+  tieneVariantes: false,
+} as const;
+
+const PREVIEW_DESCUENTO: ProductoTienda = {
+  ...PRODUCTO_PREVIEW_BASE,
+  id: 'preview-descuento',
+  nombre: 'Blazer entallado',
+  precio: '2490',
+  oferta: { tipo: 'DESCUENTO', precioConDescuento: 1990, ahorro: 500, porcentaje: 20 },
+};
+
+const PREVIEW_BOGO: ProductoTienda = {
+  ...PRODUCTO_PREVIEW_BASE,
+  id: 'preview-bogo',
+  nombre: 'Camisa de lino',
+  precio: '1290',
+  oferta: { tipo: 'BOGO', comprarCantidad: 1, llevarCantidad: 1, porcentajeDescuentoLlevar: 100 },
+};
+
+/** Agrupa visualmente los ~7 conceptos de la pestaña Personalización (Fase 15) — antes eran una sola columna continua sin ninguna separación. */
+function SeccionPersonalizacion({ titulo, descripcion, children }: { titulo: string; descripcion?: string; children: ReactNode }) {
+  return (
+    <div className="py-5 first:pt-0 last:pb-0">
+      <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{titulo}</h3>
+      {descripcion && <p className="mb-3 mt-1 text-xs text-slate-500 dark:text-slate-400">{descripcion}</p>}
+      <div className={clsx('flex flex-col gap-4', !descripcion && 'mt-3')}>{children}</div>
+    </div>
+  );
+}
 
 /**
  * Parseo defensivo espejo de `resolverTemaTienda` (backend) — acá no hace
@@ -155,7 +223,7 @@ export function TiendaOnlineConfigPanel() {
   // usuario recién tildó el checkbox sin haber apretado "Guardar" todavía.
   const activaGuardada = configuraciones?.find((c) => c.clave === CLAVE_ACTIVA)?.valor === 'true';
   const subdominio = usuario?.tenant?.subdominio;
-  const urlTienda = subdominio ? `${window.location.origin}/tienda/${subdominio}` : null;
+  const urlTienda = subdominio ? construirUrlTienda(subdominio) : null;
 
   function moverMenu(indice: number, direccion: -1 | 1) {
     const destino = indice + direccion;
@@ -287,14 +355,13 @@ export function TiendaOnlineConfigPanel() {
       )}
 
       {tab === 'personalizacion' && (
-        <div className="space-y-5">
-          <p className="text-xs text-slate-500 dark:text-slate-400">
+        <div className="divide-y divide-slate-100 dark:divide-slate-800">
+          <p className="pb-5 text-xs text-slate-500 dark:text-slate-400">
             Se aplica sobre la plantilla elegida en la pestaña General. No tiene efecto en Directo/Mercado/Boutique,
             que siguen usando el color de acento clásico de la pestaña General.
           </p>
 
-          <div>
-            <span className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">Colores</span>
+          <SeccionPersonalizacion titulo="Colores">
             <div className="grid grid-cols-4 gap-3">
               {(
                 [
@@ -315,105 +382,164 @@ export function TiendaOnlineConfigPanel() {
                 </div>
               ))}
             </div>
-          </div>
+          </SeccionPersonalizacion>
 
-          <div className="grid grid-cols-2 gap-3">
+          <SeccionPersonalizacion titulo="Tipografía">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex flex-col gap-1">
+                <label htmlFor="tema-fuente-display" className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                  Fuente de títulos
+                </label>
+                <Select
+                  id="tema-fuente-display"
+                  value={tema.fuenteDisplay ?? ''}
+                  onChange={(e) => setTema({ ...tema, fuenteDisplay: (e.target.value || null) as TemaTienda['fuenteDisplay'] })}
+                >
+                  <option value="">(automático de la plantilla)</option>
+                  {FUENTES_TIENDA.map((f) => (
+                    <option key={f} value={f}>
+                      {f}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+              <div className="flex flex-col gap-1">
+                <label htmlFor="tema-fuente-body" className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                  Fuente de texto
+                </label>
+                <Select
+                  id="tema-fuente-body"
+                  value={tema.fuenteBody ?? ''}
+                  onChange={(e) => setTema({ ...tema, fuenteBody: (e.target.value || null) as TemaTienda['fuenteBody'] })}
+                >
+                  <option value="">(automático de la plantilla)</option>
+                  {FUENTES_TIENDA.map((f) => (
+                    <option key={f} value={f}>
+                      {f}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+            </div>
+
             <div className="flex flex-col gap-1">
-              <label htmlFor="tema-fuente-display" className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                Fuente de títulos
+              <label htmlFor="tema-tamano" className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                Tamaño de fuente
               </label>
               <Select
-                id="tema-fuente-display"
-                value={tema.fuenteDisplay ?? ''}
-                onChange={(e) => setTema({ ...tema, fuenteDisplay: (e.target.value || null) as TemaTienda['fuenteDisplay'] })}
+                id="tema-tamano"
+                value={tema.tamanoFuente}
+                onChange={(e) => setTema({ ...tema, tamanoFuente: e.target.value as TemaTienda['tamanoFuente'] })}
               >
-                <option value="">(automático de la plantilla)</option>
-                {FUENTES_TIENDA.map((f) => (
-                  <option key={f} value={f}>
-                    {f}
+                {TAMANOS_FUENTE_TIENDA.map((t) => (
+                  <option key={t} value={t}>
+                    {t === 'CHICO' ? 'Chico' : t === 'MEDIANO' ? 'Mediano' : 'Grande'}
                   </option>
                 ))}
               </Select>
             </div>
-            <div className="flex flex-col gap-1">
-              <label htmlFor="tema-fuente-body" className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                Fuente de texto
-              </label>
-              <Select
-                id="tema-fuente-body"
-                value={tema.fuenteBody ?? ''}
-                onChange={(e) => setTema({ ...tema, fuenteBody: (e.target.value || null) as TemaTienda['fuenteBody'] })}
-              >
-                <option value="">(automático de la plantilla)</option>
-                {FUENTES_TIENDA.map((f) => (
-                  <option key={f} value={f}>
-                    {f}
-                  </option>
-                ))}
-              </Select>
-            </div>
-          </div>
+          </SeccionPersonalizacion>
 
-          <div className="flex flex-col gap-1">
-            <label htmlFor="tema-tamano" className="text-sm font-medium text-slate-700 dark:text-slate-300">
-              Tamaño de fuente
+          <SeccionPersonalizacion titulo="Tarjetas de producto">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex flex-col gap-1">
+                <label htmlFor="tema-radio" className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                  Esquinas de tarjeta
+                </label>
+                <Select id="tema-radio" value={tema.radioTarjeta} onChange={(e) => setTema({ ...tema, radioTarjeta: e.target.value as TemaTienda['radioTarjeta'] })}>
+                  {RADIOS_TARJETA_TIENDA.map((r) => (
+                    <option key={r} value={r}>
+                      {r === 'RECTA' ? 'Rectas' : r === 'SUAVE' ? 'Suaves' : 'Redondeadas'}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+              <div className="flex flex-col gap-1">
+                <label htmlFor="tema-ratio" className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                  Proporción de foto
+                </label>
+                <Select
+                  id="tema-ratio"
+                  value={tema.proporcionImagen}
+                  onChange={(e) => setTema({ ...tema, proporcionImagen: e.target.value as TemaTienda['proporcionImagen'] })}
+                >
+                  {PROPORCIONES_IMAGEN_TIENDA.map((p) => (
+                    <option key={p} value={p}>
+                      {p === 'CUADRADA' ? 'Cuadrada' : p === 'VERTICAL' ? 'Vertical' : 'Panorámica'}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+            </div>
+
+            <label className="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-300">
+              <input
+                type="checkbox"
+                checked={tema.sombraTarjeta}
+                onChange={(e) => setTema({ ...tema, sombraTarjeta: e.target.checked })}
+                className="h-4 w-4 rounded"
+              />
+              Sombra en la tarjeta
             </label>
-            <Select
-              id="tema-tamano"
-              value={tema.tamanoFuente}
-              onChange={(e) => setTema({ ...tema, tamanoFuente: e.target.value as TemaTienda['tamanoFuente'] })}
-            >
-              {TAMANOS_FUENTE_TIENDA.map((t) => (
-                <option key={t} value={t}>
-                  {t === 'CHICO' ? 'Chico' : t === 'MEDIANO' ? 'Mediano' : 'Grande'}
-                </option>
+          </SeccionPersonalizacion>
+
+          <SeccionPersonalizacion titulo="Sección de Ofertas" descripcion='Franja informativa con las ofertas vigentes (ej. "10% OFF en Camisas"), arriba del catálogo en el Home.'>
+            <label className="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-300">
+              <input
+                type="checkbox"
+                checked={tema.mostrarSeccionOfertas}
+                onChange={(e) => setTema({ ...tema, mostrarSeccionOfertas: e.target.checked })}
+                className="h-4 w-4 rounded"
+              />
+              Mostrar la sección de Ofertas en el Home
+            </label>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Apagarla no oculta la insignia de oferta en cada producto (más abajo) — solo esta franja aparte.
+            </p>
+          </SeccionPersonalizacion>
+
+          <SeccionPersonalizacion
+            titulo="Insignia de oferta en la tarjeta"
+            descripcion='Cómo se muestra un producto con oferta vigente en catálogo, Destacados y "También te puede interesar".'
+          >
+            <div className="grid grid-cols-3 gap-2">
+              {ESTILOS_INSIGNIA_OFERTA_TIENDA.map((estilo) => (
+                <button
+                  key={estilo}
+                  type="button"
+                  onClick={() => setTema({ ...tema, estiloInsigniaOferta: estilo })}
+                  className={clsx(
+                    'rounded-lg border px-3 py-2 text-left text-xs font-semibold transition-colors',
+                    tema.estiloInsigniaOferta === estilo
+                      ? 'border-sol-500 bg-sol-50 text-sol-700 dark:bg-sol-500/10 dark:text-sol-300'
+                      : 'border-slate-200 text-slate-600 hover:border-slate-300 dark:border-slate-700 dark:text-slate-300 dark:hover:border-slate-600',
+                  )}
+                >
+                  {ETIQUETA_ESTILO_INSIGNIA[estilo]}
+                </button>
               ))}
-            </Select>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div className="flex flex-col gap-1">
-              <label htmlFor="tema-radio" className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                Esquinas de tarjeta
-              </label>
-              <Select id="tema-radio" value={tema.radioTarjeta} onChange={(e) => setTema({ ...tema, radioTarjeta: e.target.value as TemaTienda['radioTarjeta'] })}>
-                {RADIOS_TARJETA_TIENDA.map((r) => (
-                  <option key={r} value={r}>
-                    {r === 'RECTA' ? 'Rectas' : r === 'SUAVE' ? 'Suaves' : 'Redondeadas'}
-                  </option>
-                ))}
-              </Select>
             </div>
-            <div className="flex flex-col gap-1">
-              <label htmlFor="tema-ratio" className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                Proporción de foto
-              </label>
-              <Select
-                id="tema-ratio"
-                value={tema.proporcionImagen}
-                onChange={(e) => setTema({ ...tema, proporcionImagen: e.target.value as TemaTienda['proporcionImagen'] })}
-              >
-                {PROPORCIONES_IMAGEN_TIENDA.map((p) => (
-                  <option key={p} value={p}>
-                    {p === 'CUADRADA' ? 'Cuadrada' : p === 'VERTICAL' ? 'Vertical' : 'Panorámica'}
-                  </option>
-                ))}
-              </Select>
+            <div
+              className="flex gap-4 rounded-lg border border-dashed border-slate-300 p-4 dark:border-slate-700"
+              style={variablesCssTema(tema, PREVIEW_DEFAULTS) as CSSProperties}
+            >
+              <div className="pointer-events-none w-32 shrink-0">
+                <CarritoTiendaProvider subdominio="__preview_oferta__">
+                  <TarjetaProductoTienda producto={PREVIEW_DESCUENTO} subdominio="__preview__" estiloInsignia={tema.estiloInsigniaOferta} />
+                </CarritoTiendaProvider>
+              </div>
+              <div className="pointer-events-none w-32 shrink-0">
+                <CarritoTiendaProvider subdominio="__preview_oferta__">
+                  <TarjetaProductoTienda producto={PREVIEW_BOGO} subdominio="__preview__" estiloInsignia={tema.estiloInsigniaOferta} />
+                </CarritoTiendaProvider>
+              </div>
+              <p className="self-center text-xs text-slate-500 dark:text-slate-400">
+                Vista previa con datos de ejemplo — a la izquierda una oferta de porcentaje, a la derecha una 2×1.
+              </p>
             </div>
-          </div>
+          </SeccionPersonalizacion>
 
-          <label className="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-300">
-            <input
-              type="checkbox"
-              checked={tema.sombraTarjeta}
-              onChange={(e) => setTema({ ...tema, sombraTarjeta: e.target.checked })}
-              className="h-4 w-4 rounded"
-            />
-            Sombra en la tarjeta
-          </label>
-
-          <div>
-            <span className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">Menú de navegación</span>
+          <SeccionPersonalizacion titulo="Menú de navegación">
             <div className="flex flex-col gap-1.5">
               {tema.menu.map((item, i) => (
                 <div key={item.clave} className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-1.5 dark:border-slate-700">
@@ -447,11 +573,13 @@ export function TiendaOnlineConfigPanel() {
                 </div>
               ))}
             </div>
-          </div>
+          </SeccionPersonalizacion>
 
-          <Button onClick={() => guardar.mutate()} disabled={guardar.isPending}>
-            {guardar.isPending ? 'Guardando…' : 'Guardar'}
-          </Button>
+          <div className="pt-5">
+            <Button onClick={() => guardar.mutate()} disabled={guardar.isPending}>
+              {guardar.isPending ? 'Guardando…' : 'Guardar'}
+            </Button>
+          </div>
         </div>
       )}
     </Card>

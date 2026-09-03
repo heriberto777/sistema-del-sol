@@ -198,4 +198,51 @@ export class OfertasService {
     if (ofertas.length === 0) return 0;
     return this.combinarDescuentos(ofertas, subtotalLineas);
   }
+
+  /**
+   * Fase 13 — oferta a mostrar en la tarjeta de producto del storefront
+   * público (catálogo/destacados/relacionados), en vez de solo la
+   * sección "Ofertas" informativa. Reusa la MISMA `combinarDescuentosConComision`
+   * que ya resuelve la venta real (a `cantidad=1`) para que el precio
+   * mostrado en la tarjeta nunca diverja del que termina cobrando
+   * Facturación/POS. BOGO a `cantidad=1` siempre da `monto=0`
+   * (`montoDescuentoOferta` exige `cantidad`/`precioUnitario` reales de
+   * una compra) — por eso, si no hay descuento de precio, se busca por
+   * separado si hay una BOGO vigente para mostrar su mecánica como
+   * insignia (nunca un "precio unitario con descuento" inventado).
+   */
+  async resolverOfertaVisibleProducto(
+    productoId: string,
+    categoriaId: string | null,
+    precioUnitario: number,
+  ): Promise<OfertaVisibleProducto | null> {
+    if (precioUnitario <= 0) return null;
+    const ofertas = await this.ofertasRepository.buscarVigentesParaLinea(productoId, categoriaId, new Date());
+    if (ofertas.length === 0) return null;
+
+    const { monto } = this.combinarDescuentosConComision(ofertas, precioUnitario, 1, precioUnitario);
+    if (monto > 0) {
+      return {
+        tipo: 'DESCUENTO',
+        precioConDescuento: precioUnitario - monto,
+        ahorro: monto,
+        porcentaje: Math.round((monto / precioUnitario) * 100),
+      };
+    }
+
+    const bogo = ofertas.find((o) => o.tipoDescuento === 'BOGO');
+    if (bogo) {
+      return {
+        tipo: 'BOGO',
+        comprarCantidad: bogo.comprarCantidad ?? 1,
+        llevarCantidad: bogo.llevarCantidad ?? 1,
+        porcentajeDescuentoLlevar: Number(bogo.porcentajeDescuentoLlevar ?? 100),
+      };
+    }
+    return null;
+  }
 }
+
+export type OfertaVisibleProducto =
+  | { tipo: 'DESCUENTO'; precioConDescuento: number; ahorro: number; porcentaje: number }
+  | { tipo: 'BOGO'; comprarCantidad: number; llevarCantidad: number; porcentajeDescuentoLlevar: number };

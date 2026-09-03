@@ -1,13 +1,15 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Minus, Plus, ShoppingCart, User } from 'lucide-react';
-import { formatearPrecio, useOfertasTienda, useProductosDestacados } from '../../../hooks/useTienda';
+import { formatearPrecio, useOfertasTienda, useProductosDestacados, useSeccionesTienda } from '../../../hooks/useTienda';
 import { useClienteTienda } from '../../../hooks/useClienteTienda';
 import { useCarritoDrawer } from '../CarritoDrawerContext';
 import { BannerAnuncio } from '../BannerAnuncio';
 import { SeccionDestacados } from '../SeccionDestacados';
 import { SeccionOfertas } from '../SeccionOfertas';
+import { SeccionesDinamicas } from '../SeccionesDinamicas';
 import { ProductosRelacionados } from '../ProductosRelacionados';
+import { FilaPrecioOferta, InsigniaOferta, precioOriginalParaCarrito, precioParaCarrito } from '../OfertaEnTarjeta';
 import { ClaveMenuTienda, DefaultsTemaPlantilla, menuVisibleOrdenado, useCargarFuentesTienda, variablesCssTema } from '../tema';
 import type { Plantilla, PropsCarrito, PropsHome, PropsProducto } from './tipos';
 
@@ -82,6 +84,7 @@ function AtelierHome({ config, subdominio, carrito, productos, cargando }: Props
   const menu = menuVisibleOrdenado(tema.menu);
   const { data: destacados } = useProductosDestacados(subdominio);
   const { data: ofertas } = useOfertasTienda(subdominio);
+  const { data: secciones = [] } = useSeccionesTienda(subdominio);
   return (
     <div className="min-h-screen bg-[var(--tienda-color-fondo)] text-[var(--tienda-color-texto)]" style={{ ...variablesCssTema(tema, DEFAULTS), fontFamily: 'var(--tienda-fuente-body)', fontSize: 'var(--tienda-tamano-fuente)' }}>
       <BannerAnuncio texto={config.bannerTexto} />
@@ -95,26 +98,32 @@ function AtelierHome({ config, subdominio, carrito, productos, cargando }: Props
         </h1>
       </div>
 
-      <SeccionDestacados productos={destacados ?? []} subdominio={subdominio} />
-      <SeccionOfertas ofertas={ofertas ?? []} />
+      <SeccionDestacados productos={destacados ?? []} subdominio={subdominio} estiloInsignia={tema.estiloInsigniaOferta} />
+      <SeccionOfertas ofertas={ofertas ?? []} mostrar={tema.mostrarSeccionOfertas} />
+      <SeccionesDinamicas secciones={secciones} subdominio={subdominio} estiloInsignia={tema.estiloInsigniaOferta} />
 
       <div id="catalogo" className="grid grid-cols-1 gap-px sm:grid-cols-2">
         {cargando && <p className="col-span-full px-6 py-10 text-[0.85em] opacity-60 sm:px-10">Cargando…</p>}
         {!cargando && productos.length === 0 && <p className="col-span-full px-6 py-10 text-[0.85em] opacity-60 sm:px-10">No hay productos.</p>}
         {productos.map((p) => (
           <Link key={p.id} to={`/tienda/${subdominio}/producto/${p.id}`} className="pb-8 text-center">
-            <div className="mb-3.5 overflow-hidden" style={{ aspectRatio: 'var(--tienda-ratio-imagen)', background: 'linear-gradient(140deg,#efefef,#dcdcdc)' }}>
+            <div className="relative mb-3.5 overflow-hidden" style={{ aspectRatio: 'var(--tienda-ratio-imagen)', background: 'linear-gradient(140deg,#efefef,#dcdcdc)' }}>
               {p.imagen && <img src={p.imagen} alt={p.nombre} className="h-full w-full object-cover" />}
+              <InsigniaOferta oferta={p.oferta} estilo={tema.estiloInsigniaOferta} />
             </div>
             <h3 className="mb-1 text-[0.75em] uppercase tracking-[0.05em]">{p.nombre}</h3>
             <div className="flex items-center justify-center gap-2">
-              <span className="text-[0.75em] opacity-70">{formatearPrecio(p.precio)}</span>
+              {p.oferta ? (
+                <FilaPrecioOferta precio={p.precio} oferta={p.oferta} estilo={tema.estiloInsigniaOferta} tamano="0.75em" />
+              ) : (
+                <span className="text-[0.75em] opacity-70">{formatearPrecio(p.precio)}</span>
+              )}
               {!p.tieneVariantes && p.varianteId && (
                 <button
                   type="button"
                   onClick={(e) => {
                     e.preventDefault();
-                    carrito.agregar({ productoId: p.id, varianteId: p.varianteId!, varianteEtiqueta: '', nombre: p.nombre, precio: Number(p.precio ?? 0), imagen: p.imagen });
+                    carrito.agregar({ productoId: p.id, varianteId: p.varianteId!, varianteEtiqueta: '', nombre: p.nombre, precio: precioParaCarrito(p.precio, p.oferta), precioOriginal: precioOriginalParaCarrito(p.precio, p.oferta), imagen: p.imagen });
                   }}
                   className="flex h-6 w-6 items-center justify-center border border-[color:var(--tienda-color-texto)]/20"
                 >
@@ -159,7 +168,13 @@ function AtelierProducto({ config, subdominio, carrito, producto, varianteSelecc
           <h1 className="mb-3 text-[1.7em] font-medium" style={{ fontFamily: 'var(--tienda-fuente-display)' }}>
             {producto.nombre}
           </h1>
-          <p className="mb-5 text-[1em] opacity-70">{varianteSeleccionada ? formatearPrecio(varianteSeleccionada.precio) : 'Elegí una opción'}</p>
+          <div className="mb-5">
+            {varianteSeleccionada ? (
+              <FilaPrecioOferta precio={varianteSeleccionada.precio} oferta={varianteSeleccionada.oferta} estilo={tema.estiloInsigniaOferta} tamano="1em" />
+            ) : (
+              <p className="text-[1em] opacity-70">Elegí una opción</p>
+            )}
+          </div>
           {producto.descripcionTienda && <p className="mb-6 text-[0.82em] leading-relaxed opacity-60">{producto.descripcionTienda}</p>}
 
           {debeElegirVariante && (
@@ -205,7 +220,7 @@ function AtelierProducto({ config, subdominio, carrito, producto, varianteSelecc
           </button>
         </div>
       </div>
-      <ProductosRelacionados productos={producto.relacionados} subdominio={subdominio} />
+      <ProductosRelacionados productos={producto.relacionados} subdominio={subdominio} estiloInsignia={tema.estiloInsigniaOferta} />
       <Footer nombre={nombre} />
     </div>
   );

@@ -1,12 +1,15 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
+import { useSubdominioTienda } from '../../hooks/useSubdominioTienda';
 import { useTiendaConfig, useTiendaProducto } from '../../hooks/useTienda';
 import { useCarritoTiendaContext } from './CarritoTiendaContext';
+import { precioOriginalParaCarrito, precioParaCarrito } from './OfertaEnTarjeta';
 import { PLANTILLAS } from './plantillas';
 import { TiendaCargando, TiendaNoEncontrada } from './TiendaNoEncontrada';
 
 export function TiendaProducto() {
-  const { subdominio = '', productoId = '' } = useParams();
+  const subdominio = useSubdominioTienda();
+  const { productoId = '' } = useParams();
   const [varianteId, setVarianteId] = useState<string | null>(null);
   const [cantidad, setCantidad] = useState(1);
   const carrito = useCarritoTiendaContext();
@@ -44,7 +47,8 @@ export function TiendaProducto() {
             varianteId: varianteSeleccionada.id,
             varianteEtiqueta: varianteSeleccionada.etiqueta,
             nombre: producto.nombre,
-            precio: Number(varianteSeleccionada.precio ?? 0),
+            precio: precioParaCarrito(varianteSeleccionada.precio, varianteSeleccionada.oferta),
+            precioOriginal: precioOriginalParaCarrito(varianteSeleccionada.precio, varianteSeleccionada.oferta),
             imagen: producto.imagen,
           },
           cantidad,

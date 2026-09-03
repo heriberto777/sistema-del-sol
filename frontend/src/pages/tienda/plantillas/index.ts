@@ -12,6 +12,9 @@ import { amplia } from './amplia';
 import { distrito } from './distrito';
 import { atelier } from './atelier';
 import { oficio } from './oficio';
+import { bazar } from './bazar';
+import { vitrina } from './vitrina';
+import { solmarket } from './solmarket';
 import type { Plantilla } from './tipos';
 import type { PlantillaTienda } from '../../../hooks/useTienda';
 
@@ -30,6 +33,9 @@ export const PLANTILLAS: Record<PlantillaTienda, Plantilla> = {
   DISTRITO: distrito,
   ATELIER: atelier,
   OFICIO: oficio,
+  BAZAR: bazar,
+  VITRINA: vitrina,
+  SOLMARKET: solmarket,
 };
 
 export type { Plantilla, PropsCarrito, PropsHome, PropsProducto } from './tipos';

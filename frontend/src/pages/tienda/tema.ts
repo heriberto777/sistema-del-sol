@@ -34,6 +34,10 @@ export type RadioTarjetaTienda = (typeof RADIOS_TARJETA_TIENDA)[number];
 export const PROPORCIONES_IMAGEN_TIENDA = ['CUADRADA', 'VERTICAL', 'PANORAMICA'] as const;
 export type ProporcionImagenTienda = (typeof PROPORCIONES_IMAGEN_TIENDA)[number];
 
+/** Fase 13 — cómo se muestra en la tarjeta una oferta vigente para ese producto (ver `backend/src/ecommerce/resolver-config-tienda.ts`). */
+export const ESTILOS_INSIGNIA_OFERTA_TIENDA = ['CLASICO', 'AHORRO', 'CINTA'] as const;
+export type EstiloInsigniaOfertaTienda = (typeof ESTILOS_INSIGNIA_OFERTA_TIENDA)[number];
+
 export const CLAVES_MENU_TIENDA = ['inicio', 'categorias', 'carrito', 'cuenta'] as const;
 export type ClaveMenuTienda = (typeof CLAVES_MENU_TIENDA)[number];
 
@@ -55,6 +59,8 @@ export interface TemaTienda {
   sombraTarjeta: boolean;
   proporcionImagen: ProporcionImagenTienda;
   menu: ItemMenuTienda[];
+  estiloInsigniaOferta: EstiloInsigniaOfertaTienda;
+  mostrarSeccionOfertas: boolean;
 }
 
 export const MENU_DEFAULT: ItemMenuTienda[] = CLAVES_MENU_TIENDA.map((clave) => ({ clave, visible: true }));

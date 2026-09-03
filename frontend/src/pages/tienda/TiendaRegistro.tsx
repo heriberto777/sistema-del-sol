@@ -1,5 +1,6 @@
 import { FormEvent, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { useSubdominioTienda } from '../../hooks/useSubdominioTienda';
 import { isAxiosError } from 'axios';
 import { useTiendaConfig } from '../../hooks/useTienda';
 import { useClienteTienda } from '../../hooks/useClienteTienda';
@@ -7,7 +8,7 @@ import { TiendaCargando, TiendaNoEncontrada } from './TiendaNoEncontrada';
 
 /** Genérico, no una piel más por plantilla — mismo criterio que TiendaCheckout/TiendaLogin. */
 export function TiendaRegistro() {
-  const { subdominio = '' } = useParams();
+  const subdominio = useSubdominioTienda();
   const navigate = useNavigate();
   const { data: config, isLoading, isError } = useTiendaConfig(subdominio);
   const { registro } = useClienteTienda(subdominio);

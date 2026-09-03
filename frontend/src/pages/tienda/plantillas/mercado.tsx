@@ -1,13 +1,15 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Minus, Plus, Search, ShoppingCart, Trash2, User } from 'lucide-react';
-import { formatearPrecio, useOfertasTienda, useProductosDestacados } from '../../../hooks/useTienda';
+import { formatearPrecio, useOfertasTienda, useProductosDestacados, useSeccionesTienda } from '../../../hooks/useTienda';
 import { useClienteTienda } from '../../../hooks/useClienteTienda';
 import { useCarritoDrawer } from '../CarritoDrawerContext';
 import { BannerAnuncio } from '../BannerAnuncio';
 import { SeccionDestacados } from '../SeccionDestacados';
 import { SeccionOfertas } from '../SeccionOfertas';
+import { SeccionesDinamicas } from '../SeccionesDinamicas';
 import { ProductosRelacionados } from '../ProductosRelacionados';
+import { FilaPrecioOferta, InsigniaOferta, precioOriginalParaCarrito, precioParaCarrito } from '../OfertaEnTarjeta';
 import type { Plantilla, PropsCarrito, PropsHome, PropsProducto } from './tipos';
 
 const ACCENT_DEFAULT = '#ff6b45';
@@ -61,6 +63,7 @@ function MercadoHome({ config, subdominio, carrito, productos, cargando, busqued
   const accent = config.colorAcento || ACCENT_DEFAULT;
   const { data: destacados = [] } = useProductosDestacados(subdominio);
   const { data: ofertas = [] } = useOfertasTienda(subdominio);
+  const { data: secciones = [] } = useSeccionesTienda(subdominio);
   return (
     <div className="min-h-screen bg-[#fff6ec] text-[#0d5c58] dark:bg-[#0b1a19] dark:text-[#e7f3f1]" style={{ fontFamily: FONT_BODY }}>
       <BannerAnuncio texto={config.bannerTexto} />
@@ -84,13 +87,14 @@ function MercadoHome({ config, subdominio, carrito, productos, cargando, busqued
         )}
       </div>
 
-      <SeccionDestacados productos={destacados} subdominio={subdominio} />
-      <SeccionOfertas ofertas={ofertas} />
+      <SeccionDestacados productos={destacados} subdominio={subdominio} estiloInsignia={config.tema.estiloInsigniaOferta} />
+      <SeccionOfertas ofertas={ofertas} mostrar={config.tema.mostrarSeccionOfertas} />
+      <SeccionesDinamicas secciones={secciones} subdominio={subdominio} estiloInsignia={config.tema.estiloInsigniaOferta} />
 
       <div className="mx-6 mb-6 flex items-end justify-between sm:mx-10">
         <div>
           <h2 className="text-2xl font-bold" style={{ fontFamily: FONT_DISPLAY }}>
-            Catálogo
+            Productos
           </h2>
           <p className="text-xs text-[#7a8f8d]">{productos.length} producto(s)</p>
         </div>
@@ -112,15 +116,14 @@ function MercadoHome({ config, subdominio, carrito, productos, cargando, busqued
           <Link key={p.id} to={`/tienda/${subdominio}/producto/${p.id}`} className="overflow-hidden rounded-2xl bg-white shadow-md dark:bg-[#12302e]">
             <div className="relative aspect-square" style={{ background: `linear-gradient(135deg,#ffd9a8,${accent})` }}>
               {p.imagen && <img src={p.imagen} alt={p.nombre} className="h-full w-full object-cover" />}
+              <InsigniaOferta oferta={p.oferta} estilo={config.tema.estiloInsigniaOferta} colorAcento={accent} />
             </div>
             <div className="p-4">
               <h3 className="mb-2 text-sm font-semibold" style={{ fontFamily: FONT_DISPLAY }}>
                 {p.nombre}
               </h3>
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-bold" style={{ color: accent }}>
-                  {formatearPrecio(p.precio)}
-                </span>
+              <div className="flex items-center justify-between gap-1.5">
+                <FilaPrecioOferta precio={p.precio} oferta={p.oferta} estilo={config.tema.estiloInsigniaOferta} tamano="0.875em" colorAcento={accent} />
                 <button
                   type="button"
                   onClick={(e) => {
@@ -131,7 +134,7 @@ function MercadoHome({ config, subdominio, carrito, productos, cargando, busqued
                       varianteId: p.varianteId,
                       varianteEtiqueta: '',
                       nombre: p.nombre,
-                      precio: Number(p.precio ?? 0),
+                      precio: precioParaCarrito(p.precio, p.oferta), precioOriginal: precioOriginalParaCarrito(p.precio, p.oferta),
                       imagen: p.imagen,
                     });
                   }}
@@ -185,9 +188,13 @@ function MercadoProducto({ config, subdominio, carrito, producto, varianteSelecc
           <h1 className="my-2 text-2xl font-bold" style={{ fontFamily: FONT_DISPLAY }}>
             {producto.nombre}
           </h1>
-          <p className="mb-4 text-2xl font-bold" style={{ color: accent }}>
-            {varianteSeleccionada ? formatearPrecio(varianteSeleccionada.precio) : 'Elegí una opción'}
-          </p>
+          <div className="mb-4">
+            {varianteSeleccionada ? (
+              <FilaPrecioOferta precio={varianteSeleccionada.precio} oferta={varianteSeleccionada.oferta} estilo={config.tema.estiloInsigniaOferta} tamano="1.5em" colorAcento={accent} />
+            ) : (
+              <p className="text-2xl font-bold" style={{ color: accent }}>Elegí una opción</p>
+            )}
+          </div>
           {producto.descripcionTienda && <p className="mb-5 text-sm leading-relaxed text-[#4a6462] dark:text-[#a9c2bf]">{producto.descripcionTienda}</p>}
 
           {debeElegirVariante && (
@@ -238,7 +245,7 @@ function MercadoProducto({ config, subdominio, carrito, producto, varianteSelecc
           </button>
         </div>
       </div>
-      <ProductosRelacionados productos={producto.relacionados} subdominio={subdominio} />
+      <ProductosRelacionados productos={producto.relacionados} subdominio={subdominio} estiloInsignia={config.tema.estiloInsigniaOferta} />
       <Footer nombre={config.nombre} />
     </div>
   );

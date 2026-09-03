@@ -1,11 +1,12 @@
-import { Outlet, useParams } from 'react-router-dom';
+import { Outlet } from 'react-router-dom';
+import { useSubdominioTienda } from '../../hooks/useSubdominioTienda';
 import { CarritoTiendaProvider } from './CarritoTiendaContext';
 import { CarritoDrawerProvider } from './CarritoDrawerContext';
 import { CarritoDrawer } from './CarritoDrawer';
 
 /** Envuelve las 7 rutas de tienda: una sola instancia de carrito compartida (CarritoTiendaContext) y el estado de apertura del drawer (CarritoDrawerContext), para que el drawer se pueda abrir desde cualquiera de ellas — ver CarritoDrawer.tsx. */
 export function TiendaLayout() {
-  const { subdominio = '' } = useParams();
+  const subdominio = useSubdominioTienda();
   return (
     <CarritoTiendaProvider subdominio={subdominio}>
       <CarritoDrawerProvider>

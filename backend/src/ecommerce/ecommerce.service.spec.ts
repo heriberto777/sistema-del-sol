@@ -1,11 +1,13 @@
-import { NotFoundException, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, NotFoundException, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { EcommerceService } from './ecommerce.service';
 import { EcommerceRepository } from './ecommerce.repository';
 import { PedidosTiendaRepository } from './pedidos-tienda.repository';
+import { SeccionesTiendaRepository } from './secciones-tienda.repository';
 import { ClientesService } from '../clientes/clientes.service';
 import { FacturacionService } from '../facturacion/facturacion.service';
 import { VariantesService } from '../variantes/variantes.service';
+import { OfertasService } from '../ofertas/ofertas.service';
 import { AuthenticatedRequest } from '../common/types/authenticated-request';
 
 const TENANT_ACTIVO = { id: 't1', nombre: 'Tenant Demo', estado: 'ACTIVO', plan: { modulos: [{ modulo: { clave: 'ecommerce' } }] } };
@@ -27,9 +29,11 @@ describe('EcommerceService', () => {
   };
   let ecommerceRepository: jest.Mocked<EcommerceRepository>;
   let pedidosTiendaRepository: jest.Mocked<PedidosTiendaRepository>;
+  let seccionesTiendaRepository: jest.Mocked<SeccionesTiendaRepository>;
   let clientesService: jest.Mocked<ClientesService>;
   let facturacionService: jest.Mocked<FacturacionService>;
   let variantesService: jest.Mocked<VariantesService>;
+  let ofertasService: jest.Mocked<OfertasService>;
   let jwtService: jest.Mocked<JwtService>;
 
   beforeEach(() => {
@@ -47,6 +51,8 @@ describe('EcommerceService', () => {
     ecommerceRepository = {
       catalogo: jest.fn().mockResolvedValue([[], 0]),
       ofertasVigentesPublicas: jest.fn().mockResolvedValue([]),
+      categoriasPublicas: jest.fn().mockResolvedValue([]),
+      seccionesActivasPublicas: jest.fn().mockResolvedValue([]),
       productosRelacionados: jest.fn().mockResolvedValue([]),
       buscarProductoPublico: jest.fn().mockResolvedValue(null),
       buscarAdminMasAntiguo: jest.fn().mockResolvedValue(VENDEDOR),
@@ -57,6 +63,8 @@ describe('EcommerceService', () => {
       miPerfil: jest.fn().mockResolvedValue({ id: 'c1', nombre: 'Ana', email: 'ana@ejemplo.com', telefono: null, puntosLealtad: 0 }),
       actualizarPerfil: jest.fn().mockResolvedValue({ id: 'c1', nombre: 'Ana', email: 'ana@ejemplo.com', telefono: null, puntosLealtad: 0 }),
       buscarClientePorEmail: jest.fn().mockResolvedValue(null),
+      obtenerCarrito: jest.fn().mockResolvedValue(null),
+      guardarCarrito: jest.fn().mockResolvedValue({ id: 'cc1' }),
       misDirecciones: jest.fn().mockResolvedValue([]),
       buscarDireccion: jest.fn().mockResolvedValue(null),
       crearDireccion: jest.fn().mockResolvedValue({ id: 'd1' }),
@@ -66,7 +74,16 @@ describe('EcommerceService', () => {
     pedidosTiendaRepository = {
       listar: jest.fn().mockResolvedValue([[], 0]),
       facturasPorIds: jest.fn().mockResolvedValue([]),
+      detalle: jest.fn().mockResolvedValue(null),
     } as unknown as jest.Mocked<PedidosTiendaRepository>;
+    seccionesTiendaRepository = {
+      listar: jest.fn().mockResolvedValue([]),
+      buscarPorId: jest.fn(),
+      crear: jest.fn(),
+      actualizar: jest.fn(),
+      eliminar: jest.fn().mockResolvedValue({ id: 's1' }),
+      reordenar: jest.fn().mockResolvedValue(undefined),
+    } as unknown as jest.Mocked<SeccionesTiendaRepository>;
     clientesService = {
       buscarConsumidorFinal: jest.fn().mockResolvedValue(CONSUMIDOR_FINAL),
     } as unknown as jest.Mocked<ClientesService>;
@@ -76,6 +93,9 @@ describe('EcommerceService', () => {
     variantesService = {
       listarPorProducto: jest.fn().mockResolvedValue([]),
     } as unknown as jest.Mocked<VariantesService>;
+    ofertasService = {
+      resolverOfertaVisibleProducto: jest.fn().mockResolvedValue(null),
+    } as unknown as jest.Mocked<OfertasService>;
     jwtService = {
       verify: jest.fn(),
       sign: jest.fn(),
@@ -86,9 +106,11 @@ describe('EcommerceService', () => {
       prisma as any,
       ecommerceRepository,
       pedidosTiendaRepository,
+      seccionesTiendaRepository,
       clientesService,
       facturacionService,
       variantesService,
+      ofertasService,
       jwtService,
     );
   });
@@ -155,15 +177,21 @@ describe('EcommerceService', () => {
 
       const resultado = await service.producto('demo', 'p1', requestFalso());
 
-      expect(resultado.variantes).toEqual([{ id: 'v1', etiqueta: 'Talla: M', precio: 500, stock: 5 }]);
+      expect(resultado.variantes).toEqual([{ id: 'v1', etiqueta: 'Talla: M', precio: 500, stock: 5, oferta: null }]);
     });
 
-    it('Fase 11 — sin categoría, no busca relacionados y devuelve la lista vacía', async () => {
+    it('Fase 16 — sin categoría, igual pide relacionados (con categoriaId null) para que el repositorio pueda rellenar con otros productos', async () => {
       ecommerceRepository.buscarProductoPublico.mockResolvedValue({ id: 'p1', nombre: 'Camisa', imagenesAdicionales: [], categoria: null } as never);
 
       const resultado = await service.producto('demo', 'p1', requestFalso());
 
-      expect(ecommerceRepository.productosRelacionados).not.toHaveBeenCalled();
+      expect(ecommerceRepository.productosRelacionados).toHaveBeenCalledWith({
+        tenantId: 't1',
+        categoriaId: null,
+        excluirProductoId: 'p1',
+        bodegaId: 'b1',
+        limit: 4,
+      });
       expect(resultado.relacionados).toEqual([]);
     });
 
@@ -185,7 +213,7 @@ describe('EcommerceService', () => {
         bodegaId: 'b1',
         limit: 4,
       });
-      expect(resultado.relacionados).toEqual([{ id: 'p2', nombre: 'Camisa azul' }]);
+      expect(resultado.relacionados).toEqual([{ id: 'p2', nombre: 'Camisa azul', oferta: null }]);
     });
   });
 
@@ -197,6 +225,17 @@ describe('EcommerceService', () => {
 
       expect(ecommerceRepository.ofertasVigentesPublicas).toHaveBeenCalledWith('t1');
       expect(resultado).toEqual([{ id: 'o1', nombre: '20% en Camisas' }]);
+    });
+  });
+
+  describe('categorias', () => {
+    it('Fase 12 — resuelve la tienda y delega en el repositorio las categorías con productos visibles del tenant', async () => {
+      ecommerceRepository.categoriasPublicas.mockResolvedValue([{ id: 'c1', nombre: 'Ropa', cantidad: 5 }] as never);
+
+      const resultado = await service.categorias('demo');
+
+      expect(ecommerceRepository.categoriasPublicas).toHaveBeenCalledWith('t1');
+      expect(resultado).toEqual([{ id: 'c1', nombre: 'Ropa', cantidad: 5 }]);
     });
   });
 
@@ -286,6 +325,19 @@ describe('EcommerceService', () => {
     });
   });
 
+  describe('detallePedidoAdmin', () => {
+    it('404 si el pedido no existe (o es de otro tenant — el repositorio ya lo filtra)', async () => {
+      await expect(service.detallePedidoAdmin('f-ajena')).rejects.toThrow(NotFoundException);
+    });
+
+    it('devuelve el detalle cuando la factura existe', async () => {
+      const detalle = { factura: { id: 'f1' }, pedido: null, lineas: [{ nombre: 'Producto X', cantidad: 1, precioUnitario: 100, montoTotal: 100 }] };
+      pedidosTiendaRepository.detalle.mockResolvedValue(detalle as never);
+      await expect(service.detallePedidoAdmin('f1')).resolves.toEqual(detalle);
+      expect(pedidosTiendaRepository.detalle).toHaveBeenCalledWith('f1');
+    });
+  });
+
   describe('misPedidos', () => {
     it('devuelve los pedidos del cliente autenticado cuando el subdominio corresponde a su tenant', async () => {
       ecommerceRepository.misPedidos.mockResolvedValue([{ factura: { id: 'f1' }, pedido: null }] as never);
@@ -317,6 +369,42 @@ describe('EcommerceService', () => {
       ecommerceRepository.detallePedido.mockResolvedValue(detalle as never);
       await expect(service.detallePedido('demo', CLIENTE, 'f1')).resolves.toEqual(detalle);
       expect(ecommerceRepository.detallePedido).toHaveBeenCalledWith('t1', 'c1', 'f1');
+    });
+  });
+
+  describe('obtenerCarrito / guardarCarrito (Fase 16 — carrito persistente del cliente logueado)', () => {
+    it('obtenerCarrito: sin fila guardada, devuelve items vacío', async () => {
+      const resultado = await service.obtenerCarrito('demo', CLIENTE);
+      expect(resultado).toEqual({ items: [] });
+    });
+
+    it('obtenerCarrito: parsea el JSON guardado', async () => {
+      ecommerceRepository.obtenerCarrito.mockResolvedValue({ itemsJson: JSON.stringify([{ varianteId: 'v1', cantidad: 2 }]) } as never);
+      const resultado = await service.obtenerCarrito('demo', CLIENTE);
+      expect(resultado).toEqual({ items: [{ varianteId: 'v1', cantidad: 2 }] });
+    });
+
+    it('obtenerCarrito: JSON corrupto cae a items vacío sin lanzar', async () => {
+      ecommerceRepository.obtenerCarrito.mockResolvedValue({ itemsJson: '{esto no es json' } as never);
+      await expect(service.obtenerCarrito('demo', CLIENTE)).resolves.toEqual({ items: [] });
+    });
+
+    it('obtenerCarrito: rechaza si el token es de OTRO tenant', async () => {
+      await expect(service.obtenerCarrito('demo', { ...CLIENTE, tenantId: 'otro-tenant' })).rejects.toThrow(UnauthorizedException);
+      expect(ecommerceRepository.obtenerCarrito).not.toHaveBeenCalled();
+    });
+
+    it('guardarCarrito: guarda el JSON serializado bajo el clienteId', async () => {
+      const items = [{ productoId: 'p1', varianteId: 'v1', nombre: 'X', varianteEtiqueta: '', precio: 100, imagen: null, cantidad: 1 }];
+      await service.guardarCarrito('demo', CLIENTE, { items } as never);
+      expect(ecommerceRepository.guardarCarrito).toHaveBeenCalledWith('c1', JSON.stringify(items));
+    });
+
+    it('guardarCarrito: rechaza si el token es de OTRO tenant', async () => {
+      await expect(service.guardarCarrito('demo', { ...CLIENTE, tenantId: 'otro-tenant' }, { items: [] } as never)).rejects.toThrow(
+        UnauthorizedException,
+      );
+      expect(ecommerceRepository.guardarCarrito).not.toHaveBeenCalled();
     });
   });
 
@@ -357,6 +445,78 @@ describe('EcommerceService', () => {
       ecommerceRepository.buscarDireccion.mockResolvedValue({ id: 'd1', clienteId: 'c1' } as never);
       await expect(service.actualizarDireccion('demo', CLIENTE, 'd1', { esPrincipal: true })).resolves.toBeDefined();
       expect(ecommerceRepository.actualizarDireccion).toHaveBeenCalledWith('d1', 'c1', { esPrincipal: true });
+    });
+  });
+
+  describe('secciones (Fase 17, Secciones Dinámicas)', () => {
+    it('secciones(): resuelve la tienda pública y adjunta ofertas a los productos de cada sección', async () => {
+      ecommerceRepository.seccionesActivasPublicas.mockResolvedValue([
+        { id: 's1', tipo: 'PRODUCTOS', titulo: 'Combinalo con...', productos: [{ id: 'p1', precio: 100, categoria: null }] },
+      ] as never);
+      const resultado = await service.secciones('demo', requestFalso());
+      expect(ecommerceRepository.seccionesActivasPublicas).toHaveBeenCalledWith('t1', 'b1');
+      expect(resultado[0].productos[0]).toMatchObject({ id: 'p1', oferta: null });
+    });
+
+    describe('crearSeccion — validarTipoSeccion', () => {
+      it('PRODUCTOS sin productoIds: rechaza', async () => {
+        await expect(service.crearSeccion({ tipo: 'PRODUCTOS', titulo: 'X' } as never, 't1')).rejects.toThrow(BadRequestException);
+        expect(seccionesTiendaRepository.crear).not.toHaveBeenCalled();
+      });
+
+      it('BANNER con productoIds: crea (misma validación que PRODUCTOS)', async () => {
+        await service.crearSeccion({ tipo: 'BANNER', titulo: 'X', productoIds: ['p1'] } as never, 't1');
+        expect(seccionesTiendaRepository.crear).toHaveBeenCalledWith('t1', { tipo: 'BANNER', titulo: 'X', productoIds: ['p1'] });
+      });
+
+      it('CATEGORIA sin categoriaId: rechaza', async () => {
+        await expect(service.crearSeccion({ tipo: 'CATEGORIA', titulo: 'X' } as never, 't1')).rejects.toThrow(BadRequestException);
+      });
+
+      it('MINIGRID con 1 sola categoría: rechaza (mínimo 2)', async () => {
+        await expect(service.crearSeccion({ tipo: 'MINIGRID', titulo: 'X', categoriaIds: ['c1'] } as never, 't1')).rejects.toThrow(
+          BadRequestException,
+        );
+      });
+
+      it('MINIGRID con 4 categorías: crea', async () => {
+        const categoriaIds = ['c1', 'c2', 'c3', 'c4'];
+        await service.crearSeccion({ tipo: 'MINIGRID', titulo: 'X', categoriaIds } as never, 't1');
+        expect(seccionesTiendaRepository.crear).toHaveBeenCalledWith('t1', { tipo: 'MINIGRID', titulo: 'X', categoriaIds });
+      });
+    });
+
+    describe('actualizarSeccion — combina con lo ya guardado antes de revalidar', () => {
+      it('cambiar a CATEGORIA sin mandar categoriaId, y la sección actual tampoco tenía uno: rechaza', async () => {
+        seccionesTiendaRepository.buscarPorId.mockResolvedValue({
+          id: 's1',
+          tipo: 'PRODUCTOS',
+          titulo: 'X',
+          categoriaId: null,
+          productos: [{ productoId: 'p1' }],
+          categorias: [],
+        } as never);
+        await expect(service.actualizarSeccion('s1', { tipo: 'CATEGORIA' })).rejects.toThrow(BadRequestException);
+        expect(seccionesTiendaRepository.actualizar).not.toHaveBeenCalled();
+      });
+
+      it('PATCH que solo cambia el título no toca la validación de tipo (usa los productos ya guardados)', async () => {
+        seccionesTiendaRepository.buscarPorId.mockResolvedValue({
+          id: 's1',
+          tipo: 'PRODUCTOS',
+          titulo: 'Viejo',
+          categoriaId: null,
+          productos: [{ productoId: 'p1' }],
+          categorias: [],
+        } as never);
+        await service.actualizarSeccion('s1', { titulo: 'Nuevo' });
+        expect(seccionesTiendaRepository.actualizar).toHaveBeenCalledWith('s1', { titulo: 'Nuevo' });
+      });
+    });
+
+    it('reordenarSecciones: delega el arreglo completo de ids al repositorio', async () => {
+      await service.reordenarSecciones({ ids: ['s2', 's1'] });
+      expect(seccionesTiendaRepository.reordenar).toHaveBeenCalledWith(['s2', 's1']);
     });
   });
 });

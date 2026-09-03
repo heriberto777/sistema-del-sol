@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { tiendaApiClient } from '../lib/tienda-api-client';
 
 export interface ClienteTiendaSesion {
@@ -27,6 +27,31 @@ function leer<T>(clave: string): T | null {
 }
 
 /**
+ * Sin Context (a diferencia de `CarritoTiendaContext`) — cada Nav de las
+ * 17 plantillas + `CarritoTiendaProvider` llaman `useClienteTienda(subdominio)`
+ * por su cuenta, cada uno con su propio `useState` leído de localStorage
+ * SOLO al montar. Sin este pub/sub en memoria, un login/logout hecho
+ * desde UNA instancia (ej. el formulario de Login) nunca se refleja en
+ * las demás instancias ya montadas (ej. `CarritoTiendaProvider`, que
+ * necesita enterarse para sincronizar el carrito — bug real encontrado
+ * en la verificación en vivo de la Fase 16: el carrito nunca subía al
+ * servidor tras loguearse porque el `token` de esa instancia seguía en
+ * `null`). Notificar por subdominio (no global) porque cada tienda es
+ * independiente.
+ */
+const listenersPorSubdominio = new Map<string, Set<() => void>>();
+
+function notificarCambioSesion(subdominio: string) {
+  listenersPorSubdominio.get(subdominio)?.forEach((fn) => fn());
+}
+
+function suscribirCambioSesion(subdominio: string, fn: () => void): () => void {
+  if (!listenersPorSubdominio.has(subdominio)) listenersPorSubdominio.set(subdominio, new Set());
+  listenersPorSubdominio.get(subdominio)!.add(fn);
+  return () => listenersPorSubdominio.get(subdominio)?.delete(fn);
+}
+
+/**
  * Sesión del comprador del storefront (Fase 6) — token/perfil en
  * localStorage por subdominio (mismo criterio de scoping que
  * `useCarritoTienda`). Sin interceptor de 401/redirect: `tiendaApiClient`
@@ -39,6 +64,15 @@ export function useClienteTienda(subdominio: string) {
   const [token, setToken] = useState<string | null>(() => localStorage.getItem(claveToken(subdominio)));
   const [cliente, setCliente] = useState<ClienteTiendaSesion | null>(() => leer(claveCliente(subdominio)));
 
+  useEffect(
+    () =>
+      suscribirCambioSesion(subdominio, () => {
+        setToken(localStorage.getItem(claveToken(subdominio)));
+        setCliente(leer(claveCliente(subdominio)));
+      }),
+    [subdominio],
+  );
+
   const guardarSesion = useCallback(
     (accessToken: string, perfil: ClienteTiendaSesion) => {
       try {
@@ -49,6 +83,7 @@ export function useClienteTienda(subdominio: string) {
       }
       setToken(accessToken);
       setCliente(perfil);
+      notificarCambioSesion(subdominio);
     },
     [subdominio],
   );
@@ -56,6 +91,7 @@ export function useClienteTienda(subdominio: string) {
   const cerrarSesion = useCallback(() => {
     localStorage.removeItem(claveToken(subdominio));
     localStorage.removeItem(claveCliente(subdominio));
+    notificarCambioSesion(subdominio);
     setToken(null);
     setCliente(null);
   }, [subdominio]);
@@ -95,6 +131,7 @@ export function useClienteTienda(subdominio: string) {
         }
         return siguiente;
       });
+      notificarCambioSesion(subdominio);
     },
     [subdominio],
   );

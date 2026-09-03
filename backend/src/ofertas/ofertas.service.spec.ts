@@ -342,6 +342,56 @@ describe('OfertasService', () => {
     });
   });
 
+  describe('resolverOfertaVisibleProducto (Fase 13 — insignia/precio en la tarjeta)', () => {
+    it('sin ofertas vigentes, no hay nada que mostrar', async () => {
+      const resultado = await service.resolverOfertaVisibleProducto('prod-1', 'cat-1', 100);
+      expect(resultado).toBeNull();
+    });
+
+    it('PORCENTAJE — devuelve precio con descuento, ahorro y porcentaje, usando la MISMA fórmula que la venta', async () => {
+      repository.buscarVigentesParaLinea.mockResolvedValue([ofertaBase({ tipoDescuento: 'PORCENTAJE', valor: 20 })] as never);
+
+      const resultado = await service.resolverOfertaVisibleProducto('prod-1', null, 250);
+
+      expect(resultado).toEqual({ tipo: 'DESCUENTO', precioConDescuento: 200, ahorro: 50, porcentaje: 20 });
+    });
+
+    it('MONTO_FIJO — topado a la propia base si el descuento es mayor al precio', async () => {
+      repository.buscarVigentesParaLinea.mockResolvedValue([ofertaBase({ tipoDescuento: 'MONTO_FIJO', valor: 500 })] as never);
+
+      const resultado = await service.resolverOfertaVisibleProducto('prod-1', null, 100);
+
+      expect(resultado).toEqual({ tipo: 'DESCUENTO', precioConDescuento: 0, ahorro: 100, porcentaje: 100 });
+    });
+
+    it('BOGO — a cantidad=1 no da descuento de precio, se muestra como mecánica (insignia), nunca como precio tachado inventado', async () => {
+      repository.buscarVigentesParaLinea.mockResolvedValue([
+        ofertaBase({ tipoDescuento: 'BOGO', valor: null, comprarCantidad: 2, llevarCantidad: 1, porcentajeDescuentoLlevar: 100 }),
+      ] as never);
+
+      const resultado = await service.resolverOfertaVisibleProducto('prod-1', null, 100);
+
+      expect(resultado).toEqual({ tipo: 'BOGO', comprarCantidad: 2, llevarCantidad: 1, porcentajeDescuentoLlevar: 100 });
+    });
+
+    it('con PRODUCTO y CATEGORIA vigentes a la vez, gana la de mayor descuento (mismo criterio que resolverDescuentoLinea)', async () => {
+      repository.buscarVigentesParaLinea.mockResolvedValue([
+        ofertaBase({ tipoDescuento: 'PORCENTAJE', valor: 10 }), // 10% de 100 = 10
+        ofertaBase({ id: 'oferta-2', alcance: 'CATEGORIA', productoId: null, categoriaId: 'cat-1', tipoDescuento: 'MONTO_FIJO', valor: 40 }),
+      ] as never);
+
+      const resultado = await service.resolverOfertaVisibleProducto('prod-1', 'cat-1', 100);
+
+      expect(resultado).toEqual({ tipo: 'DESCUENTO', precioConDescuento: 60, ahorro: 40, porcentaje: 40 });
+    });
+
+    it('precio <= 0 no consulta nada y devuelve null', async () => {
+      const resultado = await service.resolverOfertaVisibleProducto('prod-1', null, 0);
+      expect(resultado).toBeNull();
+      expect(repository.buscarVigentesParaLinea).not.toHaveBeenCalled();
+    });
+  });
+
   describe('resolverDescuentoCarritoTotal', () => {
     it('sin ofertas de carrito vigentes, no hay descuento', async () => {
       const descuento = await service.resolverDescuentoCarritoTotal(1000);

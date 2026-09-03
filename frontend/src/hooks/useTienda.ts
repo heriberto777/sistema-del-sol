@@ -17,7 +17,10 @@ export type PlantillaTienda =
   | 'AMPLIA'
   | 'DISTRITO'
   | 'ATELIER'
-  | 'OFICIO';
+  | 'OFICIO'
+  | 'BAZAR'
+  | 'VITRINA'
+  | 'SOLMARKET';
 
 export interface ConfigTienda {
   nombre: string;
@@ -30,6 +33,11 @@ export interface ConfigTienda {
   /** Fase 11 — mensaje de texto libre para la barra de anuncio arriba del Nav; `null`/vacío = no mostrar nada. */
   bannerTexto: string | null;
 }
+
+/** Fase 13 — oferta a mostrar en la tarjeta de producto (mirror de `OfertaVisibleProducto`, backend). `null` = sin oferta vigente para este producto/precio. */
+export type OfertaVisibleProducto =
+  | { tipo: 'DESCUENTO'; precioConDescuento: number; ahorro: number; porcentaje: number }
+  | { tipo: 'BOGO'; comprarCantidad: number; llevarCantidad: number; porcentajeDescuentoLlevar: number };
 
 export interface ProductoTienda {
   id: string;
@@ -46,14 +54,18 @@ export interface ProductoTienda {
   varianteId: string | null;
   /** Fase 4 — si tiene más de una variante (ej. Talla/Color), la grilla no puede agregar directo, hay que elegir en el detalle. */
   tieneVariantes: boolean;
+  /** Fase 13 — `null` si no hay ninguna oferta vigente para este producto/categoría. */
+  oferta: OfertaVisibleProducto | null;
 }
 
 export interface VarianteTienda {
   id: string;
-  /** Ej. "Talla: M, Color: Rojo" — vacío si el producto nunca usó atributos (una sola variante "por defecto"). */
+  /** Ej. "Talla: M, Color: Rojo" — vacío si el producto nunca usó atributos. */
   etiqueta: string;
   precio: string | null;
   stock: number | null;
+  /** Fase 13 — oferta vigente para ESTA variante (cada una puede tener un precio distinto). */
+  oferta: OfertaVisibleProducto | null;
 }
 
 export interface ProductoTiendaDetalle {
@@ -120,6 +132,7 @@ export interface OfertaTienda {
   comprarCantidad: number | null;
   llevarCantidad: number | null;
   porcentajeDescuentoLlevar: string | null;
+  fechaFin: string;
   producto: { nombre: string } | null;
   categoria: { nombre: string } | null;
 }
@@ -144,6 +157,63 @@ export function resumenOferta(oferta: OfertaTienda): string {
     return `${Number(oferta.valor ?? 0)}% OFF ${destino}`;
   }
   return `${formatearPrecio(oferta.valor)} OFF ${destino}`;
+}
+
+/** Etiqueta de vigencia para la sección "Ofertas" (Fase 12) — a partir de `fechaFin` (real, del modelo Oferta), sin simular ningún "% reclamado" que no existe como dato. */
+export function etiquetaVigenciaOferta(fechaFinIso: string): string {
+  const finDia = new Date(fechaFinIso);
+  finDia.setHours(0, 0, 0, 0);
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+  const diasRestantes = Math.round((finDia.getTime() - hoy.getTime()) / 86400000);
+  if (diasRestantes <= 0) return 'Termina hoy';
+  if (diasRestantes === 1) return 'Termina mañana';
+  if (diasRestantes <= 7) return `Termina en ${diasRestantes} días`;
+  return `Vence el ${new Date(fechaFinIso).toLocaleDateString('es-DO', { day: '2-digit', month: 'short' })}`;
+}
+
+export interface CategoriaTienda {
+  id: string;
+  nombre: string;
+  cantidad: number;
+}
+
+/** Chips de categoría del Home (Fase 12, plantillas "marketplace") — solo categorías con al menos un producto visible. */
+export function useCategoriasTienda(subdominio: string) {
+  return useQuery({
+    queryKey: ['tienda-categorias', subdominio],
+    queryFn: async () => (await tiendaApiClient.get<CategoriaTienda[]>(`/tienda/${subdominio}/categorias`)).data,
+  });
+}
+
+export type TipoSeccionTienda = 'PRODUCTOS' | 'CATEGORIA' | 'BANNER' | 'MINIGRID';
+
+/**
+ * Bloque del Home armado por el admin (Fase 17, "Secciones Dinámicas") —
+ * qué campos vienen resueltos depende de `tipo`: PRODUCTOS/BANNER traen
+ * `productos` (BANNER se renderiza como slideshow, misma data);
+ * CATEGORIA trae `categoria` (mismo shape que `CategoriaTienda`, sin
+ * `cantidad`); MINIGRID trae `categorias` (2 a 4).
+ */
+export interface SeccionTienda {
+  id: string;
+  tipo: TipoSeccionTienda;
+  titulo: string;
+  subtitulo: string | null;
+  ctaTexto: string | null;
+  imagen: string | null;
+  color: string | null;
+  categoria: { id: string; nombre: string } | null;
+  categorias: { id: string; nombre: string }[];
+  productos: ProductoTienda[];
+}
+
+/** Secciones activas del Home, ya en el orden que definió el admin. `[]` si el admin no armó ninguna — el Home sigue funcionando solo con Destacados/Ofertas builtin. */
+export function useSeccionesTienda(subdominio: string) {
+  return useQuery({
+    queryKey: ['tienda-secciones', subdominio],
+    queryFn: async () => (await tiendaApiClient.get<SeccionTienda[]>(`/tienda/${subdominio}/secciones`)).data,
+  });
 }
 
 export interface PedidoConFactura {
@@ -233,4 +303,24 @@ export function useDetallePedido(subdominio: string, token: string | null, factu
 
 export function formatearPrecio(precio: string | number | null): string {
   return `RD$ ${Number(precio ?? 0).toLocaleString('es-DO')}`;
+}
+
+/** Texto corto para la insignia de la tarjeta (Fase 13) — ej. "-20%", "2×1", "3ra al 50%". */
+export function badgeCortoOferta(oferta: OfertaVisibleProducto): string {
+  if (oferta.tipo === 'DESCUENTO') return `-${oferta.porcentaje}%`;
+  const { comprarCantidad, llevarCantidad, porcentajeDescuentoLlevar } = oferta;
+  if (porcentajeDescuentoLlevar >= 100) return `${comprarCantidad + llevarCantidad}×${comprarCantidad}`;
+  return `${porcentajeDescuentoLlevar}% en la ${llevarCantidad}ª`;
+}
+
+/** Línea debajo del precio (Fase 13) — `detallada` suma el porcentaje/mecánica completa (estilo "Ahorro"). */
+export function lineaOferta(oferta: OfertaVisibleProducto, detallada: boolean): string {
+  if (oferta.tipo === 'BOGO') {
+    const { comprarCantidad, llevarCantidad, porcentajeDescuentoLlevar } = oferta;
+    const etiquetaDescuento = porcentajeDescuentoLlevar >= 100 ? 'gratis' : `al ${porcentajeDescuentoLlevar}% OFF`;
+    return detallada
+      ? `Comprá ${comprarCantidad}, llevá ${llevarCantidad} ${etiquetaDescuento}`
+      : `Llevá ${comprarCantidad + llevarCantidad}, ${llevarCantidad} ${etiquetaDescuento}`;
+  }
+  return detallada ? `Ahorrás ${formatearPrecio(oferta.ahorro)} (${oferta.porcentaje}%)` : `Ahorrás ${formatearPrecio(oferta.ahorro)}`;
 }

@@ -1,9 +1,18 @@
-import { OfertaTienda, resumenOferta } from '../../hooks/useTienda';
+import { etiquetaVigenciaOferta, OfertaTienda, resumenOferta } from '../../hooks/useTienda';
 import { DefaultsColorTienda } from './TarjetaProductoTienda';
 
 /** Sección "Ofertas" del Home (Fase 11) — ofertas reales del motor ya usado en POS/Facturación, no renderiza nada sin ninguna vigente. `defaults` es solo para plantillas viejas sin tokens. */
-export function SeccionOfertas({ ofertas, defaults }: { ofertas: OfertaTienda[]; defaults?: DefaultsColorTienda }) {
-  if (!ofertas.length) return null;
+export function SeccionOfertas({
+  ofertas,
+  defaults,
+  mostrar = true,
+}: {
+  ofertas: OfertaTienda[];
+  defaults?: DefaultsColorTienda;
+  /** Fase 16 — el admin puede apagar esta sección desde Personalización (independiente de la insignia por producto, que sigue mostrándose siempre). */
+  mostrar?: boolean;
+}) {
+  if (!mostrar || !ofertas.length) return null;
   const acento = defaults?.acento ?? '#111827';
   const superficie = defaults?.superficie ?? '#ffffff';
   const texto = defaults?.texto ?? 'inherit';
@@ -28,6 +37,9 @@ export function SeccionOfertas({ ofertas, defaults }: { ofertas: OfertaTienda[];
             </span>
             <span className="text-[0.7em]" style={{ color: `var(--tienda-color-texto, ${texto})`, opacity: 0.7 }}>
               {o.nombre}
+            </span>
+            <span className="text-[0.68em] font-semibold" style={{ color: `var(--tienda-color-acento, ${acento})`, opacity: 0.85 }}>
+              {etiquetaVigenciaOferta(o.fechaFin)}
             </span>
           </div>
         ))}

@@ -78,4 +78,5 @@ export const TENANT_SCOPED_MODELS = new Set([
   'WhatsappMensaje',
   'CarritoBorrador',
   'PedidoTienda',
+  'SeccionTienda',
 ]);

@@ -1,10 +1,11 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Put, Query, Req, UseGuards } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { EcommerceService } from './ecommerce.service';
 import { CatalogoTiendaQueryDto } from './dto/catalogo-tienda-query.dto';
 import { CrearPedidoTiendaDto } from './dto/crear-pedido-tienda.dto';
 import { ActualizarPerfilClienteTiendaDto } from './dto/actualizar-perfil-cliente-tienda.dto';
 import { ActualizarDireccionClienteDto, CrearDireccionClienteDto } from './dto/direccion-cliente.dto';
+import { GuardarCarritoTiendaDto } from './dto/guardar-carrito-tienda.dto';
 import { Public } from '../common/decorators/public.decorator';
 import { AuthenticatedRequest } from '../common/types/authenticated-request';
 import { ClienteTiendaAuthGuard } from '../cliente-tienda-auth/guards/cliente-tienda-auth.guard';
@@ -30,13 +31,23 @@ export class EcommerceController {
   }
 
   @Get('productos')
-  catalogo(@Param('subdominio') subdominio: string, @Query() query: CatalogoTiendaQueryDto) {
-    return this.ecommerceService.catalogo(subdominio, query);
+  catalogo(@Param('subdominio') subdominio: string, @Query() query: CatalogoTiendaQueryDto, @Req() request: AuthenticatedRequest) {
+    return this.ecommerceService.catalogo(subdominio, query, request);
   }
 
   @Get('ofertas')
   ofertas(@Param('subdominio') subdominio: string) {
     return this.ecommerceService.ofertas(subdominio);
+  }
+
+  @Get('categorias')
+  categorias(@Param('subdominio') subdominio: string) {
+    return this.ecommerceService.categorias(subdominio);
+  }
+
+  @Get('secciones')
+  secciones(@Param('subdominio') subdominio: string, @Req() request: AuthenticatedRequest) {
+    return this.ecommerceService.secciones(subdominio, request);
   }
 
   @Get('productos/:productoId')
@@ -72,6 +83,22 @@ export class EcommerceController {
   @UseGuards(ClienteTiendaAuthGuard)
   miPerfil(@Param('subdominio') subdominio: string, @CurrentClienteTienda() cliente: ClienteTiendaPayload) {
     return this.ecommerceService.miPerfil(subdominio, cliente);
+  }
+
+  @Get('mi-carrito')
+  @UseGuards(ClienteTiendaAuthGuard)
+  obtenerCarrito(@Param('subdominio') subdominio: string, @CurrentClienteTienda() cliente: ClienteTiendaPayload) {
+    return this.ecommerceService.obtenerCarrito(subdominio, cliente);
+  }
+
+  @Put('mi-carrito')
+  @UseGuards(ClienteTiendaAuthGuard)
+  guardarCarrito(
+    @Param('subdominio') subdominio: string,
+    @CurrentClienteTienda() cliente: ClienteTiendaPayload,
+    @Body() dto: GuardarCarritoTiendaDto,
+  ) {
+    return this.ecommerceService.guardarCarrito(subdominio, cliente, dto);
   }
 
   @Patch('mi-perfil')

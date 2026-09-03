@@ -1,7 +1,8 @@
-import { ConflictException, Injectable, NotFoundException, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { EcommerceRepository } from './ecommerce.repository';
 import { PedidosTiendaRepository } from './pedidos-tienda.repository';
+import { SeccionesTiendaRepository } from './secciones-tienda.repository';
 import { resolverTiendaPublica } from './resolver-tienda-publica';
 import { paginar } from '../common/types/pagina-resultado';
 import { PrismaService } from '../prisma/prisma.service';
@@ -9,10 +10,14 @@ import { CatalogoTiendaQueryDto } from './dto/catalogo-tienda-query.dto';
 import { CrearPedidoTiendaDto } from './dto/crear-pedido-tienda.dto';
 import { ActualizarPerfilClienteTiendaDto } from './dto/actualizar-perfil-cliente-tienda.dto';
 import { ActualizarDireccionClienteDto, CrearDireccionClienteDto } from './dto/direccion-cliente.dto';
+import { GuardarCarritoTiendaDto } from './dto/guardar-carrito-tienda.dto';
+import { CrearSeccionTiendaDto } from './dto/crear-seccion-tienda.dto';
+import { ReordenarSeccionesTiendaDto } from './dto/reordenar-secciones-tienda.dto';
 import { ListadoQueryDto } from '../common/dto/listado-query.dto';
 import { ClientesService } from '../clientes/clientes.service';
 import { FacturacionService } from '../facturacion/facturacion.service';
 import { VariantesService } from '../variantes/variantes.service';
+import { OfertasService, OfertaVisibleProducto } from '../ofertas/ofertas.service';
 import { AuthenticatedRequest, JwtPayloadUser } from '../common/types/authenticated-request';
 import { CLIENTE_TIENDA_JWT_SECRET } from '../cliente-tienda-auth/cliente-tienda-jwt.constants';
 import { ClienteTiendaPayload } from '../cliente-tienda-auth/cliente-tienda-authenticated-request';
@@ -23,11 +28,36 @@ export class EcommerceService {
     private readonly prisma: PrismaService,
     private readonly ecommerceRepository: EcommerceRepository,
     private readonly pedidosTiendaRepository: PedidosTiendaRepository,
+    private readonly seccionesTiendaRepository: SeccionesTiendaRepository,
     private readonly clientesService: ClientesService,
     private readonly facturacionService: FacturacionService,
     private readonly variantesService: VariantesService,
+    private readonly ofertasService: OfertasService,
     private readonly jwtService: JwtService,
   ) {}
+
+  /**
+   * Fase 13 — cruza cada producto contra el motor de Ofertas real
+   * (`OfertasService.resolverOfertaVisibleProducto`, misma matemática que
+   * la venta) para adjuntar el precio con descuento u mecánica BOGO a
+   * mostrar en la tarjeta. `OfertasRepository` es request-scoped
+   * (`TenantPrismaService`), por eso exige `request.user.tenantId` ya
+   * forjado por el caller (mismo patrón que `producto()`). Una consulta
+   * por producto — aceptable al tamaño de una página paginada, nunca un
+   * listado sin límite.
+   */
+  private async adjuntarOfertas<T extends { id: string; precio: unknown; categoria: { id: string } | null }>(
+    items: T[],
+  ): Promise<(T & { oferta: OfertaVisibleProducto | null })[]> {
+    const ofertas = await Promise.all(
+      items.map((item) =>
+        item.precio
+          ? this.ofertasService.resolverOfertaVisibleProducto(item.id, item.categoria?.id ?? null, Number(item.precio as string | number))
+          : Promise.resolve(null),
+      ),
+    );
+    return items.map((item, i) => ({ ...item, oferta: ofertas[i] }));
+  }
 
   resolverTiendaPublica(subdominio: string) {
     return resolverTiendaPublica(this.prisma, subdominio);
@@ -52,10 +82,17 @@ export class EcommerceService {
     return this.ecommerceRepository.ofertasVigentesPublicas(tenant.id);
   }
 
-  async catalogo(subdominio: string, query: CatalogoTiendaQueryDto) {
+  /** Fase 12 — categorías con productos visibles, para los chips de filtro de las plantillas "marketplace" (Bazar/Vitrina/Sol Market). */
+  async categorias(subdominio: string) {
+    const { tenant } = await this.resolverTiendaPublica(subdominio);
+    return this.ecommerceRepository.categoriasPublicas(tenant.id);
+  }
+
+  async catalogo(subdominio: string, query: CatalogoTiendaQueryDto, request: AuthenticatedRequest) {
     const { tenant, config } = await this.resolverTiendaPublica(subdominio);
+    request.user = { tenantId: tenant.id, userId: 'tienda-online', email: '', roles: [], permisos: [] } as JwtPayloadUser;
     const { pagina, tamanoPagina, skip, take } = paginar(query.pagina, query.tamanoPagina);
-    const [datos, total] = await this.ecommerceRepository.catalogo({
+    const [productos, total] = await this.ecommerceRepository.catalogo({
       tenantId: tenant.id,
       bodegaId: config.bodegaId,
       skip,
@@ -64,6 +101,7 @@ export class EcommerceService {
       categoriaId: query.categoriaId,
       destacado: query.destacado === 'true' ? true : undefined,
     });
+    const datos = await this.adjuntarOfertas(productos);
     return { datos, total, pagina, tamanoPagina };
   }
 
@@ -87,23 +125,29 @@ export class EcommerceService {
     const activas = variantesCrudas.filter((v) => v.activa);
     const precios = await this.ecommerceRepository.preciosPorVariantes(activas.map((v) => v.id));
     const precioPorVariante = new Map(precios.map((p) => [p.varianteId, p.precioVenta]));
+    const categoriaId = producto.categoria?.id ?? null;
 
-    const variantes = activas.map((v) => ({
-      id: v.id,
-      etiqueta: v.valoresAtributo.map((va) => `${va.valorAtributo.atributo.nombre}: ${va.valorAtributo.valor}`).join(', '),
-      precio: precioPorVariante.get(v.id) ?? null,
-      stock: config.bodegaId && 'existencia' in v ? v.existencia : null,
-    }));
+    const variantes = await Promise.all(
+      activas.map(async (v) => {
+        const precio = precioPorVariante.get(v.id) ?? null;
+        return {
+          id: v.id,
+          etiqueta: v.valoresAtributo.map((va) => `${va.valorAtributo.atributo.nombre}: ${va.valorAtributo.valor}`).join(', '),
+          precio,
+          stock: config.bodegaId && 'existencia' in v ? v.existencia : null,
+          oferta: precio ? await this.ofertasService.resolverOfertaVisibleProducto(productoId, categoriaId, Number(precio)) : null,
+        };
+      }),
+    );
 
-    const relacionados = producto.categoria
-      ? await this.ecommerceRepository.productosRelacionados({
-          tenantId: tenant.id,
-          categoriaId: producto.categoria.id,
-          excluirProductoId: producto.id,
-          bodegaId: config.bodegaId,
-          limit: 4,
-        })
-      : [];
+    const relacionadosCrudos = await this.ecommerceRepository.productosRelacionados({
+      tenantId: tenant.id,
+      categoriaId,
+      excluirProductoId: producto.id,
+      bodegaId: config.bodegaId,
+      limit: 4,
+    });
+    const relacionados = await this.adjuntarOfertas(relacionadosCrudos);
 
     const { imagenesAdicionales, ...datosProducto } = producto;
     return { ...datosProducto, imagenesAdicionales: imagenesAdicionales.map((i) => i.imagen), variantes, relacionados };
@@ -167,6 +211,13 @@ export class EcommerceService {
     const facturasPorId = new Map(facturas.map((f) => [f.id, f]));
     const datos = pedidos.map((p) => ({ ...p, factura: facturasPorId.get(p.facturaId) ?? null }));
     return { datos, total, pagina, tamanoPagina };
+  }
+
+  /** Fase 14 — "Ver detalle" de un pedido puntual en el panel admin (líneas de factura + datos de contacto del pedido). */
+  async detallePedidoAdmin(facturaId: string) {
+    const detalle = await this.pedidosTiendaRepository.detalle(facturaId);
+    if (!detalle) throw new NotFoundException('Pedido no encontrado');
+    return detalle;
   }
 
   /**
@@ -238,6 +289,32 @@ export class EcommerceService {
     return this.ecommerceRepository.actualizarPerfil(cliente.clienteId, dto);
   }
 
+  /**
+   * Fase 16 — carrito persistente del cliente logueado, para recuperarlo
+   * en otro dispositivo. `[]` si nunca guardó ninguno (mismo criterio que
+   * "sin oferta" en otros lados: ausencia de dato, no un error). El JSON
+   * se parsea defensivo (mismo patrón que `TIENDA_TEMA`) — un blob
+   * corrupto no debe romper el storefront, solo perder ese carrito.
+   */
+  async obtenerCarrito(subdominio: string, cliente: ClienteTiendaPayload) {
+    const { tenant } = await this.resolverTiendaPublica(subdominio);
+    if (tenant.id !== cliente.tenantId) throw new UnauthorizedException('Sesión inválida para esta tienda');
+    const fila = await this.ecommerceRepository.obtenerCarrito(cliente.clienteId);
+    if (!fila) return { items: [] };
+    try {
+      return { items: JSON.parse(fila.itemsJson) };
+    } catch {
+      return { items: [] };
+    }
+  }
+
+  async guardarCarrito(subdominio: string, cliente: ClienteTiendaPayload, dto: GuardarCarritoTiendaDto) {
+    const { tenant } = await this.resolverTiendaPublica(subdominio);
+    if (tenant.id !== cliente.tenantId) throw new UnauthorizedException('Sesión inválida para esta tienda');
+    await this.ecommerceRepository.guardarCarrito(cliente.clienteId, JSON.stringify(dto.items));
+    return { ok: true };
+  }
+
   async misDirecciones(subdominio: string, cliente: ClienteTiendaPayload) {
     const { tenant } = await this.resolverTiendaPublica(subdominio);
     if (tenant.id !== cliente.tenantId) throw new UnauthorizedException('Sesión inválida para esta tienda');
@@ -269,5 +346,80 @@ export class EcommerceService {
     if (tenant.id !== cliente.tenantId) throw new UnauthorizedException('Sesión inválida para esta tienda');
     await this.direccionDelCliente(direccionId, cliente.clienteId);
     return this.ecommerceRepository.eliminarDireccion(direccionId);
+  }
+
+  /**
+   * Fase 17, "Secciones Dinámicas" — bloques del Home en el orden que
+   * definió el admin, con sus productos/categorías ya resueltos.
+   * `adjuntarOfertas` depende de `OfertasRepository`, request-scoped vía
+   * `TenantPrismaService` — mismo "forjado" de `request.user` que
+   * `catalogo()`/`producto()`, sin esto revienta con "No hay tenant en el
+   * contexto de la petición" (bug real, encontrado en la verificación en
+   * vivo de esta fase).
+   */
+  async secciones(subdominio: string, request: AuthenticatedRequest) {
+    const { tenant, config } = await this.resolverTiendaPublica(subdominio);
+    request.user = { tenantId: tenant.id, userId: 'tienda-online', email: '', roles: [], permisos: [] } as JwtPayloadUser;
+    const secciones = await this.ecommerceRepository.seccionesActivasPublicas(tenant.id, config.bodegaId);
+    return Promise.all(secciones.map(async (s) => ({ ...s, productos: await this.adjuntarOfertas(s.productos) })));
+  }
+
+  /** Panel admin "Secciones del Home" (Fase 17) — lista TODO (incl. inactivas), a diferencia de `secciones()` público. */
+  listarSecciones() {
+    return this.seccionesTiendaRepository.listar();
+  }
+
+  async crearSeccion(dto: CrearSeccionTiendaDto, tenantId: string) {
+    this.validarTipoSeccion(dto);
+    return this.seccionesTiendaRepository.crear(tenantId, dto);
+  }
+
+  /**
+   * Mismo criterio que `OfertasService.actualizar` — combina el DTO
+   * parcial con la sección ya guardada antes de revalidar, para atrapar
+   * un PATCH que cambia `tipo` sin mandar el campo que ese tipo nuevo
+   * necesita (ej. pasar de PRODUCTOS a CATEGORIA sin mandar
+   * `categoriaId`), algo que `ValidateIf` del DTO no puede ver por sí
+   * solo contra un body parcial.
+   */
+  async actualizarSeccion(id: string, dto: Partial<CrearSeccionTiendaDto>) {
+    const actual = await this.seccionesTiendaRepository.buscarPorId(id);
+    const combinado: CrearSeccionTiendaDto = {
+      tipo: dto.tipo ?? actual.tipo,
+      titulo: dto.titulo ?? actual.titulo,
+      categoriaId: dto.categoriaId !== undefined ? dto.categoriaId : (actual.categoriaId ?? undefined),
+      productoIds: dto.productoIds ?? actual.productos.map((p) => p.productoId),
+      categoriaIds: dto.categoriaIds ?? actual.categorias.map((c) => c.categoriaId),
+    };
+    this.validarTipoSeccion(combinado);
+    return this.seccionesTiendaRepository.actualizar(id, dto);
+  }
+
+  eliminarSeccion(id: string) {
+    return this.seccionesTiendaRepository.eliminar(id);
+  }
+
+  reordenarSecciones(dto: ReordenarSeccionesTiendaDto) {
+    return this.seccionesTiendaRepository.reordenar(dto.ids);
+  }
+
+  /**
+   * Qué campos aplican depende de `tipo` — el schema no lo puede exigir
+   * (todos nullable), se valida acá, mismo criterio que
+   * `OfertasService.validarAlcance`. `BANNER` comparte la validación de
+   * `PRODUCTOS` (misma tabla `productos`, solo cambia el renderizado).
+   */
+  private validarTipoSeccion(dto: Pick<CrearSeccionTiendaDto, 'tipo' | 'categoriaId' | 'productoIds' | 'categoriaIds'>) {
+    if (dto.tipo === 'PRODUCTOS' || dto.tipo === 'BANNER') {
+      if (!dto.productoIds || dto.productoIds.length === 0) {
+        throw new BadRequestException(`Una sección de tipo ${dto.tipo} necesita al menos un producto elegido a mano`);
+      }
+    } else if (dto.tipo === 'CATEGORIA') {
+      if (!dto.categoriaId) throw new BadRequestException('Una sección de tipo CATEGORIA necesita categoriaId');
+    } else if (dto.tipo === 'MINIGRID') {
+      if (!dto.categoriaIds || dto.categoriaIds.length < 2 || dto.categoriaIds.length > 4) {
+        throw new BadRequestException('Una sección de tipo MINIGRID necesita entre 2 y 4 categorías');
+      }
+    }
   }
 }

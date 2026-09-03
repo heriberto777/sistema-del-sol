@@ -1694,26 +1694,24 @@ function ModalCerrarTurno({
 
         <div className="space-y-1">
           <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Efectivo contado (por denominación)</p>
-          <div className="grid max-h-56 grid-cols-2 gap-x-4 gap-y-1 overflow-y-auto rounded-md border border-slate-200 p-2 dark:border-slate-800">
+          <div className="grid max-h-56 grid-cols-1 gap-x-3 gap-y-1 overflow-x-hidden overflow-y-auto rounded-md border border-slate-200 p-2 dark:border-slate-800 min-[420px]:grid-cols-2">
             {DENOMINACIONES.map((d) => (
-              <div key={d} className="flex items-center justify-between gap-2 text-sm">
-                <label htmlFor={`denominacion-${d}`} className="text-slate-600 dark:text-slate-400">
-                  {formatoRD(d)}
+              <div key={d} className="flex min-w-0 items-center gap-1.5 text-sm">
+                <label htmlFor={`denominacion-${d}`} className="w-11 shrink-0 text-slate-600 dark:text-slate-400">
+                  {d.toLocaleString('es-DO')}
                 </label>
-                <div className="flex items-center gap-1.5">
-                  <input
-                    id={`denominacion-${d}`}
-                    type="number"
-                    min={0}
-                    step={1}
-                    value={conteo[d] ?? ''}
-                    onChange={(e) => setConteo((prev) => ({ ...prev, [d]: e.target.value }))}
-                    className="w-16 rounded-md border border-slate-300 px-2 py-1 text-right text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-                  />
-                  <span className="w-20 shrink-0 text-right text-xs text-slate-400">
-                    {formatoRD(d * (Number(conteo[d]) || 0))}
-                  </span>
-                </div>
+                <input
+                  id={`denominacion-${d}`}
+                  type="number"
+                  min={0}
+                  step={1}
+                  value={conteo[d] ?? ''}
+                  onChange={(e) => setConteo((prev) => ({ ...prev, [d]: e.target.value }))}
+                  className="w-14 min-w-0 flex-1 rounded-md border border-slate-300 px-1.5 py-1 text-right text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                />
+                <span className="w-16 shrink-0 text-right text-xs tabular-nums text-slate-400">
+                  {(d * (Number(conteo[d]) || 0)).toLocaleString('es-DO')}
+                </span>
               </div>
             ))}
           </div>

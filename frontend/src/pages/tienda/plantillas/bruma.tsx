@@ -1,13 +1,15 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Minus, Plus, Search, ShoppingCart, Trash2, User } from 'lucide-react';
-import { formatearPrecio, useOfertasTienda, useProductosDestacados } from '../../../hooks/useTienda';
+import { formatearPrecio, useOfertasTienda, useProductosDestacados, useSeccionesTienda } from '../../../hooks/useTienda';
 import { useClienteTienda } from '../../../hooks/useClienteTienda';
 import { useCarritoDrawer } from '../CarritoDrawerContext';
 import { BannerAnuncio } from '../BannerAnuncio';
 import { SeccionDestacados } from '../SeccionDestacados';
 import { SeccionOfertas } from '../SeccionOfertas';
+import { SeccionesDinamicas } from '../SeccionesDinamicas';
 import { ProductosRelacionados } from '../ProductosRelacionados';
+import { FilaPrecioOferta, InsigniaOferta, precioOriginalParaCarrito, precioParaCarrito } from '../OfertaEnTarjeta';
 import { ClaveMenuTienda, DefaultsTemaPlantilla, menuVisibleOrdenado, useCargarFuentesTienda, variablesCssTema } from '../tema';
 import type { Plantilla, PropsCarrito, PropsHome, PropsProducto } from './tipos';
 
@@ -111,6 +113,7 @@ function BrumaHome({ config, subdominio, carrito, productos, cargando, busqueda,
   const menu = menuVisibleOrdenado(tema.menu);
   const { data: destacados = [] } = useProductosDestacados(subdominio);
   const { data: ofertas = [] } = useOfertasTienda(subdominio);
+  const { data: secciones = [] } = useSeccionesTienda(subdominio);
   return (
     <div
       className="min-h-screen bg-[var(--tienda-color-fondo)] text-[var(--tienda-color-texto)]"
@@ -129,12 +132,13 @@ function BrumaHome({ config, subdominio, carrito, productos, cargando, busqueda,
         <p className="mx-auto max-w-md text-[0.85em] leading-relaxed opacity-70">Fórmulas simples, empaques honestos — pensado para vos.</p>
       </div>
 
-      <SeccionDestacados productos={destacados} subdominio={subdominio} />
-      <SeccionOfertas ofertas={ofertas} />
+      <SeccionDestacados productos={destacados} subdominio={subdominio} estiloInsignia={tema.estiloInsigniaOferta} />
+      <SeccionOfertas ofertas={ofertas} mostrar={tema.mostrarSeccionOfertas} />
+      <SeccionesDinamicas secciones={secciones} subdominio={subdominio} estiloInsignia={tema.estiloInsigniaOferta} />
 
       <div id="catalogo" className="flex items-baseline justify-between px-6 pb-4 pt-4 sm:px-10">
         <h2 className="text-[1.05em] font-semibold" style={{ fontFamily: 'var(--tienda-fuente-display)' }}>
-          Catálogo
+          Productos
         </h2>
         <div className="relative">
           <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 opacity-50" />
@@ -156,21 +160,28 @@ function BrumaHome({ config, subdominio, carrito, productos, cargando, busqueda,
             to={`/tienda/${subdominio}/producto/${p.id}`}
             className="overflow-hidden rounded-[var(--tienda-radio-tarjeta)] bg-[var(--tienda-color-superficie)] shadow-[var(--tienda-sombra-tarjeta)] text-center"
           >
-            <ThumbBruma imagen={p.imagen} nombre={p.nombre} />
+            <div className="relative">
+              <ThumbBruma imagen={p.imagen} nombre={p.nombre} />
+              <InsigniaOferta oferta={p.oferta} estilo={tema.estiloInsigniaOferta} />
+            </div>
             <div className="p-3">
               <h3 className="mb-1.5 text-[0.85em] font-bold">{p.nombre}</h3>
               <div className="flex items-center justify-center gap-2">
-                <span className="text-[0.8em] font-bold" style={{ color: 'var(--tienda-color-acento)' }}>
-                  {formatearPrecio(p.precio)}
-                </span>
+                {p.oferta ? (
+                  <FilaPrecioOferta precio={p.precio} oferta={p.oferta} estilo={tema.estiloInsigniaOferta} tamano="0.8em" />
+                ) : (
+                  <span className="text-[0.8em] font-bold" style={{ color: 'var(--tienda-color-acento)' }}>
+                    {formatearPrecio(p.precio)}
+                  </span>
+                )}
                 {!p.tieneVariantes && p.varianteId && (
                   <button
                     type="button"
                     onClick={(e) => {
                       e.preventDefault();
-                      carrito.agregar({ productoId: p.id, varianteId: p.varianteId!, varianteEtiqueta: '', nombre: p.nombre, precio: Number(p.precio ?? 0), imagen: p.imagen });
+                      carrito.agregar({ productoId: p.id, varianteId: p.varianteId!, varianteEtiqueta: '', nombre: p.nombre, precio: precioParaCarrito(p.precio, p.oferta), precioOriginal: precioOriginalParaCarrito(p.precio, p.oferta), imagen: p.imagen });
                     }}
-                    className="flex h-6 w-6 items-center justify-center rounded-full text-white"
+                    className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-white"
                     style={{ background: 'var(--tienda-color-acento)' }}
                   >
                     <Plus size={13} />
@@ -225,9 +236,13 @@ function BrumaProducto({ config, subdominio, carrito, producto, varianteSeleccio
           <h1 className="mb-2 text-[1.5em] font-semibold" style={{ fontFamily: 'var(--tienda-fuente-display)' }}>
             {producto.nombre}
           </h1>
-          <p className="mb-4 text-[1.4em] font-bold" style={{ fontFamily: 'var(--tienda-fuente-display)', color: 'var(--tienda-color-acento)' }}>
-            {varianteSeleccionada ? formatearPrecio(varianteSeleccionada.precio) : 'Elegí una opción'}
-          </p>
+          <div className="mb-4" style={{ fontFamily: 'var(--tienda-fuente-display)' }}>
+            {varianteSeleccionada ? (
+              <FilaPrecioOferta precio={varianteSeleccionada.precio} oferta={varianteSeleccionada.oferta} estilo={tema.estiloInsigniaOferta} tamano="1.4em" />
+            ) : (
+              <p className="text-[1.4em] font-bold" style={{ color: 'var(--tienda-color-acento)' }}>Elegí una opción</p>
+            )}
+          </div>
           {producto.descripcionTienda && <p className="mb-5 text-[0.85em] leading-relaxed opacity-70">{producto.descripcionTienda}</p>}
 
           {debeElegirVariante && (
@@ -276,7 +291,7 @@ function BrumaProducto({ config, subdominio, carrito, producto, varianteSeleccio
           </button>
         </div>
       </div>
-      <ProductosRelacionados productos={producto.relacionados} subdominio={subdominio} />
+      <ProductosRelacionados productos={producto.relacionados} subdominio={subdominio} estiloInsignia={tema.estiloInsigniaOferta} />
       <Footer nombre={nombre} />
     </div>
   );

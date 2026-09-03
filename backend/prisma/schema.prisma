@@ -107,6 +107,7 @@ model Tenant {
   pasarelaConfig            PasarelaConfigTenant?
   sesionesCobroFactura      SesionCobroFactura[]
   pedidosTienda             PedidoTienda[]
+  seccionesTienda           SeccionTienda[]
 
   @@map("tenants")
 }
@@ -352,8 +353,8 @@ model FacturaPlataforma {
   createdAt        DateTime                @default(now())
   updatedAt        DateTime                @updatedAt
 
-  pagos  PagoPlataforma[]
-  lineas FacturaPlataformaLinea[]
+  pagos                             PagoPlataforma[]
+  lineas                            FacturaPlataformaLinea[]
   notificacionesVencimientoEnviadas NotificacionVencimientoEnviada[]
 
   @@map("facturas_plataforma")
@@ -554,7 +555,7 @@ model User {
 
   roles                          UserRole[]
   auditLogs                      AuditLog[]
-  facturasVendedor               Factura[]              @relation("FacturaVendedor")
+  facturasVendedor               Factura[]                 @relation("FacturaVendedor")
   movimientosInventario          MovimientoInventario[]
   ordenesCompra                  OrdenCompra[]
   ajustesInventario              AjusteInventario[]
@@ -562,15 +563,15 @@ model User {
   cotizaciones                   Cotizacion[]
   remisiones                     Remision[]
   turnosCaja                     TurnoCaja[]
-  turnosCajaCerrados             TurnoCaja[]            @relation("TurnoCajaCerradoPor")
-  turnosCajaRevisados            TurnoCaja[]            @relation("TurnoCajaRevisadoPor")
+  turnosCajaCerrados             TurnoCaja[]               @relation("TurnoCajaCerradoPor")
+  turnosCajaRevisados            TurnoCaja[]               @relation("TurnoCajaRevisadoPor")
   pagos                          Pago[]
   // Nullable: no todo User de sistema tiene un Empleado de nómina asociado
   // (ej. un Admin Total que no está en planilla).
   empleado                       Empleado?
-  ausenciasSolicitadas           Ausencia[]             @relation("AusenciaSolicitadaPor")
-  ausenciasAprobadas             Ausencia[]             @relation("AusenciaAprobadaPor")
-  asistenciasAprobadas           RegistroAsistencia[]   @relation("AsistenciaAprobadaPor")
+  ausenciasSolicitadas           Ausencia[]                @relation("AusenciaSolicitadaPor")
+  ausenciasAprobadas             Ausencia[]                @relation("AusenciaAprobadaPor")
+  asistenciasAprobadas           RegistroAsistencia[]      @relation("AsistenciaAprobadaPor")
   sucursales                     UsuarioSucursal[]
   codigosAutorizacionSolicitados CodigoAutorizacion[]
 
@@ -922,6 +923,28 @@ model PedidoTienda {
   createdAt        DateTime @default(now())
 
   @@map("pedidos_tienda")
+}
+
+/// Carrito persistente de un cliente de tienda LOGUEADO (Fase 16) — el
+/// comprador guest sigue 100% en localStorage (no hay a qué cuenta
+/// asociarlo). Sin `@relation` a `Cliente` a propósito (mismo criterio
+/// que `PedidoTienda.facturaId`, sin `@relation` a `Factura`): es un
+/// caché de conveniencia para recuperar el carrito en otro dispositivo,
+/// nunca fuente de verdad — el checkout siempre revalida precio/stock
+/// reales, así que una fila huérfana tras borrar un cliente es inofensiva.
+/// Sin `tenantId` porque `clienteId` ya es único global y se resuelve
+/// desde un JWT de cliente ya verificado para un tenant puntual (mismo
+/// criterio que `EcommerceRepository.miPerfil`, que tampoco lo pide).
+/// `itemsJson` serializa `ItemCarritoTienda[]` (frontend) tal cual — un
+/// solo blob, no un modelo de líneas, porque nunca se consulta por
+/// campo individual.
+model CarritoClienteTienda {
+  id        String   @id @default(uuid())
+  clienteId String   @unique
+  itemsJson String   @db.Text
+  updatedAt DateTime @updatedAt
+
+  @@map("carritos_cliente_tienda")
 }
 
 model NcfAsignado {
@@ -2131,27 +2154,27 @@ model VentaAparcada {
 // sin necesidad de integridad referencial, se borra al confirmar la venta,
 // al aparcarla (ya queda a salvo en VentaAparcada) o al vaciar el carrito.
 model CarritoBorrador {
-  id                      String    @id @default(uuid())
-  tenantId                String
-  tenant                  Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  turnoCajaId             String    @unique
-  turnoCaja               TurnoCaja @relation(fields: [turnoCajaId], references: [id], onDelete: Cascade)
+  id                 String    @id @default(uuid())
+  tenantId           String
+  tenant             Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  turnoCajaId        String    @unique
+  turnoCaja          TurnoCaja @relation(fields: [turnoCajaId], references: [id], onDelete: Cascade)
   // SetNull (no Cascade): borrar el cliente/vendedor no debe borrar el
   // borrador — sigue siendo útil restaurar las líneas, solo se pierde la
   // referencia (mismo criterio que VentaAparcada).
-  clienteId               String?
-  cliente                 Cliente?  @relation(fields: [clienteId], references: [id], onDelete: SetNull)
-  vendedorEmpleadoId      String?
-  vendedorEmpleado        Empleado? @relation(fields: [vendedorEmpleadoId], references: [id], onDelete: SetNull)
+  clienteId          String?
+  cliente            Cliente?  @relation(fields: [clienteId], references: [id], onDelete: SetNull)
+  vendedorEmpleadoId String?
+  vendedorEmpleado   Empleado? @relation(fields: [vendedorEmpleadoId], references: [id], onDelete: SetNull)
   // Nombre de la ListaPrecio (ej. "MAYORISTA"), no su id — mismo campo que
   // RegistrarVentaPosDto.listaPrecio/CotizarVentaPosDto.listaPrecio, sin FK
   // propia por la misma razón que esos DTOs: es un override puntual de la
   // venta, no una referencia estructural.
-  listaPrecio             String?
-  tipoFactura             String?
-  comprobanteFiscal       String?
-  lineas                  Json
-  actualizadoEn           DateTime  @updatedAt
+  listaPrecio        String?
+  tipoFactura        String?
+  comprobanteFiscal  String?
+  lineas             Json
+  actualizadoEn      DateTime  @updatedAt
 
   @@map("carritos_borrador")
 }
@@ -2213,9 +2236,11 @@ model Categoria {
   color            ColorCategoria?
   createdAt        DateTime        @default(now())
 
-  productos      Producto[]
-  ofertas        Oferta[]
-  cajaCategorias CajaCategoria[]
+  productos               Producto[]
+  ofertas                 Oferta[]
+  cajaCategorias          CajaCategoria[]
+  seccionesTiendaUnica    SeccionTienda[]          @relation("SeccionCategoriaUnica")
+  seccionesTiendaMinigrid SeccionTiendaCategoria[] @relation("SeccionCategoriaMinigrid")
 
   @@unique([tenantId, nombre])
   @@map("categorias")
@@ -2297,28 +2322,29 @@ model Producto {
   // Precio/Stock ya no cuelgan directo de Producto (Fase 3c — ver
   // VarianteProducto): todo producto tiene siempre al menos una variante
   // "por defecto", incluso sin atributos reales.
-  variantes              VarianteProducto[]
-  movimientos            MovimientoInventario[]
-  lineasFactura          LineaFactura[]
-  lineasOc               LineaOc[]
-  lineasRecepcion        LineaRecepcion[]
-  lineasCotizacion       LineaCotizacion[]
-  lineasRemision         LineaRemision[]
-  lineasDevolucionCompra LineaDevolucionCompra[]
-  lineasVentaAparcada    VentaAparcadaLinea[]
-  lineasAjusteInventario LineaAjusteInventario[]
+  variantes                     VarianteProducto[]
+  movimientos                   MovimientoInventario[]
+  lineasFactura                 LineaFactura[]
+  lineasOc                      LineaOc[]
+  lineasRecepcion               LineaRecepcion[]
+  lineasCotizacion              LineaCotizacion[]
+  lineasRemision                LineaRemision[]
+  lineasDevolucionCompra        LineaDevolucionCompra[]
+  lineasVentaAparcada           VentaAparcadaLinea[]
+  lineasAjusteInventario        LineaAjusteInventario[]
   lineasTransferenciaInventario LineaTransferenciaInventario[]
   // Fotos adicionales para la Tienda Online (Fase 5) — `imagen` sigue
   // siendo la portada, esto es la galería que se suma abajo.
-  imagenesAdicionales    ImagenProducto[]
+  imagenesAdicionales           ImagenProducto[]
   // Componentes de ESTE producto cuando `tipo: COMBO`.
-  componentes            ComponenteCombo[]       @relation("ComboComponentes")
+  componentes                   ComponenteCombo[]              @relation("ComboComponentes")
   // Combos de los que este producto forma parte (como componente).
-  partesDeCombos         ComponenteCombo[]       @relation("ComponenteDeCombos")
-  ofertas                Oferta[]
-  comisionesVenta        ComisionVenta[]
-  cajaProductos          CajaProducto[]
-  cajaProductoFavoritos  CajaProductoFavorito[]
+  partesDeCombos                ComponenteCombo[]              @relation("ComponenteDeCombos")
+  ofertas                       Oferta[]
+  comisionesVenta               ComisionVenta[]
+  cajaProductos                 CajaProducto[]
+  cajaProductoFavoritos         CajaProductoFavorito[]
+  seccionesTienda               SeccionTiendaProducto[]
 
   @@unique([tenantId, codigo])
   @@map("productos")
@@ -2381,19 +2407,19 @@ model VarianteProducto {
   activa       Boolean  @default(true)
   createdAt    DateTime @default(now())
 
-  valoresAtributo        ValorAtributoVariante[]
-  precios                Precio[]
-  stock                  Stock[]
-  movimientos            MovimientoInventario[]
-  lotes                  Lote[]
-  lineasFactura          LineaFactura[]
-  lineasCotizacion       LineaCotizacion[]
-  lineasRemision         LineaRemision[]
-  lineasOc               LineaOc[]
-  lineasRecepcion        LineaRecepcion[]
-  lineasDevolucionCompra LineaDevolucionCompra[]
-  lineasVentaAparcada    VentaAparcadaLinea[]
-  lineasAjusteInventario LineaAjusteInventario[]
+  valoresAtributo               ValorAtributoVariante[]
+  precios                       Precio[]
+  stock                         Stock[]
+  movimientos                   MovimientoInventario[]
+  lotes                         Lote[]
+  lineasFactura                 LineaFactura[]
+  lineasCotizacion              LineaCotizacion[]
+  lineasRemision                LineaRemision[]
+  lineasOc                      LineaOc[]
+  lineasRecepcion               LineaRecepcion[]
+  lineasDevolucionCompra        LineaDevolucionCompra[]
+  lineasVentaAparcada           VentaAparcadaLinea[]
+  lineasAjusteInventario        LineaAjusteInventario[]
   lineasTransferenciaInventario LineaTransferenciaInventario[]
 
   @@unique([tenantId, codigoBarras])
@@ -2515,15 +2541,15 @@ model Bodega {
   // del tenant (ver resolver-formato-impresion.ts).
   formatoImpresion FormatoImpresion?
 
-  stock        Stock[]
-  movimientos  MovimientoInventario[]
-  lotes        Lote[]
-  facturas     Factura[]
-  remisiones   Remision[]
-  turnosCaja   TurnoCaja[]
-  devoluciones DevolucionCompra[]
-  cajas        Caja[]
-  ajustesInventario AjusteInventario[]
+  stock                 Stock[]
+  movimientos           MovimientoInventario[]
+  lotes                 Lote[]
+  facturas              Factura[]
+  remisiones            Remision[]
+  turnosCaja            TurnoCaja[]
+  devoluciones          DevolucionCompra[]
+  cajas                 Caja[]
+  ajustesInventario     AjusteInventario[]
   transferenciasOrigen  TransferenciaInventario[] @relation("TransferenciaOrigen")
   transferenciasDestino TransferenciaInventario[] @relation("TransferenciaDestino")
 
@@ -2713,20 +2739,20 @@ model Lote {
 // ============================================================
 
 model Proveedor {
-  id       String  @id @default(uuid())
-  tenantId String
-  tenant   Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  nombre   String
-  rnc      String?
-  email    String?
-  telefono String?
-  activo   Boolean @default(true)
+  id            String  @id @default(uuid())
+  tenantId      String
+  tenant        Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  nombre        String
+  rnc           String?
+  email         String?
+  telefono      String?
+  activo        Boolean @default(true)
   // Crédito general con este proveedor (ítem Cuentas por Pagar) — a
   // diferencia de Factura.plazoPagoDias (snapshot por documento),
   // OrdenCompra no tiene plazo propio: todas sus órdenes heredan este
   // valor en vivo al calcular vencimiento/antigüedad (decisión explícita
   // del usuario, ver CuentasPorPagarService).
-  plazoPagoDias Int @default(30)
+  plazoPagoDias Int     @default(30)
 
   ordenesCompra OrdenCompra[]
 
@@ -2821,18 +2847,18 @@ model AjusteInventario {
 }
 
 model LineaAjusteInventario {
-  id       String           @id @default(uuid())
-  ajusteId String
-  ajuste   AjusteInventario @relation(fields: [ajusteId], references: [id], onDelete: Cascade)
-  productoId String
-  producto Producto         @relation(fields: [productoId], references: [id], onDelete: Cascade)
-  varianteId String
-  variante VarianteProducto @relation(fields: [varianteId], references: [id])
+  id               String                  @id @default(uuid())
+  ajusteId         String
+  ajuste           AjusteInventario        @relation(fields: [ajusteId], references: [id], onDelete: Cascade)
+  productoId       String
+  producto         Producto                @relation(fields: [productoId], references: [id], onDelete: Cascade)
+  varianteId       String
+  variante         VarianteProducto        @relation(fields: [varianteId], references: [id])
   // Positivo = entrada, negativo = salida — mismo criterio que
   // InventarioService.ajustarStock hoy.
-  cantidad     Decimal                 @db.Decimal(14, 4)
-  motivoAjuste MotivoAjusteInventario?
-  motivo       String?
+  cantidad         Decimal                 @db.Decimal(14, 4)
+  motivoAjuste     MotivoAjusteInventario?
+  motivo           String?
   // Solo si el producto controla vencimiento — mismo par de campos que
   // AjustarStockDto: numeroLote/fechaVencimiento en una entrada, loteId en
   // una salida (siempre explícito, nunca FEFO en un ajuste manual).
@@ -3009,21 +3035,21 @@ enum TipoCliente {
 }
 
 model Cliente {
-  id                    String                 @id @default(uuid())
-  tenantId              String
-  tenant                Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  nombre                String
-  tipo                  TipoCliente            @default(PERSONA_FISICA)
-  rncCedula             String?
-  email                 String?
-  telefono              String?
-  limiteCredito         Decimal                @default(0) @db.Decimal(14, 2)
-  activo                Boolean                @default(true)
+  id                          String                 @id @default(uuid())
+  tenantId                    String
+  tenant                      Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  nombre                      String
+  tipo                        TipoCliente            @default(PERSONA_FISICA)
+  rncCedula                   String?
+  email                       String?
+  telefono                    String?
+  limiteCredito               Decimal                @default(0) @db.Decimal(14, 2)
+  activo                      Boolean                @default(true)
   // Contacto genérico sembrado al provisionar el tenant (ver
   // TenantsRepository.crearConProvisioning) — lo usa POS como cliente
   // por defecto en la venta rápida, para no exigir elegir un cliente
   // real en cada venta de mostrador.
-  esConsumidorFinal     Boolean                @default(false)
+  esConsumidorFinal           Boolean                @default(false)
   // Cuenta de comprador de la Tienda Online (Fase 6, plugin
   // e-commerce) — null significa "no es una cuenta de tienda" (el caso
   // de siempre: Consumidor Final y clientes cargados a mano desde el
@@ -3033,17 +3059,17 @@ model Cliente {
   // "email con contraseña" se valida a nivel de servicio
   // (ClienteTiendaAuthService.registro), no con un constraint de DB
   // que podría chocar con datos viejos.
-  passwordHash          String?
+  passwordHash                String?
   // Nivel de precio por defecto de este cliente (Fase 3b de adopción de
   // Cuadre) — null resuelve a "GENERAL" (ver FacturacionService.crear).
   // Se puede sobreescribir puntualmente al facturar/cotizar/vender en POS.
-  listaPrecioId         String?
-  listaPrecio           ListaPrecio?           @relation(fields: [listaPrecioId], references: [id], onDelete: SetNull)
+  listaPrecioId               String?
+  listaPrecio                 ListaPrecio?           @relation(fields: [listaPrecioId], references: [id], onDelete: SetNull)
   // Categoría/segmentación de cliente (plan de integración Cuadre, ítem
   // E-5) — catálogo propio, puramente informativo/de reporte (sin ningún
   // efecto en precios/permisos, a diferencia de listaPrecioId).
-  categoriaId           String?
-  categoria             CategoriaCliente?      @relation(fields: [categoriaId], references: [id], onDelete: SetNull)
+  categoriaId                 String?
+  categoria                   CategoriaCliente?      @relation(fields: [categoriaId], references: [id], onDelete: SetNull)
   // Comprobante fiscal y condición de pago por defecto (ítem E-5,
   // separados a propósito — ver TipoComprobanteFiscal/CondicionPago):
   // autoseleccionan, cada uno por su lado, el comprobante fiscal y el
@@ -3063,7 +3089,7 @@ model Cliente {
   // `Stock.cantidadActual`: la fuente de verdad es la suma de
   // `MovimientoLealtad`, esto es una caché mantenida por
   // `LealtadService` para no tener que agregar en cada lectura.
-  puntosLealtad         Int                    @default(0)
+  puntosLealtad               Int                    @default(0)
 
   direcciones        DireccionCliente[]
   facturas           Factura[]
@@ -3271,6 +3297,79 @@ model Oferta {
   createdAt                 DateTime            @default(now())
 
   @@map("ofertas")
+}
+
+enum TipoSeccionTienda {
+  /// Grilla de productos elegidos a mano por el admin.
+  PRODUCTOS
+  /// Tarjeta grande que promociona UNA categoría (imagen + link al catálogo filtrado por esa categoría).
+  CATEGORIA
+  /// Igual que PRODUCTOS (misma tabla `productos`) pero se renderiza como slideshow — cada slide es un producto, clic va a su detalle (Fase 17, pedido explícito de reemplazar el banner estático).
+  BANNER
+  /// 2 a 4 categorías en mini-tarjetas lado a lado.
+  MINIGRID
+}
+
+/// Constructor de secciones del Home de la Tienda Online (Fase 17,
+/// "Secciones Dinámicas") — a diferencia de Destacados/Ofertas/Banner de
+/// texto (builtin, un toggle en `resolver-config-tienda.ts`), estas son
+/// secciones que el admin crea/edita/ordena libremente, cada una con su
+/// propio contenido. Qué campos aplican depende de `tipo` (validado en
+/// EcommerceService, no en el schema — mismo criterio que
+/// Oferta.valor/comprarCantidad): PRODUCTOS/BANNER usan `productos`;
+/// CATEGORIA usa `categoriaId`; MINIGRID usa `categorias`.
+model SeccionTienda {
+  id          String            @id @default(uuid())
+  tenantId    String
+  tenant      Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tipo        TipoSeccionTienda
+  titulo      String
+  subtitulo   String?
+  ctaTexto    String?
+  /// Solo CATEGORIA — decorativa, la tarjeta ya linkea a `categoriaId`; sin uso en PRODUCTOS/BANNER/MINIGRID.
+  imagen      String?           @db.Text
+  color       String?
+  categoriaId String?
+  categoria   Categoria?        @relation("SeccionCategoriaUnica", fields: [categoriaId], references: [id], onDelete: Cascade)
+  orden       Int               @default(0)
+  activa      Boolean           @default(true)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  productos  SeccionTiendaProducto[]
+  categorias SeccionTiendaCategoria[]
+
+  @@map("secciones_tienda")
+}
+
+/// Hija sin tenantId propio (mismo patrón que ImagenProducto/ComponenteCombo)
+/// — su aislamiento depende de llegar siempre vía una SeccionTienda ya
+/// resuelta contra el tenant. `orden` se setea por índice del array al
+/// guardar — reemplazo total, mismo criterio que ImagenProducto.
+model SeccionTiendaProducto {
+  id         String        @id @default(uuid())
+  seccionId  String
+  seccion    SeccionTienda @relation(fields: [seccionId], references: [id], onDelete: Cascade)
+  productoId String
+  producto   Producto      @relation(fields: [productoId], references: [id], onDelete: Cascade)
+  orden      Int           @default(0)
+
+  @@unique([seccionId, productoId])
+  @@map("secciones_tienda_productos")
+}
+
+/// Hija sin tenantId propio — ver SeccionTiendaProducto. Solo se usa con
+/// SeccionTienda.tipo = MINIGRID (2 a 4 filas, validado en EcommerceService).
+model SeccionTiendaCategoria {
+  id          String        @id @default(uuid())
+  seccionId   String
+  seccion     SeccionTienda @relation(fields: [seccionId], references: [id], onDelete: Cascade)
+  categoriaId String
+  categoria   Categoria     @relation("SeccionCategoriaMinigrid", fields: [categoriaId], references: [id], onDelete: Cascade)
+  orden       Int           @default(0)
+
+  @@unique([seccionId, categoriaId])
+  @@map("secciones_tienda_categorias")
 }
 
 /// Comisión de venta de punta a punta (plan de integración Cuadre, ítem

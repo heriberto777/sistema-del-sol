@@ -1,13 +1,15 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Minus, Plus, Search, Trash2 } from 'lucide-react';
-import { formatearPrecio, useOfertasTienda, useProductosDestacados } from '../../../hooks/useTienda';
+import { formatearPrecio, useOfertasTienda, useProductosDestacados, useSeccionesTienda } from '../../../hooks/useTienda';
 import { useClienteTienda } from '../../../hooks/useClienteTienda';
 import { useCarritoDrawer } from '../CarritoDrawerContext';
 import { BannerAnuncio } from '../BannerAnuncio';
 import { SeccionDestacados } from '../SeccionDestacados';
 import { SeccionOfertas } from '../SeccionOfertas';
+import { SeccionesDinamicas } from '../SeccionesDinamicas';
 import { ProductosRelacionados } from '../ProductosRelacionados';
+import { FilaPrecioOferta, InsigniaOferta, precioOriginalParaCarrito, precioParaCarrito } from '../OfertaEnTarjeta';
 import type { Plantilla, PropsCarrito, PropsHome, PropsProducto } from './tipos';
 
 // Boutique es oscura y sin tokens (Fase 7) — los componentes compartidos
@@ -54,6 +56,7 @@ function BoutiqueHome({ config, subdominio, carrito, productos, cargando, busque
   const accent = config.colorAcento || ACCENT_DEFAULT;
   const { data: destacados = [] } = useProductosDestacados(subdominio);
   const { data: ofertas = [] } = useOfertasTienda(subdominio);
+  const { data: secciones = [] } = useSeccionesTienda(subdominio);
   return (
     <div className="min-h-screen bg-[#211d19] text-[#f4ede3]" style={{ fontFamily: FONT_BODY }}>
       <BannerAnuncio texto={config.bannerTexto} colorAcento={accent} />
@@ -81,8 +84,14 @@ function BoutiqueHome({ config, subdominio, carrito, productos, cargando, busque
         </div>
       </div>
 
-      <SeccionDestacados productos={destacados} subdominio={subdominio} defaults={{ acento: accent, ...DEFAULTS_COMPARTIDOS }} />
-      <SeccionOfertas ofertas={ofertas} defaults={{ acento: accent, ...DEFAULTS_COMPARTIDOS }} />
+      <SeccionDestacados
+        productos={destacados}
+        subdominio={subdominio}
+        defaults={{ acento: accent, ...DEFAULTS_COMPARTIDOS }}
+        estiloInsignia={config.tema.estiloInsigniaOferta}
+      />
+      <SeccionOfertas ofertas={ofertas} defaults={{ acento: accent, ...DEFAULTS_COMPARTIDOS }} mostrar={config.tema.mostrarSeccionOfertas} />
+      <SeccionesDinamicas secciones={secciones} subdominio={subdominio} defaults={{ acento: accent, ...DEFAULTS_COMPARTIDOS }} estiloInsignia={config.tema.estiloInsigniaOferta} />
 
       {cargando && <p className="pb-16 text-center text-sm text-[#8a8073]">Cargando…</p>}
       {!cargando && productos.length === 0 && <p className="pb-16 text-center text-sm text-[#8a8073]">No hay productos.</p>}
@@ -90,16 +99,17 @@ function BoutiqueHome({ config, subdominio, carrito, productos, cargando, busque
         <div className="grid grid-cols-2 gap-px bg-[#37312a] px-8 pb-16 sm:grid-cols-3 sm:px-12">
           {productos.map((p) => (
             <Link key={p.id} to={`/tienda/${subdominio}/producto/${p.id}`} className="bg-[#211d19] pb-4">
-              <div className="aspect-[4/5]" style={{ background: 'linear-gradient(160deg,#3a332b,#211d19)' }}>
+              <div className="relative aspect-[4/5]" style={{ background: 'linear-gradient(160deg,#3a332b,#211d19)' }}>
                 {p.imagen && <img src={p.imagen} alt={p.nombre} className="h-full w-full object-cover" />}
+                <InsigniaOferta oferta={p.oferta} estilo={config.tema.estiloInsigniaOferta} colorAcento={accent} colorSuperficie={DEFAULTS_COMPARTIDOS.superficie} />
               </div>
               <div className="px-3 pt-4 text-center">
                 {p.categoria && <div className="text-[10px] uppercase tracking-widest text-[#8a8073]">{p.categoria.nombre}</div>}
                 <h3 className="my-1.5 text-lg font-semibold" style={{ fontFamily: FONT_DISPLAY }}>
                   {p.nombre}
                 </h3>
-                <p className="text-sm tracking-wide" style={{ color: accent }}>
-                  {formatearPrecio(p.precio)}
+                <p className="text-sm tracking-wide">
+                  <FilaPrecioOferta precio={p.precio} oferta={p.oferta} estilo={config.tema.estiloInsigniaOferta} tamano="1em" colorAcento={accent} />
                 </p>
                 <button
                   type="button"
@@ -111,7 +121,7 @@ function BoutiqueHome({ config, subdominio, carrito, productos, cargando, busque
                       varianteId: p.varianteId,
                       varianteEtiqueta: '',
                       nombre: p.nombre,
-                      precio: Number(p.precio ?? 0),
+                      precio: precioParaCarrito(p.precio, p.oferta), precioOriginal: precioOriginalParaCarrito(p.precio, p.oferta),
                       imagen: p.imagen,
                     });
                   }}
@@ -165,9 +175,13 @@ function BoutiqueProducto({ config, subdominio, carrito, producto, varianteSelec
           <h1 className="my-3 text-3xl font-semibold" style={{ fontFamily: FONT_DISPLAY }}>
             {producto.nombre}
           </h1>
-          <p className="mb-4 text-xl tracking-wide" style={{ color: accent }}>
-            {varianteSeleccionada ? formatearPrecio(varianteSeleccionada.precio) : 'Elegí una opción'}
-          </p>
+          <div className="mb-4 tracking-wide">
+            {varianteSeleccionada ? (
+              <FilaPrecioOferta precio={varianteSeleccionada.precio} oferta={varianteSeleccionada.oferta} estilo={config.tema.estiloInsigniaOferta} tamano="1.25em" colorAcento={accent} />
+            ) : (
+              <p className="text-xl" style={{ color: accent }}>Elegí una opción</p>
+            )}
+          </div>
           {producto.descripcionTienda && <p className="mb-5 text-sm leading-relaxed text-[#bdb2a1]">{producto.descripcionTienda}</p>}
 
           {debeElegirVariante && (
@@ -214,7 +228,12 @@ function BoutiqueProducto({ config, subdominio, carrito, producto, varianteSelec
           </button>
         </div>
       </div>
-      <ProductosRelacionados productos={producto.relacionados} subdominio={subdominio} defaults={{ acento: accent, ...DEFAULTS_COMPARTIDOS }} />
+      <ProductosRelacionados
+        productos={producto.relacionados}
+        subdominio={subdominio}
+        defaults={{ acento: accent, ...DEFAULTS_COMPARTIDOS }}
+        estiloInsignia={config.tema.estiloInsigniaOferta}
+      />
       <Footer nombre={config.nombre} />
     </div>
   );

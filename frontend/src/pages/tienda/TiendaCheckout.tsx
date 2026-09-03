@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
+import { useSubdominioTienda } from '../../hooks/useSubdominioTienda';
 import { useMutation } from '@tanstack/react-query';
 import { isAxiosError } from 'axios';
 import { formatearPrecio, useMisDirecciones, useTiendaConfig } from '../../hooks/useTienda';
@@ -16,7 +17,7 @@ import { TiendaCargando, TiendaNoEncontrada } from './TiendaNoEncontrada';
  * (`/pagar-factura/:facturaId`) — esta página no cobra nada.
  */
 export function TiendaCheckout() {
-  const { subdominio = '' } = useParams();
+  const subdominio = useSubdominioTienda();
   const navigate = useNavigate();
   const carrito = useCarritoTiendaContext();
   const { data: config, isLoading, isError } = useTiendaConfig(subdominio);

@@ -1,7 +1,9 @@
 import { Link } from 'react-router-dom';
 import { Plus } from 'lucide-react';
-import { formatearPrecio, ProductoTienda } from '../../hooks/useTienda';
+import { ProductoTienda } from '../../hooks/useTienda';
 import { useCarritoTiendaContext } from './CarritoTiendaContext';
+import { FilaPrecioOferta, InsigniaOferta, precioOriginalParaCarrito, precioParaCarrito } from './OfertaEnTarjeta';
+import { EstiloInsigniaOfertaTienda } from './tema';
 
 /** Valores de respaldo cuando la plantilla no define tokens (Fase 7) — las 11 plantillas nuevas nunca los usan (su var() real siempre resuelve); Directo/Mercado (claras) funcionan bien con el default; Boutique (oscura) pasa los suyos explícitos para no quedar con una tarjeta blanca sobre fondo casi negro. */
 export interface DefaultsColorTienda {
@@ -22,10 +24,12 @@ export function TarjetaProductoTienda({
   producto,
   subdominio,
   defaults,
+  estiloInsignia = 'CLASICO',
 }: {
   producto: ProductoTienda;
   subdominio: string;
   defaults?: DefaultsColorTienda;
+  estiloInsignia?: EstiloInsigniaOfertaTienda;
 }) {
   const carrito = useCarritoTiendaContext();
   const d = { ...DEFAULT, ...defaults };
@@ -40,20 +44,19 @@ export function TarjetaProductoTienda({
       }}
     >
       <div
-        className="w-full overflow-hidden"
+        className="relative w-full overflow-hidden"
         style={{
           aspectRatio: 'var(--tienda-ratio-imagen, 1/1)',
           background: `color-mix(in srgb, var(--tienda-color-acento, ${d.acento}) 15%, var(--tienda-color-superficie, ${d.superficie}))`,
         }}
       >
         {producto.imagen && <img src={producto.imagen} alt={producto.nombre} className="h-full w-full object-cover" />}
+        <InsigniaOferta oferta={producto.oferta} estilo={estiloInsignia} colorAcento={d.acento} colorSuperficie={d.superficie} />
       </div>
       <div className="p-3" style={{ color: `var(--tienda-color-texto, ${d.texto})` }}>
         <h3 className="mb-1 text-[0.85em] font-semibold">{producto.nombre}</h3>
-        <div className="flex items-center justify-between">
-          <span className="text-[0.8em] font-bold" style={{ color: `var(--tienda-color-acento, ${d.acento})` }}>
-            {formatearPrecio(producto.precio)}
-          </span>
+        <div className="flex items-center justify-between gap-2">
+          <FilaPrecioOferta precio={producto.precio} oferta={producto.oferta} estilo={estiloInsignia} colorAcento={d.acento} />
           {!producto.tieneVariantes && producto.varianteId && (
             <button
               type="button"
@@ -64,11 +67,12 @@ export function TarjetaProductoTienda({
                   varianteId: producto.varianteId!,
                   varianteEtiqueta: '',
                   nombre: producto.nombre,
-                  precio: Number(producto.precio ?? 0),
+                  precio: precioParaCarrito(producto.precio, producto.oferta),
+                  precioOriginal: precioOriginalParaCarrito(producto.precio, producto.oferta),
                   imagen: producto.imagen,
                 });
               }}
-              className="flex h-6 w-6 items-center justify-center text-white"
+              className="flex h-6 w-6 shrink-0 items-center justify-center text-white"
               style={{ borderRadius: 'var(--tienda-radio-tarjeta, 10px)', background: `var(--tienda-color-acento, ${d.acento})` }}
             >
               <Plus size={13} />
