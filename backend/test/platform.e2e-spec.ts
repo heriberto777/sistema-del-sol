@@ -618,7 +618,9 @@ describe('Plataforma (e2e)', () => {
         .expect(201);
 
       expect(Number(respuesta.body.monto)).toBe(350);
-      expect(Number(respuesta.body.total)).toBe(350);
+      // total incluye el ITBIS de plataforma (PlataformaConfiguracion.porcentajeItbis,
+      // default 18%) — 350 * 1.18 = 413.
+      expect(Number(respuesta.body.total)).toBe(413);
       expect(respuesta.body.concepto).toContain('Configuración inicial');
 
       const detalle = await request(app.getHttpServer())

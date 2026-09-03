@@ -1206,7 +1206,6 @@ describe('App (e2e)', () => {
         .post('/api/cotizaciones')
         .set('Authorization', `Bearer ${token}`)
         .send({
-          numero: 'COT-E2E-001',
           clienteId: clienteAId,
           fechaVigenciaHasta: '2099-01-01',
           lineas: [{ productoId, cantidad: 4 }],
@@ -1249,7 +1248,7 @@ describe('App (e2e)', () => {
       const cotizacion = await request(app.getHttpServer())
         .post('/api/cotizaciones')
         .set('Authorization', `Bearer ${token}`)
-        .send({ numero: 'COT-E2E-002', clienteId: clienteAId, fechaVigenciaHasta: '2099-01-01', lineas: [{ productoId, cantidad: 1 }] })
+        .send({ clienteId: clienteAId, fechaVigenciaHasta: '2099-01-01', lineas: [{ productoId, cantidad: 1 }] })
         .expect(201);
 
       await request(app.getHttpServer())
@@ -1273,7 +1272,7 @@ describe('App (e2e)', () => {
       const remision = await request(app.getHttpServer())
         .post('/api/remisiones')
         .set('Authorization', `Bearer ${token}`)
-        .send({ clienteId: clienteAId, bodegaId, numero: 'REM-E2E-001', lineas: [{ productoId, cantidad: 2 }] })
+        .send({ clienteId: clienteAId, bodegaId, lineas: [{ productoId, cantidad: 2 }] })
         .expect(201);
 
       expect(remision.body.estado).toBe('BORRADOR');
@@ -1312,16 +1311,19 @@ describe('App (e2e)', () => {
       const cotizacion = await request(app.getHttpServer())
         .post('/api/cotizaciones')
         .set('Authorization', `Bearer ${token}`)
-        .send({ numero: 'COT-E2E-003', clienteId: clienteAId, fechaVigenciaHasta: '2099-01-01', lineas: [{ productoId, cantidad: 1 }] })
+        .send({ clienteId: clienteAId, fechaVigenciaHasta: '2099-01-01', lineas: [{ productoId, cantidad: 1 }] })
         .expect(201);
 
       const editada = await request(app.getHttpServer())
         .patch(`/api/cotizaciones/${cotizacion.body.id}`)
         .set('Authorization', `Bearer ${token}`)
-        .send({ numero: 'COT-E2E-003-B', clienteId: clienteAId, fechaVigenciaHasta: '2099-01-01', lineas: [{ productoId, cantidad: 5 }] })
+        .send({ clienteId: clienteAId, fechaVigenciaHasta: '2099-01-01', lineas: [{ productoId, cantidad: 5 }] })
         .expect(200);
 
-      expect(editada.body.numero).toBe('COT-E2E-003-B');
+      // El número es siempre auto-asignado (correlativo) — editar la cotización
+      // no lo cambia, ni siquiera con un `numero` explícito en el body (el DTO
+      // de actualizar reusa CrearCotizacionDto, que no tiene ese campo).
+      expect(editada.body.numero).toBe(cotizacion.body.numero);
       expect(Number(editada.body.total)).toBe(590); // 5*100=500 + 18% = 590
 
       await request(app.getHttpServer())
@@ -1333,7 +1335,7 @@ describe('App (e2e)', () => {
       await request(app.getHttpServer())
         .patch(`/api/cotizaciones/${cotizacion.body.id}`)
         .set('Authorization', `Bearer ${token}`)
-        .send({ numero: 'COT-E2E-003-C', clienteId: clienteAId, fechaVigenciaHasta: '2099-01-01', lineas: [{ productoId, cantidad: 1 }] })
+        .send({ clienteId: clienteAId, fechaVigenciaHasta: '2099-01-01', lineas: [{ productoId, cantidad: 1 }] })
         .expect(400);
     });
 
@@ -1343,16 +1345,18 @@ describe('App (e2e)', () => {
       const remision = await request(app.getHttpServer())
         .post('/api/remisiones')
         .set('Authorization', `Bearer ${token}`)
-        .send({ clienteId: clienteAId, bodegaId, numero: 'REM-E2E-002', lineas: [{ productoId, cantidad: 1 }] })
+        .send({ clienteId: clienteAId, bodegaId, lineas: [{ productoId, cantidad: 1 }] })
         .expect(201);
 
       const editada = await request(app.getHttpServer())
         .patch(`/api/remisiones/${remision.body.id}`)
         .set('Authorization', `Bearer ${token}`)
-        .send({ clienteId: clienteAId, bodegaId, numero: 'REM-E2E-002-B', lineas: [{ productoId, cantidad: 3 }] })
+        .send({ clienteId: clienteAId, bodegaId, lineas: [{ productoId, cantidad: 3 }] })
         .expect(200);
 
-      expect(editada.body.numero).toBe('REM-E2E-002-B');
+      // Mismo criterio que en Cotizaciones: el número es auto-asignado y no
+      // cambia al editar.
+      expect(editada.body.numero).toBe(remision.body.numero);
       expect(editada.body.lineas).toHaveLength(1);
       expect(Number(editada.body.lineas[0].cantidad)).toBe(3);
 
@@ -1365,7 +1369,7 @@ describe('App (e2e)', () => {
       await request(app.getHttpServer())
         .patch(`/api/remisiones/${remision.body.id}`)
         .set('Authorization', `Bearer ${token}`)
-        .send({ clienteId: clienteAId, bodegaId, numero: 'REM-E2E-002-C', lineas: [{ productoId, cantidad: 1 }] })
+        .send({ clienteId: clienteAId, bodegaId, lineas: [{ productoId, cantidad: 1 }] })
         .expect(400);
     });
 
@@ -1392,7 +1396,7 @@ describe('App (e2e)', () => {
       const cotizacion = await request(app.getHttpServer())
         .post('/api/cotizaciones')
         .set('Authorization', `Bearer ${token}`)
-        .send({ numero: 'COT-E2E-NOTIF', clienteId: cliente.body.id, fechaVigenciaHasta: '2099-01-01', lineas: [{ productoId, cantidad: 1 }] })
+        .send({ clienteId: cliente.body.id, fechaVigenciaHasta: '2099-01-01', lineas: [{ productoId, cantidad: 1 }] })
         .expect(201);
 
       await request(app.getHttpServer())
@@ -1453,7 +1457,7 @@ describe('App (e2e)', () => {
       const cotizacion = await request(app.getHttpServer())
         .post('/api/cotizaciones')
         .set('Authorization', `Bearer ${token}`)
-        .send({ numero: 'COT-E2E-PDF', clienteId: clienteAId, fechaVigenciaHasta: '2099-01-01', lineas: [{ productoId, cantidad: 1 }] })
+        .send({ clienteId: clienteAId, fechaVigenciaHasta: '2099-01-01', lineas: [{ productoId, cantidad: 1 }] })
         .expect(201);
 
       const pdf = await request(app.getHttpServer())
@@ -1471,7 +1475,7 @@ describe('App (e2e)', () => {
       const remision = await request(app.getHttpServer())
         .post('/api/remisiones')
         .set('Authorization', `Bearer ${token}`)
-        .send({ clienteId: clienteAId, bodegaId, numero: 'REM-E2E-PDF', lineas: [{ productoId, cantidad: 1 }] })
+        .send({ clienteId: clienteAId, bodegaId, lineas: [{ productoId, cantidad: 1 }] })
         .expect(201);
 
       const pdf = await request(app.getHttpServer())
@@ -2592,7 +2596,7 @@ describe('App (e2e)', () => {
       const orden = await request(app.getHttpServer())
         .post('/api/compras')
         .set('Authorization', `Bearer ${token}`)
-        .send({ proveedorId, numero: 'OC-E2E-001', lineas: [{ productoId, cantidad: 10, costoUnitario: 20 }] })
+        .send({ proveedorId, lineas: [{ productoId, cantidad: 10, costoUnitario: 20 }] })
         .expect(201);
 
       const respuesta = await request(app.getHttpServer())
@@ -2621,7 +2625,7 @@ describe('App (e2e)', () => {
       const orden = await request(app.getHttpServer())
         .post('/api/compras')
         .set('Authorization', `Bearer ${token}`)
-        .send({ proveedorId, numero: 'OC-E2E-PARCIAL', lineas: [{ productoId, cantidad: 20, costoUnitario: 20 }] })
+        .send({ proveedorId, lineas: [{ productoId, cantidad: 20, costoUnitario: 20 }] })
         .expect(201);
 
       // Primer envío: solo 8 unidades, con una factura del proveedor que
@@ -2667,7 +2671,7 @@ describe('App (e2e)', () => {
         const orden = await request(app.getHttpServer())
           .post('/api/compras')
           .set('Authorization', `Bearer ${token}`)
-          .send({ proveedorId, numero: 'OC-E2E-002', lineas: [{ productoId, cantidad: 5, costoUnitario: 20 }] })
+          .send({ proveedorId, lineas: [{ productoId, cantidad: 5, costoUnitario: 20 }] })
           .expect(201);
 
         const stockAntes = await prisma.stock.findUnique({ where: { varianteId_bodegaId: { varianteId: await idVarianteDefault(productoId), bodegaId } } });
@@ -2837,7 +2841,7 @@ describe('App (e2e)', () => {
       const orden = await request(app.getHttpServer())
         .post('/api/compras')
         .set('Authorization', `Bearer ${token}`)
-        .send({ proveedorId, numero: 'OC-PAGO-E2E-001', lineas: [{ productoId, cantidad: 5, costoUnitario: 40 }] })
+        .send({ proveedorId, lineas: [{ productoId, cantidad: 5, costoUnitario: 40 }] })
         .expect(201);
       // total = 200
 
@@ -2880,7 +2884,7 @@ describe('App (e2e)', () => {
       const orden = await request(app.getHttpServer())
         .post('/api/compras')
         .set('Authorization', `Bearer ${token}`)
-        .send({ proveedorId, numero: 'OC-RETENCION-E2E-001', lineas: [{ productoId, cantidad: 10, costoUnitario: 100 }] })
+        .send({ proveedorId, lineas: [{ productoId, cantidad: 10, costoUnitario: 100 }] })
         .expect(201);
       // total = 1000
 
@@ -2894,7 +2898,7 @@ describe('App (e2e)', () => {
       const otraOrden = await request(app.getHttpServer())
         .post('/api/compras')
         .set('Authorization', `Bearer ${token}`)
-        .send({ proveedorId, numero: 'OC-RETENCION-E2E-002', lineas: [{ productoId, cantidad: 1, costoUnitario: 100 }] })
+        .send({ proveedorId, lineas: [{ productoId, cantidad: 1, costoUnitario: 100 }] })
         .expect(201);
       await request(app.getHttpServer())
         .post(`/api/compras/${otraOrden.body.id}/pagos`)
@@ -2933,7 +2937,7 @@ describe('App (e2e)', () => {
       const orden = await request(app.getHttpServer())
         .post('/api/compras')
         .set('Authorization', `Bearer ${token}`)
-        .send({ proveedorId, numero: 'OC-DEVOLUCION-E2E-001', lineas: [{ productoId, cantidad: 10, costoUnitario: 20 }] })
+        .send({ proveedorId, lineas: [{ productoId, cantidad: 10, costoUnitario: 20 }] })
         .expect(201);
 
       await request(app.getHttpServer())
@@ -3452,7 +3456,7 @@ describe('App (e2e)', () => {
       const orden = await request(app.getHttpServer())
         .post('/api/compras')
         .set('Authorization', `Bearer ${tokenAdmin}`)
-        .send({ proveedorId, numero: 'OC-E2E-FASE9', lineas: [{ productoId, cantidad: 5, costoUnitario: 20 }] })
+        .send({ proveedorId, lineas: [{ productoId, cantidad: 5, costoUnitario: 20 }] })
         .expect(201);
 
       await request(app.getHttpServer())
