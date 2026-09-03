@@ -214,6 +214,7 @@ function ModalNuevoUsuario({ onClose }: { onClose: () => void }) {
 function ModalEditarUsuario({ usuario, onClose }: { usuario: Usuario; onClose: () => void }) {
   const queryClient = useQueryClient();
   const [sucursalIds, setSucursalIds] = useState<string[]>(usuario.sucursales.map((s) => s.sucursal.id));
+  const [rolIds, setRolIds] = useState<string[]>(usuario.roles.map((r) => r.role.id));
   const [error, setError] = useState<string | null>(null);
 
   const { data: sucursales } = useQuery({
@@ -221,22 +222,55 @@ function ModalEditarUsuario({ usuario, onClose }: { usuario: Usuario; onClose: (
     queryFn: async () => (await apiClient.get<Sucursal[]>('/sucursales')).data,
   });
 
+  const { data: roles } = useQuery({
+    queryKey: ['admin-roles'],
+    queryFn: async () => (await apiClient.get<Rol[]>('/admin/roles')).data,
+  });
+
   const guardar = useMutation({
-    mutationFn: async () => apiClient.put(`/admin/usuarios/${usuario.id}/sucursales`, { sucursalIds }),
+    mutationFn: async () =>
+      Promise.all([
+        apiClient.put(`/admin/usuarios/${usuario.id}/sucursales`, { sucursalIds }),
+        apiClient.patch(`/admin/usuarios/${usuario.id}`, { rolIds }),
+      ]),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-usuarios'] });
       onClose();
     },
-    onError: () => setError('No se pudo guardar la asignación de sucursales.'),
+    onError: () => setError('No se pudo guardar los cambios.'),
   });
 
   function toggleSucursal(id: string) {
     setSucursalIds((prev) => (prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]));
   }
 
+  function toggleRol(id: string) {
+    setRolIds((prev) => (prev.includes(id) ? prev.filter((r) => r !== id) : [...prev, id]));
+  }
+
+  function onGuardar() {
+    setError(null);
+    if (rolIds.length === 0) {
+      setError('Selecciona al menos un rol.');
+      return;
+    }
+    guardar.mutate();
+  }
+
   return (
     <Modal titulo={`Editar usuario — ${usuario.nombre}`} onClose={onClose}>
       <div className="space-y-3">
+        <div>
+          <p className="mb-1 text-sm font-medium text-slate-700 dark:text-slate-300">Roles</p>
+          <div className="flex flex-wrap gap-2">
+            {roles?.map((rol) => (
+              <label key={rol.id} className="flex items-center gap-1 text-sm text-slate-600 dark:text-slate-400">
+                <input type="checkbox" checked={rolIds.includes(rol.id)} onChange={() => toggleRol(rol.id)} />
+                {rol.nombre}
+              </label>
+            ))}
+          </div>
+        </div>
         <div>
           <p className="mb-1 text-sm font-medium text-slate-700 dark:text-slate-300">Sucursales en las que trabaja</p>
           <p className="mb-2 text-xs text-slate-500 dark:text-slate-400">
@@ -252,7 +286,7 @@ function ModalEditarUsuario({ usuario, onClose }: { usuario: Usuario; onClose: (
           </div>
         </div>
         {error && <p className="text-sm text-red-600">{error}</p>}
-        <Button onClick={() => guardar.mutate()} disabled={guardar.isPending} className="w-full">
+        <Button onClick={onGuardar} disabled={guardar.isPending} className="w-full">
           {guardar.isPending ? 'Guardando…' : 'Guardar'}
         </Button>
       </div>
