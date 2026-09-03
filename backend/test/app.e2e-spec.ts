@@ -165,12 +165,15 @@ describe('App (e2e)', () => {
       'precios.editar',
       'compras.crear',
       'compras.recibir',
+      'compras.pagar',
       'compras.ver',
       'reportes.ver',
       'bancos.ver',
       'bancos.editar',
       'gastosmenores.ver',
       'gastosmenores.crear',
+      'admin.configuracion',
+      'admin.usuarios',
     ]);
 
     const tenantA = await crearTenantConUsuario({
