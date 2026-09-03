@@ -8,6 +8,8 @@ import {
   Boxes,
   Building2,
   CalendarClock,
+  ChevronsLeft,
+  ChevronsRight,
   Contact,
   ExternalLink,
   FileText,
@@ -31,6 +33,42 @@ import {
 import { useAuth } from '../../../hooks/useAuth';
 import { useUrlTiendaPublica } from '../../../hooks/useUrlTiendaPublica';
 
+const CLAVE_COLAPSADO = 'sol_sidebar_colapsado';
+const CLAVE_GRUPOS_ABIERTOS = 'sol_sidebar_grupos_abiertos';
+
+function leerColapsado(): boolean {
+  try {
+    return localStorage.getItem(CLAVE_COLAPSADO) === 'true';
+  } catch {
+    return false;
+  }
+}
+
+function escribirColapsado(valor: boolean) {
+  try {
+    localStorage.setItem(CLAVE_COLAPSADO, String(valor));
+  } catch {
+    // localStorage deshabilitado — el toggle sigue funcionando en memoria para esta sesión.
+  }
+}
+
+function leerGruposAbiertos(): string[] {
+  try {
+    const raw = localStorage.getItem(CLAVE_GRUPOS_ABIERTOS);
+    return raw ? (JSON.parse(raw) as string[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function escribirGruposAbiertos(grupos: Set<string>) {
+  try {
+    localStorage.setItem(CLAVE_GRUPOS_ABIERTOS, JSON.stringify(Array.from(grupos)));
+  } catch {
+    // localStorage deshabilitado — los grupos siguen abriéndose/cerrándose en memoria para esta sesión.
+  }
+}
+
 interface Enlace {
   ruta: string;
   etiqueta: string;
@@ -48,7 +86,15 @@ interface Grupo {
 
 // `permisos: undefined` = visible para cualquier usuario autenticado.
 // `permisos: string[]` = se muestra si el usuario tiene AL MENOS UNO.
-const SUELTOS_ARRIBA: Enlace[] = [{ ruta: '/', etiqueta: 'Dashboard', icono: LayoutDashboard, permisos: ['reportes.ver'] }];
+// `Reportes` vive suelto (no dentro de "Finanzas") a propósito — es un
+// hub transversal (Ventas/Ventas agrupadas/Rentabilidad/Inventario/
+// Compras/Comisiones/DGII, ver Reportes.tsx), no un reporte financiero;
+// meterlo bajo Finanzas escondía "reporte de inventario" en un lugar
+// donde nadie lo buscaría (auditoría de organización del Sidebar).
+const SUELTOS_ARRIBA: Enlace[] = [
+  { ruta: '/', etiqueta: 'Dashboard', icono: LayoutDashboard, permisos: ['reportes.ver'] },
+  { ruta: '/reportes', etiqueta: 'Reportes', icono: BarChart3, permisos: ['reportes.ver'] },
+];
 
 const GRUPOS: Grupo[] = [
   {
@@ -67,8 +113,14 @@ const GRUPOS: Grupo[] = [
     ],
   },
   {
-    id: 'cobranza',
-    etiqueta: 'Cobranza',
+    // Antes "Cobranza" con un solo ítem (Cuentas por cobrar), mientras
+    // Cuentas por pagar vivía metida dentro de "Inventario y Compras"
+    // sin ninguna relación semántica con inventario — fusionadas acá
+    // (auditoría de organización del Sidebar) porque ambas son la misma
+    // clase de trabajo (seguimiento de saldos pendientes), solo que en
+    // sentidos opuestos.
+    id: 'cobros-pagos',
+    etiqueta: 'Cobros y Pagos',
     items: [
       {
         ruta: '/cuentas-por-cobrar',
@@ -76,6 +128,13 @@ const GRUPOS: Grupo[] = [
         icono: WalletCards,
         permisos: ['cuentasporcobrar.ver'],
         modulo: 'facturacion',
+      },
+      {
+        ruta: '/cuentas-por-pagar',
+        etiqueta: 'Cuentas por pagar',
+        icono: HandCoins,
+        permisos: ['cuentasporpagar.ver'],
+        modulo: 'compras',
       },
     ],
   },
@@ -85,17 +144,7 @@ const GRUPOS: Grupo[] = [
     items: [
       { ruta: '/inventario', etiqueta: 'Inventario', icono: Boxes, permisos: ['inventario.ver'], modulo: 'inventario' },
       { ruta: '/compras', etiqueta: 'Compras', icono: ShoppingBag, permisos: ['compras.ver'], modulo: 'compras' },
-      {
-        ruta: '/cuentas-por-pagar',
-        etiqueta: 'Cuentas por pagar',
-        icono: HandCoins,
-        permisos: ['cuentasporpagar.ver'],
-        modulo: 'compras',
-      },
       { ruta: '/productos', etiqueta: 'Productos', icono: Tag, permisos: ['precios.ver'], modulo: 'productos' },
-      // Sin `modulo`: Sucursales no es gateable por plan, es plomería de
-      // ubicación compartida (mismo criterio que Contabilidad/Contactos).
-      { ruta: '/sucursales', etiqueta: 'Sucursales', icono: Building2, permisos: ['sucursales.ver'] },
     ],
   },
   {
@@ -110,7 +159,6 @@ const GRUPOS: Grupo[] = [
       // genera un asiento contable automático — no toca inventario ni
       // proveedores en ningún momento.
       { ruta: '/gastos-menores', etiqueta: 'Gastos menores', icono: Wallet, permisos: ['gastosmenores.ver'], modulo: 'gastosmenores' },
-      { ruta: '/reportes', etiqueta: 'Reportes', icono: BarChart3, permisos: ['reportes.ver'] },
     ],
   },
   {
@@ -125,6 +173,11 @@ const GRUPOS: Grupo[] = [
     id: 'sistema',
     etiqueta: 'Sistema',
     items: [
+      // Antes vivía en "Inventario y Compras" — el propio código ya la
+      // marcaba como "plomería de ubicación compartida" (la usan también
+      // POS y Nómina, no es un concepto de inventario) — auditoría de
+      // organización del Sidebar.
+      { ruta: '/sucursales', etiqueta: 'Sucursales', icono: Building2, permisos: ['sucursales.ver'] },
       { ruta: '/ia', etiqueta: 'IA', icono: Sparkles, permisos: ['ia.usar'], modulo: 'ia' },
       { ruta: '/notificaciones', etiqueta: 'Notificaciones', icono: Bell, permisos: ['notificaciones.ver'] },
       { ruta: '/admin', etiqueta: 'Admin', icono: Settings, permisos: ['admin.usuarios', 'admin.configuracion'] },
@@ -166,9 +219,11 @@ function grupoDeRuta(pathname: string): string | null {
 export function Sidebar() {
   const { usuario, tienePermiso, tieneModulo } = useAuth();
   const location = useLocation();
+  const [colapsado, setColapsado] = useState(leerColapsado);
   const [gruposAbiertos, setGruposAbiertos] = useState<Set<string>>(() => {
+    const persistidos = leerGruposAbiertos();
     const activo = grupoDeRuta(location.pathname);
-    return new Set(activo ? [activo] : []);
+    return new Set(activo ? [...persistidos, activo] : persistidos);
   });
 
   useEffect(() => {
@@ -183,6 +238,15 @@ export function Sidebar() {
       const siguiente = new Set(prev);
       if (siguiente.has(id)) siguiente.delete(id);
       else siguiente.add(id);
+      escribirGruposAbiertos(siguiente);
+      return siguiente;
+    });
+  }
+
+  function alternarColapsado() {
+    setColapsado((prev) => {
+      const siguiente = !prev;
+      escribirColapsado(siguiente);
       return siguiente;
     });
   }
@@ -190,6 +254,7 @@ export function Sidebar() {
   const enlaceClase = ({ isActive }: { isActive: boolean }) =>
     clsx(
       'flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+      colapsado && 'justify-center px-0 py-2.5',
       isActive
         ? 'bg-sol-50 text-sol-700 dark:bg-sol-900/40 dark:text-sol-300'
         : 'text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-900',
@@ -201,40 +266,49 @@ export function Sidebar() {
   })).filter((g) => g.items.length > 0);
 
   return (
-    <nav className="flex h-full w-60 flex-col gap-1 overflow-y-auto border-r border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950">
-      <div className="mb-5 flex items-center gap-2.5 px-2">
+    <nav
+      className={clsx(
+        'flex h-full shrink-0 flex-col gap-1 overflow-y-auto overflow-x-hidden border-r border-slate-200 bg-white p-4 transition-[width] duration-150 dark:border-slate-800 dark:bg-slate-950',
+        colapsado ? 'w-[4.5rem]' : 'w-60',
+      )}
+    >
+      <div className={clsx('mb-5 flex items-center gap-2.5 px-2', colapsado && 'justify-center px-0')}>
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-sol-500 text-base font-bold text-white shadow-sm">
           S
         </div>
-        <div className="min-w-0">
-          <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">El Sistema del Sol</p>
-          {usuario?.tenant?.nombre && <p className="truncate text-xs text-slate-500 dark:text-slate-400">{usuario.tenant.nombre}</p>}
-        </div>
+        {!colapsado && (
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">El Sistema del Sol</p>
+            {usuario?.tenant?.nombre && <p className="truncate text-xs text-slate-500 dark:text-slate-400">{usuario.tenant.nombre}</p>}
+          </div>
+        )}
       </div>
 
       {SUELTOS_ARRIBA.filter((enlace) => esVisible(enlace, tienePermiso, tieneModulo)).map((enlace) => (
-        <NavLink key={enlace.ruta} to={enlace.ruta} end={enlace.ruta === '/'} className={enlaceClase}>
+        <NavLink key={enlace.ruta} to={enlace.ruta} end={enlace.ruta === '/'} className={enlaceClase} title={colapsado ? enlace.etiqueta : undefined}>
           <enlace.icono size={17} className="shrink-0" />
-          {enlace.etiqueta}
+          {!colapsado && enlace.etiqueta}
         </NavLink>
       ))}
 
       {gruposVisibles.map((grupo) => {
-        const abierto = gruposAbiertos.has(grupo.id);
+        const abierto = colapsado || gruposAbiertos.has(grupo.id);
         return (
-          <div key={grupo.id} className="mt-1">
-            <button
-              type="button"
-              onClick={() => alternarGrupo(grupo.id)}
-              className="flex w-full items-center gap-1 rounded-md px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300"
-            >
-              <span>{abierto ? '▾' : '▸'}</span>
-              {grupo.etiqueta}
-            </button>
+          <div key={grupo.id} className={clsx('mt-1', colapsado && 'border-t border-slate-100 pt-1 dark:border-slate-800')}>
+            {!colapsado && (
+              <button
+                type="button"
+                onClick={() => alternarGrupo(grupo.id)}
+                className="flex w-full items-center gap-1 rounded-md px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300"
+              >
+                <span>{abierto ? '▾' : '▸'}</span>
+                {grupo.etiqueta}
+              </button>
+            )}
             {abierto && (
               <div className="flex flex-col gap-0.5">
                 {grupo.items.map((enlace) =>
-                  enlace.ruta === '/tienda-online' ? (
+                  enlace.ruta === '/tienda-online' && !colapsado ? (
                     <div key={enlace.ruta} className="flex items-center gap-0.5">
                       <NavLink to={enlace.ruta} className={(p) => clsx(enlaceClase(p), 'flex-1')}>
                         <enlace.icono size={17} className="shrink-0" />
@@ -243,9 +317,9 @@ export function Sidebar() {
                       <EnlaceTiendaExterno />
                     </div>
                   ) : (
-                    <NavLink key={enlace.ruta} to={enlace.ruta} className={enlaceClase}>
+                    <NavLink key={enlace.ruta} to={enlace.ruta} className={enlaceClase} title={colapsado ? enlace.etiqueta : undefined}>
                       <enlace.icono size={17} className="shrink-0" />
-                      {enlace.etiqueta}
+                      {!colapsado && enlace.etiqueta}
                     </NavLink>
                   ),
                 )}
@@ -254,6 +328,21 @@ export function Sidebar() {
           </div>
         );
       })}
+
+      <div className="mt-auto pt-2">
+        <button
+          type="button"
+          onClick={alternarColapsado}
+          title={colapsado ? 'Mostrar menú' : 'Ocultar menú'}
+          className={clsx(
+            'flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 dark:text-slate-500 dark:hover:bg-slate-900 dark:hover:text-slate-300',
+            colapsado && 'justify-center px-0',
+          )}
+        >
+          {colapsado ? <ChevronsRight size={17} className="shrink-0" /> : <ChevronsLeft size={17} className="shrink-0" />}
+          {!colapsado && 'Ocultar menú'}
+        </button>
+      </div>
     </nav>
   );
 }
