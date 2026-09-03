@@ -22,8 +22,20 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
+      # RedisThrottlerStorage (backend/src/redis/) respalda el guard global
+      # ThrottlerGuard — sin Redis, CUALQUIER request de los e2e falla con
+      # MaxRetriesPerRequestError, no solo los de login.
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     env:
       DATABASE_URL: postgresql://sol:sol@localhost:5432/sistema_del_sol_test
+      REDIS_URL: redis://localhost:6379
       JWT_SECRET: test-secret
     steps:
       - uses: actions/checkout@v4
