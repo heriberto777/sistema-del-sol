@@ -15,6 +15,11 @@ export class ActualizarPlataformaConfigDto {
   @IsString()
   nombreNegocio?: string;
 
+  @ApiProperty({ required: false, description: 'Data URI de la imagen — se muestra en el Login, antes de resolver tenant.' })
+  @IsOptional()
+  @IsString()
+  logo?: string;
+
   // Datos de la empresa emisora — ítem "Facturación con NCF real"
   @ApiProperty({ required: false })
   @IsOptional()

@@ -26,11 +26,18 @@ export class PlataformaConfigService implements OnModuleInit {
     return this.aFormaSegura(config);
   }
 
+  /** Sin sesión (Login, antes de resolver tenant) — a propósito solo el logo, nunca el resto de PlataformaConfiguracion (RNC, SMTP, etc. sí son sensibles). */
+  async obtenerPublica() {
+    const config = await this.repository.obtenerOCrear();
+    return { logo: config.logo };
+  }
+
   async actualizar(dto: ActualizarPlataformaConfigDto) {
     const config = await this.repository.obtenerOCrear();
     const data: Prisma.PlataformaConfiguracionUpdateInput = {};
 
     if (dto.nombreNegocio !== undefined) data.nombreNegocio = dto.nombreNegocio;
+    if (dto.logo !== undefined) data.logo = dto.logo;
     if (dto.rnc !== undefined) data.rnc = dto.rnc;
     if (dto.direccion !== undefined) data.direccion = dto.direccion;
     if (dto.telefono !== undefined) data.telefono = dto.telefono;
@@ -98,6 +105,7 @@ export class PlataformaConfigService implements OnModuleInit {
     return {
       general: {
         nombreNegocio: config.nombreNegocio,
+        logo: config.logo,
         rnc: config.rnc,
         direccion: config.direccion,
         telefono: config.telefono,

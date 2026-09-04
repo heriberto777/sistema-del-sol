@@ -429,6 +429,10 @@ model PlataformaConfiguracion {
 
   // General
   nombreNegocio String?
+  // Logo de la plataforma (se muestra en Login, antes de resolver
+  // tenant) — data URI, mismo formato/tamaño que Configuracion
+  // [DOCUMENTO_LOGO] del lado tenant. Sin cifrar, no es un secreto.
+  logo String?
 
   // Datos de la empresa emisora — ítem "Facturación con NCF real"
   // (Administración de Tenants, última pieza). Sin cifrar, no son

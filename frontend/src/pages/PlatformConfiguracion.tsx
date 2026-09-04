@@ -8,10 +8,12 @@ import { Card } from '../components/atoms/Card/Card';
 import { Select } from '../components/atoms/Select/Select';
 import { Switch } from '../components/atoms/Switch/Switch';
 import { NcfPlataformaPanel } from '../components/organisms/NcfPlataformaPanel/NcfPlataformaPanel';
+import { CampoImagen } from '../components/molecules/CampoImagen/CampoImagen';
 
 export interface ConfiguracionPlataforma {
   general: {
     nombreNegocio: string | null;
+    logo: string | null;
     rnc: string | null;
     direccion: string | null;
     telefono: string | null;
@@ -122,6 +124,7 @@ export interface SeccionProps {
 
 function SeccionGeneral({ config, guardar }: SeccionProps) {
   const [nombreNegocio, setNombreNegocio] = useState(config.general.nombreNegocio ?? '');
+  const [logo, setLogo] = useState(config.general.logo);
   const [rnc, setRnc] = useState(config.general.rnc ?? '');
   const [direccion, setDireccion] = useState(config.general.direccion ?? '');
   const [telefono, setTelefono] = useState(config.general.telefono ?? '');
@@ -129,23 +132,25 @@ function SeccionGeneral({ config, guardar }: SeccionProps) {
 
   useEffect(() => {
     setNombreNegocio(config.general.nombreNegocio ?? '');
+    setLogo(config.general.logo);
     setRnc(config.general.rnc ?? '');
     setDireccion(config.general.direccion ?? '');
     setTelefono(config.general.telefono ?? '');
     setEmail(config.general.email ?? '');
-  }, [config.general.nombreNegocio, config.general.rnc, config.general.direccion, config.general.telefono, config.general.email]);
+  }, [config.general.nombreNegocio, config.general.logo, config.general.rnc, config.general.direccion, config.general.telefono, config.general.email]);
 
   function onSubmit(e: FormEvent) {
     e.preventDefault();
-    guardar.mutate({ nombreNegocio, rnc, direccion, telefono, email });
+    guardar.mutate({ nombreNegocio, logo, rnc, direccion, telefono, email });
   }
 
   return (
     <Card
       titulo="Datos de mi empresa"
-      descripcion="Empresa que opera la plataforma — aparece como emisora en las facturas que se le cobran a cada tenant y en correos/comunicaciones."
+      descripcion="Empresa que opera la plataforma — aparece como emisora en las facturas que se le cobran a cada tenant y en correos/comunicaciones. El logo se muestra en el Login, antes de que se resuelva el tenant."
     >
       <form onSubmit={onSubmit} className="max-w-md space-y-3">
+        <CampoImagen valor={logo} onChange={setLogo} label="Logo de la plataforma" />
         <FormField
           id="nombreNegocio"
           label="Nombre de la empresa"

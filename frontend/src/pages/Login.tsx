@@ -1,5 +1,6 @@
 import { FormEvent, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { FormField } from '../components/molecules/FormField/FormField';
 import { Button } from '../components/atoms/Button/Button';
 import { ThemeToggle } from '../components/molecules/ThemeToggle/ThemeToggle';
@@ -24,6 +25,15 @@ export function Login() {
   const [empresaElegida, setEmpresaElegida] = useState<Empresa | null>(null);
   const [buscando, setBuscando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Sin sesión, sin tenant resuelto todavía — GET público, ver
+  // PlataformaConfigPublicaController. Sin logo configurado, se sigue
+  // mostrando el título de texto de siempre.
+  const { data: branding } = useQuery({
+    queryKey: ['platform-branding'],
+    queryFn: async () => (await apiClient.get<{ logo: string | null }>('/platform/branding')).data,
+    staleTime: 5 * 60 * 1000,
+  });
 
   async function onContinuar(e: FormEvent) {
     e.preventDefault();
@@ -81,7 +91,11 @@ export function Login() {
         <ThemeToggle />
       </div>
       <div className="w-full max-w-sm space-y-4 rounded-lg border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900">
-        <h1 className="text-lg font-semibold text-sol-600 dark:text-sol-400">El Sistema del Sol</h1>
+        {branding?.logo ? (
+          <img src={branding.logo} alt="Logo" className="mx-auto h-12 max-w-full object-contain" />
+        ) : (
+          <h1 className="text-lg font-semibold text-sol-600 dark:text-sol-400">El Sistema del Sol</h1>
+        )}
 
         {paso === 'email' && (
           <form onSubmit={onContinuar} className="space-y-4">
