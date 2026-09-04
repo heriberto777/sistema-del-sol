@@ -26,6 +26,14 @@ import { descargarBlob } from '../lib/descargar-archivo';
 import type { AjusteImagen } from '../constants/ajuste-imagen';
 import { PaginaResultado } from '../types/pagina-resultado';
 
+function mensajeErrorApi(err: unknown, fallback: string): string {
+  const mensaje =
+    err && typeof err === 'object' && 'response' in err
+      ? (err as { response?: { data?: { message?: string | string[] } } }).response?.data?.message
+      : undefined;
+  return (Array.isArray(mensaje) ? mensaje[0] : mensaje) ?? fallback;
+}
+
 type TipoProducto = 'PRODUCTO' | 'SERVICIO' | 'COMBO';
 
 interface Producto {
@@ -428,7 +436,13 @@ function FormularioProducto({ producto, onGuardado }: { producto: Producto | nul
       queryClient.invalidateQueries({ queryKey: ['productos'] });
       onGuardado();
     },
-    onError: () => setError('No se pudo guardar el producto. Revisa los datos (un combo necesita al menos un componente, y no puede incluirse a sí mismo ni a otro combo).'),
+    onError: (err) =>
+      setError(
+        mensajeErrorApi(
+          err,
+          'No se pudo guardar el producto. Revisa los datos (un combo necesita al menos un componente, y no puede incluirse a sí mismo ni a otro combo).',
+        ),
+      ),
   });
 
   function onSubmit(e: FormEvent) {

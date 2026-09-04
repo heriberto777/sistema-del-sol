@@ -55,6 +55,14 @@ export class HttpExceptionFilter implements ExceptionFilter {
       return { status, mensaje };
     }
 
+    // body-parser (Express) rechaza el request ANTES de que llegue a
+    // cualquier controller/DTO — nunca es una HttpException, así que sin
+    // este caso cae al 500 genérico de abajo (bug real: un producto con
+    // varias fotos tiraba "Error interno" en vez de un mensaje claro).
+    if ((exception as { type?: string })?.type === 'entity.too.large') {
+      return { status: HttpStatus.PAYLOAD_TOO_LARGE, mensaje: 'Los datos enviados son demasiado pesados — probá con menos archivos o imágenes más livianas' };
+    }
+
     return { status: HttpStatus.INTERNAL_SERVER_ERROR, mensaje: 'Error interno' };
   }
 }

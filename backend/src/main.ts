@@ -1,4 +1,5 @@
 import { NestFactory } from '@nestjs/core';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
@@ -9,7 +10,19 @@ async function bootstrap() {
   // rutas sin desactivar el parseo JSON normal del resto de la app — lo
   // único que necesita el webhook de Stripe para verificar la firma
   // (exige el body crudo, no el ya parseado a objeto).
-  const app = await NestFactory.create(AppModule, { rawBody: true });
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, { rawBody: true });
+
+  // useBodyParser() ANTES de que Nest registre su parser default (eso
+  // pasa recién al bindear el server, así que llegar primero alcanza
+  // para reemplazarlo) — el límite de Express/body-parser es 100kb por
+  // defecto, insuficiente para el patrón de este proyecto (fotos de
+  // producto/logos/documentos como data URI dentro del body JSON, no
+  // multipart). Bug real: agregar varias fotos a un producto tiraba 413
+  // "PayloadTooLargeError", enmascarado como 500 genérico por
+  // HttpExceptionFilter. Respeta rawBody automáticamente (ver doc de
+  // NestExpressApplication.useBodyParser), no hace falta bodyParser:false.
+  app.useBodyParser('json', { limit: '15mb' });
+  app.useBodyParser('urlencoded', { extended: true, limit: '15mb' });
 
   app.enableCors({
     origin: process.env.CORS_ORIGIN?.split(',') ?? 'http://localhost:5173',
