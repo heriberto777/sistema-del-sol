@@ -9,6 +9,7 @@ import { paginar } from '../common/types/pagina-resultado';
 import { PrismaService } from '../prisma/prisma.service';
 import { CatalogoTiendaQueryDto } from './dto/catalogo-tienda-query.dto';
 import { CrearPedidoTiendaDto } from './dto/crear-pedido-tienda.dto';
+import { PrevisualizarPedidoTiendaDto } from './dto/previsualizar-pedido-tienda.dto';
 import { ActualizarPerfilClienteTiendaDto } from './dto/actualizar-perfil-cliente-tienda.dto';
 import { ActualizarDireccionClienteDto, CrearDireccionClienteDto } from './dto/direccion-cliente.dto';
 import { GuardarCarritoTiendaDto } from './dto/guardar-carrito-tienda.dto';
@@ -75,6 +76,7 @@ export class EcommerceService {
       colorAcento: config.colorAcento ?? null,
       tema: config.tema,
       bannerAnuncio: config.bannerAnuncio,
+      plantillaPedido: config.plantillaPedido,
     };
   }
 
@@ -213,6 +215,31 @@ export class EcommerceService {
     });
 
     return { facturaId: factura.id };
+  }
+
+  /**
+   * Subtotal/ITBIS/total ANTES de crear el pedido — mismo
+   * `FacturacionService.cotizar()` que ya usa el POS para que el cajero
+   * vea el total exacto antes de cobrar (ver el comentario de
+   * `calcularLineasYTotales`). El carrito/checkout de la tienda tenían el
+   * mismo problema: mostraban `precio × cantidad` sin ITBIS, un monto
+   * distinto (más bajo) del que terminaba en la Factura real — este
+   * endpoint hace que muestren el número real, con exenciones/leyFiscal/
+   * ofertas por producto ya resueltas, sin duplicar esa cuenta acá.
+   */
+  async previsualizarPedido(subdominio: string, dto: PrevisualizarPedidoTiendaDto, request: AuthenticatedRequest) {
+    const { tenant } = await this.resolverTiendaPublica(subdominio);
+
+    const vendedor = await this.ecommerceRepository.buscarAdminMasAntiguo(tenant.id);
+    if (!vendedor) {
+      throw new ServiceUnavailableException('Esta tienda no puede procesar pedidos en este momento');
+    }
+
+    request.user = { tenantId: tenant.id, userId: vendedor.id, email: '', roles: [], permisos: [] } as JwtPayloadUser;
+
+    const { clienteId } = await this.resolverClienteId(request, tenant.id);
+
+    return this.facturacionService.cotizar({ clienteId, lineas: dto.lineas }, tenant.id);
   }
 
   async listarPedidos(query: ListadoQueryDto) {

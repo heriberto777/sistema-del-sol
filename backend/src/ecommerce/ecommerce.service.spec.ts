@@ -94,6 +94,7 @@ describe('EcommerceService', () => {
     } as unknown as jest.Mocked<ClientesService>;
     facturacionService = {
       crear: jest.fn().mockResolvedValue(FACTURA_CREADA),
+      cotizar: jest.fn().mockResolvedValue({ lineas: [], subtotal: 100, descuento: 0, itbis: 18, total: 118 }),
     } as unknown as jest.Mocked<FacturacionService>;
     variantesService = {
       listarPorProducto: jest.fn().mockResolvedValue([]),
@@ -155,6 +156,7 @@ describe('EcommerceService', () => {
       const config = await service.obtenerConfig('demo');
       expect(config.nombre).toBe('Tenant Demo');
       expect(config.plantilla).toBe('MERCADO');
+      expect(config.plantillaPedido).toBe('MARCA');
     });
   });
 
@@ -332,6 +334,31 @@ describe('EcommerceService', () => {
       await service.crearPedido('demo', DTO, requestFalso());
 
       expect(ecommerceRepository.actualizarPerfil).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('previsualizarPedido', () => {
+    const DTO = { lineas: [{ productoId: 'p1', cantidad: 2 }] };
+
+    it('cotiza contra Consumidor Final cuando no hay sesión, y devuelve el desglose del backend tal cual', async () => {
+      const resultado = await service.previsualizarPedido('demo', DTO, requestFalso());
+
+      expect(facturacionService.cotizar).toHaveBeenCalledWith({ clienteId: 'cf1', lineas: DTO.lineas }, 't1');
+      expect(resultado).toEqual({ lineas: [], subtotal: 100, descuento: 0, itbis: 18, total: 118 });
+    });
+
+    it('cotiza contra el cliente real de la sesión cuando el token es válido', async () => {
+      jwtService.verify.mockReturnValue({ clienteId: 'cliente-real', tenantId: 't1', email: 'a@a.com' });
+
+      await service.previsualizarPedido('demo', DTO, requestFalso('Bearer token-valido'));
+
+      expect(facturacionService.cotizar).toHaveBeenCalledWith({ clienteId: 'cliente-real', lineas: DTO.lineas }, 't1');
+    });
+
+    it('rechaza si el tenant no tiene ningún Admin Total', async () => {
+      ecommerceRepository.buscarAdminMasAntiguo.mockResolvedValue(null);
+      await expect(service.previsualizarPedido('demo', DTO, requestFalso())).rejects.toThrow(ServiceUnavailableException);
+      expect(facturacionService.cotizar).not.toHaveBeenCalled();
     });
   });
 

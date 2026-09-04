@@ -34,24 +34,49 @@ export class CobrosPublicosService {
   async obtenerFacturaPublica(facturaId: string) {
     const factura = await this.prisma.factura.findUnique({
       where: { id: facturaId },
-      include: { tenant: { select: { nombre: true } } },
+      include: {
+        tenant: { select: { nombre: true } },
+        // Resumen de productos para la pantalla de "pedido realizado" de
+        // la tienda (`CobroFactura.tsx`, plantillas de confirmación) —
+        // sin `orderBy` explícito porque `LineaFactura` no tiene columna
+        // de orden propia (a diferencia de `FacturaRecargo.orden`);
+        // aceptable acá, es puramente informativo, nunca se recalcula
+        // nada a partir de este orden.
+        lineas: { include: { producto: { select: { nombre: true } } } },
+      },
     });
     if (!factura) throw new NotFoundException('Factura no encontrada');
 
-    const [totalPagado, config] = await Promise.all([
+    const [totalPagado, config, pedidoTienda] = await Promise.all([
       this.sumaPagos(facturaId),
       this.prisma.pasarelaConfigTenant.findUnique({ where: { tenantId: factura.tenantId } }),
+      // Sin `@relation` a propósito en el schema (ver PedidoTienda) — se
+      // resuelve por el `facturaId` único. `null` para cualquier Factura
+      // que no vino de la tienda (el resto de este método no cambia).
+      this.prisma.pedidoTienda.findUnique({ where: { facturaId } }),
     ]);
     const pendiente = Math.max(0, Number(factura.total) - totalPagado);
 
     return {
       tenantNombre: factura.tenant.nombre,
       numero: factura.ncf ?? `FAC-${factura.id.slice(0, 8).toUpperCase()}`,
+      subtotal: factura.subtotal.toString(),
+      itbis: factura.itbis.toString(),
       total: factura.total.toString(),
       pendiente,
       estado: factura.estado,
       pagada: factura.pagada,
       pasarelaDisponible: config?.pasarelaActiva ?? null,
+      lineas: factura.lineas.map((l) => ({
+        nombre: l.producto?.nombre ?? l.descripcionManual ?? 'Producto',
+        cantidad: l.cantidad.toString(),
+        precioUnitario: l.precioUnitario.toString(),
+        descuento: l.descuento.toString(),
+        montoTotal: l.montoTotal.toString(),
+      })),
+      entrega: pedidoTienda
+        ? { nombre: pedidoTienda.clienteNombre, telefono: pedidoTienda.clienteTelefono, direccion: pedidoTienda.direccionEntrega }
+        : null,
     };
   }
 

@@ -554,15 +554,29 @@ function FormularioProducto({ producto, onGuardado }: { producto: Producto | nul
           ))}
         </Select>
       </div>
-      <FormField
-        id="producto-itbis"
-        label="ITBIS %"
-        type="number"
-        min={0}
-        max={100}
-        value={valores.porcentajeItbis}
-        onChange={(e) => setValores((v) => ({ ...v, porcentajeItbis: e.target.value }))}
-      />
+      <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
+        <input
+          type="checkbox"
+          checked={valores.porcentajeItbis === '0'}
+          onChange={(e) => setValores((v) => ({ ...v, porcentajeItbis: e.target.checked ? '0' : '18' }))}
+        />
+        Exento de impuesto (ITBIS)
+      </label>
+      {valores.porcentajeItbis === '0' ? (
+        <p className="-mt-2 text-xs text-slate-500 dark:text-slate-400">
+          Este producto no lleva ITBIS — el precio que le asignes es exactamente lo que paga el cliente, sin ningún cargo adicional.
+        </p>
+      ) : (
+        <FormField
+          id="producto-itbis"
+          label="ITBIS %"
+          type="number"
+          min={0}
+          max={100}
+          value={valores.porcentajeItbis}
+          onChange={(e) => setValores((v) => ({ ...v, porcentajeItbis: e.target.value }))}
+        />
+      )}
       <div className="flex flex-col gap-1">
         <label htmlFor="producto-ley-fiscal" className="text-sm font-medium text-slate-700 dark:text-slate-300">
           Ley fiscal (opcional, plan de integración Cuadre, ítem B-3)

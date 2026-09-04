@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useSubdominioTienda } from '../../hooks/useSubdominioTienda';
 import { useMutation } from '@tanstack/react-query';
 import { isAxiosError } from 'axios';
-import { formatearPrecio, useMiPerfil, useMisDirecciones, useTiendaConfig } from '../../hooks/useTienda';
+import { formatearPrecio, usePreviewPedido, useMiPerfil, useMisDirecciones, useTiendaConfig } from '../../hooks/useTienda';
 import { tiendaApiClient } from '../../lib/tienda-api-client';
 import { useCarritoTiendaContext } from './CarritoTiendaContext';
 import { useClienteTienda } from '../../hooks/useClienteTienda';
@@ -31,6 +31,15 @@ export function TiendaCheckout() {
   const { cliente, token, autenticado } = useClienteTienda(subdominio);
   const { data: direcciones } = useMisDirecciones(subdominio, token);
   const { data: perfil } = useMiPerfil(subdominio, token);
+  // El precio de catálogo que ve toda la tienda es SIN ITBIS — sumarlo acá
+  // a mano duplicaría exenciones/leyFiscal/ofertas por producto que solo
+  // el backend conoce, y podía desalinearse del total real de la Factura
+  // (bug reportado: el total del checkout no coincidía con el cobrado).
+  const previewPedido = usePreviewPedido(
+    subdominio,
+    carrito.items.map((i) => ({ productoId: i.productoId, varianteId: i.varianteId, cantidad: i.cantidad })),
+    token,
+  );
 
   // Con sesión, precarga los datos del perfil — igual editables, se
   // mandan igual que en modo guest (el backend no distingue el DTO).
@@ -83,7 +92,11 @@ export function TiendaCheckout() {
     },
     onSuccess: ({ facturaId }) => {
       carrito.vaciar();
-      navigate(`/pagar-factura/${facturaId}`);
+      // `tienda` en la URL es lo que le permite a esa página (genérica,
+      // compartida con cualquier link de cobro de tenant, ver
+      // CobroFactura.tsx) mostrar "Volver a la tienda"/"Mis pedidos" sin
+      // asumir que TODO pago público viene de acá.
+      navigate(`/pagar-factura/${facturaId}?tienda=${subdominio}`);
     },
   });
 
@@ -111,6 +124,12 @@ export function TiendaCheckout() {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-slate-50 px-6 py-10 dark:bg-slate-950">
         <div className="w-full max-w-sm text-center">
+          <Link
+            to={`/tienda/${subdominio}`}
+            className="mb-4 inline-block text-sm text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+          >
+            ‹ Seguir comprando
+          </Link>
           <h1 className="mb-1 text-xl font-semibold text-slate-900 dark:text-slate-100">Iniciá sesión para continuar</h1>
           <p className="mb-6 text-sm text-slate-500 dark:text-slate-400">
             Tu carrito ({carrito.items.length} {carrito.items.length === 1 ? 'producto' : 'productos'}) sigue guardado — inicia sesión o creá una
@@ -151,6 +170,12 @@ export function TiendaCheckout() {
   return (
     <div className="min-h-screen bg-slate-50 py-10 dark:bg-slate-950">
       <div className="mx-auto max-w-lg px-6">
+        <Link
+          to={`/tienda/${subdominio}`}
+          className="mb-3 inline-block text-sm text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+        >
+          ‹ Seguir comprando
+        </Link>
         <h1 className="mb-1 text-xl font-semibold text-slate-900 dark:text-slate-100">Finalizar compra</h1>
         <p className="mb-6 text-sm text-slate-500 dark:text-slate-400">{config.nombre}</p>
 
@@ -163,9 +188,30 @@ export function TiendaCheckout() {
               <span className="font-medium text-slate-900 dark:text-slate-100">{formatearPrecio(item.precio * item.cantidad)}</span>
             </div>
           ))}
-          <div className="mt-2 flex justify-between border-t border-slate-200 pt-2 text-sm font-semibold text-slate-900 dark:border-slate-800 dark:text-slate-100">
-            <span>Total</span>
-            <span>{formatearPrecio(carrito.total)}</span>
+          <div className="mt-2 space-y-1 border-t border-slate-200 pt-2 text-sm dark:border-slate-800">
+            {previewPedido.isLoading ? (
+              <p className="text-slate-500 dark:text-slate-400">Calculando ITBIS…</p>
+            ) : previewPedido.data ? (
+              <>
+                <div className="flex justify-between text-slate-600 dark:text-slate-400">
+                  <span>Subtotal</span>
+                  <span>{formatearPrecio(previewPedido.data.subtotal)}</span>
+                </div>
+                <div className="flex justify-between text-slate-600 dark:text-slate-400">
+                  <span>ITBIS</span>
+                  <span>{formatearPrecio(previewPedido.data.itbis)}</span>
+                </div>
+                <div className="flex justify-between font-semibold text-slate-900 dark:text-slate-100">
+                  <span>Total</span>
+                  <span>{formatearPrecio(previewPedido.data.total)}</span>
+                </div>
+              </>
+            ) : (
+              <div className="flex justify-between font-semibold text-slate-900 dark:text-slate-100">
+                <span>Subtotal (el ITBIS se calcula al confirmar)</span>
+                <span>{formatearPrecio(carrito.total)}</span>
+              </div>
+            )}
           </div>
         </div>
 

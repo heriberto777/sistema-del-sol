@@ -23,6 +23,9 @@ export type PlantillaTienda =
   | 'VITRINA'
   | 'SOLMARKET';
 
+/** Plantilla de la pantalla de "pedido realizado" — independiente de `PlantillaTienda` (esa es del catálogo/Home). Ver `pages/tienda/plantillas-pedido/`. */
+export type PlantillaPedidoTienda = 'RECIBO' | 'MARCA' | 'BOUTIQUE' | 'PANEL';
+
 export interface ConfigTienda {
   nombre: string;
   plantilla: PlantillaTienda;
@@ -33,6 +36,7 @@ export interface ConfigTienda {
   tema: TemaTienda;
   /** Fase 11 (extendida) — slide de mensajes para la barra de anuncio arriba del Nav; `mensajes: []` = no mostrar nada. */
   bannerAnuncio: { mensajes: MensajeBannerAnuncio[]; intervaloSegundos: number };
+  plantillaPedido: PlantillaPedidoTienda;
 }
 
 /** Fase 13 — oferta a mostrar en la tarjeta de producto (mirror de `OfertaVisibleProducto`, backend). `null` = sin oferta vigente para este producto/precio. */
@@ -94,6 +98,7 @@ export function useTiendaConfig(subdominio: string) {
   return useQuery({
     queryKey: ['tienda-config', subdominio],
     queryFn: async () => (await tiendaApiClient.get<ConfigTienda>(`/tienda/${subdominio}/config`)).data,
+    enabled: !!subdominio,
     retry: false,
   });
 }
@@ -277,6 +282,49 @@ export function useMisDirecciones(subdominio: string, token: string | null) {
   });
 }
 
+export interface LineaPedidoPreview {
+  productoId: string;
+  varianteId: string | null;
+  cantidad: number;
+  precioUnitario: string;
+  descuento: string;
+  porcentajeItbis: string;
+  montoItbis: string;
+  montoTotal: string;
+}
+
+export interface PreviewPedido {
+  lineas: LineaPedidoPreview[];
+  subtotal: number;
+  descuento: number;
+  itbis: number;
+  total: number;
+}
+
+/**
+ * Subtotal/ITBIS/total EXACTOS (mismo `FacturacionService.cotizar()` del
+ * POS) para el carrito antes de crear el pedido — el precio de catálogo
+ * que se muestra en toda la tienda es sin ITBIS, y sumarlo a mano acá
+ * duplicaría exenciones/leyFiscal/ofertas por producto que solo el
+ * backend conoce. `enabled: lineas.length > 0` evita pegarle al backend
+ * con el carrito vacío.
+ */
+export function usePreviewPedido(subdominio: string, lineas: { productoId: string; varianteId?: string; cantidad: number }[], token: string | null) {
+  return useQuery({
+    queryKey: ['tienda-preview-pedido', subdominio, lineas, token],
+    queryFn: async () =>
+      (
+        await tiendaApiClient.post<PreviewPedido>(
+          `/tienda/${subdominio}/pedidos/preview`,
+          { lineas },
+          token ? { headers: { Authorization: `Bearer ${token}` } } : undefined,
+        )
+      ).data,
+    enabled: lineas.length > 0,
+    retry: false,
+  });
+}
+
 export interface LineaDetallePedido {
   nombre: string;
   cantidad: string;
@@ -306,7 +354,7 @@ export function useDetallePedido(subdominio: string, token: string | null, factu
 }
 
 export function formatearPrecio(precio: string | number | null): string {
-  return `RD$ ${Number(precio ?? 0).toLocaleString('es-DO')}`;
+  return `RD$ ${Number(precio ?? 0).toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 /** Texto corto para la insignia de la tarjeta (Fase 13) — ej. "-20%", "2×1", "3ra al 50%". */

@@ -9,6 +9,7 @@ export const CLAVE_TIENDA_COLOR_ACENTO = 'TIENDA_COLOR_ACENTO';
 export const CLAVE_TIENDA_BODEGA_ID = 'TIENDA_BODEGA_ID';
 export const CLAVE_TIENDA_TEMA = 'TIENDA_TEMA';
 export const CLAVE_TIENDA_BANNER_TEXTO = 'TIENDA_BANNER_TEXTO';
+export const CLAVE_TIENDA_PLANTILLA_PEDIDO = 'TIENDA_PLANTILLA_PEDIDO';
 
 export const PLANTILLAS_TIENDA = [
   'DIRECTO',
@@ -31,6 +32,16 @@ export const PLANTILLAS_TIENDA = [
 ] as const;
 export type PlantillaTienda = (typeof PLANTILLAS_TIENDA)[number];
 
+/**
+ * Plantilla de la pantalla de "pedido realizado" (`/pagar-factura/:id`,
+ * con `?tienda=` — ver `CobroFactura.tsx`) — elegible por el tenant,
+ * mismo patrón que `plantilla` (catálogo cerrado, cae a un default si el
+ * valor guardado no es válido). Independiente de `PLANTILLAS_TIENDA`
+ * (esas son del catálogo/Home, esta es solo de la confirmación).
+ */
+export const PLANTILLAS_PEDIDO_TIENDA = ['RECIBO', 'MARCA', 'BOUTIQUE', 'PANEL'] as const;
+export type PlantillaPedidoTienda = (typeof PLANTILLAS_PEDIDO_TIENDA)[number];
+
 const CLAVES_TIENDA = [
   CLAVE_TIENDA_ACTIVA,
   CLAVE_TIENDA_NOMBRE,
@@ -41,6 +52,7 @@ const CLAVES_TIENDA = [
   CLAVE_TIENDA_BODEGA_ID,
   CLAVE_TIENDA_TEMA,
   CLAVE_TIENDA_BANNER_TEXTO,
+  CLAVE_TIENDA_PLANTILLA_PEDIDO,
 ];
 
 export interface ConfigTienda {
@@ -54,6 +66,8 @@ export interface ConfigTienda {
   tema: TemaTienda;
   /** Fase 11 (extendida): slide de mensajes de texto para la barra de anuncio arriba del Nav (distinto de TIENDA_BANNER, que es una imagen usada solo por la plantilla "mercado"). */
   bannerAnuncio: BannerAnuncioTienda;
+  /** Default 'MARCA' si el tenant nunca lo configuró. */
+  plantillaPedido: PlantillaPedidoTienda;
 }
 
 export const TAMANOS_FUENTE_BANNER = ['NORMAL', 'GRANDE', 'MUY_GRANDE'] as const;
@@ -278,6 +292,7 @@ export async function resolverConfigTienda(prisma: PrismaService, tenantId: stri
   const valor = (clave: string) => filas.find((f) => f.clave === clave)?.valor || undefined;
 
   const plantilla = valor(CLAVE_TIENDA_PLANTILLA);
+  const plantillaPedido = valor(CLAVE_TIENDA_PLANTILLA_PEDIDO);
   return {
     activa: valor(CLAVE_TIENDA_ACTIVA) === 'true',
     nombre: valor(CLAVE_TIENDA_NOMBRE),
@@ -288,5 +303,8 @@ export async function resolverConfigTienda(prisma: PrismaService, tenantId: stri
     bodegaId: valor(CLAVE_TIENDA_BODEGA_ID),
     tema: resolverTemaTienda(valor(CLAVE_TIENDA_TEMA), valor(CLAVE_TIENDA_COLOR_ACENTO)),
     bannerAnuncio: resolverBannerAnuncio(valor(CLAVE_TIENDA_BANNER_TEXTO)),
+    plantillaPedido: (PLANTILLAS_PEDIDO_TIENDA as readonly string[]).includes(plantillaPedido ?? '')
+      ? (plantillaPedido as PlantillaPedidoTienda)
+      : 'MARCA',
   };
 }

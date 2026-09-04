@@ -3,6 +3,7 @@ import { ApiTags } from '@nestjs/swagger';
 import { EcommerceService } from './ecommerce.service';
 import { CatalogoTiendaQueryDto } from './dto/catalogo-tienda-query.dto';
 import { CrearPedidoTiendaDto } from './dto/crear-pedido-tienda.dto';
+import { PrevisualizarPedidoTiendaDto } from './dto/previsualizar-pedido-tienda.dto';
 import { ActualizarPerfilClienteTiendaDto } from './dto/actualizar-perfil-cliente-tienda.dto';
 import { ActualizarDireccionClienteDto, CrearDireccionClienteDto } from './dto/direccion-cliente.dto';
 import { GuardarCarritoTiendaDto } from './dto/guardar-carrito-tienda.dto';
@@ -58,6 +59,11 @@ export class EcommerceController {
   @Post('pedidos')
   crearPedido(@Param('subdominio') subdominio: string, @Body() dto: CrearPedidoTiendaDto, @Req() request: AuthenticatedRequest) {
     return this.ecommerceService.crearPedido(subdominio, dto, request);
+  }
+
+  @Post('pedidos/preview')
+  previsualizarPedido(@Param('subdominio') subdominio: string, @Body() dto: PrevisualizarPedidoTiendaDto, @Req() request: AuthenticatedRequest) {
+    return this.ecommerceService.previsualizarPedido(subdominio, dto, request);
   }
 
   /**

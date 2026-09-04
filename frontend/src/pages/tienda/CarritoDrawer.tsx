@@ -89,10 +89,11 @@ export function CarritoDrawer({ subdominio }: { subdominio: string }) {
 
         {carrito.items.length > 0 && (
           <div className="border-t border-slate-200 px-5 py-4 dark:border-slate-700">
-            <div className="mb-3 flex items-center justify-between text-sm font-semibold text-slate-900 dark:text-slate-100">
-              <span>Total</span>
+            <div className="mb-1 flex items-center justify-between text-sm font-semibold text-slate-900 dark:text-slate-100">
+              <span>Subtotal</span>
               <span>{formatearPrecio(carrito.total)}</span>
             </div>
+            <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">+ ITBIS, calculado en el checkout.</p>
             <button
               type="button"
               onClick={() => {

@@ -12,8 +12,11 @@ const FACTURA_BASE = {
   ncf: 'B0200000001',
   estado: 'EMITIDA',
   pagada: false,
+  subtotal: 900 as unknown,
+  itbis: 100 as unknown,
   total: 1000 as unknown,
   tenant: { nombre: 'Tenant Demo' },
+  lineas: [] as unknown[],
 };
 
 const CONFIG_BASE = {
@@ -40,6 +43,7 @@ describe('CobrosPublicosService', () => {
     pago: { aggregate: jest.Mock };
     pasarelaConfigTenant: { findUnique: jest.Mock };
     formaPago: { findFirst: jest.Mock };
+    pedidoTienda: { findUnique: jest.Mock };
   };
   let sesionesCobroRepository: jest.Mocked<SesionesCobroRepository>;
   let facturacionService: jest.Mocked<FacturacionService>;
@@ -52,6 +56,7 @@ describe('CobrosPublicosService', () => {
       pago: { aggregate: jest.fn().mockResolvedValue({ _sum: { monto: 0 } }) },
       pasarelaConfigTenant: { findUnique: jest.fn().mockResolvedValue(CONFIG_BASE) },
       formaPago: { findFirst: jest.fn().mockResolvedValue({ id: 'fp-tarjeta' }) },
+      pedidoTienda: { findUnique: jest.fn().mockResolvedValue(null) },
     };
     sesionesCobroRepository = {
       crear: jest.fn().mockResolvedValue(SESION_BASE),
@@ -88,6 +93,36 @@ describe('CobrosPublicosService', () => {
       const resultado = await service.obtenerFacturaPublica('f1');
       expect(resultado.pendiente).toBe(700);
       expect(resultado.pasarelaDisponible).toBe('AZUL');
+    });
+
+    it('mapea las líneas con el nombre del producto (o la descripción manual si no tiene producto)', async () => {
+      prisma.factura.findUnique.mockResolvedValue({
+        ...FACTURA_BASE,
+        lineas: [
+          { producto: { nombre: 'Camisa' }, descripcionManual: null, cantidad: 2 as unknown, precioUnitario: 100 as unknown, descuento: 0 as unknown, montoTotal: 200 as unknown },
+          { producto: null, descripcionManual: 'Instalación', cantidad: 1 as unknown, precioUnitario: 50 as unknown, descuento: 0 as unknown, montoTotal: 50 as unknown },
+        ],
+      });
+      const resultado = await service.obtenerFacturaPublica('f1');
+      expect(resultado.lineas).toEqual([
+        { nombre: 'Camisa', cantidad: '2', precioUnitario: '100', descuento: '0', montoTotal: '200' },
+        { nombre: 'Instalación', cantidad: '1', precioUnitario: '50', descuento: '0', montoTotal: '50' },
+      ]);
+    });
+
+    it('entrega es null si la factura no vino de un pedido de tienda', async () => {
+      const resultado = await service.obtenerFacturaPublica('f1');
+      expect(resultado.entrega).toBeNull();
+    });
+
+    it('entrega trae los datos del PedidoTienda cuando la factura sí vino de la tienda', async () => {
+      prisma.pedidoTienda.findUnique.mockResolvedValue({
+        clienteNombre: 'Ana Martínez',
+        clienteTelefono: '809-555-0142',
+        direccionEntrega: 'Av. Independencia #245, Santo Domingo',
+      });
+      const resultado = await service.obtenerFacturaPublica('f1');
+      expect(resultado.entrega).toEqual({ nombre: 'Ana Martínez', telefono: '809-555-0142', direccion: 'Av. Independencia #245, Santo Domingo' });
     });
   });
 
