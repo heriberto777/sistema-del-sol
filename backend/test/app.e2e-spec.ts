@@ -316,7 +316,7 @@ describe('App (e2e)', () => {
         .send({ email: 'admin@e2e-a.com', password: PASSWORD, tenantSubdominio: SUBDOMINIO_A })
         .expect(201);
 
-      expect(respuesta.body.usuario.tenant).toEqual({ subdominio: SUBDOMINIO_A, nombre: `E2E ${SUBDOMINIO_A}` });
+      expect(respuesta.body.usuario.tenant).toEqual({ subdominio: SUBDOMINIO_A, nombre: `E2E ${SUBDOMINIO_A}`, logo: null });
     });
 
     it('resolver-empresas devuelve la empresa de un email conocido', async () => {
