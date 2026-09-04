@@ -1,6 +1,6 @@
 import { ProductoTienda } from '../../hooks/useTienda';
 import { TarjetaProductoTienda, DefaultsColorTienda } from './TarjetaProductoTienda';
-import { EstiloInsigniaOfertaTienda } from './tema';
+import { EstiloInsigniaOfertaTienda, EstiloInsigniaSinStockTienda } from './tema';
 
 /** "También te puede interesar" en la ficha de producto (Fase 11) — misma categoría, no renderiza nada si no hay relacionados. `defaults` es solo para plantillas viejas sin tokens (ver TarjetaProductoTienda). */
 export function ProductosRelacionados({
@@ -8,11 +8,13 @@ export function ProductosRelacionados({
   subdominio,
   defaults,
   estiloInsignia = 'CLASICO',
+  estiloInsigniaSinStock = 'ETIQUETA',
 }: {
   productos: ProductoTienda[];
   subdominio: string;
   defaults?: DefaultsColorTienda;
   estiloInsignia?: EstiloInsigniaOfertaTienda;
+  estiloInsigniaSinStock?: EstiloInsigniaSinStockTienda;
 }) {
   if (!productos.length) return null;
   return (
@@ -25,7 +27,14 @@ export function ProductosRelacionados({
       </h2>
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         {productos.map((p) => (
-          <TarjetaProductoTienda key={p.id} producto={p} subdominio={subdominio} defaults={defaults} estiloInsignia={estiloInsignia} />
+          <TarjetaProductoTienda
+            key={p.id}
+            producto={p}
+            subdominio={subdominio}
+            defaults={defaults}
+            estiloInsignia={estiloInsignia}
+            estiloInsigniaSinStock={estiloInsigniaSinStock}
+          />
         ))}
       </div>
     </div>

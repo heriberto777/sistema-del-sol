@@ -3,7 +3,8 @@ import { Plus } from 'lucide-react';
 import { ProductoTienda } from '../../hooks/useTienda';
 import { useCarritoTiendaContext } from './CarritoTiendaContext';
 import { FilaPrecioOferta, InsigniaOferta, precioOriginalParaCarrito, precioParaCarrito } from './OfertaEnTarjeta';
-import { EstiloInsigniaOfertaTienda } from './tema';
+import { claseImagenSinStock, InsigniaSinStock, TextoSinStock } from './InsigniaSinStock';
+import { EstiloInsigniaOfertaTienda, EstiloInsigniaSinStockTienda } from './tema';
 
 /** Valores de respaldo cuando la plantilla no define tokens (Fase 7) — las 11 plantillas nuevas nunca los usan (su var() real siempre resuelve); Directo/Mercado (claras) funcionan bien con el default; Boutique (oscura) pasa los suyos explícitos para no quedar con una tarjeta blanca sobre fondo casi negro. */
 export interface DefaultsColorTienda {
@@ -25,11 +26,13 @@ export function TarjetaProductoTienda({
   subdominio,
   defaults,
   estiloInsignia = 'CLASICO',
+  estiloInsigniaSinStock = 'ETIQUETA',
 }: {
   producto: ProductoTienda;
   subdominio: string;
   defaults?: DefaultsColorTienda;
   estiloInsignia?: EstiloInsigniaOfertaTienda;
+  estiloInsigniaSinStock?: EstiloInsigniaSinStockTienda;
 }) {
   const carrito = useCarritoTiendaContext();
   const d = { ...DEFAULT, ...defaults };
@@ -50,14 +53,25 @@ export function TarjetaProductoTienda({
           background: `color-mix(in srgb, var(--tienda-color-acento, ${d.acento}) 15%, var(--tienda-color-superficie, ${d.superficie}))`,
         }}
       >
-        {producto.imagen && <img src={producto.imagen} alt={producto.nombre} className="h-full w-full object-cover" />}
-        <InsigniaOferta oferta={producto.oferta} estilo={estiloInsignia} colorAcento={d.acento} colorSuperficie={d.superficie} />
+        {producto.imagen && (
+          <img
+            src={producto.imagen}
+            alt={producto.nombre}
+            className={`h-full w-full object-cover ${claseImagenSinStock(producto.sinStock, estiloInsigniaSinStock)}`}
+          />
+        )}
+        {producto.sinStock ? (
+          <InsigniaSinStock sinStock estilo={estiloInsigniaSinStock} />
+        ) : (
+          <InsigniaOferta oferta={producto.oferta} estilo={estiloInsignia} colorAcento={d.acento} colorSuperficie={d.superficie} />
+        )}
       </div>
       <div className="p-3" style={{ color: `var(--tienda-color-texto, ${d.texto})` }}>
         <h3 className="mb-1 text-[0.85em] font-semibold">{producto.nombre}</h3>
         <div className="flex items-center justify-between gap-2">
-          <FilaPrecioOferta precio={producto.precio} oferta={producto.oferta} estilo={estiloInsignia} colorAcento={d.acento} />
-          {!producto.tieneVariantes && producto.varianteId && (
+          <FilaPrecioOferta precio={producto.precio} oferta={producto.sinStock ? null : producto.oferta} estilo={estiloInsignia} colorAcento={d.acento} />
+          <TextoSinStock sinStock={producto.sinStock} estilo={estiloInsigniaSinStock} />
+          {!producto.tieneVariantes && producto.varianteId && !producto.sinStock && (
             <button
               type="button"
               onClick={(e) => {

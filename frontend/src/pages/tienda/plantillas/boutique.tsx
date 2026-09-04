@@ -10,6 +10,7 @@ import { SeccionOfertas } from '../SeccionOfertas';
 import { SeccionesDinamicas } from '../SeccionesDinamicas';
 import { ProductosRelacionados } from '../ProductosRelacionados';
 import { FilaPrecioOferta, InsigniaOferta, precioOriginalParaCarrito, precioParaCarrito } from '../OfertaEnTarjeta';
+import { claseImagenSinStock, EtiquetaSinExistenciaVariante, InsigniaSinStock, TextoSinStock } from '../InsigniaSinStock';
 import type { Plantilla, PropsCarrito, PropsHome, PropsProducto } from './tipos';
 
 // Boutique es oscura y sin tokens (Fase 7) — los componentes compartidos
@@ -89,9 +90,16 @@ function BoutiqueHome({ config, subdominio, carrito, productos, cargando, busque
         subdominio={subdominio}
         defaults={{ acento: accent, ...DEFAULTS_COMPARTIDOS }}
         estiloInsignia={config.tema.estiloInsigniaOferta}
+        estiloInsigniaSinStock={config.tema.estiloInsigniaSinStock}
       />
       <SeccionOfertas ofertas={ofertas} defaults={{ acento: accent, ...DEFAULTS_COMPARTIDOS }} mostrar={config.tema.mostrarSeccionOfertas} />
-      <SeccionesDinamicas secciones={secciones} subdominio={subdominio} defaults={{ acento: accent, ...DEFAULTS_COMPARTIDOS }} estiloInsignia={config.tema.estiloInsigniaOferta} />
+      <SeccionesDinamicas
+        secciones={secciones}
+        subdominio={subdominio}
+        defaults={{ acento: accent, ...DEFAULTS_COMPARTIDOS }}
+        estiloInsignia={config.tema.estiloInsigniaOferta}
+        estiloInsigniaSinStock={config.tema.estiloInsigniaSinStock}
+      />
 
       {cargando && <p className="pb-16 text-center text-sm text-[#8a8073]">Cargando…</p>}
       {!cargando && productos.length === 0 && <p className="pb-16 text-center text-sm text-[#8a8073]">No hay productos.</p>}
@@ -99,9 +107,13 @@ function BoutiqueHome({ config, subdominio, carrito, productos, cargando, busque
         <div className="grid grid-cols-2 gap-px bg-[#37312a] px-8 pb-16 sm:grid-cols-3 sm:px-12">
           {productos.map((p) => (
             <Link key={p.id} to={`/tienda/${subdominio}/producto/${p.id}`} className="bg-[#211d19] pb-4">
-              <div className="relative aspect-[4/5]" style={{ background: 'linear-gradient(160deg,#3a332b,#211d19)' }}>
+              <div className={`relative aspect-[4/5] ${claseImagenSinStock(p.sinStock, config.tema.estiloInsigniaSinStock)}`} style={{ background: 'linear-gradient(160deg,#3a332b,#211d19)' }}>
                 {p.imagen && <img src={p.imagen} alt={p.nombre} className="h-full w-full object-cover" />}
-                <InsigniaOferta oferta={p.oferta} estilo={config.tema.estiloInsigniaOferta} colorAcento={accent} colorSuperficie={DEFAULTS_COMPARTIDOS.superficie} />
+                {p.sinStock ? (
+                  <InsigniaSinStock sinStock estilo={config.tema.estiloInsigniaSinStock} />
+                ) : (
+                  <InsigniaOferta oferta={p.oferta} estilo={config.tema.estiloInsigniaOferta} colorAcento={accent} colorSuperficie={DEFAULTS_COMPARTIDOS.superficie} />
+                )}
               </div>
               <div className="px-3 pt-4 text-center">
                 {p.categoria && <div className="text-[10px] uppercase tracking-widest text-[#8a8073]">{p.categoria.nombre}</div>}
@@ -109,12 +121,14 @@ function BoutiqueHome({ config, subdominio, carrito, productos, cargando, busque
                   {p.nombre}
                 </h3>
                 <p className="text-sm tracking-wide">
-                  <FilaPrecioOferta precio={p.precio} oferta={p.oferta} estilo={config.tema.estiloInsigniaOferta} tamano="1em" colorAcento={accent} />
+                  <FilaPrecioOferta precio={p.precio} oferta={p.sinStock ? null : p.oferta} estilo={config.tema.estiloInsigniaOferta} tamano="1em" colorAcento={accent} />
                 </p>
+                <TextoSinStock sinStock={p.sinStock} estilo={config.tema.estiloInsigniaSinStock} />
                 <button
                   type="button"
+                  disabled={!p.tieneVariantes && p.sinStock}
                   onClick={(e) => {
-                    if (p.tieneVariantes || !p.varianteId) return;
+                    if (p.tieneVariantes || !p.varianteId || p.sinStock) return;
                     e.preventDefault();
                     carrito.agregar({
                       productoId: p.id,
@@ -125,10 +139,10 @@ function BoutiqueHome({ config, subdominio, carrito, productos, cargando, busque
                       imagen: p.imagen,
                     });
                   }}
-                  className="mt-3 border px-4 py-1.5 text-[10px] font-semibold uppercase tracking-widest"
+                  className="mt-3 border px-4 py-1.5 text-[10px] font-semibold uppercase tracking-widest disabled:cursor-not-allowed disabled:opacity-40"
                   style={{ borderColor: accent, color: accent }}
                 >
-                  {p.tieneVariantes ? 'Ver opciones' : 'Agregar'}
+                  {!p.tieneVariantes && p.sinStock ? 'Agotado' : p.tieneVariantes ? 'Ver opciones' : 'Agregar'}
                 </button>
               </div>
             </Link>
@@ -197,7 +211,12 @@ function BoutiqueProducto({ config, subdominio, carrito, producto, varianteSelec
                 >
                   <span className="flex flex-col normal-case">
                     <span>{v.etiqueta || '(sin atributos)'}</span>
-                    {v.stock !== null && <span className="text-[10px] uppercase tracking-widest text-[#8a8073]">{v.stock > 0 ? `${v.stock} disponibles` : 'Sin existencia'}</span>}
+                    {v.stock !== null &&
+                      (v.stock > 0 ? (
+                        <span className="text-[10px] uppercase tracking-widest text-[#8a8073]">{v.stock} disponibles</span>
+                      ) : (
+                        <EtiquetaSinExistenciaVariante estilo={config.tema.estiloInsigniaSinStock} />
+                      ))}
                   </span>
                   <span>{formatearPrecio(v.precio)}</span>
                 </button>
@@ -206,7 +225,9 @@ function BoutiqueProducto({ config, subdominio, carrito, producto, varianteSelec
           )}
 
           {varianteSeleccionada && varianteSeleccionada.stock !== null && (
-            <p className="mb-6 text-xs uppercase tracking-widest text-[#8a8073]">{varianteSeleccionada.stock > 0 ? `${varianteSeleccionada.stock} disponibles` : 'Sin stock'}</p>
+            <p className="mb-6 text-xs uppercase tracking-widest text-[#8a8073]">
+              {varianteSeleccionada.stock > 0 ? `${varianteSeleccionada.stock} disponibles` : <EtiquetaSinExistenciaVariante estilo={config.tema.estiloInsigniaSinStock} />}
+            </p>
           )}
           <div className="mb-6 flex items-center justify-center gap-3 sm:justify-start">
             <button type="button" onClick={() => onCantidadChange(Math.max(1, cantidad - 1))} className="flex h-9 w-9 items-center justify-center border border-[#37312a]">
@@ -233,6 +254,7 @@ function BoutiqueProducto({ config, subdominio, carrito, producto, varianteSelec
         subdominio={subdominio}
         defaults={{ acento: accent, ...DEFAULTS_COMPARTIDOS }}
         estiloInsignia={config.tema.estiloInsigniaOferta}
+        estiloInsigniaSinStock={config.tema.estiloInsigniaSinStock}
       />
       <Footer nombre={config.nombre} />
     </div>

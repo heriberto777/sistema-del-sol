@@ -17,6 +17,7 @@ import {
   RADIOS_TARJETA_TIENDA,
   PROPORCIONES_IMAGEN_TIENDA,
   ESTILOS_INSIGNIA_OFERTA_TIENDA,
+  ESTILOS_INSIGNIA_SIN_STOCK_TIENDA,
   MENU_DEFAULT,
   TemaTienda,
   ClaveMenuTienda,
@@ -84,12 +85,19 @@ const TEMA_DEFAULT: TemaTienda = {
   menu: MENU_DEFAULT,
   estiloInsigniaOferta: 'CLASICO',
   mostrarSeccionOfertas: true,
+  estiloInsigniaSinStock: 'ETIQUETA',
 };
 
 const ETIQUETA_ESTILO_INSIGNIA: Record<TemaTienda['estiloInsigniaOferta'], string> = {
   CLASICO: 'Clásico',
   AHORRO: 'Ahorro explícito',
   CINTA: 'Cinta de esquina',
+};
+
+const ETIQUETA_ESTILO_INSIGNIA_SIN_STOCK: Record<TemaTienda['estiloInsigniaSinStock'], string> = {
+  ETIQUETA: 'Insignia sólida',
+  CINTA: 'Cinta de esquina',
+  TEXTO: 'Texto discreto',
 };
 
 /** Defaults neutros solo para el preview del panel — no tienen relación con ninguna de las 17 plantillas reales. */
@@ -112,6 +120,7 @@ const PRODUCTO_PREVIEW_BASE = {
   stock: 10,
   varianteId: 'preview',
   tieneVariantes: false,
+  sinStock: false,
 } as const;
 
 const PREVIEW_DESCUENTO: ProductoTienda = {
@@ -128,6 +137,16 @@ const PREVIEW_BOGO: ProductoTienda = {
   nombre: 'Camisa de lino',
   precio: '1290',
   oferta: { tipo: 'BOGO', comprarCantidad: 1, llevarCantidad: 1, porcentajeDescuentoLlevar: 100 },
+};
+
+const PREVIEW_SIN_STOCK: ProductoTienda = {
+  ...PRODUCTO_PREVIEW_BASE,
+  id: 'preview-sin-stock',
+  nombre: 'Pantalón de vestir',
+  precio: '1890',
+  oferta: null,
+  stock: 0,
+  sinStock: true,
 };
 
 /** Agrupa visualmente los ~7 conceptos de la pestaña Personalización (Fase 15) — antes eran una sola columna continua sin ninguna separación. */
@@ -654,6 +673,40 @@ export function TiendaOnlineConfigPanel() {
               <p className="self-center text-xs text-slate-500 dark:text-slate-400">
                 Vista previa con datos de ejemplo — a la izquierda una oferta de porcentaje, a la derecha una 2×1.
               </p>
+            </div>
+          </SeccionPersonalizacion>
+
+          <SeccionPersonalizacion
+            titulo="Etiqueta de sin stock"
+            descripcion="Cómo se muestra un producto o variante agotado en catálogo, Destacados, y en el selector de opciones del detalle. Reemplaza a la insignia de oferta cuando ambas aplicarían a la vez."
+          >
+            <div className="grid grid-cols-3 gap-2">
+              {ESTILOS_INSIGNIA_SIN_STOCK_TIENDA.map((estilo) => (
+                <button
+                  key={estilo}
+                  type="button"
+                  onClick={() => setTema({ ...tema, estiloInsigniaSinStock: estilo })}
+                  className={clsx(
+                    'rounded-lg border px-3 py-2 text-left text-xs font-semibold transition-colors',
+                    tema.estiloInsigniaSinStock === estilo
+                      ? 'border-sol-500 bg-sol-50 text-sol-700 dark:bg-sol-500/10 dark:text-sol-300'
+                      : 'border-slate-200 text-slate-600 hover:border-slate-300 dark:border-slate-700 dark:text-slate-300 dark:hover:border-slate-600',
+                  )}
+                >
+                  {ETIQUETA_ESTILO_INSIGNIA_SIN_STOCK[estilo]}
+                </button>
+              ))}
+            </div>
+            <div
+              className="flex gap-4 rounded-lg border border-dashed border-slate-300 p-4 dark:border-slate-700"
+              style={variablesCssTema(tema, PREVIEW_DEFAULTS) as CSSProperties}
+            >
+              <div className="pointer-events-none w-32 shrink-0">
+                <CarritoTiendaProvider subdominio="__preview_sin_stock__">
+                  <TarjetaProductoTienda producto={PREVIEW_SIN_STOCK} subdominio="__preview__" estiloInsigniaSinStock={tema.estiloInsigniaSinStock} />
+                </CarritoTiendaProvider>
+              </div>
+              <p className="self-center text-xs text-slate-500 dark:text-slate-400">Vista previa con un producto agotado de ejemplo.</p>
             </div>
           </SeccionPersonalizacion>
 

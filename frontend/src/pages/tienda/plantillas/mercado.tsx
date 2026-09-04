@@ -10,6 +10,7 @@ import { SeccionOfertas } from '../SeccionOfertas';
 import { SeccionesDinamicas } from '../SeccionesDinamicas';
 import { ProductosRelacionados } from '../ProductosRelacionados';
 import { FilaPrecioOferta, InsigniaOferta, precioOriginalParaCarrito, precioParaCarrito } from '../OfertaEnTarjeta';
+import { claseImagenSinStock, EtiquetaSinExistenciaVariante, InsigniaSinStock, TextoSinStock } from '../InsigniaSinStock';
 import type { Plantilla, PropsCarrito, PropsHome, PropsProducto } from './tipos';
 
 const ACCENT_DEFAULT = '#ff6b45';
@@ -87,9 +88,9 @@ function MercadoHome({ config, subdominio, carrito, productos, cargando, busqued
         )}
       </div>
 
-      <SeccionDestacados productos={destacados} subdominio={subdominio} estiloInsignia={config.tema.estiloInsigniaOferta} />
+      <SeccionDestacados productos={destacados} subdominio={subdominio} estiloInsignia={config.tema.estiloInsigniaOferta} estiloInsigniaSinStock={config.tema.estiloInsigniaSinStock} />
       <SeccionOfertas ofertas={ofertas} mostrar={config.tema.mostrarSeccionOfertas} />
-      <SeccionesDinamicas secciones={secciones} subdominio={subdominio} estiloInsignia={config.tema.estiloInsigniaOferta} />
+      <SeccionesDinamicas secciones={secciones} subdominio={subdominio} estiloInsignia={config.tema.estiloInsigniaOferta} estiloInsigniaSinStock={config.tema.estiloInsigniaSinStock} />
 
       <div className="mx-6 mb-6 flex items-end justify-between sm:mx-10">
         <div>
@@ -114,20 +115,25 @@ function MercadoHome({ config, subdominio, carrito, productos, cargando, busqued
         {!cargando && productos.length === 0 && <p className="col-span-full text-sm text-[#7a8f8d]">No hay productos.</p>}
         {productos.map((p) => (
           <Link key={p.id} to={`/tienda/${subdominio}/producto/${p.id}`} className="overflow-hidden rounded-2xl bg-white shadow-md dark:bg-[#12302e]">
-            <div className="relative aspect-square" style={{ background: `linear-gradient(135deg,#ffd9a8,${accent})` }}>
+            <div className={`relative aspect-square ${claseImagenSinStock(p.sinStock, config.tema.estiloInsigniaSinStock)}`} style={{ background: `linear-gradient(135deg,#ffd9a8,${accent})` }}>
               {p.imagen && <img src={p.imagen} alt={p.nombre} className="h-full w-full object-cover" />}
-              <InsigniaOferta oferta={p.oferta} estilo={config.tema.estiloInsigniaOferta} colorAcento={accent} />
+              {p.sinStock ? (
+                <InsigniaSinStock sinStock estilo={config.tema.estiloInsigniaSinStock} />
+              ) : (
+                <InsigniaOferta oferta={p.oferta} estilo={config.tema.estiloInsigniaOferta} colorAcento={accent} />
+              )}
             </div>
             <div className="p-4">
               <h3 className="mb-2 text-sm font-semibold" style={{ fontFamily: FONT_DISPLAY }}>
                 {p.nombre}
               </h3>
               <div className="flex items-center justify-between gap-1.5">
-                <FilaPrecioOferta precio={p.precio} oferta={p.oferta} estilo={config.tema.estiloInsigniaOferta} tamano="0.875em" colorAcento={accent} />
+                <FilaPrecioOferta precio={p.precio} oferta={p.sinStock ? null : p.oferta} estilo={config.tema.estiloInsigniaOferta} tamano="0.875em" colorAcento={accent} />
+                <TextoSinStock sinStock={p.sinStock} estilo={config.tema.estiloInsigniaSinStock} />
                 <button
                   type="button"
                   onClick={(e) => {
-                    if (p.tieneVariantes || !p.varianteId) return;
+                    if (p.tieneVariantes || !p.varianteId || p.sinStock) return;
                     e.preventDefault();
                     carrito.agregar({
                       productoId: p.id,
@@ -212,7 +218,12 @@ function MercadoProducto({ config, subdominio, carrito, producto, varianteSelecc
                 >
                   <span className="flex flex-col">
                     <span>{v.etiqueta || '(sin atributos)'}</span>
-                    {v.stock !== null && <span className="text-xs text-[#7a8f8d]">{v.stock > 0 ? `${v.stock} disponibles` : 'Sin existencia'}</span>}
+                    {v.stock !== null &&
+                      (v.stock > 0 ? (
+                        <span className="text-xs text-[#7a8f8d]">{v.stock} disponibles</span>
+                      ) : (
+                        <EtiquetaSinExistenciaVariante estilo={config.tema.estiloInsigniaSinStock} />
+                      ))}
                   </span>
                   <span className="font-bold" style={{ color: accent }}>
                     {formatearPrecio(v.precio)}
@@ -223,7 +234,9 @@ function MercadoProducto({ config, subdominio, carrito, producto, varianteSelecc
           )}
 
           {varianteSeleccionada && varianteSeleccionada.stock !== null && (
-            <p className="mb-6 text-sm text-[#7a8f8d]">{varianteSeleccionada.stock > 0 ? `${varianteSeleccionada.stock} disponibles` : 'Sin stock'}</p>
+            <p className="mb-6 text-sm text-[#7a8f8d]">
+              {varianteSeleccionada.stock > 0 ? `${varianteSeleccionada.stock} disponibles` : <EtiquetaSinExistenciaVariante estilo={config.tema.estiloInsigniaSinStock} />}
+            </p>
           )}
           <div className="mb-5 flex items-center gap-3">
             <button type="button" onClick={() => onCantidadChange(Math.max(1, cantidad - 1))} className="flex h-9 w-9 items-center justify-center rounded-full bg-white shadow-sm dark:bg-[#12302e]">
@@ -245,7 +258,7 @@ function MercadoProducto({ config, subdominio, carrito, producto, varianteSelecc
           </button>
         </div>
       </div>
-      <ProductosRelacionados productos={producto.relacionados} subdominio={subdominio} estiloInsignia={config.tema.estiloInsigniaOferta} />
+      <ProductosRelacionados productos={producto.relacionados} subdominio={subdominio} estiloInsignia={config.tema.estiloInsigniaOferta} estiloInsigniaSinStock={config.tema.estiloInsigniaSinStock} />
       <Footer nombre={config.nombre} />
     </div>
   );

@@ -118,6 +118,18 @@ export type ProporcionImagenTienda = (typeof PROPORCIONES_IMAGEN_TIENDA)[number]
 export const ESTILOS_INSIGNIA_OFERTA_TIENDA = ['CLASICO', 'AHORRO', 'CINTA'] as const;
 export type EstiloInsigniaOfertaTienda = (typeof ESTILOS_INSIGNIA_OFERTA_TIENDA)[number];
 
+/**
+ * Cómo se muestra que un producto/variante está agotado — mismo criterio
+ * que `EstiloInsigniaOfertaTienda`: `ETIQUETA` = insignia sólida en la
+ * esquina; `CINTA` = cinta diagonal; `TEXTO` = sin insignia sobre la
+ * imagen, solo la atenúa y agrega un texto discreto junto al precio.
+ * Cuando un producto está agotado, esta insignia REEMPLAZA a la de
+ * oferta en la tarjeta (nunca las dos a la vez — no tiene sentido
+ * publicitar un descuento en algo que no se puede comprar).
+ */
+export const ESTILOS_INSIGNIA_SIN_STOCK_TIENDA = ['ETIQUETA', 'CINTA', 'TEXTO'] as const;
+export type EstiloInsigniaSinStockTienda = (typeof ESTILOS_INSIGNIA_SIN_STOCK_TIENDA)[number];
+
 export const CLAVES_MENU_TIENDA = ['inicio', 'categorias', 'carrito', 'cuenta'] as const;
 export type ClaveMenuTienda = (typeof CLAVES_MENU_TIENDA)[number];
 
@@ -143,6 +155,8 @@ export interface TemaTienda {
   estiloInsigniaOferta: EstiloInsigniaOfertaTienda;
   /** Fase 16 — sección "Ofertas" informativa del Home (chips agregados, alcance CARRITO incluido) — default `true`. Independiente de la insignia por producto (Fase 13), que sigue mostrándose siempre que haya oferta vigente. */
   mostrarSeccionOfertas: boolean;
+  /** Ítem "etiqueta de sin stock" — default ETIQUETA si el tenant nunca lo configuró. */
+  estiloInsigniaSinStock: EstiloInsigniaSinStockTienda;
 }
 
 const MENU_DEFAULT: ItemMenuTienda[] = CLAVES_MENU_TIENDA.map((clave) => ({ clave, visible: true }));
@@ -203,6 +217,9 @@ export function resolverTemaTienda(valorJson: string | undefined, colorAcentoLeg
       ? (bruto.estiloInsigniaOferta as EstiloInsigniaOfertaTienda)
       : 'CLASICO',
     mostrarSeccionOfertas: typeof bruto.mostrarSeccionOfertas === 'boolean' ? bruto.mostrarSeccionOfertas : true,
+    estiloInsigniaSinStock: (ESTILOS_INSIGNIA_SIN_STOCK_TIENDA as readonly string[]).includes(bruto.estiloInsigniaSinStock as string)
+      ? (bruto.estiloInsigniaSinStock as EstiloInsigniaSinStockTienda)
+      : 'ETIQUETA',
   };
 }
 

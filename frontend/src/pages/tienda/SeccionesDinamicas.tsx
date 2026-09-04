@@ -2,12 +2,13 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { formatearPrecio, SeccionTienda } from '../../hooks/useTienda';
 import { TarjetaProductoTienda, DefaultsColorTienda } from './TarjetaProductoTienda';
-import { EstiloInsigniaOfertaTienda } from './tema';
+import { EstiloInsigniaOfertaTienda, EstiloInsigniaSinStockTienda } from './tema';
 
 interface PropsComunes {
   subdominio: string;
   defaults?: DefaultsColorTienda;
   estiloInsignia?: EstiloInsigniaOfertaTienda;
+  estiloInsigniaSinStock?: EstiloInsigniaSinStockTienda;
 }
 
 /**
@@ -49,14 +50,27 @@ function TituloSeccion({ titulo, subtitulo, defaults }: { titulo: string; subtit
   );
 }
 
-function SeccionProductos({ seccion, subdominio, defaults, estiloInsignia = 'CLASICO' }: PropsComunes & { seccion: SeccionTienda }) {
+function SeccionProductos({
+  seccion,
+  subdominio,
+  defaults,
+  estiloInsignia = 'CLASICO',
+  estiloInsigniaSinStock = 'ETIQUETA',
+}: PropsComunes & { seccion: SeccionTienda }) {
   if (!seccion.productos.length) return null;
   return (
     <div className="px-6 pb-6 pt-2 sm:px-10">
       <TituloSeccion titulo={seccion.titulo} subtitulo={seccion.subtitulo} defaults={defaults} />
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         {seccion.productos.map((p) => (
-          <TarjetaProductoTienda key={p.id} producto={p} subdominio={subdominio} defaults={defaults} estiloInsignia={estiloInsignia} />
+          <TarjetaProductoTienda
+            key={p.id}
+            producto={p}
+            subdominio={subdominio}
+            defaults={defaults}
+            estiloInsignia={estiloInsignia}
+            estiloInsigniaSinStock={estiloInsigniaSinStock}
+          />
         ))}
       </div>
     </div>

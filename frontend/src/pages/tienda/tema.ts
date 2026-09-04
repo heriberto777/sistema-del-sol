@@ -38,6 +38,10 @@ export type ProporcionImagenTienda = (typeof PROPORCIONES_IMAGEN_TIENDA)[number]
 export const ESTILOS_INSIGNIA_OFERTA_TIENDA = ['CLASICO', 'AHORRO', 'CINTA'] as const;
 export type EstiloInsigniaOfertaTienda = (typeof ESTILOS_INSIGNIA_OFERTA_TIENDA)[number];
 
+/** Ítem "etiqueta de sin stock" — cómo se muestra que un producto/variante está agotado (ver `backend/src/ecommerce/resolver-config-tienda.ts`). Reemplaza a la insignia de oferta cuando ambas aplicarían a la vez. */
+export const ESTILOS_INSIGNIA_SIN_STOCK_TIENDA = ['ETIQUETA', 'CINTA', 'TEXTO'] as const;
+export type EstiloInsigniaSinStockTienda = (typeof ESTILOS_INSIGNIA_SIN_STOCK_TIENDA)[number];
+
 export const CLAVES_MENU_TIENDA = ['inicio', 'categorias', 'carrito', 'cuenta'] as const;
 export type ClaveMenuTienda = (typeof CLAVES_MENU_TIENDA)[number];
 
@@ -61,6 +65,7 @@ export interface TemaTienda {
   menu: ItemMenuTienda[];
   estiloInsigniaOferta: EstiloInsigniaOfertaTienda;
   mostrarSeccionOfertas: boolean;
+  estiloInsigniaSinStock: EstiloInsigniaSinStockTienda;
 }
 
 export const MENU_DEFAULT: ItemMenuTienda[] = CLAVES_MENU_TIENDA.map((clave) => ({ clave, visible: true }));

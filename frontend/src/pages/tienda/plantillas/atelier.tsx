@@ -10,6 +10,7 @@ import { SeccionOfertas } from '../SeccionOfertas';
 import { SeccionesDinamicas } from '../SeccionesDinamicas';
 import { ProductosRelacionados } from '../ProductosRelacionados';
 import { FilaPrecioOferta, InsigniaOferta, precioOriginalParaCarrito, precioParaCarrito } from '../OfertaEnTarjeta';
+import { claseImagenSinStock, EtiquetaSinExistenciaVariante, InsigniaSinStock, TextoSinStock } from '../InsigniaSinStock';
 import { ClaveMenuTienda, DefaultsTemaPlantilla, menuVisibleOrdenado, useCargarFuentesTienda, variablesCssTema } from '../tema';
 import type { Plantilla, PropsCarrito, PropsHome, PropsProducto } from './tipos';
 
@@ -98,27 +99,32 @@ function AtelierHome({ config, subdominio, carrito, productos, cargando }: Props
         </h1>
       </div>
 
-      <SeccionDestacados productos={destacados ?? []} subdominio={subdominio} estiloInsignia={tema.estiloInsigniaOferta} />
+      <SeccionDestacados productos={destacados ?? []} subdominio={subdominio} estiloInsignia={tema.estiloInsigniaOferta} estiloInsigniaSinStock={tema.estiloInsigniaSinStock} />
       <SeccionOfertas ofertas={ofertas ?? []} mostrar={tema.mostrarSeccionOfertas} />
-      <SeccionesDinamicas secciones={secciones} subdominio={subdominio} estiloInsignia={tema.estiloInsigniaOferta} />
+      <SeccionesDinamicas secciones={secciones} subdominio={subdominio} estiloInsignia={tema.estiloInsigniaOferta} estiloInsigniaSinStock={tema.estiloInsigniaSinStock} />
 
       <div id="catalogo" className="grid grid-cols-1 gap-px sm:grid-cols-2">
         {cargando && <p className="col-span-full px-6 py-10 text-[0.85em] opacity-60 sm:px-10">Cargando…</p>}
         {!cargando && productos.length === 0 && <p className="col-span-full px-6 py-10 text-[0.85em] opacity-60 sm:px-10">No hay productos.</p>}
         {productos.map((p) => (
           <Link key={p.id} to={`/tienda/${subdominio}/producto/${p.id}`} className="pb-8 text-center">
-            <div className="relative mb-3.5 overflow-hidden" style={{ aspectRatio: 'var(--tienda-ratio-imagen)', background: 'linear-gradient(140deg,#efefef,#dcdcdc)' }}>
+            <div className={`relative mb-3.5 overflow-hidden ${claseImagenSinStock(p.sinStock, tema.estiloInsigniaSinStock)}`} style={{ aspectRatio: 'var(--tienda-ratio-imagen)', background: 'linear-gradient(140deg,#efefef,#dcdcdc)' }}>
               {p.imagen && <img src={p.imagen} alt={p.nombre} className="h-full w-full object-cover" />}
-              <InsigniaOferta oferta={p.oferta} estilo={tema.estiloInsigniaOferta} />
+              {p.sinStock ? (
+                <InsigniaSinStock sinStock estilo={tema.estiloInsigniaSinStock} />
+              ) : (
+                <InsigniaOferta oferta={p.oferta} estilo={tema.estiloInsigniaOferta} />
+              )}
             </div>
             <h3 className="mb-1 text-[0.75em] uppercase tracking-[0.05em]">{p.nombre}</h3>
             <div className="flex items-center justify-center gap-2">
-              {p.oferta ? (
+              {p.oferta && !p.sinStock ? (
                 <FilaPrecioOferta precio={p.precio} oferta={p.oferta} estilo={tema.estiloInsigniaOferta} tamano="0.75em" />
               ) : (
                 <span className="text-[0.75em] opacity-70">{formatearPrecio(p.precio)}</span>
               )}
-              {!p.tieneVariantes && p.varianteId && (
+              <TextoSinStock sinStock={p.sinStock} estilo={tema.estiloInsigniaSinStock} />
+              {!p.tieneVariantes && p.varianteId && !p.sinStock && (
                 <button
                   type="button"
                   onClick={(e) => {
@@ -190,7 +196,12 @@ function AtelierProducto({ config, subdominio, carrito, producto, varianteSelecc
                 >
                   <span className="flex flex-col">
                     <span>{v.etiqueta || '(sin atributos)'}</span>
-                    {v.stock !== null && <span className="text-[0.75em] opacity-50">{v.stock > 0 ? `${v.stock} disponibles` : 'Sin existencia'}</span>}
+                    {v.stock !== null &&
+                      (v.stock > 0 ? (
+                        <span className="text-[0.75em] opacity-50">{v.stock} disponibles</span>
+                      ) : (
+                        <EtiquetaSinExistenciaVariante estilo={tema.estiloInsigniaSinStock} />
+                      ))}
                   </span>
                   <span>{formatearPrecio(v.precio)}</span>
                 </button>
@@ -199,7 +210,9 @@ function AtelierProducto({ config, subdominio, carrito, producto, varianteSelecc
           )}
 
           {varianteSeleccionada && varianteSeleccionada.stock !== null && (
-            <p className="mb-6 text-[0.8em] opacity-50">{varianteSeleccionada.stock > 0 ? `${varianteSeleccionada.stock} disponibles` : 'Sin stock'}</p>
+            <p className="mb-6 text-[0.8em] opacity-50">
+              {varianteSeleccionada.stock > 0 ? `${varianteSeleccionada.stock} disponibles` : <EtiquetaSinExistenciaVariante estilo={tema.estiloInsigniaSinStock} />}
+            </p>
           )}
           <div className="mb-6 flex items-center gap-3">
             <button type="button" onClick={() => onCantidadChange(Math.max(1, cantidad - 1))} className="flex h-8 w-8 items-center justify-center border border-[color:var(--tienda-color-texto)]/15">
@@ -220,7 +233,7 @@ function AtelierProducto({ config, subdominio, carrito, producto, varianteSelecc
           </button>
         </div>
       </div>
-      <ProductosRelacionados productos={producto.relacionados} subdominio={subdominio} estiloInsignia={tema.estiloInsigniaOferta} />
+      <ProductosRelacionados productos={producto.relacionados} subdominio={subdominio} estiloInsignia={tema.estiloInsigniaOferta} estiloInsigniaSinStock={tema.estiloInsigniaSinStock} />
       <Footer nombre={nombre} />
     </div>
   );

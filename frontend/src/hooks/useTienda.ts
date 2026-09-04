@@ -57,6 +57,8 @@ export interface ProductoTienda {
   tieneVariantes: boolean;
   /** Fase 13 — `null` si no hay ninguna oferta vigente para este producto/categoría. */
   oferta: OfertaVisibleProducto | null;
+  /** Ítem "etiqueta de sin stock" — TODAS las variantes en 0 (no solo `stock`, que es de la variante representativa). Siempre `false` si la tienda no tiene bodega configurada (stock desconocido, nunca "agotado"). */
+  sinStock: boolean;
 }
 
 export interface VarianteTienda {

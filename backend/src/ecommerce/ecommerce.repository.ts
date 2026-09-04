@@ -73,7 +73,6 @@ export class EcommerceRepository {
       categoria: { select: { id: true, nombre: true } },
       _count: { select: { variantes: true } },
       variantes: {
-        take: 1,
         orderBy: { createdAt: 'asc' as const },
         select: {
           id: true,
@@ -93,6 +92,11 @@ export class EcommerceRepository {
       precio: variantes[0]?.precios[0]?.precioVenta ?? null,
       stock: params.bodegaId ? Number(variantes[0]?.stock?.[0]?.cantidadActual ?? 0) : null,
       tieneVariantes: _count.variantes > 1,
+      // Ítem "etiqueta de sin stock" — agotado de VERDAD (todas las
+      // variantes en 0), no solo la primera (que es la única que ya se
+      // traía para el precio/stock "representativo" de la tarjeta). Sin
+      // bodega configurada, el stock es desconocido — nunca "agotado".
+      sinStock: params.bodegaId ? variantes.every((v) => Number(v.stock?.[0]?.cantidadActual ?? 0) <= 0) : false,
     }));
     return [datos, total] as const;
   }
@@ -338,7 +342,6 @@ export class EcommerceRepository {
           categoria: { select: { id: true, nombre: true } },
           _count: { select: { variantes: true } },
           variantes: {
-            take: 1,
             orderBy: { createdAt: 'asc' as const },
             select: {
               id: true,
@@ -366,6 +369,7 @@ export class EcommerceRepository {
       precio: variantes[0]?.precios[0]?.precioVenta ?? null,
       stock: params.bodegaId ? Number(variantes[0]?.stock?.[0]?.cantidadActual ?? 0) : null,
       tieneVariantes: _count.variantes > 1,
+      sinStock: params.bodegaId ? variantes.every((v) => Number(v.stock?.[0]?.cantidadActual ?? 0) <= 0) : false,
     }));
   }
 
@@ -385,7 +389,6 @@ export class EcommerceRepository {
             categoria: { select: { id: true, nombre: true } },
             _count: { select: { variantes: true } },
             variantes: {
-              take: 1,
               orderBy: { createdAt: 'asc' as const },
               select: {
                 id: true,
@@ -402,6 +405,7 @@ export class EcommerceRepository {
       precio: variantes[0]?.precios[0]?.precioVenta ?? null,
       stock: bodegaId ? Number(variantes[0]?.stock?.[0]?.cantidadActual ?? 0) : null,
       tieneVariantes: _count.variantes > 1,
+      sinStock: bodegaId ? variantes.every((v) => Number(v.stock?.[0]?.cantidadActual ?? 0) <= 0) : false,
     }));
     return new Map(datos.map((d) => [d.id, d]));
   }

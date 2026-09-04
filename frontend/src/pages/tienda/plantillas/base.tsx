@@ -10,6 +10,7 @@ import { SeccionOfertas } from '../SeccionOfertas';
 import { SeccionesDinamicas } from '../SeccionesDinamicas';
 import { ProductosRelacionados } from '../ProductosRelacionados';
 import { FilaPrecioOferta, InsigniaOferta, precioOriginalParaCarrito, precioParaCarrito } from '../OfertaEnTarjeta';
+import { claseImagenSinStock, EtiquetaSinExistenciaVariante, InsigniaSinStock, TextoSinStock } from '../InsigniaSinStock';
 import { ClaveMenuTienda, DefaultsTemaPlantilla, menuVisibleOrdenado, useCargarFuentesTienda, variablesCssTema } from '../tema';
 import type { Plantilla, PropsCarrito, PropsHome, PropsProducto } from './tipos';
 
@@ -107,9 +108,9 @@ function BaseHome({ config, subdominio, carrito, productos, cargando, busqueda, 
         <p className="text-[0.85em] opacity-60">Piezas que ya sabés que vas a usar — sin ruido, sin descuentos gritados.</p>
       </div>
 
-      <SeccionDestacados productos={destacados} subdominio={subdominio} estiloInsignia={tema.estiloInsigniaOferta} />
+      <SeccionDestacados productos={destacados} subdominio={subdominio} estiloInsignia={tema.estiloInsigniaOferta} estiloInsigniaSinStock={tema.estiloInsigniaSinStock} />
       <SeccionOfertas ofertas={ofertas} mostrar={tema.mostrarSeccionOfertas} />
-      <SeccionesDinamicas secciones={secciones} subdominio={subdominio} estiloInsignia={tema.estiloInsigniaOferta} />
+      <SeccionesDinamicas secciones={secciones} subdominio={subdominio} estiloInsignia={tema.estiloInsigniaOferta} estiloInsigniaSinStock={tema.estiloInsigniaSinStock} />
 
       <div id="catalogo" className="flex items-baseline justify-between px-6 pb-4 pt-6 sm:px-10">
         <h2 className="text-[1.05em] font-bold" style={{ fontFamily: 'var(--tienda-fuente-display)' }}>
@@ -131,19 +132,24 @@ function BaseHome({ config, subdominio, carrito, productos, cargando, busqueda, 
         {!cargando && productos.length === 0 && <p className="col-span-full text-[0.85em] opacity-60">No hay productos.</p>}
         {productos.map((p) => (
           <Link key={p.id} to={`/tienda/${subdominio}/producto/${p.id}`}>
-            <div className="relative">
+            <div className={`relative ${claseImagenSinStock(p.sinStock, tema.estiloInsigniaSinStock)}`}>
               <ThumbBase imagen={p.imagen} nombre={p.nombre} />
-              <InsigniaOferta oferta={p.oferta} estilo={tema.estiloInsigniaOferta} />
+              {p.sinStock ? (
+                <InsigniaSinStock sinStock estilo={tema.estiloInsigniaSinStock} />
+              ) : (
+                <InsigniaOferta oferta={p.oferta} estilo={tema.estiloInsigniaOferta} />
+              )}
             </div>
             <div className="pt-2.5">
               <h3 className="mb-1 text-[0.85em] font-semibold">{p.nombre}</h3>
               <div className="flex items-center justify-between gap-1.5">
-                {p.oferta ? (
+                {p.oferta && !p.sinStock ? (
                   <FilaPrecioOferta precio={p.precio} oferta={p.oferta} estilo={tema.estiloInsigniaOferta} tamano="0.82em" />
                 ) : (
                   <span className="text-[0.82em] font-semibold">{formatearPrecio(p.precio)}</span>
                 )}
-                {!p.tieneVariantes && p.varianteId && (
+                <TextoSinStock sinStock={p.sinStock} estilo={tema.estiloInsigniaSinStock} />
+                {!p.tieneVariantes && p.varianteId && !p.sinStock && (
                   <button
                     type="button"
                     onClick={(e) => {
@@ -217,7 +223,12 @@ function BaseProducto({ config, subdominio, carrito, producto, varianteSeleccion
                 >
                   <span className="flex flex-col">
                     <span>{v.etiqueta || '(sin atributos)'}</span>
-                    {v.stock !== null && <span className="text-[0.75em] opacity-60">{v.stock > 0 ? `${v.stock} disponibles` : 'Sin existencia'}</span>}
+                    {v.stock !== null &&
+                      (v.stock > 0 ? (
+                        <span className="text-[0.75em] opacity-60">{v.stock} disponibles</span>
+                      ) : (
+                        <EtiquetaSinExistenciaVariante estilo={tema.estiloInsigniaSinStock} />
+                      ))}
                   </span>
                   <span className="font-bold">{formatearPrecio(v.precio)}</span>
                 </button>
@@ -226,7 +237,9 @@ function BaseProducto({ config, subdominio, carrito, producto, varianteSeleccion
           )}
 
           {varianteSeleccionada && varianteSeleccionada.stock !== null && (
-            <p className="mb-6 text-[0.85em] opacity-60">{varianteSeleccionada.stock > 0 ? `${varianteSeleccionada.stock} disponibles` : 'Sin stock'}</p>
+            <p className="mb-6 text-[0.85em] opacity-60">
+              {varianteSeleccionada.stock > 0 ? `${varianteSeleccionada.stock} disponibles` : <EtiquetaSinExistenciaVariante estilo={tema.estiloInsigniaSinStock} />}
+            </p>
           )}
           <div className="mb-5 flex items-center gap-3">
             <button type="button" onClick={() => onCantidadChange(Math.max(1, cantidad - 1))} className="flex h-9 w-9 items-center justify-center rounded border border-[color:var(--tienda-color-texto)]/15">
@@ -242,7 +255,7 @@ function BaseProducto({ config, subdominio, carrito, producto, varianteSeleccion
           </button>
         </div>
       </div>
-      <ProductosRelacionados productos={producto.relacionados} subdominio={subdominio} estiloInsignia={tema.estiloInsigniaOferta} />
+      <ProductosRelacionados productos={producto.relacionados} subdominio={subdominio} estiloInsignia={tema.estiloInsigniaOferta} estiloInsigniaSinStock={tema.estiloInsigniaSinStock} />
       <Footer nombre={nombre} />
     </div>
   );

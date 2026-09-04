@@ -22,7 +22,18 @@ describe('resolverTemaTienda', () => {
       ],
       estiloInsigniaOferta: 'CLASICO',
       mostrarSeccionOfertas: true,
+      estiloInsigniaSinStock: 'ETIQUETA',
     });
+  });
+
+  it('con estiloInsigniaSinStock fuera de las opciones válidas, cae a ETIQUETA', () => {
+    const tema = resolverTemaTienda(JSON.stringify({ estiloInsigniaSinStock: 'BRILLANTE' }), undefined);
+    expect(tema.estiloInsigniaSinStock).toBe('ETIQUETA');
+  });
+
+  it('con estiloInsigniaSinStock válido, lo refleja', () => {
+    const tema = resolverTemaTienda(JSON.stringify({ estiloInsigniaSinStock: 'CINTA' }), undefined);
+    expect(tema.estiloInsigniaSinStock).toBe('CINTA');
   });
 
   it('sin TIENDA_TEMA ni color legacy, colorAcento queda null (cada plantilla nueva usa su propio default)', () => {

@@ -92,7 +92,13 @@ export function TiendaCategoria() {
             <p className="col-span-full py-12 text-center text-sm text-slate-400">No hay productos en esta categoría todavía.</p>
           )}
           {productos.map((p) => (
-            <TarjetaProductoTienda key={p.id} producto={p} subdominio={subdominio} defaults={{ acento: accent }} />
+            <TarjetaProductoTienda
+              key={p.id}
+              producto={p}
+              subdominio={subdominio}
+              defaults={{ acento: accent }}
+              estiloInsigniaSinStock={config?.tema.estiloInsigniaSinStock}
+            />
           ))}
         </div>
       </div>
