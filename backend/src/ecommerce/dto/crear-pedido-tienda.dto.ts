@@ -35,13 +35,21 @@ export class CrearPedidoTiendaDto {
   @IsNotEmpty()
   clienteTelefono: string;
 
-  @IsOptional()
   @IsEmail()
-  clienteEmail?: string;
+  clienteEmail: string;
 
   @IsString()
   @IsNotEmpty()
   direccionEntrega: string;
+
+  // Ítem "documento fiscal del comprador" — pedido explícito del usuario,
+  // obligatorio. Se guarda en Cliente.rncCedula (el mismo campo que ya usa
+  // Contactos/facturación admin — no un dato suelto del pedido) para que
+  // quede en el perfil real y no haya que volver a pedirlo la próxima
+  // compra (ver EcommerceService.crearPedido).
+  @IsString()
+  @IsNotEmpty()
+  clienteDocumento: string;
 
   @IsOptional()
   @IsString()

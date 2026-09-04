@@ -250,6 +250,8 @@ describe('EcommerceService', () => {
       lineas: [{ productoId: 'p1', cantidad: 2 }],
       clienteNombre: 'Juan Pérez',
       clienteTelefono: '8095551234',
+      clienteEmail: 'juan@example.com',
+      clienteDocumento: '00112345678',
       direccionEntrega: 'Calle Falsa 123',
     };
 
@@ -316,6 +318,20 @@ describe('EcommerceService', () => {
       await service.crearPedido('demo', DTO, requestFalso('Bearer token-vencido'));
 
       expect(facturacionService.crear).toHaveBeenCalledWith(expect.objectContaining({ clienteId: 'cf1' }), 't1', 'u1');
+    });
+
+    it('con cliente autenticado, guarda el RNC/Cédula del checkout en su Cliente real', async () => {
+      jwtService.verify.mockReturnValue({ clienteId: 'cliente-real', tenantId: 't1', email: 'a@a.com' });
+
+      await service.crearPedido('demo', DTO, requestFalso('Bearer token-valido'));
+
+      expect(ecommerceRepository.actualizarPerfil).toHaveBeenCalledWith('cliente-real', { rncCedula: DTO.clienteDocumento });
+    });
+
+    it('sin sesión (cae a Consumidor Final), NUNCA le pisa el RNC/Cédula al cliente compartido', async () => {
+      await service.crearPedido('demo', DTO, requestFalso());
+
+      expect(ecommerceRepository.actualizarPerfil).not.toHaveBeenCalled();
     });
   });
 

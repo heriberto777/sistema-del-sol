@@ -190,12 +190,14 @@ function SeccionPerfil({
   const [nombre, setNombre] = useState('');
   const [telefono, setTelefono] = useState('');
   const [email, setEmail] = useState('');
+  const [rncCedula, setRncCedula] = useState('');
 
   useEffect(() => {
     if (!perfil) return;
     setNombre(perfil.nombre);
     setTelefono(perfil.telefono ?? '');
     setEmail(perfil.email ?? '');
+    setRncCedula(perfil.rncCedula ?? '');
   }, [perfil]);
 
   const guardar = useMutation({
@@ -203,7 +205,7 @@ function SeccionPerfil({
       (
         await tiendaApiClient.patch(
           `/tienda/${subdominio}/mi-perfil`,
-          { nombre, telefono: telefono || undefined, email: email || undefined },
+          { nombre, telefono: telefono || undefined, email: email || undefined, rncCedula: rncCedula || undefined },
           { headers: { Authorization: `Bearer ${token}` } },
         )
       ).data,
@@ -240,6 +242,12 @@ function SeccionPerfil({
             Correo
           </label>
           <input id="perfil-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} className={INPUT} />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label htmlFor="perfil-rnc-cedula" className="text-sm font-medium text-slate-700 dark:text-slate-300">
+            RNC o Cédula
+          </label>
+          <input id="perfil-rnc-cedula" value={rncCedula} onChange={(e) => setRncCedula(e.target.value)} className={INPUT} />
         </div>
         {guardar.isError && <p className={ERROR}>{mensajeError(guardar.error, 'No se pudo actualizar el perfil.')}</p>}
         {guardar.isSuccess && <p className={OK}>Perfil actualizado.</p>}

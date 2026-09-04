@@ -244,6 +244,7 @@ export interface PerfilClienteTienda {
   nombre: string;
   email: string | null;
   telefono: string | null;
+  rncCedula: string | null;
   puntosLealtad: number;
 }
 

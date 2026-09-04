@@ -16,4 +16,9 @@ export class ActualizarPerfilClienteTiendaDto {
   @IsOptional()
   @IsEmail()
   email?: string;
+
+  @ApiProperty({ required: false, description: 'Mismo campo que ya usa Contactos/facturación admin (Cliente.rncCedula)' })
+  @IsOptional()
+  @IsString()
+  rncCedula?: string;
 }

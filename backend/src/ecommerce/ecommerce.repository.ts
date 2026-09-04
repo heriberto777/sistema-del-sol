@@ -190,20 +190,20 @@ export class EcommerceRepository {
     };
   }
 
-  /** Fase 10 — perfil del cliente de tienda (id/nombre/email/teléfono/puntos, sin passwordHash). */
+  /** Fase 10 — perfil del cliente de tienda (id/nombre/email/teléfono/RNC-Cédula/puntos, sin passwordHash). */
   miPerfil(clienteId: string) {
     return this.prisma.cliente.findUnique({
       where: { id: clienteId },
-      select: { id: true, nombre: true, email: true, telefono: true, puntosLealtad: true },
+      select: { id: true, nombre: true, email: true, telefono: true, rncCedula: true, puntosLealtad: true },
     });
   }
 
-  /** `email` ya validado por unicidad (email+password) en el servicio antes de llamar acá. */
-  actualizarPerfil(clienteId: string, data: { nombre?: string; telefono?: string; email?: string }) {
+  /** `email` ya validado por unicidad (email+password) en el servicio antes de llamar acá. `rncCedula` es el mismo campo que ya usa Contactos/facturación admin — ver Cliente en el schema. */
+  actualizarPerfil(clienteId: string, data: { nombre?: string; telefono?: string; email?: string; rncCedula?: string }) {
     return this.prisma.cliente.update({
       where: { id: clienteId },
       data,
-      select: { id: true, nombre: true, email: true, telefono: true, puntosLealtad: true },
+      select: { id: true, nombre: true, email: true, telefono: true, rncCedula: true, puntosLealtad: true },
     });
   }
 

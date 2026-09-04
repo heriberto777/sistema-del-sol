@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useSubdominioTienda } from '../../hooks/useSubdominioTienda';
 import { useMutation } from '@tanstack/react-query';
 import { isAxiosError } from 'axios';
-import { formatearPrecio, useMisDirecciones, useTiendaConfig } from '../../hooks/useTienda';
+import { formatearPrecio, useMiPerfil, useMisDirecciones, useTiendaConfig } from '../../hooks/useTienda';
 import { tiendaApiClient } from '../../lib/tienda-api-client';
 import { useCarritoTiendaContext } from './CarritoTiendaContext';
 import { useClienteTienda } from '../../hooks/useClienteTienda';
@@ -30,12 +30,20 @@ export function TiendaCheckout() {
   const { data: config, isLoading, isError } = useTiendaConfig(subdominio);
   const { cliente, token, autenticado } = useClienteTienda(subdominio);
   const { data: direcciones } = useMisDirecciones(subdominio, token);
+  const { data: perfil } = useMiPerfil(subdominio, token);
 
   // Con sesión, precarga los datos del perfil — igual editables, se
   // mandan igual que en modo guest (el backend no distingue el DTO).
   const [clienteNombre, setClienteNombre] = useState(cliente?.nombre ?? '');
   const [clienteTelefono, setClienteTelefono] = useState(cliente?.telefono ?? '');
   const [clienteEmail, setClienteEmail] = useState(cliente?.email ?? '');
+  // Ítem "documento fiscal del comprador" — pedido explícito, obligatorio.
+  // `cliente` (la sesión, sin rncCedula) no lo trae — se precarga aparte
+  // desde `useMiPerfil` (el perfil completo) apenas carga, igual criterio
+  // que `direcciones` más abajo. Si ya lo cargó antes (queda guardado en
+  // su Cliente real, ver EcommerceService.crearPedido), no hay que
+  // pedirlo de nuevo.
+  const [clienteDocumento, setClienteDocumento] = useState('');
   const [direccionEntrega, setDireccionEntrega] = useState('');
   const [notas, setNotas] = useState('');
 
@@ -49,6 +57,12 @@ export function TiendaCheckout() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [direcciones]);
 
+  useEffect(() => {
+    if (!perfil?.rncCedula || clienteDocumento) return;
+    setClienteDocumento(perfil.rncCedula);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [perfil]);
+
   const crearPedido = useMutation({
     mutationFn: async () => {
       const { data } = await tiendaApiClient.post<{ facturaId: string }>(
@@ -57,7 +71,8 @@ export function TiendaCheckout() {
           lineas: carrito.items.map((i) => ({ productoId: i.productoId, varianteId: i.varianteId, cantidad: i.cantidad })),
           clienteNombre,
           clienteTelefono,
-          clienteEmail: clienteEmail || undefined,
+          clienteEmail,
+          clienteDocumento,
           direccionEntrega,
           notas: notas || undefined,
         },
@@ -183,15 +198,30 @@ export function TiendaCheckout() {
 
           <div className="flex flex-col gap-1">
             <label htmlFor="checkout-email" className="text-sm font-medium text-slate-700 dark:text-slate-300">
-              Correo (opcional)
+              Correo
             </label>
             <input
               id="checkout-email"
               type="email"
+              required
               value={clienteEmail}
               onChange={(e) => setClienteEmail(e.target.value)}
               className="rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
             />
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label htmlFor="checkout-documento" className="text-sm font-medium text-slate-700 dark:text-slate-300">
+              RNC o Cédula
+            </label>
+            <input
+              id="checkout-documento"
+              required
+              value={clienteDocumento}
+              onChange={(e) => setClienteDocumento(e.target.value)}
+              className="rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+            />
+            <span className="text-xs text-slate-500 dark:text-slate-400">Necesario para tu comprobante.</span>
           </div>
 
           {!!direcciones?.length && (

@@ -180,7 +180,16 @@ export class EcommerceService {
 
     request.user = { tenantId: tenant.id, userId: vendedor.id, email: '', roles: [], permisos: [] } as JwtPayloadUser;
 
-    const clienteId = await this.resolverClienteId(request, tenant.id);
+    const { clienteId, autenticado } = await this.resolverClienteId(request, tenant.id);
+
+    // Persiste el documento al Cliente REAL (no a "Consumidor Final",
+    // compartido por todos los guests) — ver el comentario de
+    // resolverClienteId. Antes de crear la factura: si esto fallara, no
+    // tiene sentido cobrar sin el dato que el usuario pidió como
+    // obligatorio.
+    if (autenticado) {
+      await this.ecommerceRepository.actualizarPerfil(clienteId, { rncCedula: dto.clienteDocumento });
+    }
 
     const factura = await this.facturacionService.crear(
       {
@@ -235,14 +244,24 @@ export class EcommerceService {
    * ausente/inválido/vencido/de otro tenant) — esto es aditivo, nunca
    * bloquea la compra de un guest.
    */
-  private async resolverClienteId(request: AuthenticatedRequest, tenantId: string): Promise<string> {
+  /**
+   * `autenticado: false` (cae a "Consumidor Final", un cliente COMPARTIDO
+   * por todos los guests) es el único caso donde NO hay que persistir
+   * nada al `Cliente` resuelto — ver `crearPedido()`, que usa este flag
+   * para no pisarle el RNC/Cédula a "Consumidor Final" con el dato de
+   * un comprador cualquiera. Con el gate de login del checkout ya
+   * obligatorio, este caso solo ocurre si el token vence entre que se
+   * carga el checkout y se envía el pedido — residual, no alcanzable
+   * en el flujo normal.
+   */
+  private async resolverClienteId(request: AuthenticatedRequest, tenantId: string): Promise<{ clienteId: string; autenticado: boolean }> {
     const header = request.headers.authorization;
     if (header?.startsWith('Bearer ')) {
       try {
         const payload = this.jwtService.verify<ClienteTiendaPayload>(header.slice('Bearer '.length), {
           secret: CLIENTE_TIENDA_JWT_SECRET,
         });
-        if (payload.tenantId === tenantId) return payload.clienteId;
+        if (payload.tenantId === tenantId) return { clienteId: payload.clienteId, autenticado: true };
       } catch {
         // token inválido/vencido — sigue como guest.
       }
@@ -251,7 +270,7 @@ export class EcommerceService {
     if (!consumidorFinal) {
       throw new ServiceUnavailableException('Esta tienda no puede procesar pedidos en este momento');
     }
-    return consumidorFinal.id;
+    return { clienteId: consumidorFinal.id, autenticado: false };
   }
 
   /**
