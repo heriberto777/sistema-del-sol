@@ -19,6 +19,36 @@ function claveStorage(subdominio: string): string {
   return `sol_carrito_tienda_${subdominio}`;
 }
 
+/**
+ * Bug real (reportado en producción): la fusión de abajo se activaba de
+ * nuevo en CADA montaje (cada recarga de página) porque el guard vivía
+ * solo en un `useRef` — se resetea con el componente. Local y servidor ya
+ * quedaban sincronizados tras la primera fusión, así que la segunda
+ * `combinarCarritos` sumaba el mismo carrito consigo mismo, duplicando la
+ * cantidad en cada F5. Persistir qué token ya se fusionó (por subdominio)
+ * hace que sobreviva a la recarga — sigue reaccionando a un login nuevo
+ * de verdad porque el JWT trae `iat` distinto cada vez.
+ */
+function claveFusion(subdominio: string): string {
+  return `sol_carrito_fusionado_${subdominio}`;
+}
+
+function leerTokenFusionado(subdominio: string): string | null {
+  try {
+    return localStorage.getItem(claveFusion(subdominio));
+  } catch {
+    return null;
+  }
+}
+
+function escribirTokenFusionado(subdominio: string, token: string) {
+  try {
+    localStorage.setItem(claveFusion(subdominio), token);
+  } catch {
+    // localStorage lleno/deshabilitado — en el peor caso se refusiona en el próximo reload, no corrompe nada.
+  }
+}
+
 function leer(subdominio: string): ItemCarritoTienda[] {
   try {
     const raw = localStorage.getItem(claveStorage(subdominio));
@@ -84,12 +114,20 @@ export function useCarritoTienda(subdominio: string, token: string | null = null
 
   useEffect(() => {
     if (!token || yaFusionoEsteToken.current === token) return;
+    // Guard persistido — ver comentario de `claveFusion`. Sin esto, cada
+    // recarga de página con sesión activa reejecutaba la fusión de abajo
+    // y duplicaba el carrito (bug real, reportado en producción).
+    if (leerTokenFusionado(subdominio) === token) {
+      yaFusionoEsteToken.current = token;
+      return;
+    }
     yaFusionoEsteToken.current = token;
     (async () => {
       try {
         const { data } = await tiendaApiClient.get<{ items: ItemCarritoTienda[] }>(`/tienda/${subdominio}/mi-carrito`, {
           headers: { Authorization: `Bearer ${token}` },
         });
+        escribirTokenFusionado(subdominio, token);
         setItems((actual) => {
           const combinado = combinarCarritos(actual, data.items ?? []);
           escribir(subdominio, combinado);
@@ -97,7 +135,7 @@ export function useCarritoTienda(subdominio: string, token: string | null = null
           return combinado;
         });
       } catch {
-        // sin conexión o token inválido/vencido — el carrito local sigue funcionando igual, se reintenta en el próximo login.
+        // sin conexión o token inválido/vencido — no se marca como fusionado, se reintenta en el próximo montaje/login.
       }
     })();
   }, [subdominio, token]);
