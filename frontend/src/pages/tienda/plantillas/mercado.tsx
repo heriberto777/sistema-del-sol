@@ -66,7 +66,7 @@ function MercadoHome({ config, subdominio, carrito, productos, cargando, busqued
   const { data: secciones = [] } = useSeccionesTienda(subdominio);
   return (
     <div className="min-h-screen bg-[#fff6ec] text-[#0d5c58] dark:bg-[#0b1a19] dark:text-[#e7f3f1]" style={{ fontFamily: FONT_BODY }}>
-      <BannerAnuncio texto={config.bannerTexto} />
+      <BannerAnuncio mensajes={config.bannerAnuncio.mensajes} intervaloSegundos={config.bannerAnuncio.intervaloSegundos} />
       <Nav nombre={config.nombre} logo={config.logo} subdominio={subdominio} cantidadCarrito={carrito.cantidadTotal} accent={accent} />
 
       <div className="mx-6 mb-10 grid gap-6 rounded-3xl p-8 text-white sm:mx-10 sm:grid-cols-2 sm:p-11" style={{ background: BG_OSCURO }}>

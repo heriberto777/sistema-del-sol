@@ -98,7 +98,7 @@ function RoperoHome({ config, subdominio, carrito, productos, cargando, busqueda
   const { data: secciones = [] } = useSeccionesTienda(subdominio);
   return (
     <div className="min-h-screen bg-[var(--tienda-color-fondo)] text-[var(--tienda-color-texto)]" style={{ ...variablesCssTema(tema, DEFAULTS), fontFamily: 'var(--tienda-fuente-body)', fontSize: 'var(--tienda-tamano-fuente)' }}>
-      <BannerAnuncio texto={config.bannerTexto} />
+      <BannerAnuncio mensajes={config.bannerAnuncio.mensajes} intervaloSegundos={config.bannerAnuncio.intervaloSegundos} />
       <Nav nombre={nombre} logo={logo} subdominio={subdominio} cantidadCarrito={carrito.cantidadTotal} menu={menu} />
       <div className="px-6 pb-6 pt-10 text-center sm:px-10">
         <div className="mb-2 text-[0.85em] italic opacity-70" style={{ color: '#8a9a72' }}>

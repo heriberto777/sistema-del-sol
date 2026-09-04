@@ -1,4 +1,4 @@
-import { resolverTemaTienda } from './resolver-config-tienda';
+import { resolverBannerAnuncio, resolverTemaTienda } from './resolver-config-tienda';
 
 describe('resolverTemaTienda', () => {
   it('sin TIENDA_TEMA, siembra colorAcento desde el valor legacy y usa defaults en el resto', () => {
@@ -104,5 +104,69 @@ describe('resolverTemaTienda', () => {
     const valorJson = JSON.stringify({ colorAcento: 'rojo' });
     expect(resolverTemaTienda(valorJson, '#222222').colorAcento).toBe('#222222');
     expect(resolverTemaTienda(valorJson, undefined).colorAcento).toBeNull();
+  });
+});
+
+describe('resolverBannerAnuncio', () => {
+  it('sin valor guardado, no hay mensajes', () => {
+    expect(resolverBannerAnuncio(undefined)).toEqual({ mensajes: [], intervaloSegundos: 5 });
+  });
+
+  it('con un string plano (formato legado, antes del slide), lo trata como un único mensaje sin color propio', () => {
+    const banner = resolverBannerAnuncio('Envío gratis desde RD$ 3,000');
+    expect(banner).toEqual({
+      mensajes: [{ texto: 'Envío gratis desde RD$ 3,000', colorFondo: null, colorTexto: '#ffffff', tamanoFuente: 'NORMAL' }],
+      intervaloSegundos: 5,
+    });
+  });
+
+  it('con JSON válido de varios mensajes, refleja cada uno con su propio estilo', () => {
+    const valorJson = JSON.stringify({
+      mensajes: [
+        { texto: 'Envío gratis', colorFondo: '#111827', colorTexto: '#ffffff', tamanoFuente: 'NORMAL' },
+        { texto: '2x1 en camisas', colorFondo: '#c66b78', colorTexto: '#000000', tamanoFuente: 'GRANDE' },
+      ],
+      intervaloSegundos: 8,
+    });
+    const banner = resolverBannerAnuncio(valorJson);
+    expect(banner.mensajes).toHaveLength(2);
+    expect(banner.mensajes[1]).toEqual({ texto: '2x1 en camisas', colorFondo: '#c66b78', colorTexto: '#000000', tamanoFuente: 'GRANDE' });
+    expect(banner.intervaloSegundos).toBe(8);
+  });
+
+  it('con JSON corrupto (no parseable), cae al string completo como mensaje legado sin lanzar', () => {
+    expect(() => resolverBannerAnuncio('{esto no es json')).not.toThrow();
+    expect(resolverBannerAnuncio('{esto no es json').mensajes[0].texto).toBe('{esto no es json');
+  });
+
+  it('descarta mensajes sin texto o con texto vacío/solo espacios', () => {
+    const valorJson = JSON.stringify({ mensajes: [{ texto: '  ' }, { texto: 'Válido' }, {}] });
+    expect(resolverBannerAnuncio(valorJson).mensajes).toEqual([
+      { texto: 'Válido', colorFondo: null, colorTexto: '#ffffff', tamanoFuente: 'NORMAL' },
+    ]);
+  });
+
+  it('con colorFondo/colorTexto con formato inválido, cae a null/blanco sin afectar el texto', () => {
+    const valorJson = JSON.stringify({ mensajes: [{ texto: 'Hola', colorFondo: 'rojo', colorTexto: 'no-es-color' }] });
+    const mensaje = resolverBannerAnuncio(valorJson).mensajes[0];
+    expect(mensaje.colorFondo).toBeNull();
+    expect(mensaje.colorTexto).toBe('#ffffff');
+  });
+
+  it('con tamanoFuente fuera de las opciones válidas, cae a NORMAL', () => {
+    const valorJson = JSON.stringify({ mensajes: [{ texto: 'Hola', tamanoFuente: 'ENORME' }] });
+    expect(resolverBannerAnuncio(valorJson).mensajes[0].tamanoFuente).toBe('NORMAL');
+  });
+
+  it('con intervaloSegundos fuera de rango, lo acota entre 2 y 30', () => {
+    const bajo = JSON.stringify({ mensajes: [{ texto: 'Hola' }], intervaloSegundos: 0 });
+    const alto = JSON.stringify({ mensajes: [{ texto: 'Hola' }], intervaloSegundos: 999 });
+    expect(resolverBannerAnuncio(bajo).intervaloSegundos).toBe(2);
+    expect(resolverBannerAnuncio(alto).intervaloSegundos).toBe(30);
+  });
+
+  it('con intervaloSegundos inválido (no numérico), usa el default de 5', () => {
+    const valorJson = JSON.stringify({ mensajes: [{ texto: 'Hola' }], intervaloSegundos: 'rápido' });
+    expect(resolverBannerAnuncio(valorJson).intervaloSegundos).toBe(5);
   });
 });

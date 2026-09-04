@@ -26,6 +26,7 @@ import {
 import { TarjetaProductoTienda } from '../../../pages/tienda/TarjetaProductoTienda';
 import { CarritoTiendaProvider } from '../../../pages/tienda/CarritoTiendaContext';
 import { ProductoTienda } from '../../../hooks/useTienda';
+import { MensajeBannerAnuncio, TamanoFuenteBanner } from '../../../pages/tienda/BannerAnuncio';
 
 interface Configuracion {
   clave: string;
@@ -161,6 +162,43 @@ function parsearTemaGuardado(valorJson: string, colorAcentoLegacy: string): Tema
   }
 }
 
+interface BannerAnuncioForm {
+  mensajes: MensajeBannerAnuncio[];
+  intervaloSegundos: number;
+}
+
+const BANNER_ANUNCIO_DEFAULT: BannerAnuncioForm = { mensajes: [], intervaloSegundos: 5 };
+
+/**
+ * Parseo defensivo espejo de `resolverBannerAnuncio` (backend) — antes de
+ * esta extensión la clave guardaba un string plano (un único mensaje,
+ * siempre blanco sobre el acento del tema). Si el valor guardado no es
+ * JSON, se materializa como ese mensaje legado con el acento ACTUAL como
+ * color de fondo (en vez de "hereda del tema") — apenas el admin guarda una
+ * vez desde este editor, el mensaje pasa a tener un color explícito, ya no
+ * legado.
+ */
+function parsearBannerAnuncioGuardado(valorCrudo: string, colorAcentoActual: string): BannerAnuncioForm {
+  if (!valorCrudo) return BANNER_ANUNCIO_DEFAULT;
+  try {
+    const parseado = JSON.parse(valorCrudo);
+    if (parseado && Array.isArray(parseado.mensajes)) {
+      return {
+        mensajes: parseado.mensajes.map((m: Partial<MensajeBannerAnuncio>) => ({
+          texto: m.texto ?? '',
+          colorFondo: m.colorFondo ?? colorAcentoActual,
+          colorTexto: m.colorTexto ?? '#ffffff',
+          tamanoFuente: m.tamanoFuente ?? 'NORMAL',
+        })),
+        intervaloSegundos: typeof parseado.intervaloSegundos === 'number' ? parseado.intervaloSegundos : 5,
+      };
+    }
+  } catch {
+    // no era JSON — es el string legado, tratado abajo.
+  }
+  return { mensajes: [{ texto: valorCrudo, colorFondo: colorAcentoActual, colorTexto: '#ffffff', tamanoFuente: 'NORMAL' }], intervaloSegundos: 5 };
+}
+
 /**
  * Configuración de la Tienda Online (plugin e-commerce v1) — guarda en el
  * store genérico `Configuracion` (mismo backend/endpoint que
@@ -179,7 +217,7 @@ export function TiendaOnlineConfigPanel() {
   const [banner, setBanner] = useState<string | null>(null);
   const [colorAcento, setColorAcento] = useState('#f59e0b');
   const [bodegaId, setBodegaId] = useState('');
-  const [bannerTexto, setBannerTexto] = useState('');
+  const [bannerAnuncio, setBannerAnuncio] = useState<BannerAnuncioForm>(BANNER_ANUNCIO_DEFAULT);
   const [tema, setTema] = useState<TemaTienda>(TEMA_DEFAULT);
 
   const { data: configuraciones } = useQuery({
@@ -197,7 +235,7 @@ export function TiendaOnlineConfigPanel() {
     setBanner(valor(CLAVE_BANNER) || null);
     setColorAcento(valor(CLAVE_COLOR_ACENTO) || '#f59e0b');
     setBodegaId(valor(CLAVE_BODEGA_ID));
-    setBannerTexto(valor(CLAVE_BANNER_TEXTO));
+    setBannerAnuncio(parsearBannerAnuncioGuardado(valor(CLAVE_BANNER_TEXTO), valor(CLAVE_COLOR_ACENTO) || '#111827'));
     const valorTema = valor(CLAVE_TEMA);
     setTema(valorTema ? parsearTemaGuardado(valorTema, valor(CLAVE_COLOR_ACENTO)) : { ...TEMA_DEFAULT, colorAcento: valor(CLAVE_COLOR_ACENTO) || null });
   }, [configuraciones]);
@@ -213,7 +251,7 @@ export function TiendaOnlineConfigPanel() {
         apiClient.put(`/admin/configuraciones/${CLAVE_COLOR_ACENTO}`, { valor: colorAcento }),
         apiClient.put(`/admin/configuraciones/${CLAVE_BODEGA_ID}`, { valor: bodegaId }),
         apiClient.put(`/admin/configuraciones/${CLAVE_TEMA}`, { valor: JSON.stringify(tema) }),
-        apiClient.put(`/admin/configuraciones/${CLAVE_BANNER_TEXTO}`, { valor: bannerTexto }),
+        apiClient.put(`/admin/configuraciones/${CLAVE_BANNER_TEXTO}`, { valor: JSON.stringify(bannerAnuncio) }),
       ]),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin-configuraciones'] }),
   });
@@ -224,6 +262,19 @@ export function TiendaOnlineConfigPanel() {
   const activaGuardada = configuraciones?.find((c) => c.clave === CLAVE_ACTIVA)?.valor === 'true';
   const subdominio = usuario?.tenant?.subdominio;
   const urlTienda = subdominio ? construirUrlTienda(subdominio) : null;
+
+  function agregarMensajeBanner() {
+    setBannerAnuncio({
+      ...bannerAnuncio,
+      mensajes: [...bannerAnuncio.mensajes, { texto: '', colorFondo: colorAcento, colorTexto: '#ffffff', tamanoFuente: 'NORMAL' }],
+    });
+  }
+  function actualizarMensajeBanner(indice: number, cambios: Partial<MensajeBannerAnuncio>) {
+    setBannerAnuncio({ ...bannerAnuncio, mensajes: bannerAnuncio.mensajes.map((m, i) => (i === indice ? { ...m, ...cambios } : m)) });
+  }
+  function quitarMensajeBanner(indice: number) {
+    setBannerAnuncio({ ...bannerAnuncio, mensajes: bannerAnuncio.mensajes.filter((_, i) => i !== indice) });
+  }
 
   function moverMenu(indice: number, direccion: -1 | 1) {
     const destino = indice + direccion;
@@ -319,19 +370,86 @@ export function TiendaOnlineConfigPanel() {
           <CampoImagen valor={logo} onChange={setLogo} label="Logo" />
           <CampoImagen valor={banner} onChange={setBanner} label="Banner" />
 
-          <div className="flex flex-col gap-1">
-            <label htmlFor="tienda-banner-texto" className="text-sm font-medium text-slate-700 dark:text-slate-300">
-              Banner de anuncio (texto)
-            </label>
-            <textarea
-              id="tienda-banner-texto"
-              rows={2}
-              value={bannerTexto}
-              onChange={(e) => setBannerTexto(e.target.value)}
-              placeholder='Ej. "Envío gratis en compras desde RD$ 3,000" — se muestra arriba de todo en la tienda pública'
-              className="rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-            />
-            <span className="text-xs text-slate-500 dark:text-slate-400">Dejalo vacío para no mostrar ningún anuncio.</span>
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between gap-2">
+              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Banner de anuncio (slide)</label>
+              <Button type="button" variante="secundario" onClick={agregarMensajeBanner}>
+                Agregar mensaje
+              </Button>
+            </div>
+            <span className="text-xs text-slate-500 dark:text-slate-400">
+              Sin mensajes no se muestra ningún anuncio. Con 2 o más, rotan solos arriba de la tienda.
+            </span>
+
+            {bannerAnuncio.mensajes.length > 1 && (
+              <div className="flex items-center gap-2">
+                <label htmlFor="tienda-banner-intervalo" className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                  Intervalo del slide (segundos)
+                </label>
+                <input
+                  id="tienda-banner-intervalo"
+                  type="number"
+                  min={2}
+                  max={30}
+                  value={bannerAnuncio.intervaloSegundos}
+                  onChange={(e) => setBannerAnuncio({ ...bannerAnuncio, intervaloSegundos: Math.min(30, Math.max(2, Number(e.target.value) || 5)) })}
+                  className="w-20 rounded-lg border border-slate-300 px-2 py-1 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                />
+              </div>
+            )}
+
+            {bannerAnuncio.mensajes.map((mensaje, indice) => (
+              <div key={indice} className="flex flex-col gap-2 rounded-lg border border-slate-200 p-3 dark:border-slate-700">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={mensaje.texto}
+                    onChange={(e) => actualizarMensajeBanner(indice, { texto: e.target.value })}
+                    placeholder='Ej. "Envío gratis en compras desde RD$ 3,000"'
+                    className="flex-1 rounded-lg border border-slate-300 px-3 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => quitarMensajeBanner(indice)}
+                    className="shrink-0 text-xs font-medium text-red-600 hover:underline dark:text-red-400"
+                  >
+                    Quitar
+                  </button>
+                </div>
+                <div className="flex flex-wrap items-center gap-4">
+                  <label className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+                    Fondo
+                    <input
+                      type="color"
+                      value={mensaje.colorFondo ?? colorAcento}
+                      onChange={(e) => actualizarMensajeBanner(indice, { colorFondo: e.target.value })}
+                      className="h-7 w-12 rounded border border-slate-300 dark:border-slate-700"
+                    />
+                  </label>
+                  <label className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+                    Texto
+                    <input
+                      type="color"
+                      value={mensaje.colorTexto}
+                      onChange={(e) => actualizarMensajeBanner(indice, { colorTexto: e.target.value })}
+                      className="h-7 w-12 rounded border border-slate-300 dark:border-slate-700"
+                    />
+                  </label>
+                  <label className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+                    Tamaño
+                    <Select
+                      value={mensaje.tamanoFuente}
+                      onChange={(e) => actualizarMensajeBanner(indice, { tamanoFuente: e.target.value as TamanoFuenteBanner })}
+                      className="py-1 text-xs"
+                    >
+                      <option value="NORMAL">Normal</option>
+                      <option value="GRANDE">Grande</option>
+                      <option value="MUY_GRANDE">Muy grande</option>
+                    </Select>
+                  </label>
+                </div>
+              </div>
+            ))}
           </div>
 
           <div className="flex flex-col gap-1">

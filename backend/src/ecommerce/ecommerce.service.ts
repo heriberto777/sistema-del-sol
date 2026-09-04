@@ -72,7 +72,7 @@ export class EcommerceService {
       banner: config.banner ?? null,
       colorAcento: config.colorAcento ?? null,
       tema: config.tema,
-      bannerTexto: config.bannerTexto ?? null,
+      bannerAnuncio: config.bannerAnuncio,
     };
   }
 

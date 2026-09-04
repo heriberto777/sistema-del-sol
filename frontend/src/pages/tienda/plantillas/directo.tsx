@@ -60,7 +60,7 @@ function DirectoHome({ config, subdominio, carrito, productos, cargando, busqued
   const { data: secciones = [] } = useSeccionesTienda(subdominio);
   return (
     <div className="min-h-screen bg-[#faf7f2] font-['Karla'] text-[#1c1a17] dark:bg-[#17140f] dark:text-[#f1ece2]" style={{ fontFamily: FONT_BODY }}>
-      <BannerAnuncio texto={config.bannerTexto} />
+      <BannerAnuncio mensajes={config.bannerAnuncio.mensajes} intervaloSegundos={config.bannerAnuncio.intervaloSegundos} />
       <Nav nombre={config.nombre} logo={config.logo} subdominio={subdominio} cantidadCarrito={carrito.cantidadTotal} accent={accent} />
 
       <div className="max-w-xl px-6 pb-14 pt-16 sm:px-10">

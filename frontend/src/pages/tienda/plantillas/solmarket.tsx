@@ -96,7 +96,7 @@ function SolMarketHome({ config, subdominio, carrito, productos, cargando, busqu
   const { data: secciones = [] } = useSeccionesTienda(subdominio);
   return (
     <div className="min-h-screen bg-[var(--tienda-color-fondo)] text-[var(--tienda-color-texto)]" style={{ ...variablesCssTema(tema, DEFAULTS), fontFamily: 'var(--tienda-fuente-body)', fontSize: 'var(--tienda-tamano-fuente)' }}>
-      <BannerAnuncio texto={config.bannerTexto} />
+      <BannerAnuncio mensajes={config.bannerAnuncio.mensajes} intervaloSegundos={config.bannerAnuncio.intervaloSegundos} />
       <Nav nombre={nombre} logo={logo} subdominio={subdominio} cantidadCarrito={carrito.cantidadTotal} menu={menu} />
 
       <div className="mx-4 mb-6 overflow-hidden p-8 text-center sm:mx-6 sm:p-14" style={{ borderRadius: 'var(--tienda-radio-tarjeta)', background: 'linear-gradient(120deg, var(--tienda-color-acento), #ff3d81 55%, #7a2bd1)' }}>

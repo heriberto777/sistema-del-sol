@@ -99,7 +99,7 @@ function BazarHome({ config, subdominio, carrito, productos, cargando, busqueda,
   const { data: secciones = [] } = useSeccionesTienda(subdominio);
   return (
     <div className="min-h-screen bg-[var(--tienda-color-fondo)] text-[var(--tienda-color-texto)]" style={{ ...variablesCssTema(tema, DEFAULTS), fontFamily: 'var(--tienda-fuente-body)', fontSize: 'var(--tienda-tamano-fuente)' }}>
-      <BannerAnuncio texto={config.bannerTexto} colorAcento={DEFAULTS.colorAcento} />
+      <BannerAnuncio mensajes={config.bannerAnuncio.mensajes} intervaloSegundos={config.bannerAnuncio.intervaloSegundos} colorAcento={DEFAULTS.colorAcento} />
       <Nav nombre={nombre} logo={logo} subdominio={subdominio} cantidadCarrito={carrito.cantidadTotal} menu={menu} />
 
       <div className="flex items-center gap-2 overflow-x-auto px-6 py-2.5 sm:px-10" style={{ background: HEADER_BG_2 }}>

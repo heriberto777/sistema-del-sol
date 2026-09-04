@@ -98,7 +98,7 @@ function NodoHome({ config, subdominio, carrito, productos, cargando, busqueda, 
   const { data: secciones = [] } = useSeccionesTienda(subdominio);
   return (
     <div className="min-h-screen bg-[var(--tienda-color-fondo)] text-[var(--tienda-color-texto)]" style={{ ...variablesCssTema(tema, DEFAULTS), fontFamily: 'var(--tienda-fuente-body)', fontSize: 'var(--tienda-tamano-fuente)' }}>
-      <BannerAnuncio texto={config.bannerTexto} />
+      <BannerAnuncio mensajes={config.bannerAnuncio.mensajes} intervaloSegundos={config.bannerAnuncio.intervaloSegundos} />
       <Nav nombre={nombre} logo={logo} subdominio={subdominio} cantidadCarrito={carrito.cantidadTotal} menu={menu} />
       <div className="max-w-md px-6 pb-6 pt-14 sm:px-10">
         <div className="mb-2 text-[0.7em] font-semibold uppercase tracking-[0.1em]" style={{ color: 'var(--tienda-color-acento)' }}>

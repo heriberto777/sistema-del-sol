@@ -119,7 +119,7 @@ function BrumaHome({ config, subdominio, carrito, productos, cargando, busqueda,
       className="min-h-screen bg-[var(--tienda-color-fondo)] text-[var(--tienda-color-texto)]"
       style={{ ...variablesCssTema(tema, DEFAULTS), fontFamily: 'var(--tienda-fuente-body)', fontSize: 'var(--tienda-tamano-fuente)' }}
     >
-      <BannerAnuncio texto={config.bannerTexto} />
+      <BannerAnuncio mensajes={config.bannerAnuncio.mensajes} intervaloSegundos={config.bannerAnuncio.intervaloSegundos} />
       <Nav nombre={nombre} logo={logo} subdominio={subdominio} cantidadCarrito={carrito.cantidadTotal} menu={menu} />
 
       <div className="px-6 pb-8 pt-14 text-center sm:px-10">

@@ -100,7 +100,7 @@ function ChispaHome({ config, subdominio, carrito, productos, cargando, busqueda
   const { data: secciones = [] } = useSeccionesTienda(subdominio);
   return (
     <div className="min-h-screen bg-[var(--tienda-color-fondo)] text-[var(--tienda-color-texto)]" style={{ ...variablesCssTema(tema, DEFAULTS), fontFamily: 'var(--tienda-fuente-body)', fontSize: 'var(--tienda-tamano-fuente)' }}>
-      <BannerAnuncio texto={config.bannerTexto} />
+      <BannerAnuncio mensajes={config.bannerAnuncio.mensajes} intervaloSegundos={config.bannerAnuncio.intervaloSegundos} />
       <Nav nombre={nombre} logo={logo} subdominio={subdominio} cantidadCarrito={carrito.cantidadTotal} menu={menu} />
       <div className="mx-4 rounded-[28px] px-6 py-10 text-center sm:mx-10" style={{ background: 'linear-gradient(120deg, color-mix(in srgb, var(--tienda-color-acento) 22%, var(--tienda-color-fondo)), color-mix(in srgb, #6a3bff 18%, var(--tienda-color-fondo)))' }}>
         <div className="mb-2 text-[0.7em] font-bold uppercase tracking-[0.1em]" style={{ color: 'var(--tienda-color-acento)' }}>

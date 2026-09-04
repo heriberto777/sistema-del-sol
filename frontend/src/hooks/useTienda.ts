@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { tiendaApiClient } from '../lib/tienda-api-client';
 import { PaginaResultado } from '../types/pagina-resultado';
 import { TemaTienda } from '../pages/tienda/tema';
+import { MensajeBannerAnuncio } from '../pages/tienda/BannerAnuncio';
 
 export type PlantillaTienda =
   | 'DIRECTO'
@@ -30,8 +31,8 @@ export interface ConfigTienda {
   colorAcento: string | null;
   /** Fase 7 — personalización sobre la plantilla elegida (siempre resuelto con defaults, nunca null). */
   tema: TemaTienda;
-  /** Fase 11 — mensaje de texto libre para la barra de anuncio arriba del Nav; `null`/vacío = no mostrar nada. */
-  bannerTexto: string | null;
+  /** Fase 11 (extendida) — slide de mensajes para la barra de anuncio arriba del Nav; `mensajes: []` = no mostrar nada. */
+  bannerAnuncio: { mensajes: MensajeBannerAnuncio[]; intervaloSegundos: number };
 }
 
 /** Fase 13 — oferta a mostrar en la tarjeta de producto (mirror de `OfertaVisibleProducto`, backend). `null` = sin oferta vigente para este producto/precio. */

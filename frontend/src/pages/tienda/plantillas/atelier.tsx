@@ -87,7 +87,7 @@ function AtelierHome({ config, subdominio, carrito, productos, cargando }: Props
   const { data: secciones = [] } = useSeccionesTienda(subdominio);
   return (
     <div className="min-h-screen bg-[var(--tienda-color-fondo)] text-[var(--tienda-color-texto)]" style={{ ...variablesCssTema(tema, DEFAULTS), fontFamily: 'var(--tienda-fuente-body)', fontSize: 'var(--tienda-tamano-fuente)' }}>
-      <BannerAnuncio texto={config.bannerTexto} />
+      <BannerAnuncio mensajes={config.bannerAnuncio.mensajes} intervaloSegundos={config.bannerAnuncio.intervaloSegundos} />
       <Nav nombre={nombre} logo={logo} subdominio={subdominio} cantidadCarrito={carrito.cantidadTotal} menu={menu} />
       <div className="px-6 pb-4 pt-2 sm:px-10">
         <div className="mb-2 text-[0.65em] uppercase tracking-[0.14em]" style={{ color: 'var(--tienda-color-acento)' }}>

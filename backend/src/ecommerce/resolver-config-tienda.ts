@@ -52,8 +52,24 @@ export interface ConfigTienda {
   colorAcento?: string;
   bodegaId?: string;
   tema: TemaTienda;
-  /** Fase 11 — mensaje de texto libre, editable por el admin, para la barra de anuncio arriba del Nav en las 14 plantillas (distinto de TIENDA_BANNER, que es una imagen usada solo por la plantilla "mercado"). */
-  bannerTexto?: string;
+  /** Fase 11 (extendida): slide de mensajes de texto para la barra de anuncio arriba del Nav (distinto de TIENDA_BANNER, que es una imagen usada solo por la plantilla "mercado"). */
+  bannerAnuncio: BannerAnuncioTienda;
+}
+
+export const TAMANOS_FUENTE_BANNER = ['NORMAL', 'GRANDE', 'MUY_GRANDE'] as const;
+export type TamanoFuenteBanner = (typeof TAMANOS_FUENTE_BANNER)[number];
+
+export interface MensajeBannerAnuncio {
+  texto: string;
+  /** null = hereda `--tienda-color-acento` del tema — comportamiento legado, antes de que el color por mensaje existiera. */
+  colorFondo: string | null;
+  colorTexto: string;
+  tamanoFuente: TamanoFuenteBanner;
+}
+
+export interface BannerAnuncioTienda {
+  mensajes: MensajeBannerAnuncio[];
+  intervaloSegundos: number;
 }
 
 // Catálogo curado — evita que el tenant elija una fuente exótica que
@@ -190,6 +206,47 @@ export function resolverTemaTienda(valorJson: string | undefined, colorAcentoLeg
   };
 }
 
+const COLOR_VALIDO = /^#[0-9a-fA-F]{6}$/;
+const BANNER_ANUNCIO_DEFAULT: BannerAnuncioTienda = { mensajes: [], intervaloSegundos: 5 };
+
+/**
+ * Parsea `TIENDA_BANNER_TEXTO` — mismo criterio defensivo que
+ * `resolverTemaTienda`. Antes de esta extensión, la clave guardaba un
+ * string plano (un único mensaje, sin color/tamaño propios, siempre
+ * blanco sobre `--tienda-color-acento`); ahora guarda un JSON con la
+ * lista de mensajes + el intervalo del slide. Si el valor guardado no
+ * es JSON (o no tiene el shape nuevo), se trata como ese string legado
+ * — un tenant que nunca tocó el editor nuevo no pierde su banner ni
+ * cambia de aspecto.
+ */
+export function resolverBannerAnuncio(valorCrudo: string | undefined): BannerAnuncioTienda {
+  if (!valorCrudo) return BANNER_ANUNCIO_DEFAULT;
+
+  try {
+    const parseado = JSON.parse(valorCrudo);
+    if (parseado && typeof parseado === 'object' && Array.isArray(parseado.mensajes)) {
+      const mensajes: MensajeBannerAnuncio[] = parseado.mensajes
+        .filter((m: unknown): m is Record<string, unknown> => !!m && typeof m === 'object' && typeof (m as { texto?: unknown }).texto === 'string')
+        .map((m: Record<string, unknown>) => ({
+          texto: String(m.texto),
+          colorFondo: typeof m.colorFondo === 'string' && COLOR_VALIDO.test(m.colorFondo) ? m.colorFondo : null,
+          colorTexto: typeof m.colorTexto === 'string' && COLOR_VALIDO.test(m.colorTexto) ? m.colorTexto : '#ffffff',
+          tamanoFuente: (TAMANOS_FUENTE_BANNER as readonly string[]).includes(m.tamanoFuente as string)
+            ? (m.tamanoFuente as TamanoFuenteBanner)
+            : 'NORMAL',
+        }))
+        .filter((m: MensajeBannerAnuncio) => m.texto.trim().length > 0);
+      const intervaloBruto = Number(parseado.intervaloSegundos);
+      const intervaloSegundos = Number.isFinite(intervaloBruto) ? Math.min(30, Math.max(2, intervaloBruto)) : 5;
+      return { mensajes, intervaloSegundos };
+    }
+  } catch {
+    // no era JSON — cae al tratamiento de string legado, abajo.
+  }
+
+  return { mensajes: [{ texto: valorCrudo, colorFondo: null, colorTexto: '#ffffff', tamanoFuente: 'NORMAL' }], intervaloSegundos: 5 };
+}
+
 /**
  * Configuración de la Tienda Online (plugin e-commerce v1) — mismo patrón
  * que `resolverPersonalizacionDocumento`: claves sueltas en el store
@@ -213,6 +270,6 @@ export async function resolverConfigTienda(prisma: PrismaService, tenantId: stri
     colorAcento: valor(CLAVE_TIENDA_COLOR_ACENTO),
     bodegaId: valor(CLAVE_TIENDA_BODEGA_ID),
     tema: resolverTemaTienda(valor(CLAVE_TIENDA_TEMA), valor(CLAVE_TIENDA_COLOR_ACENTO)),
-    bannerTexto: valor(CLAVE_TIENDA_BANNER_TEXTO),
+    bannerAnuncio: resolverBannerAnuncio(valor(CLAVE_TIENDA_BANNER_TEXTO)),
   };
 }

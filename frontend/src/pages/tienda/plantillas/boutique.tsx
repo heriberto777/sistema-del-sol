@@ -59,7 +59,7 @@ function BoutiqueHome({ config, subdominio, carrito, productos, cargando, busque
   const { data: secciones = [] } = useSeccionesTienda(subdominio);
   return (
     <div className="min-h-screen bg-[#211d19] text-[#f4ede3]" style={{ fontFamily: FONT_BODY }}>
-      <BannerAnuncio texto={config.bannerTexto} colorAcento={accent} />
+      <BannerAnuncio mensajes={config.bannerAnuncio.mensajes} intervaloSegundos={config.bannerAnuncio.intervaloSegundos} colorAcento={accent} />
       <Nav nombre={config.nombre} logo={config.logo} subdominio={subdominio} cantidadCarrito={carrito.cantidadTotal} accent={accent} />
 
       <div className="px-8 py-16 text-center sm:py-20">
