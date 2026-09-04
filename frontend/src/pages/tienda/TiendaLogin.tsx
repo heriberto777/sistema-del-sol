@@ -1,5 +1,5 @@
 import { FormEvent, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useSubdominioTienda } from '../../hooks/useSubdominioTienda';
 import { isAxiosError } from 'axios';
 import { useTiendaConfig } from '../../hooks/useTienda';
@@ -10,8 +10,14 @@ import { TiendaCargando, TiendaNoEncontrada } from './TiendaNoEncontrada';
 export function TiendaLogin() {
   const subdominio = useSubdominioTienda();
   const navigate = useNavigate();
+  const location = useLocation();
   const { data: config, isLoading, isError } = useTiendaConfig(subdominio);
   const { login } = useClienteTienda(subdominio);
+
+  // Si llegó acá desde el gate de checkout (u otro lugar que necesite
+  // volver a donde estaba), `state.from` manda — si no, el destino de
+  // siempre.
+  const destino = (location.state as { from?: string | { pathname: string; search?: string } })?.from ?? `/tienda/${subdominio}/mis-pedidos`;
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -27,7 +33,7 @@ export function TiendaLogin() {
     setEnviando(true);
     try {
       await login({ email, password });
-      navigate(`/tienda/${subdominio}/mis-pedidos`);
+      navigate(destino);
     } catch (err) {
       setError(isAxiosError(err) && err.response?.status === 401 ? 'Correo o contraseña incorrectos.' : 'No se pudo iniciar sesión.');
     } finally {
@@ -82,7 +88,7 @@ export function TiendaLogin() {
 
         <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">
           ¿No tenés cuenta?{' '}
-          <Link to={`/tienda/${subdominio}/registro`} className="font-medium text-sol-600 hover:underline dark:text-sol-400">
+          <Link to={`/tienda/${subdominio}/registro`} state={location.state} className="font-medium text-sol-600 hover:underline dark:text-sol-400">
             Registrate
           </Link>
         </p>

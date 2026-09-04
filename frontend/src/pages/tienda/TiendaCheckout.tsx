@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useSubdominioTienda } from '../../hooks/useSubdominioTienda';
 import { useMutation } from '@tanstack/react-query';
 import { isAxiosError } from 'axios';
@@ -15,13 +15,20 @@ import { TiendaCargando, TiendaNoEncontrada } from './TiendaNoEncontrada';
  * el pedido (`POST /tienda/:subdominio/pedidos`, revalida stock/precio
  * server-side) y redirige al checkout público YA existente
  * (`/pagar-factura/:facturaId`) — esta página no cobra nada.
+ *
+ * Pedido explícito: agregar al carrito sigue sin pedir nada, pero
+ * finalizar la compra exige cuenta — si no hay sesión, esta página
+ * muestra un gate (login/crear cuenta) en vez del formulario. El
+ * backend (`crear-pedido-tienda.dto.ts`) sigue aceptando guest tal cual
+ * (no se le sacó esa capacidad), el gate es solo de este lado.
  */
 export function TiendaCheckout() {
   const subdominio = useSubdominioTienda();
   const navigate = useNavigate();
+  const location = useLocation();
   const carrito = useCarritoTiendaContext();
   const { data: config, isLoading, isError } = useTiendaConfig(subdominio);
-  const { cliente, token } = useClienteTienda(subdominio);
+  const { cliente, token, autenticado } = useClienteTienda(subdominio);
   const { data: direcciones } = useMisDirecciones(subdominio, token);
 
   // Con sesión, precarga los datos del perfil — igual editables, se
@@ -54,7 +61,7 @@ export function TiendaCheckout() {
           direccionEntrega,
           notas: notas || undefined,
         },
-        // Con sesión, la Factura sale a nombre del cliente real (aparece en "Mis pedidos") — sin token, sigue siendo guest tal cual la Fase 3.
+        // El gate de abajo (!autenticado) ya garantiza que siempre hay token acá — la Factura sale a nombre del cliente real (aparece en "Mis pedidos").
         token ? { headers: { Authorization: `Bearer ${token}` } } : undefined,
       );
       return data;
@@ -73,6 +80,44 @@ export function TiendaCheckout() {
       <div className="flex min-h-screen flex-col items-center justify-center gap-2 bg-slate-50 px-6 text-center dark:bg-slate-950">
         <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Tu carrito está vacío</h1>
         <p className="text-sm text-slate-500 dark:text-slate-400">Agregá productos antes de finalizar la compra.</p>
+      </div>
+    );
+  }
+
+  // Pedido explícito: para finalizar la compra hace falta cuenta — el
+  // carrito NO se toca acá (sigue en localStorage, keyed solo por
+  // subdominio — ver useCarritoTienda) y `useClienteTienda` ya fusiona
+  // automáticamente el carrito guest con el del servidor apenas hay
+  // token, sin importar en qué página ocurrió el login (pub/sub propio,
+  // ver notificarCambioSesion) — así que volver acá después de loguearse
+  // muestra el mismo carrito, sin ningún manejo especial de más.
+  if (!autenticado) {
+    const destino = { pathname: location.pathname, search: location.search };
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-slate-50 px-6 py-10 dark:bg-slate-950">
+        <div className="w-full max-w-sm text-center">
+          <h1 className="mb-1 text-xl font-semibold text-slate-900 dark:text-slate-100">Iniciá sesión para continuar</h1>
+          <p className="mb-6 text-sm text-slate-500 dark:text-slate-400">
+            Tu carrito ({carrito.items.length} {carrito.items.length === 1 ? 'producto' : 'productos'}) sigue guardado — inicia sesión o creá una
+            cuenta para finalizar la compra.
+          </p>
+          <div className="flex flex-col gap-3">
+            <Link
+              to={`/tienda/${subdominio}/login`}
+              state={{ from: destino }}
+              className="rounded-lg bg-sol-500 px-6 py-3 text-sm font-semibold text-white hover:bg-sol-600"
+            >
+              Iniciar sesión
+            </Link>
+            <Link
+              to={`/tienda/${subdominio}/registro`}
+              state={{ from: destino }}
+              className="rounded-lg border border-slate-300 px-6 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-900"
+            >
+              Crear cuenta
+            </Link>
+          </div>
+        </div>
       </div>
     );
   }

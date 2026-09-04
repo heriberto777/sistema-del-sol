@@ -1,5 +1,5 @@
 import { FormEvent, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useSubdominioTienda } from '../../hooks/useSubdominioTienda';
 import { isAxiosError } from 'axios';
 import { useTiendaConfig } from '../../hooks/useTienda';
@@ -10,8 +10,12 @@ import { TiendaCargando, TiendaNoEncontrada } from './TiendaNoEncontrada';
 export function TiendaRegistro() {
   const subdominio = useSubdominioTienda();
   const navigate = useNavigate();
+  const location = useLocation();
   const { data: config, isLoading, isError } = useTiendaConfig(subdominio);
   const { registro } = useClienteTienda(subdominio);
+
+  // Mismo mecanismo de "volver a donde estaba" que TiendaLogin — ver ahí.
+  const destino = (location.state as { from?: string | { pathname: string; search?: string } })?.from ?? `/tienda/${subdominio}/mis-pedidos`;
 
   const [nombre, setNombre] = useState('');
   const [email, setEmail] = useState('');
@@ -29,7 +33,7 @@ export function TiendaRegistro() {
     setEnviando(true);
     try {
       await registro({ nombre, email, password, telefono: telefono || undefined });
-      navigate(`/tienda/${subdominio}/mis-pedidos`);
+      navigate(destino);
     } catch (err) {
       setError(isAxiosError(err) && err.response?.status === 409 ? 'Ya existe una cuenta con ese correo.' : 'No se pudo crear la cuenta.');
     } finally {
@@ -108,7 +112,7 @@ export function TiendaRegistro() {
 
         <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">
           ¿Ya tenés cuenta?{' '}
-          <Link to={`/tienda/${subdominio}/login`} className="font-medium text-sol-600 hover:underline dark:text-sol-400">
+          <Link to={`/tienda/${subdominio}/login`} state={location.state} className="font-medium text-sol-600 hover:underline dark:text-sol-400">
             Iniciá sesión
           </Link>
         </p>
