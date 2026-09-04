@@ -64,8 +64,8 @@ export class PosController {
 
   @Get('turnos/:id')
   @Permissions('pos.ver')
-  buscarTurno(@Param('id') id: string) {
-    return this.posService.buscarPorId(id);
+  buscarTurno(@Param('id') id: string, @CurrentUser() user: JwtPayloadUser) {
+    return this.posService.buscarPorId(id, user.tenantId);
   }
 
   @Post('turnos/:id/movimientos')

@@ -1986,6 +1986,17 @@ enum FormatoImpresion {
   TERMICA_58MM
 }
 
+/// Cómo se abre la gaveta de dinero física al cobrar en POS (ítem F-9,
+/// ver ARCHITECTURE.md) — AGENTE_LOCAL habla con una impresora térmica
+/// USB o un puerto serial/COM directo (mismo comando ESC/POS de kick en
+/// ambos casos, ver agente-caja/); WEB_SERIAL usa la Web Serial API del
+/// navegador (solo Chrome/Edge), sin instalar nada.
+enum MetodoAperturaCaja {
+  NINGUNO
+  AGENTE_LOCAL
+  WEB_SERIAL
+}
+
 /// PENDIENTE_REVISION (plan de integración Cuadre, ítem E-6): un turno
 /// cuya diferencia de arqueo excedió la tolerancia configurada cae acá al
 /// cerrarse (en vez de directo a CERRADO) — un supervisor lo revisa
@@ -2544,6 +2555,9 @@ model Bodega {
   // null = hereda el default de Configuracion[FORMATO_IMPRESION_DEFAULT]
   // del tenant (ver resolver-formato-impresion.ts).
   formatoImpresion FormatoImpresion?
+  // null = hereda el default de Configuracion[CAJA_METODO_APERTURA_DEFAULT]
+  // del tenant (ver resolver-metodo-apertura-caja.ts).
+  metodoAperturaCaja MetodoAperturaCaja?
 
   stock                 Stock[]
   movimientos           MovimientoInventario[]

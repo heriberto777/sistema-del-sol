@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsBoolean, IsEnum, IsOptional, IsString } from 'class-validator';
-import { FormatoImpresion } from '@prisma/client';
+import { FormatoImpresion, MetodoAperturaCaja } from '@prisma/client';
 
 export class ActualizarBodegaDto {
   @ApiProperty({ required: false })
@@ -27,4 +27,9 @@ export class ActualizarBodegaDto {
   @IsOptional()
   @IsEnum(FormatoImpresion)
   formatoImpresion?: FormatoImpresion | null;
+
+  @ApiProperty({ enum: MetodoAperturaCaja, required: false, nullable: true, description: 'null = usa el default de la empresa (Configuracion[CAJA_METODO_APERTURA_DEFAULT]).' })
+  @IsOptional()
+  @IsEnum(MetodoAperturaCaja)
+  metodoAperturaCaja?: MetodoAperturaCaja | null;
 }

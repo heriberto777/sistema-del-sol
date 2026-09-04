@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { TenantPrismaService } from '../prisma/tenant-prisma.service';
-import { FormatoImpresion, MotivoAjusteInventario, Prisma, TipoMovimientoInventario } from '@prisma/client';
+import { FormatoImpresion, MetodoAperturaCaja, MotivoAjusteInventario, Prisma, TipoMovimientoInventario } from '@prisma/client';
 
 /** Un lote a acreditar en una entrada (recepción de compra, ajuste positivo, o reconstruido por una Nota de Crédito — Fase 5b). */
 export interface LoteEntrada {
@@ -497,7 +497,17 @@ export class InventarioRepository {
     return this.db.bodega.create({ data: { tenantId, sucursalId, nombre, direccion } });
   }
 
-  actualizarBodega(id: string, data: { nombre?: string; direccion?: string; sucursalId?: string; activa?: boolean; formatoImpresion?: FormatoImpresion | null }) {
+  actualizarBodega(
+    id: string,
+    data: {
+      nombre?: string;
+      direccion?: string;
+      sucursalId?: string;
+      activa?: boolean;
+      formatoImpresion?: FormatoImpresion | null;
+      metodoAperturaCaja?: MetodoAperturaCaja | null;
+    },
+  ) {
     return this.db.bodega.update({ where: { id }, data });
   }
 }

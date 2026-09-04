@@ -21,6 +21,13 @@ import { useAtajosTeclado } from '../../../hooks/useAtajosTeclado';
 import { useListasPrecio } from '../../../hooks/useListasPrecio';
 import { useDebouncedValue } from '../../../hooks/useDebouncedValue';
 import { PaginaResultado } from '../../../types/pagina-resultado';
+import {
+  abrirCajaAgenteLocal,
+  abrirCajaWebSerial,
+  conectarCajaWebSerial,
+  puertoWebSerialYaAutorizado,
+  soportaWebSerial,
+} from '../../../lib/apertura-caja';
 
 const ID_COMBOBOX_CLIENTE = 'turno-cliente-combobox';
 const ID_COMBOBOX_VENDEDOR = 'turno-vendedor-combobox';
@@ -168,6 +175,8 @@ interface TurnoCajaDetalleData {
   cerradoPor: Cajero | null;
   movimientos: MovimientoCaja[];
   facturas: FacturaTurno[];
+  /** Ítem F-9 — resuelto server-side (override de la Bodega, o el default de la empresa). 'NINGUNO' si no hay gaveta configurada. */
+  metodoAperturaCajaResuelto: 'NINGUNO' | 'AGENTE_LOCAL' | 'WEB_SERIAL';
 }
 
 function formatoRD(valor: string | number) {
@@ -270,6 +279,7 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
   const [error, setError] = useState<string | null>(null);
   const [facturaImprimiendo, setFacturaImprimiendo] = useState<string | null>(null);
   const [avisoBorrador, setAvisoBorrador] = useState<string | null>(null);
+  const [cajaWebSerialConectada, setCajaWebSerialConectada] = useState(false);
   // Evita aplicar la restauración del borrador más de una vez, y evita un
   // DELETE innecesario cuando el carrito arranca vacío y nunca hubo nada
   // que proteger (ver los dos efectos de borrador más abajo).
@@ -290,6 +300,14 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
     queryKey: ['pos-turno', turnoId],
     queryFn: async () => (await apiClient.get<TurnoCajaDetalleData>(`/pos/turnos/${turnoId}`)).data,
   });
+
+  // Un puerto ya autorizado en una sesión anterior no vuelve a pedir
+  // permiso — chequeo silencioso al entrar, sin gesto del usuario.
+  const metodoAperturaCaja = data?.metodoAperturaCajaResuelto;
+  useEffect(() => {
+    if (metodoAperturaCaja !== 'WEB_SERIAL') return;
+    puertoWebSerialYaAutorizado().then(setCajaWebSerialConectada);
+  }, [metodoAperturaCaja]);
 
   const { data: consumidorFinal } = useQuery({
     queryKey: ['clientes-consumidor-final'],
@@ -404,6 +422,14 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
       setModalCheckout(false);
       setCotizacion(null);
       setVentaConfirmada({ id: respuesta.data.id, total: respuesta.data.total });
+      // Apertura de gaveta — nunca bloqueante ni crítica para el flujo:
+      // un fallo acá (agente no corriendo, puerto no autorizado) no debe
+      // impedir que la venta ya registrada se vea como exitosa.
+      if (data?.metodoAperturaCajaResuelto === 'AGENTE_LOCAL') {
+        void abrirCajaAgenteLocal();
+      } else if (data?.metodoAperturaCajaResuelto === 'WEB_SERIAL') {
+        void abrirCajaWebSerial();
+      }
       // Venta confirmada — el borrador ya no protege nada, se borra ya
       // mismo (no hace falta esperar el debounce del efecto de guardado).
       huboBorradorRef.current = false;
@@ -630,6 +656,22 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
     >
       <div className="space-y-4">
       {error && <p className="text-sm text-red-600">{error}</p>}
+      {data.estado === 'ABIERTO' && data.metodoAperturaCajaResuelto === 'WEB_SERIAL' && !cajaWebSerialConectada && (
+        <p className="flex items-center justify-between gap-2 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
+          {soportaWebSerial()
+            ? 'La gaveta de dinero de esta bodega se abre por Web Serial — conectá el puerto una vez por navegador.'
+            : 'La gaveta de dinero de esta bodega se abre por Web Serial, pero este navegador no lo soporta (usá Chrome o Edge de escritorio).'}
+          {soportaWebSerial() && (
+            <button
+              type="button"
+              onClick={() => conectarCajaWebSerial().then(setCajaWebSerialConectada)}
+              className="shrink-0 rounded-md bg-amber-600 px-2 py-1 text-xs font-medium text-white hover:bg-amber-700"
+            >
+              Conectar caja
+            </button>
+          )}
+        </p>
+      )}
       {avisoBorrador && (
         <p className="flex items-center justify-between gap-2 rounded-md bg-sol-50 px-3 py-2 text-sm text-sol-700 dark:bg-sol-900/30 dark:text-sol-300">
           {avisoBorrador}

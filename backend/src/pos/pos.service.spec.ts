@@ -11,6 +11,7 @@ import { AuthService } from '../auth/auth.service';
 import { RedisService } from '../redis/redis.service';
 import { AutorizacionesService } from '../autorizaciones/autorizaciones.service';
 import { CajasService } from '../cajas/cajas.service';
+import { PrismaService } from '../prisma/prisma.service';
 
 describe('PosService', () => {
   let service: PosService;
@@ -25,6 +26,7 @@ describe('PosService', () => {
   let redis: jest.Mocked<RedisService>;
   let autorizacionesService: jest.Mocked<AutorizacionesService>;
   let cajasService: jest.Mocked<CajasService>;
+  let prisma: jest.Mocked<PrismaService>;
 
   beforeEach(() => {
     posRepository = {
@@ -73,6 +75,10 @@ describe('PosService', () => {
       buscarPorId: jest.fn(),
       validarLineasPermitidas: jest.fn().mockResolvedValue(undefined),
     } as unknown as jest.Mocked<CajasService>;
+    prisma = {
+      bodega: { findFirst: jest.fn().mockResolvedValue(null) },
+      configuracion: { findUnique: jest.fn().mockResolvedValue(null) },
+    } as unknown as jest.Mocked<PrismaService>;
     service = new PosService(
       posRepository,
       facturacionService,
@@ -85,6 +91,7 @@ describe('PosService', () => {
       redis,
       autorizacionesService,
       cajasService,
+      prisma,
     );
   });
 
@@ -890,7 +897,7 @@ describe('PosService', () => {
         ],
       } as never);
 
-      const resultado = await service.buscarPorId('t1');
+      const resultado = await service.buscarPorId('t1', 'tenant-1');
 
       expect(resultado.facturas).toEqual([
         expect.objectContaining({ id: 'f1', tieneNotaAplicada: true }),

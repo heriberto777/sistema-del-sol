@@ -23,12 +23,14 @@ import { useVariantesProducto } from '../hooks/useVariantesProducto';
 import { SelectorLineaProducto } from '../components/molecules/SelectorLineaProducto/SelectorLineaProducto';
 import { PaginaResultado } from '../types/pagina-resultado';
 import { FORMATOS_IMPRESION, FormatoImpresion } from '../constants/formato-impresion';
+import { METODOS_APERTURA_CAJA, MetodoAperturaCaja } from '../constants/metodo-apertura-caja';
 
 interface Bodega {
   id: string;
   nombre: string;
   direccion: string | null;
   formatoImpresion: FormatoImpresion | null;
+  metodoAperturaCaja: MetodoAperturaCaja | null;
   sucursalId: string;
   activa: boolean;
   sucursal?: { nombre: string };
@@ -632,6 +634,7 @@ function ModalEditarBodega({ bodega, onClose }: { bodega: Bodega; onClose: () =>
   const [sucursalId, setSucursalId] = useState(bodega.sucursalId);
   const [activa, setActiva] = useState(bodega.activa);
   const [formatoImpresion, setFormatoImpresion] = useState(bodega.formatoImpresion ?? '');
+  const [metodoAperturaCaja, setMetodoAperturaCaja] = useState(bodega.metodoAperturaCaja ?? '');
   const [error, setError] = useState<string | null>(null);
 
   const { data: sucursales } = useQuery({
@@ -647,6 +650,7 @@ function ModalEditarBodega({ bodega, onClose }: { bodega: Bodega; onClose: () =>
         sucursalId,
         activa,
         formatoImpresion: formatoImpresion || null,
+        metodoAperturaCaja: metodoAperturaCaja || null,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['bodegas'] });
@@ -679,6 +683,17 @@ function ModalEditarBodega({ bodega, onClose }: { bodega: Bodega; onClose: () =>
             {FORMATOS_IMPRESION.map((f) => (
               <option key={f.value} value={f.value}>
                 {f.label}
+              </option>
+            ))}
+          </Select>
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Apertura de caja registradora</label>
+          <Select value={metodoAperturaCaja} onChange={(e) => setMetodoAperturaCaja(e.target.value)}>
+            <option value="">Usar el default de la empresa</option>
+            {METODOS_APERTURA_CAJA.map((m) => (
+              <option key={m.value} value={m.value}>
+                {m.label}
               </option>
             ))}
           </Select>

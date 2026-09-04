@@ -23,6 +23,8 @@ import { CONFIGURACIONES_BASE } from '../tenants/roles-base';
 import { MotivoMovimientoCaja } from '@prisma/client';
 import { AutorizacionesService } from '../autorizaciones/autorizaciones.service';
 import { CajasService } from '../cajas/cajas.service';
+import { PrismaService } from '../prisma/prisma.service';
+import { resolverMetodoAperturaCaja } from '../common/pos/resolver-metodo-apertura-caja';
 
 const CLAVE_TOLERANCIA_ARQUEO = 'POS_TOLERANCIA_ARQUEO';
 
@@ -65,6 +67,7 @@ export class PosService {
     private readonly redis: RedisService,
     private readonly autorizacionesService: AutorizacionesService,
     private readonly cajasService: CajasService,
+    private readonly prisma: PrismaService,
   ) {}
 
   listarVendedores(busqueda?: string) {
@@ -118,9 +121,13 @@ export class PosService {
     return this.posRepository.crearTurno({ tenantId, bodegaId: dto.bodegaId, cajaId: dto.cajaId, cajeroId, montoInicial: dto.montoInicial });
   }
 
-  async buscarPorId(id: string) {
+  async buscarPorId(id: string, tenantId: string) {
     const turno = await this.posRepository.buscarPorId(id);
-    return { ...turno, facturas: turno.facturas.map(mapearFacturaTurno) };
+    // Ítem F-9 — el frontend necesita saber esto para decidir si intenta
+    // pegarle al agente local o a Web Serial al cobrar; se resuelve acá
+    // para no pedir un round-trip aparte.
+    const metodoAperturaCajaResuelto = await resolverMetodoAperturaCaja(this.prisma, tenantId, turno.bodegaId);
+    return { ...turno, facturas: turno.facturas.map(mapearFacturaTurno), metodoAperturaCajaResuelto };
   }
 
   /** Ítem "buscador de Devolución" — ver PosRepository.buscarParaDevolver. */

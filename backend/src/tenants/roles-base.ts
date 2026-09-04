@@ -87,6 +87,10 @@ export const CONFIGURACIONES_BASE: Record<string, string> = {
   // Remisiones/POS (ver resolver-formato-impresion.ts) — un valor del
   // enum FormatoImpresion. Una Bodega puede anularlo puntualmente.
   FORMATO_IMPRESION_DEFAULT: 'CARTA',
+  // Cómo se abre la gaveta de dinero al cobrar en POS por defecto (ítem
+  // F-9, ver resolver-metodo-apertura-caja.ts) — un valor del enum
+  // MetodoAperturaCaja. Una Bodega puede anularlo puntualmente.
+  CAJA_METODO_APERTURA_DEFAULT: 'NINGUNO',
   // Plan de integración Cuadre, ítem G-4 — leídas por AsistenciaService
   // al marcar la salida, para calcular `horasExtra`/`salidaAnticipada`
   // de RegistroAsistencia (ver el comentario en el schema).

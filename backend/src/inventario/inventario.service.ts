@@ -1,5 +1,5 @@
 import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
-import { FormatoImpresion, MotivoAjusteInventario, Prisma } from '@prisma/client';
+import { FormatoImpresion, MetodoAperturaCaja, MotivoAjusteInventario, Prisma } from '@prisma/client';
 import { InventarioRepository, LoteEntrada } from './inventario.repository';
 import { ProductosService } from '../productos/productos.service';
 import { VariantesService } from '../variantes/variantes.service';
@@ -512,7 +512,14 @@ export class InventarioService {
 
   async actualizarBodega(
     id: string,
-    data: { nombre?: string; direccion?: string; sucursalId?: string; activa?: boolean; formatoImpresion?: FormatoImpresion | null },
+    data: {
+      nombre?: string;
+      direccion?: string;
+      sucursalId?: string;
+      activa?: boolean;
+      formatoImpresion?: FormatoImpresion | null;
+      metodoAperturaCaja?: MetodoAperturaCaja | null;
+    },
   ) {
     // Mismo chequeo IDOR-safe que crearBodega — mover una bodega a una
     // sucursal de otro tenant no debería ser posible.
