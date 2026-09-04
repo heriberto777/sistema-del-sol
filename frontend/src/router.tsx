@@ -58,33 +58,6 @@ import { TiendaLogin } from './pages/tienda/TiendaLogin';
 import { TiendaRegistro } from './pages/tienda/TiendaRegistro';
 import { TiendaMisPedidos } from './pages/tienda/TiendaMisPedidos';
 
-// Subdominios que nunca son un tenant — mismo criterio que
-// `backend/src/tenants/subdominios-reservados.ts` (SUBDOMINIOS_RESERVADOS),
-// acá solo importan los que de verdad resuelven a esta app por DNS:
-// `app.dominio.com` es el panel de admin fijo de TODOS los tenants,
-// `www.dominio.com` cae al mismo lugar por si alguien lo escribe así.
-const HOSTS_ADMIN = new Set(['app', 'www']);
-
-/**
- * Resuelve si el hostname real (`window.location.hostname`) es el de un
- * tenant (`<subdominio>.dominio.com`, producción) — en ese caso la
- * tienda se monta directo en "/", sin pedir `/tienda/:subdominio` en la
- * URL visible (pedido explícito: la URL de la tienda tiene que ser
- * amigable, un cliente real nunca va a escribir `/tienda/demo` a mano).
- * `null` = esta es la app de administración (incluye `localhost` en
- * desarrollo, donde se sigue usando `/tienda/:subdominio` tal cual).
- */
-function resolverContextoTienda(): string | null {
-  const hostname = window.location.hostname;
-  if (hostname === 'localhost' || hostname === '127.0.0.1') return null;
-  const labels = hostname.split('.');
-  // Dominio raíz sin ningún subdominio (ej. "midominio.com") — no hay
-  // forma de saber a qué tenant se refiere, cae a la app de admin.
-  if (labels.length < 3) return null;
-  const primerLabel = labels[0].toLowerCase();
-  return HOSTS_ADMIN.has(primerLabel) ? null : primerLabel;
-}
-
 const RUTAS_TIENDA_PUBLICA = [
   { index: true, element: <TiendaHome /> },
   { path: 'producto/:productoId', element: <TiendaProducto /> },
@@ -95,8 +68,6 @@ const RUTAS_TIENDA_PUBLICA = [
   { path: 'registro', element: <TiendaRegistro /> },
   { path: 'mis-pedidos', element: <TiendaMisPedidos /> },
 ];
-
-const subdominioDeHostname = resolverContextoTienda();
 
 // Estamos en <subdominio>.dominio.com — nada de rutas de admin/plataforma
 // acá, esto SOLO puede ser la tienda pública de ese tenant. TiendaLayout/
@@ -209,4 +180,12 @@ const RUTAS_ADMIN = [
   },
 ];
 
-export const router = createBrowserRouter(subdominioDeHostname ? RUTAS_HOSTNAME_TENANT : RUTAS_ADMIN);
+/**
+ * `subdominio` ya viene resuelto por `App.tsx` (síncrono para
+ * localhost/`*.ciguadev.com`, async vía `resolverSubdominioPorDominioPropio`
+ * para un dominio propio — ver `lib/resolver-subdominio-tienda.ts`) antes
+ * de llamar a esto, así que acá no queda ninguna lógica de hostname.
+ */
+export function crearRouter(subdominio: string | null) {
+  return createBrowserRouter(subdominio ? RUTAS_HOSTNAME_TENANT : RUTAS_ADMIN);
+}

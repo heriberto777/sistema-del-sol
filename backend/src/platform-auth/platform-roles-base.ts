@@ -6,6 +6,7 @@ export const PERMISOS_PLATAFORMA_BASE = [
   'platform.tenants.ver',
   'platform.tenants.crear',
   'platform.tenants.gestionar',
+  'platform.tenants.dominios.gestionar',
   'platform.planes.ver',
   'platform.planes.gestionar',
   'platform.admins.ver',

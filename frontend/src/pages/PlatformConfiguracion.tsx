@@ -50,6 +50,14 @@ export interface ConfiguracionPlataforma {
   autoSuspension: {
     diasParaAutoSuspender: number;
   };
+  dominioPropio: {
+    npmBaseUrl: string | null;
+    npmUsuario: string | null;
+    npmPasswordConfigurado: boolean;
+    npmForwardHost: string | null;
+    npmForwardPort: number | null;
+    npmPublicHost: string | null;
+  };
 }
 
 // Fase 4 — reglas de notificación de vencimiento configurables.
@@ -62,7 +70,7 @@ interface ReglaNotificacion {
 
 const PLACEHOLDER_CONFIGURADO = '•••••••• (configurado)';
 
-const TABS = ['General', 'NCF / e-CF', 'Notificaciones', 'Pasarela de pago', 'Webhook', 'Vencimientos'] as const;
+const TABS = ['General', 'NCF / e-CF', 'Notificaciones', 'Pasarela de pago', 'Webhook', 'Vencimientos', 'Dominio propio'] as const;
 type Tab = (typeof TABS)[number];
 
 export function PlatformConfiguracion() {
@@ -111,6 +119,7 @@ export function PlatformConfiguracion() {
           {tab === 'Pasarela de pago' && <SeccionPasarela config={config} guardar={guardar} />}
           {tab === 'Webhook' && <SeccionWebhook config={config} guardar={guardar} />}
           {tab === 'Vencimientos' && <SeccionVencimientos config={config} guardar={guardar} />}
+          {tab === 'Dominio propio' && <SeccionDominioPropio config={config} guardar={guardar} />}
         </>
       )}
     </div>
@@ -393,6 +402,97 @@ function SeccionWebhook({ config, guardar }: SeccionProps) {
           value={webhookSecret}
           onChange={(e) => setWebhookSecret(e.target.value)}
           placeholder={webhook.secretConfigurado ? PLACEHOLDER_CONFIGURADO : ''}
+        />
+        <Button type="submit" disabled={guardar.isPending}>
+          {guardar.isPending ? 'Guardando…' : 'Guardar'}
+        </Button>
+      </form>
+    </Card>
+  );
+}
+
+/**
+ * Credenciales de la API de Nginx Proxy Manager (puerto 81, la misma que
+ * usa su UI) — usadas para crear el Proxy Host + certificado cuando el
+ * super admin asigna un dominio propio a la tienda de un tenant (ver
+ * "Dominios" en /plataforma/tenants). `npmForwardHost`/`npmForwardPort`
+ * es el mismo destino interno que ya usa el Proxy Host de
+ * app.ciguadev.com en NPM.
+ */
+function SeccionDominioPropio({ config, guardar }: SeccionProps) {
+  const npm = config.dominioPropio;
+  const [npmBaseUrl, setNpmBaseUrl] = useState(npm.npmBaseUrl ?? '');
+  const [npmUsuario, setNpmUsuario] = useState(npm.npmUsuario ?? '');
+  const [npmPassword, setNpmPassword] = useState('');
+  const [npmForwardHost, setNpmForwardHost] = useState(npm.npmForwardHost ?? '');
+  const [npmForwardPort, setNpmForwardPort] = useState(npm.npmForwardPort?.toString() ?? '');
+  const [npmPublicHost, setNpmPublicHost] = useState(npm.npmPublicHost ?? '');
+
+  useEffect(() => {
+    setNpmBaseUrl(npm.npmBaseUrl ?? '');
+    setNpmUsuario(npm.npmUsuario ?? '');
+    setNpmForwardHost(npm.npmForwardHost ?? '');
+    setNpmForwardPort(npm.npmForwardPort?.toString() ?? '');
+    setNpmPublicHost(npm.npmPublicHost ?? '');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [npm.npmBaseUrl, npm.npmUsuario, npm.npmForwardHost, npm.npmForwardPort, npm.npmPublicHost]);
+
+  function onSubmit(e: FormEvent) {
+    e.preventDefault();
+    guardar.mutate({
+      npmBaseUrl,
+      npmUsuario,
+      npmForwardHost,
+      npmForwardPort: npmForwardPort ? Number(npmForwardPort) : undefined,
+      npmPublicHost,
+      ...(npmPassword !== '' ? { npmPassword } : {}),
+    });
+    setNpmPassword('');
+  }
+
+  return (
+    <Card
+      titulo="Dominio propio de tenant (Nginx Proxy Manager)"
+      descripcion="Credenciales de la API de NPM — necesarias para que el super admin pueda asignar dominios propios a la tienda de un tenant desde /plataforma/tenants."
+    >
+      <form onSubmit={onSubmit} className="max-w-md space-y-3">
+        <FormField
+          id="npmBaseUrl"
+          label="URL base de la API de NPM"
+          value={npmBaseUrl}
+          onChange={(e) => setNpmBaseUrl(e.target.value)}
+          placeholder="http://10.0.10.10:81"
+        />
+        <FormField id="npmUsuario" label="Usuario" value={npmUsuario} onChange={(e) => setNpmUsuario(e.target.value)} placeholder="admin@ciguadev.com" />
+        <FormField
+          id="npmPassword"
+          label="Contraseña"
+          type="password"
+          value={npmPassword}
+          onChange={(e) => setNpmPassword(e.target.value)}
+          placeholder={npm.npmPasswordConfigurado ? PLACEHOLDER_CONFIGURADO : ''}
+        />
+        <FormField
+          id="npmForwardHost"
+          label="Host de destino interno"
+          value={npmForwardHost}
+          onChange={(e) => setNpmForwardHost(e.target.value)}
+          placeholder="Mismo destino que ya usa el Proxy Host de app.ciguadev.com"
+        />
+        <FormField
+          id="npmForwardPort"
+          label="Puerto de destino interno"
+          type="number"
+          value={npmForwardPort}
+          onChange={(e) => setNpmForwardPort(e.target.value)}
+          placeholder="8291"
+        />
+        <FormField
+          id="npmPublicHost"
+          label="Destino público (a esto el tenant apunta su DNS)"
+          value={npmPublicHost}
+          onChange={(e) => setNpmPublicHost(e.target.value)}
+          placeholder="app.ciguadev.com o la IP pública del servidor"
         />
         <Button type="submit" disabled={guardar.isPending}>
           {guardar.isPending ? 'Guardando…' : 'Guardar'}

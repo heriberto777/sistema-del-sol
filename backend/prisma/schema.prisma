@@ -108,6 +108,7 @@ model Tenant {
   sesionesCobroFactura      SesionCobroFactura[]
   pedidosTienda             PedidoTienda[]
   seccionesTienda           SeccionTienda[]
+  dominios                  TenantDominio[]
 
   @@map("tenants")
 }
@@ -273,6 +274,38 @@ model TenantModuloOverride {
   @@map("tenant_modulo_overrides")
 }
 
+/// Dominio propio asignado por el super admin a la tienda de un tenant
+/// (ej. `shopy-me.com`, además de `<subdominio>.ciguadev.com` que sigue
+/// funcionando siempre). Un tenant puede tener varios. Activarlo requiere
+/// que el DNS del dominio ya apunte al servidor y que Nginx Proxy Manager
+/// tenga el Proxy Host + certificado creados (ver NpmClientService /
+/// TenantDominiosService) — PENDIENTE/VERIFICANDO/ERROR son estados
+/// intermedios de ese proceso, ACTIVO es el único que la tienda pública
+/// resuelve (ver GET /api/tenants/resolver-por-dominio).
+enum EstadoDominioTenant {
+  PENDIENTE
+  VERIFICANDO
+  ACTIVO
+  ERROR
+}
+
+model TenantDominio {
+  id               String              @id @default(uuid())
+  tenantId         String
+  tenant           Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  dominio          String              @unique
+  estado           EstadoDominioTenant @default(PENDIENTE)
+  // Motivo legible del último intento fallido (DNS no apunta bien, error
+  // crudo de NPM/Let's Encrypt) — se limpia al reintentar con éxito.
+  mensajeError     String?
+  npmProxyHostId   Int?
+  npmCertificadoId Int?
+  createdAt        DateTime            @default(now())
+  activadoEn       DateTime?
+
+  @@map("tenant_dominios")
+}
+
 // ============================================================
 // SUSCRIPCIÓN Y FACTURACIÓN DE PLATAFORMA (lo que le cobra la
 // plataforma a cada tenant por el servicio — no confundir con Factura,
@@ -432,7 +465,7 @@ model PlataformaConfiguracion {
   // Logo de la plataforma (se muestra en Login, antes de resolver
   // tenant) — data URI, mismo formato/tamaño que Configuracion
   // [DOCUMENTO_LOGO] del lado tenant. Sin cifrar, no es un secreto.
-  logo String?
+  logo          String?
 
   // Datos de la empresa emisora — ítem "Facturación con NCF real"
   // (Administración de Tenants, última pieza). Sin cifrar, no son
@@ -486,6 +519,21 @@ model PlataformaConfiguracion {
   // Configurable a pedido del usuario (el roadmap original lo fijaba en
   // 10). Ver FacturasPlataformaCronService.suspenderTenantsMorosos.
   diasParaAutoSuspender Int @default(10)
+
+  // Dominio propio de tenant (ver TenantDominio/NpmClientService) —
+  // credenciales de la API REST de Nginx Proxy Manager (puerto 81, la
+  // misma que usa su UI) para crear el Proxy Host + certificado por
+  // código. `npmForwardHost`/`npmForwardPort` es el destino INTERNO al
+  // que NPM reenvía la petición (el mismo que ya usa el Proxy Host de
+  // `app.ciguadev.com`) — distinto de `npmPublicHost`, que es el destino
+  // PÚBLICO (IP o `app.ciguadev.com`) al que el TENANT apunta su propio
+  // DNS y contra el que se verifica antes de emitir el certificado.
+  npmBaseUrl         String?
+  npmUsuario         String?
+  npmPasswordCifrado String?
+  npmForwardHost     String?
+  npmForwardPort     Int?
+  npmPublicHost      String?
 
   @@map("plataforma_configuracion")
 }
@@ -2542,19 +2590,19 @@ model UsuarioSucursal {
 }
 
 model Bodega {
-  id               String            @id @default(uuid())
-  tenantId         String
-  tenant           Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  sucursalId       String
+  id                 String              @id @default(uuid())
+  tenantId           String
+  tenant             Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  sucursalId         String
   // Cascade: Tenant -> Sucursal -> Bodega es una cadena normal (no una
   // carrera de ramas hermanas) — borrar la sucursal se lleva sus bodegas.
-  sucursal         Sucursal          @relation(fields: [sucursalId], references: [id], onDelete: Cascade)
-  nombre           String
-  direccion        String?
-  activa           Boolean           @default(true)
+  sucursal           Sucursal            @relation(fields: [sucursalId], references: [id], onDelete: Cascade)
+  nombre             String
+  direccion          String?
+  activa             Boolean             @default(true)
   // null = hereda el default de Configuracion[FORMATO_IMPRESION_DEFAULT]
   // del tenant (ver resolver-formato-impresion.ts).
-  formatoImpresion FormatoImpresion?
+  formatoImpresion   FormatoImpresion?
   // null = hereda el default de Configuracion[CAJA_METODO_APERTURA_DEFAULT]
   // del tenant (ver resolver-metodo-apertura-caja.ts).
   metodoAperturaCaja MetodoAperturaCaja?

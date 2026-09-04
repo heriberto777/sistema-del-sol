@@ -212,6 +212,128 @@ function PanelModulosTenant({ tenant, onClose }: { tenant: Tenant; onClose: () =
   );
 }
 
+interface TenantDominio {
+  id: string;
+  dominio: string;
+  estado: 'PENDIENTE' | 'VERIFICANDO' | 'ACTIVO' | 'ERROR';
+  mensajeError: string | null;
+  activadoEn: string | null;
+}
+
+const TONO_POR_ESTADO_DOMINIO: Record<TenantDominio['estado'], 'neutro' | 'advertencia' | 'exito' | 'peligro'> = {
+  PENDIENTE: 'neutro',
+  VERIFICANDO: 'advertencia',
+  ACTIVO: 'exito',
+  ERROR: 'peligro',
+};
+
+function mensajeErrorApi(err: unknown, fallback: string): string {
+  const mensaje =
+    err && typeof err === 'object' && 'response' in err
+      ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
+      : undefined;
+  return mensaje ?? fallback;
+}
+
+/** Dominios propios de la tienda de un tenant (además de `<subdominio>.ciguadev.com`, que sigue funcionando siempre) — gestión 100% del super admin, ver TenantDominiosService en el backend. */
+function PanelDominiosTenant({ tenant, onClose }: { tenant: Tenant; onClose: () => void }) {
+  const queryClient = useQueryClient();
+  const [dominioNuevo, setDominioNuevo] = useState('');
+  const [error, setError] = useState<string | null>(null);
+
+  const queryKey = ['platform-tenant-dominios', tenant.id];
+
+  const { data: dominios } = useQuery({
+    queryKey,
+    queryFn: async () => (await platformApiClient.get<TenantDominio[]>(`/platform/tenants/${tenant.id}/dominios`)).data,
+  });
+
+  const agregar = useMutation({
+    mutationFn: async () => platformApiClient.post(`/platform/tenants/${tenant.id}/dominios`, { dominio: dominioNuevo }),
+    onSuccess: () => {
+      setDominioNuevo('');
+      setError(null);
+      queryClient.invalidateQueries({ queryKey });
+    },
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo agregar el dominio.')),
+  });
+
+  const verificar = useMutation({
+    mutationFn: async (dominioId: string) => platformApiClient.post(`/platform/tenants/${tenant.id}/dominios/${dominioId}/verificar`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey }),
+  });
+
+  const eliminar = useMutation({
+    mutationFn: async (dominioId: string) => platformApiClient.delete(`/platform/tenants/${tenant.id}/dominios/${dominioId}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey }),
+  });
+
+  function onSubmit(e: FormEvent) {
+    e.preventDefault();
+    agregar.mutate();
+  }
+
+  return (
+    <Modal titulo={`Dominios — ${tenant.nombre}`} onClose={onClose}>
+      <p className="mb-3 text-xs text-slate-400">
+        Además de <span className="font-mono">{tenant.subdominio}.ciguadev.com</span> (siempre activo), este tenant puede
+        tener uno o más dominios propios. Antes de agregar uno, pedile al cliente que apunte su DNS (CNAME o A record,
+        según lo configurado en Configuración → Dominio propio) al destino público de la plataforma.
+      </p>
+
+      <div className="mb-4 space-y-2">
+        {dominios?.length === 0 && <p className="text-sm text-slate-400">Sin dominios propios todavía.</p>}
+        {dominios?.map((d) => (
+          <div key={d.id} className="rounded-md border border-slate-200 px-3 py-2 dark:border-slate-800">
+            <div className="flex items-center justify-between gap-2">
+              <span className="font-mono text-sm text-slate-900 dark:text-slate-100">{d.dominio}</span>
+              <div className="flex items-center gap-2">
+                <Badge tono={TONO_POR_ESTADO_DOMINIO[d.estado]}>{d.estado}</Badge>
+                {d.estado !== 'ACTIVO' && (
+                  <button
+                    type="button"
+                    className="text-xs text-sol-600 hover:underline dark:text-sol-400"
+                    disabled={verificar.isPending}
+                    onClick={() => verificar.mutate(d.id)}
+                  >
+                    Verificar
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="text-xs text-red-600 hover:underline dark:text-red-400"
+                  disabled={eliminar.isPending}
+                  onClick={() => eliminar.mutate(d.id)}
+                >
+                  Eliminar
+                </button>
+              </div>
+            </div>
+            {d.mensajeError && <p className="mt-1 text-xs text-red-600 dark:text-red-400">{d.mensajeError}</p>}
+          </div>
+        ))}
+      </div>
+
+      <form onSubmit={onSubmit} className="flex items-end gap-2">
+        <div className="flex-1">
+          <FormField
+            id="dominio-nuevo"
+            label="Nuevo dominio"
+            value={dominioNuevo}
+            onChange={(e) => setDominioNuevo(e.target.value)}
+            placeholder="shopy-me.com"
+            required
+          />
+        </div>
+        <Button type="submit" disabled={agregar.isPending}>
+          Agregar
+        </Button>
+      </form>
+      {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+    </Modal>
+  );
+}
+
 export function PlatformTenants() {
   const queryClient = useQueryClient();
 
@@ -219,6 +341,7 @@ export function PlatformTenants() {
   const [tenantEditando, setTenantEditando] = useState<Tenant | null>(null);
   const [tenantModulos, setTenantModulos] = useState<Tenant | null>(null);
   const [tenantSuscripcion, setTenantSuscripcion] = useState<Tenant | null>(null);
+  const [tenantDominios, setTenantDominios] = useState<Tenant | null>(null);
 
   const { data: tenants } = useQuery({
     queryKey: ['platform-tenants'],
@@ -297,6 +420,7 @@ export function PlatformTenants() {
                         { etiqueta: 'Editar', onClick: () => setTenantEditando(tenant) },
                         { etiqueta: 'Suscripción', onClick: () => setTenantSuscripcion(tenant) },
                         { etiqueta: 'Ver módulos', onClick: () => setTenantModulos(tenant) },
+                        { etiqueta: 'Dominios', onClick: () => setTenantDominios(tenant) },
                         tenant.estado === 'ACTIVO'
                           ? {
                               etiqueta: 'Suspender',
@@ -325,6 +449,7 @@ export function PlatformTenants() {
       {tenantEditando && <ModalEditarTenant tenant={tenantEditando} onClose={() => setTenantEditando(null)} />}
       {tenantModulos && <PanelModulosTenant tenant={tenantModulos} onClose={() => setTenantModulos(null)} />}
       {tenantSuscripcion && <PanelSuscripcionTenant tenant={tenantSuscripcion} onClose={() => setTenantSuscripcion(null)} />}
+      {tenantDominios && <PanelDominiosTenant tenant={tenantDominios} onClose={() => setTenantDominios(null)} />}
     </div>
   );
 }

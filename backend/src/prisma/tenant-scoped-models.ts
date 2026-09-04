@@ -79,4 +79,5 @@ export const TENANT_SCOPED_MODELS = new Set([
   'CarritoBorrador',
   'PedidoTienda',
   'SeccionTienda',
+  'TenantDominio',
 ]);

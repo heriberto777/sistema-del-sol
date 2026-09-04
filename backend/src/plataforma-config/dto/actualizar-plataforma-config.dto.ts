@@ -142,4 +142,35 @@ export class ActualizarPlataformaConfigDto {
   @IsOptional()
   @IsInt()
   diasParaAutoSuspender?: number;
+
+  // Dominio propio de tenant — credenciales de la API de Nginx Proxy Manager
+  @ApiProperty({ required: false, description: 'URL base de la API de NPM, ej. http://10.0.10.10:81' })
+  @IsOptional()
+  @IsString()
+  npmBaseUrl?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  npmUsuario?: string;
+
+  @ApiProperty({ required: false, description: '"" borra el override guardado' })
+  @IsOptional()
+  @IsString()
+  npmPassword?: string;
+
+  @ApiProperty({ required: false, description: 'Mismo destino interno que ya usa el Proxy Host de app.ciguadev.com en NPM' })
+  @IsOptional()
+  @IsString()
+  npmForwardHost?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsInt()
+  npmForwardPort?: number;
+
+  @ApiProperty({ required: false, description: 'IP pública o app.ciguadev.com — a esto el tenant apunta su propio DNS (CNAME/A record)' })
+  @IsOptional()
+  @IsString()
+  npmPublicHost?: string;
 }

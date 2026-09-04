@@ -14,7 +14,10 @@ interface ConfiguracionFila {
  * hostname actual por el subdominio del tenant, se conserva el resto
  * (dominio base + puerto) tal cual. En desarrollo (`localhost`) o si el
  * hostname no sigue ese esquema, cae al patrón viejo (`/tienda/:subdominio`)
- * — mismo criterio que `resolverContextoTienda` en `router.tsx`.
+ * — mismo criterio que `resolverContextoTiendaSincrono` en
+ * `lib/resolver-subdominio-tienda.ts`. No contempla un dominio propio de
+ * tenant acá (ver TenantDominio) — este link sigue siempre apuntando al
+ * subdominio de ciguadev.com, que nunca deja de funcionar.
  */
 export function construirUrlTienda(subdominio: string): string {
   const { protocol, hostname, port } = window.location;

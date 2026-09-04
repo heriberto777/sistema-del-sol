@@ -56,12 +56,18 @@ export class PlataformaConfigService implements OnModuleInit {
     if (dto.webhookUrl !== undefined) data.webhookUrl = dto.webhookUrl;
     if (dto.webhookActivo !== undefined) data.webhookActivo = dto.webhookActivo;
     if (dto.diasParaAutoSuspender !== undefined) data.diasParaAutoSuspender = dto.diasParaAutoSuspender;
+    if (dto.npmBaseUrl !== undefined) data.npmBaseUrl = dto.npmBaseUrl;
+    if (dto.npmUsuario !== undefined) data.npmUsuario = dto.npmUsuario;
+    if (dto.npmForwardHost !== undefined) data.npmForwardHost = dto.npmForwardHost;
+    if (dto.npmForwardPort !== undefined) data.npmForwardPort = dto.npmForwardPort;
+    if (dto.npmPublicHost !== undefined) data.npmPublicHost = dto.npmPublicHost;
 
     this.aplicarCampoSecreto(data, 'smtpPasswordCifrado', dto.smtpPassword);
     this.aplicarCampoSecreto(data, 'twilioAuthTokenCifrado', dto.twilioAuthToken);
     this.aplicarCampoSecreto(data, 'stripeSecretKeyCifrado', dto.stripeSecretKey);
     this.aplicarCampoSecreto(data, 'stripeWebhookSecretCifrado', dto.stripeWebhookSecret);
     this.aplicarCampoSecreto(data, 'webhookSecretCifrado', dto.webhookSecret);
+    this.aplicarCampoSecreto(data, 'npmPasswordCifrado', dto.npmPassword);
 
     const actualizado = await this.repository.actualizar(config.id, data);
     this.sincronizarEnv(actualizado);
@@ -141,6 +147,14 @@ export class PlataformaConfigService implements OnModuleInit {
       },
       autoSuspension: {
         diasParaAutoSuspender: config.diasParaAutoSuspender,
+      },
+      dominioPropio: {
+        npmBaseUrl: config.npmBaseUrl,
+        npmUsuario: config.npmUsuario,
+        npmPasswordConfigurado: Boolean(config.npmPasswordCifrado),
+        npmForwardHost: config.npmForwardHost,
+        npmForwardPort: config.npmForwardPort,
+        npmPublicHost: config.npmPublicHost,
       },
     };
   }
