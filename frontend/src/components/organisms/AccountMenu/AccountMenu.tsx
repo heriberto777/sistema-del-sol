@@ -1,8 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
 import { ChevronDown, KeyRound, LogOut, Moon, Sun } from 'lucide-react';
+import clsx from 'clsx';
 import { useAuth } from '../../../hooks/useAuth';
 import { useTheme } from '../../../hooks/useTheme';
+import type { TamanoFuente } from '../../../contexts/ThemeContext';
 import { ModalMiPin } from '../ModalMiPin/ModalMiPin';
+
+const OPCIONES_TAMANO_FUENTE: { valor: TamanoFuente; etiqueta: string }[] = [
+  { valor: 'normal', etiqueta: 'A' },
+  { valor: 'grande', etiqueta: 'A' },
+  { valor: 'muy-grande', etiqueta: 'A' },
+];
 
 function iniciales(nombre?: string) {
   if (!nombre) return '?';
@@ -19,7 +27,7 @@ function iniciales(nombre?: string) {
  */
 export function AccountMenu() {
   const { usuario, logout } = useAuth();
-  const { tema, toggleTema } = useTheme();
+  const { tema, toggleTema, tamanoFuente, setTamanoFuente } = useTheme();
   const [abierto, setAbierto] = useState(false);
   const [modalPinAbierto, setModalPinAbierto] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -58,6 +66,29 @@ export function AccountMenu() {
             {tema === 'claro' ? <Moon size={15} /> : <Sun size={15} />}
             {tema === 'claro' ? 'Tema oscuro' : 'Tema claro'}
           </button>
+          <div className="flex items-center justify-between px-3 py-2">
+            <span className="text-sm text-slate-700 dark:text-slate-300">Tamaño de texto</span>
+            <div className="flex overflow-hidden rounded-md border border-slate-200 dark:border-slate-700">
+              {OPCIONES_TAMANO_FUENTE.map((opcion, i) => (
+                <button
+                  key={opcion.valor}
+                  type="button"
+                  title={opcion.valor === 'normal' ? 'Normal' : opcion.valor === 'grande' ? 'Grande' : 'Muy grande'}
+                  onClick={() => setTamanoFuente(opcion.valor)}
+                  className={clsx(
+                    'flex h-7 w-7 items-center justify-center font-semibold leading-none transition-colors',
+                    i > 0 && 'border-l border-slate-200 dark:border-slate-700',
+                    tamanoFuente === opcion.valor
+                      ? 'bg-sol-500 text-white'
+                      : 'bg-white text-slate-600 hover:bg-slate-100 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800',
+                  )}
+                  style={{ fontSize: i === 0 ? '11px' : i === 1 ? '13px' : '15px' }}
+                >
+                  {opcion.etiqueta}
+                </button>
+              ))}
+            </div>
+          </div>
           <button
             type="button"
             onClick={() => {
