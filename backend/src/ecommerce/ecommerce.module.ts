@@ -7,6 +7,7 @@ import { EcommerceService } from './ecommerce.service';
 import { EcommerceRepository } from './ecommerce.repository';
 import { PedidosTiendaRepository } from './pedidos-tienda.repository';
 import { SeccionesTiendaRepository } from './secciones-tienda.repository';
+import { DominiosTiendaRepository } from './dominios-tienda.repository';
 import { FacturacionModule } from '../facturacion/facturacion.module';
 import { ClientesModule } from '../clientes/clientes.module';
 import { VariantesModule } from '../variantes/variantes.module';
@@ -31,6 +32,6 @@ import { OfertasModule } from '../ofertas/ofertas.module';
   // que de todos modos no comparte estado (ver ese archivo).
   imports: [FacturacionModule, ClientesModule, VariantesModule, OfertasModule, JwtModule.register({})],
   controllers: [EcommerceController, EcommercePedidosController, SeccionesTiendaController],
-  providers: [EcommerceService, EcommerceRepository, PedidosTiendaRepository, SeccionesTiendaRepository],
+  providers: [EcommerceService, EcommerceRepository, PedidosTiendaRepository, SeccionesTiendaRepository, DominiosTiendaRepository],
 })
 export class EcommerceModule {}

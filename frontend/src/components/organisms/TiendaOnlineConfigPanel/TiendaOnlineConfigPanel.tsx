@@ -282,6 +282,13 @@ export function TiendaOnlineConfigPanel() {
   const subdominio = usuario?.tenant?.subdominio;
   const urlTienda = subdominio ? construirUrlTienda(subdominio) : null;
 
+  // Ítem "dominio propio de tenant" — gestionado por el super admin en
+  // /plataforma/tenants, acá solo se muestra el link real una vez activo.
+  const { data: dominiosPropios = [] } = useQuery({
+    queryKey: ['admin-ecommerce-dominios'],
+    queryFn: async () => (await apiClient.get<string[]>('/admin/ecommerce/dominios')).data,
+  });
+
   function agregarMensajeBanner() {
     setBannerAnuncio({
       ...bannerAnuncio,
@@ -350,6 +357,19 @@ export function TiendaOnlineConfigPanel() {
                   </span>
                 </>
               )}
+              {activaGuardada &&
+                dominiosPropios.map((dominio) => (
+                  <a
+                    key={dominio}
+                    href={`https://${dominio}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center gap-1.5 text-sm font-medium text-sol-600 hover:underline dark:text-sol-400"
+                  >
+                    {dominio}
+                    <ExternalLink size={14} />
+                  </a>
+                ))}
             </div>
           )}
 

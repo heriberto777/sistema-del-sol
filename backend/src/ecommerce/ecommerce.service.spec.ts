@@ -4,6 +4,7 @@ import { EcommerceService } from './ecommerce.service';
 import { EcommerceRepository } from './ecommerce.repository';
 import { PedidosTiendaRepository } from './pedidos-tienda.repository';
 import { SeccionesTiendaRepository } from './secciones-tienda.repository';
+import { DominiosTiendaRepository } from './dominios-tienda.repository';
 import { ClientesService } from '../clientes/clientes.service';
 import { FacturacionService } from '../facturacion/facturacion.service';
 import { VariantesService } from '../variantes/variantes.service';
@@ -30,6 +31,7 @@ describe('EcommerceService', () => {
   let ecommerceRepository: jest.Mocked<EcommerceRepository>;
   let pedidosTiendaRepository: jest.Mocked<PedidosTiendaRepository>;
   let seccionesTiendaRepository: jest.Mocked<SeccionesTiendaRepository>;
+  let dominiosTiendaRepository: jest.Mocked<DominiosTiendaRepository>;
   let clientesService: jest.Mocked<ClientesService>;
   let facturacionService: jest.Mocked<FacturacionService>;
   let variantesService: jest.Mocked<VariantesService>;
@@ -84,6 +86,9 @@ describe('EcommerceService', () => {
       eliminar: jest.fn().mockResolvedValue({ id: 's1' }),
       reordenar: jest.fn().mockResolvedValue(undefined),
     } as unknown as jest.Mocked<SeccionesTiendaRepository>;
+    dominiosTiendaRepository = {
+      listarActivos: jest.fn().mockResolvedValue([]),
+    } as unknown as jest.Mocked<DominiosTiendaRepository>;
     clientesService = {
       buscarConsumidorFinal: jest.fn().mockResolvedValue(CONSUMIDOR_FINAL),
     } as unknown as jest.Mocked<ClientesService>;
@@ -107,6 +112,7 @@ describe('EcommerceService', () => {
       ecommerceRepository,
       pedidosTiendaRepository,
       seccionesTiendaRepository,
+      dominiosTiendaRepository,
       clientesService,
       facturacionService,
       variantesService,

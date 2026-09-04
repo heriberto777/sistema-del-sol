@@ -3,6 +3,7 @@ import { JwtService } from '@nestjs/jwt';
 import { EcommerceRepository } from './ecommerce.repository';
 import { PedidosTiendaRepository } from './pedidos-tienda.repository';
 import { SeccionesTiendaRepository } from './secciones-tienda.repository';
+import { DominiosTiendaRepository } from './dominios-tienda.repository';
 import { resolverTiendaPublica } from './resolver-tienda-publica';
 import { paginar } from '../common/types/pagina-resultado';
 import { PrismaService } from '../prisma/prisma.service';
@@ -29,6 +30,7 @@ export class EcommerceService {
     private readonly ecommerceRepository: EcommerceRepository,
     private readonly pedidosTiendaRepository: PedidosTiendaRepository,
     private readonly seccionesTiendaRepository: SeccionesTiendaRepository,
+    private readonly dominiosTiendaRepository: DominiosTiendaRepository,
     private readonly clientesService: ClientesService,
     private readonly facturacionService: FacturacionService,
     private readonly variantesService: VariantesService,
@@ -218,6 +220,11 @@ export class EcommerceService {
     const detalle = await this.pedidosTiendaRepository.detalle(facturaId);
     if (!detalle) throw new NotFoundException('Pedido no encontrado');
     return detalle;
+  }
+
+  /** Ítem "dominio propio de tenant" — para el link de "Enlace de tu tienda" del panel admin, junto al subdominio de ciguadev.com de siempre. */
+  listarDominiosActivos() {
+    return this.dominiosTiendaRepository.listarActivos();
   }
 
   /**

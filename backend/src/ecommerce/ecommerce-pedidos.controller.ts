@@ -22,4 +22,11 @@ export class EcommercePedidosController {
   detallePedido(@Param('facturaId') facturaId: string) {
     return this.ecommerceService.detallePedidoAdmin(facturaId);
   }
+
+  /** Dominios propios ACTIVOS del tenant (ver TenantDominio) — para mostrar el link real en "Enlace de tu tienda", junto al subdominio de ciguadev.com. Gestionados solo por el super admin, acá de solo lectura. */
+  @Get('dominios')
+  @Permissions('admin.configuracion')
+  listarDominios() {
+    return this.ecommerceService.listarDominiosActivos();
+  }
 }
