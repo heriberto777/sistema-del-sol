@@ -1,6 +1,7 @@
 import { FormEvent, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../../lib/api-client';
+import { mensajeErrorApi } from '../../../lib/mensaje-error-api';
 import { type Puesto } from '../../../hooks/usePuestos';
 import { FormField } from '../../molecules/FormField/FormField';
 import { Button } from '../../atoms/Button/Button';
@@ -32,7 +33,7 @@ export function PuestosPanel() {
       setNombre('');
       setError(null);
     },
-    onError: () => setError('No se pudo crear el puesto (¿ya existe uno con ese nombre?).'),
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo crear el puesto (¿ya existe uno con ese nombre?).')),
   });
 
   const actualizar = useMutation({

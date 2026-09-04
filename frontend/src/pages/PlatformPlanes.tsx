@@ -2,6 +2,7 @@ import { FormEvent, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
 import { platformApiClient } from '../lib/platform-api-client';
+import { mensajeErrorApi } from '../lib/mensaje-error-api';
 import { FormField } from '../components/molecules/FormField/FormField';
 import { Button } from '../components/atoms/Button/Button';
 import { Badge } from '../components/atoms/Badge/Badge';
@@ -210,7 +211,7 @@ function ModalPlan({ plan, onClose }: { plan: Plan | null; onClose: () => void }
       queryClient.invalidateQueries({ queryKey: ['platform-planes'] });
       onClose();
     },
-    onError: () => setError('No se pudo guardar el plan. Revisa que el nombre no esté repetido.'),
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo guardar el plan. Revisa que el nombre no esté repetido.')),
   });
 
   function alternarModulo(clave: string) {

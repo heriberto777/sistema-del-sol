@@ -1,6 +1,7 @@
 import { FormEvent, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { platformApiClient } from '../lib/platform-api-client';
+import { mensajeErrorApi } from '../lib/mensaje-error-api';
 import { FormField } from '../components/molecules/FormField/FormField';
 import { Button } from '../components/atoms/Button/Button';
 import { Badge } from '../components/atoms/Badge/Badge';
@@ -78,13 +79,13 @@ function PanelFactura({ factura, onClose }: { factura: FacturaPlataforma; onClos
     mutationFn: async () =>
       platformApiClient.patch(`/platform/facturas/${factura.id}`, { descuento: Number(descuento), montoMora: Number(montoMora) }),
     onSuccess: invalidar,
-    onError: () => setError('No se pudo guardar — revisa que el descuento + mora no superen el monto.'),
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo guardar — revisa que el descuento + mora no superen el monto.')),
   });
 
   const anular = useMutation({
     mutationFn: async () => platformApiClient.post(`/platform/facturas/${factura.id}/anular`),
     onSuccess: invalidar,
-    onError: () => setError('No se pudo anular — puede que ya tenga pagos registrados.'),
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo anular — puede que ya tenga pagos registrados.')),
   });
 
   const registrarPago = useMutation({
@@ -100,7 +101,7 @@ function PanelFactura({ factura, onClose }: { factura: FacturaPlataforma; onClos
       setReferencia('');
       setError(null);
     },
-    onError: () => setError('No se pudo registrar el pago — revisa el monto contra el saldo pendiente.'),
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo registrar el pago — revisa el monto contra el saldo pendiente.')),
   });
 
   const totalPagado = pagos?.totalPagado ?? 0;
@@ -352,7 +353,7 @@ function ModalNuevaFacturaManual({ tenants, onClose }: { tenants: Tenant[]; onCl
       queryClient.invalidateQueries({ queryKey: ['platform-facturas'] });
       onClose();
     },
-    onError: () => setError('No se pudo crear la factura — revisa el tenant y los montos.'),
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo crear la factura — revisa el tenant y los montos.')),
   });
 
   function onSubmit(e: FormEvent) {

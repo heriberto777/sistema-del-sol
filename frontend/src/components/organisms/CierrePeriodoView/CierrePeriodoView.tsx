@@ -6,6 +6,7 @@ import { Button } from '../../atoms/Button/Button';
 import { Card } from '../../atoms/Card/Card';
 import { Input } from '../../atoms/Input/Input';
 import { useAuth } from '../../../hooks/useAuth';
+import { mensajeErrorApi } from '../../../lib/mensaje-error-api';
 
 interface PeriodoCerrado {
   id: string;
@@ -36,8 +37,13 @@ export function CierrePeriodoView() {
       setFecha('');
       setError(null);
     },
-    onError: () =>
-      setError('No se pudo cerrar el período — revisá que la fecha sea posterior al último cierre y que haya movimientos de ingresos/gastos en el rango.'),
+    onError: (err) =>
+      setError(
+        mensajeErrorApi(
+          err,
+          'No se pudo cerrar el período — revisá que la fecha sea posterior al último cierre y que haya movimientos de ingresos/gastos en el rango.',
+        ),
+      ),
   });
 
   function onSubmit(e: FormEvent) {

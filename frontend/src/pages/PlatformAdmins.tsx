@@ -1,6 +1,7 @@
 import { FormEvent, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { platformApiClient } from '../lib/platform-api-client';
+import { mensajeErrorApi } from '../lib/mensaje-error-api';
 import { FormField } from '../components/molecules/FormField/FormField';
 import { Button } from '../components/atoms/Button/Button';
 import { Badge } from '../components/atoms/Badge/Badge';
@@ -66,7 +67,7 @@ export function PlatformAdmins() {
       setRoleId('');
       setError(null);
     },
-    onError: () => setError('No se pudo crear el admin. Revisa que el email no esté repetido.'),
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo crear el admin. Revisa que el email no esté repetido.')),
   });
 
   const cambiarRol = useMutation({
@@ -79,7 +80,7 @@ export function PlatformAdmins() {
     mutationFn: async ({ id, activo }: { id: string; activo: boolean }) =>
       platformApiClient.patch(`/platform/admins/${id}`, { activo }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['platform-admins'] }),
-    onError: () => setError('No se pudo actualizar — no puedes desactivar tu propia cuenta.'),
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo actualizar — no puedes desactivar tu propia cuenta.')),
   });
 
   function onSubmit(e: FormEvent) {

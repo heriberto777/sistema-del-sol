@@ -4,6 +4,7 @@ import { apiClient } from '../../../lib/api-client';
 import { FormField } from '../../molecules/FormField/FormField';
 import { Button } from '../../atoms/Button/Button';
 import { Card } from '../../atoms/Card/Card';
+import { mensajeErrorApi } from '../../../lib/mensaje-error-api';
 
 interface TasaCambio {
   id: string;
@@ -42,7 +43,7 @@ export function TasasCambioPanel() {
       setTasa('');
       setError(null);
     },
-    onError: () => setError('No se pudo guardar (¿ya existe una tasa para esa moneda? Editala abajo en vez de crear otra).'),
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo guardar (¿ya existe una tasa para esa moneda? Editala abajo en vez de crear otra).')),
   });
 
   const actualizar = useMutation({

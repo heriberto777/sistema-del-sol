@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { platformApiClient } from '../lib/platform-api-client';
+import { mensajeErrorApi } from '../lib/mensaje-error-api';
 import { FormField } from '../components/molecules/FormField/FormField';
 import { Button } from '../components/atoms/Button/Button';
 import { Badge } from '../components/atoms/Badge/Badge';
@@ -80,7 +81,7 @@ function PanelSuscripcionTenant({ tenant, onClose }: { tenant: Tenant; onClose: 
       queryClient.invalidateQueries({ queryKey: ['platform-facturas'] });
       setMensaje('Factura generada correctamente.');
     },
-    onError: () => setMensaje('No se pudo generar la factura.'),
+    onError: (err) => setMensaje(mensajeErrorApi(err, 'No se pudo generar la factura.')),
   });
 
   if (!suscripcion) {
@@ -226,14 +227,6 @@ const TONO_POR_ESTADO_DOMINIO: Record<TenantDominio['estado'], 'neutro' | 'adver
   ACTIVO: 'exito',
   ERROR: 'peligro',
 };
-
-function mensajeErrorApi(err: unknown, fallback: string): string {
-  const mensaje =
-    err && typeof err === 'object' && 'response' in err
-      ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
-      : undefined;
-  return mensaje ?? fallback;
-}
 
 /** Dominios propios de la tienda de un tenant (además de `<subdominio>.ciguadev.com`, que sigue funcionando siempre) — gestión 100% del super admin, ver TenantDominiosService en el backend. */
 function PanelDominiosTenant({ tenant, onClose }: { tenant: Tenant; onClose: () => void }) {
@@ -486,7 +479,7 @@ function ModalNuevoTenant({ planes, onClose }: { planes: Plan[]; onClose: () => 
       queryClient.invalidateQueries({ queryKey: ['platform-tenants'] });
       onClose();
     },
-    onError: () => setError('No se pudo crear el tenant. Revisa que el subdominio no esté repetido y que el plan sea válido.'),
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo crear el tenant. Revisa que el subdominio no esté repetido y que el plan sea válido.')),
   });
 
   function onSubmit(e: FormEvent) {
@@ -557,7 +550,7 @@ function ModalEditarTenant({ tenant, onClose }: { tenant: Tenant; onClose: () =>
       queryClient.invalidateQueries({ queryKey: ['platform-tenants'] });
       onClose();
     },
-    onError: () => setError('No se pudo guardar. Revisa que el subdominio no esté repetido.'),
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo guardar. Revisa que el subdominio no esté repetido.')),
   });
 
   function onSubmit(e: FormEvent) {

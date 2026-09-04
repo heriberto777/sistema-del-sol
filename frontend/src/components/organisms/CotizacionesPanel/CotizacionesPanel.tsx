@@ -21,6 +21,7 @@ import { SelectFormaPago } from '../../molecules/SelectFormaPago/SelectFormaPago
 import { useDebouncedValue } from '../../../hooks/useDebouncedValue';
 import { useAuth } from '../../../hooks/useAuth';
 import { PaginaResultado } from '../../../types/pagina-resultado';
+import { mensajeErrorApi } from '../../../lib/mensaje-error-api';
 
 interface Cliente {
   id: string;
@@ -330,7 +331,7 @@ function ModalNuevaCotizacion({ productos, onClose }: { productos: Producto[]; o
       queryClient.invalidateQueries({ queryKey: ['cotizaciones'] });
       onClose();
     },
-    onError: () => setError('No se pudo crear la cotización. Revisa los datos.'),
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo crear la cotización. Revisa los datos.')),
   });
 
   function actualizarLinea(index: number, cambios: Partial<LineaForm>) {
@@ -454,7 +455,7 @@ function ModalEditarCotizacion({
       queryClient.invalidateQueries({ queryKey: ['cotizaciones'] });
       onClose();
     },
-    onError: () => setError('No se pudo guardar la cotización. Revisa los datos.'),
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo guardar la cotización. Revisa los datos.')),
   });
 
   function onSubmit(e: FormEvent) {
@@ -622,7 +623,7 @@ function ModalConvertirCotizacion({ cotizacion, onClose }: { cotizacion: Cotizac
       queryClient.invalidateQueries({ queryKey: ['cotizaciones'] });
       onClose();
     },
-    onError: () => setError('No se pudo convertir la cotización en factura.'),
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo convertir la cotización en factura.')),
   });
 
   function onSubmit(e: FormEvent) {

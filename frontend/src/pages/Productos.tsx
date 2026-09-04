@@ -25,14 +25,7 @@ import { useVariantesProducto, etiquetaVariante } from '../hooks/useVariantesPro
 import { descargarBlob } from '../lib/descargar-archivo';
 import type { AjusteImagen } from '../constants/ajuste-imagen';
 import { PaginaResultado } from '../types/pagina-resultado';
-
-function mensajeErrorApi(err: unknown, fallback: string): string {
-  const mensaje =
-    err && typeof err === 'object' && 'response' in err
-      ? (err as { response?: { data?: { message?: string | string[] } } }).response?.data?.message
-      : undefined;
-  return (Array.isArray(mensaje) ? mensaje[0] : mensaje) ?? fallback;
-}
+import { mensajeErrorApi } from '../lib/mensaje-error-api';
 
 type TipoProducto = 'PRODUCTO' | 'SERVICIO' | 'COMBO';
 
@@ -822,7 +815,7 @@ function FormularioPrecio({
       queryClient.invalidateQueries({ queryKey: ['precio-vigente', productoId] });
       onGuardado();
     },
-    onError: () => setError('No se pudo guardar el precio. Revisa los datos.'),
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo guardar el precio. Revisa los datos.')),
   });
 
   function onSubmit(e: FormEvent) {

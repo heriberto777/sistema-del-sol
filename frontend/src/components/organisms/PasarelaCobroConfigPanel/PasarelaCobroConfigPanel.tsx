@@ -4,6 +4,7 @@ import { apiClient } from '../../../lib/api-client';
 import { Card } from '../../atoms/Card/Card';
 import { Button } from '../../atoms/Button/Button';
 import { FormField } from '../../molecules/FormField/FormField';
+import { mensajeErrorApi } from '../../../lib/mensaje-error-api';
 
 interface PasarelaConfig {
   pasarelaActiva: 'AZUL' | 'CARDNET' | null;
@@ -77,7 +78,7 @@ export function PasarelaCobroConfigPanel() {
       setAzulAuthKey('');
       queryClient.invalidateQueries({ queryKey: ['pasarela-cobro-config'] });
     },
-    onError: () => setError('No se pudo guardar la configuración.'),
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo guardar la configuración.')),
   });
 
   return (

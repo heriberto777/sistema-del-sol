@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { cobrosPublicosApiClient } from '../lib/cobros-publicos-api-client';
+import { mensajeErrorApi } from '../lib/mensaje-error-api';
 import { Button } from '../components/atoms/Button/Button';
 import { Badge } from '../components/atoms/Badge/Badge';
 import { ThemeToggle } from '../components/molecules/ThemeToggle/ThemeToggle';
@@ -64,7 +65,7 @@ export function CobroFactura() {
         setFormPost({ url: resultado.url, campos: resultado.campos ?? {} });
       }
     },
-    onError: () => setError('No se pudo iniciar el pago en línea. Intenta de nuevo en unos minutos.'),
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo iniciar el pago en línea. Intenta de nuevo en unos minutos.')),
   });
 
   useEffect(() => {

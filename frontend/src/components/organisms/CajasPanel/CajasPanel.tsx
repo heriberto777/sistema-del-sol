@@ -9,6 +9,7 @@ import { Modal } from '../../molecules/Modal/Modal';
 import { RowActionsMenu } from '../../molecules/RowActionsMenu/RowActionsMenu';
 import { SelectorBodega } from '../../molecules/SelectorBodega/SelectorBodega';
 import { EstadoVacio } from '../../molecules/EstadoVacio/EstadoVacio';
+import { mensajeErrorApi } from '../../../lib/mensaje-error-api';
 
 interface Categoria {
   id: string;
@@ -190,7 +191,7 @@ function FormularioCaja({ caja, onGuardado }: { caja: Caja | null; onGuardado: (
       queryClient.invalidateQueries({ queryKey: ['cajas'] });
       onGuardado();
     },
-    onError: () => setError('No se pudo guardar la caja.'),
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo guardar la caja.')),
   });
 
   function onSubmit(e: FormEvent) {

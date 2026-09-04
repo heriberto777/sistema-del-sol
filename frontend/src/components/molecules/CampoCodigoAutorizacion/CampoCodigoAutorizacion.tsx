@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { apiClient } from '../../../lib/api-client';
+import { mensajeErrorApi } from '../../../lib/mensaje-error-api';
 import { FormField } from '../FormField/FormField';
 import { Button } from '../../atoms/Button/Button';
 
@@ -42,7 +43,7 @@ export function CampoCodigoAutorizacion({ requerido, solicitarUrl, solicitarBody
       setError(null);
       onChange('');
     },
-    onError: () => setError('No se pudo enviar el código de autorización — probá de nuevo.'),
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo enviar el código de autorización — probá de nuevo.')),
   });
 
   useEffect(() => {

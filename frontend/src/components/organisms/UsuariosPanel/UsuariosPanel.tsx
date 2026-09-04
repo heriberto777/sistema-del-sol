@@ -11,6 +11,7 @@ import { SearchInput } from '../../molecules/SearchInput/SearchInput';
 import { Paginacion } from '../../molecules/Paginacion/Paginacion';
 import { useDebouncedValue } from '../../../hooks/useDebouncedValue';
 import { PaginaResultado } from '../../../types/pagina-resultado';
+import { mensajeErrorApi } from '../../../lib/mensaje-error-api';
 
 interface Rol {
   id: string;
@@ -168,7 +169,7 @@ function ModalNuevoUsuario({ onClose }: { onClose: () => void }) {
       queryClient.invalidateQueries({ queryKey: ['admin-usuarios'] });
       onClose();
     },
-    onError: () => setError('No se pudo crear el usuario. Revisa los datos.'),
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo crear el usuario. Revisa los datos.')),
   });
 
   function toggleRol(id: string) {
@@ -237,7 +238,7 @@ function ModalEditarUsuario({ usuario, onClose }: { usuario: Usuario; onClose: (
       queryClient.invalidateQueries({ queryKey: ['admin-usuarios'] });
       onClose();
     },
-    onError: () => setError('No se pudo guardar los cambios.'),
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo guardar los cambios.')),
   });
 
   function toggleSucursal(id: string) {

@@ -4,6 +4,7 @@ import { apiClient } from '../../../lib/api-client';
 import { FormField } from '../../molecules/FormField/FormField';
 import { Button } from '../../atoms/Button/Button';
 import { Card } from '../../atoms/Card/Card';
+import { mensajeErrorApi } from '../../../lib/mensaje-error-api';
 
 interface ValorAtributo {
   id: string;
@@ -39,7 +40,7 @@ export function AtributosPanel() {
       setNombre('');
       setError(null);
     },
-    onError: () => setError('No se pudo crear el atributo (¿ya existe uno con ese nombre?).'),
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo crear el atributo (¿ya existe uno con ese nombre?).')),
   });
 
   const crearValor = useMutation({
@@ -49,20 +50,20 @@ export function AtributosPanel() {
       invalidar();
       setValoresNuevos((prev) => ({ ...prev, [atributoId]: '' }));
     },
-    onError: () => setError('No se pudo agregar el valor (¿ya existe en este atributo?).'),
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo agregar el valor (¿ya existe en este atributo?).')),
   });
 
   const eliminarValor = useMutation({
     mutationFn: async ({ atributoId, valorId }: { atributoId: string; valorId: string }) =>
       apiClient.delete(`/atributos/${atributoId}/valores/${valorId}`),
     onSuccess: invalidar,
-    onError: () => setError('No se pudo eliminar — revisá que no haya variantes usando este valor.'),
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo eliminar — revisá que no haya variantes usando este valor.')),
   });
 
   const eliminarAtributo = useMutation({
     mutationFn: async (id: string) => apiClient.delete(`/atributos/${id}`),
     onSuccess: invalidar,
-    onError: () => setError('No se pudo eliminar — revisá que ninguno de sus valores esté en uso.'),
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo eliminar — revisá que ninguno de sus valores esté en uso.')),
   });
 
   function onSubmit(e: FormEvent) {

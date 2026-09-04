@@ -1,6 +1,7 @@
 import { FormEvent, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../../lib/api-client';
+import { mensajeErrorApi } from '../../../lib/mensaje-error-api';
 import { Badge } from '../../atoms/Badge/Badge';
 import { Button } from '../../atoms/Button/Button';
 import { Card } from '../../atoms/Card/Card';
@@ -114,7 +115,7 @@ function ModalPlantilla({ plantilla, onClose }: { plantilla: Plantilla | null; o
       queryClient.invalidateQueries({ queryKey: ['notificacion-plantillas'] });
       onClose();
     },
-    onError: () => setError('No se pudo guardar la plantilla.'),
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo guardar la plantilla.')),
   });
 
   function onSubmit(e: FormEvent) {

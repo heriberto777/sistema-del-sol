@@ -1,6 +1,7 @@
 import { FormEvent, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../../lib/api-client';
+import { mensajeErrorApi } from '../../../lib/mensaje-error-api';
 import { Modal } from '../Modal/Modal';
 import { FormField } from '../FormField/FormField';
 import { SelectFormaPago } from '../SelectFormaPago/SelectFormaPago';
@@ -60,7 +61,7 @@ export function ModalRegistrarPagoOrdenCompra({
       setRetencionItbis('');
       setError(null);
     },
-    onError: () => setError('No se pudo registrar el pago. Revisa el monto.'),
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo registrar el pago. Revisa el monto.')),
   });
 
   function onSubmit(e: FormEvent) {

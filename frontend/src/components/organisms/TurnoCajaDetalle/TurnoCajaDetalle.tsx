@@ -28,6 +28,7 @@ import {
   puertoWebSerialYaAutorizado,
   soportaWebSerial,
 } from '../../../lib/apertura-caja';
+import { mensajeErrorApi } from '../../../lib/mensaje-error-api';
 
 const ID_COMBOBOX_CLIENTE = 'turno-cliente-combobox';
 const ID_COMBOBOX_VENDEDOR = 'turno-vendedor-combobox';
@@ -181,14 +182,6 @@ interface TurnoCajaDetalleData {
 
 function formatoRD(valor: string | number) {
   return `RD$ ${Number(valor).toLocaleString('es-DO', { minimumFractionDigits: 2 })}`;
-}
-
-function mensajeErrorApi(err: unknown, fallback: string): string {
-  const mensaje =
-    err && typeof err === 'object' && 'response' in err
-      ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
-      : undefined;
-  return mensaje ?? fallback;
 }
 
 /** Réplica del cálculo de pos.service.ts (calcularMovimientoEfectivo) — solo para mostrar el esperado ANTES de cerrar; el backend sigue siendo la fuente de verdad final. */
@@ -1627,7 +1620,7 @@ function ModalMovimiento({ turnoId, onClose, onRegistrado }: { turnoId: string; 
       onRegistrado();
       onClose();
     },
-    onError: () => setError('No se pudo registrar el movimiento.'),
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo registrar el movimiento.')),
   });
 
   function onSubmit(e: FormEvent) {

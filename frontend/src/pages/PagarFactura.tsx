@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { pagosPublicosApiClient } from '../lib/pagos-publicos-api-client';
+import { mensajeErrorApi } from '../lib/mensaje-error-api';
 import { Button } from '../components/atoms/Button/Button';
 import { Badge } from '../components/atoms/Badge/Badge';
 import { ThemeToggle } from '../components/molecules/ThemeToggle/ThemeToggle';
@@ -38,7 +39,7 @@ export function PagarFactura() {
     onSuccess: (data) => {
       window.location.href = data.url;
     },
-    onError: () => setError('No se pudo iniciar el pago en línea. Intenta de nuevo en unos minutos.'),
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo iniciar el pago en línea. Intenta de nuevo en unos minutos.')),
   });
 
   return (

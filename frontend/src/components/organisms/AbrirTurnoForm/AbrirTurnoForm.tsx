@@ -4,6 +4,7 @@ import { apiClient } from '../../../lib/api-client';
 import { Button } from '../../atoms/Button/Button';
 import { FormField } from '../../molecules/FormField/FormField';
 import { useSucursalActiva } from '../../../hooks/useSucursalActiva';
+import { mensajeErrorApi } from '../../../lib/mensaje-error-api';
 
 interface Bodega {
   id: string;
@@ -54,7 +55,7 @@ export function AbrirTurnoForm({ bodegas, onAbierto }: AbrirTurnoFormProps) {
       queryClient.invalidateQueries({ queryKey: ['pos-mi-turno-abierto'] });
       onAbierto(respuesta.data.id);
     },
-    onError: () => setError('No se pudo abrir el turno — esa bodega ya podría tener uno abierto.'),
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo abrir el turno — esa bodega ya podría tener uno abierto.')),
   });
 
   function onSubmit(e: FormEvent) {

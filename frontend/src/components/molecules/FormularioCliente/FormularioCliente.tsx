@@ -1,6 +1,7 @@
 import { FormEvent, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../../lib/api-client';
+import { mensajeErrorApi } from '../../../lib/mensaje-error-api';
 import { Button } from '../../atoms/Button/Button';
 import { FormField } from '../FormField/FormField';
 import { SelectField } from '../FormField/SelectField';
@@ -114,7 +115,7 @@ export function FormularioCliente({ cliente, onGuardado }: { cliente: Cliente | 
       queryClient.invalidateQueries({ queryKey: ['clientes'] });
       onGuardado(data);
     },
-    onError: () => setError('No se pudo guardar el cliente. Revisa los datos.'),
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo guardar el cliente. Revisa los datos.')),
   });
 
   function onSubmit(e: FormEvent) {

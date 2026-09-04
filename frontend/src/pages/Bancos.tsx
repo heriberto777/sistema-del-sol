@@ -1,6 +1,7 @@
 import { FormEvent, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../lib/api-client';
+import { mensajeErrorApi } from '../lib/mensaje-error-api';
 import { Button } from '../components/atoms/Button/Button';
 import { Card } from '../components/atoms/Card/Card';
 import { Select } from '../components/atoms/Select/Select';
@@ -177,7 +178,7 @@ function FormularioCuentaBancaria({ cuenta, onGuardado }: { cuenta?: CuentaBanca
       queryClient.invalidateQueries({ queryKey: ['bancos'] });
       onGuardado();
     },
-    onError: () => setError('No se pudo guardar la cuenta bancaria. Revisa los datos.'),
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo guardar la cuenta bancaria. Revisa los datos.')),
   });
 
   function onSubmit(e: FormEvent) {

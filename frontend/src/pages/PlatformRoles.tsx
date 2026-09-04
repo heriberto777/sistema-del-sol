@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
 import { platformApiClient } from '../lib/platform-api-client';
+import { mensajeErrorApi } from '../lib/mensaje-error-api';
 import { FormField } from '../components/molecules/FormField/FormField';
 import { Button } from '../components/atoms/Button/Button';
 import { Badge } from '../components/atoms/Badge/Badge';
@@ -69,7 +70,7 @@ export function PlatformRoles() {
       queryClient.invalidateQueries({ queryKey: ['platform-roles'] });
       limpiarFormulario();
     },
-    onError: () => setError('No se pudo guardar el rol. Revisa que el nombre no esté repetido.'),
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo guardar el rol. Revisa que el nombre no esté repetido.')),
   });
 
   function alternarPermiso(clave: string) {

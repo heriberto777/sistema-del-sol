@@ -1,6 +1,7 @@
 import { FormEvent, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../../lib/api-client';
+import { mensajeErrorApi } from '../../../lib/mensaje-error-api';
 import { Button } from '../../atoms/Button/Button';
 import { Card } from '../../atoms/Card/Card';
 import { Select } from '../../atoms/Select/Select';
@@ -48,7 +49,7 @@ export function GastoRapidoForm() {
       setCuentaOrigenId('');
       setError(null);
     },
-    onError: () => setError('No se pudo registrar el gasto. Revisa los datos.'),
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo registrar el gasto. Revisa los datos.')),
   });
 
   function onSubmit(e: FormEvent) {

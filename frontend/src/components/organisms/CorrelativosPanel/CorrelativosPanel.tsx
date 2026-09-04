@@ -1,6 +1,7 @@
 import { FormEvent, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../../lib/api-client';
+import { mensajeErrorApi } from '../../../lib/mensaje-error-api';
 import { Button } from '../../atoms/Button/Button';
 import { Card } from '../../atoms/Card/Card';
 import { FormField } from '../../molecules/FormField/FormField';
@@ -110,7 +111,7 @@ function ModalEditarCorrelativo({ correlativo, onClose }: { correlativo: Correla
       queryClient.invalidateQueries({ queryKey: ['admin-correlativos'] });
       onClose();
     },
-    onError: () => setError('No se pudo guardar el consecutivo.'),
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo guardar el consecutivo.')),
   });
 
   function onSubmit(e: FormEvent) {

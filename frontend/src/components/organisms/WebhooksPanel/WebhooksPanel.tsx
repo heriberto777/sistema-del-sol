@@ -1,6 +1,7 @@
 import { FormEvent, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../../lib/api-client';
+import { mensajeErrorApi } from '../../../lib/mensaje-error-api';
 import { Badge } from '../../atoms/Badge/Badge';
 import { Button } from '../../atoms/Button/Button';
 import { Card } from '../../atoms/Card/Card';
@@ -54,7 +55,7 @@ export function WebhooksPanel() {
   const eliminar = useMutation({
     mutationFn: async (id: string) => apiClient.delete(`/webhooks/${id}`),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['webhooks'] }),
-    onError: () => setError('No se pudo eliminar el webhook.'),
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo eliminar el webhook.')),
   });
 
   return (
@@ -134,7 +135,7 @@ function ModalNuevoWebhook({ onClose }: { onClose: () => void }) {
       queryClient.invalidateQueries({ queryKey: ['webhooks'] });
       setSecretCreado(webhook.secret);
     },
-    onError: () => setError('No se pudo crear el webhook. Revisa que la URL sea válida (http/https, sin apuntar a una IP privada).'),
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo crear el webhook. Revisa que la URL sea válida (http/https, sin apuntar a una IP privada).')),
   });
 
   function alternarEvento(clave: string) {

@@ -1,6 +1,7 @@
 import { FormEvent, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../lib/api-client';
+import { mensajeErrorApi } from '../lib/mensaje-error-api';
 import { Button } from '../components/atoms/Button/Button';
 import { Card } from '../components/atoms/Card/Card';
 import { Select } from '../components/atoms/Select/Select';
@@ -264,7 +265,7 @@ function ModalNuevoGastoMenor({ onClose }: { onClose: () => void }) {
       queryClient.invalidateQueries({ queryKey: ['gastos-menores'] });
       onClose();
     },
-    onError: () => setError('No se pudo registrar el gasto menor. Revisa los datos.'),
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo registrar el gasto menor. Revisa los datos.')),
   });
 
   function onSubmit(e: FormEvent) {

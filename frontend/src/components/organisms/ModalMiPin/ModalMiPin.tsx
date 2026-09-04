@@ -5,14 +5,7 @@ import { Modal } from '../../molecules/Modal/Modal';
 import { FormField } from '../../molecules/FormField/FormField';
 import { Button } from '../../atoms/Button/Button';
 import { useAuth } from '../../../hooks/useAuth';
-
-function mensajeErrorApi(err: unknown, fallback: string): string {
-  const mensaje =
-    err && typeof err === 'object' && 'response' in err
-      ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
-      : undefined;
-  return mensaje ?? fallback;
-}
+import { mensajeErrorApi } from '../../../lib/mensaje-error-api';
 
 /**
  * Autoservicio (Fase 9) — pide la contraseña completa antes de fijar/quitar

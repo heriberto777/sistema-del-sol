@@ -1,6 +1,7 @@
 import { FormEvent, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../../lib/api-client';
+import { mensajeErrorApi } from '../../../lib/mensaje-error-api';
 import { FormField } from '../../molecules/FormField/FormField';
 import { Select } from '../../atoms/Select/Select';
 import { Button } from '../../atoms/Button/Button';
@@ -69,7 +70,7 @@ export function FormasPagoPanel() {
       setTipo('');
       setError(null);
     },
-    onError: () => setError('No se pudo crear la forma de pago (¿ya existe una con ese nombre?).'),
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo crear la forma de pago (¿ya existe una con ese nombre?).')),
   });
 
   const actualizar = useMutation({

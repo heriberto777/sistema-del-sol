@@ -3,6 +3,7 @@ import { User } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 import { apiClient } from '../lib/api-client';
+import { mensajeErrorApi } from '../lib/mensaje-error-api';
 import { Button } from '../components/atoms/Button/Button';
 import { Card } from '../components/atoms/Card/Card';
 import { Select } from '../components/atoms/Select/Select';
@@ -164,7 +165,7 @@ function ModalNuevaFactura({ onClose }: { onClose: () => void }) {
       queryClient.invalidateQueries({ queryKey: ['facturas'] });
       onClose();
     },
-    onError: () => setError('No se pudo crear la factura. Revisa los datos y el stock disponible.'),
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo crear la factura. Revisa los datos y el stock disponible.')),
   });
 
   function onSubmit(e: FormEvent) {
@@ -421,7 +422,7 @@ function NuevoClienteInline({ onCreado }: { onCreado: (c: Cliente) => void }) {
   const crear = useMutation({
     mutationFn: async () => (await apiClient.post<Cliente>('/clientes', { nombre, tipo: 'PERSONA_FISICA' })).data,
     onSuccess: (cliente) => onCreado(cliente),
-    onError: () => setError('No se pudo crear el cliente.'),
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo crear el cliente.')),
   });
 
   return (

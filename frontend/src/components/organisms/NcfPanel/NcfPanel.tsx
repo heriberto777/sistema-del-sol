@@ -1,6 +1,7 @@
 import { FormEvent, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../../lib/api-client';
+import { mensajeErrorApi } from '../../../lib/mensaje-error-api';
 import { FormField } from '../../molecules/FormField/FormField';
 import { Button } from '../../atoms/Button/Button';
 import { Badge } from '../../atoms/Badge/Badge';
@@ -76,7 +77,7 @@ export function NcfPanel() {
       setUmbralAlerta('');
       setError(null);
     },
-    onError: () => setError('No se pudo crear la secuencia (¿ya existe una para ese tipo/sucursal?).'),
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo crear la secuencia (¿ya existe una para ese tipo/sucursal?).')),
   });
 
   const desactivar = useMutation({

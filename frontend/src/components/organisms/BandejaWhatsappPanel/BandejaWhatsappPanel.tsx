@@ -4,6 +4,7 @@ import { apiClient } from '../../../lib/api-client';
 import { Card } from '../../atoms/Card/Card';
 import { Button } from '../../atoms/Button/Button';
 import { EstadoVacio } from '../../molecules/EstadoVacio/EstadoVacio';
+import { mensajeErrorApi } from '../../../lib/mensaje-error-api';
 
 interface MensajePendiente {
   id: string;
@@ -32,13 +33,13 @@ export function BandejaWhatsappPanel() {
     mutationFn: async ({ telefono, contenido }: { telefono: string; contenido: string }) =>
       apiClient.post(`/admin/whatsapp-bandeja/${encodeURIComponent(telefono)}/responder`, { contenido }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['whatsapp-bandeja'] }),
-    onError: () => setError('No se pudo enviar la respuesta.'),
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo enviar la respuesta.')),
   });
 
   const marcarAtendido = useMutation({
     mutationFn: async (telefono: string) => apiClient.patch(`/admin/whatsapp-bandeja/${encodeURIComponent(telefono)}/atendido`),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['whatsapp-bandeja'] }),
-    onError: () => setError('No se pudo marcar como atendido.'),
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo marcar como atendido.')),
   });
 
   return (

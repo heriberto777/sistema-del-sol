@@ -1,6 +1,7 @@
 import { FormEvent, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../../lib/api-client';
+import { mensajeErrorApi } from '../../../lib/mensaje-error-api';
 import { aplanarArbolCategorias, type CategoriaPlana } from '../../../lib/categorias-arbol';
 import { COLORES_CATEGORIA, ETIQUETA_COLOR_CATEGORIA, CLASE_PUNTO_COLOR_CATEGORIA, type ColorCategoria } from '../../../lib/color-categoria';
 import { FormField } from '../../molecules/FormField/FormField';
@@ -44,13 +45,13 @@ export function CategoriasPanel() {
       invalidar();
       limpiar();
     },
-    onError: () => setError('No se pudo guardar (¿ya existe una categoría con ese nombre, o se creó un ciclo?).'),
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo guardar (¿ya existe una categoría con ese nombre, o se creó un ciclo?).')),
   });
 
   const eliminar = useMutation({
     mutationFn: async (id: string) => apiClient.delete(`/categorias/${id}`),
     onSuccess: invalidar,
-    onError: () => setError('No se pudo eliminar — revisá que no tenga productos ni subcategorías asignadas.'),
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo eliminar — revisá que no tenga productos ni subcategorías asignadas.')),
   });
 
   function onSubmit(e: FormEvent) {

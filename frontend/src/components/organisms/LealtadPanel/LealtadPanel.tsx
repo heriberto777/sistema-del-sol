@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../../lib/api-client';
+import { mensajeErrorApi } from '../../../lib/mensaje-error-api';
 import { Card } from '../../atoms/Card/Card';
 import { Button } from '../../atoms/Button/Button';
 import { Select } from '../../atoms/Select/Select';
@@ -74,7 +75,7 @@ export function LealtadPanel() {
         diasExpiracion: valores.diasExpiracion || null,
       }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['lealtad-configuracion'] }),
-    onError: () => setError('No se pudo guardar — revisá que el monto por punto esté configurado si el modo es "Por monto".'),
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo guardar — revisá que el monto por punto esté configurado si el modo es "Por monto".')),
   });
 
   return (

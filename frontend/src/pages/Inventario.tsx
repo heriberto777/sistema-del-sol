@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 import clsx from 'clsx';
 import { apiClient } from '../lib/api-client';
+import { mensajeErrorApi } from '../lib/mensaje-error-api';
 import { Badge } from '../components/atoms/Badge/Badge';
 import { Button } from '../components/atoms/Button/Button';
 import { Card } from '../components/atoms/Card/Card';
@@ -591,7 +592,7 @@ function ModalNuevaBodega({ onClose }: { onClose: () => void }) {
       queryClient.invalidateQueries({ queryKey: ['bodegas'] });
       onClose();
     },
-    onError: () => setError('No se pudo crear la bodega.'),
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo crear la bodega.')),
   });
 
   function onSubmit(e: FormEvent) {
@@ -656,7 +657,7 @@ function ModalEditarBodega({ bodega, onClose }: { bodega: Bodega; onClose: () =>
       queryClient.invalidateQueries({ queryKey: ['bodegas'] });
       onClose();
     },
-    onError: () => setError('No se pudo guardar la bodega.'),
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo guardar la bodega.')),
   });
 
   return (
@@ -930,7 +931,7 @@ function ModalEditarAjuste({ ajuste, onClose }: { ajuste: AjusteInventario; onCl
       queryClient.invalidateQueries({ queryKey: ['ajuste-inventario', ajuste.id] });
       onClose();
     },
-    onError: () => setError('No se pudo guardar el ajuste. Revisa los datos.'),
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo guardar el ajuste. Revisa los datos.')),
   });
 
   function onSubmit(e: FormEvent) {
@@ -1123,7 +1124,7 @@ function ModalEditarTransferencia({ transferencia, onClose }: { transferencia: T
       queryClient.invalidateQueries({ queryKey: ['transferencia-inventario', transferencia.id] });
       onClose();
     },
-    onError: () => setError('No se pudo guardar la transferencia. Revisa los datos.'),
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo guardar la transferencia. Revisa los datos.')),
   });
 
   function onSubmit(e: FormEvent) {
@@ -1279,7 +1280,7 @@ function ModalTransferirStock({
       queryClient.invalidateQueries({ queryKey: ['transferencias-inventario'] });
       onClose();
     },
-    onError: () => setError('No se pudo guardar la transferencia. Revisa los datos.'),
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo guardar la transferencia. Revisa los datos.')),
   });
 
   function onSubmit(e: FormEvent) {

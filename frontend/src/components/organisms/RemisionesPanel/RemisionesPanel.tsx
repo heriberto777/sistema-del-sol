@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useState } from 'react';
 import { Eye, Plus, User, X } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../../lib/api-client';
+import { mensajeErrorApi } from '../../../lib/mensaje-error-api';
 import { ModalImprimir } from '../../molecules/ModalImprimir/ModalImprimir';
 import { Modal } from '../../molecules/Modal/Modal';
 import { RowActionsMenu } from '../../molecules/RowActionsMenu/RowActionsMenu';
@@ -296,7 +297,7 @@ function ModalNuevaRemision({
       queryClient.invalidateQueries({ queryKey: ['remisiones'] });
       onClose();
     },
-    onError: () => setError('No se pudo crear la remisión. Revisa que el número no esté repetido.'),
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo crear la remisión. Revisa que el número no esté repetido.')),
   });
 
   function actualizarLinea(index: number, cambios: Partial<LineaForm>) {
@@ -459,7 +460,7 @@ function ModalEditarRemision({
       queryClient.invalidateQueries({ queryKey: ['remisiones'] });
       onClose();
     },
-    onError: () => setError('No se pudo guardar la remisión. Revisa los datos.'),
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo guardar la remisión. Revisa los datos.')),
   });
 
   function onSubmit(e: FormEvent) {
@@ -583,7 +584,7 @@ function ModalConvertirRemision({ remision, onClose }: { remision: Remision; onC
       queryClient.invalidateQueries({ queryKey: ['remisiones'] });
       onClose();
     },
-    onError: () => setError('No se pudo convertir la remisión en factura.'),
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo convertir la remisión en factura.')),
   });
 
   function onSubmit(e: FormEvent) {

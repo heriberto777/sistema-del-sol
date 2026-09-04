@@ -12,6 +12,7 @@ import { Paginacion } from '../../molecules/Paginacion/Paginacion';
 import { useDebouncedValue } from '../../../hooks/useDebouncedValue';
 import { useAuth } from '../../../hooks/useAuth';
 import { PaginaResultado } from '../../../types/pagina-resultado';
+import { mensajeErrorApi } from '../../../lib/mensaje-error-api';
 
 interface CuentaContable {
   id: string;
@@ -76,7 +77,7 @@ export function AsientosContablesTable() {
       queryClient.invalidateQueries({ queryKey: ['contabilidad-asientos'] });
       setError(null);
     },
-    onError: () => setError('No se pudo anular el asiento.'),
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo anular el asiento.')),
   });
 
   return (
@@ -189,7 +190,7 @@ function ModalNuevoAsiento({ onClose }: { onClose: () => void }) {
       queryClient.invalidateQueries({ queryKey: ['contabilidad-asientos'] });
       onClose();
     },
-    onError: () => setError('No se pudo crear el asiento — confirmá que débito y crédito totalicen lo mismo.'),
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo crear el asiento — confirmá que débito y crédito totalicen lo mismo.')),
   });
 
   function onSubmit(e: FormEvent) {

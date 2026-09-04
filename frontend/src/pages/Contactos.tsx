@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 import { apiClient } from '../lib/api-client';
+import { mensajeErrorApi } from '../lib/mensaje-error-api';
 import { Button } from '../components/atoms/Button/Button';
 import { Card } from '../components/atoms/Card/Card';
 import { FormField } from '../components/molecules/FormField/FormField';
@@ -443,7 +444,7 @@ function FormularioProveedor({ proveedor, onGuardado }: { proveedor: Proveedor |
       queryClient.invalidateQueries({ queryKey: ['proveedores'] });
       onGuardado();
     },
-    onError: () => setError('No se pudo guardar el proveedor. Revisa los datos.'),
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo guardar el proveedor. Revisa los datos.')),
   });
 
   function onSubmit(e: FormEvent) {

@@ -3,6 +3,7 @@ import { Truck } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 import { apiClient } from '../lib/api-client';
+import { mensajeErrorApi } from '../lib/mensaje-error-api';
 import { Badge } from '../components/atoms/Badge/Badge';
 import { Button } from '../components/atoms/Button/Button';
 import { Card } from '../components/atoms/Card/Card';
@@ -350,7 +351,7 @@ function ModalNuevaOrdenCompra({ onClose }: { onClose: () => void }) {
       queryClient.invalidateQueries({ queryKey: ['ordenes-compra'] });
       onClose();
     },
-    onError: () => setError('No se pudo crear la orden de compra. Revisa los datos.'),
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo crear la orden de compra. Revisa los datos.')),
   });
 
   function onSubmit(e: FormEvent) {
@@ -515,7 +516,7 @@ function ModalEditarOrdenCompra({ orden, onClose }: { orden: OrdenCompra; onClos
       queryClient.invalidateQueries({ queryKey: ['orden-compra', orden.id] });
       onClose();
     },
-    onError: () => setError('No se pudo guardar la orden de compra. Revisa los datos.'),
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo guardar la orden de compra. Revisa los datos.')),
   });
 
   function onSubmit(e: FormEvent) {
@@ -608,7 +609,7 @@ function NuevoProveedorInline({ onCreado }: { onCreado: (p: Proveedor) => void }
   const crear = useMutation({
     mutationFn: async () => (await apiClient.post<Proveedor>('/proveedores', { nombre })).data,
     onSuccess: (proveedor) => onCreado(proveedor),
-    onError: () => setError('No se pudo crear el proveedor.'),
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo crear el proveedor.')),
   });
 
   return (
@@ -680,7 +681,7 @@ function ModalRecibirOrden({ orden, onClose }: { orden: OrdenCompra; onClose: ()
       queryClient.invalidateQueries({ queryKey: ['stock'] });
       setResultado(data);
     },
-    onError: () => setError('No se pudo recibir la orden. Revisa los datos.'),
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo recibir la orden. Revisa los datos.')),
   });
 
   function onSubmit(e: FormEvent) {
@@ -834,7 +835,7 @@ function ModalDevolverOrden({ orden, onClose }: { orden: OrdenCompra; onClose: (
       queryClient.invalidateQueries({ queryKey: ['stock'] });
       onClose();
     },
-    onError: () => setError('No se pudo registrar la devolución. Revisa las cantidades.'),
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo registrar la devolución. Revisa las cantidades.')),
   });
 
   function onSubmit(e: FormEvent) {

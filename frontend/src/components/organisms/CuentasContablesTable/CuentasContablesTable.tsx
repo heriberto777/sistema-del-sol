@@ -8,6 +8,7 @@ import { Card } from '../../atoms/Card/Card';
 import { FormField } from '../../molecules/FormField/FormField';
 import { Modal } from '../../molecules/Modal/Modal';
 import { useAuth } from '../../../hooks/useAuth';
+import { mensajeErrorApi } from '../../../lib/mensaje-error-api';
 
 type TipoCuenta = 'ACTIVO' | 'PASIVO' | 'PATRIMONIO' | 'INGRESO' | 'GASTO';
 type NaturalezaCuenta = 'DEUDORA' | 'ACREEDORA';
@@ -158,7 +159,7 @@ function ModalNuevaCuenta({ cuentas, onClose }: { cuentas: CuentaContablePlana[]
       queryClient.invalidateQueries({ queryKey: ['contabilidad-cuentas'] });
       onClose();
     },
-    onError: () => setError('No se pudo crear la cuenta — revisá que el código no esté repetido.'),
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo crear la cuenta — revisá que el código no esté repetido.')),
   });
 
   function onSubmit(e: FormEvent) {

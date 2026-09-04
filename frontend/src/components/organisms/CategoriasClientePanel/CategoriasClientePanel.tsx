@@ -6,6 +6,7 @@ import { FormField } from '../../molecules/FormField/FormField';
 import { Button } from '../../atoms/Button/Button';
 import { Badge } from '../../atoms/Badge/Badge';
 import { Card } from '../../atoms/Card/Card';
+import { mensajeErrorApi } from '../../../lib/mensaje-error-api';
 
 export function CategoriasClientePanel() {
   const queryClient = useQueryClient();
@@ -31,7 +32,7 @@ export function CategoriasClientePanel() {
       setNombre('');
       setError(null);
     },
-    onError: () => setError('No se pudo crear la categoría (¿ya existe una con ese nombre?).'),
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo crear la categoría (¿ya existe una con ese nombre?).')),
   });
 
   const actualizar = useMutation({

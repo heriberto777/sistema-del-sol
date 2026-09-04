@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../../lib/api-client';
+import { mensajeErrorApi } from '../../../lib/mensaje-error-api';
 import { type PlantillaHorario } from '../../../hooks/usePlantillasHorario';
 import { FormField } from '../../molecules/FormField/FormField';
 import { Modal } from '../../molecules/Modal/Modal';
@@ -67,7 +68,7 @@ export function PlantillasHorarioPanel() {
       setPredeterminada(false);
       setError(null);
     },
-    onError: () => setError('No se pudo crear la plantilla (¿ya existe una con ese código?).'),
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo crear la plantilla (¿ya existe una con ese código?).')),
   });
 
   const actualizar = useMutation({

@@ -7,6 +7,7 @@ import { Card } from '../../atoms/Card/Card';
 import { FormField } from '../../molecules/FormField/FormField';
 import { Modal } from '../../molecules/Modal/Modal';
 import { RowActionsMenu } from '../../molecules/RowActionsMenu/RowActionsMenu';
+import { mensajeErrorApi } from '../../../lib/mensaje-error-api';
 
 interface Rol {
   id: string;
@@ -42,7 +43,7 @@ export function RolesPanel() {
       queryClient.invalidateQueries({ queryKey: ['admin-roles'] });
       setError(null);
     },
-    onError: () => setError('No se pudo eliminar el rol — puede ser un rol del sistema o tener usuarios asignados.'),
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo eliminar el rol — puede ser un rol del sistema o tener usuarios asignados.')),
   });
 
   function abrirNuevo() {
@@ -152,7 +153,7 @@ function ModalRol({ rolId, onClose }: { rolId: string | null; onClose: () => voi
       queryClient.invalidateQueries({ queryKey: ['admin-roles'] });
       onClose();
     },
-    onError: () => setError('No se pudo guardar el rol. Revisa que el nombre no esté repetido y que haya al menos un permiso.'),
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo guardar el rol. Revisa que el nombre no esté repetido y que haya al menos un permiso.')),
   });
 
   function alternarPermiso(clave: string) {

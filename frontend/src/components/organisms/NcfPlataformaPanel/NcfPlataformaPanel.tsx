@@ -5,6 +5,7 @@ import { FormField } from '../../molecules/FormField/FormField';
 import { Button } from '../../atoms/Button/Button';
 import { Badge } from '../../atoms/Badge/Badge';
 import { Card } from '../../atoms/Card/Card';
+import { mensajeErrorApi } from '../../../lib/mensaje-error-api';
 
 interface NcfPlataforma {
   id: string;
@@ -55,7 +56,7 @@ export function NcfPlataformaPanel({ config, guardar }: NcfPlataformaPanelProps)
       setUmbralAlerta('');
       setError(null);
     },
-    onError: () => setError('No se pudo crear la secuencia (¿ya existe una activa para ese tipo?).'),
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo crear la secuencia (¿ya existe una activa para ese tipo?).')),
   });
 
   const desactivar = useMutation({
