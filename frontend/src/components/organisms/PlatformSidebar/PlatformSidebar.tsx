@@ -1,4 +1,5 @@
 import { NavLink } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import clsx from 'clsx';
 import {
   Activity,
@@ -12,6 +13,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { usePlatformAuth } from '../../../hooks/usePlatformAuth';
+import { apiClient } from '../../../lib/api-client';
 
 interface Enlace {
   ruta: string;
@@ -42,6 +44,14 @@ export function PlatformSidebar() {
   const { tienePermiso } = usePlatformAuth();
   const enlacesVisibles = ENLACES.filter((enlace) => !enlace.permiso || tienePermiso(enlace.permiso));
 
+  // Mismo endpoint público que Login.tsx (GET /platform/branding) — acá
+  // ya hay sesión, pero no hace falta un endpoint protegido aparte.
+  const { data: branding } = useQuery({
+    queryKey: ['platform-branding'],
+    queryFn: async () => (await apiClient.get<{ logo: string | null }>('/platform/branding')).data,
+    staleTime: 5 * 60 * 1000,
+  });
+
   const enlaceClase = ({ isActive }: { isActive: boolean }) =>
     clsx(
       'flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
@@ -53,9 +63,13 @@ export function PlatformSidebar() {
   return (
     <nav className="flex h-full w-60 flex-col gap-1 overflow-y-auto border-r border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950">
       <div className="mb-5 flex items-center gap-2.5 px-2">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-sol-500 text-base font-bold text-white shadow-sm">
-          S
-        </div>
+        {branding?.logo ? (
+          <img src={branding.logo} alt="Logo" className="h-9 w-9 shrink-0 rounded-lg object-contain shadow-sm" />
+        ) : (
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-sol-500 text-base font-bold text-white shadow-sm">
+            S
+          </div>
+        )}
         <div className="min-w-0">
           <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">El Sistema del Sol</p>
           <p className="truncate text-xs text-slate-500 dark:text-slate-400">Plataforma</p>
