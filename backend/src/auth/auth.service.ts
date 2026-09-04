@@ -12,6 +12,7 @@ import { generarTokenReset, hashearTokenReset, RESET_PASSWORD_TTL_MS } from '../
 import { EmailChannel } from '../notificaciones/canales/email.channel';
 import { CLAVE_2FA_ANULAR, CLAVE_2FA_DEVOLUCION } from '../autorizaciones/autorizaciones.service';
 import { resolverModulosActivos } from '../planes/resolver-modulos-activos';
+import { resolverPersonalizacionDocumento } from '../common/impresion/resolver-personalizacion-documento';
 
 const RESPUESTA_GENERICA_OLVIDE = {
   mensaje: 'Si el correo existe, se envió un enlace para restablecer la contraseña.',
@@ -86,6 +87,13 @@ export class AuthService {
     });
     const requiereAutorizacionAnular = config2fa.find((c) => c.clave === CLAVE_2FA_ANULAR)?.valor === 'true';
     const requiereAutorizacionDevolucion = config2fa.find((c) => c.clave === CLAVE_2FA_DEVOLUCION)?.valor === 'true';
+    // Reusa el mismo logo que ya se usa en documentos impresos (ver
+    // resolver-personalizacion-documento.ts) — se resuelve una sola vez
+    // acá y queda cacheado en localStorage con el resto de la sesión, no
+    // hace falta un endpoint aparte que el Sidebar no podría llamar de
+    // todos modos (admin.configuracion lo bloquearía para la mayoría de
+    // los roles).
+    const { logo: logoTenant } = await resolverPersonalizacionDocumento(this.prisma, tenant.id);
 
     return {
       accessToken: this.jwtService.sign(payload),
@@ -109,7 +117,7 @@ export class AuthService {
         tienePin: !!user.pinHash,
         requiereAutorizacionAnular,
         requiereAutorizacionDevolucion,
-        tenant: { subdominio: tenant.subdominio, nombre: tenant.nombre },
+        tenant: { subdominio: tenant.subdominio, nombre: tenant.nombre, logo: logoTenant ?? null },
       },
     };
   }

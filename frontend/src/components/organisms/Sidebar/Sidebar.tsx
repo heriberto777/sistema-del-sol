@@ -273,9 +273,17 @@ export function Sidebar() {
       )}
     >
       <div className={clsx('mb-5 flex items-center gap-2.5 px-2', colapsado && 'justify-center px-0')}>
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-sol-500 text-base font-bold text-white shadow-sm">
-          S
-        </div>
+        {usuario?.tenant?.logo ? (
+          <img
+            src={usuario.tenant.logo}
+            alt={usuario.tenant.nombre}
+            className="h-9 w-9 shrink-0 rounded-lg object-contain shadow-sm"
+          />
+        ) : (
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-sol-500 text-base font-bold text-white shadow-sm">
+            S
+          </div>
+        )}
         {!colapsado && (
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">El Sistema del Sol</p>

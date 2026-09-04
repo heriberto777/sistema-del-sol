@@ -13,7 +13,7 @@ export interface UsuarioAutenticado {
   /** Ítem D-1 — solo para decidir si el frontend muestra el flujo de "solicitar código de autorización" en anular/devolver; la validación real es 100% del backend. */
   requiereAutorizacionAnular?: boolean;
   requiereAutorizacionDevolucion?: boolean;
-  tenant?: { subdominio: string; nombre: string };
+  tenant?: { subdominio: string; nombre: string; logo?: string | null };
 }
 
 interface AuthContextValue {
