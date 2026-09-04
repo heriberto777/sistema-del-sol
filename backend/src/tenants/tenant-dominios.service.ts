@@ -81,8 +81,7 @@ export class TenantDominiosService {
     }
 
     try {
-      const email = config.email || 'admin@ciguadev.com';
-      const certificadoId = await this.npm.emitirCertificado([registro.dominio], email);
+      const certificadoId = await this.npm.emitirCertificado([registro.dominio]);
       const proxyHostId = await this.npm.crearProxyHost([registro.dominio], certificadoId);
       return this.repo.actualizarEstado(id, {
         estado: 'ACTIVO',

@@ -100,12 +100,23 @@ export class NpmClientService {
    * cubre `*.ciguadev.com`) — exige que el DNS del dominio YA apunte al
    * servidor antes de llamar esto, porque el challenge le pega al dominio
    * real. Llamar después de confirmar el DNS (ver `TenantDominiosService`).
+   *
+   * `meta` de NPM (`backend/schema/components/certificate-object.json` en
+   * su repo, `additionalProperties: false`) solo acepta
+   * `dns_challenge`/`dns_provider`/`dns_provider_credentials`/
+   * `propagation_seconds`/`key_type`/`certificate`/`certificate_key`/
+   * `letsencrypt_certificate` — nada de `letsencrypt_email` ni
+   * `letsencrypt_agree` (NPM usa el email de SU PROPIA cuenta de Let's
+   * Encrypt, configurada una sola vez en su propia instancia, no uno por
+   * certificado). Mandar esos dos campos de más tira 400 "must NOT have
+   * additional properties" — bug real, encontrado en la primera prueba
+   * end-to-end contra una NPM real.
    */
-  async emitirCertificado(dominios: string[], email: string): Promise<number> {
+  async emitirCertificado(dominios: string[]): Promise<number> {
     const creado = await this.peticion<{ id: number }>('POST', '/api/nginx/certificates', {
       provider: 'letsencrypt',
       domain_names: dominios,
-      meta: { letsencrypt_email: email, letsencrypt_agree: true, dns_challenge: false },
+      meta: { dns_challenge: false },
     });
     return creado.id;
   }

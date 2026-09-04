@@ -84,7 +84,7 @@ describe('TenantDominiosService', () => {
 
     it('con DNS (A record) que no apunta al host público, cae a ERROR sin llamar a NPM', async () => {
       repo.buscarPorId.mockResolvedValue({ id: 'd1', dominio: 'shopy-me.com' } as never);
-      plataformaConfigRepo.obtenerOCrear.mockResolvedValue({ npmPublicHost: '10.0.10.5', email: null } as never);
+      plataformaConfigRepo.obtenerOCrear.mockResolvedValue({ npmPublicHost: '10.0.10.5' } as never);
       resolve4.mockResolvedValue(['1.2.3.4']);
 
       await service.verificarYActivar('d1');
@@ -96,14 +96,14 @@ describe('TenantDominiosService', () => {
 
     it('con DNS que sí apunta bien, emite el certificado, crea el Proxy Host y marca ACTIVO', async () => {
       repo.buscarPorId.mockResolvedValue({ id: 'd1', dominio: 'shopy-me.com' } as never);
-      plataformaConfigRepo.obtenerOCrear.mockResolvedValue({ npmPublicHost: '10.0.10.5', email: 'admin@ciguadev.com' } as never);
+      plataformaConfigRepo.obtenerOCrear.mockResolvedValue({ npmPublicHost: '10.0.10.5' } as never);
       resolve4.mockResolvedValue(['10.0.10.5']);
       npm.emitirCertificado.mockResolvedValue(42);
       npm.crearProxyHost.mockResolvedValue(99);
 
       await service.verificarYActivar('d1');
 
-      expect(npm.emitirCertificado).toHaveBeenCalledWith(['shopy-me.com'], 'admin@ciguadev.com');
+      expect(npm.emitirCertificado).toHaveBeenCalledWith(['shopy-me.com']);
       expect(npm.crearProxyHost).toHaveBeenCalledWith(['shopy-me.com'], 42);
       const ultimaLlamada = repo.actualizarEstado.mock.calls.at(-1)!;
       expect(ultimaLlamada[1]).toEqual(
@@ -113,7 +113,7 @@ describe('TenantDominiosService', () => {
 
     it('con CNAME (host público no-IP) que sí apunta bien, también activa', async () => {
       repo.buscarPorId.mockResolvedValue({ id: 'd1', dominio: 'www.shopy-me.com' } as never);
-      plataformaConfigRepo.obtenerOCrear.mockResolvedValue({ npmPublicHost: 'app.ciguadev.com', email: null } as never);
+      plataformaConfigRepo.obtenerOCrear.mockResolvedValue({ npmPublicHost: 'app.ciguadev.com' } as never);
       resolveCname.mockResolvedValue(['app.ciguadev.com.']);
       npm.emitirCertificado.mockResolvedValue(1);
       npm.crearProxyHost.mockResolvedValue(2);
@@ -126,7 +126,7 @@ describe('TenantDominiosService', () => {
 
     it('si NPM falla (ej. rate limit de Let\'s Encrypt), cae a ERROR con el mensaje crudo', async () => {
       repo.buscarPorId.mockResolvedValue({ id: 'd1', dominio: 'shopy-me.com' } as never);
-      plataformaConfigRepo.obtenerOCrear.mockResolvedValue({ npmPublicHost: '10.0.10.5', email: null } as never);
+      plataformaConfigRepo.obtenerOCrear.mockResolvedValue({ npmPublicHost: '10.0.10.5' } as never);
       resolve4.mockResolvedValue(['10.0.10.5']);
       npm.emitirCertificado.mockRejectedValue(new Error('Nginx Proxy Manager: too many certificates already issued'));
 
