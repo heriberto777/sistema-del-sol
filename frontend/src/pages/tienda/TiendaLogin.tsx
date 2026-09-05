@@ -7,7 +7,7 @@ import { useClienteTienda } from '../../hooks/useClienteTienda';
 import { TiendaCargando, TiendaNoEncontrada } from './TiendaNoEncontrada';
 import { AuthSplitLayout } from '../../components/organisms/AuthSplitLayout/AuthSplitLayout';
 
-const GRADIENTE_CLIENTE = 'linear-gradient(150deg,#0c2a22,#0f8b6c 65%,#34c592)';
+const GRADIENTE_CLIENTE = { claro: 'linear-gradient(150deg,#ecfdf5,#a7f3d0 55%,#34c592)', oscuro: 'linear-gradient(150deg,#0c2a22,#0f8b6c 65%,#34c592)' };
 
 /** Genérico, no una piel más por plantilla — mismo criterio que TiendaCheckout. */
 export function TiendaLogin() {
@@ -53,7 +53,7 @@ export function TiendaLogin() {
           {config.logo ? (
             <img src={config.logo} alt="" className="h-8 w-8 rounded-lg object-contain" />
           ) : (
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/20 text-sm font-bold">{config.nombre.charAt(0).toUpperCase()}</span>
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-900/10 text-sm font-bold dark:bg-white/20">{config.nombre.charAt(0).toUpperCase()}</span>
           )}
           <span className="text-sm font-extrabold">{config.nombre}</span>
         </div>

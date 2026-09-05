@@ -1,8 +1,15 @@
 import { ReactNode } from 'react';
+import { useTheme } from '../../../hooks/useTheme';
 
 interface AuthSplitLayoutProps {
-  /** Fondo del panel visual — degradé de marca (CSS `background`, ej. `linear-gradient(...)`). */
-  gradiente: string;
+  /**
+   * Fondo del panel visual — degradé de marca (CSS `background`, ej.
+   * `linear-gradient(...)`), uno por tema. Es inline style (no puede usar
+   * `dark:` de Tailwind), así que el switch lo hace este componente leyendo
+   * `useTheme()` — antes quedaba fijo en el degradé oscuro sin importar el
+   * tema de la app, bug real reportado por el usuario.
+   */
+  gradiente: { claro: string; oscuro: string };
   /** Foto real opcional (ej. banner de la tienda) — se muestra debajo del degradé como overlay semitransparente. */
   imagenFondo?: string | null;
   /** Fila de marca (ícono/logo + nombre) arriba del panel visual. */
@@ -19,16 +26,22 @@ interface AuthSplitLayoutProps {
  * panel visual de marca a la izquierda (oculto en mobile), formulario a la derecha.
  */
 export function AuthSplitLayout({ gradiente, imagenFondo, marca, titulo, caracteristicas, toolbar, children }: AuthSplitLayoutProps) {
+  const { tema } = useTheme();
+  const gradienteActivo = tema === 'oscuro' ? gradiente.oscuro : gradiente.claro;
+
   return (
     <div className="relative flex min-h-screen items-center justify-center bg-slate-50 px-4 py-10 dark:bg-slate-950">
       {toolbar && <div className="absolute right-4 top-4 z-20">{toolbar}</div>}
 
       <div className="flex w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-xl shadow-slate-900/5 dark:bg-slate-900 dark:shadow-black/30 md:max-w-4xl md:border md:border-slate-200 md:dark:border-slate-800">
-        <div className="relative hidden w-[44%] flex-col justify-between overflow-hidden p-10 text-white md:flex" style={{ background: gradiente }}>
+        <div
+          className="relative hidden w-[44%] flex-col justify-between overflow-hidden p-10 text-slate-900 dark:text-white md:flex"
+          style={{ background: gradienteActivo }}
+        >
           {imagenFondo && (
             <>
               <img src={imagenFondo} alt="" className="absolute inset-0 h-full w-full object-cover" />
-              <div className="absolute inset-0" style={{ background: gradiente, opacity: 0.78 }} />
+              <div className="absolute inset-0" style={{ background: gradienteActivo, opacity: 0.78 }} />
             </>
           )}
           <div

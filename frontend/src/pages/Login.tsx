@@ -9,7 +9,7 @@ import { useAuth } from '../hooks/useAuth';
 import { usaPosComoInicio } from '../contexts/AuthContext';
 import { apiClient } from '../lib/api-client';
 
-const GRADIENTE_APP = 'linear-gradient(150deg,#111827,#1e293b 60%,#334155)';
+const GRADIENTE_APP = { claro: 'linear-gradient(150deg,#f8fafc,#e2e8f0 55%,#cbd5e1)', oscuro: 'linear-gradient(150deg,#111827,#1e293b 60%,#334155)' };
 
 interface Empresa {
   subdominio: string;
@@ -94,7 +94,7 @@ export function Login() {
       gradiente={GRADIENTE_APP}
       marca={
         <div className="flex items-center gap-2.5">
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-400/25 text-sm font-bold text-amber-300">☀</span>
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-500/20 text-sm font-bold text-amber-700 dark:bg-amber-400/25 dark:text-amber-300">☀</span>
           <span className="text-sm font-extrabold">El Sistema del Sol</span>
         </div>
       }

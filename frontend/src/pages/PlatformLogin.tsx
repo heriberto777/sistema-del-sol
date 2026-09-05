@@ -8,7 +8,7 @@ import { AuthSplitLayout } from '../components/organisms/AuthSplitLayout/AuthSpl
 import { usePlatformAuth } from '../hooks/usePlatformAuth';
 import { apiClient } from '../lib/api-client';
 
-const GRADIENTE_PLATAFORMA = 'linear-gradient(150deg,#171a23,#2b2114 60%,#4a3410)';
+const GRADIENTE_PLATAFORMA = { claro: 'linear-gradient(150deg,#fff8e6,#ffedbf 55%,#ffc94a)', oscuro: 'linear-gradient(150deg,#171a23,#2b2114 60%,#4a3410)' };
 
 export function PlatformLogin() {
   const { login, cargando } = usePlatformAuth();
@@ -41,7 +41,7 @@ export function PlatformLogin() {
       gradiente={GRADIENTE_PLATAFORMA}
       marca={
         <div className="flex items-center gap-2.5">
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/15 text-sm font-bold">☀</span>
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-900/10 text-sm font-bold dark:bg-white/15">☀</span>
           <span className="text-sm font-extrabold">Plataforma</span>
         </div>
       }
