@@ -4,9 +4,12 @@ import { useQuery } from '@tanstack/react-query';
 import { FormField } from '../components/molecules/FormField/FormField';
 import { Button } from '../components/atoms/Button/Button';
 import { ThemeToggle } from '../components/molecules/ThemeToggle/ThemeToggle';
+import { AuthSplitLayout } from '../components/organisms/AuthSplitLayout/AuthSplitLayout';
 import { useAuth } from '../hooks/useAuth';
 import { usaPosComoInicio } from '../contexts/AuthContext';
 import { apiClient } from '../lib/api-client';
+
+const GRADIENTE_APP = 'linear-gradient(150deg,#111827,#1e293b 60%,#334155)';
 
 interface Empresa {
   subdominio: string;
@@ -86,11 +89,19 @@ export function Login() {
   }
 
   return (
-    <div className="relative flex h-screen items-center justify-center bg-slate-50 dark:bg-slate-950">
-      <div className="absolute right-4 top-4">
-        <ThemeToggle />
-      </div>
-      <div className="w-full max-w-sm space-y-4 rounded-lg border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900">
+    <AuthSplitLayout
+      toolbar={<ThemeToggle />}
+      gradiente={GRADIENTE_APP}
+      marca={
+        <div className="flex items-center gap-2.5">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-400/25 text-sm font-bold text-amber-300">☀</span>
+          <span className="text-sm font-extrabold">El Sistema del Sol</span>
+        </div>
+      }
+      titulo="Facturación, inventario y contabilidad en un solo lugar"
+      caracteristicas={['NCF e ITBIS calculados al instante', 'Stock sincronizado en todas tus sucursales', 'Reportes fiscales listos para la DGII']}
+    >
+      <div className="space-y-4">
         {branding?.logo ? (
           <img src={branding.logo} alt="Logo" className="mx-auto h-12 max-w-full object-contain" />
         ) : (
@@ -148,6 +159,6 @@ export function Login() {
           ¿Olvidaste tu contraseña?
         </Link>
       </div>
-    </div>
+    </AuthSplitLayout>
   );
 }

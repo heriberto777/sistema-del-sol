@@ -5,6 +5,9 @@ import { isAxiosError } from 'axios';
 import { useTiendaConfig } from '../../hooks/useTienda';
 import { useClienteTienda } from '../../hooks/useClienteTienda';
 import { TiendaCargando, TiendaNoEncontrada } from './TiendaNoEncontrada';
+import { AuthSplitLayout } from '../../components/organisms/AuthSplitLayout/AuthSplitLayout';
+
+const GRADIENTE_CLIENTE = 'linear-gradient(150deg,#0c2a22,#0f8b6c 65%,#34c592)';
 
 /** Genérico, no una piel más por plantilla — mismo criterio que TiendaCheckout. */
 export function TiendaLogin() {
@@ -42,8 +45,23 @@ export function TiendaLogin() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 px-6 dark:bg-slate-950">
-      <div className="w-full max-w-sm">
+    <AuthSplitLayout
+      gradiente={GRADIENTE_CLIENTE}
+      imagenFondo={config.banner}
+      marca={
+        <div className="flex items-center gap-2.5">
+          {config.logo ? (
+            <img src={config.logo} alt="" className="h-8 w-8 rounded-lg object-contain" />
+          ) : (
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/20 text-sm font-bold">{config.nombre.charAt(0).toUpperCase()}</span>
+          )}
+          <span className="text-sm font-extrabold">{config.nombre}</span>
+        </div>
+      }
+      titulo="Todo tu pedido, en un solo lugar"
+      caracteristicas={['Seguí el estado de tus pedidos', 'Guardá tus datos de envío', 'Repetí tu compra en un clic']}
+    >
+      <div className="w-full">
         <h1 className="mb-1 text-xl font-semibold text-slate-900 dark:text-slate-100">Iniciar sesión</h1>
         <p className="mb-6 text-sm text-slate-500 dark:text-slate-400">{config?.nombre}</p>
 
@@ -96,6 +114,6 @@ export function TiendaLogin() {
           ← Volver a la tienda
         </Link>
       </div>
-    </div>
+    </AuthSplitLayout>
   );
 }

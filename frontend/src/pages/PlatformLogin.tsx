@@ -4,8 +4,11 @@ import { useQuery } from '@tanstack/react-query';
 import { FormField } from '../components/molecules/FormField/FormField';
 import { Button } from '../components/atoms/Button/Button';
 import { ThemeToggle } from '../components/molecules/ThemeToggle/ThemeToggle';
+import { AuthSplitLayout } from '../components/organisms/AuthSplitLayout/AuthSplitLayout';
 import { usePlatformAuth } from '../hooks/usePlatformAuth';
 import { apiClient } from '../lib/api-client';
+
+const GRADIENTE_PLATAFORMA = 'linear-gradient(150deg,#171a23,#2b2114 60%,#4a3410)';
 
 export function PlatformLogin() {
   const { login, cargando } = usePlatformAuth();
@@ -33,11 +36,19 @@ export function PlatformLogin() {
   }
 
   return (
-    <div className="relative flex h-screen items-center justify-center bg-slate-50 dark:bg-slate-950">
-      <div className="absolute right-4 top-4">
-        <ThemeToggle />
-      </div>
-      <form onSubmit={onSubmit} className="w-full max-w-sm space-y-4 rounded-lg border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900">
+    <AuthSplitLayout
+      toolbar={<ThemeToggle />}
+      gradiente={GRADIENTE_PLATAFORMA}
+      marca={
+        <div className="flex items-center gap-2.5">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/15 text-sm font-bold">☀</span>
+          <span className="text-sm font-extrabold">Plataforma</span>
+        </div>
+      }
+      titulo="Un panel para administrar todos tus tenants"
+      caracteristicas={['Suscripciones y facturación automática', 'Roles y permisos por equipo', 'Monitoreo de actividad en tiempo real']}
+    >
+      <form onSubmit={onSubmit} className="space-y-4">
         <div>
           {branding?.logo ? (
             <img src={branding.logo} alt="Logo" className="mb-1 h-10 max-w-full object-contain" />
@@ -56,6 +67,6 @@ export function PlatformLogin() {
           ¿Olvidaste tu contraseña?
         </Link>
       </form>
-    </div>
+    </AuthSplitLayout>
   );
 }
