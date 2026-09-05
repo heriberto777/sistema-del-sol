@@ -50,6 +50,7 @@ import { CobroFacturaResultado } from './pages/CobroFacturaResultado';
 import { VerFactura, VerCotizacion } from './pages/VerDocumentoPublico';
 import { TiendaLayout } from './pages/tienda/TiendaLayout';
 import { TiendaHome } from './pages/tienda/TiendaHome';
+import { TiendaProductos } from './pages/tienda/TiendaProductos';
 import { TiendaProducto } from './pages/tienda/TiendaProducto';
 import { TiendaCategoria } from './pages/tienda/TiendaCategoria';
 import { TiendaCarrito } from './pages/tienda/TiendaCarrito';
@@ -60,6 +61,7 @@ import { TiendaMisPedidos } from './pages/tienda/TiendaMisPedidos';
 
 const RUTAS_TIENDA_PUBLICA = [
   { index: true, element: <TiendaHome /> },
+  { path: 'productos', element: <TiendaProductos /> },
   { path: 'producto/:productoId', element: <TiendaProducto /> },
   { path: 'categoria/:categoriaId', element: <TiendaCategoria /> },
   { path: 'carrito', element: <TiendaCarrito /> },

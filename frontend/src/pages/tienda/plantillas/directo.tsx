@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Minus, Plus, Search, ShoppingCart, Trash2, User } from 'lucide-react';
+import { Minus, Plus, ShoppingCart, Trash2, User } from 'lucide-react';
 import { formatearPrecio, useOfertasTienda, useProductosDestacados, useSeccionesTienda } from '../../../hooks/useTienda';
 import { useClienteTienda } from '../../../hooks/useClienteTienda';
 import { useCarritoDrawer } from '../CarritoDrawerContext';
@@ -9,8 +9,8 @@ import { SeccionDestacados } from '../SeccionDestacados';
 import { SeccionOfertas } from '../SeccionOfertas';
 import { SeccionesDinamicas } from '../SeccionesDinamicas';
 import { ProductosRelacionados } from '../ProductosRelacionados';
-import { FilaPrecioOferta, InsigniaOferta, precioOriginalParaCarrito, precioParaCarrito } from '../OfertaEnTarjeta';
-import { claseImagenSinStock, EtiquetaSinExistenciaVariante, InsigniaSinStock, TextoSinStock } from '../InsigniaSinStock';
+import { FilaPrecioOferta } from '../OfertaEnTarjeta';
+import { EtiquetaSinExistenciaVariante } from '../InsigniaSinStock';
 import type { Plantilla, PropsCarrito, PropsHome, PropsProducto } from './tipos';
 
 const ACCENT_DEFAULT = '#c77d2e';
@@ -27,6 +27,9 @@ function Nav({ nombre, logo, subdominio, cantidadCarrito, accent }: { nombre: st
         <span className="text-lg font-extrabold tracking-tight text-[#1c1a17] dark:text-[#f1ece2]">{nombre}</span>
       </Link>
       <div className="flex items-center gap-5">
+        <Link to={`/tienda/${subdominio}/productos`} className="text-sm font-bold text-[#1c1a17] dark:text-[#f1ece2]">
+          Productos
+        </Link>
         <Link
           to={`/tienda/${subdominio}/${autenticado ? 'mis-pedidos' : 'login'}`}
           className="flex items-center gap-1.5 text-sm font-bold text-[#1c1a17] dark:text-[#f1ece2]"
@@ -54,7 +57,7 @@ function Footer({ nombre }: { nombre: string }) {
   );
 }
 
-function DirectoHome({ config, subdominio, carrito, productos, cargando, busqueda, onBuscar }: PropsHome) {
+function DirectoHome({ config, subdominio, carrito }: PropsHome) {
   const accent = config.colorAcento || ACCENT_DEFAULT;
   const { data: destacados = [] } = useProductosDestacados(subdominio);
   const { data: ofertas = [] } = useOfertasTienda(subdominio);
@@ -77,78 +80,6 @@ function DirectoHome({ config, subdominio, carrito, productos, cargando, busqued
       <SeccionDestacados productos={destacados} subdominio={subdominio} estiloInsignia={config.tema.estiloInsigniaOferta} estiloInsigniaSinStock={config.tema.estiloInsigniaSinStock} />
       <SeccionOfertas ofertas={ofertas} mostrar={config.tema.mostrarSeccionOfertas} />
       <SeccionesDinamicas secciones={secciones} subdominio={subdominio} estiloInsignia={config.tema.estiloInsigniaOferta} estiloInsigniaSinStock={config.tema.estiloInsigniaSinStock} />
-
-      <div className="flex items-baseline justify-between px-6 pb-4 sm:px-10">
-        <h2 className="text-lg font-extrabold" style={{ fontFamily: FONT_DISPLAY }}>
-          Productos
-        </h2>
-        <div className="relative">
-          <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#7a7266]" />
-          <input
-            value={busqueda}
-            onChange={(e) => onBuscar(e.target.value)}
-            placeholder="Buscar producto…"
-            className="rounded-lg border border-[#eae3d6] bg-white py-2 pl-8 pr-3 text-xs outline-none dark:border-[#332c22] dark:bg-[#1f1b15]"
-          />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4 px-6 pb-16 sm:grid-cols-3 sm:px-10 lg:grid-cols-4">
-        {cargando && <p className="col-span-full text-sm text-[#7a7266]">Cargando…</p>}
-        {!cargando && productos.length === 0 && <p className="col-span-full text-sm text-[#7a7266]">No hay productos.</p>}
-        {productos.map((p) => (
-          <Link
-            key={p.id}
-            to={`/tienda/${subdominio}/producto/${p.id}`}
-            className="overflow-hidden rounded-xl border border-[#eae3d6] bg-white dark:border-[#332c22] dark:bg-[#1f1b15]"
-          >
-            <div className={`relative aspect-square bg-gradient-to-br from-[#f1e9da] to-[#e3d5ba] ${claseImagenSinStock(p.sinStock, config.tema.estiloInsigniaSinStock)}`}>
-              {p.imagen && <img src={p.imagen} alt={p.nombre} className="h-full w-full object-cover" />}
-              {p.sinStock ? (
-                <InsigniaSinStock sinStock estilo={config.tema.estiloInsigniaSinStock} />
-              ) : (
-                <InsigniaOferta oferta={p.oferta} estilo={config.tema.estiloInsigniaOferta} colorAcento={accent} />
-              )}
-            </div>
-            <div className="p-3">
-              {p.categoria && <div className="text-[10px] font-bold uppercase tracking-wide text-[#7a7266]">{p.categoria.nombre}</div>}
-              <h3 className="my-1.5 text-sm font-semibold">{p.nombre}</h3>
-              <div className="flex items-center justify-between gap-1.5">
-                {!p.sinStock && p.oferta ? (
-                  <span style={{ fontFamily: FONT_DISPLAY }}>
-                    <FilaPrecioOferta precio={p.precio} oferta={p.oferta} estilo={config.tema.estiloInsigniaOferta} tamano="0.875em" colorAcento={accent} />
-                  </span>
-                ) : (
-                  <span className="text-sm font-extrabold" style={{ fontFamily: FONT_DISPLAY }}>
-                    {formatearPrecio(p.precio)}
-                  </span>
-                )}
-                <TextoSinStock sinStock={p.sinStock} estilo={config.tema.estiloInsigniaSinStock} />
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    // Con más de una variante (talla/color), no hay forma de saber cuál sin ir al detalle — se deja navegar el <Link>.
-                    if (p.tieneVariantes || !p.varianteId || p.sinStock) return;
-                    e.preventDefault();
-                    carrito.agregar({
-                      productoId: p.id,
-                      varianteId: p.varianteId,
-                      varianteEtiqueta: '',
-                      nombre: p.nombre,
-                      precio: precioParaCarrito(p.precio, p.oferta), precioOriginal: precioOriginalParaCarrito(p.precio, p.oferta),
-                      imagen: p.imagen,
-                    });
-                  }}
-                  className="flex h-7 w-7 items-center justify-center rounded-lg text-white"
-                  style={{ background: accent }}
-                >
-                  <Plus size={15} />
-                </button>
-              </div>
-            </div>
-          </Link>
-        ))}
-      </div>
 
       <Footer nombre={config.nombre} />
     </div>

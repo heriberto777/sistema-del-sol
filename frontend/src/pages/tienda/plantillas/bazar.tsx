@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Minus, Plus, Search, ShoppingCart, Trash2, User } from 'lucide-react';
 import { formatearPrecio, useOfertasTienda, useProductosDestacados, useSeccionesTienda } from '../../../hooks/useTienda';
 import { useClienteTienda } from '../../../hooks/useClienteTienda';
@@ -9,8 +9,8 @@ import { SeccionDestacados } from '../SeccionDestacados';
 import { SeccionOfertas } from '../SeccionOfertas';
 import { SeccionesDinamicas } from '../SeccionesDinamicas';
 import { ProductosRelacionados } from '../ProductosRelacionados';
-import { FilaPrecioOferta, InsigniaOferta, precioOriginalParaCarrito, precioParaCarrito } from '../OfertaEnTarjeta';
-import { claseImagenSinStock, EtiquetaSinExistenciaVariante, InsigniaSinStock, TextoSinStock } from '../InsigniaSinStock';
+import { FilaPrecioOferta } from '../OfertaEnTarjeta';
+import { EtiquetaSinExistenciaVariante } from '../InsigniaSinStock';
 import { ClaveMenuTienda, DefaultsTemaPlantilla, menuVisibleOrdenado, useCargarFuentesTienda, variablesCssTema } from '../tema';
 import type { Plantilla, PropsCarrito, PropsHome, PropsProducto } from './tipos';
 
@@ -31,7 +31,7 @@ const HEADER_BG_2 = '#232f3e';
 
 const ENLACES_MENU: Record<ClaveMenuTienda, { label: string; href: (subdominio: string) => string }> = {
   inicio: { label: 'Inicio', href: (s) => `/tienda/${s}` },
-  categorias: { label: 'Productos', href: (s) => `/tienda/${s}#catalogo` },
+  categorias: { label: 'Productos', href: (s) => `/tienda/${s}/productos` },
   carrito: { label: 'Carrito', href: (s) => `/tienda/${s}/carrito` },
   cuenta: { label: 'Mi cuenta', href: (s) => `/tienda/${s}/mis-pedidos` },
 };
@@ -91,10 +91,12 @@ function ThumbBazar({ imagen, nombre }: { imagen: string | null; nombre: string 
   );
 }
 
-function BazarHome({ config, subdominio, carrito, productos, cargando, busqueda, onBuscar, categorias, categoriaId, onCategoriaSeleccionar }: PropsHome) {
+function BazarHome({ config, subdominio, carrito }: PropsHome) {
   const { tema, nombre, logo } = config;
   useCargarFuentesTienda([tema.fuenteDisplay ?? DEFAULTS.fuenteDisplay, tema.fuenteBody ?? DEFAULTS.fuenteBody]);
   const menu = menuVisibleOrdenado(tema.menu);
+  const navigate = useNavigate();
+  const [busqueda, setBusqueda] = useState('');
   const { data: destacados = [] } = useProductosDestacados(subdominio);
   const { data: ofertas = [] } = useOfertasTienda(subdominio);
   const { data: secciones = [] } = useSeccionesTienda(subdominio);
@@ -103,36 +105,24 @@ function BazarHome({ config, subdominio, carrito, productos, cargando, busqueda,
       <BannerAnuncio mensajes={config.bannerAnuncio.mensajes} intervaloSegundos={config.bannerAnuncio.intervaloSegundos} colorAcento={DEFAULTS.colorAcento} />
       <Nav nombre={nombre} logo={logo} subdominio={subdominio} cantidadCarrito={carrito.cantidadTotal} menu={menu} />
 
-      <div className="flex items-center gap-2 overflow-x-auto px-6 py-2.5 sm:px-10" style={{ background: HEADER_BG_2 }}>
-        <button
-          type="button"
-          onClick={() => onCategoriaSeleccionar(undefined)}
-          className="whitespace-nowrap rounded-full px-3 py-1 text-[0.75em] font-semibold"
-          style={{ background: !categoriaId ? 'var(--tienda-color-acento)' : 'transparent', color: !categoriaId ? '#111' : '#fff', opacity: !categoriaId ? 1 : 0.8 }}
-        >
-          Todo
-        </button>
-        {categorias.map((c) => (
-          <button
-            key={c.id}
-            type="button"
-            onClick={() => onCategoriaSeleccionar(c.id)}
-            className="whitespace-nowrap rounded-full px-3 py-1 text-[0.75em] font-semibold"
-            style={{ background: categoriaId === c.id ? 'var(--tienda-color-acento)' : 'transparent', color: categoriaId === c.id ? '#111' : '#fff', opacity: categoriaId === c.id ? 1 : 0.8 }}
-          >
-            {c.nombre}
-          </button>
-        ))}
+      <form
+        className="flex items-center gap-2 px-6 py-2.5 sm:px-10"
+        style={{ background: HEADER_BG_2 }}
+        onSubmit={(e) => {
+          e.preventDefault();
+          navigate(`/tienda/${subdominio}/productos${busqueda ? `?busqueda=${encodeURIComponent(busqueda)}` : ''}`);
+        }}
+      >
         <div className="relative ml-auto min-w-[220px] flex-1 sm:max-w-sm">
           <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
           <input
             value={busqueda}
-            onChange={(e) => onBuscar(e.target.value)}
+            onChange={(e) => setBusqueda(e.target.value)}
             placeholder="Buscar en la tienda…"
             className="w-full rounded py-1.5 pl-8 pr-3 text-[0.8em] text-slate-900 outline-none"
           />
         </div>
-      </div>
+      </form>
 
       <div className="p-4 sm:p-6">
         <div className="rounded-lg p-8 text-white sm:p-12" style={{ background: `linear-gradient(120deg, ${HEADER_BG}, ${HEADER_BG_2})`, borderRadius: 'var(--tienda-radio-tarjeta)' }}>
@@ -154,57 +144,16 @@ function BazarHome({ config, subdominio, carrito, productos, cargando, busqueda,
         {config.banner ? (
           <img src={config.banner} alt="" className="aspect-[21/6] w-full object-cover" />
         ) : (
-          <a
-            href="#catalogo"
+          <Link
+            to={`/tienda/${subdominio}/productos`}
             className="flex aspect-[21/6] w-full items-center justify-center text-center text-[1.1em] font-extrabold text-white sm:text-[1.3em]"
             style={{ background: `linear-gradient(120deg, color-mix(in srgb, var(--tienda-color-acento) 70%, ${HEADER_BG}), ${HEADER_BG})`, fontFamily: 'var(--tienda-fuente-display)' }}
           >
             Descubrí todo el catálogo →
-          </a>
+          </Link>
         )}
       </div>
 
-      <div id="catalogo" className="px-4 pb-4 sm:px-6">
-        <h2 className="mb-3 text-[1.05em] font-bold" style={{ fontFamily: 'var(--tienda-fuente-display)' }}>
-          Productos{categoriaId ? ` · ${categorias.find((c) => c.id === categoriaId)?.nombre ?? ''}` : ''}
-        </h2>
-      </div>
-      <div className="grid grid-cols-2 gap-3 px-4 pb-16 sm:grid-cols-3 sm:px-6 lg:grid-cols-5">
-        {cargando && <p className="col-span-full text-[0.85em] opacity-60">Cargando…</p>}
-        {!cargando && productos.length === 0 && <p className="col-span-full text-[0.85em] opacity-60">No hay productos.</p>}
-        {productos.map((p) => (
-          <Link key={p.id} to={`/tienda/${subdominio}/producto/${p.id}`} className="overflow-hidden bg-[var(--tienda-color-superficie)] p-2" style={{ borderRadius: 'var(--tienda-radio-tarjeta)', boxShadow: 'var(--tienda-sombra-tarjeta)' }}>
-            <div className={`relative ${claseImagenSinStock(p.sinStock, tema.estiloInsigniaSinStock)}`}>
-              <ThumbBazar imagen={p.imagen} nombre={p.nombre} />
-              {p.sinStock ? (
-                <InsigniaSinStock sinStock estilo={tema.estiloInsigniaSinStock} />
-              ) : (
-                <InsigniaOferta oferta={p.oferta} estilo={tema.estiloInsigniaOferta} />
-              )}
-            </div>
-            <div className="pt-2">
-              <h3 className="mb-1 text-[0.78em] font-semibold leading-tight">{p.nombre}</h3>
-              <div className="flex items-center justify-between gap-1.5">
-                <FilaPrecioOferta precio={p.precio} oferta={p.sinStock ? null : p.oferta} estilo={tema.estiloInsigniaOferta} tamano="0.82em" />
-                <TextoSinStock sinStock={p.sinStock} estilo={tema.estiloInsigniaSinStock} />
-                {!p.tieneVariantes && p.varianteId && !p.sinStock && (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      carrito.agregar({ productoId: p.id, varianteId: p.varianteId!, varianteEtiqueta: '', nombre: p.nombre, precio: precioParaCarrito(p.precio, p.oferta), precioOriginal: precioOriginalParaCarrito(p.precio, p.oferta), imagen: p.imagen });
-                    }}
-                    className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-[#111]"
-                    style={{ background: 'var(--tienda-color-acento)' }}
-                  >
-                    <Plus size={13} />
-                  </button>
-                )}
-              </div>
-            </div>
-          </Link>
-        ))}
-      </div>
       <Footer nombre={nombre} />
     </div>
   );

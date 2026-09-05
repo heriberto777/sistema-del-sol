@@ -9,8 +9,8 @@ import { SeccionDestacados } from '../SeccionDestacados';
 import { SeccionOfertas } from '../SeccionOfertas';
 import { SeccionesDinamicas } from '../SeccionesDinamicas';
 import { ProductosRelacionados } from '../ProductosRelacionados';
-import { FilaPrecioOferta, InsigniaOferta, precioOriginalParaCarrito, precioParaCarrito } from '../OfertaEnTarjeta';
-import { claseImagenSinStock, EtiquetaSinExistenciaVariante, InsigniaSinStock, TextoSinStock } from '../InsigniaSinStock';
+import { FilaPrecioOferta } from '../OfertaEnTarjeta';
+import { EtiquetaSinExistenciaVariante } from '../InsigniaSinStock';
 import { ClaveMenuTienda, DefaultsTemaPlantilla, menuVisibleOrdenado, useCargarFuentesTienda, variablesCssTema } from '../tema';
 import type { Plantilla, PropsCarrito, PropsHome, PropsProducto } from './tipos';
 
@@ -28,7 +28,7 @@ const DEFAULTS: DefaultsTemaPlantilla = {
 
 const ENLACES_MENU: Record<ClaveMenuTienda, { label: string; href: (subdominio: string) => string }> = {
   inicio: { label: 'Colección', href: (s) => `/tienda/${s}` },
-  categorias: { label: 'Archivo', href: (s) => `/tienda/${s}#catalogo` },
+  categorias: { label: 'Archivo', href: (s) => `/tienda/${s}/productos` },
   carrito: { label: 'Bolsa', href: (s) => `/tienda/${s}/carrito` },
   cuenta: { label: 'Cuenta', href: (s) => `/tienda/${s}/mis-pedidos` },
 };
@@ -79,7 +79,7 @@ function Footer({ nombre }: { nombre: string }) {
   );
 }
 
-function AtelierHome({ config, subdominio, carrito, productos, cargando }: PropsHome) {
+function AtelierHome({ config, subdominio, carrito }: PropsHome) {
   const { tema, nombre, logo } = config;
   useCargarFuentesTienda([tema.fuenteDisplay ?? DEFAULTS.fuenteDisplay, tema.fuenteBody ?? DEFAULTS.fuenteBody]);
   const menu = menuVisibleOrdenado(tema.menu);
@@ -102,44 +102,6 @@ function AtelierHome({ config, subdominio, carrito, productos, cargando }: Props
       <SeccionDestacados productos={destacados ?? []} subdominio={subdominio} estiloInsignia={tema.estiloInsigniaOferta} estiloInsigniaSinStock={tema.estiloInsigniaSinStock} />
       <SeccionOfertas ofertas={ofertas ?? []} mostrar={tema.mostrarSeccionOfertas} />
       <SeccionesDinamicas secciones={secciones} subdominio={subdominio} estiloInsignia={tema.estiloInsigniaOferta} estiloInsigniaSinStock={tema.estiloInsigniaSinStock} />
-
-      <div id="catalogo" className="grid grid-cols-1 gap-px sm:grid-cols-2">
-        {cargando && <p className="col-span-full px-6 py-10 text-[0.85em] opacity-60 sm:px-10">Cargando…</p>}
-        {!cargando && productos.length === 0 && <p className="col-span-full px-6 py-10 text-[0.85em] opacity-60 sm:px-10">No hay productos.</p>}
-        {productos.map((p) => (
-          <Link key={p.id} to={`/tienda/${subdominio}/producto/${p.id}`} className="pb-8 text-center">
-            <div className={`relative mb-3.5 overflow-hidden ${claseImagenSinStock(p.sinStock, tema.estiloInsigniaSinStock)}`} style={{ aspectRatio: 'var(--tienda-ratio-imagen)', background: 'linear-gradient(140deg,#efefef,#dcdcdc)' }}>
-              {p.imagen && <img src={p.imagen} alt={p.nombre} className="h-full w-full object-cover" />}
-              {p.sinStock ? (
-                <InsigniaSinStock sinStock estilo={tema.estiloInsigniaSinStock} />
-              ) : (
-                <InsigniaOferta oferta={p.oferta} estilo={tema.estiloInsigniaOferta} />
-              )}
-            </div>
-            <h3 className="mb-1 text-[0.75em] uppercase tracking-[0.05em]">{p.nombre}</h3>
-            <div className="flex items-center justify-center gap-2">
-              {p.oferta && !p.sinStock ? (
-                <FilaPrecioOferta precio={p.precio} oferta={p.oferta} estilo={tema.estiloInsigniaOferta} tamano="0.75em" />
-              ) : (
-                <span className="text-[0.75em] opacity-70">{formatearPrecio(p.precio)}</span>
-              )}
-              <TextoSinStock sinStock={p.sinStock} estilo={tema.estiloInsigniaSinStock} />
-              {!p.tieneVariantes && p.varianteId && !p.sinStock && (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    carrito.agregar({ productoId: p.id, varianteId: p.varianteId!, varianteEtiqueta: '', nombre: p.nombre, precio: precioParaCarrito(p.precio, p.oferta), precioOriginal: precioOriginalParaCarrito(p.precio, p.oferta), imagen: p.imagen });
-                  }}
-                  className="flex h-6 w-6 items-center justify-center border border-[color:var(--tienda-color-texto)]/20"
-                >
-                  <Plus size={12} />
-                </button>
-              )}
-            </div>
-          </Link>
-        ))}
-      </div>
       <Footer nombre={nombre} />
     </div>
   );

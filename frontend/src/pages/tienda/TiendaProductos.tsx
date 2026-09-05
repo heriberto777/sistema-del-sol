@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
-import { useSubdominioTienda } from '../../hooks/useSubdominioTienda';
+import { Link, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, ChevronLeft, ChevronRight, ShoppingBag } from 'lucide-react';
+import { useSubdominioTienda } from '../../hooks/useSubdominioTienda';
 import { useCategoriasTienda, useTiendaCatalogo, useTiendaConfig } from '../../hooks/useTienda';
 import { useCarritoTiendaContext } from './CarritoTiendaContext';
 import { useCarritoDrawer } from './CarritoDrawerContext';
@@ -10,22 +10,25 @@ import { TarjetaProductoTienda } from './TarjetaProductoTienda';
 import { TiendaCargando, TiendaNoEncontrada } from './TiendaNoEncontrada';
 
 /**
- * Página dedicada de una categoría (Fase 18) — a la que llega un clic en
- * una sección CATEGORIA/MINIGRID de "Secciones Dinámicas" (ver
- * SeccionesDinamicas.tsx). Antes ese clic solo filtraba el Home in-place,
- * dejando visible el hero + Destacados + Ofertas + el resto de secciones
- * arriba de la grilla filtrada — el usuario lo describió como "muy lleno"
- * y pidió el patrón de amazon.com: clic en una categoría lleva a una
- * página propia, chica y enfocada, solo con esos productos. Genérica (no
- * una piel más por plantilla, mismo criterio que TiendaCheckout/
- * TiendaMisPedidos) pero con una barra propia mínima (volver + carrito)
- * porque a diferencia de esas dos, acá sí hace falta poder seguir
- * navegando la tienda sin depender del botón atrás del navegador.
+ * Página dedicada del catálogo completo (pedido explícito, "opción B" —
+ * ver PLANTILLAS_PEDIDO... no, ver tipos.ts/PropsHome): antes el link
+ * "Productos" del menú de las 17 plantillas apuntaba a `#catalogo`, un
+ * ancla DENTRO del Home — nunca cambiaba de ruta ("se queda en la misma
+ * página", reportado). Ahora es una página propia, mismo criterio que
+ * `TiendaCategoria` (genérica, sin piel por plantilla, con su propia
+ * barra mínima de volver+carrito): búsqueda, filtro por categoría y
+ * paginación real (antes NINGUNA página de tienda paginaba de verdad —
+ * `useTiendaCatalogo` ya lo soporta, solo nadie le mandaba `pagina`).
+ *
+ * `?busqueda=` en la URL — para que un buscador en el Home (si una
+ * plantilla lo muestra en su hero) pueda linkear acá con el texto ya
+ * cargado, en vez de filtrar in-place como antes.
  */
-export function TiendaCategoria() {
+export function TiendaProductos() {
   const subdominio = useSubdominioTienda();
-  const { categoriaId = '' } = useParams();
-  const [busqueda, setBusqueda] = useState('');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [busqueda, setBusqueda] = useState(searchParams.get('busqueda') ?? '');
+  const [categoriaId, setCategoriaId] = useState<string | undefined>(undefined);
   const [pagina, setPagina] = useState(1);
   const busquedaDebounced = useDebouncedValue(busqueda);
   const carrito = useCarritoTiendaContext();
@@ -35,13 +38,22 @@ export function TiendaCategoria() {
   const { data: categorias = [] } = useCategoriasTienda(subdominio);
   const { data: paginaResultado, isLoading: cargandoCatalogo } = useTiendaCatalogo(subdominio, {
     pagina,
-    categoriaId,
     busqueda: busquedaDebounced || undefined,
+    categoriaId,
   });
 
-  // Volver a la página 1 con cada búsqueda nueva — igual criterio que TiendaProductos.
+  // Cambiar de búsqueda/categoría vuelve siempre a la página 1 — quedarse
+  // en la 3 de un filtro nuevo que capaz solo tiene 1 página deja la
+  // grilla vacía sin que sea obvio por qué.
   useEffect(() => {
     setPagina(1);
+  }, [busquedaDebounced, categoriaId]);
+
+  // Refleja la búsqueda en la URL (sin agregar historial nuevo por cada
+  // tecla) — así el link se puede compartir/recargar con el filtro puesto.
+  useEffect(() => {
+    setSearchParams(busquedaDebounced ? { busqueda: busquedaDebounced } : {}, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [busquedaDebounced]);
 
   if (isLoading) return <TiendaCargando />;
@@ -51,11 +63,6 @@ export function TiendaCategoria() {
   const total = paginaResultado?.total ?? 0;
   const tamanoPagina = paginaResultado?.tamanoPagina ?? 20;
   const totalPaginas = Math.max(1, Math.ceil(total / tamanoPagina));
-  // La categoría puede no traer productos propios (recién creada, o todos
-  // ocultos/sin stock) — en ese caso no aparece en `categorias`
-  // (categoriasPublicas solo lista las que tienen algo visible); cae a
-  // "Categoría" en vez de dejar el título vacío.
-  const nombreCategoria = categorias.find((c) => c.id === categoriaId)?.nombre ?? productos[0]?.categoria?.nombre ?? 'Categoría';
   const accent = config.tema.colorAcento || config.colorAcento || '#111827';
 
   return (
@@ -80,24 +87,56 @@ export function TiendaCategoria() {
           <Link to={`/tienda/${subdominio}`} className="hover:underline">
             Inicio
           </Link>{' '}
-          / {nombreCategoria}
+          / Productos
         </p>
-        <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
+        <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">{nombreCategoria}</h1>
+            <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">Todos los productos</h1>
             <p className="text-sm text-slate-500 dark:text-slate-400">{cargandoCatalogo ? 'Cargando…' : `${total} producto${total === 1 ? '' : 's'}`}</p>
           </div>
           <input
             value={busqueda}
             onChange={(e) => setBusqueda(e.target.value)}
-            placeholder={`Buscar en ${nombreCategoria}…`}
+            placeholder="Buscar productos…"
             className="w-full max-w-xs rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
           />
         </div>
 
+        {categorias.length > 0 && (
+          <div className="mb-6 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setCategoriaId(undefined)}
+              className="whitespace-nowrap rounded-full border px-3.5 py-1.5 text-xs font-semibold"
+              style={{
+                background: !categoriaId ? accent : 'transparent',
+                color: !categoriaId ? '#fff' : undefined,
+                borderColor: `color-mix(in srgb, ${accent} 35%, transparent)`,
+              }}
+            >
+              Todo
+            </button>
+            {categorias.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => setCategoriaId(c.id)}
+                className="whitespace-nowrap rounded-full border px-3.5 py-1.5 text-xs font-semibold"
+                style={{
+                  background: categoriaId === c.id ? accent : 'transparent',
+                  color: categoriaId === c.id ? '#fff' : undefined,
+                  borderColor: `color-mix(in srgb, ${accent} 35%, transparent)`,
+                }}
+              >
+                {c.nombre} <span className="opacity-60">({c.cantidad})</span>
+              </button>
+            ))}
+          </div>
+        )}
+
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
           {!cargandoCatalogo && productos.length === 0 && (
-            <p className="col-span-full py-12 text-center text-sm text-slate-400">No hay productos en esta categoría todavía.</p>
+            <p className="col-span-full py-12 text-center text-sm text-slate-400">No encontramos productos con ese filtro.</p>
           )}
           {productos.map((p) => (
             <TarjetaProductoTienda
@@ -105,7 +144,7 @@ export function TiendaCategoria() {
               producto={p}
               subdominio={subdominio}
               defaults={{ acento: accent }}
-              estiloInsigniaSinStock={config?.tema.estiloInsigniaSinStock}
+              estiloInsigniaSinStock={config.tema.estiloInsigniaSinStock}
             />
           ))}
         </div>

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Minus, Plus, Search, Trash2 } from 'lucide-react';
+import { Minus, Plus, Trash2 } from 'lucide-react';
 import { formatearPrecio, useOfertasTienda, useProductosDestacados, useSeccionesTienda } from '../../../hooks/useTienda';
 import { useClienteTienda } from '../../../hooks/useClienteTienda';
 import { useCarritoDrawer } from '../CarritoDrawerContext';
@@ -9,8 +9,8 @@ import { SeccionDestacados } from '../SeccionDestacados';
 import { SeccionOfertas } from '../SeccionOfertas';
 import { SeccionesDinamicas } from '../SeccionesDinamicas';
 import { ProductosRelacionados } from '../ProductosRelacionados';
-import { FilaPrecioOferta, InsigniaOferta, precioOriginalParaCarrito, precioParaCarrito } from '../OfertaEnTarjeta';
-import { claseImagenSinStock, EtiquetaSinExistenciaVariante, InsigniaSinStock, TextoSinStock } from '../InsigniaSinStock';
+import { FilaPrecioOferta } from '../OfertaEnTarjeta';
+import { EtiquetaSinExistenciaVariante } from '../InsigniaSinStock';
 import type { Plantilla, PropsCarrito, PropsHome, PropsProducto } from './tipos';
 
 // Boutique es oscura y sin tokens (Fase 7) — los componentes compartidos
@@ -33,6 +33,9 @@ function Nav({ nombre, logo, subdominio, cantidadCarrito, accent }: { nombre: st
         <span className="text-2xl font-semibold tracking-wide">{nombre}</span>
       </Link>
       <div className="flex items-center gap-6">
+        <Link to={`/tienda/${subdominio}/productos`} className="text-[11px] font-semibold uppercase tracking-widest text-[#bdb2a1]">
+          Productos
+        </Link>
         <Link to={`/tienda/${subdominio}/${autenticado ? 'mis-pedidos' : 'login'}`} className="text-[11px] font-semibold uppercase tracking-widest text-[#bdb2a1]">
           {autenticado ? 'Mi cuenta' : 'Iniciar sesión'}
         </Link>
@@ -53,7 +56,7 @@ function Footer({ nombre }: { nombre: string }) {
   );
 }
 
-function BoutiqueHome({ config, subdominio, carrito, productos, cargando, busqueda, onBuscar }: PropsHome) {
+function BoutiqueHome({ config, subdominio, carrito }: PropsHome) {
   const accent = config.colorAcento || ACCENT_DEFAULT;
   const { data: destacados = [] } = useProductosDestacados(subdominio);
   const { data: ofertas = [] } = useOfertasTienda(subdominio);
@@ -73,18 +76,6 @@ function BoutiqueHome({ config, subdominio, carrito, productos, cargando, busque
         <p className="mx-auto max-w-md text-sm leading-relaxed text-[#bdb2a1]">Piezas seleccionadas, disponibilidad real.</p>
       </div>
 
-      <div className="mx-auto mb-8 flex max-w-xs items-center justify-center">
-        <div className="relative w-full">
-          <Search size={13} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#8a8073]" />
-          <input
-            value={busqueda}
-            onChange={(e) => onBuscar(e.target.value)}
-            placeholder="Buscar…"
-            className="w-full border border-[#37312a] bg-transparent py-2 pl-8 pr-3 text-center text-xs uppercase tracking-widest text-[#f4ede3] outline-none placeholder:text-[#8a8073]"
-          />
-        </div>
-      </div>
-
       <SeccionDestacados
         productos={destacados}
         subdominio={subdominio}
@@ -100,55 +91,6 @@ function BoutiqueHome({ config, subdominio, carrito, productos, cargando, busque
         estiloInsignia={config.tema.estiloInsigniaOferta}
         estiloInsigniaSinStock={config.tema.estiloInsigniaSinStock}
       />
-
-      {cargando && <p className="pb-16 text-center text-sm text-[#8a8073]">Cargando…</p>}
-      {!cargando && productos.length === 0 && <p className="pb-16 text-center text-sm text-[#8a8073]">No hay productos.</p>}
-      {productos.length > 0 && (
-        <div className="grid grid-cols-2 gap-px bg-[#37312a] px-8 pb-16 sm:grid-cols-3 sm:px-12">
-          {productos.map((p) => (
-            <Link key={p.id} to={`/tienda/${subdominio}/producto/${p.id}`} className="bg-[#211d19] pb-4">
-              <div className={`relative aspect-[4/5] ${claseImagenSinStock(p.sinStock, config.tema.estiloInsigniaSinStock)}`} style={{ background: 'linear-gradient(160deg,#3a332b,#211d19)' }}>
-                {p.imagen && <img src={p.imagen} alt={p.nombre} className="h-full w-full object-cover" />}
-                {p.sinStock ? (
-                  <InsigniaSinStock sinStock estilo={config.tema.estiloInsigniaSinStock} />
-                ) : (
-                  <InsigniaOferta oferta={p.oferta} estilo={config.tema.estiloInsigniaOferta} colorAcento={accent} colorSuperficie={DEFAULTS_COMPARTIDOS.superficie} />
-                )}
-              </div>
-              <div className="px-3 pt-4 text-center">
-                {p.categoria && <div className="text-[10px] uppercase tracking-widest text-[#8a8073]">{p.categoria.nombre}</div>}
-                <h3 className="my-1.5 text-lg font-semibold" style={{ fontFamily: FONT_DISPLAY }}>
-                  {p.nombre}
-                </h3>
-                <p className="text-sm tracking-wide">
-                  <FilaPrecioOferta precio={p.precio} oferta={p.sinStock ? null : p.oferta} estilo={config.tema.estiloInsigniaOferta} tamano="1em" colorAcento={accent} />
-                </p>
-                <TextoSinStock sinStock={p.sinStock} estilo={config.tema.estiloInsigniaSinStock} />
-                <button
-                  type="button"
-                  disabled={!p.tieneVariantes && p.sinStock}
-                  onClick={(e) => {
-                    if (p.tieneVariantes || !p.varianteId || p.sinStock) return;
-                    e.preventDefault();
-                    carrito.agregar({
-                      productoId: p.id,
-                      varianteId: p.varianteId,
-                      varianteEtiqueta: '',
-                      nombre: p.nombre,
-                      precio: precioParaCarrito(p.precio, p.oferta), precioOriginal: precioOriginalParaCarrito(p.precio, p.oferta),
-                      imagen: p.imagen,
-                    });
-                  }}
-                  className="mt-3 border px-4 py-1.5 text-[10px] font-semibold uppercase tracking-widest disabled:cursor-not-allowed disabled:opacity-40"
-                  style={{ borderColor: accent, color: accent }}
-                >
-                  {!p.tieneVariantes && p.sinStock ? 'Agotado' : p.tieneVariantes ? 'Ver opciones' : 'Agregar'}
-                </button>
-              </div>
-            </Link>
-          ))}
-        </div>
-      )}
 
       <Footer nombre={config.nombre} />
     </div>

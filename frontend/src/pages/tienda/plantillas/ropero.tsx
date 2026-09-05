@@ -9,8 +9,8 @@ import { SeccionDestacados } from '../SeccionDestacados';
 import { SeccionOfertas } from '../SeccionOfertas';
 import { SeccionesDinamicas } from '../SeccionesDinamicas';
 import { ProductosRelacionados } from '../ProductosRelacionados';
-import { FilaPrecioOferta, InsigniaOferta, precioOriginalParaCarrito, precioParaCarrito } from '../OfertaEnTarjeta';
-import { claseImagenSinStock, EtiquetaSinExistenciaVariante, InsigniaSinStock, TextoSinStock } from '../InsigniaSinStock';
+import { FilaPrecioOferta } from '../OfertaEnTarjeta';
+import { EtiquetaSinExistenciaVariante } from '../InsigniaSinStock';
 import { ClaveMenuTienda, DefaultsTemaPlantilla, menuVisibleOrdenado, useCargarFuentesTienda, variablesCssTema } from '../tema';
 import type { Plantilla, PropsCarrito, PropsHome, PropsProducto } from './tipos';
 
@@ -27,7 +27,7 @@ const DEFAULTS: DefaultsTemaPlantilla = {
 
 const ENLACES_MENU: Record<ClaveMenuTienda, { label: string; href: (subdominio: string) => string }> = {
   inicio: { label: 'Inicio', href: (s) => `/tienda/${s}` },
-  categorias: { label: 'Piezas', href: (s) => `/tienda/${s}#catalogo` },
+  categorias: { label: 'Piezas', href: (s) => `/tienda/${s}/productos` },
   carrito: { label: 'Bolsa', href: (s) => `/tienda/${s}/carrito` },
   cuenta: { label: 'Cuenta', href: (s) => `/tienda/${s}/mis-pedidos` },
 };
@@ -90,7 +90,7 @@ function ThumbRopero({ imagen, nombre }: { imagen: string | null; nombre: string
   );
 }
 
-function RoperoHome({ config, subdominio, carrito, productos, cargando, busqueda, onBuscar }: PropsHome) {
+function RoperoHome({ config, subdominio, carrito }: PropsHome) {
   const { tema, nombre, logo } = config;
   useCargarFuentesTienda([tema.fuenteDisplay ?? DEFAULTS.fuenteDisplay, tema.fuenteBody ?? DEFAULTS.fuenteBody]);
   const menu = menuVisibleOrdenado(tema.menu);
@@ -115,68 +115,6 @@ function RoperoHome({ config, subdominio, carrito, productos, cargando, busqueda
       <SeccionOfertas ofertas={ofertas} mostrar={tema.mostrarSeccionOfertas} />
       <SeccionesDinamicas secciones={secciones} subdominio={subdominio} estiloInsignia={tema.estiloInsigniaOferta} estiloInsigniaSinStock={tema.estiloInsigniaSinStock} />
 
-      <div id="catalogo" className="flex items-center justify-between px-6 pb-4 pt-4 sm:px-10">
-        <h2 className="text-[1.05em] font-semibold" style={{ fontFamily: 'var(--tienda-fuente-display)' }}>
-          Productos
-        </h2>
-        <input
-          value={busqueda}
-          onChange={(e) => onBuscar(e.target.value)}
-          placeholder="Buscar…"
-          className="rounded border border-[color:var(--tienda-color-texto)]/15 bg-[var(--tienda-color-superficie)] px-3 py-1.5 text-[0.8em] outline-none"
-        />
-      </div>
-
-      <div className="grid grid-cols-2 gap-6 px-6 pb-16 sm:grid-cols-3 sm:px-10 lg:grid-cols-4">
-        {cargando && <p className="col-span-full text-[0.85em] opacity-60">Cargando…</p>}
-        {!cargando && productos.length === 0 && <p className="col-span-full text-[0.85em] opacity-60">No hay productos.</p>}
-        {productos.map((p, i) => (
-          <Link
-            key={p.id}
-            to={`/tienda/${subdominio}/producto/${p.id}`}
-            className="bg-[var(--tienda-color-superficie)] p-2.5 shadow-[var(--tienda-sombra-tarjeta)]"
-            style={{ transform: `rotate(${i % 3 === 0 ? '-1deg' : i % 3 === 1 ? '1deg' : '-0.4deg'})` }}
-          >
-            <div className={`relative ${claseImagenSinStock(p.sinStock, tema.estiloInsigniaSinStock)}`}>
-              <ThumbRopero imagen={p.imagen} nombre={p.nombre} />
-              {p.sinStock ? (
-                <InsigniaSinStock sinStock estilo={tema.estiloInsigniaSinStock} />
-              ) : (
-                <InsigniaOferta oferta={p.oferta} estilo={tema.estiloInsigniaOferta} />
-              )}
-            </div>
-            <div className="pt-2">
-              <div className="text-[0.65em] font-semibold uppercase tracking-[0.04em]" style={{ color: '#8a9a72' }}>
-                Única pieza
-              </div>
-              <h3 className="mb-1 text-[0.85em] font-medium">{p.nombre}</h3>
-              <div className="flex items-center justify-between gap-1.5">
-                {!p.sinStock && p.oferta ? (
-                  <FilaPrecioOferta precio={p.precio} oferta={p.oferta} estilo={tema.estiloInsigniaOferta} tamano="0.85em" />
-                ) : (
-                  <span className="text-[0.85em]" style={{ color: 'var(--tienda-color-acento)' }}>
-                    {formatearPrecio(p.precio)}
-                  </span>
-                )}
-                <TextoSinStock sinStock={p.sinStock} estilo={tema.estiloInsigniaSinStock} />
-                {!p.tieneVariantes && p.varianteId && !p.sinStock && (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      carrito.agregar({ productoId: p.id, varianteId: p.varianteId!, varianteEtiqueta: '', nombre: p.nombre, precio: precioParaCarrito(p.precio, p.oferta), precioOriginal: precioOriginalParaCarrito(p.precio, p.oferta), imagen: p.imagen });
-                    }}
-                    className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-white"
-                    style={{ background: 'var(--tienda-color-acento)' }}
-                  >
-                    <Plus size={13} />
-                  </button>
-                )}
-              </div>
-            </div>
-          </Link>
-        ))}
-      </div>
       <Footer nombre={nombre} />
     </div>
   );

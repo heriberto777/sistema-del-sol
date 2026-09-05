@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Minus, Plus, Search, ShoppingCart, Trash2, User } from 'lucide-react';
+import { Minus, Plus, ShoppingCart, Trash2, User } from 'lucide-react';
 import { formatearPrecio, useOfertasTienda, useProductosDestacados, useSeccionesTienda } from '../../../hooks/useTienda';
 import { useClienteTienda } from '../../../hooks/useClienteTienda';
 import { useCarritoDrawer } from '../CarritoDrawerContext';
@@ -9,8 +9,8 @@ import { SeccionDestacados } from '../SeccionDestacados';
 import { SeccionOfertas } from '../SeccionOfertas';
 import { SeccionesDinamicas } from '../SeccionesDinamicas';
 import { ProductosRelacionados } from '../ProductosRelacionados';
-import { FilaPrecioOferta, InsigniaOferta, precioOriginalParaCarrito, precioParaCarrito } from '../OfertaEnTarjeta';
-import { claseImagenSinStock, EtiquetaSinExistenciaVariante, InsigniaSinStock, TextoSinStock } from '../InsigniaSinStock';
+import { FilaPrecioOferta } from '../OfertaEnTarjeta';
+import { EtiquetaSinExistenciaVariante } from '../InsigniaSinStock';
 import { ClaveMenuTienda, DefaultsTemaPlantilla, menuVisibleOrdenado, useCargarFuentesTienda, variablesCssTema } from '../tema';
 import type { Plantilla, PropsCarrito, PropsHome, PropsProducto } from './tipos';
 
@@ -27,7 +27,7 @@ const DEFAULTS: DefaultsTemaPlantilla = {
 
 const ENLACES_MENU: Record<ClaveMenuTienda, { label: string; href: (subdominio: string) => string }> = {
   inicio: { label: 'Nuevo', href: (s) => `/tienda/${s}` },
-  categorias: { label: 'Colección', href: (s) => `/tienda/${s}#catalogo` },
+  categorias: { label: 'Colección', href: (s) => `/tienda/${s}/productos` },
   carrito: { label: 'Bolsa', href: (s) => `/tienda/${s}/carrito` },
   cuenta: { label: 'Cuenta', href: (s) => `/tienda/${s}/mis-pedidos` },
 };
@@ -89,7 +89,7 @@ function ThumbEditorial({ imagen, nombre }: { imagen: string | null; nombre: str
   );
 }
 
-function EditorialHome({ config, subdominio, carrito, productos, cargando, busqueda, onBuscar }: PropsHome) {
+function EditorialHome({ config, subdominio, carrito }: PropsHome) {
   const { tema, nombre, logo } = config;
   useCargarFuentesTienda([tema.fuenteDisplay ?? DEFAULTS.fuenteDisplay, tema.fuenteBody ?? DEFAULTS.fuenteBody]);
   const menu = menuVisibleOrdenado(tema.menu);
@@ -113,62 +113,6 @@ function EditorialHome({ config, subdominio, carrito, productos, cargando, busqu
       <SeccionOfertas ofertas={ofertas} mostrar={tema.mostrarSeccionOfertas} />
       <SeccionesDinamicas secciones={secciones} subdominio={subdominio} estiloInsignia={tema.estiloInsigniaOferta} estiloInsigniaSinStock={tema.estiloInsigniaSinStock} />
 
-      <div id="catalogo" className="flex items-baseline justify-between px-6 pb-4 pt-6 sm:px-10">
-        <h2 className="text-[1em] font-bold uppercase tracking-[0.03em]">Productos</h2>
-        <div className="relative">
-          <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 opacity-50" />
-          <input
-            value={busqueda}
-            onChange={(e) => onBuscar(e.target.value)}
-            placeholder="Buscar…"
-            className="border border-[color:var(--tienda-color-texto)]/15 bg-[var(--tienda-color-fondo)] py-2 pl-8 pr-3 text-[0.8em] outline-none"
-          />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4">
-        {cargando && <p className="col-span-full px-6 py-6 text-[0.85em] opacity-60 sm:px-10">Cargando…</p>}
-        {!cargando && productos.length === 0 && <p className="col-span-full px-6 py-6 text-[0.85em] opacity-60 sm:px-10">No hay productos.</p>}
-        {productos.map((p) => (
-          <Link key={p.id} to={`/tienda/${subdominio}/producto/${p.id}`} className="relative border-b border-r border-[color:var(--tienda-color-texto)]/10 pb-3">
-            {p.sinStock ? (
-              <InsigniaSinStock sinStock estilo={tema.estiloInsigniaSinStock} />
-            ) : p.oferta ? (
-              <InsigniaOferta oferta={p.oferta} estilo={tema.estiloInsigniaOferta} />
-            ) : (
-              <span className="absolute left-2.5 top-2.5 text-[0.65em] font-semibold uppercase tracking-[0.04em]" style={{ color: 'var(--tienda-color-acento)' }}>
-                Nuevo
-              </span>
-            )}
-            <div className={claseImagenSinStock(p.sinStock, tema.estiloInsigniaSinStock)}>
-              <ThumbEditorial imagen={p.imagen} nombre={p.nombre} />
-            </div>
-            <div className="px-2.5 pt-2.5">
-              <h3 className="mb-1 text-[0.78em] font-medium">{p.nombre}</h3>
-              <div className="flex items-center justify-between gap-1.5">
-                {!p.sinStock && p.oferta ? (
-                  <FilaPrecioOferta precio={p.precio} oferta={p.oferta} estilo={tema.estiloInsigniaOferta} tamano="0.78em" />
-                ) : (
-                  <span className="text-[0.78em] font-semibold">{formatearPrecio(p.precio)}</span>
-                )}
-                <TextoSinStock sinStock={p.sinStock} estilo={tema.estiloInsigniaSinStock} />
-                {!p.tieneVariantes && p.varianteId && !p.sinStock && (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      carrito.agregar({ productoId: p.id, varianteId: p.varianteId!, varianteEtiqueta: '', nombre: p.nombre, precio: precioParaCarrito(p.precio, p.oferta), precioOriginal: precioOriginalParaCarrito(p.precio, p.oferta), imagen: p.imagen });
-                    }}
-                    className="flex h-6 w-6 shrink-0 items-center justify-center border border-[color:var(--tienda-color-texto)]/20"
-                  >
-                    <Plus size={12} />
-                  </button>
-                )}
-              </div>
-            </div>
-          </Link>
-        ))}
-      </div>
       <Footer nombre={nombre} />
     </div>
   );

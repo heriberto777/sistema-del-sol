@@ -1,4 +1,4 @@
-import { CategoriaTienda, ConfigTienda, ProductoTienda, ProductoTiendaDetalle, VarianteTienda } from '../../../hooks/useTienda';
+import { ConfigTienda, ProductoTiendaDetalle, VarianteTienda } from '../../../hooks/useTienda';
 import { CarritoTienda } from '../../../hooks/useCarritoTienda';
 
 export interface PropsBase {
@@ -7,16 +7,16 @@ export interface PropsBase {
   carrito: CarritoTienda;
 }
 
-export interface PropsHome extends PropsBase {
-  productos: ProductoTienda[];
-  cargando: boolean;
-  busqueda: string;
-  onBuscar: (valor: string) => void;
-  /** Fase 12 — chips de categoría (plantillas "marketplace"); las demás plantillas los ignoran sin problema. */
-  categorias: CategoriaTienda[];
-  categoriaId?: string;
-  onCategoriaSeleccionar: (categoriaId: string | undefined) => void;
-}
+/**
+ * El Home ya NO recibe el catálogo — pedido explícito ("opción B"): el
+ * Home es una vidriera curada (banner/Destacados/Ofertas/Secciones), el
+ * catálogo completo y cada categoría viven en su propia página
+ * (`TiendaProductos`/`TiendaCategoria`, con búsqueda y paginación real).
+ * Antes tenía `productos`/`busqueda`/`categorias`/etc. — cualquier
+ * buscador que una plantilla muestre en el Home ahora navega a
+ * `/tienda/:subdominio/productos?busqueda=...` en vez de filtrar in-place.
+ */
+export type PropsHome = PropsBase;
 
 export interface PropsProducto extends PropsBase {
   producto: ProductoTiendaDetalle;
