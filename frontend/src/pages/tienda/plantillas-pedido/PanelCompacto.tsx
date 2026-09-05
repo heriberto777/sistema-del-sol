@@ -17,9 +17,12 @@ export function PanelCompacto({ datos, subdominio, onPagar, pagando, error }: Pl
   return (
     <div className="w-full max-w-sm rounded-xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-800 dark:bg-slate-900">
       <div className="flex items-start justify-between gap-3">
-        <div>
-          <h1 className="text-base font-bold text-slate-900 dark:text-slate-100">Pedido {datos.numero}</h1>
-          <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{datos.storeNombre}</p>
+        <div className="flex items-center gap-2.5">
+          {datos.storeLogo && <img src={datos.storeLogo} alt="" className="h-8 w-auto max-w-[6rem] object-contain" />}
+          <div>
+            <h1 className="text-base font-bold text-slate-900 dark:text-slate-100">Pedido {datos.numero}</h1>
+            <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{datos.storeNombre}</p>
+          </div>
         </div>
         <span className={`shrink-0 whitespace-nowrap rounded-md px-2 py-0.5 text-[11px] font-bold tracking-wide ${TONO_ESTADO[estado]}`}>{estado}</span>
       </div>

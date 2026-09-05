@@ -9,6 +9,7 @@ export function TarjetaDeMarca({ datos, subdominio, onPagar, pagando, error }: P
 
   return (
     <div className="w-full max-w-sm rounded-3xl border border-slate-200 bg-white p-7 shadow-2xl dark:border-slate-800 dark:bg-slate-900">
+      {datos.storeLogo && <img src={datos.storeLogo} alt="" className="mx-auto mb-4 h-9 w-auto max-w-[9rem] object-contain" />}
       <div
         className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full text-white"
         style={{ background: estado === 'ANULADA' ? '#94a3b8' : datos.colorAcento }}

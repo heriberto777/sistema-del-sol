@@ -139,6 +139,7 @@ export function CobroFactura() {
           onPagar={() => pagar.mutate(factura.pendiente)}
           datos={{
             storeNombre: config.nombre,
+            storeLogo: config.logo,
             colorAcento: config.tema.colorAcento ?? config.colorAcento ?? '#f59e0b',
             numero: factura.numero,
             estado: factura.estado,

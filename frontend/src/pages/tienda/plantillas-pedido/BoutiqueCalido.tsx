@@ -13,6 +13,7 @@ export function BoutiqueCalido({ datos, subdominio, onPagar, pagando, error }: P
       className="w-full max-w-sm border border-[#ddccb2] bg-[#f8f2e8] px-9 py-11 shadow-2xl dark:border-[#46392a] dark:bg-[#2b2219]"
       style={{ fontFamily: "'Georgia', 'Times New Roman', serif" }}
     >
+      {datos.storeLogo && <img src={datos.storeLogo} alt="" className="mx-auto mb-3 h-9 w-auto max-w-[9rem] object-contain" />}
       <div className="text-center text-sm tracking-[0.3em]" style={{ color: datos.colorAcento }}>
         ✦
       </div>

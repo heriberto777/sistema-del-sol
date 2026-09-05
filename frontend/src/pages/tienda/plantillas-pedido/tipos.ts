@@ -16,6 +16,7 @@ export type EstadoFacturaRecibo = 'BORRADOR' | 'EMITIDA' | 'ANULADA';
 
 export interface DatosReciboPedido {
   storeNombre: string;
+  storeLogo: string | null;
   colorAcento: string;
   numero: string;
   estado: EstadoFacturaRecibo;

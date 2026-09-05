@@ -10,7 +10,8 @@ export function ReciboTermico({ datos, subdominio, onPagar, pagando, error }: Pl
   return (
     <div className="w-full max-w-sm">
       <div className="relative bg-white px-7 py-8 font-mono text-[13px] text-slate-900 shadow-2xl dark:bg-slate-900 dark:text-slate-100">
-        <div className="text-center">
+        <div className="flex flex-col items-center gap-2 text-center">
+          {datos.storeLogo && <img src={datos.storeLogo} alt="" className="h-10 w-auto max-w-[10rem] object-contain" />}
           <div className="text-lg font-bold uppercase tracking-wide">{datos.storeNombre}</div>
         </div>
         <hr className="my-4 border-t border-dashed border-slate-300 dark:border-slate-700" />
