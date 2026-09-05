@@ -11,6 +11,7 @@ import { SeccionesDinamicas } from '../SeccionesDinamicas';
 import { ProductosRelacionados } from '../ProductosRelacionados';
 import { FilaPrecioOferta } from '../OfertaEnTarjeta';
 import { EtiquetaSinExistenciaVariante } from '../InsigniaSinStock';
+import { ToggleTemaTienda } from '../ToggleTemaTienda';
 import type { Plantilla, PropsCarrito, PropsHome, PropsProducto } from './tipos';
 
 const ACCENT_DEFAULT = '#ff6b45';
@@ -27,15 +28,15 @@ function Nav({ nombre, logo, subdominio, cantidadCarrito, accent }: { nombre: st
         Powered by Sistema del Sol
       </div>
       <div className="flex flex-wrap items-center justify-between gap-y-2 px-6 py-4 sm:px-10">
-        <Link to={`/tienda/${subdominio}`} className="flex items-center gap-2" style={{ fontFamily: FONT_DISPLAY, color: BG_OSCURO }}>
+        <Link to={`/tienda/${subdominio}`} className="flex items-center gap-2 text-[#0d5c58] dark:text-[#e7f3f1]" style={{ fontFamily: FONT_DISPLAY }}>
           {logo && <img src={logo} alt={nombre} className="h-8 w-auto max-w-[7rem] rounded-full object-contain" />}
           <span className="text-xl font-bold">{nombre}</span>
         </Link>
         <div className="flex flex-wrap items-center gap-3 gap-y-2 sm:gap-4">
-          <Link to={`/tienda/${subdominio}/productos`} className="text-sm font-semibold" style={{ color: BG_OSCURO }}>
+          <Link to={`/tienda/${subdominio}/productos`} className="text-sm font-semibold text-[#0d5c58] dark:text-[#e7f3f1]">
             Productos
           </Link>
-          <Link to={`/tienda/${subdominio}/${autenticado ? 'mis-pedidos' : 'login'}`} className="flex items-center gap-1.5 text-sm font-semibold" style={{ color: BG_OSCURO }}>
+          <Link to={`/tienda/${subdominio}/${autenticado ? 'mis-pedidos' : 'login'}`} className="flex items-center gap-1.5 text-sm font-semibold text-[#0d5c58] dark:text-[#e7f3f1]">
             <User size={16} />
             {autenticado ? 'Mi cuenta' : 'Iniciar sesión'}
           </Link>
@@ -48,6 +49,7 @@ function Nav({ nombre, logo, subdominio, cantidadCarrito, accent }: { nombre: st
             <ShoppingCart size={15} />
             Carrito · {cantidadCarrito}
           </button>
+          <ToggleTemaTienda className="text-[#0d5c58] dark:text-[#e7f3f1]" />
         </div>
       </div>
     </>

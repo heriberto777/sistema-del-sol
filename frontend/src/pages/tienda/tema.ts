@@ -1,4 +1,5 @@
 import { CSSProperties, useEffect } from 'react';
+import type { ModoTiendaTema } from './TiendaTemaContext';
 
 // Espejo manual de `backend/src/ecommerce/resolver-config-tienda.ts` — mismo
 // criterio ya usado para `PlantillaTienda`/`PLANTILLAS_TIENDA` en este repo
@@ -104,13 +105,33 @@ export interface DefaultsTemaPlantilla {
  * (Bruma/Bloque) — cada campo `null` de `tema` cae al default propio de la
  * plantilla (pasado por el llamador) para que se vea terminada sin que el
  * tenant tenga que tocar nada en Personalización.
+ *
+ * `modo` (pedido explícito del usuario, "derivar automáticamente"): en
+ * 'oscuro' NO se usan `colorFondo`/`colorSuperficie`/`colorTexto` del
+ * tenant tal cual (siguen siendo su paleta CLARA, pensada para fondo
+ * blanco) — se deriva una versión oscura con `color-mix()` nativo del
+ * navegador, manteniendo el `colorAcento` reconocible (con un aclarado
+ * fijo para que no se apague sobre fondo casi negro) sin que el tenant
+ * tenga que configurar una segunda paleta.
  */
-export function variablesCssTema(tema: TemaTienda, defaults: DefaultsTemaPlantilla): CSSProperties {
+export function variablesCssTema(tema: TemaTienda, defaults: DefaultsTemaPlantilla, modo: ModoTiendaTema = 'claro'): CSSProperties {
+  const acento = tema.colorAcento ?? defaults.colorAcento;
+  const colores: Record<string, string> =
+    modo === 'oscuro'
+      ? {
+          '--tienda-color-acento': `color-mix(in srgb, ${acento} 82%, white)`,
+          '--tienda-color-fondo': `color-mix(in srgb, ${acento} 6%, #0b0b0d)`,
+          '--tienda-color-superficie': `color-mix(in srgb, ${acento} 8%, #17171b)`,
+          '--tienda-color-texto': `color-mix(in srgb, ${acento} 3%, #f2f2f0)`,
+        }
+      : {
+          '--tienda-color-acento': acento,
+          '--tienda-color-fondo': tema.colorFondo ?? defaults.colorFondo,
+          '--tienda-color-superficie': tema.colorSuperficie ?? defaults.colorSuperficie,
+          '--tienda-color-texto': tema.colorTexto ?? defaults.colorTexto,
+        };
   return {
-    '--tienda-color-acento': tema.colorAcento ?? defaults.colorAcento,
-    '--tienda-color-fondo': tema.colorFondo ?? defaults.colorFondo,
-    '--tienda-color-superficie': tema.colorSuperficie ?? defaults.colorSuperficie,
-    '--tienda-color-texto': tema.colorTexto ?? defaults.colorTexto,
+    ...colores,
     '--tienda-fuente-display': `'${tema.fuenteDisplay ?? defaults.fuenteDisplay}', serif`,
     '--tienda-fuente-body': `'${tema.fuenteBody ?? defaults.fuenteBody}', sans-serif`,
     '--tienda-tamano-fuente': TAMANO_FUENTE_PX[tema.tamanoFuente],

@@ -16,8 +16,31 @@
   :root {
     color-scheme: light;
   }
-  :root.dark {
+  /*
+   * `.dark` sin el prefijo `:root` a propósito — la tienda pública aplica
+   * su propio modo oscuro en un wrapper propio (ver TiendaLayout.tsx),
+   * nunca en <html>, para no compartir preferencia con el panel admin.
+   * Esta regla cubre AMBOS casos con una sola declaración.
+   */
+  :root.dark,
+  .dark {
     color-scheme: dark;
+  }
+
+  /*
+   * Bug real reportado ("en oscuro la letra no se ve"): TiendaCategoria/
+   * TiendaProductos usan TarjetaProductoTienda sin definirle las
+   * variables `--tienda-color-superficie`/`--tienda-color-texto` (a
+   * diferencia de las 14 plantillas de marca, que sí las definen vía
+   * variablesCssTema) — sin este override, la tarjeta caía a su fallback
+   * BLANCO fijo mientras el texto heredaba blanco también (por
+   * `color-scheme: dark` de arriba), quedando texto blanco sobre tarjeta
+   * blanca. Con este override la tarjeta se ve oscura y coherente con el
+   * resto de la página en vez de "flotar" en blanco.
+   */
+  .dark {
+    --tienda-color-superficie: #17171b;
+    --tienda-color-texto: #f2f2f0;
   }
 
   body {

@@ -12,6 +12,8 @@ import { ProductosRelacionados } from '../ProductosRelacionados';
 import { FilaPrecioOferta } from '../OfertaEnTarjeta';
 import { EtiquetaSinExistenciaVariante } from '../InsigniaSinStock';
 import { ClaveMenuTienda, DefaultsTemaPlantilla, menuVisibleOrdenado, useCargarFuentesTienda, variablesCssTema } from '../tema';
+import { useTiendaTema } from '../TiendaTemaContext';
+import { ToggleTemaTienda } from '../ToggleTemaTienda';
 import type { Plantilla, PropsCarrito, PropsHome, PropsProducto } from './tipos';
 
 // Fase 8 — alta costura minimalista: lujo silencioso, blanco/negro absoluto,
@@ -65,6 +67,7 @@ function Nav({ nombre, logo, subdominio, cantidadCarrito, menu }: { nombre: stri
             </Link>
           );
         })}
+        <ToggleTemaTienda className="text-[var(--tienda-color-texto)] opacity-60" />
       </div>
     </div>
   );
@@ -81,13 +84,14 @@ function Footer({ nombre }: { nombre: string }) {
 
 function AtelierHome({ config, subdominio, carrito }: PropsHome) {
   const { tema, nombre, logo } = config;
+  const { modo } = useTiendaTema();
   useCargarFuentesTienda([tema.fuenteDisplay ?? DEFAULTS.fuenteDisplay, tema.fuenteBody ?? DEFAULTS.fuenteBody]);
   const menu = menuVisibleOrdenado(tema.menu);
   const { data: destacados } = useProductosDestacados(subdominio);
   const { data: ofertas } = useOfertasTienda(subdominio);
   const { data: secciones = [] } = useSeccionesTienda(subdominio);
   return (
-    <div className="min-h-screen bg-[var(--tienda-color-fondo)] text-[var(--tienda-color-texto)]" style={{ ...variablesCssTema(tema, DEFAULTS), fontFamily: 'var(--tienda-fuente-body)', fontSize: 'var(--tienda-tamano-fuente)' }}>
+    <div className="min-h-screen bg-[var(--tienda-color-fondo)] text-[var(--tienda-color-texto)]" style={{ ...variablesCssTema(tema, DEFAULTS, modo), fontFamily: 'var(--tienda-fuente-body)', fontSize: 'var(--tienda-tamano-fuente)' }}>
       <BannerAnuncio mensajes={config.bannerAnuncio.mensajes} intervaloSegundos={config.bannerAnuncio.intervaloSegundos} />
       <Nav nombre={nombre} logo={logo} subdominio={subdominio} cantidadCarrito={carrito.cantidadTotal} menu={menu} />
       <div className="px-6 pb-4 pt-2 sm:px-10">
@@ -109,13 +113,14 @@ function AtelierHome({ config, subdominio, carrito }: PropsHome) {
 
 function AtelierProducto({ config, subdominio, carrito, producto, varianteSeleccionada, onSeleccionarVariante, cantidad, onCantidadChange, onAgregar }: PropsProducto) {
   const { tema, nombre, logo } = config;
+  const { modo } = useTiendaTema();
   useCargarFuentesTienda([tema.fuenteDisplay ?? DEFAULTS.fuenteDisplay, tema.fuenteBody ?? DEFAULTS.fuenteBody]);
   const menu = menuVisibleOrdenado(tema.menu);
   const debeElegirVariante = producto.variantes.length > 1;
   const galeria = [producto.imagen, ...producto.imagenesAdicionales].filter((img): img is string => !!img);
   const [imagenActiva, setImagenActiva] = useState(galeria[0] ?? null);
   return (
-    <div className="min-h-screen bg-[var(--tienda-color-fondo)] text-[var(--tienda-color-texto)]" style={{ ...variablesCssTema(tema, DEFAULTS), fontFamily: 'var(--tienda-fuente-body)', fontSize: 'var(--tienda-tamano-fuente)' }}>
+    <div className="min-h-screen bg-[var(--tienda-color-fondo)] text-[var(--tienda-color-texto)]" style={{ ...variablesCssTema(tema, DEFAULTS, modo), fontFamily: 'var(--tienda-fuente-body)', fontSize: 'var(--tienda-tamano-fuente)' }}>
       <Nav nombre={nombre} logo={logo} subdominio={subdominio} cantidadCarrito={carrito.cantidadTotal} menu={menu} />
       <div className="mx-auto grid max-w-4xl gap-12 px-6 py-10 sm:grid-cols-2 sm:px-10">
         <div>
@@ -203,10 +208,11 @@ function AtelierProducto({ config, subdominio, carrito, producto, varianteSelecc
 
 function AtelierCarrito({ config, subdominio, carrito }: PropsCarrito) {
   const { tema, nombre, logo } = config;
+  const { modo } = useTiendaTema();
   useCargarFuentesTienda([tema.fuenteDisplay ?? DEFAULTS.fuenteDisplay, tema.fuenteBody ?? DEFAULTS.fuenteBody]);
   const menu = menuVisibleOrdenado(tema.menu);
   return (
-    <div className="min-h-screen bg-[var(--tienda-color-fondo)] text-[var(--tienda-color-texto)]" style={{ ...variablesCssTema(tema, DEFAULTS), fontFamily: 'var(--tienda-fuente-body)', fontSize: 'var(--tienda-tamano-fuente)' }}>
+    <div className="min-h-screen bg-[var(--tienda-color-fondo)] text-[var(--tienda-color-texto)]" style={{ ...variablesCssTema(tema, DEFAULTS, modo), fontFamily: 'var(--tienda-fuente-body)', fontSize: 'var(--tienda-tamano-fuente)' }}>
       <Nav nombre={nombre} logo={logo} subdominio={subdominio} cantidadCarrito={carrito.cantidadTotal} menu={menu} />
       <div className="mx-auto max-w-2xl px-6 py-12 sm:px-10">
         <h1 className="mb-8 text-[1.4em] font-medium" style={{ fontFamily: 'var(--tienda-fuente-display)' }}>

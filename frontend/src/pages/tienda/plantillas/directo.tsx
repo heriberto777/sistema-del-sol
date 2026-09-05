@@ -11,6 +11,7 @@ import { SeccionesDinamicas } from '../SeccionesDinamicas';
 import { ProductosRelacionados } from '../ProductosRelacionados';
 import { FilaPrecioOferta } from '../OfertaEnTarjeta';
 import { EtiquetaSinExistenciaVariante } from '../InsigniaSinStock';
+import { ToggleTemaTienda } from '../ToggleTemaTienda';
 import type { Plantilla, PropsCarrito, PropsHome, PropsProducto } from './tipos';
 
 const ACCENT_DEFAULT = '#c77d2e';
@@ -43,6 +44,7 @@ function Nav({ nombre, logo, subdominio, cantidadCarrito, accent }: { nombre: st
             {cantidadCarrito}
           </span>
         </button>
+        <ToggleTemaTienda className="text-[#1c1a17] dark:text-[#f1ece2]" />
       </div>
     </div>
   );
