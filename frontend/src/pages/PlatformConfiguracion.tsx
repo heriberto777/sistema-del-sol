@@ -9,6 +9,7 @@ import { Select } from '../components/atoms/Select/Select';
 import { Switch } from '../components/atoms/Switch/Switch';
 import { NcfPlataformaPanel } from '../components/organisms/NcfPlataformaPanel/NcfPlataformaPanel';
 import { CampoImagen } from '../components/molecules/CampoImagen/CampoImagen';
+import { mensajeErrorApi } from '../lib/mensaje-error-api';
 
 export interface ConfiguracionPlataforma {
   general: {
@@ -63,6 +64,9 @@ export interface ConfiguracionPlataforma {
     claudeApiKeyConfigurado: boolean;
     openaiApiKeyConfigurado: boolean;
     geminiApiKeyConfigurado: boolean;
+    claudeModelo: string | null;
+    openaiModelo: string | null;
+    geminiModelo: string | null;
   };
 }
 
@@ -370,22 +374,79 @@ function SeccionPasarela({ config, guardar }: SeccionProps) {
  * credencial que ya usa el resto de la IA de la plataforma
  * (`ANTHROPIC_API_KEY`) — no es una llave nueva y distinta.
  */
+interface ModeloIa {
+  id: string;
+  nombre: string;
+}
+
+/**
+ * Un <select> por el modelo real del proveedor en vez de texto libre —
+ * "Cargar modelos" usa la API key ya guardada para consultar el propio
+ * listado del proveedor (GET .../ia-imagen/modelos), así se elige de lo
+ * que esa cuenta puede usar de verdad, sin riesgo de tipear mal el
+ * nombre de un modelo o dejar uno viejo/descontinuado.
+ */
+function SelectorModeloIa({ proveedor, label, value, onChange }: { proveedor: string; label: string; value: string; onChange: (modelo: string) => void }) {
+  const [modelos, setModelos] = useState<ModeloIa[]>([]);
+  const [error, setError] = useState<string | null>(null);
+
+  const cargarModelos = useMutation({
+    mutationFn: async () =>
+      (await platformApiClient.get<{ modelos: ModeloIa[] }>('/platform/configuracion/ia-imagen/modelos', { params: { proveedor } })).data.modelos,
+    onSuccess: (lista) => {
+      setError(null);
+      setModelos(lista);
+      if (lista.length > 0 && !lista.some((m) => m.id === value)) onChange(lista[0].id);
+    },
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudieron cargar los modelos.')),
+  });
+
+  return (
+    <div className="flex flex-col gap-1">
+      <label className="text-sm font-medium text-slate-700 dark:text-slate-300">{label}</label>
+      <div className="flex items-center gap-2">
+        <Select value={value} onChange={(e) => onChange(e.target.value)} className="flex-1">
+          {value && !modelos.some((m) => m.id === value) && <option value={value}>{value}</option>}
+          {modelos.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.nombre}
+            </option>
+          ))}
+        </Select>
+        <Button type="button" variante="secundario" onClick={() => cargarModelos.mutate()} disabled={cargarModelos.isPending}>
+          {cargarModelos.isPending ? 'Cargando…' : 'Cargar modelos'}
+        </Button>
+      </div>
+      {error && <p className="text-xs text-red-600 dark:text-red-400">{error}</p>}
+    </div>
+  );
+}
+
 function SeccionIaImagen({ config, guardar }: SeccionProps) {
   const iaImagen = config.iaImagen;
   const [proveedorActivo, setProveedorActivo] = useState(iaImagen.proveedorActivo ?? 'claude');
   const [claudeApiKey, setClaudeApiKey] = useState('');
   const [openaiApiKey, setOpenaiApiKey] = useState('');
   const [geminiApiKey, setGeminiApiKey] = useState('');
+  const [claudeModelo, setClaudeModelo] = useState(iaImagen.claudeModelo ?? '');
+  const [openaiModelo, setOpenaiModelo] = useState(iaImagen.openaiModelo ?? '');
+  const [geminiModelo, setGeminiModelo] = useState(iaImagen.geminiModelo ?? '');
 
   useEffect(() => {
     setProveedorActivo(iaImagen.proveedorActivo ?? 'claude');
+    setClaudeModelo(iaImagen.claudeModelo ?? '');
+    setOpenaiModelo(iaImagen.openaiModelo ?? '');
+    setGeminiModelo(iaImagen.geminiModelo ?? '');
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [iaImagen.proveedorActivo]);
+  }, [iaImagen.proveedorActivo, iaImagen.claudeModelo, iaImagen.openaiModelo, iaImagen.geminiModelo]);
 
   function onSubmit(e: FormEvent) {
     e.preventDefault();
     guardar.mutate({
       iaImagenProveedorActivo: proveedorActivo,
+      iaClaudeModelo: claudeModelo,
+      iaOpenaiModelo: openaiModelo,
+      iaGeminiModelo: geminiModelo,
       ...(claudeApiKey !== '' ? { iaClaudeApiKey: claudeApiKey } : {}),
       ...(openaiApiKey !== '' ? { iaOpenaiApiKey: openaiApiKey } : {}),
       ...(geminiApiKey !== '' ? { iaGeminiApiKey: geminiApiKey } : {}),
@@ -419,6 +480,7 @@ function SeccionIaImagen({ config, guardar }: SeccionProps) {
           onChange={(e) => setClaudeApiKey(e.target.value)}
           placeholder={iaImagen.claudeApiKeyConfigurado ? PLACEHOLDER_CONFIGURADO : 'sk-ant-...'}
         />
+        <SelectorModeloIa proveedor="claude" label="Modelo de Claude" value={claudeModelo} onChange={setClaudeModelo} />
         <FormField
           id="iaOpenaiApiKey"
           label="OpenAI API Key"
@@ -427,6 +489,7 @@ function SeccionIaImagen({ config, guardar }: SeccionProps) {
           onChange={(e) => setOpenaiApiKey(e.target.value)}
           placeholder={iaImagen.openaiApiKeyConfigurado ? PLACEHOLDER_CONFIGURADO : 'sk-...'}
         />
+        <SelectorModeloIa proveedor="openai" label="Modelo de OpenAI" value={openaiModelo} onChange={setOpenaiModelo} />
         <FormField
           id="iaGeminiApiKey"
           label="Gemini API Key"
@@ -435,6 +498,7 @@ function SeccionIaImagen({ config, guardar }: SeccionProps) {
           onChange={(e) => setGeminiApiKey(e.target.value)}
           placeholder={iaImagen.geminiApiKeyConfigurado ? PLACEHOLDER_CONFIGURADO : 'AIza...'}
         />
+        <SelectorModeloIa proveedor="gemini" label="Modelo de Gemini" value={geminiModelo} onChange={setGeminiModelo} />
         <Button type="submit" disabled={guardar.isPending}>
           {guardar.isPending ? 'Guardando…' : 'Guardar'}
         </Button>
