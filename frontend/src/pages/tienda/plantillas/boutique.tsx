@@ -29,7 +29,7 @@ function Nav({ nombre, logo, subdominio, cantidadCarrito, accent }: { nombre: st
   return (
     <div className="flex flex-wrap items-center justify-between gap-y-2 border-b border-[#37312a] px-8 py-5 sm:px-12">
       <Link to={`/tienda/${subdominio}`} className="flex items-center gap-2 text-[#f4ede3]" style={{ fontFamily: FONT_DISPLAY }}>
-        {logo && <img src={logo} alt={nombre} className="h-8 w-8 rounded-full object-cover" />}
+        {logo && <img src={logo} alt={nombre} className="h-8 w-auto max-w-[7rem] rounded-full object-contain" />}
         <span className="text-2xl font-semibold tracking-wide">{nombre}</span>
       </Link>
       <div className="flex flex-wrap items-center gap-3 gap-y-2 sm:gap-6">

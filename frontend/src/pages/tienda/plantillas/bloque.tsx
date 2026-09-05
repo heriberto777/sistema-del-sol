@@ -50,7 +50,7 @@ function Nav({
   return (
     <div className="flex flex-wrap items-center justify-between gap-y-2 border-b border-[color:var(--tienda-color-texto)]/10 px-6 py-5 sm:px-10">
       <Link to={`/tienda/${subdominio}`} className="flex items-center gap-2 uppercase tracking-[0.02em]" style={{ fontFamily: 'var(--tienda-fuente-display)' }}>
-        {logo && <img src={logo} alt={nombre} className="h-8 w-8 object-cover" />}
+        {logo && <img src={logo} alt={nombre} className="h-8 w-auto max-w-[7rem] object-contain" />}
         <span className="text-[1.3em] text-[var(--tienda-color-texto)]">{nombre}</span>
       </Link>
       <div className="flex flex-wrap items-center gap-3 gap-y-2 sm:gap-6">

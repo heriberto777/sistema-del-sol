@@ -64,7 +64,7 @@ export function PlatformSidebar({ onNavegar }: { onNavegar?: () => void } = {}) 
     <nav className="flex h-full w-60 flex-col gap-1 overflow-y-auto border-r border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950">
       <div className="mb-5 flex items-center gap-2.5 px-2">
         {branding?.logo ? (
-          <img src={branding.logo} alt="Logo" className="h-9 w-9 shrink-0 rounded-lg object-contain shadow-sm" />
+          <img src={branding.logo} alt="Logo" className="h-9 w-auto max-w-[9.5rem] shrink-0 rounded-lg object-contain shadow-sm" />
         ) : (
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-sol-500 text-base font-bold text-white shadow-sm">
             S

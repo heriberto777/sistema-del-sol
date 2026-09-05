@@ -42,7 +42,7 @@ function Nav({ nombre, logo, subdominio, cantidadCarrito, menu }: { nombre: stri
   return (
     <div className="flex flex-wrap items-center gap-x-6 gap-y-2 px-6 py-3 sm:px-10" style={{ background: HEADER_BG }}>
       <Link to={`/tienda/${subdominio}`} className="flex items-center gap-2 text-white" style={{ fontFamily: 'var(--tienda-fuente-display)' }}>
-        {logo && <img src={logo} alt={nombre} className="h-8 w-8 rounded object-cover" />}
+        {logo && <img src={logo} alt={nombre} className="h-8 w-auto max-w-[7rem] rounded object-contain" />}
         <span className="text-[1.15em] font-extrabold">{nombre}</span>
       </Link>
       <div className="ml-auto flex flex-wrap items-center justify-end gap-3 gap-y-2 sm:gap-5">

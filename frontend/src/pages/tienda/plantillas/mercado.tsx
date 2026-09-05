@@ -28,7 +28,7 @@ function Nav({ nombre, logo, subdominio, cantidadCarrito, accent }: { nombre: st
       </div>
       <div className="flex flex-wrap items-center justify-between gap-y-2 px-6 py-4 sm:px-10">
         <Link to={`/tienda/${subdominio}`} className="flex items-center gap-2" style={{ fontFamily: FONT_DISPLAY, color: BG_OSCURO }}>
-          {logo && <img src={logo} alt={nombre} className="h-8 w-8 rounded-full object-cover" />}
+          {logo && <img src={logo} alt={nombre} className="h-8 w-auto max-w-[7rem] rounded-full object-contain" />}
           <span className="text-xl font-bold">{nombre}</span>
         </Link>
         <div className="flex flex-wrap items-center gap-3 gap-y-2 sm:gap-4">

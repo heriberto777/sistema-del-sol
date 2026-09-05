@@ -285,7 +285,7 @@ export function Sidebar({ forzarExpandido, onNavegar }: SidebarProps = {}) {
           <img
             src={usuario.tenant.logo}
             alt={usuario.tenant.nombre}
-            className="h-9 w-9 shrink-0 rounded-lg object-contain shadow-sm"
+            className={clsx('h-9 shrink-0 rounded-lg object-contain shadow-sm', colapsado ? 'w-9 max-w-none' : 'w-auto max-w-[9.5rem]')}
           />
         ) : (
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-sol-500 text-base font-bold text-white shadow-sm">

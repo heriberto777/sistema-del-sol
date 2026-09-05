@@ -51,7 +51,7 @@ export function TiendaLogin() {
       marca={
         <div className="flex items-center gap-2.5">
           {config.logo ? (
-            <img src={config.logo} alt="" className="h-8 w-8 rounded-lg object-contain" />
+            <img src={config.logo} alt="" className="h-8 w-auto max-w-[7rem] rounded-lg object-contain" />
           ) : (
             <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-900/10 text-sm font-bold dark:bg-white/20">{config.nombre.charAt(0).toUpperCase()}</span>
           )}
