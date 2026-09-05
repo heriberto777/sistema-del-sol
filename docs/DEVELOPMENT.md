@@ -218,7 +218,17 @@ docker compose -f docker-compose.prod.yml up -d
 docker compose -f docker-compose.prod.yml pull
 docker compose -f docker-compose.prod.yml up -d
 docker compose -f docker-compose.prod.yml exec api pnpm prisma:migrate:deploy
+docker compose -f docker-compose.prod.yml exec api pnpm permisos:backfill
 ```
+
+`permisos:backfill` (idempotente, no rompe nada si no hay nada nuevo)
+siempre va después de migrar, no solo cuando "el PR agregó un permiso" —
+`prisma:migrate:deploy` solo aplica cambios de ESQUEMA; el catálogo de
+permisos y a qué rol se lo otorga (`PERMISOS_BASE`/`ROLES_BASE` en
+`roles-base.ts`) es dato de aplicación que la migración nunca siembra
+para tenants ya existentes (bug real reportado: permiso agregado al
+código + migración corrida, pero invisible en "Roles y permisos" hasta
+correr este script).
 
 La imagen de `api` lleva `node_modules` completo (con devDependencies) a
 propósito — permite correr cualquier script operativo

@@ -12,6 +12,13 @@ name: sistema-del-sol
 #   cp .env.example .env   # completar con los valores reales de producción
 #   docker compose -f docker-compose.prod.yml up -d
 #   docker compose -f docker-compose.prod.yml exec api pnpm prisma:migrate:deploy
+#   docker compose -f docker-compose.prod.yml exec api pnpm permisos:backfill
+#     ↑ SIEMPRE después de migrar, no solo "si el PR agregó un permiso
+#     nuevo" — es idempotente (no duplica ni borra nada si no hay
+#     cambios) y la migración NUNCA siembra PERMISOS_BASE/ROLES_BASE
+#     (roles-base.ts) para tenants ya existentes, solo cambia esquema.
+#     Olvidarlo deja el permiso nuevo invisible en Roles y permisos aunque
+#     el código y la migración ya estén desplegados (ver ARCHITECTURE.md).
 #
 # El `api` NO publica puerto al host — solo Nginx Proxy Manager (u otro
 # proxy en la misma red del servidor) llega a él a través de `web`, que sí

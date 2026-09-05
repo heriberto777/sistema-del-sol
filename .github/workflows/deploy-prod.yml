@@ -5,8 +5,11 @@ name: Deploy prod
 #   docker compose -f docker-compose.prod.yml pull
 #   docker compose -f docker-compose.prod.yml up -d
 # (y `... exec api pnpm prisma:migrate:deploy` si el push trae migración
-# nueva) — igual criterio manual que bonifapp/ciguacash/ciguainv en este
-# servidor, sin SSH action ni credenciales del servidor en el repo.
+# nueva, seguido SIEMPRE de `... exec api pnpm permisos:backfill` —
+# idempotente, y la migración nunca siembra permisos nuevos para tenants
+# ya existentes, ver docs/DEVELOPMENT.md) — igual criterio manual que
+# bonifapp/ciguacash/ciguainv en este servidor, sin SSH action ni
+# credenciales del servidor en el repo.
 on:
   workflow_run:
     workflows: [CI]
