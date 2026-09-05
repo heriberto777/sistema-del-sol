@@ -5,8 +5,10 @@ import { PlataformaConfigService } from './plataforma-config.service';
 import { PlataformaConfigRepository } from './plataforma-config.repository';
 import { PlataformaWebhookChannel } from './plataforma-webhook.channel';
 import { NpmClientService } from './npm/npm-client.service';
+import { IaModule } from '../ia/ia.module';
 
 @Module({
+  imports: [IaModule],
   controllers: [PlataformaConfigController, PlataformaConfigPublicaController],
   providers: [PlataformaConfigService, PlataformaConfigRepository, PlataformaWebhookChannel, NpmClientService],
   exports: [PlataformaConfigRepository, PlataformaWebhookChannel, NpmClientService],

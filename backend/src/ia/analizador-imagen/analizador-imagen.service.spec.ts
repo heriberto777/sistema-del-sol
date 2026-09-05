@@ -1,4 +1,4 @@
-import { ServiceUnavailableException } from '@nestjs/common';
+import { BadRequestException, ServiceUnavailableException } from '@nestjs/common';
 import { AnalizadorImagenService } from './analizador-imagen.service';
 import { ClaudeVisionAdapter } from './claude-vision.adapter';
 import { OpenAiVisionAdapter } from './openai-vision.adapter';
@@ -12,9 +12,24 @@ describe('AnalizadorImagenService', () => {
   const ENV_ORIGINAL = { ...process.env };
 
   beforeEach(() => {
-    claudeAdapter = { clave: 'claude', habilitado: true, analizar: jest.fn().mockResolvedValue([{ nombre: 'X', descripcion: 'Y' }]) } as unknown as jest.Mocked<ClaudeVisionAdapter>;
-    openAiAdapter = { clave: 'openai', habilitado: true, analizar: jest.fn().mockResolvedValue([{ nombre: 'X', descripcion: 'Y' }]) } as unknown as jest.Mocked<OpenAiVisionAdapter>;
-    geminiAdapter = { clave: 'gemini', habilitado: true, analizar: jest.fn().mockResolvedValue([{ nombre: 'X', descripcion: 'Y' }]) } as unknown as jest.Mocked<GeminiVisionAdapter>;
+    claudeAdapter = {
+      clave: 'claude',
+      habilitado: true,
+      analizar: jest.fn().mockResolvedValue([{ nombre: 'X', descripcion: 'Y' }]),
+      listarModelos: jest.fn().mockResolvedValue([{ id: 'claude-sonnet-5', nombre: 'Claude Sonnet 5' }]),
+    } as unknown as jest.Mocked<ClaudeVisionAdapter>;
+    openAiAdapter = {
+      clave: 'openai',
+      habilitado: true,
+      analizar: jest.fn().mockResolvedValue([{ nombre: 'X', descripcion: 'Y' }]),
+      listarModelos: jest.fn().mockResolvedValue([{ id: 'gpt-4o', nombre: 'gpt-4o' }]),
+    } as unknown as jest.Mocked<OpenAiVisionAdapter>;
+    geminiAdapter = {
+      clave: 'gemini',
+      habilitado: true,
+      analizar: jest.fn().mockResolvedValue([{ nombre: 'X', descripcion: 'Y' }]),
+      listarModelos: jest.fn().mockResolvedValue([{ id: 'gemini-2.0-flash', nombre: 'Gemini 2.0 Flash' }]),
+    } as unknown as jest.Mocked<GeminiVisionAdapter>;
     service = new AnalizadorImagenService(claudeAdapter, openAiAdapter, geminiAdapter);
   });
 
@@ -61,6 +76,20 @@ describe('AnalizadorImagenService', () => {
       (claudeAdapter as { habilitado: boolean }).habilitado = false;
       await expect(service.analizarDesdeDataUri('data:image/jpeg;base64,YWJj')).rejects.toThrow(ServiceUnavailableException);
       expect(claudeAdapter.analizar).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('listarModelos', () => {
+    it('delega en el adaptador del proveedor pedido, no necesariamente el activo', async () => {
+      process.env.IA_IMAGEN_PROVEEDOR_ACTIVO = 'claude';
+      const resultado = await service.listarModelos('gemini');
+      expect(resultado).toEqual([{ id: 'gemini-2.0-flash', nombre: 'Gemini 2.0 Flash' }]);
+      expect(geminiAdapter.listarModelos).toHaveBeenCalled();
+      expect(claudeAdapter.listarModelos).not.toHaveBeenCalled();
+    });
+
+    it('rechaza un proveedor no reconocido', async () => {
+      await expect(service.listarModelos('otro')).rejects.toThrow(BadRequestException);
     });
   });
 });

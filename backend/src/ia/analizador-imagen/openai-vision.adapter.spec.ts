@@ -58,4 +58,42 @@ describe('OpenAiVisionAdapter', () => {
     fetchMock.mockRejectedValue(new Error('ECONNRESET'));
     await expect(adapter.analizar('x', 'image/jpeg')).rejects.toThrow(ServiceUnavailableException);
   });
+
+  describe('listarModelos', () => {
+    it('lanza ServiceUnavailableException sin llamar a fetch si falta la API key', async () => {
+      delete process.env.OPENAI_API_KEY;
+      await expect(adapter.listarModelos()).rejects.toThrow(ServiceUnavailableException);
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('filtra el catálogo completo a solo familias de chat/visión conocidas', async () => {
+      process.env.OPENAI_API_KEY = 'sk-oa-1';
+      fetchMock.mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          data: [
+            { id: 'gpt-4o' },
+            { id: 'gpt-4o-mini' },
+            { id: 'whisper-1' },
+            { id: 'text-embedding-3-small' },
+            { id: 'gpt-4o-mini-tts' },
+            { id: 'dall-e-3' },
+          ],
+        }),
+      });
+
+      const resultado = await adapter.listarModelos();
+
+      expect(resultado).toEqual([{ id: 'gpt-4o', nombre: 'gpt-4o' }, { id: 'gpt-4o-mini', nombre: 'gpt-4o-mini' }]);
+      const [url, opciones] = fetchMock.mock.calls[0];
+      expect(url).toBe('https://api.openai.com/v1/models');
+      expect(opciones.headers.Authorization).toBe('Bearer sk-oa-1');
+    });
+
+    it('lanza ServiceUnavailableException si OpenAI responde con error', async () => {
+      process.env.OPENAI_API_KEY = 'sk-oa-1';
+      fetchMock.mockResolvedValue({ ok: false, status: 401, text: async () => 'unauthorized' });
+      await expect(adapter.listarModelos()).rejects.toThrow(ServiceUnavailableException);
+    });
+  });
 });

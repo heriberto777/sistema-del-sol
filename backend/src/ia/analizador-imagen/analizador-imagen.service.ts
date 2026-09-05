@@ -1,8 +1,8 @@
-import { Injectable, ServiceUnavailableException } from '@nestjs/common';
+import { BadRequestException, Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { ClaudeVisionAdapter } from './claude-vision.adapter';
 import { OpenAiVisionAdapter } from './openai-vision.adapter';
 import { GeminiVisionAdapter } from './gemini-vision.adapter';
-import { AnalizadorImagenAdapter, CandidatoProducto } from './analizador-imagen.interface';
+import { AnalizadorImagenAdapter, CandidatoProducto, ModeloIa } from './analizador-imagen.interface';
 
 export const PROVEEDORES_IA_IMAGEN = ['claude', 'openai', 'gemini'] as const;
 export type ProveedorIaImagen = (typeof PROVEEDORES_IA_IMAGEN)[number];
@@ -16,14 +16,20 @@ export class AnalizadorImagenService {
     private readonly geminiAdapter: GeminiVisionAdapter,
   ) {}
 
+  private get adaptadores(): Record<string, AnalizadorImagenAdapter> {
+    return { claude: this.claudeAdapter, openai: this.openAiAdapter, gemini: this.geminiAdapter };
+  }
+
   get activo(): AnalizadorImagenAdapter {
     const clave = process.env.IA_IMAGEN_PROVEEDOR_ACTIVO || 'claude';
-    const adaptadores: Record<string, AnalizadorImagenAdapter> = {
-      claude: this.claudeAdapter,
-      openai: this.openAiAdapter,
-      gemini: this.geminiAdapter,
-    };
-    return adaptadores[clave] ?? this.claudeAdapter;
+    return this.adaptadores[clave] ?? this.claudeAdapter;
+  }
+
+  /** Lista de modelos reales de UN proveedor puntual (no necesariamente el activo) — para el selector de `/plataforma/configuración`. */
+  async listarModelos(proveedor: string): Promise<ModeloIa[]> {
+    const adapter = this.adaptadores[proveedor];
+    if (!adapter) throw new BadRequestException(`Proveedor "${proveedor}" no reconocido`);
+    return adapter.listarModelos();
   }
 
   /** `dataUri` completa (`data:image/...;base64,...`) — misma validación de formato que ya usa CrearProductoDto.imagen. */

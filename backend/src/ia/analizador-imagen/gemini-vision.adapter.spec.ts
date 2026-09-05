@@ -57,4 +57,37 @@ describe('GeminiVisionAdapter', () => {
     fetchMock.mockRejectedValue(new Error('ECONNRESET'));
     await expect(adapter.analizar('x', 'image/jpeg')).rejects.toThrow(ServiceUnavailableException);
   });
+
+  describe('listarModelos', () => {
+    it('lanza ServiceUnavailableException sin llamar a fetch si falta la API key', async () => {
+      delete process.env.GEMINI_API_KEY;
+      await expect(adapter.listarModelos()).rejects.toThrow(ServiceUnavailableException);
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('filtra a los que soportan generateContent y saca el prefijo "models/"', async () => {
+      process.env.GEMINI_API_KEY = 'gm-1';
+      fetchMock.mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          models: [
+            { name: 'models/gemini-2.0-flash', displayName: 'Gemini 2.0 Flash', supportedGenerationMethods: ['generateContent'] },
+            { name: 'models/embedding-001', supportedGenerationMethods: ['embedContent'] },
+          ],
+        }),
+      });
+
+      const resultado = await adapter.listarModelos();
+
+      expect(resultado).toEqual([{ id: 'gemini-2.0-flash', nombre: 'Gemini 2.0 Flash' }]);
+      const [url] = fetchMock.mock.calls[0];
+      expect(url).toBe('https://generativelanguage.googleapis.com/v1beta/models?key=gm-1');
+    });
+
+    it('lanza ServiceUnavailableException si Gemini responde con error', async () => {
+      process.env.GEMINI_API_KEY = 'gm-1';
+      fetchMock.mockResolvedValue({ ok: false, status: 401, text: async () => 'unauthorized' });
+      await expect(adapter.listarModelos()).rejects.toThrow(ServiceUnavailableException);
+    });
+  });
 });

@@ -546,6 +546,13 @@ model PlataformaConfiguracion {
   iaClaudeApiKeyCifrado   String?
   iaOpenaiApiKeyCifrado   String?
   iaGeminiApiKeyCifrado   String?
+  // Modelo elegido por proveedor — no es secreto (texto plano). Se llena
+  // eligiendo de la lista real que devuelve el proveedor (ver
+  // GET /platform/configuracion/ia-imagen/modelos), nunca tipeado a mano,
+  // para no arriesgar un nombre de modelo inválido/desactualizado.
+  iaClaudeModelo          String? @default("claude-sonnet-5")
+  iaOpenaiModelo          String? @default("gpt-4o")
+  iaGeminiModelo          String? @default("gemini-2.0-flash")
 
   @@map("plataforma_configuracion")
 }

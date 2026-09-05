@@ -119,5 +119,28 @@ describe('PlataformaConfigService', () => {
 
       expect(process.env.PASARELA_PAGO_ACTIVA).toBe('stripe');
     });
+
+    it('el modelo elegido por proveedor se guarda y se sincroniza a su variable de entorno', async () => {
+      delete process.env.ANTHROPIC_MODEL;
+      repo.actualizar.mockResolvedValue({ ...CONFIG_VACIA, iaClaudeModelo: 'claude-haiku-4-5' } as never);
+
+      await service.actualizar({ iaClaudeModelo: 'claude-haiku-4-5' } as never);
+
+      const [, data] = repo.actualizar.mock.calls[0];
+      expect((data as { iaClaudeModelo?: string }).iaClaudeModelo).toBe('claude-haiku-4-5');
+      expect(process.env.ANTHROPIC_MODEL).toBe('claude-haiku-4-5');
+    });
+  });
+
+  describe('obtener — iaImagen', () => {
+    it('expone el modelo elegido por proveedor (no es secreto)', async () => {
+      repo.obtenerOCrear.mockResolvedValue({ ...CONFIG_VACIA, iaClaudeModelo: 'claude-sonnet-5', iaOpenaiModelo: 'gpt-4o', iaGeminiModelo: 'gemini-2.0-flash' } as never);
+
+      const resultado = await service.obtener();
+
+      expect(resultado.iaImagen.claudeModelo).toBe('claude-sonnet-5');
+      expect(resultado.iaImagen.openaiModelo).toBe('gpt-4o');
+      expect(resultado.iaImagen.geminiModelo).toBe('gemini-2.0-flash');
+    });
   });
 });

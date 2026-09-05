@@ -194,4 +194,19 @@ export class ActualizarPlataformaConfigDto {
   @IsOptional()
   @IsString()
   iaGeminiApiKey?: string;
+
+  @ApiProperty({ required: false, description: 'Elegido de GET .../ia-imagen/modelos, no tipeado a mano' })
+  @IsOptional()
+  @IsString()
+  iaClaudeModelo?: string;
+
+  @ApiProperty({ required: false, description: 'Elegido de GET .../ia-imagen/modelos, no tipeado a mano' })
+  @IsOptional()
+  @IsString()
+  iaOpenaiModelo?: string;
+
+  @ApiProperty({ required: false, description: 'Elegido de GET .../ia-imagen/modelos, no tipeado a mano' })
+  @IsOptional()
+  @IsString()
+  iaGeminiModelo?: string;
 }

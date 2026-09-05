@@ -62,6 +62,9 @@ export class PlataformaConfigService implements OnModuleInit {
     if (dto.npmForwardPort !== undefined) data.npmForwardPort = dto.npmForwardPort;
     if (dto.npmPublicHost !== undefined) data.npmPublicHost = dto.npmPublicHost;
     if (dto.iaImagenProveedorActivo !== undefined) data.iaImagenProveedorActivo = dto.iaImagenProveedorActivo;
+    if (dto.iaClaudeModelo !== undefined) data.iaClaudeModelo = dto.iaClaudeModelo;
+    if (dto.iaOpenaiModelo !== undefined) data.iaOpenaiModelo = dto.iaOpenaiModelo;
+    if (dto.iaGeminiModelo !== undefined) data.iaGeminiModelo = dto.iaGeminiModelo;
 
     this.aplicarCampoSecreto(data, 'smtpPasswordCifrado', dto.smtpPassword);
     this.aplicarCampoSecreto(data, 'twilioAuthTokenCifrado', dto.twilioAuthToken);
@@ -115,6 +118,9 @@ export class PlataformaConfigService implements OnModuleInit {
     if (config.iaClaudeApiKeyCifrado) process.env.ANTHROPIC_API_KEY = descifrar(config.iaClaudeApiKeyCifrado);
     if (config.iaOpenaiApiKeyCifrado) process.env.OPENAI_API_KEY = descifrar(config.iaOpenaiApiKeyCifrado);
     if (config.iaGeminiApiKeyCifrado) process.env.GEMINI_API_KEY = descifrar(config.iaGeminiApiKeyCifrado);
+    if (config.iaClaudeModelo) process.env.ANTHROPIC_MODEL = config.iaClaudeModelo;
+    if (config.iaOpenaiModelo) process.env.OPENAI_MODEL = config.iaOpenaiModelo;
+    if (config.iaGeminiModelo) process.env.GEMINI_MODEL = config.iaGeminiModelo;
   }
 
   /** Nunca expone un secreto en texto plano — solo si hay uno guardado (*Configurado). */
@@ -172,6 +178,9 @@ export class PlataformaConfigService implements OnModuleInit {
         claudeApiKeyConfigurado: Boolean(config.iaClaudeApiKeyCifrado),
         openaiApiKeyConfigurado: Boolean(config.iaOpenaiApiKeyCifrado),
         geminiApiKeyConfigurado: Boolean(config.iaGeminiApiKeyCifrado),
+        claudeModelo: config.iaClaudeModelo,
+        openaiModelo: config.iaOpenaiModelo,
+        geminiModelo: config.iaGeminiModelo,
       },
     };
   }

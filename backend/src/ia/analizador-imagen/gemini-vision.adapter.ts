@@ -1,5 +1,5 @@
 import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
-import { AnalizadorImagenAdapter, CandidatoProducto } from './analizador-imagen.interface';
+import { AnalizadorImagenAdapter, CandidatoProducto, ModeloIa } from './analizador-imagen.interface';
 import { PROMPT_ANALIZAR_PRODUCTO, parsearCandidatos } from './analizador-imagen.prompt';
 
 /**
@@ -48,5 +48,31 @@ export class GeminiVisionAdapter implements AnalizadorImagenAdapter {
     const texto = cuerpo.candidates?.[0]?.content?.parts?.find((p) => p.text)?.text;
     if (!texto) throw new ServiceUnavailableException('Gemini no devolvió ningún resultado');
     return parsearCandidatos(texto, 'Gemini');
+  }
+
+  async listarModelos(): Promise<ModeloIa[]> {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) throw new ServiceUnavailableException('Guarda primero la API key de Gemini para poder listar sus modelos');
+
+    let respuesta: Response;
+    try {
+      respuesta = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+    } catch (error) {
+      this.logger.error('Fallo al listar modelos de Gemini', error as Error);
+      throw new ServiceUnavailableException('No se pudo contactar a Gemini para listar los modelos');
+    }
+
+    if (!respuesta.ok) {
+      const detalle = await respuesta.text();
+      this.logger.error(`Gemini respondió ${respuesta.status} al listar modelos: ${detalle}`);
+      throw new ServiceUnavailableException('Gemini no pudo devolver la lista de modelos — revisa la API key');
+    }
+
+    const cuerpo = (await respuesta.json()) as {
+      models?: { name: string; displayName?: string; supportedGenerationMethods?: string[] }[];
+    };
+    return (cuerpo.models ?? [])
+      .filter((m) => m.supportedGenerationMethods?.includes('generateContent'))
+      .map((m) => ({ id: m.name.replace(/^models\//, ''), nombre: m.displayName || m.name }));
   }
 }

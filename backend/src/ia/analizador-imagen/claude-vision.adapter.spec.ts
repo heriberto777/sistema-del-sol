@@ -58,4 +58,36 @@ describe('ClaudeVisionAdapter', () => {
     fetchMock.mockRejectedValue(new Error('ECONNRESET'));
     await expect(adapter.analizar('x', 'image/jpeg')).rejects.toThrow(ServiceUnavailableException);
   });
+
+  describe('listarModelos', () => {
+    it('lanza ServiceUnavailableException sin llamar a fetch si falta la API key', async () => {
+      delete process.env.ANTHROPIC_API_KEY;
+      await expect(adapter.listarModelos()).rejects.toThrow(ServiceUnavailableException);
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('consulta GET /v1/models y devuelve id + display_name', async () => {
+      process.env.ANTHROPIC_API_KEY = 'sk-ant-1';
+      fetchMock.mockResolvedValue({
+        ok: true,
+        json: async () => ({ data: [{ id: 'claude-sonnet-5', display_name: 'Claude Sonnet 5' }, { id: 'claude-haiku-4-5' }] }),
+      });
+
+      const resultado = await adapter.listarModelos();
+
+      expect(resultado).toEqual([
+        { id: 'claude-sonnet-5', nombre: 'Claude Sonnet 5' },
+        { id: 'claude-haiku-4-5', nombre: 'claude-haiku-4-5' },
+      ]);
+      const [url, opciones] = fetchMock.mock.calls[0];
+      expect(url).toBe('https://api.anthropic.com/v1/models?limit=100');
+      expect(opciones.headers['x-api-key']).toBe('sk-ant-1');
+    });
+
+    it('lanza ServiceUnavailableException si Anthropic responde con error', async () => {
+      process.env.ANTHROPIC_API_KEY = 'sk-ant-1';
+      fetchMock.mockResolvedValue({ ok: false, status: 401, text: async () => 'unauthorized' });
+      await expect(adapter.listarModelos()).rejects.toThrow(ServiceUnavailableException);
+    });
+  });
 });
