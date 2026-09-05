@@ -3,8 +3,15 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../../lib/api-client';
 import { Card } from '../../atoms/Card/Card';
 import { Button } from '../../atoms/Button/Button';
+import { Badge } from '../../atoms/Badge/Badge';
 import { FormField } from '../../molecules/FormField/FormField';
 import { mensajeErrorApi } from '../../../lib/mensaje-error-api';
+
+const NOMBRES_PROVEEDOR_IA: Record<string, string> = {
+  ANTHROPIC: 'Claude (Anthropic)',
+  OPENAI: 'OpenAI (GPT-4o)',
+  GEMINI: 'Google Gemini',
+};
 
 interface WhatsappConfig {
   habilitado: boolean;
@@ -118,7 +125,10 @@ export function WhatsappConfigPanel() {
         </div>
 
         <div className="space-y-3 border-t border-slate-200 pt-3 dark:border-slate-800">
-          <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Proveedor de IA</p>
+          <div className="flex items-center gap-2">
+            <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Proveedor de IA</p>
+            {config?.iaProveedor && <Badge tono="exito">Activo ahora: {NOMBRES_PROVEEDOR_IA[config.iaProveedor] ?? config.iaProveedor}</Badge>}
+          </div>
           <p className="text-xs text-slate-500 dark:text-slate-400">La API key de abajo tiene que ser la de este proveedor (una key de Claude no sirve si elegís OpenAI, y viceversa).</p>
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Proveedor</label>
