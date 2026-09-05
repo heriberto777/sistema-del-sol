@@ -9,6 +9,7 @@ import { Select } from '../components/atoms/Select/Select';
 import { Switch } from '../components/atoms/Switch/Switch';
 import { NcfPlataformaPanel } from '../components/organisms/NcfPlataformaPanel/NcfPlataformaPanel';
 import { CampoImagen } from '../components/molecules/CampoImagen/CampoImagen';
+import { Badge } from '../components/atoms/Badge/Badge';
 import { mensajeErrorApi } from '../lib/mensaje-error-api';
 
 export interface ConfiguracionPlataforma {
@@ -472,33 +473,53 @@ function SeccionIaImagen({ config, guardar }: SeccionProps) {
             <option value="gemini">Google Gemini</option>
           </Select>
         </div>
-        <FormField
-          id="iaClaudeApiKey"
-          label="Claude API Key"
-          type="password"
-          value={claudeApiKey}
-          onChange={(e) => setClaudeApiKey(e.target.value)}
-          placeholder={iaImagen.claudeApiKeyConfigurado ? PLACEHOLDER_CONFIGURADO : 'sk-ant-...'}
-        />
-        <SelectorModeloIa proveedor="claude" label="Modelo de Claude" value={claudeModelo} onChange={setClaudeModelo} />
-        <FormField
-          id="iaOpenaiApiKey"
-          label="OpenAI API Key"
-          type="password"
-          value={openaiApiKey}
-          onChange={(e) => setOpenaiApiKey(e.target.value)}
-          placeholder={iaImagen.openaiApiKeyConfigurado ? PLACEHOLDER_CONFIGURADO : 'sk-...'}
-        />
-        <SelectorModeloIa proveedor="openai" label="Modelo de OpenAI" value={openaiModelo} onChange={setOpenaiModelo} />
-        <FormField
-          id="iaGeminiApiKey"
-          label="Gemini API Key"
-          type="password"
-          value={geminiApiKey}
-          onChange={(e) => setGeminiApiKey(e.target.value)}
-          placeholder={iaImagen.geminiApiKeyConfigurado ? PLACEHOLDER_CONFIGURADO : 'AIza...'}
-        />
-        <SelectorModeloIa proveedor="gemini" label="Modelo de Gemini" value={geminiModelo} onChange={setGeminiModelo} />
+        <div className="space-y-3 border-t border-slate-200 pt-3 dark:border-slate-800">
+          <div className="flex items-center gap-2">
+            <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Claude (Anthropic)</p>
+            {proveedorActivo === 'claude' && <Badge tono="exito">Activo ahora</Badge>}
+          </div>
+          <FormField
+            id="iaClaudeApiKey"
+            label="Claude API Key"
+            type="password"
+            value={claudeApiKey}
+            onChange={(e) => setClaudeApiKey(e.target.value)}
+            placeholder={iaImagen.claudeApiKeyConfigurado ? PLACEHOLDER_CONFIGURADO : 'sk-ant-...'}
+          />
+          <SelectorModeloIa proveedor="claude" label="Modelo de Claude" value={claudeModelo} onChange={setClaudeModelo} />
+        </div>
+
+        <div className="space-y-3 border-t border-slate-200 pt-3 dark:border-slate-800">
+          <div className="flex items-center gap-2">
+            <p className="text-sm font-medium text-slate-700 dark:text-slate-300">OpenAI</p>
+            {proveedorActivo === 'openai' && <Badge tono="exito">Activo ahora</Badge>}
+          </div>
+          <FormField
+            id="iaOpenaiApiKey"
+            label="OpenAI API Key"
+            type="password"
+            value={openaiApiKey}
+            onChange={(e) => setOpenaiApiKey(e.target.value)}
+            placeholder={iaImagen.openaiApiKeyConfigurado ? PLACEHOLDER_CONFIGURADO : 'sk-...'}
+          />
+          <SelectorModeloIa proveedor="openai" label="Modelo de OpenAI" value={openaiModelo} onChange={setOpenaiModelo} />
+        </div>
+
+        <div className="space-y-3 border-t border-slate-200 pt-3 dark:border-slate-800">
+          <div className="flex items-center gap-2">
+            <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Google Gemini</p>
+            {proveedorActivo === 'gemini' && <Badge tono="exito">Activo ahora</Badge>}
+          </div>
+          <FormField
+            id="iaGeminiApiKey"
+            label="Gemini API Key"
+            type="password"
+            value={geminiApiKey}
+            onChange={(e) => setGeminiApiKey(e.target.value)}
+            placeholder={iaImagen.geminiApiKeyConfigurado ? PLACEHOLDER_CONFIGURADO : 'AIza...'}
+          />
+          <SelectorModeloIa proveedor="gemini" label="Modelo de Gemini" value={geminiModelo} onChange={setGeminiModelo} />
+        </div>
         <Button type="submit" disabled={guardar.isPending}>
           {guardar.isPending ? 'Guardando…' : 'Guardar'}
         </Button>

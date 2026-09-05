@@ -2,7 +2,7 @@ process.env.ENCRYPTION_KEY = 'clave-de-prueba';
 
 import { WhatsappBotService } from './whatsapp-bot.service';
 import { WhatsappMensajesRepository } from './whatsapp-mensajes.repository';
-import { IaClientService } from '../ia/ia-client.service';
+import { ConversacionIaService } from '../ia/conversacion/conversacion-ia.service';
 import { EventBusService } from '../event-bus/event-bus.service';
 import { EVENTOS } from '../event-bus/events';
 import { cifrar } from '../common/utils/encriptado.util';
@@ -13,6 +13,7 @@ const CONFIG_BASE = {
   twilioAccountSid: 'ACxxx',
   twilioAuthTokenCifrado: cifrar('twilio-auth-token'),
   twilioWhatsappFrom: '+14155238886',
+  iaProveedor: 'ANTHROPIC',
   iaModelo: null,
   iaApiKeyCifrado: cifrar('sk-ant-tenant'),
   iaPromptNegocio: 'Horario: L-V 9am-5pm.',
@@ -26,7 +27,7 @@ describe('WhatsappBotService', () => {
   let service: WhatsappBotService;
   let prisma: { whatsappConfigTenant: { findUnique: jest.Mock }; whatsappMensaje: { update: jest.Mock } };
   let whatsappMensajesRepository: jest.Mocked<WhatsappMensajesRepository>;
-  let iaClientService: jest.Mocked<IaClientService>;
+  let conversacionIaService: jest.Mocked<ConversacionIaService>;
   let eventBus: jest.Mocked<EventBusService>;
   let fetchMock: jest.Mock;
 
@@ -40,35 +41,41 @@ describe('WhatsappBotService', () => {
       contarRespuestasHoy: jest.fn().mockResolvedValue(0),
       historialReciente: jest.fn().mockResolvedValue([MENSAJE_ENTRANTE]),
     } as unknown as jest.Mocked<WhatsappMensajesRepository>;
-    iaClientService = {
-      completarConversacion: jest.fn().mockResolvedValue('{"respuesta":"Hola, en qué te ayudo?","requiereHumano":false}'),
-    } as unknown as jest.Mocked<IaClientService>;
+    conversacionIaService = {
+      completar: jest.fn().mockResolvedValue('{"respuesta":"Hola, en qué te ayudo?","requiereHumano":false}'),
+    } as unknown as jest.Mocked<ConversacionIaService>;
     eventBus = { emit: jest.fn() } as unknown as jest.Mocked<EventBusService>;
     fetchMock = jest.fn().mockResolvedValue({ ok: true });
     (global as unknown as { fetch: typeof fetch }).fetch = fetchMock as never;
 
-    service = new WhatsappBotService(prisma as never, whatsappMensajesRepository, iaClientService, eventBus);
+    service = new WhatsappBotService(prisma as never, whatsappMensajesRepository, conversacionIaService, eventBus);
   });
 
   describe('procesarMensajeEntrante', () => {
     it('responde con IA y no emite el evento cuando requiereHumano es false', async () => {
       await service.procesarMensajeEntrante(CONFIG_BASE, 'whatsapp:+18095551234', 'hola');
 
-      expect(iaClientService.completarConversacion).toHaveBeenCalled();
+      expect(conversacionIaService.completar).toHaveBeenCalled();
       expect(eventBus.emit).not.toHaveBeenCalled();
       expect(fetchMock).toHaveBeenCalled(); // enviarWhatsappTwilio
+    });
+
+    it('pasa el proveedor elegido por el tenant al servicio de IA', async () => {
+      await service.procesarMensajeEntrante({ ...CONFIG_BASE, iaProveedor: 'GEMINI' }, 'whatsapp:+18095551234', 'hola');
+
+      expect(conversacionIaService.completar).toHaveBeenCalledWith('GEMINI', expect.any(Array), expect.any(Object));
     });
 
     it('usa la apiKey descifrada del tenant, no una de plataforma', async () => {
       await service.procesarMensajeEntrante(CONFIG_BASE, 'whatsapp:+18095551234', 'hola');
 
-      expect(iaClientService.completarConversacion).toHaveBeenCalledWith(expect.any(Array), expect.objectContaining({ apiKey: 'sk-ant-tenant' }));
+      expect(conversacionIaService.completar).toHaveBeenCalledWith('ANTHROPIC', expect.any(Array), expect.objectContaining({ apiKey: 'sk-ant-tenant' }));
     });
 
     it('incluye el iaPromptNegocio del tenant en el system prompt', async () => {
       await service.procesarMensajeEntrante(CONFIG_BASE, 'whatsapp:+18095551234', 'hola');
 
-      const [, opciones] = iaClientService.completarConversacion.mock.calls[0];
+      const [, , opciones] = conversacionIaService.completar.mock.calls[0];
       expect(opciones?.system).toContain('Horario: L-V 9am-5pm.');
     });
 
@@ -77,7 +84,7 @@ describe('WhatsappBotService', () => {
 
       await service.procesarMensajeEntrante(CONFIG_BASE, 'whatsapp:+18095551234', 'hola');
 
-      expect(iaClientService.completarConversacion).not.toHaveBeenCalled();
+      expect(conversacionIaService.completar).not.toHaveBeenCalled();
       expect(prisma.whatsappMensaje.update).toHaveBeenCalledWith({ where: { id: 'm1' }, data: { requiereAtencionHumana: true } });
       expect(eventBus.emit).toHaveBeenCalledWith(EVENTOS.WHATSAPP_REQUIERE_ATENCION, expect.objectContaining({ tenantId: 't1' }));
     });
@@ -85,12 +92,12 @@ describe('WhatsappBotService', () => {
     it('sin iaApiKeyCifrado configurada: no llama a la IA y escala a humano', async () => {
       await service.procesarMensajeEntrante({ ...CONFIG_BASE, iaApiKeyCifrado: null }, 'whatsapp:+18095551234', 'hola');
 
-      expect(iaClientService.completarConversacion).not.toHaveBeenCalled();
+      expect(conversacionIaService.completar).not.toHaveBeenCalled();
       expect(eventBus.emit).toHaveBeenCalled();
     });
 
     it('JSON inválido de la IA: fail-safe a requiereHumano con una respuesta genérica', async () => {
-      iaClientService.completarConversacion.mockResolvedValue('esto no es JSON');
+      conversacionIaService.completar.mockResolvedValue('esto no es JSON');
 
       await service.procesarMensajeEntrante(CONFIG_BASE, 'whatsapp:+18095551234', 'hola');
 
@@ -100,7 +107,7 @@ describe('WhatsappBotService', () => {
     });
 
     it('la IA sin respuesta (null): fail-safe a requiereHumano', async () => {
-      iaClientService.completarConversacion.mockResolvedValue(null);
+      conversacionIaService.completar.mockResolvedValue(null);
 
       await service.procesarMensajeEntrante(CONFIG_BASE, 'whatsapp:+18095551234', 'hola');
 
@@ -108,7 +115,7 @@ describe('WhatsappBotService', () => {
     });
 
     it('respeta requiereHumano:true devuelto por la IA aunque haya respondido bien', async () => {
-      iaClientService.completarConversacion.mockResolvedValue('{"respuesta":"Dejame conectarte con soporte","requiereHumano":true}');
+      conversacionIaService.completar.mockResolvedValue('{"respuesta":"Dejame conectarte con soporte","requiereHumano":true}');
 
       await service.procesarMensajeEntrante(CONFIG_BASE, 'whatsapp:+18095551234', 'hola');
 
@@ -123,7 +130,7 @@ describe('WhatsappBotService', () => {
 
       await service.procesarMensajeEntrante(CONFIG_BASE, 'whatsapp:+18095551234', 'hola');
 
-      const [mensajes] = iaClientService.completarConversacion.mock.calls[0];
+      const [, mensajes] = conversacionIaService.completar.mock.calls[0];
       expect(mensajes).toEqual([
         { role: 'assistant', content: 'Hola, bienvenido' },
         { role: 'user', content: 'hola' },

@@ -28,7 +28,7 @@ export class ActualizarWhatsappConfigDto {
   @IsString()
   twilioWhatsappFrom?: string;
 
-  @ApiProperty({ required: false, enum: ['ANTHROPIC', 'OPENAI', 'VERCEL'] })
+  @ApiProperty({ required: false, enum: ['ANTHROPIC', 'OPENAI', 'GEMINI'] })
   @IsOptional()
   @IsString()
   iaProveedor?: string;

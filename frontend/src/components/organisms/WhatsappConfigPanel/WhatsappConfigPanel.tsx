@@ -24,8 +24,10 @@ interface WhatsappConfig {
  * criterio de secretos que WebhooksPanel/PlataformaConfig: nunca se
  * muestran en claro, solo "configurado: true/false"; dejar el campo
  * vacío al guardar no borra el secreto ya guardado. Sin botón de
- * "Probar conexión" (decisión explícita del usuario). El bot hoy solo
- * funciona con IA de Anthropic — elegir otro proveedor no tiene efecto.
+ * "Probar conexión" (decisión explícita del usuario). Proveedor de IA
+ * real (Anthropic/OpenAI/Gemini) — mismo patrón de adaptador que "IA
+ * para productos" de plataforma, pero acá la key es la propia del
+ * tenant (ver ConversacionIaService), nunca la de plataforma.
  */
 export function WhatsappConfigPanel() {
   const queryClient = useQueryClient();
@@ -117,7 +119,7 @@ export function WhatsappConfigPanel() {
 
         <div className="space-y-3 border-t border-slate-200 pt-3 dark:border-slate-800">
           <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Proveedor de IA</p>
-          <p className="text-xs text-slate-500 dark:text-slate-400">Por ahora el bot solo funciona con Anthropic — elegir otro proveedor no tiene efecto todavía.</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400">La API key de abajo tiene que ser la de este proveedor (una key de Claude no sirve si elegís OpenAI, y viceversa).</p>
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Proveedor</label>
             <select
@@ -126,9 +128,9 @@ export function WhatsappConfigPanel() {
               className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
             >
               <option value="">Sin proveedor</option>
-              <option value="ANTHROPIC">Anthropic</option>
-              <option value="OPENAI">OpenAI</option>
-              <option value="VERCEL">Vercel</option>
+              <option value="ANTHROPIC">Claude (Anthropic)</option>
+              <option value="OPENAI">OpenAI (GPT-4o)</option>
+              <option value="GEMINI">Google Gemini</option>
             </select>
           </div>
           <FormField

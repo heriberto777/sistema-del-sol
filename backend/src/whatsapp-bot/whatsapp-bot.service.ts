@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { WhatsappMensajesRepository } from './whatsapp-mensajes.repository';
 import { verificarFirmaTwilio } from './twilio-signature.util';
-import { IaClientService } from '../ia/ia-client.service';
+import { ConversacionIaService } from '../ia/conversacion/conversacion-ia.service';
 import { EventBusService } from '../event-bus/event-bus.service';
 import { EVENTOS } from '../event-bus/events';
 import { descifrar } from '../common/utils/encriptado.util';
@@ -23,6 +23,8 @@ interface ConfigBot {
   twilioAccountSid: string | null;
   twilioAuthTokenCifrado: string | null;
   twilioWhatsappFrom: string | null;
+  /** ANTHROPIC/OPENAI/GEMINI — ver ConversacionIaService. Vacío/desconocido cae a Claude. */
+  iaProveedor: string | null;
   iaModelo: string | null;
   iaApiKeyCifrado: string | null;
   iaPromptNegocio: string | null;
@@ -41,7 +43,7 @@ export class WhatsappBotService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly whatsappMensajesRepository: WhatsappMensajesRepository,
-    private readonly iaClientService: IaClientService,
+    private readonly conversacionIaService: ConversacionIaService,
     private readonly eventBus: EventBusService,
   ) {}
 
@@ -87,7 +89,7 @@ export class WhatsappBotService {
       ? `${PROMPT_SCAFFOLDING}\n\nInformación del negocio (provista por el negocio, no la inventes ni la contradigas):\n${config.iaPromptNegocio}`
       : PROMPT_SCAFFOLDING;
 
-    const textoIa = await this.iaClientService.completarConversacion(mensajes, {
+    const textoIa = await this.conversacionIaService.completar(config.iaProveedor, mensajes, {
       apiKey: descifrar(config.iaApiKeyCifrado),
       modelo: config.iaModelo ?? undefined,
       system,
