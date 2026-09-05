@@ -225,7 +225,7 @@ export function TiendaCheckout() {
               required
               value={clienteNombre}
               onChange={(e) => setClienteNombre(e.target.value)}
-              className="rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
             />
           </div>
 
@@ -238,7 +238,7 @@ export function TiendaCheckout() {
               required
               value={clienteTelefono}
               onChange={(e) => setClienteTelefono(e.target.value)}
-              className="rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
             />
           </div>
 
@@ -252,7 +252,7 @@ export function TiendaCheckout() {
               required
               value={clienteEmail}
               onChange={(e) => setClienteEmail(e.target.value)}
-              className="rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
             />
           </div>
 
@@ -265,7 +265,7 @@ export function TiendaCheckout() {
               required
               value={clienteDocumento}
               onChange={(e) => setClienteDocumento(e.target.value)}
-              className="rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
             />
             <span className="text-xs text-slate-500 dark:text-slate-400">Necesario para tu comprobante.</span>
           </div>
@@ -282,7 +282,7 @@ export function TiendaCheckout() {
                   const elegida = direcciones.find((d) => d.id === e.target.value);
                   if (elegida) setDireccionEntrega(elegida.direccion);
                 }}
-                className="rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
               >
                 <option value="" disabled>
                   Elegí una dirección guardada o escribí una nueva abajo
@@ -307,7 +307,7 @@ export function TiendaCheckout() {
               rows={2}
               value={direccionEntrega}
               onChange={(e) => setDireccionEntrega(e.target.value)}
-              className="rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
             />
           </div>
 
@@ -320,7 +320,7 @@ export function TiendaCheckout() {
               rows={2}
               value={notas}
               onChange={(e) => setNotas(e.target.value)}
-              className="rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
             />
           </div>
 

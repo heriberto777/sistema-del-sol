@@ -91,7 +91,7 @@ export function TiendaCategoria() {
             value={busqueda}
             onChange={(e) => setBusqueda(e.target.value)}
             placeholder={`Buscar en ${nombreCategoria}…`}
-            className="w-full max-w-xs rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+            className="w-full max-w-xs rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
           />
         </div>
 

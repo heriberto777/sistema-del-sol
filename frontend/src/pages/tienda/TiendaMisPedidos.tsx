@@ -22,7 +22,7 @@ const ETIQUETA_ESTADO: Record<string, string> = {
   ANULADA: 'Anulada',
 };
 
-const INPUT = 'rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100';
+const INPUT = 'rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100';
 const BOTON = 'rounded-lg bg-sol-500 px-6 py-3 text-sm font-semibold text-white hover:bg-sol-600 disabled:opacity-60';
 const ERROR = 'text-sm text-red-600 dark:text-red-400';
 const OK = 'text-sm text-emerald-600 dark:text-emerald-400';
