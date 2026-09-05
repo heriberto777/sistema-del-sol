@@ -263,7 +263,7 @@ function RoperoProducto({ config, subdominio, carrito, producto, varianteSelecci
               <Plus size={14} />
             </button>
           </div>
-          <button type="button" onClick={onAgregar} disabled={!varianteSeleccionada} className="rounded px-6 py-3 text-[0.85em] font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50" style={{ background: 'var(--tienda-color-acento)' }}>
+          <button type="button" onClick={onAgregar} disabled={!varianteSeleccionada || (varianteSeleccionada.stock !== null && varianteSeleccionada.stock <= 0)} className="rounded px-6 py-3 text-[0.85em] font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50" style={{ background: 'var(--tienda-color-acento)' }}>
             Agregar a la bolsa
           </button>
         </div>

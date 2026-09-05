@@ -286,7 +286,7 @@ function SolMarketProducto({ config, subdominio, carrito, producto, varianteSele
           <button
             type="button"
             onClick={onAgregar}
-            disabled={!varianteSeleccionada}
+            disabled={!varianteSeleccionada || (varianteSeleccionada.stock !== null && varianteSeleccionada.stock <= 0)}
             className="rounded-full px-6 py-3 text-[0.85em] font-bold disabled:cursor-not-allowed disabled:opacity-50"
             style={{ background: 'var(--tienda-color-acento)', color: '#1c1420' }}
           >

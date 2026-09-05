@@ -241,7 +241,7 @@ function BoutiqueProducto({ config, subdominio, carrito, producto, varianteSelec
           <button
             type="button"
             onClick={onAgregar}
-            disabled={!varianteSeleccionada}
+            disabled={!varianteSeleccionada || (varianteSeleccionada.stock !== null && varianteSeleccionada.stock <= 0)}
             className="border px-8 py-3 text-[11px] font-semibold uppercase tracking-widest disabled:cursor-not-allowed disabled:opacity-50"
             style={{ borderColor: accent, color: accent }}
           >

@@ -40,7 +40,12 @@ export function TiendaProducto() {
       cantidad={cantidad}
       onCantidadChange={setCantidad}
       onAgregar={() => {
-        if (!varianteSeleccionada) return;
+        // Bug real: el botón de cada plantilla ya se deshabilita sin
+        // stock, pero esto es la fuente de verdad compartida por las 17
+        // — sin este guard, un producto de una sola variante agotada
+        // (sin selector visible, se auto-elige en el useEffect de
+        // arriba) igual se podía agregar al carrito.
+        if (!varianteSeleccionada || (varianteSeleccionada.stock !== null && varianteSeleccionada.stock <= 0)) return;
         carrito.agregar(
           {
             productoId: producto.id,

@@ -250,7 +250,7 @@ function MercadoProducto({ config, subdominio, carrito, producto, varianteSelecc
           <button
             type="button"
             onClick={onAgregar}
-            disabled={!varianteSeleccionada}
+            disabled={!varianteSeleccionada || (varianteSeleccionada.stock !== null && varianteSeleccionada.stock <= 0)}
             className="rounded-full px-6 py-3 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
             style={{ background: accent }}
           >

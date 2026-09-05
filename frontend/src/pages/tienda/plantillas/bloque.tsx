@@ -298,7 +298,7 @@ function BloqueProducto({ config, subdominio, carrito, producto, varianteSelecci
           <button
             type="button"
             onClick={onAgregar}
-            disabled={!varianteSeleccionada}
+            disabled={!varianteSeleccionada || (varianteSeleccionada.stock !== null && varianteSeleccionada.stock <= 0)}
             className="px-6 py-3 text-[0.85em] font-bold uppercase tracking-[0.03em] disabled:cursor-not-allowed disabled:opacity-50"
             style={{ background: 'var(--tienda-color-acento)', color: '#151414' }}
           >

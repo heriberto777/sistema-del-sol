@@ -255,7 +255,7 @@ function EditorialProducto({ config, subdominio, carrito, producto, varianteSele
           <button
             type="button"
             onClick={onAgregar}
-            disabled={!varianteSeleccionada}
+            disabled={!varianteSeleccionada || (varianteSeleccionada.stock !== null && varianteSeleccionada.stock <= 0)}
             className="px-6 py-3 text-[0.8em] font-semibold uppercase tracking-[0.04em] text-white disabled:cursor-not-allowed disabled:opacity-50"
             style={{ background: 'var(--tienda-color-texto)' }}
           >

@@ -226,7 +226,7 @@ function AtelierProducto({ config, subdominio, carrito, producto, varianteSelecc
           <button
             type="button"
             onClick={onAgregar}
-            disabled={!varianteSeleccionada}
+            disabled={!varianteSeleccionada || (varianteSeleccionada.stock !== null && varianteSeleccionada.stock <= 0)}
             className="border border-[var(--tienda-color-texto)] px-6 py-3 text-[0.75em] uppercase tracking-[0.08em] disabled:cursor-not-allowed disabled:opacity-40"
           >
             Agregar a la bolsa
