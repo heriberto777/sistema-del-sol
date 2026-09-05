@@ -15,7 +15,10 @@ platformApiClient.interceptors.request.use((config) => {
 platformApiClient.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    // Ver el mismo comentario en api-client.ts — un 401 de la propia
+    // llamada de login es "contraseña incorrecta", no "sesión vencida".
+    const esIntentoDeLogin = error.config?.url === '/platform/auth/login';
+    if (error.response?.status === 401 && !esIntentoDeLogin) {
       // Ver el mismo comentario en api-client.ts — sin esto, PlatformAuthProvider
       // sigue leyendo 'sol_platform_admin' como "autenticado" tras la
       // recarga y cae en el mismo loop infinito de recargas.

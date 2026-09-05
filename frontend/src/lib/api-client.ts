@@ -15,7 +15,15 @@ apiClient.interceptors.request.use((config) => {
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    // Un 401 de /auth/login es "contraseña incorrecta" — nunca hubo sesión
+    // que expiró, así que NO hay que redirigir/limpiar nada acá; el propio
+    // formulario de Login ya lo maneja con su catch y muestra el error
+    // inline. Sin este chequeo, cualquier intento de login fallido disparaba
+    // igual la lógica de "sesión inválida" de abajo (recarga completa a
+    // /login en vez del mensaje de error — bug real reportado por el
+    // usuario).
+    const esIntentoDeLogin = error.config?.url === '/auth/login';
+    if (error.response?.status === 401 && !esIntentoDeLogin) {
       // Sin borrar también 'sol_usuario', AuthProvider lo sigue leyendo como
       // "autenticado" tras la recarga (usuario != null pero sin token real),
       // dispara la misma petición sin Authorization, vuelve a dar 401 —
