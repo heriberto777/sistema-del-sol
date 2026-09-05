@@ -74,13 +74,13 @@ export function ReporteCompras() {
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
               {data?.ordenes.map((o) => (
                 <tr key={o.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                  <td className="px-5 py-3">{o.numero}</td>
-                  <td className="px-5 py-3">{new Date(o.fecha).toLocaleDateString('es-DO')}</td>
-                  <td className="px-5 py-3">{o.proveedor.nombre}</td>
+                  <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{o.numero}</td>
+                  <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{new Date(o.fecha).toLocaleDateString('es-DO')}</td>
+                  <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{o.proveedor.nombre}</td>
                   <td className="px-5 py-3">
                     <Badge>{o.estado}</Badge>
                   </td>
-                  <td className="px-5 py-3">RD$ {Number(o.total).toLocaleString('es-DO')}</td>
+                  <td className="px-5 py-3 text-slate-700 dark:text-slate-300">RD$ {Number(o.total).toLocaleString('es-DO')}</td>
                 </tr>
               ))}
             </tbody>

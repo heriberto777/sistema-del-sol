@@ -216,10 +216,18 @@ function grupoDeRuta(pathname: string): string | null {
   return grupo?.id ?? null;
 }
 
-export function Sidebar() {
+interface SidebarProps {
+  /** true en el drawer móvil — ignora el colapso a rail de ícono aunque el usuario lo tenga activado en desktop (en un drawer angosto no tiene sentido ocultar las etiquetas). */
+  forzarExpandido?: boolean;
+  /** Cierra el drawer móvil al navegar a un enlace — no-op en desktop. */
+  onNavegar?: () => void;
+}
+
+export function Sidebar({ forzarExpandido, onNavegar }: SidebarProps = {}) {
   const { usuario, tienePermiso, tieneModulo } = useAuth();
   const location = useLocation();
-  const [colapsado, setColapsado] = useState(leerColapsado);
+  const [colapsadoInterno, setColapsadoInterno] = useState(leerColapsado);
+  const colapsado = forzarExpandido ? false : colapsadoInterno;
   const [gruposAbiertos, setGruposAbiertos] = useState<Set<string>>(() => {
     const persistidos = leerGruposAbiertos();
     const activo = grupoDeRuta(location.pathname);
@@ -244,7 +252,7 @@ export function Sidebar() {
   }
 
   function alternarColapsado() {
-    setColapsado((prev) => {
+    setColapsadoInterno((prev) => {
       const siguiente = !prev;
       escribirColapsado(siguiente);
       return siguiente;
@@ -293,7 +301,14 @@ export function Sidebar() {
       </div>
 
       {SUELTOS_ARRIBA.filter((enlace) => esVisible(enlace, tienePermiso, tieneModulo)).map((enlace) => (
-        <NavLink key={enlace.ruta} to={enlace.ruta} end={enlace.ruta === '/'} className={enlaceClase} title={colapsado ? enlace.etiqueta : undefined}>
+        <NavLink
+          key={enlace.ruta}
+          to={enlace.ruta}
+          end={enlace.ruta === '/'}
+          className={enlaceClase}
+          title={colapsado ? enlace.etiqueta : undefined}
+          onClick={onNavegar}
+        >
           <enlace.icono size={17} className="shrink-0" />
           {!colapsado && enlace.etiqueta}
         </NavLink>
@@ -318,14 +333,20 @@ export function Sidebar() {
                 {grupo.items.map((enlace) =>
                   enlace.ruta === '/tienda-online' && !colapsado ? (
                     <div key={enlace.ruta} className="flex items-center gap-0.5">
-                      <NavLink to={enlace.ruta} className={(p) => clsx(enlaceClase(p), 'flex-1')}>
+                      <NavLink to={enlace.ruta} className={(p) => clsx(enlaceClase(p), 'flex-1')} onClick={onNavegar}>
                         <enlace.icono size={17} className="shrink-0" />
                         {enlace.etiqueta}
                       </NavLink>
                       <EnlaceTiendaExterno />
                     </div>
                   ) : (
-                    <NavLink key={enlace.ruta} to={enlace.ruta} className={enlaceClase} title={colapsado ? enlace.etiqueta : undefined}>
+                    <NavLink
+                      key={enlace.ruta}
+                      to={enlace.ruta}
+                      className={enlaceClase}
+                      title={colapsado ? enlace.etiqueta : undefined}
+                      onClick={onNavegar}
+                    >
                       <enlace.icono size={17} className="shrink-0" />
                       {!colapsado && enlace.etiqueta}
                     </NavLink>
@@ -337,20 +358,22 @@ export function Sidebar() {
         );
       })}
 
-      <div className="mt-auto pt-2">
-        <button
-          type="button"
-          onClick={alternarColapsado}
-          title={colapsado ? 'Mostrar menú' : 'Ocultar menú'}
-          className={clsx(
-            'flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 dark:text-slate-500 dark:hover:bg-slate-900 dark:hover:text-slate-300',
-            colapsado && 'justify-center px-0',
-          )}
-        >
-          {colapsado ? <ChevronsRight size={17} className="shrink-0" /> : <ChevronsLeft size={17} className="shrink-0" />}
-          {!colapsado && 'Ocultar menú'}
-        </button>
-      </div>
+      {!forzarExpandido && (
+        <div className="mt-auto pt-2">
+          <button
+            type="button"
+            onClick={alternarColapsado}
+            title={colapsado ? 'Mostrar menú' : 'Ocultar menú'}
+            className={clsx(
+              'flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 dark:text-slate-500 dark:hover:bg-slate-900 dark:hover:text-slate-300',
+              colapsado && 'justify-center px-0',
+            )}
+          >
+            {colapsado ? <ChevronsRight size={17} className="shrink-0" /> : <ChevronsLeft size={17} className="shrink-0" />}
+            {!colapsado && 'Ocultar menú'}
+          </button>
+        </div>
+      )}
     </nav>
   );
 }

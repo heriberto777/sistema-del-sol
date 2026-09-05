@@ -166,7 +166,7 @@ export function CobroFactura() {
         <h1 className="text-lg font-semibold text-sol-600 dark:text-sol-400">El Sistema del Sol</h1>
 
         {(isLoading || (tienda && !config)) && <p className="text-sm text-slate-400">Cargando…</p>}
-        {isError && <p className="text-sm text-red-600">No encontramos esa factura.</p>}
+        {isError && <p className="text-sm text-red-600 dark:text-red-400">No encontramos esa factura.</p>}
 
         {factura && !tienda && (
           <div className="space-y-4">
@@ -205,7 +205,7 @@ export function CobroFactura() {
                     className="rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
                   />
                 </div>
-                {error && <p className="text-sm text-red-600">{error}</p>}
+                {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
                 <Button className="w-full" disabled={pagar.isPending} onClick={onSubmit}>
                   {pagar.isPending ? 'Redirigiendo…' : 'Pagar con tarjeta'}
                 </Button>

@@ -156,8 +156,8 @@ export function RemisionesPanel() {
                     onClick={() => setRemisionViendo(remision)}
                     className="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/40"
                   >
-                    <td className="px-5 py-3 font-mono text-xs">{remision.numero}</td>
-                    <td className="px-5 py-3">{remision.cliente?.nombre}</td>
+                    <td className="px-5 py-3 font-mono text-xs text-slate-700 dark:text-slate-300">{remision.numero}</td>
+                    <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{remision.cliente?.nombre}</td>
                     <td className="px-5 py-3">
                       <Badge tono={TONO_POR_ESTADO[remision.estado]}>{remision.estado}</Badge>
                       {remision.facturaId && <span className="ml-2 text-xs text-slate-400">Ya facturada</span>}
@@ -263,7 +263,7 @@ function ModalDetalleRemision({ remision, onClose, onImprimir }: { remision: Rem
           </Button>
         </div>
 
-        {!detalle ? <p className="text-sm text-slate-500">Cargando…</p> : <TablaArticulosDocumento lineas={detalle.lineas} mostrarPrecios={false} />}
+        {!detalle ? <p className="text-sm text-slate-500 dark:text-slate-400">Cargando…</p> : <TablaArticulosDocumento lineas={detalle.lineas} mostrarPrecios={false} />}
       </div>
     </Modal>
   );
@@ -476,7 +476,7 @@ function ModalEditarRemision({
   if (!valores) {
     return (
       <Modal titulo={`Editar remisión ${numeroActual}`} onClose={onClose}>
-        <p className="text-sm text-slate-500">Cargando…</p>
+        <p className="text-sm text-slate-500 dark:text-slate-400">Cargando…</p>
       </Modal>
     );
   }

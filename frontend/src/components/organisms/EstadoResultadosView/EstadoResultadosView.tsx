@@ -50,7 +50,7 @@ export function EstadoResultadosView() {
         <p className="text-xs text-slate-500 dark:text-slate-400">Por defecto: mes actual</p>
       </div>
 
-      {isLoading && <p className="text-sm text-slate-500">Calculando estado de resultados…</p>}
+      {isLoading && <p className="text-sm text-slate-500 dark:text-slate-400">Calculando estado de resultados…</p>}
       {error && <p className="text-sm text-red-600">No se pudo calcular el estado de resultados.</p>}
 
       {data && (

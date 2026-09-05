@@ -42,7 +42,7 @@ export function BalanceGeneralView() {
         <p className="text-xs text-slate-500 dark:text-slate-400">Por defecto: hoy</p>
       </div>
 
-      {isLoading && <p className="text-sm text-slate-500">Calculando balance general…</p>}
+      {isLoading && <p className="text-sm text-slate-500 dark:text-slate-400">Calculando balance general…</p>}
       {error && <p className="text-sm text-red-600">No se pudo calcular el balance general.</p>}
 
       {data && (

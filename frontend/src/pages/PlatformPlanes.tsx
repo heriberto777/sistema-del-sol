@@ -263,7 +263,7 @@ function ModalPlan({ plan, onClose }: { plan: Plan | null; onClose: () => void }
           </div>
 
           {cargandoModulos && <p className="text-sm text-slate-400">Cargando catálogo de módulos…</p>}
-          {errorModulos && <p className="text-sm text-red-600">No se pudo cargar el catálogo de módulos. Intenta recargar la página.</p>}
+          {errorModulos && <p className="text-sm text-red-600 dark:text-red-400">No se pudo cargar el catálogo de módulos. Intenta recargar la página.</p>}
           {catalogoModulos && catalogoModulos.length === 0 && (
             <p className="text-sm text-slate-400">No hay módulos en el catálogo todavía.</p>
           )}
@@ -308,7 +308,7 @@ function ModalPlan({ plan, onClose }: { plan: Plan | null; onClose: () => void }
           </label>
         )}
 
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
         <Button type="submit" disabled={guardarPlan.isPending} className="w-full">
           {guardarPlan.isPending ? 'Guardando…' : plan ? 'Guardar cambios' : 'Crear plan'}
         </Button>

@@ -142,7 +142,7 @@ export function HorarioEmpleadoPanel() {
           </div>
         )}
 
-        {empleado && !usaPlantilla && isLoading && <p className="text-sm text-slate-500">Cargando horario…</p>}
+        {empleado && !usaPlantilla && isLoading && <p className="text-sm text-slate-500 dark:text-slate-400">Cargando horario…</p>}
 
         {empleado && !usaPlantilla && !isLoading && (
           <div className="overflow-x-auto">
@@ -158,7 +158,7 @@ export function HorarioEmpleadoPanel() {
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {DIAS.map((d) => (
                   <tr key={d.clave}>
-                    <td className="py-2 pr-4">{d.etiqueta}</td>
+                    <td className="py-2 pr-4 text-slate-700 dark:text-slate-300">{d.etiqueta}</td>
                     <td className="py-2 pr-4">
                       <input
                         type="checkbox"
@@ -202,7 +202,7 @@ export function HorarioEmpleadoPanel() {
           </div>
         )}
 
-        {!empleado && <p className="text-sm text-slate-500">Seleccioná un empleado para ver o editar su horario.</p>}
+        {!empleado && <p className="text-sm text-slate-500 dark:text-slate-400">Seleccioná un empleado para ver o editar su horario.</p>}
       </div>
     </Card>
   );

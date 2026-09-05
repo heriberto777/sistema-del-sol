@@ -154,7 +154,7 @@ export function TurnosCajaTable() {
         </div>
       </Card>
 
-      {isLoading && <p className="text-sm text-slate-500">Cargando turnos…</p>}
+      {isLoading && <p className="text-sm text-slate-500 dark:text-slate-400">Cargando turnos…</p>}
       {errorCarga && <p className="text-sm text-red-600">No se pudieron cargar los turnos.</p>}
 
       {data && (
@@ -174,18 +174,18 @@ export function TurnosCajaTable() {
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {data.datos.map((turno) => (
                   <tr key={turno.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                    <td className="px-5 py-3">{bodegas?.find((b) => b.id === turno.bodegaId)?.nombre ?? turno.bodegaId}</td>
-                    <td className="px-5 py-3">
+                    <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{bodegas?.find((b) => b.id === turno.bodegaId)?.nombre ?? turno.bodegaId}</td>
+                    <td className="px-5 py-3 text-slate-700 dark:text-slate-300">
                       {turno.cajero.nombre}
                       {turno.estado === 'CERRADO' && turno.cerradoPor && turno.cerradoPor.id !== turno.cajero.id && (
                         <span className="block text-xs text-slate-400">Cerrado por {turno.cerradoPor.nombre}</span>
                       )}
                     </td>
-                    <td className="px-5 py-3">RD$ {Number(turno.montoInicial).toLocaleString('es-DO')}</td>
+                    <td className="px-5 py-3 text-slate-700 dark:text-slate-300">RD$ {Number(turno.montoInicial).toLocaleString('es-DO')}</td>
                     <td className="px-5 py-3">
                       <Badge tono={TONO_ESTADO[turno.estado]}>{ETIQUETA_ESTADO[turno.estado]}</Badge>
                     </td>
-                    <td className="px-5 py-3">{new Date(turno.abiertoEn).toLocaleString('es-DO')}</td>
+                    <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{new Date(turno.abiertoEn).toLocaleString('es-DO')}</td>
                     <td className="px-5 py-3">
                       <div className="flex gap-2">
                         <Button variante="secundario" onClick={() => navigate(`/pos/caja/${turno.id}`)}>

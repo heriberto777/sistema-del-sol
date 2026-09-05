@@ -114,11 +114,11 @@ export function ImportarProductosModal({ onImportado }: { onImportado: () => voi
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {filas.map((f, i) => (
                   <tr key={i} className={f.errores.length > 0 ? 'bg-red-50 dark:bg-red-950/30' : undefined}>
-                    <td className="px-3 py-2">{f.codigo || '—'}</td>
-                    <td className="px-3 py-2">{f.nombre || '—'}</td>
-                    <td className="px-3 py-2">{f.categoria ?? '—'}</td>
-                    <td className="px-3 py-2">{f.tipo ?? 'PRODUCTO'}</td>
-                    <td className="px-3 py-2">{f.precioGeneral ?? '—'}</td>
+                    <td className="px-3 py-2 text-slate-700 dark:text-slate-300">{f.codigo || '—'}</td>
+                    <td className="px-3 py-2 text-slate-700 dark:text-slate-300">{f.nombre || '—'}</td>
+                    <td className="px-3 py-2 text-slate-700 dark:text-slate-300">{f.categoria ?? '—'}</td>
+                    <td className="px-3 py-2 text-slate-700 dark:text-slate-300">{f.tipo ?? 'PRODUCTO'}</td>
+                    <td className="px-3 py-2 text-slate-700 dark:text-slate-300">{f.precioGeneral ?? '—'}</td>
                     <td className="px-3 py-2 text-red-600">{f.errores.join('; ')}</td>
                   </tr>
                 ))}

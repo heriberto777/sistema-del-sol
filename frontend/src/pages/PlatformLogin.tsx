@@ -59,7 +59,7 @@ export function PlatformLogin() {
         </div>
         <FormField id="email" label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
         <FormField id="password" label="Contraseña" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
         <Button type="submit" disabled={cargando} className="w-full">
           {cargando ? 'Ingresando…' : 'Ingresar'}
         </Button>

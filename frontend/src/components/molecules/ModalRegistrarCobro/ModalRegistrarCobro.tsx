@@ -104,7 +104,7 @@ export function ModalRegistrarCobro({
             </Button>
           </form>
         ) : (
-          <p className="text-sm text-slate-500">Esta factura ya está pagada en su totalidad.</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400">Esta factura ya está pagada en su totalidad.</p>
         )}
       </div>
     </Modal>

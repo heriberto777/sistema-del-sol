@@ -104,9 +104,9 @@ export function LeyesFiscalesPanel() {
           <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
             {leyes?.map((l) => (
               <tr key={l.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                <td className="px-5 py-3 font-mono text-xs">{l.codigo}</td>
-                <td className="px-5 py-3">{l.nombre}</td>
-                <td className="px-5 py-3">{Number(l.porcentajeItbisAPagar)}%</td>
+                <td className="px-5 py-3 font-mono text-xs text-slate-700 dark:text-slate-300">{l.codigo}</td>
+                <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{l.nombre}</td>
+                <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{Number(l.porcentajeItbisAPagar)}%</td>
                 <td className="px-5 py-3">
                   <Badge tono={l.activa ? 'exito' : 'neutro'}>{l.activa ? 'Activa' : 'Inactiva'}</Badge>
                 </td>

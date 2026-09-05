@@ -104,7 +104,7 @@ export function TasasCambioPanel() {
           <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
             {tasas?.map((t) => (
               <tr key={t.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                <td className="px-5 py-3 font-mono text-xs">{t.moneda}</td>
+                <td className="px-5 py-3 font-mono text-xs text-slate-700 dark:text-slate-300">{t.moneda}</td>
                 <td className="px-5 py-3">
                   <input
                     type="number"
@@ -118,7 +118,7 @@ export function TasasCambioPanel() {
                     className="w-28 rounded-md border border-slate-300 px-2 py-1 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
                   />
                 </td>
-                <td className="px-5 py-3">{new Date(t.actualizadaEn).toLocaleDateString('es-DO')}</td>
+                <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{new Date(t.actualizadaEn).toLocaleDateString('es-DO')}</td>
                 <td className="px-5 py-3 text-right">
                   <Button variante="peligro" disabled={eliminar.isPending} onClick={() => eliminar.mutate(t.id)}>
                     Eliminar

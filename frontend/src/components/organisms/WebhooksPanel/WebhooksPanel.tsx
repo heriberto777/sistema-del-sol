@@ -89,7 +89,7 @@ export function WebhooksPanel() {
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {webhooks?.map((webhook) => (
                   <tr key={webhook.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                    <td className="px-5 py-3 font-mono text-xs">{webhook.url}</td>
+                    <td className="px-5 py-3 font-mono text-xs text-slate-700 dark:text-slate-300">{webhook.url}</td>
                     <td className="px-5 py-3">
                       <div className="flex flex-wrap gap-1">
                         {webhook.eventos.map((evento) => (

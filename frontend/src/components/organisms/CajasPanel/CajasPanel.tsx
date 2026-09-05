@@ -101,9 +101,9 @@ export function CajasPanel() {
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
               {cajas?.map((caja) => (
                 <tr key={caja.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                  <td className="px-5 py-3 font-mono text-xs">{caja.codigo}</td>
-                  <td className="px-5 py-3">{caja.nombre}</td>
-                  <td className="px-5 py-3">{caja.bodega.nombre}</td>
+                  <td className="px-5 py-3 font-mono text-xs text-slate-700 dark:text-slate-300">{caja.codigo}</td>
+                  <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{caja.nombre}</td>
+                  <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{caja.bodega.nombre}</td>
                   <td className="px-5 py-3">
                     {caja.categorias.length === 0 && caja.productos.length === 0 ? (
                       <span className="text-slate-400">Vende todo</span>

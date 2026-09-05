@@ -92,8 +92,8 @@ export function UsuariosPanel() {
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
               {usuarios?.datos.map((usuario) => (
                 <tr key={usuario.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                  <td className="px-5 py-3">{usuario.nombre}</td>
-                  <td className="px-5 py-3">{usuario.email}</td>
+                  <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{usuario.nombre}</td>
+                  <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{usuario.email}</td>
                   <td className="px-5 py-3">
                     <div className="flex flex-wrap gap-1">
                       {usuario.roles.map(({ role }) => (

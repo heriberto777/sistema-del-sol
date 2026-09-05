@@ -188,10 +188,10 @@ export function ReporteFiscalDgii() {
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                     {retenciones.empleados.map((e) => (
                       <tr key={e.cedula} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                        <td className="px-5 py-3 font-mono text-xs">{e.cedula}</td>
-                        <td className="px-5 py-3">{e.nombre}</td>
-                        <td className="px-5 py-3 text-right">{formatoRD(e.salarioBruto)}</td>
-                        <td className="px-5 py-3 text-right">{formatoRD(e.isr)}</td>
+                        <td className="px-5 py-3 font-mono text-xs text-slate-700 dark:text-slate-300">{e.cedula}</td>
+                        <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{e.nombre}</td>
+                        <td className="px-5 py-3 text-right text-slate-700 dark:text-slate-300">{formatoRD(e.salarioBruto)}</td>
+                        <td className="px-5 py-3 text-right text-slate-700 dark:text-slate-300">{formatoRD(e.isr)}</td>
                       </tr>
                     ))}
                     {retenciones.empleados.length === 0 && (
@@ -240,13 +240,13 @@ export function ReporteFiscalDgii() {
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                     {retencionesProveedores.filas.map((f, i) => (
                       <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                        <td className="px-5 py-3">{f.proveedorNombre}</td>
-                        <td className="px-5 py-3 font-mono text-xs">{f.proveedorRnc || '—'}</td>
-                        <td className="px-5 py-3">{new Date(f.fecha).toLocaleDateString('es-DO')}</td>
-                        <td className="px-5 py-3 text-right">{formatoRD(f.montoBruto)}</td>
-                        <td className="px-5 py-3 text-right">{formatoRD(f.retencionIsr)}</td>
-                        <td className="px-5 py-3 text-right">{formatoRD(f.retencionItbis)}</td>
-                        <td className="px-5 py-3 text-right">{formatoRD(f.netoPagado)}</td>
+                        <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{f.proveedorNombre}</td>
+                        <td className="px-5 py-3 font-mono text-xs text-slate-700 dark:text-slate-300">{f.proveedorRnc || '—'}</td>
+                        <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{new Date(f.fecha).toLocaleDateString('es-DO')}</td>
+                        <td className="px-5 py-3 text-right text-slate-700 dark:text-slate-300">{formatoRD(f.montoBruto)}</td>
+                        <td className="px-5 py-3 text-right text-slate-700 dark:text-slate-300">{formatoRD(f.retencionIsr)}</td>
+                        <td className="px-5 py-3 text-right text-slate-700 dark:text-slate-300">{formatoRD(f.retencionItbis)}</td>
+                        <td className="px-5 py-3 text-right text-slate-700 dark:text-slate-300">{formatoRD(f.netoPagado)}</td>
                       </tr>
                     ))}
                     {retencionesProveedores.filas.length === 0 && (

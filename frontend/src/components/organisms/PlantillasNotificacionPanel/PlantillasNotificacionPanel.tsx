@@ -73,8 +73,8 @@ export function PlantillasNotificacionPanel() {
                   <td className="px-5 py-3">
                     <Badge>{p.canal}</Badge>
                   </td>
-                  <td className="px-5 py-3 font-mono text-xs">{p.clave}</td>
-                  <td className="px-5 py-3">{p.asunto ?? '—'}</td>
+                  <td className="px-5 py-3 font-mono text-xs text-slate-700 dark:text-slate-300">{p.clave}</td>
+                  <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{p.asunto ?? '—'}</td>
                   <td className="px-5 py-3">
                     <Switch activo={p.activa} onChange={() => guardarActiva.mutate(p)} disabled={guardarActiva.isPending} />
                   </td>

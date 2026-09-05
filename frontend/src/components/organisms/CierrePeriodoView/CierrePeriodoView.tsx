@@ -74,7 +74,7 @@ export function CierrePeriodoView() {
       )}
 
       {error && <p className="text-sm text-red-600">{error}</p>}
-      {isLoading && <p className="text-sm text-slate-500">Cargando cierres…</p>}
+      {isLoading && <p className="text-sm text-slate-500 dark:text-slate-400">Cargando cierres…</p>}
       {errorCarga && <p className="text-sm text-red-600">No se pudieron cargar los cierres anteriores.</p>}
 
       {data && (
@@ -93,8 +93,8 @@ export function CierrePeriodoView() {
                   const utilidad = Number(c.utilidadNeta);
                   return (
                     <tr key={c.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                      <td className="px-5 py-3">{new Date(c.fecha).toLocaleDateString('es-DO')}</td>
-                      <td className="px-5 py-3">#{c.asientoCierre.numero}</td>
+                      <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{new Date(c.fecha).toLocaleDateString('es-DO')}</td>
+                      <td className="px-5 py-3 text-slate-700 dark:text-slate-300">#{c.asientoCierre.numero}</td>
                       <td className="px-5 py-3 text-right">
                         <Badge tono={utilidad >= 0 ? 'exito' : 'peligro'}>{formatoRD(utilidad)}</Badge>
                       </td>

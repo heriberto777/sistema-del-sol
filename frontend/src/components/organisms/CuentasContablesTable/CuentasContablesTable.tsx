@@ -61,7 +61,7 @@ export function CuentasContablesTable() {
         descripcion={data ? `${data.length} cuenta(s)` : undefined}
         acciones={tienePermiso('contabilidad.editar') ? <Button onClick={() => setModalNuevaCuenta(true)}>Nueva cuenta</Button> : undefined}
       >
-        {isLoading && <p className="p-5 text-sm text-slate-500">Cargando catálogo de cuentas…</p>}
+        {isLoading && <p className="p-5 text-sm text-slate-500 dark:text-slate-400">Cargando catálogo de cuentas…</p>}
         {data && (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
@@ -112,7 +112,7 @@ function FilaCuenta({
   return (
     <>
       <tr className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-        <td className="py-3 pr-5 font-mono text-xs" style={{ paddingLeft: `${1.25 + profundidad * 1.5}rem` }}>
+        <td className="py-3 pr-5 font-mono text-xs text-slate-700 dark:text-slate-300" style={{ paddingLeft: `${1.25 + profundidad * 1.5}rem` }}>
           {tieneHijos ? (
             <button
               type="button"
@@ -127,7 +127,7 @@ function FilaCuenta({
           )}
           {cuenta.codigo}
         </td>
-        <td className="px-5 py-3">{cuenta.nombre}</td>
+        <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{cuenta.nombre}</td>
         <td className="px-5 py-3">
           <Badge tono={TONO_POR_TIPO[cuenta.tipo as TipoCuenta]}>{cuenta.tipo}</Badge>
         </td>

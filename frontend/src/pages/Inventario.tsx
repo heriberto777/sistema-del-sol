@@ -391,7 +391,7 @@ export function Inventario() {
           acciones={tienePermisoAjustar && <Button onClick={() => setAjusteNuevo(true)}>Nuevo ajuste</Button>}
         >
           {ajustes?.datos.length === 0 ? (
-            <p className="p-5 text-sm text-slate-500">
+            <p className="p-5 text-sm text-slate-500 dark:text-slate-400">
               Todavía no hay ajustes registrados — usá el botón "Nuevo ajuste" de arriba para crear el primero.
             </p>
           ) : (
@@ -459,7 +459,7 @@ export function Inventario() {
           acciones={tienePermisoTransferir && <Button onClick={() => setTransferenciaNueva(true)}>Nueva transferencia</Button>}
         >
           {transferencias?.datos.length === 0 ? (
-            <p className="p-5 text-sm text-slate-500">
+            <p className="p-5 text-sm text-slate-500 dark:text-slate-400">
               Todavía no hay transferencias registradas — usá el botón "Nueva transferencia" de arriba para crear la primera.
             </p>
           ) : (
@@ -619,7 +619,7 @@ function ModalNuevaBodega({ onClose }: { onClose: () => void }) {
         </div>
         <FormField id="bodega-nombre" label="Nombre" value={nombre} onChange={(e) => setNombre(e.target.value)} required />
         <FormField id="bodega-direccion" label="Dirección" value={direccion} onChange={(e) => setDireccion(e.target.value)} />
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
         <Button type="submit" disabled={crear.isPending} className="w-full">
           {crear.isPending ? 'Creando…' : 'Crear bodega'}
         </Button>
@@ -708,7 +708,7 @@ function ModalEditarBodega({ bodega, onClose }: { bodega: Bodega; onClose: () =>
             Inactivarla la saca de los selectores de bodega en toda la app (Facturación, Compras, POS, etc.) — no borra su stock ni su historial.
           </p>
         )}
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
         <Button onClick={() => guardar.mutate()} disabled={guardar.isPending} className="w-full">
           {guardar.isPending ? 'Guardando…' : 'Guardar'}
         </Button>
@@ -829,7 +829,7 @@ function ModalAjustarStock({
           </Select>
         </div>
         <FormField id="ajuste-motivo" label="Detalle (opcional)" value={motivo} onChange={(e) => setMotivo(e.target.value)} />
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
         <Button type="submit" disabled={guardarBorrador.isPending} className="w-full">
           {guardarBorrador.isPending ? 'Guardando…' : 'Guardar borrador'}
         </Button>
@@ -974,7 +974,7 @@ function ModalEditarAjuste({ ajuste, onClose }: { ajuste: AjusteInventario; onCl
               />
             </div>
           ))}
-          {error && <p className="text-sm text-red-600">{error}</p>}
+          {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
           <Button type="submit" disabled={guardar.isPending} className="w-full">
             {guardar.isPending ? 'Guardando…' : 'Guardar cambios'}
           </Button>
@@ -1029,7 +1029,7 @@ function ModalConfirmarAjuste({ ajuste, onClose }: { ajuste: AjusteInventario; o
             Al confirmar, este ajuste se aplica de verdad al stock de {detalle.bodega.nombre} — ya no se podrá editar.
           </p>
           {tieneSalida && <CampoPin value={pin} onChange={setPin} id="ajuste-confirmar-pin" />}
-          {error && <p className="text-sm text-red-600">{error}</p>}
+          {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
           <Button type="submit" disabled={confirmar.isPending} className="w-full">
             {confirmar.isPending ? 'Confirmando…' : 'Confirmar ajuste'}
           </Button>
@@ -1152,7 +1152,7 @@ function ModalEditarTransferencia({ transferencia, onClose }: { transferencia: T
               />
             </div>
           ))}
-          {error && <p className="text-sm text-red-600">{error}</p>}
+          {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
           <Button type="submit" disabled={guardar.isPending} className="w-full">
             {guardar.isPending ? 'Guardando…' : 'Guardar cambios'}
           </Button>
@@ -1312,7 +1312,7 @@ function ModalTransferirStock({
           </Select>
         </div>
         <FormField id="transferir-cantidad" label="Cantidad" type="number" min={1} value={cantidad} onChange={(e) => setCantidad(e.target.value)} required />
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
         <Button type="submit" disabled={guardarBorrador.isPending} className="w-full">
           {guardarBorrador.isPending ? 'Guardando…' : 'Guardar borrador'}
         </Button>

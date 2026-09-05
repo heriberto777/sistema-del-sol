@@ -84,7 +84,7 @@ export function TiposAusenciaConfigPanel() {
 
   return (
     <Card sinPadding className="overflow-x-auto" titulo="Tipos de ausencia" descripcion="Reglas por tipo — el catálogo de tipos en sí es fijo (categorías del Código de Trabajo)">
-      {isLoading && <p className="p-5 text-sm text-slate-500">Cargando…</p>}
+      {isLoading && <p className="p-5 text-sm text-slate-500 dark:text-slate-400">Cargando…</p>}
       {config && (
         <table className="w-full text-left text-sm">
           <thead className="bg-slate-50 text-slate-500 dark:bg-slate-900/60 dark:text-slate-400">

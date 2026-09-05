@@ -70,7 +70,7 @@ export function PuestosPanel() {
           <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
             {puestos?.map((p) => (
               <tr key={p.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                <td className="px-5 py-3">{p.nombre}</td>
+                <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{p.nombre}</td>
                 <td className="px-5 py-3">
                   <Badge tono={p.activo ? 'exito' : 'neutro'}>{p.activo ? 'Activo' : 'Inactivo'}</Badge>
                 </td>

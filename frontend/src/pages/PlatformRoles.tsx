@@ -116,7 +116,7 @@ export function PlatformRoles() {
 
                 {cargandoPermisos && <p className="text-sm text-slate-400">Cargando catálogo de permisos…</p>}
                 {errorPermisos && (
-                  <p className="text-sm text-red-600">No se pudo cargar el catálogo de permisos. Intenta recargar la página.</p>
+                  <p className="text-sm text-red-600 dark:text-red-400">No se pudo cargar el catálogo de permisos. Intenta recargar la página.</p>
                 )}
 
                 {catalogoPermisos && catalogoPermisos.length > 0 && (
@@ -152,7 +152,7 @@ export function PlatformRoles() {
                 )}
               </div>
 
-              {error && <p className="text-sm text-red-600">{error}</p>}
+              {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
               <Button type="submit" disabled={guardarRol.isPending} className="w-full">
                 {guardarRol.isPending ? 'Guardando…' : rolEditandoId ? 'Guardar cambios' : 'Crear rol'}
               </Button>

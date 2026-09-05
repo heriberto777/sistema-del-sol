@@ -69,10 +69,10 @@ export function CorrelativosPanel() {
           <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
             {correlativos?.map((c) => (
               <tr key={c.tipo} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                <td className="px-5 py-3">{ETIQUETA_TIPO[c.tipo]}</td>
-                <td className="px-5 py-3 font-mono text-xs">{c.prefijo || <span className="text-slate-400">—</span>}</td>
-                <td className="px-5 py-3">{c.siguienteNumero}</td>
-                <td className="px-5 py-3">{c.digitos}</td>
+                <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{ETIQUETA_TIPO[c.tipo]}</td>
+                <td className="px-5 py-3 font-mono text-xs text-slate-700 dark:text-slate-300">{c.prefijo || <span className="text-slate-400">—</span>}</td>
+                <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{c.siguienteNumero}</td>
+                <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{c.digitos}</td>
                 <td className="px-5 py-3 font-mono text-xs text-slate-500 dark:text-slate-400">
                   {c.prefijo}
                   {String(c.siguienteNumero).padStart(c.digitos, '0')}

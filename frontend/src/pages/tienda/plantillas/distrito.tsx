@@ -40,12 +40,12 @@ function Nav({ nombre, logo, subdominio, cantidadCarrito, menu }: { nombre: stri
       <div className="px-6 py-1.5 text-center text-[0.68em] font-semibold uppercase tracking-[0.04em] text-white sm:px-10" style={{ background: 'var(--tienda-color-acento)' }}>
         Envío gratis en compras desde RD$ 3,000
       </div>
-      <div className="flex items-center justify-between border-b border-[color:var(--tienda-color-texto)]/10 px-6 py-4 sm:px-10">
+      <div className="flex flex-wrap items-center justify-between gap-y-2 border-b border-[color:var(--tienda-color-texto)]/10 px-6 py-4 sm:px-10">
         <Link to={`/tienda/${subdominio}`} className="flex items-center gap-2" style={{ fontFamily: 'var(--tienda-fuente-display)' }}>
           {logo && <img src={logo} alt={nombre} className="h-8 w-8 object-cover" />}
           <span className="text-[1.25em] font-bold text-[var(--tienda-color-texto)]">{nombre}</span>
         </Link>
-        <div className="flex items-center gap-6">
+        <div className="flex flex-wrap items-center gap-3 gap-y-2 sm:gap-6">
           {menu.map((clave) => {
             if (clave === 'cuenta') {
               return (

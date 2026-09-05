@@ -434,7 +434,7 @@ function ModalNuevaOrdenCompra({ onClose }: { onClose: () => void }) {
                 <button
                   type="button"
                   onClick={() => setLineas((prev) => prev.filter((_, idx) => idx !== i))}
-                  className="text-red-600 hover:text-red-700"
+                  className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
                   aria-label="Quitar línea"
                 >
                   ×
@@ -455,7 +455,7 @@ function ModalNuevaOrdenCompra({ onClose }: { onClose: () => void }) {
           Total: RD$ {total.toLocaleString('es-DO')}
         </p>
 
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
         <Button type="submit" disabled={crear.isPending} className="w-full">
           {crear.isPending ? 'Creando…' : 'Crear orden de compra'}
         </Button>
@@ -571,7 +571,7 @@ function ModalEditarOrdenCompra({ orden, onClose }: { orden: OrdenCompra; onClos
                   <button
                     type="button"
                     onClick={() => setLineas((prev) => prev.filter((_, idx) => idx !== i))}
-                    className="text-red-600 hover:text-red-700"
+                    className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
                     aria-label="Quitar línea"
                   >
                     ×
@@ -592,7 +592,7 @@ function ModalEditarOrdenCompra({ orden, onClose }: { orden: OrdenCompra; onClos
             Total: RD$ {total.toLocaleString('es-DO')}
           </p>
 
-          {error && <p className="text-sm text-red-600">{error}</p>}
+          {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
           <Button type="submit" disabled={guardar.isPending} className="w-full">
             {guardar.isPending ? 'Guardando…' : 'Guardar cambios'}
           </Button>
@@ -621,7 +621,7 @@ function NuevoProveedorInline({ onCreado }: { onCreado: (p: Proveedor) => void }
           value={nombre}
           onChange={(e) => setNombre(e.target.value)}
         />
-        {error && <p className="text-xs text-red-600">{error}</p>}
+        {error && <p className="text-xs text-red-600 dark:text-red-400">{error}</p>}
       </div>
       <Button
         type="button"
@@ -783,7 +783,7 @@ function ModalRecibirOrden({ orden, onClose }: { orden: OrdenCompra; onClose: ()
           onChange={(e) => setMontoFacturaProveedor(e.target.value)}
         />
 
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
         <Button type="submit" disabled={recibir.isPending || lineasPendientes.length === 0} className="w-full">
           {recibir.isPending ? 'Recibiendo…' : 'Recibir'}
         </Button>
@@ -884,7 +884,7 @@ function ModalDevolverOrden({ orden, onClose }: { orden: OrdenCompra; onClose: (
 
         <FormField id="devolver-motivo" label="Motivo (opcional)" value={motivo} onChange={(e) => setMotivo(e.target.value)} />
 
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
         <Button type="submit" disabled={devolver.isPending || lineasDevolvibles.length === 0} className="w-full">
           {devolver.isPending ? 'Registrando…' : 'Devolver a proveedor'}
         </Button>

@@ -57,7 +57,7 @@ export function SucursalesTable() {
       )}
 
       <Card sinPadding titulo="Sucursales" descripcion={data ? `${data.length} sucursal(es)` : undefined}>
-        {isLoading && <p className="p-5 text-sm text-slate-500">Cargando sucursales…</p>}
+        {isLoading && <p className="p-5 text-sm text-slate-500 dark:text-slate-400">Cargando sucursales…</p>}
         {errorCarga && <p className="p-5 text-sm text-red-600">No se pudieron cargar las sucursales.</p>}
         {data && (
           <div className="overflow-x-auto">
@@ -75,10 +75,10 @@ export function SucursalesTable() {
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {data.map((s) => (
                   <tr key={s.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                    <td className="px-5 py-3">{s.nombre}</td>
-                    <td className="px-5 py-3">{s.nombreComercial ?? '—'}</td>
-                    <td className="px-5 py-3">{s.ciudad ?? '—'}</td>
-                    <td className="px-5 py-3">{s.telefono ?? '—'}</td>
+                    <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{s.nombre}</td>
+                    <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{s.nombreComercial ?? '—'}</td>
+                    <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{s.ciudad ?? '—'}</td>
+                    <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{s.telefono ?? '—'}</td>
                     <td className="px-5 py-3">
                       <Badge tono={s.activa ? 'exito' : 'neutro'}>{s.activa ? 'Activa' : 'Inactiva'}</Badge>
                     </td>
@@ -97,7 +97,7 @@ export function SucursalesTable() {
                 ))}
                 {data.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="px-5 py-6 text-center text-slate-500">
+                    <td colSpan={6} className="px-5 py-6 text-center text-slate-500 dark:text-slate-400">
                       Sin sucursales registradas.
                     </td>
                   </tr>

@@ -47,7 +47,7 @@ export function PlatformRestablecerPassword() {
           <>
             <FormField id="password" label="Nueva contraseña" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8} />
             <FormField id="confirmar" label="Confirmar contraseña" type="password" value={confirmar} onChange={(e) => setConfirmar(e.target.value)} required minLength={8} />
-            {error && <p className="text-sm text-red-600">{error}</p>}
+            {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
             <Button type="submit" disabled={enviando} className="w-full">
               {enviando ? 'Guardando…' : 'Restablecer contraseña'}
             </Button>

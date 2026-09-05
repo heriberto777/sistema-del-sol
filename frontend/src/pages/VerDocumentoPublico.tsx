@@ -56,7 +56,7 @@ function VerDocumentoPublico({ tipo }: { tipo: 'factura' | 'cotizacion' }) {
         <h1 className="text-lg font-semibold text-sol-600 dark:text-sol-400">El Sistema del Sol</h1>
 
         {isLoading && <p className="text-sm text-slate-400">Cargando…</p>}
-        {isError && <p className="text-sm text-red-600">No encontramos ese documento.</p>}
+        {isError && <p className="text-sm text-red-600 dark:text-red-400">No encontramos ese documento.</p>}
 
         {documento && (
           <div className="space-y-4">

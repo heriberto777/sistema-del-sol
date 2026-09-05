@@ -36,12 +36,12 @@ function Nav({ nombre, logo, subdominio, cantidadCarrito, menu }: { nombre: stri
   const { autenticado } = useClienteTienda(subdominio);
   const { abrir } = useCarritoDrawer();
   return (
-    <div className="flex items-center justify-between border-b border-[color:var(--tienda-color-texto)]/10 px-6 py-4 sm:px-10">
+    <div className="flex flex-wrap items-center justify-between gap-y-2 border-b border-[color:var(--tienda-color-texto)]/10 px-6 py-4 sm:px-10">
       <Link to={`/tienda/${subdominio}`} className="flex items-center gap-2" style={{ fontFamily: 'var(--tienda-fuente-display)' }}>
         {logo && <img src={logo} alt={nombre} className="h-8 w-8 rounded object-cover" />}
         <span className="text-[1.15em] font-semibold text-[var(--tienda-color-texto)]">{nombre}</span>
       </Link>
-      <div className="flex items-center gap-5">
+      <div className="flex flex-wrap items-center gap-3 gap-y-2 sm:gap-5">
         {menu.map((clave) => {
           if (clave === 'cuenta') {
             return (

@@ -79,7 +79,7 @@ export function RolesPanel() {
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
               {roles?.map((rol) => (
                 <tr key={rol.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                  <td className="px-5 py-3">{rol.nombre}</td>
+                  <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{rol.nombre}</td>
                   <td className="px-5 py-3 text-slate-500 dark:text-slate-400">{rol.descripcion ?? '—'}</td>
                   <td className="px-5 py-3">
                     <Badge tono={rol.esSistema ? 'neutro' : 'exito'}>{rol.esSistema ? 'Sistema' : 'Personalizado'}</Badge>

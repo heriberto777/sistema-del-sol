@@ -95,7 +95,7 @@ function PanelSuscripcionTenant({ tenant, onClose }: { tenant: Tenant; onClose: 
   return (
     <Modal titulo={`Suscripción — ${tenant.nombre}`} onClose={onClose}>
       <div className="space-y-4">
-        <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm dark:bg-slate-800/60">
+        <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700 dark:bg-slate-800/60 dark:text-slate-300">
           <p>
             Plan: <span className="font-medium">{suscripcion.plan.nombre}</span> — RD${' '}
             {Number(suscripcion.plan.precio).toLocaleString('es-DO')} / {ETIQUETA_CICLO[suscripcion.plan.cicloFacturacion]}
@@ -322,7 +322,7 @@ function PanelDominiosTenant({ tenant, onClose }: { tenant: Tenant; onClose: () 
           Agregar
         </Button>
       </form>
-      {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+      {error && <p className="mt-2 text-sm text-red-600 dark:text-red-400">{error}</p>}
     </Modal>
   );
 }
@@ -517,7 +517,7 @@ function ModalNuevoTenant({ planes, onClose }: { planes: Plan[]; onClose: () => 
         <FormField id="adminNombre" label="Nombre" value={adminNombre} onChange={(e) => setAdminNombre(e.target.value)} required />
         <FormField id="adminEmail" label="Email" type="email" value={adminEmail} onChange={(e) => setAdminEmail(e.target.value)} required />
         <FormField id="adminPassword" label="Contraseña" type="password" value={adminPassword} onChange={(e) => setAdminPassword(e.target.value)} required minLength={8} />
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
         <Button type="submit" disabled={crearTenant.isPending} className="w-full">
           {crearTenant.isPending ? 'Creando…' : 'Crear tenant'}
         </Button>
@@ -568,7 +568,7 @@ function ModalEditarTenant({ tenant, onClose }: { tenant: Tenant; onClose: () =>
         <FormField id="editar-direccion" label="Dirección (opcional)" value={direccion} onChange={(e) => setDireccion(e.target.value)} />
         <FormField id="editar-telefono" label="Teléfono (opcional)" value={telefono} onChange={(e) => setTelefono(e.target.value)} />
         <FormField id="editar-email" label="Correo de la empresa (opcional)" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
         <Button type="submit" disabled={guardar.isPending} className="w-full">
           {guardar.isPending ? 'Guardando…' : 'Guardar cambios'}
         </Button>

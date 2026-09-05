@@ -196,11 +196,11 @@ export function NcfPanel() {
           <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
             {secuencias?.map((s) => (
               <tr key={s.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                <td className="px-5 py-3 font-mono text-xs">{s.tipoNcf}</td>
-                <td className="px-5 py-3">{s.sucursal?.nombre ?? <span className="text-slate-400">Compartida</span>}</td>
-                <td className="px-5 py-3">{s.secuenciaActual}</td>
-                <td className="px-5 py-3">{s.secuenciaFinal}</td>
-                <td className="px-5 py-3">{new Date(s.vigenciaHasta).toLocaleDateString('es-DO')}</td>
+                <td className="px-5 py-3 font-mono text-xs text-slate-700 dark:text-slate-300">{s.tipoNcf}</td>
+                <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{s.sucursal?.nombre ?? <span className="text-slate-400">Compartida</span>}</td>
+                <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{s.secuenciaActual}</td>
+                <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{s.secuenciaFinal}</td>
+                <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{new Date(s.vigenciaHasta).toLocaleDateString('es-DO')}</td>
                 <td className="px-5 py-3">
                   <Badge tono={s.activo ? 'exito' : 'neutro'}>{s.activo ? 'Activa' : 'Inactiva'}</Badge>
                 </td>

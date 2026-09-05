@@ -156,9 +156,9 @@ export function BonosPanel() {
           <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
             {bonos?.map((b) => (
               <tr key={b.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                <td className="px-5 py-3 font-mono text-xs">{b.codigo}</td>
-                <td className="px-5 py-3">RD$ {Number(b.montoInicial).toLocaleString('es-DO')}</td>
-                <td className="px-5 py-3 font-medium">RD$ {Number(b.saldoActual).toLocaleString('es-DO')}</td>
+                <td className="px-5 py-3 font-mono text-xs text-slate-700 dark:text-slate-300">{b.codigo}</td>
+                <td className="px-5 py-3 text-slate-700 dark:text-slate-300">RD$ {Number(b.montoInicial).toLocaleString('es-DO')}</td>
+                <td className="px-5 py-3 font-medium text-slate-900 dark:text-slate-100">RD$ {Number(b.saldoActual).toLocaleString('es-DO')}</td>
                 <td className="px-5 py-3 text-xs text-slate-500 dark:text-slate-400">{formatearFecha(b.fechaVencimiento)}</td>
                 <td className="px-5 py-3">
                   <Badge tono={TONO_ESTADO[b.estado]}>{b.estado}</Badge>

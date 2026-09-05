@@ -173,7 +173,7 @@ export function CatalogoProductosPos({
         )}
       </div>
       <div className="grid flex-1 grid-cols-2 gap-3 overflow-y-auto p-3 sm:grid-cols-3 xl:grid-cols-4">
-        {isLoading && <p className="col-span-full text-sm text-slate-500">Cargando catálogo…</p>}
+        {isLoading && <p className="col-span-full text-sm text-slate-500 dark:text-slate-400">Cargando catálogo…</p>}
         {!isLoading && data?.datos.length === 0 && <p className="col-span-full text-sm text-slate-400">Sin productos para mostrar.</p>}
         {data?.datos.map((producto) => (
           <button
@@ -214,7 +214,7 @@ export function CatalogoProductosPos({
                   className="flex w-full items-center justify-between gap-3 rounded-lg border border-slate-200 px-3 py-2 text-left text-sm hover:border-sol-400 hover:bg-sol-50/50 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-slate-200 disabled:hover:bg-transparent dark:border-slate-800 dark:hover:bg-sol-900/10"
                 >
                   <span className="flex flex-col">
-                    <span>{etiquetaVariante(v) || '(sin atributos)'}</span>
+                    <span className="text-slate-900 dark:text-slate-100">{etiquetaVariante(v) || '(sin atributos)'}</span>
                     {v.existencia !== undefined && (
                       <span className={v.existencia > 0 ? 'text-xs text-slate-400 dark:text-slate-500' : 'text-xs text-amber-600 dark:text-amber-500'}>
                         {v.existencia > 0 ? `${v.existencia} disponible${v.existencia === 1 ? '' : 's'}` : 'Sin existencia'}

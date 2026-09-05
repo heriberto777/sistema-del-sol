@@ -84,11 +84,11 @@ export function ReporteInventario() {
                 const enAlerta = Number(s.cantidadActual) < Number(s.stockMinimo);
                 return (
                   <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                    <td className="px-5 py-3 font-mono text-xs">{s.producto.codigo}</td>
-                    <td className="px-5 py-3">{s.producto.nombre}</td>
-                    <td className="px-5 py-3">{s.bodega.nombre}</td>
-                    <td className="px-5 py-3">{s.cantidadActual}</td>
-                    <td className="px-5 py-3">{s.stockMinimo}</td>
+                    <td className="px-5 py-3 font-mono text-xs text-slate-700 dark:text-slate-300">{s.producto.codigo}</td>
+                    <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{s.producto.nombre}</td>
+                    <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{s.bodega.nombre}</td>
+                    <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{s.cantidadActual}</td>
+                    <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{s.stockMinimo}</td>
                     <td className="px-5 py-3">{enAlerta && <Badge tono="advertencia">Bajo</Badge>}</td>
                   </tr>
                 );

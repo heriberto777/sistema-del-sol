@@ -633,7 +633,7 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
     pantallaCompleta && puedeVender,
   );
 
-  if (isLoading || !data) return <p className="text-sm text-slate-500">Cargando turno…</p>;
+  if (isLoading || !data) return <p className="text-sm text-slate-500 dark:text-slate-400">Cargando turno…</p>;
 
   const descripcion =
     `Abierto por ${data.cajero.nombre}` +
@@ -1323,9 +1323,9 @@ function ModalDevolucion({
             <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Venta a devolver</label>
             <SearchInput value={busqueda} onChange={setBusqueda} placeholder="Buscar por número, NCF o cliente…" />
             <div className="mt-1 max-h-64 divide-y divide-slate-200 overflow-y-auto rounded-md border border-slate-200 dark:divide-slate-800 dark:border-slate-800">
-              {buscando && <p className="px-3 py-4 text-center text-sm text-slate-500">Buscando…</p>}
+              {buscando && <p className="px-3 py-4 text-center text-sm text-slate-500 dark:text-slate-400">Buscando…</p>}
               {!buscando && resultados?.datos.length === 0 && (
-                <p className="px-3 py-4 text-center text-sm text-slate-500">No se encontraron ventas.</p>
+                <p className="px-3 py-4 text-center text-sm text-slate-500 dark:text-slate-400">No se encontraron ventas.</p>
               )}
               {resultados?.datos.map((f) => (
                 <button
@@ -1362,7 +1362,7 @@ function ModalDevolucion({
           </div>
         )}
 
-        {isLoading && <p className="text-sm text-slate-500">Cargando líneas…</p>}
+        {isLoading && <p className="text-sm text-slate-500 dark:text-slate-400">Cargando líneas…</p>}
 
         {factura && (
           <form onSubmit={onSubmit} className="space-y-3">

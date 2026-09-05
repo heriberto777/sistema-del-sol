@@ -79,7 +79,7 @@ export function LibroMayorView() {
       </div>
 
       {!cuentaId && <p className="text-sm text-slate-500 dark:text-slate-400">Elegí una cuenta para ver su movimiento.</p>}
-      {isLoading && <p className="text-sm text-slate-500">Cargando libro mayor…</p>}
+      {isLoading && <p className="text-sm text-slate-500 dark:text-slate-400">Cargando libro mayor…</p>}
       {error && <p className="text-sm text-red-600">No se pudo cargar el libro mayor de esta cuenta.</p>}
 
       {data && (
@@ -105,12 +105,12 @@ export function LibroMayorView() {
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                   {data.movimientos.map((m, i) => (
                     <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                      <td className="px-5 py-3">{new Date(m.fecha).toLocaleDateString('es-DO')}</td>
-                      <td className="px-5 py-3">#{m.asientoNumero}</td>
-                      <td className="px-5 py-3">{m.concepto}</td>
-                      <td className="px-5 py-3 text-right">{m.debito > 0 ? formatoRD(m.debito) : '—'}</td>
-                      <td className="px-5 py-3 text-right">{m.credito > 0 ? formatoRD(m.credito) : '—'}</td>
-                      <td className="px-5 py-3 text-right font-medium">{formatoRD(m.saldoAcumulado)}</td>
+                      <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{new Date(m.fecha).toLocaleDateString('es-DO')}</td>
+                      <td className="px-5 py-3 text-slate-700 dark:text-slate-300">#{m.asientoNumero}</td>
+                      <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{m.concepto}</td>
+                      <td className="px-5 py-3 text-right text-slate-700 dark:text-slate-300">{m.debito > 0 ? formatoRD(m.debito) : '—'}</td>
+                      <td className="px-5 py-3 text-right text-slate-700 dark:text-slate-300">{m.credito > 0 ? formatoRD(m.credito) : '—'}</td>
+                      <td className="px-5 py-3 text-right font-medium text-slate-900 dark:text-slate-100">{formatoRD(m.saldoAcumulado)}</td>
                     </tr>
                   ))}
                   {data.movimientos.length === 0 && (

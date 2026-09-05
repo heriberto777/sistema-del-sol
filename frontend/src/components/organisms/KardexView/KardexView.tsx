@@ -64,7 +64,7 @@ export function KardexView({ varianteId, bodegaId }: { varianteId: string; bodeg
         <p className="text-xs text-slate-500 dark:text-slate-400">Por defecto: mes actual</p>
       </div>
 
-      {isLoading && <p className="text-sm text-slate-500">Cargando kardex…</p>}
+      {isLoading && <p className="text-sm text-slate-500 dark:text-slate-400">Cargando kardex…</p>}
       {error && <p className="text-sm text-red-600">No se pudo cargar el kardex de este producto.</p>}
 
       {data && (
@@ -91,16 +91,16 @@ export function KardexView({ varianteId, bodegaId }: { varianteId: string; bodeg
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                   {data.movimientos.map((m, i) => (
                     <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                      <td className="px-5 py-3">{new Date(m.fecha).toLocaleString('es-DO')}</td>
-                      <td className="px-5 py-3">{ETIQUETA_TIPO[m.tipo] ?? m.tipo}</td>
-                      {todasLasBodegas && <td className="px-5 py-3">{m.bodega.nombre}</td>}
+                      <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{new Date(m.fecha).toLocaleString('es-DO')}</td>
+                      <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{ETIQUETA_TIPO[m.tipo] ?? m.tipo}</td>
+                      {todasLasBodegas && <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{m.bodega.nombre}</td>}
                       <td className="px-5 py-3 text-slate-500 dark:text-slate-400">{m.motivo ?? '—'}</td>
-                      <td className="px-5 py-3">{m.usuario}</td>
+                      <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{m.usuario}</td>
                       <td className={`px-5 py-3 text-right ${m.direccion === 'ENTRADA' ? 'text-emerald-600' : 'text-red-600'}`}>
                         {m.direccion === 'ENTRADA' ? '+' : '−'}
                         {m.cantidad.toLocaleString('es-DO')}
                       </td>
-                      <td className="px-5 py-3 text-right font-medium">{m.saldoAcumulado.toLocaleString('es-DO')}</td>
+                      <td className="px-5 py-3 text-right font-medium text-slate-900 dark:text-slate-100">{m.saldoAcumulado.toLocaleString('es-DO')}</td>
                     </tr>
                   ))}
                   {data.movimientos.length === 0 && (

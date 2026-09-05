@@ -76,7 +76,7 @@ export function BoutiqueCalido({ datos, subdominio, onPagar, pagando, error }: P
         </button>
       )}
       {!datos.pagada && datos.estado === 'EMITIDA' && !datos.pasarelaDisponible && (
-        <p className="mt-4 text-center font-sans text-xs text-[#9a5a2c]">Este negocio no tiene un pago en línea disponible todavía.</p>
+        <p className="mt-4 text-center font-sans text-xs text-[#9a5a2c] dark:text-[#d9a066]">Este negocio no tiene un pago en línea disponible todavía.</p>
       )}
       {datos.pagada && <p className="mt-4 text-center font-sans text-xs" style={{ color: datos.colorAcento }}>Esta factura ya fue pagada — gracias.</p>}
 

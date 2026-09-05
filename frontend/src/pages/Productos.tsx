@@ -717,7 +717,7 @@ function FormularioProducto({ producto, onGuardado }: { producto: Producto | nul
               <button
                 type="button"
                 onClick={() => setComponentes((prev) => prev.filter((_, idx) => idx !== i))}
-                className="text-red-600 hover:text-red-700"
+                className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
                 aria-label="Quitar componente"
               >
                 ×
@@ -741,7 +741,7 @@ function FormularioProducto({ producto, onGuardado }: { producto: Producto | nul
         <p className="text-xs text-slate-400">Guardá el producto primero para poder armarle variantes (Talla, Color, etc.).</p>
       )}
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
       <Button type="submit" disabled={guardar.isPending} className="w-full">
         {guardar.isPending ? 'Guardando…' : 'Guardar'}
       </Button>
@@ -952,7 +952,7 @@ function FormularioPrecio({
         value={precioVenta}
         onChange={(e) => setPrecioVenta(e.target.value)}
       />
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
       <Button type="submit" disabled={guardar.isPending} className="w-full">
         {guardar.isPending ? 'Guardando…' : 'Guardar precio'}
       </Button>

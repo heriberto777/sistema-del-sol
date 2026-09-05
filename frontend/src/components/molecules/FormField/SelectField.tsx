@@ -15,7 +15,7 @@ export function SelectField({ label, error, id, children, ...props }: SelectFiel
       <Select id={id} {...props}>
         {children}
       </Select>
-      {error && <span className="text-xs text-red-600">{error}</span>}
+      {error && <span className="text-xs text-red-600 dark:text-red-400">{error}</span>}
     </div>
   );
 }

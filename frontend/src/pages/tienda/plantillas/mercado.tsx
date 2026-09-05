@@ -26,12 +26,12 @@ function Nav({ nombre, logo, subdominio, cantidadCarrito, accent }: { nombre: st
       <div className="py-1.5 text-center text-xs font-semibold text-white" style={{ background: BG_OSCURO }}>
         Powered by Sistema del Sol
       </div>
-      <div className="flex items-center justify-between px-6 py-4 sm:px-10">
+      <div className="flex flex-wrap items-center justify-between gap-y-2 px-6 py-4 sm:px-10">
         <Link to={`/tienda/${subdominio}`} className="flex items-center gap-2" style={{ fontFamily: FONT_DISPLAY, color: BG_OSCURO }}>
           {logo && <img src={logo} alt={nombre} className="h-8 w-8 rounded-full object-cover" />}
           <span className="text-xl font-bold">{nombre}</span>
         </Link>
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-3 gap-y-2 sm:gap-4">
           <Link to={`/tienda/${subdominio}/productos`} className="text-sm font-semibold" style={{ color: BG_OSCURO }}>
             Productos
           </Link>

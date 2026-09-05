@@ -89,8 +89,8 @@ export function ConciliacionBancariaView() {
         </div>
       </div>
 
-      {!cuentaBancariaId && <p className="text-sm text-slate-500">Seleccioná una cuenta bancaria para ver su conciliación.</p>}
-      {isLoading && <p className="text-sm text-slate-500">Cargando conciliación…</p>}
+      {!cuentaBancariaId && <p className="text-sm text-slate-500 dark:text-slate-400">Seleccioná una cuenta bancaria para ver su conciliación.</p>}
+      {isLoading && <p className="text-sm text-slate-500 dark:text-slate-400">Cargando conciliación…</p>}
       {error && <p className="text-sm text-red-600">No se pudo cargar la conciliación.</p>}
 
       {data && (
@@ -116,10 +116,10 @@ export function ConciliacionBancariaView() {
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                   {data.movimientos.map((m) => (
                     <tr key={m.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                      <td className="px-5 py-3">{new Date(m.fecha).toLocaleDateString('es-DO')}</td>
-                      <td className="px-5 py-3">{m.concepto}</td>
-                      <td className="px-5 py-3 text-right">{m.debito > 0 ? formatoRD(m.debito) : ''}</td>
-                      <td className="px-5 py-3 text-right">{m.credito > 0 ? formatoRD(m.credito) : ''}</td>
+                      <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{new Date(m.fecha).toLocaleDateString('es-DO')}</td>
+                      <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{m.concepto}</td>
+                      <td className="px-5 py-3 text-right text-slate-700 dark:text-slate-300">{m.debito > 0 ? formatoRD(m.debito) : ''}</td>
+                      <td className="px-5 py-3 text-right text-slate-700 dark:text-slate-300">{m.credito > 0 ? formatoRD(m.credito) : ''}</td>
                       <td className="px-5 py-3 text-center">
                         <input
                           type="checkbox"

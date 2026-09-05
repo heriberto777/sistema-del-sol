@@ -63,7 +63,7 @@ function ReporteAportesView({ id }: { id: string }) {
     queryFn: async () => (await apiClient.get<ReporteAportes>(`/nomina/periodos/${id}/reporte-aportes`)).data,
   });
 
-  if (isLoading || !data) return <p className="py-2 text-sm text-slate-500">Calculando reporte de aportes…</p>;
+  if (isLoading || !data) return <p className="py-2 text-sm text-slate-500 dark:text-slate-400">Calculando reporte de aportes…</p>;
 
   return (
     <div className="overflow-x-auto">
@@ -81,24 +81,24 @@ function ReporteAportesView({ id }: { id: string }) {
         <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
           {data.empleados.map((e) => (
             <tr key={e.empleadoId}>
-              <td className="py-1">{e.nombre}</td>
-              <td className="py-1 font-mono text-xs">{e.cedula}</td>
-              <td className="py-1 text-right">{formatoRD(String(e.sfsEmpleado + e.sfsEmpleador))}</td>
-              <td className="py-1 text-right">{formatoRD(String(e.afpEmpleado + e.afpEmpleador))}</td>
-              <td className="py-1 text-right">{formatoRD(String(e.infotep))}</td>
-              <td className="py-1 text-right">{formatoRD(String(e.isr))}</td>
+              <td className="py-1 text-slate-700 dark:text-slate-300">{e.nombre}</td>
+              <td className="py-1 font-mono text-xs text-slate-700 dark:text-slate-300">{e.cedula}</td>
+              <td className="py-1 text-right text-slate-700 dark:text-slate-300">{formatoRD(String(e.sfsEmpleado + e.sfsEmpleador))}</td>
+              <td className="py-1 text-right text-slate-700 dark:text-slate-300">{formatoRD(String(e.afpEmpleado + e.afpEmpleador))}</td>
+              <td className="py-1 text-right text-slate-700 dark:text-slate-300">{formatoRD(String(e.infotep))}</td>
+              <td className="py-1 text-right text-slate-700 dark:text-slate-300">{formatoRD(String(e.isr))}</td>
             </tr>
           ))}
         </tbody>
         <tfoot>
           <tr className="border-t border-slate-200 font-medium dark:border-slate-800">
-            <td className="py-1" colSpan={2}>
+            <td className="py-1 text-slate-900 dark:text-slate-100" colSpan={2}>
               Total a remitir
             </td>
-            <td className="py-1 text-right">{formatoRD(String(data.totales.totalSfs))}</td>
-            <td className="py-1 text-right">{formatoRD(String(data.totales.totalAfp))}</td>
-            <td className="py-1 text-right">{formatoRD(String(data.totales.infotep))}</td>
-            <td className="py-1 text-right">{formatoRD(String(data.totales.isr))}</td>
+            <td className="py-1 text-right text-slate-900 dark:text-slate-100">{formatoRD(String(data.totales.totalSfs))}</td>
+            <td className="py-1 text-right text-slate-900 dark:text-slate-100">{formatoRD(String(data.totales.totalAfp))}</td>
+            <td className="py-1 text-right text-slate-900 dark:text-slate-100">{formatoRD(String(data.totales.infotep))}</td>
+            <td className="py-1 text-right text-slate-900 dark:text-slate-100">{formatoRD(String(data.totales.isr))}</td>
           </tr>
         </tfoot>
       </table>
@@ -161,7 +161,7 @@ function PeriodoDetalle({ id }: { id: string }) {
     },
   });
 
-  if (isLoading || !data) return <p className="p-3 text-sm text-slate-500">Cargando período…</p>;
+  if (isLoading || !data) return <p className="p-3 text-sm text-slate-500 dark:text-slate-400">Cargando período…</p>;
 
   return (
     <div className="space-y-3 border-t border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950">
@@ -192,9 +192,9 @@ function PeriodoDetalle({ id }: { id: string }) {
           <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
             {data.recibos.map((recibo) => (
               <tr key={recibo.id}>
-                <td className="py-1">{recibo.empleado.nombre}</td>
-                <td className="py-1">{formatoRD(recibo.salarioBruto)}</td>
-                <td className="py-1">{formatoRD(recibo.salarioNeto)}</td>
+                <td className="py-1 text-slate-700 dark:text-slate-300">{recibo.empleado.nombre}</td>
+                <td className="py-1 text-slate-700 dark:text-slate-300">{formatoRD(recibo.salarioBruto)}</td>
+                <td className="py-1 text-slate-700 dark:text-slate-300">{formatoRD(recibo.salarioNeto)}</td>
                 <td className="py-1 text-right">
                   <button
                     type="button"
@@ -282,7 +282,7 @@ export function PeriodosNominaTable() {
         </Card>
       )}
 
-      {isLoading && <p className="text-sm text-slate-500">Cargando períodos…</p>}
+      {isLoading && <p className="text-sm text-slate-500 dark:text-slate-400">Cargando períodos…</p>}
       {errorCarga && <p className="text-sm text-red-600">No se pudieron cargar los períodos.</p>}
 
       {data && (

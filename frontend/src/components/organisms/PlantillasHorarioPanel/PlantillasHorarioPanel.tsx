@@ -121,8 +121,8 @@ export function PlantillasHorarioPanel() {
           <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
             {plantillas?.map((p) => (
               <tr key={p.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                <td className="px-5 py-3 font-mono text-xs">{p.codigo}</td>
-                <td className="px-5 py-3">{p.nombre}</td>
+                <td className="px-5 py-3 font-mono text-xs text-slate-700 dark:text-slate-300">{p.codigo}</td>
+                <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{p.nombre}</td>
                 <td className="px-5 py-3">{p.predeterminada && <Badge tono="exito">Predeterminada</Badge>}</td>
                 <td className="px-5 py-3">
                   <Badge tono={p.activa ? 'exito' : 'neutro'}>{p.activa ? 'Activa' : 'Inactiva'}</Badge>
@@ -205,7 +205,7 @@ function ModalDiasPlantilla({ plantilla, onClose }: { plantilla: PlantillaHorari
 
   return (
     <Modal titulo={`Días de "${plantilla.nombre}"`} onClose={onClose}>
-      {isLoading && <p className="text-sm text-slate-500">Cargando…</p>}
+      {isLoading && <p className="text-sm text-slate-500 dark:text-slate-400">Cargando…</p>}
       {!isLoading && (
         <div className="space-y-4">
           <p className="text-xs text-amber-700 dark:text-amber-400">
@@ -224,7 +224,7 @@ function ModalDiasPlantilla({ plantilla, onClose }: { plantilla: PlantillaHorari
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {DIAS.map((d) => (
                   <tr key={d.clave}>
-                    <td className="py-2 pr-4">{d.etiqueta}</td>
+                    <td className="py-2 pr-4 text-slate-700 dark:text-slate-300">{d.etiqueta}</td>
                     <td className="py-2 pr-4">
                       <input
                         type="checkbox"

@@ -349,7 +349,7 @@ function ModalNuevoGastoMenor({ onClose }: { onClose: () => void }) {
                 <button
                   type="button"
                   onClick={() => setLineas((prev) => prev.filter((_, idx) => idx !== i))}
-                  className="text-red-600 hover:text-red-700"
+                  className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
                   aria-label="Quitar línea"
                 >
                   ×
@@ -370,7 +370,7 @@ function ModalNuevoGastoMenor({ onClose }: { onClose: () => void }) {
           Total estimado: RD$ {totalEstimado.toLocaleString('es-DO', { maximumFractionDigits: 2 })}
         </p>
 
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
         <Button type="submit" disabled={crear.isPending} className="w-full">
           {crear.isPending ? 'Registrando…' : 'Registrar gasto menor'}
         </Button>

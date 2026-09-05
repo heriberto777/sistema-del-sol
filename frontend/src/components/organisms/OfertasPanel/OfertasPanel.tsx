@@ -346,12 +346,12 @@ export function OfertasPanel() {
           <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
             {ofertas?.map((o) => (
               <tr key={o.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                <td className="px-5 py-3">
+                <td className="px-5 py-3 text-slate-700 dark:text-slate-300">
                   {o.nombre}
                   {o.acumulable && <span className="ml-1 text-xs text-slate-400">(acumulable)</span>}
                 </td>
-                <td className="px-5 py-3">{etiquetaAlcance(o)}</td>
-                <td className="px-5 py-3">{etiquetaDescuento(o)}</td>
+                <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{etiquetaAlcance(o)}</td>
+                <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{etiquetaDescuento(o)}</td>
                 <td className="px-5 py-3 text-xs text-slate-500 dark:text-slate-400">
                   {formatearFechaHora(o.fechaInicio)} – {formatearFechaHora(o.fechaFin)}
                 </td>

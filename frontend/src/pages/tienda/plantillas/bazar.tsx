@@ -40,12 +40,12 @@ function Nav({ nombre, logo, subdominio, cantidadCarrito, menu }: { nombre: stri
   const { autenticado } = useClienteTienda(subdominio);
   const { abrir } = useCarritoDrawer();
   return (
-    <div className="flex items-center gap-6 px-6 py-3 sm:px-10" style={{ background: HEADER_BG }}>
+    <div className="flex flex-wrap items-center gap-x-6 gap-y-2 px-6 py-3 sm:px-10" style={{ background: HEADER_BG }}>
       <Link to={`/tienda/${subdominio}`} className="flex items-center gap-2 text-white" style={{ fontFamily: 'var(--tienda-fuente-display)' }}>
         {logo && <img src={logo} alt={nombre} className="h-8 w-8 rounded object-cover" />}
         <span className="text-[1.15em] font-extrabold">{nombre}</span>
       </Link>
-      <div className="ml-auto flex items-center gap-5">
+      <div className="ml-auto flex flex-wrap items-center justify-end gap-3 gap-y-2 sm:gap-5">
         {menu.map((clave) => {
           if (clave === 'cuenta') {
             return (
@@ -119,7 +119,7 @@ function BazarHome({ config, subdominio, carrito }: PropsHome) {
             value={busqueda}
             onChange={(e) => setBusqueda(e.target.value)}
             placeholder="Buscar en la tienda…"
-            className="w-full rounded py-1.5 pl-8 pr-3 text-[0.8em] text-slate-900 outline-none"
+            className="w-full rounded bg-white py-1.5 pl-8 pr-3 text-[0.8em] text-slate-900 outline-none dark:bg-slate-800 dark:text-slate-100"
           />
         </div>
       </form>

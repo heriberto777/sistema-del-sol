@@ -102,7 +102,7 @@ export function AsientosContablesTable() {
           </div>
         }
       >
-        {isLoading && <p className="p-5 text-sm text-slate-500">Cargando asientos…</p>}
+        {isLoading && <p className="p-5 text-sm text-slate-500 dark:text-slate-400">Cargando asientos…</p>}
         {errorCarga && <p className="p-5 text-sm text-red-600">No se pudieron cargar los asientos.</p>}
 
         {data && (
@@ -140,8 +140,8 @@ export function AsientosContablesTable() {
                           <td className="py-1 text-slate-600 dark:text-slate-400">
                             {linea.cuentaContable.codigo} — {linea.cuentaContable.nombre}
                           </td>
-                          <td className="py-1 text-right">{Number(linea.debito) > 0 ? `RD$ ${Number(linea.debito).toLocaleString('es-DO')}` : ''}</td>
-                          <td className="py-1 text-right">{Number(linea.credito) > 0 ? `RD$ ${Number(linea.credito).toLocaleString('es-DO')}` : ''}</td>
+                          <td className="py-1 text-right text-slate-600 dark:text-slate-400">{Number(linea.debito) > 0 ? `RD$ ${Number(linea.debito).toLocaleString('es-DO')}` : ''}</td>
+                          <td className="py-1 text-right text-slate-600 dark:text-slate-400">{Number(linea.credito) > 0 ? `RD$ ${Number(linea.credito).toLocaleString('es-DO')}` : ''}</td>
                         </tr>
                       ))}
                     </tbody>

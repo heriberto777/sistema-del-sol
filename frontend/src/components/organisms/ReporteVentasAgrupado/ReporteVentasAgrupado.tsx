@@ -66,7 +66,7 @@ export function ReporteVentasAgrupado() {
       </div>
 
       <Card sinPadding titulo="Ventas agrupadas">
-        {isLoading && <p className="p-5 text-sm text-slate-500">Cargando…</p>}
+        {isLoading && <p className="p-5 text-sm text-slate-500 dark:text-slate-400">Cargando…</p>}
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead className="bg-slate-50 text-slate-500 dark:bg-slate-900/60 dark:text-slate-400">
@@ -81,11 +81,11 @@ export function ReporteVentasAgrupado() {
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
               {data?.filas.map((f) => (
                 <tr key={f.etiqueta} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                  <td className="px-5 py-3">{f.etiqueta}</td>
-                  <td className="px-5 py-3">{f.cantidad}</td>
-                  <td className="px-5 py-3">RD$ {f.subtotal.toLocaleString('es-DO', { minimumFractionDigits: 2 })}</td>
-                  <td className="px-5 py-3">RD$ {f.itbis.toLocaleString('es-DO', { minimumFractionDigits: 2 })}</td>
-                  <td className="px-5 py-3">RD$ {f.total.toLocaleString('es-DO', { minimumFractionDigits: 2 })}</td>
+                  <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{f.etiqueta}</td>
+                  <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{f.cantidad}</td>
+                  <td className="px-5 py-3 text-slate-700 dark:text-slate-300">RD$ {f.subtotal.toLocaleString('es-DO', { minimumFractionDigits: 2 })}</td>
+                  <td className="px-5 py-3 text-slate-700 dark:text-slate-300">RD$ {f.itbis.toLocaleString('es-DO', { minimumFractionDigits: 2 })}</td>
+                  <td className="px-5 py-3 text-slate-700 dark:text-slate-300">RD$ {f.total.toLocaleString('es-DO', { minimumFractionDigits: 2 })}</td>
                 </tr>
               ))}
               {data?.filas.length === 0 && (

@@ -40,7 +40,7 @@ const ENLACES: Enlace[] = [
  * colapsables a propósito: solo 7 enlaces, no hace falta la jerarquía
  * que sí necesita el lado tenant.
  */
-export function PlatformSidebar() {
+export function PlatformSidebar({ onNavegar }: { onNavegar?: () => void } = {}) {
   const { tienePermiso } = usePlatformAuth();
   const enlacesVisibles = ENLACES.filter((enlace) => !enlace.permiso || tienePermiso(enlace.permiso));
 
@@ -77,7 +77,7 @@ export function PlatformSidebar() {
       </div>
 
       {enlacesVisibles.map((enlace) => (
-        <NavLink key={enlace.ruta} to={enlace.ruta} className={enlaceClase}>
+        <NavLink key={enlace.ruta} to={enlace.ruta} className={enlaceClase} onClick={onNavegar}>
           <enlace.icono size={17} className="shrink-0" />
           {enlace.etiqueta}
         </NavLink>

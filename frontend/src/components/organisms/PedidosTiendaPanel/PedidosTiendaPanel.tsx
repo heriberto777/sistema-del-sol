@@ -106,7 +106,7 @@ function DetallePedidoModal({ pedido, onClose }: { pedido: PedidoTienda; onClose
             </div>
             <div className="flex items-center justify-between">
               <span className="text-slate-500 dark:text-slate-400">Fecha</span>
-              <span>{pedido.factura ? new Date(pedido.factura.fecha).toLocaleDateString('es-DO') : '—'}</span>
+              <span className="font-medium text-slate-900 dark:text-slate-100">{pedido.factura ? new Date(pedido.factura.fecha).toLocaleDateString('es-DO') : '—'}</span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-slate-500 dark:text-slate-400">Estado</span>
@@ -137,9 +137,9 @@ function DetallePedidoModal({ pedido, onClose }: { pedido: PedidoTienda; onClose
               {detalle.lineas.map((linea, i) => (
                 <tr key={i}>
                   <td className="px-4 py-2.5 font-medium text-slate-900 dark:text-slate-100">{linea.nombre}</td>
-                  <td className="px-4 py-2.5">{linea.cantidad}</td>
-                  <td className="px-4 py-2.5">{formatearPrecio(linea.precioUnitario)}</td>
-                  <td className="px-4 py-2.5">{formatearPrecio(linea.montoTotal)}</td>
+                  <td className="px-4 py-2.5 text-slate-700 dark:text-slate-300">{linea.cantidad}</td>
+                  <td className="px-4 py-2.5 text-slate-700 dark:text-slate-300">{formatearPrecio(linea.precioUnitario)}</td>
+                  <td className="px-4 py-2.5 text-slate-700 dark:text-slate-300">{formatearPrecio(linea.montoTotal)}</td>
                 </tr>
               ))}
             </tbody>

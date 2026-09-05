@@ -52,7 +52,7 @@ export function BalanceComprobacionView() {
         </div>
       </div>
 
-      {isLoading && <p className="text-sm text-slate-500">Calculando balance de comprobación…</p>}
+      {isLoading && <p className="text-sm text-slate-500 dark:text-slate-400">Calculando balance de comprobación…</p>}
       {error && <p className="text-sm text-red-600">No se pudo calcular el balance de comprobación.</p>}
 
       {data && (
@@ -77,12 +77,12 @@ export function BalanceComprobacionView() {
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                   {data.cuentas.map((c) => (
                     <tr key={c.codigo} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                      <td className="px-5 py-3">
+                      <td className="px-5 py-3 text-slate-700 dark:text-slate-300">
                         {c.codigo} — {c.nombre}
                       </td>
-                      <td className="px-5 py-3 text-right">{formatoRD(c.totalDebito)}</td>
-                      <td className="px-5 py-3 text-right">{formatoRD(c.totalCredito)}</td>
-                      <td className="px-5 py-3 text-right font-medium">{formatoRD(c.saldo)}</td>
+                      <td className="px-5 py-3 text-right text-slate-700 dark:text-slate-300">{formatoRD(c.totalDebito)}</td>
+                      <td className="px-5 py-3 text-right text-slate-700 dark:text-slate-300">{formatoRD(c.totalCredito)}</td>
+                      <td className="px-5 py-3 text-right font-medium text-slate-900 dark:text-slate-100">{formatoRD(c.saldo)}</td>
                     </tr>
                   ))}
                   {data.cuentas.length === 0 && (
@@ -95,9 +95,9 @@ export function BalanceComprobacionView() {
                 </tbody>
                 <tfoot>
                   <tr className="border-t border-slate-200 font-medium dark:border-slate-800">
-                    <td className="px-5 py-3">Total</td>
-                    <td className="px-5 py-3 text-right">{formatoRD(data.totales.debito)}</td>
-                    <td className="px-5 py-3 text-right">{formatoRD(data.totales.credito)}</td>
+                    <td className="px-5 py-3 text-slate-900 dark:text-slate-100">Total</td>
+                    <td className="px-5 py-3 text-right text-slate-900 dark:text-slate-100">{formatoRD(data.totales.debito)}</td>
+                    <td className="px-5 py-3 text-right text-slate-900 dark:text-slate-100">{formatoRD(data.totales.credito)}</td>
                     <td className="px-5 py-3"></td>
                   </tr>
                 </tfoot>

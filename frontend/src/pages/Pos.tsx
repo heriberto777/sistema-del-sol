@@ -185,7 +185,7 @@ function PosCajero() {
       <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Punto de venta</h1>
 
       <RequierePermiso permiso="pos.ver">
-        {(isLoading || miTurnoAbierto) && <p className="text-sm text-slate-500">Cargando tu turno…</p>}
+        {(isLoading || miTurnoAbierto) && <p className="text-sm text-slate-500 dark:text-slate-400">Cargando tu turno…</p>}
 
         {!isLoading && !miTurnoAbierto && (
           <div className="mx-auto max-w-sm space-y-3 rounded-lg border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900">

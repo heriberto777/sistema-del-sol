@@ -48,7 +48,7 @@ export function BandejaWhatsappPanel() {
       titulo="Bandeja de WhatsApp"
       descripcion="Mensajes que el bot no pudo resolver solo — respondé manual o marcá como atendido."
     >
-      {isLoading && <p className="p-5 text-sm text-slate-500">Cargando…</p>}
+      {isLoading && <p className="p-5 text-sm text-slate-500 dark:text-slate-400">Cargando…</p>}
       {error && <p className="px-5 text-sm text-red-600">{error}</p>}
 
       {pendientes?.length === 0 && (

@@ -100,9 +100,9 @@ export function FeriadosTable() {
           <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
             {feriados?.map((f) => (
               <tr key={f.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                <td className="px-5 py-3">{f.nombre}</td>
-                <td className="px-5 py-3">{formatearFecha(f.fecha)}</td>
-                <td className="px-5 py-3">{f.recurrenteAnual ? 'Cada año' : 'Fecha puntual'}</td>
+                <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{f.nombre}</td>
+                <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{formatearFecha(f.fecha)}</td>
+                <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{f.recurrenteAnual ? 'Cada año' : 'Fecha puntual'}</td>
                 <td className="px-5 py-3">
                   <Badge tono={f.activo ? 'exito' : 'neutro'}>{f.activo ? 'Activo' : 'Inactivo'}</Badge>
                 </td>

@@ -74,11 +74,11 @@ export function ReporteVentas() {
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
               {data?.facturas.map((f) => (
                 <tr key={f.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                  <td className="px-5 py-3 font-mono text-xs">{f.ncf ?? '—'}</td>
-                  <td className="px-5 py-3">{new Date(f.fecha).toLocaleDateString('es-DO')}</td>
-                  <td className="px-5 py-3">{f.cliente.nombre}</td>
-                  <td className="px-5 py-3">{f.tipoFactura}</td>
-                  <td className="px-5 py-3">RD$ {Number(f.total).toLocaleString('es-DO')}</td>
+                  <td className="px-5 py-3 font-mono text-xs text-slate-700 dark:text-slate-300">{f.ncf ?? '—'}</td>
+                  <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{new Date(f.fecha).toLocaleDateString('es-DO')}</td>
+                  <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{f.cliente.nombre}</td>
+                  <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{f.tipoFactura}</td>
+                  <td className="px-5 py-3 text-slate-700 dark:text-slate-300">RD$ {Number(f.total).toLocaleString('es-DO')}</td>
                 </tr>
               ))}
             </tbody>

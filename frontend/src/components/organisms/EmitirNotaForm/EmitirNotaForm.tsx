@@ -128,9 +128,9 @@ export function EmitirNotaForm({ onClose }: { onClose: () => void }) {
           {error && <p className="text-sm text-red-600">{error}</p>}
 
           <div className="max-h-80 divide-y divide-slate-200 overflow-y-auto rounded-md border border-slate-200 dark:divide-slate-800 dark:border-slate-800">
-            {buscando && <p className="px-3 py-4 text-center text-sm text-slate-500">Buscando…</p>}
+            {buscando && <p className="px-3 py-4 text-center text-sm text-slate-500 dark:text-slate-400">Buscando…</p>}
             {!buscando && resultados?.datos.length === 0 && (
-              <p className="px-3 py-4 text-center text-sm text-slate-500">No se encontraron facturas vigentes.</p>
+              <p className="px-3 py-4 text-center text-sm text-slate-500 dark:text-slate-400">No se encontraron facturas vigentes.</p>
             )}
             {resultados?.datos.map((factura) => (
               <button

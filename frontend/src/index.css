@@ -3,6 +3,23 @@
 @tailwind utilities;
 
 @layer base {
+  /*
+   * Sin esto, los controles nativos (el popup de <select>, checkboxes,
+   * scrollbars, date/time pickers) siempre se renderizan con la paleta
+   * clara del SO — aunque el <select> tenga dark:bg-slate-900
+   * dark:text-slate-100, esas clases solo pintan la caja cerrada; el
+   * popup de opciones es del SO y hereda el color de TEXTO (claro) sobre
+   * SU fondo (claro, por defecto) → texto invisible hasta pasar el mouse
+   * (el SO resalta esa fila) o seleccionar. Bug real reportado por el
+   * usuario en modo oscuro.
+   */
+  :root {
+    color-scheme: light;
+  }
+  :root.dark {
+    color-scheme: dark;
+  }
+
   body {
     @apply font-sans antialiased;
   }

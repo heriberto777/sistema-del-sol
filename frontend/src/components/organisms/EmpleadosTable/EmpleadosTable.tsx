@@ -96,7 +96,7 @@ export function EmpleadosTable() {
           </div>
         }
       >
-        {isLoading && <p className="p-5 text-sm text-slate-500">Cargando empleados…</p>}
+        {isLoading && <p className="p-5 text-sm text-slate-500 dark:text-slate-400">Cargando empleados…</p>}
         {errorCarga && <p className="p-5 text-sm text-red-600">No se pudieron cargar los empleados.</p>}
         {data && (
           <div className="overflow-x-auto">
@@ -115,11 +115,11 @@ export function EmpleadosTable() {
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {data.datos.map((empleado) => (
                   <tr key={empleado.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                    <td className="px-5 py-3">{empleado.nombre}</td>
-                    <td className="px-5 py-3 font-mono text-xs">{empleado.cedula}</td>
-                    <td className="px-5 py-3">{empleado.cargo}</td>
+                    <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{empleado.nombre}</td>
+                    <td className="px-5 py-3 font-mono text-xs text-slate-700 dark:text-slate-300">{empleado.cedula}</td>
+                    <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{empleado.cargo}</td>
                     <td className="px-5 py-3">{empleado.puesto?.nombre ?? <span className="text-slate-400">—</span>}</td>
-                    <td className="px-5 py-3">RD$ {Number(empleado.salarioBrutoMensual).toLocaleString('es-DO')}</td>
+                    <td className="px-5 py-3 text-slate-700 dark:text-slate-300">RD$ {Number(empleado.salarioBrutoMensual).toLocaleString('es-DO')}</td>
                     <td className="px-5 py-3">
                       <Badge tono={empleado.activo ? 'exito' : 'neutro'}>{empleado.activo ? 'Activo' : 'Inactivo'}</Badge>
                     </td>

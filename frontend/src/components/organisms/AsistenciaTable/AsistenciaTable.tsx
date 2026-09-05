@@ -89,7 +89,7 @@ export function AsistenciaTable() {
       </div>
 
       <Card sinPadding titulo="Asistencia" descripcion={data ? `${data.total} registro(s)` : undefined}>
-        {isLoading && <p className="p-5 text-sm text-slate-500">Cargando asistencia…</p>}
+        {isLoading && <p className="p-5 text-sm text-slate-500 dark:text-slate-400">Cargando asistencia…</p>}
         {errorCarga && <p className="p-5 text-sm text-red-600">No se pudo cargar la asistencia.</p>}
         {data && (
           <div className="overflow-x-auto">
@@ -108,10 +108,10 @@ export function AsistenciaTable() {
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {data.datos.map((r) => (
                   <tr key={r.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                    <td className="px-5 py-3">{r.empleado.nombre}</td>
-                    <td className="px-5 py-3">{formatearFecha(r.fecha)}</td>
-                    <td className="px-5 py-3 font-mono text-xs">{r.horaEntrada ?? '—'}</td>
-                    <td className="px-5 py-3 font-mono text-xs">{r.horaSalida ?? '—'}</td>
+                    <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{r.empleado.nombre}</td>
+                    <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{formatearFecha(r.fecha)}</td>
+                    <td className="px-5 py-3 font-mono text-xs text-slate-700 dark:text-slate-300">{r.horaEntrada ?? '—'}</td>
+                    <td className="px-5 py-3 font-mono text-xs text-slate-700 dark:text-slate-300">{r.horaSalida ?? '—'}</td>
                     <td className="px-5 py-3">
                       <div className="flex flex-wrap gap-1">
                         {r.tardanza && <Badge tono="advertencia">Tardanza</Badge>}
@@ -142,7 +142,7 @@ export function AsistenciaTable() {
                 ))}
                 {data.datos.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="px-5 py-6 text-center text-slate-500">
+                    <td colSpan={7} className="px-5 py-6 text-center text-slate-500 dark:text-slate-400">
                       Sin registros de asistencia.
                     </td>
                   </tr>

@@ -72,7 +72,7 @@ export function ListasPrecioPanel() {
           <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
             {listasPrecio?.map((l) => (
               <tr key={l.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                <td className="px-5 py-3">
+                <td className="px-5 py-3 text-slate-700 dark:text-slate-300">
                   {l.nombre}
                   {l.nombre === 'GENERAL' && <span className="ml-2 text-xs text-slate-400">(por defecto)</span>}
                 </td>

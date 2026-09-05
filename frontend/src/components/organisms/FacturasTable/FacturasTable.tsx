@@ -112,7 +112,7 @@ export function FacturasTable({ tiposFactura, titulo = 'Facturas', busquedaPlace
           />
         }
       >
-        {isLoading && <p className="p-5 text-sm text-slate-500">Cargando facturas…</p>}
+        {isLoading && <p className="p-5 text-sm text-slate-500 dark:text-slate-400">Cargando facturas…</p>}
         {data && (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
@@ -156,8 +156,8 @@ export function FacturasTable({ tiposFactura, titulo = 'Facturas', busquedaPlace
                         {identificadorFactura(factura)}
                       </td>
                       <td className="px-5 py-3 font-mono text-xs text-slate-500 dark:text-slate-400">{factura.ncf ?? '—'}</td>
-                      <td className="px-5 py-3">{factura.cliente?.nombre}</td>
-                      <td className="px-5 py-3">{factura.tipoFactura}</td>
+                      <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{factura.cliente?.nombre}</td>
+                      <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{factura.tipoFactura}</td>
                       <td className="px-5 py-3 font-medium text-slate-900 dark:text-slate-100">RD$ {Number(factura.total).toLocaleString('es-DO')}</td>
                       <td className="px-5 py-3">
                         <Badge tono={TONO_POR_ESTADO[factura.estado]}>{factura.estado}</Badge>
@@ -170,7 +170,7 @@ export function FacturasTable({ tiposFactura, titulo = 'Facturas', busquedaPlace
                           <span className="ml-2 text-xs text-slate-400">{factura.pagada ? 'pagada' : 'pendiente de cobro'}</span>
                         )}
                       </td>
-                      <td className="px-5 py-3">{new Date(factura.fecha).toLocaleDateString('es-DO')}</td>
+                      <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{new Date(factura.fecha).toLocaleDateString('es-DO')}</td>
                       <td className="px-5 py-3 text-right" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-end gap-1">
                           <button
@@ -273,7 +273,7 @@ function ModalDetalleFactura({ factura, onClose, onImprimir }: { factura: Factur
         </div>
 
         {!detalle ? (
-          <p className="text-sm text-slate-500">Cargando…</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400">Cargando…</p>
         ) : (
           <>
             <TablaArticulosDocumento lineas={detalle.lineas} />

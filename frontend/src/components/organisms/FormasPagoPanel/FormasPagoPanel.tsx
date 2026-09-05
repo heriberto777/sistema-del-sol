@@ -137,11 +137,11 @@ export function FormasPagoPanel() {
           <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
             {formasPago?.map((f) => (
               <tr key={f.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                <td className="px-5 py-3">{f.nombre}</td>
-                <td className="px-5 py-3">
+                <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{f.nombre}</td>
+                <td className="px-5 py-3 text-slate-700 dark:text-slate-300">
                   {f.tipo ? ETIQUETA_TIPO_FORMA_PAGO[f.tipo] : <span className="text-slate-400">Sin clasificar</span>}
                 </td>
-                <td className="px-5 py-3">{f.requiereReferencia ? 'Sí' : 'No'}</td>
+                <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{f.requiereReferencia ? 'Sí' : 'No'}</td>
                 <td className="px-5 py-3">
                   {f.esEfectivo ? <Badge tono="exito">Efectivo</Badge> : <span className="text-slate-400">—</span>}
                 </td>

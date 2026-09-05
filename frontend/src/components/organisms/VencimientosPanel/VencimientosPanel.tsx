@@ -19,7 +19,7 @@ export function VencimientosPanel() {
 
   return (
     <div className="overflow-x-auto">
-      {isLoading && <p className="p-4 text-sm text-slate-500">Cargando…</p>}
+      {isLoading && <p className="p-4 text-sm text-slate-500 dark:text-slate-400">Cargando…</p>}
       <table className="w-full text-left text-sm">
         <thead className="bg-slate-50 text-slate-500 dark:bg-slate-900/60 dark:text-slate-400">
           <tr>
@@ -33,13 +33,13 @@ export function VencimientosPanel() {
         <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
           {lotes?.map((l) => (
             <tr key={l.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-              <td className="px-5 py-3">
+              <td className="px-5 py-3 text-slate-700 dark:text-slate-300">
                 {l.variante.producto.codigo} — {l.variante.producto.nombre}
               </td>
-              <td className="px-5 py-3">{l.bodega.nombre}</td>
-              <td className="px-5 py-3 font-mono text-xs">{l.numeroLote}</td>
-              <td className="px-5 py-3">{new Date(l.fechaVencimiento).toLocaleDateString('es-DO', { timeZone: 'UTC' })}</td>
-              <td className="px-5 py-3 text-right">{Number(l.cantidadActual)}</td>
+              <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{l.bodega.nombre}</td>
+              <td className="px-5 py-3 font-mono text-xs text-slate-700 dark:text-slate-300">{l.numeroLote}</td>
+              <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{new Date(l.fechaVencimiento).toLocaleDateString('es-DO', { timeZone: 'UTC' })}</td>
+              <td className="px-5 py-3 text-right text-slate-700 dark:text-slate-300">{Number(l.cantidadActual)}</td>
             </tr>
           ))}
           {lotes?.length === 0 && (

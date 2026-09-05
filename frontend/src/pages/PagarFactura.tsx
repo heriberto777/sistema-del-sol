@@ -51,7 +51,7 @@ export function PagarFactura() {
         <h1 className="text-lg font-semibold text-sol-600 dark:text-sol-400">El Sistema del Sol</h1>
 
         {isLoading && <p className="text-sm text-slate-400">Cargando…</p>}
-        {isError && <p className="text-sm text-red-600">No encontramos esa factura.</p>}
+        {isError && <p className="text-sm text-red-600 dark:text-red-400">No encontramos esa factura.</p>}
 
         {factura && (
           <div className="space-y-4">
@@ -73,7 +73,7 @@ export function PagarFactura() {
             {factura.estado === 'ANULADA' && <p className="text-sm text-slate-400">Esta factura fue anulada.</p>}
             {(factura.estado === 'PENDIENTE' || factura.estado === 'VENCIDA') && (
               <>
-                {error && <p className="text-sm text-red-600">{error}</p>}
+                {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
                 <Button className="w-full" disabled={pagar.isPending} onClick={() => pagar.mutate()}>
                   {pagar.isPending ? 'Redirigiendo…' : 'Pagar con tarjeta'}
                 </Button>

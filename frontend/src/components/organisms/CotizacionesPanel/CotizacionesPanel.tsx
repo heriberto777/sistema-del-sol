@@ -180,10 +180,10 @@ export function CotizacionesPanel() {
                     onClick={() => setCotizacionViendo(cotizacion)}
                     className="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/40"
                   >
-                    <td className="px-5 py-3">{cotizacion.numero}</td>
-                    <td className="px-5 py-3">{cotizacion.cliente?.nombre}</td>
+                    <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{cotizacion.numero}</td>
+                    <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{cotizacion.cliente?.nombre}</td>
                     <td className="px-5 py-3 font-medium text-slate-900 dark:text-slate-100">RD$ {Number(cotizacion.total).toLocaleString('es-DO')}</td>
-                    <td className="px-5 py-3">{new Date(cotizacion.fechaVigenciaHasta).toLocaleDateString('es-DO')}</td>
+                    <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{new Date(cotizacion.fechaVigenciaHasta).toLocaleDateString('es-DO')}</td>
                     <td className="px-5 py-3">
                       <Badge tono={TONO_POR_ESTADO[cotizacion.estado]}>{cotizacion.estado}</Badge>
                       {cotizacion.facturaId && <span className="ml-2 text-xs text-slate-400">Ya facturada</span>}
@@ -295,7 +295,7 @@ function ModalDetalleCotizacion({
         </div>
 
         {!detalle ? (
-          <p className="text-sm text-slate-500">Cargando…</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400">Cargando…</p>
         ) : (
           <>
             <TablaArticulosDocumento lineas={detalle.lineas} />
@@ -475,7 +475,7 @@ function ModalEditarCotizacion({
   if (!valores) {
     return (
       <Modal titulo={`Editar cotización ${numeroActual}`} onClose={onClose}>
-        <p className="text-sm text-slate-500">Cargando…</p>
+        <p className="text-sm text-slate-500 dark:text-slate-400">Cargando…</p>
       </Modal>
     );
   }

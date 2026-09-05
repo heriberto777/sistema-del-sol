@@ -112,12 +112,12 @@ export function ReporteComisiones() {
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                   {(data?.datos as FilaPorVenta[] | undefined)?.map((f) => (
                     <tr key={f.facturaId} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                      <td className="px-5 py-3 font-mono text-xs">{f.ncf ?? '—'}</td>
-                      <td className="px-5 py-3">{new Date(f.fecha).toLocaleDateString('es-DO')}</td>
-                      <td className="px-5 py-3">{f.cliente}</td>
-                      <td className="px-5 py-3">{f.empleado}</td>
-                      <td className="px-5 py-3">{f.cantidadLineas}</td>
-                      <td className="px-5 py-3">RD$ {f.montoTotal.toLocaleString('es-DO', { minimumFractionDigits: 2 })}</td>
+                      <td className="px-5 py-3 font-mono text-xs text-slate-700 dark:text-slate-300">{f.ncf ?? '—'}</td>
+                      <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{new Date(f.fecha).toLocaleDateString('es-DO')}</td>
+                      <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{f.cliente}</td>
+                      <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{f.empleado}</td>
+                      <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{f.cantidadLineas}</td>
+                      <td className="px-5 py-3 text-slate-700 dark:text-slate-300">RD$ {f.montoTotal.toLocaleString('es-DO', { minimumFractionDigits: 2 })}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -135,9 +135,9 @@ export function ReporteComisiones() {
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                   {(data?.datos as FilaPorVendedor[] | undefined)?.map((f) => (
                     <tr key={f.empleadoId} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                      <td className="px-5 py-3">{f.empleado}</td>
-                      <td className="px-5 py-3">{f.cantidadVentas}</td>
-                      <td className="px-5 py-3">RD$ {f.montoTotal.toLocaleString('es-DO', { minimumFractionDigits: 2 })}</td>
+                      <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{f.empleado}</td>
+                      <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{f.cantidadVentas}</td>
+                      <td className="px-5 py-3 text-slate-700 dark:text-slate-300">RD$ {f.montoTotal.toLocaleString('es-DO', { minimumFractionDigits: 2 })}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -155,9 +155,9 @@ export function ReporteComisiones() {
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                   {(data?.datos as FilaPorProducto[] | undefined)?.map((f) => (
                     <tr key={f.productoId} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                      <td className="px-5 py-3">{f.producto}</td>
-                      <td className="px-5 py-3">{f.cantidadLineas}</td>
-                      <td className="px-5 py-3">RD$ {f.montoTotal.toLocaleString('es-DO', { minimumFractionDigits: 2 })}</td>
+                      <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{f.producto}</td>
+                      <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{f.cantidadLineas}</td>
+                      <td className="px-5 py-3 text-slate-700 dark:text-slate-300">RD$ {f.montoTotal.toLocaleString('es-DO', { minimumFractionDigits: 2 })}</td>
                     </tr>
                   ))}
                 </tbody>

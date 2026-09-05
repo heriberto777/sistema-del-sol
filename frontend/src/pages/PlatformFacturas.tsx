@@ -116,7 +116,7 @@ function PanelFactura({ factura, onClose }: { factura: FacturaPlataforma; onClos
   return (
     <Modal titulo={factura.concepto} onClose={onClose}>
       <div className="space-y-4">
-        <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm dark:bg-slate-800/60">
+        <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700 dark:bg-slate-800/60 dark:text-slate-300">
           <p>
             Tenant: <span className="font-medium">{factura.tenant.nombre}</span>
           </p>
@@ -159,7 +159,7 @@ function PanelFactura({ factura, onClose }: { factura: FacturaPlataforma; onClos
           </div>
         )}
 
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
 
         <hr className="border-slate-200 dark:border-slate-800" />
 
@@ -426,7 +426,7 @@ function ModalNuevaFacturaManual({ tenants, onClose }: { tenants: Tenant[]; onCl
           onChange={(e) => setFechaVencimiento(e.target.value)}
         />
 
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
         <Button type="submit" disabled={crear.isPending || !tenantId} className="w-full">
           {crear.isPending ? 'Creando…' : 'Crear factura'}
         </Button>

@@ -96,7 +96,7 @@ export function CuentasPorCobrar() {
           <StatCard etiqueta="Por vencer" valor={cargandoResumen ? '…' : fmtRD(resumen?.totalPorVencer ?? 0)} icono={CalendarClock} />
         </div>
 
-        {error && <p className="text-sm text-red-600">No se pudo cargar Cuentas por cobrar.</p>}
+        {error && <p className="text-sm text-red-600 dark:text-red-400">No se pudo cargar Cuentas por cobrar.</p>}
 
         <Card
           sinPadding
@@ -113,7 +113,7 @@ export function CuentasPorCobrar() {
             />
           }
         >
-          {isLoading && <p className="p-5 text-sm text-slate-500">Cargando…</p>}
+          {isLoading && <p className="p-5 text-sm text-slate-500 dark:text-slate-400">Cargando…</p>}
           {data && (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">

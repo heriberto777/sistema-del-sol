@@ -30,7 +30,7 @@ export function GrupoCuentasContables({
                 <td className="px-5 py-2 text-slate-600 dark:text-slate-400">
                   {cuenta.codigo} — {cuenta.nombre}
                 </td>
-                <td className="px-5 py-2 text-right">{formatoRD(cuenta.saldo)}</td>
+                <td className="px-5 py-2 text-right text-slate-600 dark:text-slate-400">{formatoRD(cuenta.saldo)}</td>
               </tr>
             ))}
             {grupo.cuentas.length === 0 && (
@@ -43,8 +43,8 @@ export function GrupoCuentasContables({
           </tbody>
           <tfoot>
             <tr className="border-t border-slate-200 font-medium dark:border-slate-800">
-              <td className="px-5 py-2">Total</td>
-              <td className="px-5 py-2 text-right">{formatoRD(grupo.total)}</td>
+              <td className="px-5 py-2 text-slate-900 dark:text-slate-100">Total</td>
+              <td className="px-5 py-2 text-right text-slate-900 dark:text-slate-100">{formatoRD(grupo.total)}</td>
             </tr>
           </tfoot>
         </table>

@@ -77,7 +77,7 @@ export function AusenciasTable() {
       </div>
 
       <Card sinPadding titulo="Ausencias" descripcion={data ? `${data.total} solicitud(es)` : undefined}>
-        {isLoading && <p className="p-5 text-sm text-slate-500">Cargando ausencias…</p>}
+        {isLoading && <p className="p-5 text-sm text-slate-500 dark:text-slate-400">Cargando ausencias…</p>}
         {errorCarga && <p className="p-5 text-sm text-red-600">No se pudieron cargar las ausencias.</p>}
         {data && (
           <div className="overflow-x-auto">
@@ -96,11 +96,11 @@ export function AusenciasTable() {
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {data.datos.map((a) => (
                   <tr key={a.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                    <td className="px-5 py-3">{a.empleado.nombre}</td>
-                    <td className="px-5 py-3">{ETIQUETAS_TIPO[a.tipo]}</td>
-                    <td className="px-5 py-3">{formatearFecha(a.fechaDesde)}</td>
-                    <td className="px-5 py-3">{formatearFecha(a.fechaHasta)}</td>
-                    <td className="px-5 py-3">{a.conGoceDeSueldo ? 'Sí' : 'No'}</td>
+                    <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{a.empleado.nombre}</td>
+                    <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{ETIQUETAS_TIPO[a.tipo]}</td>
+                    <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{formatearFecha(a.fechaDesde)}</td>
+                    <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{formatearFecha(a.fechaHasta)}</td>
+                    <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{a.conGoceDeSueldo ? 'Sí' : 'No'}</td>
                     <td className="px-5 py-3">
                       <Badge tono={TONOS_ESTADO[a.estado]}>{a.estado}</Badge>
                     </td>
@@ -127,7 +127,7 @@ export function AusenciasTable() {
                 ))}
                 {data.datos.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="px-5 py-6 text-center text-slate-500">
+                    <td colSpan={7} className="px-5 py-6 text-center text-slate-500 dark:text-slate-400">
                       Sin solicitudes de ausencia.
                     </td>
                   </tr>

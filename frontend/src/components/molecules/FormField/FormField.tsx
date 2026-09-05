@@ -13,7 +13,7 @@ export function FormField({ label, error, id, ...props }: FormFieldProps) {
         {label}
       </label>
       <Input id={id} {...props} />
-      {error && <span className="text-xs text-red-600">{error}</span>}
+      {error && <span className="text-xs text-red-600 dark:text-red-400">{error}</span>}
     </div>
   );
 }

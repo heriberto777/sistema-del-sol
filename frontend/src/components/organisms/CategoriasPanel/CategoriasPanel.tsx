@@ -116,7 +116,7 @@ export function CategoriasPanel() {
             {plano.map((c) => (
               <tr key={c.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
                 <td className="px-5 py-3">
-                  <span className="inline-flex items-center gap-2">
+                  <span className="inline-flex items-center gap-2 text-slate-700 dark:text-slate-300">
                     {c.color && <span className={`h-2.5 w-2.5 rounded-full ${CLASE_PUNTO_COLOR_CATEGORIA[c.color]}`} />}
                     {'— '.repeat(c.profundidad)}
                     {c.nombre}
