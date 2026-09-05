@@ -50,6 +50,7 @@ export class FacturasPlataformaRepository {
     suscripcionId: string;
     concepto: string;
     monto: number;
+    descuento?: number;
     itbis?: number;
     total: number;
     fechaEmision: Date;

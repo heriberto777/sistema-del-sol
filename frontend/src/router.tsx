@@ -37,6 +37,7 @@ import { PlatformLogin } from './pages/PlatformLogin';
 import { PlatformDashboard } from './pages/PlatformDashboard';
 import { PlatformTenants } from './pages/PlatformTenants';
 import { PlatformPlanes } from './pages/PlatformPlanes';
+import { PlatformCupones } from './pages/PlatformCupones';
 import { PlatformRoles } from './pages/PlatformRoles';
 import { PlatformAdmins } from './pages/PlatformAdmins';
 import { PlatformFacturas } from './pages/PlatformFacturas';
@@ -134,6 +135,7 @@ const RUTAS_ADMIN = [
           { path: '/plataforma/dashboard', element: <PlatformDashboard /> },
           { path: '/plataforma/tenants', element: <PlatformTenants /> },
           { path: '/plataforma/planes', element: <PlatformPlanes /> },
+          { path: '/plataforma/cupones', element: <PlatformCupones /> },
           { path: '/plataforma/roles', element: <PlatformRoles /> },
           { path: '/plataforma/admins', element: <PlatformAdmins /> },
           { path: '/plataforma/facturas', element: <PlatformFacturas /> },

@@ -22,4 +22,9 @@ export class SuscripcionesService {
     const suscripcion = await this.suscripcionesRepository.buscarPorTenant(tenantId);
     return this.facturasPlataformaService.generarDesdeSuscripcion(suscripcion);
   }
+
+  async generarFacturaAdelantada(tenantId: string, ciclos: number) {
+    const suscripcion = await this.suscripcionesRepository.buscarPorTenant(tenantId);
+    return this.facturasPlataformaService.generarFacturaAdelantada(suscripcion, ciclos);
+  }
 }

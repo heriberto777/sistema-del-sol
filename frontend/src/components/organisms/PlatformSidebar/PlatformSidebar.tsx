@@ -9,6 +9,7 @@ import {
   Receipt,
   Settings,
   ShieldCheck,
+  Tag,
   UserCog,
   type LucideIcon,
 } from 'lucide-react';
@@ -26,6 +27,7 @@ const ENLACES: Enlace[] = [
   { ruta: '/plataforma/dashboard', etiqueta: 'Dashboard', icono: LayoutDashboard, permiso: 'platform.tenants.ver' },
   { ruta: '/plataforma/tenants', etiqueta: 'Tenants', icono: Building2, permiso: 'platform.tenants.ver' },
   { ruta: '/plataforma/planes', etiqueta: 'Planes', icono: CreditCard, permiso: 'platform.planes.ver' },
+  { ruta: '/plataforma/cupones', etiqueta: 'Cupones', icono: Tag, permiso: 'platform.facturacion.ver' },
   { ruta: '/plataforma/facturas', etiqueta: 'Facturas', icono: Receipt, permiso: 'platform.facturacion.ver' },
   { ruta: '/plataforma/admins', etiqueta: 'Admins', icono: UserCog, permiso: 'platform.admins.ver' },
   { ruta: '/plataforma/roles', etiqueta: 'Roles', icono: ShieldCheck, permiso: 'platform.roles.ver' },

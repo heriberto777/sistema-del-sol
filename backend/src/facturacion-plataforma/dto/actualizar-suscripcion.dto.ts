@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { EstadoSuscripcion } from '@prisma/client';
-import { IsEnum, IsNumber, IsOptional, Max, Min } from 'class-validator';
+import { IsBoolean, IsEnum, IsNumber, IsOptional, Max, Min } from 'class-validator';
 
 export class ActualizarSuscripcionDto {
   @ApiProperty({ required: false, description: '% aplicado una sola vez cuando una factura se vence sin pagar' })
@@ -14,4 +14,9 @@ export class ActualizarSuscripcionDto {
   @IsOptional()
   @IsEnum(EstadoSuscripcion)
   estado?: EstadoSuscripcion;
+
+  @ApiProperty({ required: false, description: 'true = la próxima factura automática sale con descuento total (100%, ITBIS incluido) y se apaga sola al aplicarse' })
+  @IsOptional()
+  @IsBoolean()
+  primerPeriodoGratis?: boolean;
 }

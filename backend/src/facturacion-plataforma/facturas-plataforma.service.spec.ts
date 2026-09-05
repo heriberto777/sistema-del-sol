@@ -8,6 +8,8 @@ import { PlataformaConfigRepository } from '../plataforma-config/plataforma-conf
 import { NcfPlataformaService } from '../ncf-plataforma/ncf-plataforma.service';
 import { EmisionECfService } from '../emision-ecf/emision-ecf.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { SuscripcionesRepository } from './suscripciones.repository';
+import { CuponesPlataformaRepository } from './cupones/cupones-plataforma.repository';
 
 describe('FacturasPlataformaService', () => {
   let service: FacturasPlataformaService;
@@ -19,6 +21,8 @@ describe('FacturasPlataformaService', () => {
   let ncfPlataformaService: jest.Mocked<NcfPlataformaService>;
   let emisionECfService: jest.Mocked<EmisionECfService>;
   let prisma: { user: { findFirst: jest.Mock }; suscripcion: { findUnique: jest.Mock }; tenant: { findUnique: jest.Mock } };
+  let suscripcionesRepository: jest.Mocked<SuscripcionesRepository>;
+  let cuponesPlataformaRepository: jest.Mocked<CuponesPlataformaRepository>;
 
   beforeEach(() => {
     repo = {
@@ -44,6 +48,15 @@ describe('FacturasPlataformaService', () => {
       suscripcion: { findUnique: jest.fn().mockResolvedValue({ id: 's1', tenantId: 't1' }) },
       tenant: { findUnique: jest.fn().mockResolvedValue({ telefono: '+18095551234' }) },
     };
+    suscripcionesRepository = {
+      desactivarPrimerPeriodoGratis: jest.fn().mockResolvedValue(undefined),
+      avanzarProximoCorte: jest.fn().mockResolvedValue(undefined),
+    } as unknown as jest.Mocked<SuscripcionesRepository>;
+    cuponesPlataformaRepository = {
+      buscarAplicacionActiva: jest.fn().mockResolvedValue(null),
+      decrementarCiclos: jest.fn().mockResolvedValue(undefined),
+      desactivarAplicacion: jest.fn().mockResolvedValue(undefined),
+    } as unknown as jest.Mocked<CuponesPlataformaRepository>;
     service = new FacturasPlataformaService(
       repo,
       emailChannel,
@@ -53,6 +66,8 @@ describe('FacturasPlataformaService', () => {
       ncfPlataformaService,
       emisionECfService,
       prisma as unknown as PrismaService,
+      suscripcionesRepository,
+      cuponesPlataformaRepository,
     );
   });
 
@@ -131,6 +146,125 @@ describe('FacturasPlataformaService', () => {
       expect(args.monto).toBe(1500);
       expect(args.itbis).toBe(270);
       expect(args.total).toBe(1770);
+    });
+
+    it('primer período gratis: descuento = 100% del monto, ITBIS en $0, total $0, y se apaga solo', async () => {
+      plataformaConfigRepository.obtenerOCrear.mockResolvedValue({ porcentajeItbis: 18 } as never);
+      const suscripcion = {
+        id: 's1',
+        tenantId: 't1',
+        primerPeriodoGratis: true,
+        plan: { nombre: 'Premium', precio: 1500, cicloFacturacion: 'MENSUAL' },
+      } as never;
+      repo.crear.mockResolvedValue({ id: 'f1' } as never);
+      repo.buscarPorId.mockResolvedValue({ id: 'f1', concepto: 'x', total: 0, fechaVencimiento: new Date() } as never);
+
+      await service.generarDesdeSuscripcion(suscripcion);
+
+      const [args] = repo.crear.mock.calls[0];
+      expect(args.descuento).toBe(1500);
+      expect(args.itbis).toBe(0);
+      expect(args.total).toBe(0);
+      expect(suscripcionesRepository.desactivarPrimerPeriodoGratis).toHaveBeenCalledWith('s1');
+      expect(cuponesPlataformaRepository.buscarAplicacionActiva).not.toHaveBeenCalled();
+    });
+
+    it('cupón PORCENTAJE activo: descuenta ese % y decrementa los ciclos restantes', async () => {
+      plataformaConfigRepository.obtenerOCrear.mockResolvedValue({ porcentajeItbis: 18 } as never);
+      cuponesPlataformaRepository.buscarAplicacionActiva.mockResolvedValue({
+        id: 'sc1',
+        ciclosRestantes: 3,
+        cupon: { tipo: 'PORCENTAJE', valor: 20 },
+      } as never);
+      const suscripcion = { id: 's1', tenantId: 't1', primerPeriodoGratis: false, plan: { nombre: 'Premium', precio: 1000, cicloFacturacion: 'MENSUAL' } } as never;
+      repo.crear.mockResolvedValue({ id: 'f1' } as never);
+      repo.buscarPorId.mockResolvedValue({ id: 'f1', concepto: 'x', total: 944, fechaVencimiento: new Date() } as never);
+
+      await service.generarDesdeSuscripcion(suscripcion);
+
+      const [args] = repo.crear.mock.calls[0];
+      // subtotalNeto = 1000 - 200 = 800; itbis = 800*0.18=144; total = 944
+      expect(args.descuento).toBe(200);
+      expect(args.itbis).toBe(144);
+      expect(args.total).toBe(944);
+      expect(cuponesPlataformaRepository.decrementarCiclos).toHaveBeenCalledWith('sc1', 2);
+      expect(cuponesPlataformaRepository.desactivarAplicacion).not.toHaveBeenCalled();
+    });
+
+    it('cupón MONTO_FIJO activo, tope al monto de la factura (nunca queda negativo)', async () => {
+      cuponesPlataformaRepository.buscarAplicacionActiva.mockResolvedValue({
+        id: 'sc1',
+        ciclosRestantes: null,
+        cupon: { tipo: 'MONTO_FIJO', valor: 5000 },
+      } as never);
+      const suscripcion = { id: 's1', tenantId: 't1', primerPeriodoGratis: false, plan: { nombre: 'Básico', precio: 500, cicloFacturacion: 'MENSUAL' } } as never;
+      repo.crear.mockResolvedValue({ id: 'f1' } as never);
+      repo.buscarPorId.mockResolvedValue({ id: 'f1', concepto: 'x', total: 0, fechaVencimiento: new Date() } as never);
+
+      await service.generarDesdeSuscripcion(suscripcion);
+
+      const [args] = repo.crear.mock.calls[0];
+      expect(args.descuento).toBe(500);
+      expect(args.total).toBe(0);
+      // ciclosRestantes null = indefinido, nunca se decrementa ni se desactiva
+      expect(cuponesPlataformaRepository.decrementarCiclos).not.toHaveBeenCalled();
+      expect(cuponesPlataformaRepository.desactivarAplicacion).not.toHaveBeenCalled();
+    });
+
+    it('cupón que llega a su último ciclo se desactiva en vez de decrementar a 0', async () => {
+      cuponesPlataformaRepository.buscarAplicacionActiva.mockResolvedValue({
+        id: 'sc1',
+        ciclosRestantes: 1,
+        cupon: { tipo: 'PORCENTAJE', valor: 10 },
+      } as never);
+      const suscripcion = { id: 's1', tenantId: 't1', primerPeriodoGratis: false, plan: { nombre: 'Básico', precio: 500, cicloFacturacion: 'MENSUAL' } } as never;
+      repo.crear.mockResolvedValue({ id: 'f1' } as never);
+      repo.buscarPorId.mockResolvedValue({ id: 'f1', concepto: 'x', total: 450, fechaVencimiento: new Date() } as never);
+
+      await service.generarDesdeSuscripcion(suscripcion);
+
+      expect(cuponesPlataformaRepository.desactivarAplicacion).toHaveBeenCalledWith('sc1');
+      expect(cuponesPlataformaRepository.decrementarCiclos).not.toHaveBeenCalled();
+    });
+
+    it('sin primer período gratis ni cupón activo, no aplica ningún descuento', async () => {
+      const suscripcion = { id: 's1', tenantId: 't1', primerPeriodoGratis: false, plan: { nombre: 'Premium', precio: 1500, cicloFacturacion: 'MENSUAL' } } as never;
+      repo.crear.mockResolvedValue({ id: 'f1' } as never);
+      repo.buscarPorId.mockResolvedValue({ id: 'f1', concepto: 'x', total: 1500, fechaVencimiento: new Date() } as never);
+
+      await service.generarDesdeSuscripcion(suscripcion);
+
+      const [args] = repo.crear.mock.calls[0];
+      expect(args.descuento).toBe(0);
+      expect(suscripcionesRepository.desactivarPrimerPeriodoGratis).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('generarFacturaAdelantada', () => {
+    it('cobra precio × ciclos en una sola factura, sin descuento, y avanza fechaProximoCorte esa cantidad de ciclos', async () => {
+      const suscripcion = {
+        id: 's1',
+        tenantId: 't1',
+        fechaProximoCorte: new Date('2026-01-01T00:00:00Z'),
+        plan: { nombre: 'Premium', precio: 1000, cicloFacturacion: 'MENSUAL' },
+      } as never;
+      repo.crear.mockResolvedValue({ id: 'f1' } as never);
+      repo.buscarPorId.mockResolvedValue({ id: 'f1', concepto: 'x', total: 6000, fechaVencimiento: new Date() } as never);
+
+      await service.generarFacturaAdelantada(suscripcion, 6);
+
+      const [args] = repo.crear.mock.calls[0];
+      expect(args.monto).toBe(6000);
+      expect(args.total).toBe(6000);
+      expect(args.concepto).toContain('6 meses');
+      const [, fechaAvanzada] = suscripcionesRepository.avanzarProximoCorte.mock.calls[0];
+      expect((fechaAvanzada as Date).toISOString()).toContain('2026-07-0');
+    });
+
+    it('rechaza con 400 si ciclos es menor a 1', async () => {
+      const suscripcion = { id: 's1', tenantId: 't1', fechaProximoCorte: new Date(), plan: { nombre: 'Premium', precio: 1000, cicloFacturacion: 'MENSUAL' } } as never;
+      await expect(service.generarFacturaAdelantada(suscripcion, 0)).rejects.toThrow(BadRequestException);
+      expect(repo.crear).not.toHaveBeenCalled();
     });
   });
 

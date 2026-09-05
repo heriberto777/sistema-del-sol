@@ -19,10 +19,13 @@ import { PasarelaPagoService } from './pasarela/pasarela-pago.service';
 import { StripeAdapter } from './pasarela/stripe.adapter';
 import { AzulAdapter } from './pasarela/azul.adapter';
 import { CardNetAdapter } from './pasarela/cardnet.adapter';
+import { CuponesPlataformaController } from './cupones/cupones-plataforma.controller';
+import { CuponesPlataformaService } from './cupones/cupones-plataforma.service';
+import { CuponesPlataformaRepository } from './cupones/cupones-plataforma.repository';
 
 @Module({
   imports: [NotificacionesModule, PlataformaConfigModule, NcfPlataformaModule, EmisionECfModule, ReglasNotificacionModule, TenantsModule],
-  controllers: [SuscripcionController, FacturasPlataformaController, PagoPublicoController],
+  controllers: [SuscripcionController, FacturasPlataformaController, PagoPublicoController, CuponesPlataformaController],
   providers: [
     SuscripcionesService,
     SuscripcionesRepository,
@@ -35,6 +38,8 @@ import { CardNetAdapter } from './pasarela/cardnet.adapter';
     StripeAdapter,
     AzulAdapter,
     CardNetAdapter,
+    CuponesPlataformaService,
+    CuponesPlataformaRepository,
   ],
   // Ítem "dashboard de plataforma" — PlatformDashboardModule necesita la
   // cartera pendiente/vencida.

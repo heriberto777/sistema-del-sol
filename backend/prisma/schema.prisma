@@ -335,12 +335,65 @@ model Suscripcion {
   fechaProximoCorte DateTime
   // % de mora aplicado una sola vez cuando una factura pasa a VENCIDA.
   feeMoraPct        Decimal           @default(5) @db.Decimal(5, 2)
+  // Opt-in manual por tenant (no por Plan) — la próxima factura generada
+  // por `generarDesdeSuscripcion` sale con descuento total (100%, ITBIS
+  // incluido) y esta bandera se apaga sola al aplicarse. Independiente
+  // de un cupón: si ambos aplican a la vez, el gratis manda (ver
+  // FacturasPlataformaService.generarDesdeSuscripcion).
+  primerPeriodoGratis Boolean         @default(false)
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
 
   facturas FacturaPlataforma[]
+  cupones  SuscripcionCupon[]
 
   @@map("suscripciones")
+}
+
+enum TipoCupon {
+  PORCENTAJE
+  MONTO_FIJO
+}
+
+// Catálogo de cupones de plataforma (independiente de Plan) — un mismo
+// código puede aplicarse a varios tenants, cada aplicación es su propia
+// fila en SuscripcionCupon con su propio contador de ciclos restantes.
+model CuponDescuento {
+  id              String    @id @default(uuid())
+  codigo          String    @unique
+  tipo            TipoCupon
+  // % (0-100) si tipo=PORCENTAJE, monto fijo en la moneda de la factura si tipo=MONTO_FIJO.
+  valor           Decimal   @db.Decimal(12, 2)
+  // null = aplica indefinidamente mientras la suscripción esté activa; un número = se descuenta esa cantidad de facturas y después deja de aplicar solo.
+  duracionCiclos  Int?
+  // Después de esta fecha el código ya no se puede CANJEAR (aplicar a un tenant nuevo) — no afecta aplicaciones ya en curso.
+  fechaExpiracion DateTime?
+  // Tope total de tenants que pueden canjear este código — null = sin tope.
+  usosMaximos     Int?
+  usosActuales    Int       @default(0)
+  activo          Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+
+  aplicaciones SuscripcionCupon[]
+
+  @@map("cupones_descuento")
+}
+
+// Una fila por CANJE — historial completo (nunca se borra), la
+// aplicación vigente de un tenant es la que tiene activo=true (a lo
+// sumo una por Suscripcion, se desactiva la anterior al aplicar una nueva).
+model SuscripcionCupon {
+  id              String         @id @default(uuid())
+  suscripcionId   String
+  suscripcion     Suscripcion    @relation(fields: [suscripcionId], references: [id], onDelete: Cascade)
+  cuponId         String
+  cupon           CuponDescuento @relation(fields: [cuponId], references: [id])
+  // Se decrementa en cada factura generada mientras activo=true; null = indefinido (nunca se decrementa, sigue hasta que se quite a mano).
+  ciclosRestantes Int?
+  activo          Boolean        @default(true)
+  fechaAplicado   DateTime       @default(now())
+
+  @@map("suscripcion_cupones")
 }
 
 enum EstadoFacturaPlataforma {

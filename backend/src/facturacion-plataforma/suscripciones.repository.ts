@@ -12,8 +12,13 @@ export class SuscripcionesRepository {
     return this.prisma.suscripcion.findUniqueOrThrow({ where: { tenantId }, include: INCLUDE_SUSCRIPCION });
   }
 
-  actualizar(tenantId: string, data: { feeMoraPct?: number; estado?: EstadoSuscripcion }) {
+  actualizar(tenantId: string, data: { feeMoraPct?: number; estado?: EstadoSuscripcion; primerPeriodoGratis?: boolean }) {
     return this.prisma.suscripcion.update({ where: { tenantId }, data, include: INCLUDE_SUSCRIPCION });
+  }
+
+  /** Se apaga sola una vez aplicada — ver FacturasPlataformaService.resolverDescuento. */
+  desactivarPrimerPeriodoGratis(id: string) {
+    return this.prisma.suscripcion.update({ where: { id }, data: { primerPeriodoGratis: false } });
   }
 
   listarActivasParaFacturar(hoy: Date) {

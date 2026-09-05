@@ -12,8 +12,12 @@ import { EmisionECfService } from '../emision-ecf/emision-ecf.service';
 import { generarDocumentoPdf } from '../common/pdf/documento-pdf';
 import { mapearFacturaPlataformaAParams } from './mapear-factura-plataforma-pdf';
 import { PrismaService } from '../prisma/prisma.service';
+import { SuscripcionesRepository } from './suscripciones.repository';
+import { CuponesPlataformaRepository } from './cupones/cupones-plataforma.repository';
+import { sumarCiclos } from './sumar-ciclo.util';
 
 const CICLO_ES: Record<string, string> = { MENSUAL: 'mensual', ANUAL: 'anual' };
+const CICLO_ES_PLURAL: Record<string, string> = { MENSUAL: 'meses', ANUAL: 'años' };
 
 @Injectable()
 export class FacturasPlataformaService {
@@ -28,6 +32,8 @@ export class FacturasPlataformaService {
     private readonly ncfPlataformaService: NcfPlataformaService,
     private readonly emisionECfService: EmisionECfService,
     private readonly prisma: PrismaService,
+    private readonly suscripcionesRepository: SuscripcionesRepository,
+    private readonly cuponesPlataformaRepository: CuponesPlataformaRepository,
   ) {}
 
   listar(query: Parameters<FacturasPlataformaRepository['listar']>[0]) {
@@ -52,15 +58,18 @@ export class FacturasPlataformaService {
     const ahora = new Date();
     const periodo = ahora.toLocaleDateString('es-DO', { month: 'long', year: 'numeric' });
     const monto = Number(suscripcion.plan.precio);
-    const [asignacionNcf, itbis] = await Promise.all([this.ncfPlataformaService.asignarSiguiente(), this.calcularItbis(monto)]);
+    const { descuento, aplicarEfectos } = await this.resolverDescuento(suscripcion, monto);
+    const subtotalNeto = monto - descuento;
+    const [asignacionNcf, itbis] = await Promise.all([this.ncfPlataformaService.asignarSiguiente(), this.calcularItbis(subtotalNeto)]);
 
     const factura = await this.facturasPlataformaRepository.crear({
       tenantId: suscripcion.tenantId,
       suscripcionId: suscripcion.id,
       concepto: `Suscripción ${suscripcion.plan.nombre} (${CICLO_ES[suscripcion.plan.cicloFacturacion] ?? suscripcion.plan.cicloFacturacion}) — ${periodo}`,
       monto,
+      descuento,
       itbis,
-      total: monto + itbis,
+      total: subtotalNeto + itbis,
       // Vence el mismo día que se emite (sin período de gracia) — el
       // admin puede moverla con PATCH si hace falta dar más plazo.
       fechaEmision: ahora,
@@ -68,8 +77,94 @@ export class FacturasPlataformaService {
       ...(asignacionNcf ?? {}),
     });
 
+    await aplicarEfectos();
     await this.emisionECfService.emitirParaFacturaPlataforma(factura.id);
     await this.notificarFactura(suscripcion.tenantId, factura.id, 'generada');
+    return factura;
+  }
+
+  /**
+   * Resuelve el descuento de la PRÓXIMA factura automática de una
+   * suscripción — "primer período gratis" manda sobre un cupón activo
+   * (si ambos aplican a la vez, el gratis es el que se ve, el cupón
+   * sigue esperando para el período siguiente). `aplicarEfectos` es
+   * side-effect diferido a propósito: recién se ejecuta si la factura
+   * se creó bien (apagar el flag/decrementar el cupón antes de crear la
+   * factura, y que la creación falle después, dejaría el descuento
+   * "gastado" sin ninguna factura que lo refleje).
+   */
+  private async resolverDescuento(
+    suscripcion: Suscripcion,
+    monto: number,
+  ): Promise<{ descuento: number; aplicarEfectos: () => Promise<void> }> {
+    if (suscripcion.primerPeriodoGratis) {
+      return {
+        descuento: monto,
+        aplicarEfectos: async () => {
+          await this.suscripcionesRepository.desactivarPrimerPeriodoGratis(suscripcion.id);
+        },
+      };
+    }
+
+    const aplicacion = await this.cuponesPlataformaRepository.buscarAplicacionActiva(suscripcion.id);
+    if (!aplicacion) {
+      return { descuento: 0, aplicarEfectos: async () => {} };
+    }
+
+    const descuento =
+      aplicacion.cupon.tipo === 'PORCENTAJE'
+        ? Math.round(monto * (Number(aplicacion.cupon.valor) / 100) * 100) / 100
+        : Math.min(monto, Number(aplicacion.cupon.valor));
+
+    return {
+      descuento,
+      aplicarEfectos: async () => {
+        if (aplicacion.ciclosRestantes === null) return; // indefinido — nunca se decrementa, se quita a mano
+        const restantes = aplicacion.ciclosRestantes - 1;
+        if (restantes <= 0) {
+          await this.cuponesPlataformaRepository.desactivarAplicacion(aplicacion.id);
+        } else {
+          await this.cuponesPlataformaRepository.decrementarCiclos(aplicacion.id, restantes);
+        }
+      },
+    };
+  }
+
+  /**
+   * Pago adelantado — el tenant paga N ciclos (meses/años) de una sola
+   * vez. Una única factura por precio×N (sin descuento de "primer
+   * período gratis" ni cupón — es un cargo puntual negociado aparte, no
+   * el ciclo automático), y adelanta `fechaProximoCorte` esa misma
+   * cantidad de ciclos para que el cron no vuelva a facturar hasta que
+   * el período pagado termine (mismo campo que ya lee el cron todos los
+   * días — no hace falta tocar notificaciones ni el resto del flujo).
+   */
+  async generarFacturaAdelantada(suscripcion: Suscripcion & { plan: Plan }, ciclos: number) {
+    if (ciclos < 1) throw new BadRequestException('La cantidad de ciclos debe ser al menos 1');
+
+    const ahora = new Date();
+    const monto = Number(suscripcion.plan.precio) * ciclos;
+    const etiquetaCiclo = ciclos === 1 ? CICLO_ES[suscripcion.plan.cicloFacturacion] : CICLO_ES_PLURAL[suscripcion.plan.cicloFacturacion];
+    const [asignacionNcf, itbis] = await Promise.all([this.ncfPlataformaService.asignarSiguiente(), this.calcularItbis(monto)]);
+
+    const factura = await this.facturasPlataformaRepository.crear({
+      tenantId: suscripcion.tenantId,
+      suscripcionId: suscripcion.id,
+      concepto: `Suscripción ${suscripcion.plan.nombre} — pago adelantado (${ciclos} ${etiquetaCiclo ?? suscripcion.plan.cicloFacturacion})`,
+      monto,
+      itbis,
+      total: monto + itbis,
+      fechaEmision: ahora,
+      fechaVencimiento: ahora,
+      ...(asignacionNcf ?? {}),
+    });
+
+    await this.suscripcionesRepository.avanzarProximoCorte(
+      suscripcion.id,
+      sumarCiclos(suscripcion.fechaProximoCorte, suscripcion.plan.cicloFacturacion, ciclos),
+    );
+    await this.emisionECfService.emitirParaFacturaPlataforma(factura.id);
+    await this.notificarFactura(suscripcion.tenantId, factura.id, 'manual');
     return factura;
   }
 

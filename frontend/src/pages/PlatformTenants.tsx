@@ -50,19 +50,35 @@ interface Suscripcion {
   estado: 'ACTIVA' | 'CANCELADA';
   fechaProximoCorte: string;
   feeMoraPct: string;
+  primerPeriodoGratis: boolean;
   plan: { nombre: string; precio: string; cicloFacturacion: 'MENSUAL' | 'ANUAL' };
 }
 
+interface CuponAplicado {
+  id: string;
+  ciclosRestantes: number | null;
+  cupon: { codigo: string; tipo: 'PORCENTAJE' | 'MONTO_FIJO'; valor: string };
+}
+
 const ETIQUETA_CICLO: Record<'MENSUAL' | 'ANUAL', string> = { MENSUAL: 'mes', ANUAL: 'año' };
+const ETIQUETA_CICLO_PLURAL: Record<'MENSUAL' | 'ANUAL', string> = { MENSUAL: 'meses', ANUAL: 'años' };
 
 function PanelSuscripcionTenant({ tenant, onClose }: { tenant: Tenant; onClose: () => void }) {
   const queryClient = useQueryClient();
   const [feeMoraPct, setFeeMoraPct] = useState('');
   const [mensaje, setMensaje] = useState<string | null>(null);
+  const [modalAdelantadoAbierto, setModalAdelantadoAbierto] = useState(false);
+  const [codigoCupon, setCodigoCupon] = useState('');
+  const [errorCupon, setErrorCupon] = useState<string | null>(null);
 
   const { data: suscripcion } = useQuery({
     queryKey: ['platform-tenant-suscripcion', tenant.id],
     queryFn: async () => (await platformApiClient.get<Suscripcion>(`/platform/tenants/${tenant.id}/suscripcion`)).data,
+  });
+
+  const { data: cuponAplicado } = useQuery({
+    queryKey: ['platform-tenant-suscripcion-cupon', tenant.id],
+    queryFn: async () => (await platformApiClient.get<CuponAplicado | null>(`/platform/tenants/${tenant.id}/suscripcion/cupon`)).data,
   });
 
   useEffect(() => {
@@ -70,9 +86,24 @@ function PanelSuscripcionTenant({ tenant, onClose }: { tenant: Tenant; onClose: 
   }, [suscripcion]);
 
   const actualizar = useMutation({
-    mutationFn: async (data: { feeMoraPct?: number; estado?: 'ACTIVA' | 'CANCELADA' }) =>
+    mutationFn: async (data: { feeMoraPct?: number; estado?: 'ACTIVA' | 'CANCELADA'; primerPeriodoGratis?: boolean }) =>
       platformApiClient.patch(`/platform/tenants/${tenant.id}/suscripcion`, data),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['platform-tenant-suscripcion', tenant.id] }),
+  });
+
+  const aplicarCupon = useMutation({
+    mutationFn: async () => platformApiClient.post(`/platform/tenants/${tenant.id}/suscripcion/cupon`, { codigo: codigoCupon }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['platform-tenant-suscripcion-cupon', tenant.id] });
+      setCodigoCupon('');
+      setErrorCupon(null);
+    },
+    onError: (err) => setErrorCupon(mensajeErrorApi(err, 'No se pudo aplicar el cupón.')),
+  });
+
+  const quitarCupon = useMutation({
+    mutationFn: async () => platformApiClient.delete(`/platform/tenants/${tenant.id}/suscripcion/cupon`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['platform-tenant-suscripcion-cupon', tenant.id] }),
   });
 
   const generarFactura = useMutation({
@@ -139,6 +170,53 @@ function PanelSuscripcionTenant({ tenant, onClose }: { tenant: Tenant; onClose: 
           </div>
         </div>
 
+        <div className="flex items-center justify-between">
+          <div>
+            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Primer período gratis</span>
+            <p className="text-xs text-slate-500 dark:text-slate-400">La próxima factura automática sale en RD$0 y se apaga sola.</p>
+          </div>
+          <Switch
+            activo={suscripcion.primerPeriodoGratis}
+            disabled={actualizar.isPending}
+            onChange={(valor) => actualizar.mutate({ primerPeriodoGratis: valor })}
+          />
+        </div>
+
+        <hr className="border-slate-200 dark:border-slate-800" />
+
+        <div>
+          <p className="mb-1 text-sm font-medium text-slate-700 dark:text-slate-300">Cupón de descuento</p>
+          {cuponAplicado ? (
+            <div className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 dark:bg-slate-800/60">
+              <div>
+                <Badge tono="exito">{cuponAplicado.cupon.codigo}</Badge>{' '}
+                <span className="text-sm text-slate-600 dark:text-slate-400">
+                  {cuponAplicado.cupon.tipo === 'PORCENTAJE' ? `${cuponAplicado.cupon.valor}%` : `RD$ ${Number(cuponAplicado.cupon.valor).toLocaleString('es-DO')}`}
+                  {' — '}
+                  {cuponAplicado.ciclosRestantes === null ? 'indefinido' : `${cuponAplicado.ciclosRestantes} ciclo(s) restante(s)`}
+                </span>
+              </div>
+              <Button variante="secundario" disabled={quitarCupon.isPending} onClick={() => quitarCupon.mutate()}>
+                Quitar
+              </Button>
+            </div>
+          ) : (
+            <div className="flex gap-2">
+              <input
+                type="text"
+                placeholder="Código de cupón"
+                value={codigoCupon}
+                onChange={(e) => setCodigoCupon(e.target.value)}
+                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm uppercase dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+              />
+              <Button variante="secundario" disabled={!codigoCupon || aplicarCupon.isPending} onClick={() => aplicarCupon.mutate()}>
+                Aplicar
+              </Button>
+            </div>
+          )}
+          {errorCupon && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errorCupon}</p>}
+        </div>
+
         <hr className="border-slate-200 dark:border-slate-800" />
 
         <Button
@@ -148,7 +226,80 @@ function PanelSuscripcionTenant({ tenant, onClose }: { tenant: Tenant; onClose: 
         >
           {generarFactura.isPending ? 'Generando…' : 'Generar factura ahora'}
         </Button>
+        <Button variante="secundario" className="w-full" onClick={() => setModalAdelantadoAbierto(true)}>
+          Generar factura adelantada (varios ciclos)
+        </Button>
         {mensaje && <p className="text-sm text-slate-500 dark:text-slate-400">{mensaje}</p>}
+      </div>
+
+      {modalAdelantadoAbierto && (
+        <ModalFacturaAdelantada
+          tenant={tenant}
+          suscripcion={suscripcion}
+          onClose={() => setModalAdelantadoAbierto(false)}
+        />
+      )}
+    </Modal>
+  );
+}
+
+function ModalFacturaAdelantada({
+  tenant,
+  suscripcion,
+  onClose,
+}: {
+  tenant: Tenant;
+  suscripcion: Suscripcion;
+  onClose: () => void;
+}) {
+  const queryClient = useQueryClient();
+  const [ciclos, setCiclos] = useState('1');
+  const [error, setError] = useState<string | null>(null);
+
+  const generarAdelantada = useMutation({
+    mutationFn: async () =>
+      platformApiClient.post(`/platform/tenants/${tenant.id}/suscripcion/generar-factura-adelantada`, { ciclos: Number(ciclos) }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['platform-tenant-suscripcion', tenant.id] });
+      queryClient.invalidateQueries({ queryKey: ['platform-facturas'] });
+      onClose();
+    },
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo generar la factura adelantada.')),
+  });
+
+  const n = Number(ciclos) || 0;
+  const monto = n * Number(suscripcion.plan.precio);
+  const unidad = n === 1 ? ETIQUETA_CICLO[suscripcion.plan.cicloFacturacion] : ETIQUETA_CICLO_PLURAL[suscripcion.plan.cicloFacturacion];
+
+  return (
+    <Modal titulo={`Factura adelantada — ${tenant.nombre}`} onClose={onClose}>
+      <div className="space-y-4">
+        <p className="text-sm text-slate-600 dark:text-slate-400">
+          Cobra de una sola vez varios ciclos del plan y adelanta la fecha de próximo corte esa misma cantidad. No aplica
+          descuentos (cupón/primer período gratis) — se trata como un cargo negociado aparte.
+        </p>
+        <FormField
+          id="factura-adelantada-ciclos"
+          label={`Cantidad de ${ETIQUETA_CICLO_PLURAL[suscripcion.plan.cicloFacturacion]}`}
+          type="number"
+          min="1"
+          step="1"
+          value={ciclos}
+          onChange={(e) => setCiclos(e.target.value)}
+        />
+        {n > 0 && (
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            Total: RD$ {monto.toLocaleString('es-DO')} + ITBIS por {n} {unidad}.
+          </p>
+        )}
+        {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+        <Button
+          className="w-full"
+          disabled={n < 1 || generarAdelantada.isPending}
+          onClick={() => generarAdelantada.mutate()}
+        >
+          {generarAdelantada.isPending ? 'Generando…' : 'Generar factura'}
+        </Button>
       </div>
     </Modal>
   );
