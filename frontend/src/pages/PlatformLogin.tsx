@@ -51,7 +51,7 @@ export function PlatformLogin() {
       <form onSubmit={onSubmit} className="space-y-4">
         <div>
           {branding?.logo ? (
-            <img src={branding.logo} alt="Logo" className="mb-1 h-10 max-w-full object-contain" />
+            <img src={branding.logo} alt="Logo" className="mb-2 h-16 max-w-[220px] object-contain" />
           ) : (
             <h1 className="text-lg font-semibold text-sol-600 dark:text-sol-400">El Sistema del Sol</h1>
           )}

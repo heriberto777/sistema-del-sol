@@ -103,7 +103,7 @@ export function Login() {
     >
       <div className="space-y-4">
         {branding?.logo ? (
-          <img src={branding.logo} alt="Logo" className="mx-auto h-12 max-w-full object-contain" />
+          <img src={branding.logo} alt="Logo" className="mx-auto h-16 max-w-[220px] object-contain" />
         ) : (
           <h1 className="text-lg font-semibold text-sol-600 dark:text-sol-400">El Sistema del Sol</h1>
         )}
