@@ -6,6 +6,7 @@ import { CategoriasModule } from '../categorias/categorias.module';
 import { LeyesFiscalesModule } from '../leyes-fiscales/leyes-fiscales.module';
 import { VariantesModule } from '../variantes/variantes.module';
 import { PreciosRepository } from '../precios/precios.repository';
+import { IaModule } from '../ia/ia.module';
 
 // PreciosRepository se provee acá directo (no vía PreciosModule) para que
 // ProductosService pueda crear el Precio GENERAL de una fila importada
@@ -14,7 +15,7 @@ import { PreciosRepository } from '../precios/precios.repository';
 // circular. PreciosRepository no depende de nada de Productos, así que
 // darle su propia instancia acá es seguro.
 @Module({
-  imports: [CategoriasModule, LeyesFiscalesModule, VariantesModule],
+  imports: [CategoriasModule, LeyesFiscalesModule, VariantesModule, IaModule],
   controllers: [ProductosController],
   providers: [ProductosService, ProductosRepository, PreciosRepository],
   exports: [ProductosService],

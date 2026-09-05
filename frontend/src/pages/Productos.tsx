@@ -26,6 +26,8 @@ import { descargarBlob } from '../lib/descargar-archivo';
 import type { AjusteImagen } from '../constants/ajuste-imagen';
 import { PaginaResultado } from '../types/pagina-resultado';
 import { mensajeErrorApi } from '../lib/mensaje-error-api';
+import { useAuth } from '../hooks/useAuth';
+import { Sparkles } from 'lucide-react';
 
 type TipoProducto = 'PRODUCTO' | 'SERVICIO' | 'COMBO';
 
@@ -363,6 +365,9 @@ function FormularioProducto({ producto, onGuardado }: { producto: Producto | nul
   );
   const [componentes, setComponentes] = useState<ComponenteComboForm[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const { tienePermiso } = useAuth();
+  const [candidatosIa, setCandidatosIa] = useState<{ nombre: string; descripcion: string }[] | null>(null);
+  const [errorIa, setErrorIa] = useState<string | null>(null);
 
   // Editar un producto existente: la lista (GET /productos) no trae ni la
   // imagen ni (si es combo) los componentes — hay que pedir el detalle
@@ -438,6 +443,16 @@ function FormularioProducto({ producto, onGuardado }: { producto: Producto | nul
       ),
   });
 
+  // Adicional opt-in (permiso productos.ia_generar) — analiza la foto ya
+  // cargada y sugiere 3 opciones de nombre/descripción; el admin elige
+  // cuál usar, nunca se aplica sola (ver modal más abajo).
+  const analizarConIa = useMutation({
+    mutationFn: async () =>
+      (await apiClient.post<{ opciones: { nombre: string; descripcion: string }[] }>('/productos/analizar-imagen', { imagen: valores.imagen })).data,
+    onSuccess: (data) => setCandidatosIa(data.opciones),
+    onError: (err) => setErrorIa(mensajeErrorApi(err, 'No se pudo generar con IA — probá de nuevo.')),
+  });
+
   function onSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
@@ -453,6 +468,7 @@ function FormularioProducto({ producto, onGuardado }: { producto: Producto | nul
   }
 
   return (
+    <>
     <form onSubmit={onSubmit} className="space-y-3">
       <CampoImagen
         valor={valores.imagen}
@@ -460,6 +476,24 @@ function FormularioProducto({ producto, onGuardado }: { producto: Producto | nul
         ajuste={valores.imagenAjuste}
         onChangeAjuste={(imagenAjuste) => setValores((v) => ({ ...v, imagenAjuste }))}
       />
+      {tienePermiso('productos.ia_generar') && valores.imagen && (
+        <div className="flex flex-col gap-1">
+          <Button
+            type="button"
+            variante="secundario"
+            onClick={() => {
+              setErrorIa(null);
+              analizarConIa.mutate();
+            }}
+            disabled={analizarConIa.isPending}
+            className="flex items-center gap-1.5 self-start"
+          >
+            <Sparkles size={14} />
+            {analizarConIa.isPending ? 'Analizando imagen…' : 'Generar con IA'}
+          </Button>
+          {errorIa && <p className="text-xs text-red-600 dark:text-red-400">{errorIa}</p>}
+        </div>
+      )}
       <GaleriaImagenes
         valores={valores.imagenesAdicionales}
         onChange={(imagenesAdicionales) => setValores((v) => ({ ...v, imagenesAdicionales }))}
@@ -712,6 +746,35 @@ function FormularioProducto({ producto, onGuardado }: { producto: Producto | nul
         {guardar.isPending ? 'Guardando…' : 'Guardar'}
       </Button>
     </form>
+
+    {candidatosIa && (
+      <Modal titulo="Elegí la opción que mejor describa el producto" onClose={() => setCandidatosIa(null)}>
+        <div className="space-y-3">
+          {candidatosIa.map((candidato, i) => (
+            <button
+              key={i}
+              type="button"
+              onClick={() => {
+                setValores((v) => ({ ...v, nombre: candidato.nombre, descripcionTienda: candidato.descripcion }));
+                setCandidatosIa(null);
+              }}
+              className="w-full rounded-lg border border-slate-200 p-3 text-left hover:border-sol-500 hover:bg-sol-50 dark:border-slate-700 dark:hover:bg-sol-900/30"
+            >
+              <p className="font-medium text-slate-900 dark:text-slate-100">{candidato.nombre}</p>
+              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{candidato.descripcion}</p>
+            </button>
+          ))}
+          <button
+            type="button"
+            onClick={() => setCandidatosIa(null)}
+            className="w-full text-center text-sm text-slate-500 hover:underline dark:text-slate-400"
+          >
+            Ninguna de estas — cancelar
+          </button>
+        </div>
+      </Modal>
+    )}
+    </>
   );
 }
 

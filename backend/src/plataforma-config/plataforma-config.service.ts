@@ -61,6 +61,7 @@ export class PlataformaConfigService implements OnModuleInit {
     if (dto.npmForwardHost !== undefined) data.npmForwardHost = dto.npmForwardHost;
     if (dto.npmForwardPort !== undefined) data.npmForwardPort = dto.npmForwardPort;
     if (dto.npmPublicHost !== undefined) data.npmPublicHost = dto.npmPublicHost;
+    if (dto.iaImagenProveedorActivo !== undefined) data.iaImagenProveedorActivo = dto.iaImagenProveedorActivo;
 
     this.aplicarCampoSecreto(data, 'smtpPasswordCifrado', dto.smtpPassword);
     this.aplicarCampoSecreto(data, 'twilioAuthTokenCifrado', dto.twilioAuthToken);
@@ -68,6 +69,9 @@ export class PlataformaConfigService implements OnModuleInit {
     this.aplicarCampoSecreto(data, 'stripeWebhookSecretCifrado', dto.stripeWebhookSecret);
     this.aplicarCampoSecreto(data, 'webhookSecretCifrado', dto.webhookSecret);
     this.aplicarCampoSecreto(data, 'npmPasswordCifrado', dto.npmPassword);
+    this.aplicarCampoSecreto(data, 'iaClaudeApiKeyCifrado', dto.iaClaudeApiKey);
+    this.aplicarCampoSecreto(data, 'iaOpenaiApiKeyCifrado', dto.iaOpenaiApiKey);
+    this.aplicarCampoSecreto(data, 'iaGeminiApiKeyCifrado', dto.iaGeminiApiKey);
 
     const actualizado = await this.repository.actualizar(config.id, data);
     this.sincronizarEnv(actualizado);
@@ -104,6 +108,13 @@ export class PlataformaConfigService implements OnModuleInit {
     if (config.stripeSecretKeyCifrado) process.env.STRIPE_SECRET_KEY = descifrar(config.stripeSecretKeyCifrado);
     if (config.stripeWebhookSecretCifrado) process.env.STRIPE_WEBHOOK_SECRET = descifrar(config.stripeWebhookSecretCifrado);
     if (config.stripeCurrency) process.env.STRIPE_CURRENCY = config.stripeCurrency;
+
+    if (config.iaImagenProveedorActivo) process.env.IA_IMAGEN_PROVEEDOR_ACTIVO = config.iaImagenProveedorActivo;
+    // `ANTHROPIC_API_KEY` es la MISMA variable que ya lee IaClientService
+    // (bot de WhatsApp) — configurarla acá no crea una credencial nueva.
+    if (config.iaClaudeApiKeyCifrado) process.env.ANTHROPIC_API_KEY = descifrar(config.iaClaudeApiKeyCifrado);
+    if (config.iaOpenaiApiKeyCifrado) process.env.OPENAI_API_KEY = descifrar(config.iaOpenaiApiKeyCifrado);
+    if (config.iaGeminiApiKeyCifrado) process.env.GEMINI_API_KEY = descifrar(config.iaGeminiApiKeyCifrado);
   }
 
   /** Nunca expone un secreto en texto plano — solo si hay uno guardado (*Configurado). */
@@ -155,6 +166,12 @@ export class PlataformaConfigService implements OnModuleInit {
         npmForwardHost: config.npmForwardHost,
         npmForwardPort: config.npmForwardPort,
         npmPublicHost: config.npmPublicHost,
+      },
+      iaImagen: {
+        proveedorActivo: config.iaImagenProveedorActivo,
+        claudeApiKeyConfigurado: Boolean(config.iaClaudeApiKeyCifrado),
+        openaiApiKeyConfigurado: Boolean(config.iaOpenaiApiKeyCifrado),
+        geminiApiKeyConfigurado: Boolean(config.iaGeminiApiKeyCifrado),
       },
     };
   }

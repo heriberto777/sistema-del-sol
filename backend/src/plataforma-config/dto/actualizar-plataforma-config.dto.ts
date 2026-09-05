@@ -173,4 +173,25 @@ export class ActualizarPlataformaConfigDto {
   @IsOptional()
   @IsString()
   npmPublicHost?: string;
+
+  // IA para analizar la foto de un producto (ítem "Generar con IA")
+  @ApiProperty({ required: false, enum: ['claude', 'openai', 'gemini'] })
+  @IsOptional()
+  @IsString()
+  iaImagenProveedorActivo?: string;
+
+  @ApiProperty({ required: false, description: '"" borra el override guardado — misma credencial que ANTHROPIC_API_KEY' })
+  @IsOptional()
+  @IsString()
+  iaClaudeApiKey?: string;
+
+  @ApiProperty({ required: false, description: '"" borra el override guardado' })
+  @IsOptional()
+  @IsString()
+  iaOpenaiApiKey?: string;
+
+  @ApiProperty({ required: false, description: '"" borra el override guardado' })
+  @IsOptional()
+  @IsString()
+  iaGeminiApiKey?: string;
 }

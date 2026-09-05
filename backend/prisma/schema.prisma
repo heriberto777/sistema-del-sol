@@ -535,6 +535,18 @@ model PlataformaConfiguracion {
   npmForwardPort     Int?
   npmPublicHost      String?
 
+  // IA para analizar la foto de un producto y sugerir nombre/descripción
+  // (ver AnalizadorImagenService) — mismo patrón que la pasarela de pago:
+  // un `activa` que decide el adaptador, cada proveedor con su propia
+  // llave cifrada. `iaClaudeApiKeyCifrado` es la MISMA credencial que
+  // `ANTHROPIC_API_KEY` (IaClientService, ya usada por el bot de
+  // WhatsApp) — configurarla acá la sincroniza a esa misma variable, no
+  // es una llave nueva y distinta.
+  iaImagenProveedorActivo String? @default("claude")
+  iaClaudeApiKeyCifrado   String?
+  iaOpenaiApiKeyCifrado   String?
+  iaGeminiApiKeyCifrado   String?
+
   @@map("plataforma_configuracion")
 }
 

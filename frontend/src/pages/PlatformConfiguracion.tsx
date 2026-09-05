@@ -58,6 +58,12 @@ export interface ConfiguracionPlataforma {
     npmForwardPort: number | null;
     npmPublicHost: string | null;
   };
+  iaImagen: {
+    proveedorActivo: string | null;
+    claudeApiKeyConfigurado: boolean;
+    openaiApiKeyConfigurado: boolean;
+    geminiApiKeyConfigurado: boolean;
+  };
 }
 
 // Fase 4 — reglas de notificación de vencimiento configurables.
@@ -70,7 +76,7 @@ interface ReglaNotificacion {
 
 const PLACEHOLDER_CONFIGURADO = '•••••••• (configurado)';
 
-const TABS = ['General', 'NCF / e-CF', 'Notificaciones', 'Pasarela de pago', 'Webhook', 'Vencimientos', 'Dominio propio'] as const;
+const TABS = ['General', 'NCF / e-CF', 'Notificaciones', 'Pasarela de pago', 'IA para productos', 'Webhook', 'Vencimientos', 'Dominio propio'] as const;
 type Tab = (typeof TABS)[number];
 
 export function PlatformConfiguracion() {
@@ -117,6 +123,7 @@ export function PlatformConfiguracion() {
           {tab === 'NCF / e-CF' && <NcfPlataformaPanel config={config} guardar={guardar} />}
           {tab === 'Notificaciones' && <SeccionNotificaciones config={config} guardar={guardar} />}
           {tab === 'Pasarela de pago' && <SeccionPasarela config={config} guardar={guardar} />}
+          {tab === 'IA para productos' && <SeccionIaImagen config={config} guardar={guardar} />}
           {tab === 'Webhook' && <SeccionWebhook config={config} guardar={guardar} />}
           {tab === 'Vencimientos' && <SeccionVencimientos config={config} guardar={guardar} />}
           {tab === 'Dominio propio' && <SeccionDominioPropio config={config} guardar={guardar} />}
@@ -347,6 +354,86 @@ function SeccionPasarela({ config, guardar }: SeccionProps) {
           value={stripeWebhookSecret}
           onChange={(e) => setStripeWebhookSecret(e.target.value)}
           placeholder={pasarela.stripeWebhookSecretConfigurado ? PLACEHOLDER_CONFIGURADO : 'whsec_...'}
+        />
+        <Button type="submit" disabled={guardar.isPending}>
+          {guardar.isPending ? 'Guardando…' : 'Guardar'}
+        </Button>
+      </form>
+    </Card>
+  );
+}
+
+/**
+ * Ítem "Generar con IA" (analizar la foto de un producto para sugerir
+ * nombre/descripción) — mismo patrón que SeccionPasarela: un proveedor
+ * "activo" + una llave por proveedor. `iaClaudeApiKey` es la MISMA
+ * credencial que ya usa el resto de la IA de la plataforma
+ * (`ANTHROPIC_API_KEY`) — no es una llave nueva y distinta.
+ */
+function SeccionIaImagen({ config, guardar }: SeccionProps) {
+  const iaImagen = config.iaImagen;
+  const [proveedorActivo, setProveedorActivo] = useState(iaImagen.proveedorActivo ?? 'claude');
+  const [claudeApiKey, setClaudeApiKey] = useState('');
+  const [openaiApiKey, setOpenaiApiKey] = useState('');
+  const [geminiApiKey, setGeminiApiKey] = useState('');
+
+  useEffect(() => {
+    setProveedorActivo(iaImagen.proveedorActivo ?? 'claude');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [iaImagen.proveedorActivo]);
+
+  function onSubmit(e: FormEvent) {
+    e.preventDefault();
+    guardar.mutate({
+      iaImagenProveedorActivo: proveedorActivo,
+      ...(claudeApiKey !== '' ? { iaClaudeApiKey: claudeApiKey } : {}),
+      ...(openaiApiKey !== '' ? { iaOpenaiApiKey: openaiApiKey } : {}),
+      ...(geminiApiKey !== '' ? { iaGeminiApiKey: geminiApiKey } : {}),
+    });
+    setClaudeApiKey('');
+    setOpenaiApiKey('');
+    setGeminiApiKey('');
+  }
+
+  return (
+    <Card
+      titulo="IA para productos"
+      descripcion='Analiza la foto de un producto y sugiere nombre/descripción — botón "Generar con IA" al crear un producto (requiere el permiso productos.ia_generar).'
+    >
+      <form onSubmit={onSubmit} className="max-w-md space-y-3">
+        <div>
+          <label htmlFor="iaProveedorActivo" className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+            Proveedor activo
+          </label>
+          <Select id="iaProveedorActivo" value={proveedorActivo} onChange={(e) => setProveedorActivo(e.target.value)}>
+            <option value="claude">Claude (Anthropic)</option>
+            <option value="openai">OpenAI (GPT-4o)</option>
+            <option value="gemini">Google Gemini</option>
+          </Select>
+        </div>
+        <FormField
+          id="iaClaudeApiKey"
+          label="Claude API Key"
+          type="password"
+          value={claudeApiKey}
+          onChange={(e) => setClaudeApiKey(e.target.value)}
+          placeholder={iaImagen.claudeApiKeyConfigurado ? PLACEHOLDER_CONFIGURADO : 'sk-ant-...'}
+        />
+        <FormField
+          id="iaOpenaiApiKey"
+          label="OpenAI API Key"
+          type="password"
+          value={openaiApiKey}
+          onChange={(e) => setOpenaiApiKey(e.target.value)}
+          placeholder={iaImagen.openaiApiKeyConfigurado ? PLACEHOLDER_CONFIGURADO : 'sk-...'}
+        />
+        <FormField
+          id="iaGeminiApiKey"
+          label="Gemini API Key"
+          type="password"
+          value={geminiApiKey}
+          onChange={(e) => setGeminiApiKey(e.target.value)}
+          placeholder={iaImagen.geminiApiKeyConfigurado ? PLACEHOLDER_CONFIGURADO : 'AIza...'}
         />
         <Button type="submit" disabled={guardar.isPending}>
           {guardar.isPending ? 'Guardando…' : 'Guardar'}

@@ -11,6 +11,7 @@ import { VariantesService } from '../variantes/variantes.service';
 import { PreciosRepository } from '../precios/precios.repository';
 import { generarExcel } from '../reportes/exportadores/excel-exportador';
 import type { ArchivoGenerado } from '../reportes/reportes.service';
+import { AnalizadorImagenService } from '../ia/analizador-imagen/analizador-imagen.service';
 
 export interface ResumenImportacion {
   creados: number;
@@ -26,7 +27,14 @@ export class ProductosService {
     private readonly leyesFiscalesRepository: LeyesFiscalesRepository,
     private readonly variantesService: VariantesService,
     private readonly preciosRepository: PreciosRepository,
+    private readonly analizadorImagenService: AnalizadorImagenService,
   ) {}
+
+  /** Pedido explícito — sugiere nombre/descripción a partir de la foto, gateado por `productos.ia_generar` (ver ProductosController). El admin elige cuál candidato usar; nunca se aplica sola. */
+  async analizarImagen(imagen: string) {
+    const opciones = await this.analizadorImagenService.analizarDesdeDataUri(imagen);
+    return { opciones };
+  }
 
   async crear(dto: CrearProductoDto, tenantId: string) {
     const tipoEfectivo = dto.tipo ?? 'PRODUCTO';

@@ -5,6 +5,7 @@ import { ProductosService } from './productos.service';
 import { CrearProductoDto } from './dto/crear-producto.dto';
 import { CatalogoQueryDto } from './dto/catalogo-query.dto';
 import { ImportarProductosDto } from './dto/importar-productos.dto';
+import { AnalizarImagenProductoDto } from './dto/analizar-imagen-producto.dto';
 import { Permissions } from '../common/decorators/permissions.decorator';
 import { RequiereModulo } from '../common/decorators/requiere-modulo.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -55,6 +56,14 @@ export class ProductosController {
   @Permissions('precios.editar')
   importar(@Body() dto: ImportarProductosDto, @CurrentUser() user: JwtPayloadUser) {
     return this.productosService.importar(dto, user.tenantId);
+  }
+
+  // Adicional opt-in (nunca en PERMISOS por default de ningún rol) — ver
+  // roles-base.ts. Antes de ':id' por el mismo motivo que 'catalogo'/'exportar'.
+  @Post('analizar-imagen')
+  @Permissions('productos.ia_generar')
+  analizarImagen(@Body() dto: AnalizarImagenProductoDto) {
+    return this.productosService.analizarImagen(dto.imagen);
   }
 
   @Get(':id')

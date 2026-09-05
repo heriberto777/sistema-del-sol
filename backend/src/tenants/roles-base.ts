@@ -17,6 +17,11 @@ export const PERMISOS_BASE = [
   'inventario.ver', 'inventario.ajustar', 'inventario.transferir',
   'sucursales.ver', 'sucursales.editar',
   'precios.ver', 'precios.editar',
+  // Adicional opt-in (ítem "Generar con IA" al crear un producto) — no lo
+  // otorga ningún rol base salvo Admin Total (hereda todo PERMISOS_BASE,
+  // ver abajo); para que otro rol lo use hay que asignárselo a mano, a
+  // propósito (pedido explícito del usuario).
+  'productos.ia_generar',
   'ofertas.ver', 'ofertas.editar',
   'comisiones.ver',
   'lealtad.ver', 'lealtad.editar',

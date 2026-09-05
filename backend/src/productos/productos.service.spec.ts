@@ -5,6 +5,7 @@ import { CategoriasRepository } from '../categorias/categorias.repository';
 import { LeyesFiscalesRepository } from '../leyes-fiscales/leyes-fiscales.repository';
 import { VariantesService } from '../variantes/variantes.service';
 import { PreciosRepository } from '../precios/precios.repository';
+import { AnalizadorImagenService } from '../ia/analizador-imagen/analizador-imagen.service';
 
 describe('ProductosService', () => {
   let service: ProductosService;
@@ -13,6 +14,7 @@ describe('ProductosService', () => {
   let leyesFiscalesRepository: jest.Mocked<LeyesFiscalesRepository>;
   let variantesService: jest.Mocked<VariantesService>;
   let preciosRepository: jest.Mocked<PreciosRepository>;
+  let analizadorImagenService: jest.Mocked<AnalizadorImagenService>;
 
   beforeEach(() => {
     repository = {
@@ -40,7 +42,19 @@ describe('ProductosService', () => {
       crear: jest.fn(),
     } as unknown as jest.Mocked<PreciosRepository>;
     leyesFiscalesRepository = { buscarPorId: jest.fn() } as unknown as jest.Mocked<LeyesFiscalesRepository>;
-    service = new ProductosService(repository, categoriasRepository, leyesFiscalesRepository, variantesService, preciosRepository);
+    analizadorImagenService = { analizarDesdeDataUri: jest.fn() } as unknown as jest.Mocked<AnalizadorImagenService>;
+    service = new ProductosService(repository, categoriasRepository, leyesFiscalesRepository, variantesService, preciosRepository, analizadorImagenService);
+  });
+
+  describe('analizarImagen', () => {
+    it('delega en AnalizadorImagenService y envuelve el resultado en { opciones }', async () => {
+      analizadorImagenService.analizarDesdeDataUri.mockResolvedValue([{ nombre: 'Camisa azul', descripcion: 'Camisa de algodón, manga larga.' }]);
+
+      const resultado = await service.analizarImagen('data:image/jpeg;base64,abc123');
+
+      expect(analizadorImagenService.analizarDesdeDataUri).toHaveBeenCalledWith('data:image/jpeg;base64,abc123');
+      expect(resultado).toEqual({ opciones: [{ nombre: 'Camisa azul', descripcion: 'Camisa de algodón, manga larga.' }] });
+    });
   });
 
   describe('crear', () => {
