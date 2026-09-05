@@ -57,7 +57,7 @@ function Nav({ nombre, logo, subdominio, cantidadCarrito, menu }: { nombre: stri
           }
           if (clave === 'carrito') {
             return (
-              <button key={clave} type="button" onClick={abrir} className="flex items-center gap-2 rounded-full px-4 py-2 text-[0.8em] font-bold text-white" style={{ background: 'var(--tienda-color-texto)' }}>
+              <button key={clave} type="button" onClick={abrir} className="flex items-center gap-2 rounded-full px-4 py-2 text-[0.8em] font-bold" style={{ background: 'var(--tienda-color-texto)', color: 'var(--tienda-color-fondo)' }}>
                 <ShoppingCart size={14} />
                 {cantidadCarrito}
               </button>

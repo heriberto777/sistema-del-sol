@@ -152,7 +152,7 @@ function AmpliaProducto({ config, subdominio, carrito, producto, varianteSelecci
           )}
         </div>
         <div>
-          <span className="mb-2 inline-block rounded-full px-2.5 py-1 text-[0.7em] font-semibold" style={{ background: 'color-mix(in srgb, #8a8f5c 18%, var(--tienda-color-superficie))', color: '#5f6440' }}>
+          <span className="mb-2 inline-block rounded-full px-2.5 py-1 text-[0.7em] font-semibold" style={{ background: 'color-mix(in srgb, #8a8f5c 18%, var(--tienda-color-superficie))', color: 'color-mix(in srgb, #5f6440 55%, var(--tienda-color-texto))' }}>
             Fit: XS – 4X
           </span>
           <h1 className="mb-2 text-[1.5em] font-semibold" style={{ fontFamily: 'var(--tienda-fuente-display)' }}>

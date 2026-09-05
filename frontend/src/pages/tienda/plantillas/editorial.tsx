@@ -205,8 +205,8 @@ function EditorialProducto({ config, subdominio, carrito, producto, varianteSele
             type="button"
             onClick={onAgregar}
             disabled={!varianteSeleccionada || (varianteSeleccionada.stock !== null && varianteSeleccionada.stock <= 0)}
-            className="px-6 py-3 text-[0.8em] font-semibold uppercase tracking-[0.04em] text-white disabled:cursor-not-allowed disabled:opacity-50"
-            style={{ background: 'var(--tienda-color-texto)' }}
+            className="px-6 py-3 text-[0.8em] font-semibold uppercase tracking-[0.04em] disabled:cursor-not-allowed disabled:opacity-50"
+            style={{ background: 'var(--tienda-color-texto)', color: 'var(--tienda-color-fondo)' }}
           >
             Agregar a la bolsa
           </button>
@@ -261,7 +261,7 @@ function EditorialCarrito({ config, subdominio, carrito }: PropsCarrito) {
         {carrito.items.length > 0 && (
           <div className="mt-8 flex flex-col items-end gap-3 border-t border-[color:var(--tienda-color-texto)]/10 pt-6">
             <p className="text-[1.05em] font-semibold">Total: {formatearPrecio(carrito.total)}</p>
-            <Link to={`/tienda/${subdominio}/checkout`} className="px-6 py-3 text-[0.8em] font-semibold uppercase tracking-[0.04em] text-white" style={{ background: 'var(--tienda-color-texto)' }}>
+            <Link to={`/tienda/${subdominio}/checkout`} className="px-6 py-3 text-[0.8em] font-semibold uppercase tracking-[0.04em]" style={{ background: 'var(--tienda-color-texto)', color: 'var(--tienda-color-fondo)' }}>
               Finalizar compra
             </Link>
           </div>
