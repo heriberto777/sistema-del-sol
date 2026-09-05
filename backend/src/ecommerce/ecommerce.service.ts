@@ -20,6 +20,7 @@ import { ClientesService } from '../clientes/clientes.service';
 import { FacturacionService } from '../facturacion/facturacion.service';
 import { VariantesService } from '../variantes/variantes.service';
 import { OfertasService, OfertaVisibleProducto } from '../ofertas/ofertas.service';
+import { ofertaConItbis, precioConItbis } from './precio-con-itbis';
 import { AuthenticatedRequest, JwtPayloadUser } from '../common/types/authenticated-request';
 import { CLIENTE_TIENDA_JWT_SECRET } from '../cliente-tienda-auth/cliente-tienda-jwt.constants';
 import { ClienteTiendaPayload } from '../cliente-tienda-auth/cliente-tienda-authenticated-request';
@@ -49,7 +50,7 @@ export class EcommerceService {
    * por producto — aceptable al tamaño de una página paginada, nunca un
    * listado sin límite.
    */
-  private async adjuntarOfertas<T extends { id: string; precio: unknown; categoria: { id: string } | null }>(
+  private async adjuntarOfertas<T extends { id: string; precio: unknown; porcentajeItbis: unknown; categoria: { id: string } | null }>(
     items: T[],
   ): Promise<(T & { oferta: OfertaVisibleProducto | null })[]> {
     const ofertas = await Promise.all(
@@ -59,7 +60,15 @@ export class EcommerceService {
           : Promise.resolve(null),
       ),
     );
-    return items.map((item, i) => ({ ...item, oferta: ofertas[i] }));
+    // Pedido explícito: el precio que ve el comprador incluye ITBIS — ver
+    // precio-con-itbis.ts para por qué esto se aplica DESPUÉS del motor de
+    // ofertas (que sigue resolviendo todo en pre-impuesto, igual que
+    // Facturación) y nunca antes.
+    return items.map((item, i) => ({
+      ...item,
+      ...(item.precio ? { precio: precioConItbis(item.precio, item.porcentajeItbis) } : {}),
+      oferta: ofertaConItbis(ofertas[i], item.porcentajeItbis),
+    }));
   }
 
   resolverTiendaPublica(subdominio: string) {
@@ -134,12 +143,14 @@ export class EcommerceService {
     const variantes = await Promise.all(
       activas.map(async (v) => {
         const precio = precioPorVariante.get(v.id) ?? null;
+        const oferta = precio ? await this.ofertasService.resolverOfertaVisibleProducto(productoId, categoriaId, Number(precio)) : null;
         return {
           id: v.id,
           etiqueta: v.valoresAtributo.map((va) => `${va.valorAtributo.atributo.nombre}: ${va.valorAtributo.valor}`).join(', '),
-          precio,
+          // Con ITBIS incluido, igual que el resto del storefront — ver precio-con-itbis.ts.
+          precio: precioConItbis(precio, producto.porcentajeItbis),
           stock: config.bodegaId && 'existencia' in v ? v.existencia : null,
-          oferta: precio ? await this.ofertasService.resolverOfertaVisibleProducto(productoId, categoriaId, Number(precio)) : null,
+          oferta: ofertaConItbis(oferta, producto.porcentajeItbis),
         };
       }),
     );

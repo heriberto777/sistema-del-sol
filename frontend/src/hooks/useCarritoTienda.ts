@@ -7,7 +7,14 @@ export interface ItemCarritoTienda {
   nombre: string;
   /** Ej. "Talla: M, Color: Rojo" — vacío si el producto nunca usó atributos. */
   varianteEtiqueta: string;
-  /** Precio ya con descuento aplicado si el producto tenía una oferta al momento de agregarlo (ver `precioParaCarrito`) — es el que realmente se cobra. */
+  /**
+   * Con ITBIS incluido (el backend ya lo suma — ver `precio-con-itbis.ts`)
+   * y con el descuento aplicado si el producto tenía una oferta al
+   * momento de agregarlo (ver `precioParaCarrito`) — es el precio final
+   * que ve el comprador, coincide con lo que termina cobrando la
+   * factura real salvo que el precio/oferta haya cambiado entre que se
+   * agregó al carrito y el checkout (se revalida ahí, ver `usePreviewPedido`).
+   */
   precio: number;
   /** Fase 16 — precio de lista ANTES del descuento, solo presente si hubo oferta al agregar. Puramente informativo (mostrar tachado en el carrito); nunca se usa para calcular el total. */
   precioOriginal?: number;

@@ -53,6 +53,7 @@ export interface ProductoTienda {
   porcentajeItbis: string;
   tipo: string;
   categoria: { id: string; nombre: string } | null;
+  /** Precio FINAL, con ITBIS incluido (el backend ya lo suma — ver `precio-con-itbis.ts`) — nunca el `Precio.precioVenta` pre-impuesto que usa Facturación/POS internamente. */
   precio: string | null;
   stock: number | null;
   /** Solo útil para agregar directo cuando `tieneVariantes` es false — con más de una variante, ver el detalle antes de decidir cuál. */

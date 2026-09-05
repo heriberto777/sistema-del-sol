@@ -160,13 +160,31 @@ describe('EcommerceService', () => {
     });
   });
 
+  describe('catalogo', () => {
+    it('el precio final incluye ITBIS (pedido explícito) — nunca el pre-impuesto de Precio.precioVenta tal cual', async () => {
+      ecommerceRepository.catalogo.mockResolvedValue([[{ id: 'p1', precio: '100', porcentajeItbis: '18', categoria: null }], 1] as never);
+
+      const resultado = await service.catalogo('demo', {} as never, requestFalso());
+
+      expect(resultado.datos[0].precio).toBe('118.0000');
+    });
+
+    it('un producto exento (porcentajeItbis 0) muestra el mismo precio de lista', async () => {
+      ecommerceRepository.catalogo.mockResolvedValue([[{ id: 'p1', precio: '100', porcentajeItbis: '0', categoria: null }], 1] as never);
+
+      const resultado = await service.catalogo('demo', {} as never, requestFalso());
+
+      expect(resultado.datos[0].precio).toBe('100.0000');
+    });
+  });
+
   describe('producto', () => {
     it('404 si el producto no existe o no es visible en la tienda', async () => {
       await expect(service.producto('demo', 'p1', requestFalso())).rejects.toThrow(NotFoundException);
     });
 
-    it('devuelve solo las variantes activas, con etiqueta/precio/stock resueltos (Fase 4)', async () => {
-      ecommerceRepository.buscarProductoPublico.mockResolvedValue({ id: 'p1', nombre: 'Camisa', imagenesAdicionales: [] } as never);
+    it('devuelve solo las variantes activas, con etiqueta/precio/stock resueltos (Fase 4) — precio final con ITBIS incluido', async () => {
+      ecommerceRepository.buscarProductoPublico.mockResolvedValue({ id: 'p1', nombre: 'Camisa', imagenesAdicionales: [], porcentajeItbis: '18' } as never);
       variantesService.listarPorProducto.mockResolvedValue([
         {
           id: 'v1',
@@ -185,7 +203,7 @@ describe('EcommerceService', () => {
 
       const resultado = await service.producto('demo', 'p1', requestFalso());
 
-      expect(resultado.variantes).toEqual([{ id: 'v1', etiqueta: 'Talla: M', precio: 500, stock: 5, oferta: null }]);
+      expect(resultado.variantes).toEqual([{ id: 'v1', etiqueta: 'Talla: M', precio: '590.0000', stock: 5, oferta: null }]);
     });
 
     it('Fase 16 — sin categoría, igual pide relacionados (con categoriaId null) para que el repositorio pueda rellenar con otros productos', async () => {

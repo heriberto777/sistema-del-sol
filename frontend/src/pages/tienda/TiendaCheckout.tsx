@@ -208,7 +208,7 @@ export function TiendaCheckout() {
               </>
             ) : (
               <div className="flex justify-between font-semibold text-slate-900 dark:text-slate-100">
-                <span>Subtotal (el ITBIS se calcula al confirmar)</span>
+                <span>Total (ITBIS incluido)</span>
                 <span>{formatearPrecio(carrito.total)}</span>
               </div>
             )}
