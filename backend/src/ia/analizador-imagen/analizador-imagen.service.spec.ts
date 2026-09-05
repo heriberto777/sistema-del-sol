@@ -63,8 +63,14 @@ describe('AnalizadorImagenService', () => {
     it('separa mimeType/base64 de la data URI y delega en el adaptador activo', async () => {
       process.env.IA_IMAGEN_PROVEEDOR_ACTIVO = 'openai';
       const resultado = await service.analizarDesdeDataUri('data:image/png;base64,YWJj');
-      expect(openAiAdapter.analizar).toHaveBeenCalledWith('YWJj', 'image/png');
+      expect(openAiAdapter.analizar).toHaveBeenCalledWith('YWJj', 'image/png', undefined);
       expect(resultado).toEqual([{ nombre: 'X', descripcion: 'Y' }]);
+    });
+
+    it('pasa el detalle opcional al adaptador activo', async () => {
+      process.env.IA_IMAGEN_PROVEEDOR_ACTIVO = 'openai';
+      await service.analizarDesdeDataUri('data:image/png;base64,YWJj', 'Marca Nike, talla 9');
+      expect(openAiAdapter.analizar).toHaveBeenCalledWith('YWJj', 'image/png', 'Marca Nike, talla 9');
     });
 
     it('rechaza una data URI con formato inválido sin llamar a ningún adaptador', async () => {

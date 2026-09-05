@@ -1,6 +1,6 @@
 import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { AnalizadorImagenAdapter, CandidatoProducto, ModeloIa } from './analizador-imagen.interface';
-import { PROMPT_ANALIZAR_PRODUCTO, parsearCandidatos } from './analizador-imagen.prompt';
+import { construirPromptAnalizarProducto, parsearCandidatos } from './analizador-imagen.prompt';
 
 /**
  * Misma API/credencial que `IaClientService` (Anthropic Messages API,
@@ -18,7 +18,7 @@ export class ClaudeVisionAdapter implements AnalizadorImagenAdapter {
     return Boolean(process.env.ANTHROPIC_API_KEY);
   }
 
-  async analizar(imagenBase64: string, mimeType: string): Promise<CandidatoProducto[]> {
+  async analizar(imagenBase64: string, mimeType: string, detalle?: string): Promise<CandidatoProducto[]> {
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) {
       throw new ServiceUnavailableException('Generar con IA no está disponible todavía (falta configurar Claude)');
@@ -37,7 +37,7 @@ export class ClaudeVisionAdapter implements AnalizadorImagenAdapter {
               role: 'user',
               content: [
                 { type: 'image', source: { type: 'base64', media_type: mimeType, data: imagenBase64 } },
-                { type: 'text', text: PROMPT_ANALIZAR_PRODUCTO },
+                { type: 'text', text: construirPromptAnalizarProducto(detalle) },
               ],
             },
           ],

@@ -1,6 +1,6 @@
 import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { AnalizadorImagenAdapter, CandidatoProducto, ModeloIa } from './analizador-imagen.interface';
-import { PROMPT_ANALIZAR_PRODUCTO, parsearCandidatos } from './analizador-imagen.prompt';
+import { construirPromptAnalizarProducto, parsearCandidatos } from './analizador-imagen.prompt';
 
 /**
  * Generative Language API de Google (Gemini 2.0 Flash, visión) — `fetch`
@@ -16,7 +16,7 @@ export class GeminiVisionAdapter implements AnalizadorImagenAdapter {
     return Boolean(process.env.GEMINI_API_KEY);
   }
 
-  async analizar(imagenBase64: string, mimeType: string): Promise<CandidatoProducto[]> {
+  async analizar(imagenBase64: string, mimeType: string, detalle?: string): Promise<CandidatoProducto[]> {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
       throw new ServiceUnavailableException('Generar con IA no está disponible todavía (falta configurar Gemini)');
@@ -29,7 +29,7 @@ export class GeminiVisionAdapter implements AnalizadorImagenAdapter {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          contents: [{ parts: [{ text: PROMPT_ANALIZAR_PRODUCTO }, { inline_data: { mime_type: mimeType, data: imagenBase64 } }] }],
+          contents: [{ parts: [{ text: construirPromptAnalizarProducto(detalle) }, { inline_data: { mime_type: mimeType, data: imagenBase64 } }] }],
           generationConfig: { responseMimeType: 'application/json' },
         }),
       });

@@ -32,8 +32,13 @@ export class AnalizadorImagenService {
     return adapter.listarModelos();
   }
 
-  /** `dataUri` completa (`data:image/...;base64,...`) — misma validación de formato que ya usa CrearProductoDto.imagen. */
-  async analizarDesdeDataUri(dataUri: string): Promise<CandidatoProducto[]> {
+  /**
+   * `dataUri` completa (`data:image/...;base64,...`) — misma validación de
+   * formato que ya usa CrearProductoDto.imagen. `detalle` es el texto
+   * opcional que el admin escribe junto a la foto para darle más contexto
+   * al modelo (ver `construirPromptAnalizarProducto`).
+   */
+  async analizarDesdeDataUri(dataUri: string, detalle?: string): Promise<CandidatoProducto[]> {
     const match = /^data:(image\/[a-z]+);base64,(.+)$/.exec(dataUri);
     if (!match) throw new ServiceUnavailableException('La imagen no tiene un formato válido');
     const [, mimeType, base64] = match;
@@ -42,6 +47,6 @@ export class AnalizadorImagenService {
     if (!adapter.habilitado) {
       throw new ServiceUnavailableException(`Generar con IA no está disponible todavía (proveedor "${adapter.clave}" sin configurar)`);
     }
-    return adapter.analizar(base64, mimeType);
+    return adapter.analizar(base64, mimeType, detalle);
   }
 }

@@ -63,7 +63,7 @@ export class ProductosController {
   @Post('analizar-imagen')
   @Permissions('productos.ia_generar')
   analizarImagen(@Body() dto: AnalizarImagenProductoDto) {
-    return this.productosService.analizarImagen(dto.imagen);
+    return this.productosService.analizarImagen(dto.imagen, dto.detalle);
   }
 
   @Get(':id')

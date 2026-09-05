@@ -52,8 +52,14 @@ describe('ProductosService', () => {
 
       const resultado = await service.analizarImagen('data:image/jpeg;base64,abc123');
 
-      expect(analizadorImagenService.analizarDesdeDataUri).toHaveBeenCalledWith('data:image/jpeg;base64,abc123');
+      expect(analizadorImagenService.analizarDesdeDataUri).toHaveBeenCalledWith('data:image/jpeg;base64,abc123', undefined);
       expect(resultado).toEqual({ opciones: [{ nombre: 'Camisa azul', descripcion: 'Camisa de algodón, manga larga.' }] });
+    });
+
+    it('pasa el detalle opcional a AnalizadorImagenService', async () => {
+      analizadorImagenService.analizarDesdeDataUri.mockResolvedValue([]);
+      await service.analizarImagen('data:image/jpeg;base64,abc123', 'Es de cuero genuino, talla 42');
+      expect(analizadorImagenService.analizarDesdeDataUri).toHaveBeenCalledWith('data:image/jpeg;base64,abc123', 'Es de cuero genuino, talla 42');
     });
   });
 

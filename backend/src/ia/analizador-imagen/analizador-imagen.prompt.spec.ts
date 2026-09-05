@@ -1,5 +1,29 @@
 import { ServiceUnavailableException } from '@nestjs/common';
-import { parsearCandidatos } from './analizador-imagen.prompt';
+import { construirPromptAnalizarProducto, parsearCandidatos } from './analizador-imagen.prompt';
+
+describe('construirPromptAnalizarProducto', () => {
+  it('sin detalle, devuelve solo el prompt base', () => {
+    const prompt = construirPromptAnalizarProducto();
+    expect(prompt).toContain('Analizá esta foto de un producto');
+    expect(prompt).not.toContain('detalle adicional');
+  });
+
+  it('con detalle en blanco (solo espacios), lo trata como si no hubiera detalle', () => {
+    expect(construirPromptAnalizarProducto('   ')).toBe(construirPromptAnalizarProducto());
+  });
+
+  it('con detalle, lo agrega al final marcado como fuente confiable', () => {
+    const prompt = construirPromptAnalizarProducto('Es de cuero genuino, marca Timberland, talla 42');
+    expect(prompt).toContain('Analizá esta foto de un producto');
+    expect(prompt).toContain('detalle adicional');
+    expect(prompt).toContain('Es de cuero genuino, marca Timberland, talla 42');
+  });
+
+  it('recorta espacios sobrantes del detalle', () => {
+    const prompt = construirPromptAnalizarProducto('  talla M  ');
+    expect(prompt).toContain('"""talla M"""');
+  });
+});
 
 describe('parsearCandidatos', () => {
   it('parsea un JSON limpio con 3 opciones', () => {

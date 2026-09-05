@@ -53,6 +53,20 @@ describe('OpenAiVisionAdapter', () => {
     await expect(adapter.analizar('x', 'image/jpeg')).rejects.toThrow(ServiceUnavailableException);
   });
 
+  it('incluye el detalle del admin en el bloque de texto cuando se pasa uno', async () => {
+    process.env.OPENAI_API_KEY = 'sk-oa-1';
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({ choices: [{ message: { content: '{"opciones":[{"nombre":"X","descripcion":"Y"}]}' } }] }),
+    });
+
+    await adapter.analizar('YmFzZTY0', 'image/png', 'Marca Nike, talla 9');
+
+    const [, opciones] = fetchMock.mock.calls[0];
+    const cuerpo = JSON.parse(opciones.body);
+    expect(cuerpo.messages[0].content[0].text).toContain('Marca Nike, talla 9');
+  });
+
   it('lanza ServiceUnavailableException si la petición falla', async () => {
     process.env.OPENAI_API_KEY = 'sk-oa-1';
     fetchMock.mockRejectedValue(new Error('ECONNRESET'));

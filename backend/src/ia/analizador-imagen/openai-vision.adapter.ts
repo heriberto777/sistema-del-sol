@@ -1,6 +1,6 @@
 import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { AnalizadorImagenAdapter, CandidatoProducto, ModeloIa } from './analizador-imagen.interface';
-import { PROMPT_ANALIZAR_PRODUCTO, parsearCandidatos } from './analizador-imagen.prompt';
+import { construirPromptAnalizarProducto, parsearCandidatos } from './analizador-imagen.prompt';
 
 /**
  * Chat Completions API de OpenAI (GPT-4o, tiene visión) — `fetch` directo,
@@ -16,7 +16,7 @@ export class OpenAiVisionAdapter implements AnalizadorImagenAdapter {
     return Boolean(process.env.OPENAI_API_KEY);
   }
 
-  async analizar(imagenBase64: string, mimeType: string): Promise<CandidatoProducto[]> {
+  async analizar(imagenBase64: string, mimeType: string, detalle?: string): Promise<CandidatoProducto[]> {
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
       throw new ServiceUnavailableException('Generar con IA no está disponible todavía (falta configurar OpenAI)');
@@ -35,7 +35,7 @@ export class OpenAiVisionAdapter implements AnalizadorImagenAdapter {
             {
               role: 'user',
               content: [
-                { type: 'text', text: PROMPT_ANALIZAR_PRODUCTO },
+                { type: 'text', text: construirPromptAnalizarProducto(detalle) },
                 { type: 'image_url', image_url: { url: `data:${mimeType};base64,${imagenBase64}` } },
               ],
             },

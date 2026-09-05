@@ -14,8 +14,13 @@ export interface ModeloIa {
 export interface AnalizadorImagenAdapter {
   readonly clave: string;
   readonly habilitado: boolean;
-  /** `imagenBase64` sin el prefijo `data:image/...;base64,` — ya separado por quien llama. */
-  analizar(imagenBase64: string, mimeType: string): Promise<CandidatoProducto[]>;
+  /**
+   * `imagenBase64` sin el prefijo `data:image/...;base64,` — ya separado
+   * por quien llama. `detalle` es el texto opcional que el admin escribe
+   * junto a la foto (marca, material, talla, uso, etc.) para darle más
+   * contexto al modelo — ver `construirPromptAnalizarProducto`.
+   */
+  analizar(imagenBase64: string, mimeType: string, detalle?: string): Promise<CandidatoProducto[]>;
   /** Lista real de modelos disponibles para la API key ya configurada — para que el admin elija de un <select> en vez de tipear el nombre a mano (riesgo de typo/modelo desactualizado). */
   listarModelos(): Promise<ModeloIa[]>;
 }

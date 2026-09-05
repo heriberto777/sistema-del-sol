@@ -53,6 +53,20 @@ describe('ClaudeVisionAdapter', () => {
     await expect(adapter.analizar('x', 'image/jpeg')).rejects.toThrow(ServiceUnavailableException);
   });
 
+  it('incluye el detalle del admin en el bloque de texto cuando se pasa uno', async () => {
+    process.env.ANTHROPIC_API_KEY = 'sk-ant-1';
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({ content: [{ type: 'text', text: '{"opciones":[{"nombre":"X","descripcion":"Y"}]}' }] }),
+    });
+
+    await adapter.analizar('YmFzZTY0', 'image/png', 'Es de cuero genuino, talla 42');
+
+    const [, opciones] = fetchMock.mock.calls[0];
+    const cuerpo = JSON.parse(opciones.body);
+    expect(cuerpo.messages[0].content[1].text).toContain('Es de cuero genuino, talla 42');
+  });
+
   it('lanza ServiceUnavailableException si la petición falla', async () => {
     process.env.ANTHROPIC_API_KEY = 'sk-ant-1';
     fetchMock.mockRejectedValue(new Error('ECONNRESET'));

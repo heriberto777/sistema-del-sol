@@ -30,9 +30,15 @@ export class ProductosService {
     private readonly analizadorImagenService: AnalizadorImagenService,
   ) {}
 
-  /** Pedido explícito — sugiere nombre/descripción a partir de la foto, gateado por `productos.ia_generar` (ver ProductosController). El admin elige cuál candidato usar; nunca se aplica sola. */
-  async analizarImagen(imagen: string) {
-    const opciones = await this.analizadorImagenService.analizarDesdeDataUri(imagen);
+  /**
+   * Pedido explícito — sugiere nombre/descripción a partir de la foto,
+   * gateado por `productos.ia_generar` (ver ProductosController). El admin
+   * elige cuál candidato usar; nunca se aplica sola. `detalle` es un texto
+   * corto opcional (marca, material, talla, uso, etc.) que el admin ya
+   * conoce y la foto sola no puede confirmar.
+   */
+  async analizarImagen(imagen: string, detalle?: string) {
+    const opciones = await this.analizadorImagenService.analizarDesdeDataUri(imagen, detalle);
     return { opciones };
   }
 

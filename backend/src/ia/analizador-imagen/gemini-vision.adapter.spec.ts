@@ -52,6 +52,20 @@ describe('GeminiVisionAdapter', () => {
     await expect(adapter.analizar('x', 'image/jpeg')).rejects.toThrow(ServiceUnavailableException);
   });
 
+  it('incluye el detalle del admin en el bloque de texto cuando se pasa uno', async () => {
+    process.env.GEMINI_API_KEY = 'gm-1';
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({ candidates: [{ content: { parts: [{ text: '{"opciones":[{"nombre":"X","descripcion":"Y"}]}' }] } }] }),
+    });
+
+    await adapter.analizar('YmFzZTY0', 'image/png', 'Sabor mango, sin azúcar');
+
+    const [, opciones] = fetchMock.mock.calls[0];
+    const cuerpo = JSON.parse(opciones.body);
+    expect(cuerpo.contents[0].parts[0].text).toContain('Sabor mango, sin azúcar');
+  });
+
   it('lanza ServiceUnavailableException si la petición falla', async () => {
     process.env.GEMINI_API_KEY = 'gm-1';
     fetchMock.mockRejectedValue(new Error('ECONNRESET'));

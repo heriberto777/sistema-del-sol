@@ -368,6 +368,7 @@ function FormularioProducto({ producto, onGuardado }: { producto: Producto | nul
   const { tienePermiso } = useAuth();
   const [candidatosIa, setCandidatosIa] = useState<{ nombre: string; descripcion: string }[] | null>(null);
   const [errorIa, setErrorIa] = useState<string | null>(null);
+  const [detalleIa, setDetalleIa] = useState('');
 
   // Editar un producto existente: la lista (GET /productos) no trae ni la
   // imagen ni (si es combo) los componentes — hay que pedir el detalle
@@ -448,7 +449,12 @@ function FormularioProducto({ producto, onGuardado }: { producto: Producto | nul
   // cuál usar, nunca se aplica sola (ver modal más abajo).
   const analizarConIa = useMutation({
     mutationFn: async () =>
-      (await apiClient.post<{ opciones: { nombre: string; descripcion: string }[] }>('/productos/analizar-imagen', { imagen: valores.imagen })).data,
+      (
+        await apiClient.post<{ opciones: { nombre: string; descripcion: string }[] }>('/productos/analizar-imagen', {
+          imagen: valores.imagen,
+          detalle: detalleIa.trim() || undefined,
+        })
+      ).data,
     onSuccess: (data) => setCandidatosIa(data.opciones),
     onError: (err) => setErrorIa(mensajeErrorApi(err, 'No se pudo generar con IA — probá de nuevo.')),
   });
@@ -477,7 +483,15 @@ function FormularioProducto({ producto, onGuardado }: { producto: Producto | nul
         onChangeAjuste={(imagenAjuste) => setValores((v) => ({ ...v, imagenAjuste }))}
       />
       {tienePermiso('productos.ia_generar') && valores.imagen && (
-        <div className="flex flex-col gap-1">
+        <div className="flex flex-col gap-1.5">
+          <input
+            type="text"
+            value={detalleIa}
+            onChange={(e) => setDetalleIa(e.target.value)}
+            maxLength={300}
+            placeholder="Detalle breve del producto (opcional) — marca, material, talla, uso… ayuda a la IA a acertar mejor"
+            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+          />
           <Button
             type="button"
             variante="secundario"
