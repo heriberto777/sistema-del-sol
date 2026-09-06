@@ -7,9 +7,10 @@ import { WhatsappBandejaController } from './whatsapp-bandeja.controller';
 import { WhatsappBandejaService } from './whatsapp-bandeja.service';
 import { IaModule } from '../ia/ia.module';
 import { WhatsappConfigModule } from '../whatsapp-config/whatsapp-config.module';
+import { ProductosModule } from '../productos/productos.module';
 
 @Module({
-  imports: [IaModule, WhatsappConfigModule],
+  imports: [IaModule, WhatsappConfigModule, ProductosModule],
   controllers: [WhatsappWebhookController, WhatsappBandejaController],
   providers: [WhatsappBotService, WhatsappMensajesRepository, WhatsappMensajesAdminRepository, WhatsappBandejaService],
 })

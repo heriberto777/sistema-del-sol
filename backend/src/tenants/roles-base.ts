@@ -32,6 +32,12 @@ export const PERMISOS_BASE = [
   'reportes.ver',
   'admin.configuracion', 'admin.usuarios',
   'auditoria.ver',
+  // Responder la Bandeja de WhatsApp (drawer global, Facturación/POS
+  // incluidos) — a propósito SEPARADO de `admin.configuracion` (que sigue
+  // gateando solo la pantalla de configuración del bot): el objetivo de
+  // este permiso es que Cajero/Vendedor atiendan clientes sin pasar por
+  // Administración, no que un admin más lo use.
+  'whatsapp.bandeja.usar',
 ];
 
 export const ROLES_BASE: Record<string, string[]> = {
@@ -45,7 +51,7 @@ export const ROLES_BASE: Record<string, string[]> = {
     'cotizaciones.crear', 'cotizaciones.editar', 'cotizaciones.ver',
     'remisiones.crear', 'remisiones.editar', 'remisiones.ver',
     'clientes.crear', 'clientes.ver', 'precios.ver',
-    'ia.usar', 'notificaciones.ver',
+    'ia.usar', 'notificaciones.ver', 'whatsapp.bandeja.usar',
   ],
   Cajero: [
     // facturacion.anular (acotado a la propia venta de POS mientras el
@@ -54,7 +60,7 @@ export const ROLES_BASE: Record<string, string[]> = {
     // hay una ruta separada solo para POS.
     'facturacion.anular', 'facturacion.imprimir',
     'clientes.crear', 'clientes.ver', 'precios.ver', 'bonos.ver', 'lealtad.ver',
-    'pos.ver', 'pos.editar', 'ia.usar', 'notificaciones.ver',
+    'pos.ver', 'pos.editar', 'ia.usar', 'notificaciones.ver', 'whatsapp.bandeja.usar',
   ],
   // Mismo alcance que Cajero + pos.supervisar: puede cerrar el turno de
   // OTRO cajero y anular cualquier venta de POS sin la restricción de
@@ -63,7 +69,7 @@ export const ROLES_BASE: Record<string, string[]> = {
   'Supervisor de Caja': [
     'facturacion.anular', 'facturacion.imprimir',
     'clientes.crear', 'clientes.ver', 'precios.ver', 'bonos.ver', 'lealtad.ver',
-    'pos.ver', 'pos.editar', 'pos.supervisar', 'ia.usar', 'notificaciones.ver',
+    'pos.ver', 'pos.editar', 'pos.supervisar', 'ia.usar', 'notificaciones.ver', 'whatsapp.bandeja.usar',
   ],
   Almacenero: ['inventario.ver', 'inventario.ajustar', 'inventario.transferir', 'compras.recibir', 'remisiones.ver'],
   Contador: ['facturacion.ver', 'facturacion.cobrar', 'facturacion.imprimir', 'cuentasporcobrar.ver', 'compras.ver', 'compras.pagar', 'cuentasporpagar.ver', 'reportes.ver', 'comisiones.ver', 'precios.ver', 'contabilidad.ver', 'contabilidad.editar', 'contabilidad.anular', 'contabilidad.cerrarperiodo', 'contabilidad.conciliar', 'bancos.ver', 'bancos.editar', 'gastosmenores.ver', 'gastosmenores.crear', 'nomina.ver', 'nomina.editar', 'rrhh.ver', 'ia.usar', 'notificaciones.ver'],

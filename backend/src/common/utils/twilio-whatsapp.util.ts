@@ -11,18 +11,23 @@ export async function enviarWhatsappTwilio(params: {
   from: string;
   to: string;
   body: string;
+  /** URL pública HTTPS de una imagen — Twilio la descarga él mismo, no acepta el base64 inline (ver ProductoImagenPublicaController). */
+  mediaUrl?: string;
 }): Promise<boolean> {
+  const form: Record<string, string> = {
+    From: params.from,
+    To: `whatsapp:${params.to}`,
+    Body: params.body,
+  };
+  if (params.mediaUrl) form.MediaUrl = params.mediaUrl;
+
   const respuesta = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${params.accountSid}/Messages.json`, {
     method: 'POST',
     headers: {
       Authorization: `Basic ${Buffer.from(`${params.accountSid}:${params.authToken}`).toString('base64')}`,
       'Content-Type': 'application/x-www-form-urlencoded',
     },
-    body: new URLSearchParams({
-      From: params.from,
-      To: `whatsapp:${params.to}`,
-      Body: params.body,
-    }),
+    body: new URLSearchParams(form),
   });
 
   return respuesta.ok;

@@ -3,7 +3,7 @@ import { TenantPrismaService } from '../prisma/tenant-prisma.service';
 
 /**
  * Usa `TenantPrismaService` — solo lo consume la bandeja de Admin
- * (autenticada, `admin.configuracion`). Ver `WhatsappMensajesRepository`
+ * (autenticada, `whatsapp.bandeja.usar`). Ver `WhatsappMensajesRepository`
  * (público, sin JWT, `PrismaService` global) para el porqué de la
  * separación en dos clases.
  */
@@ -15,6 +15,14 @@ export class WhatsappMensajesAdminRepository {
     return this.tenantPrisma.client.whatsappMensaje.findMany({
       where: { requiereAtencionHumana: true, atendido: false },
       orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  /** Hilo completo (todos los roles, no solo lo pendiente) para pintar la conversación tipo chat en el drawer. */
+  obtenerConversacion(telefono: string) {
+    return this.tenantPrisma.client.whatsappMensaje.findMany({
+      where: { telefono },
+      orderBy: { createdAt: 'asc' },
     });
   }
 

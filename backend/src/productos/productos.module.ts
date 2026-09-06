@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 import { ProductosService } from './productos.service';
 import { ProductosController } from './productos.controller';
+import { ProductoImagenPublicaController } from './producto-imagen-publica.controller';
+import { ProductoImagenPublicaService } from './producto-imagen-publica.service';
 import { ProductosRepository } from './productos.repository';
 import { CategoriasModule } from '../categorias/categorias.module';
 import { LeyesFiscalesModule } from '../leyes-fiscales/leyes-fiscales.module';
@@ -16,8 +18,8 @@ import { IaModule } from '../ia/ia.module';
 // darle su propia instancia acá es seguro.
 @Module({
   imports: [CategoriasModule, LeyesFiscalesModule, VariantesModule, IaModule],
-  controllers: [ProductosController],
-  providers: [ProductosService, ProductosRepository, PreciosRepository],
+  controllers: [ProductosController, ProductoImagenPublicaController],
+  providers: [ProductosService, ProductosRepository, PreciosRepository, ProductoImagenPublicaService],
   exports: [ProductosService],
 })
 export class ProductosModule {}

@@ -7,6 +7,7 @@ import { EventBusService } from '../event-bus/event-bus.service';
 import { EVENTOS } from '../event-bus/events';
 import { descifrar } from '../common/utils/encriptado.util';
 import { enviarWhatsappTwilio } from '../common/utils/twilio-whatsapp.util';
+import { resolverOrigenPublicoWhatsapp } from '../common/utils/origen-publico-whatsapp.util';
 import { fechaHoyRD } from '../common/utils/zona-horaria-rd.util';
 
 const MENSAJE_LIMITE_ALCANZADO = 'Alcanzamos el límite de respuestas automáticas de hoy — un representante te va a contactar pronto.';
@@ -15,8 +16,9 @@ const MENSAJE_FALLBACK = 'Dejame conectarte con alguien del equipo, un momento p
 
 const PROMPT_SCAFFOLDING = `Sos un asistente virtual de atención al cliente por WhatsApp.
 Respondé ÚNICAMENTE con un JSON válido, sin texto adicional antes o después, con este formato exacto:
-{"respuesta": "texto de tu respuesta al cliente", "requiereHumano": true o false}
-Nunca inventes ni afirmes datos de facturas, pedidos, saldos o cuentas de clientes — no tenés acceso a esa información. Si te preguntan algo así, o el cliente pide hablar con una persona, o no podés resolver la consulta, marcá "requiereHumano": true y respondé que un representante lo va a contactar.`;
+{"respuesta": "texto de tu respuesta al cliente", "requiereHumano": true o false, "buscarProducto": "texto o null"}
+Nunca inventes ni afirmes datos de facturas, pedidos, saldos o cuentas de clientes — no tenés acceso a esa información. Si te preguntan algo así, o el cliente pide hablar con una persona, o no podés resolver la consulta, marcá "requiereHumano": true y respondé que un representante lo va a contactar.
+Si el cliente pregunta por un producto puntual del catálogo (por nombre o palabra clave, pidiendo o no una foto), llená "buscarProducto" con esa palabra clave — el sistema busca el producto y adjunta su foto aparte si lo encuentra, vos NO prometas la foto en tu texto (puede que no se encuentre). En cualquier otro caso, "buscarProducto" va en null.`;
 
 interface ConfigBot {
   tenantId: string;
@@ -95,7 +97,7 @@ export class WhatsappBotService {
       system,
     });
 
-    const { respuesta, requiereHumano } = this.parsearRespuestaIa(textoIa);
+    const { respuesta, requiereHumano, buscarProducto } = this.parsearRespuestaIa(textoIa);
 
     await this.whatsappMensajesRepository.crear({ tenantId, telefono: from, rol: 'ASISTENTE', contenido: respuesta, diaRD });
 
@@ -104,6 +106,63 @@ export class WhatsappBotService {
     }
 
     await this.enviarRespuesta(config, from, respuesta);
+
+    if (buscarProducto) {
+      await this.intentarEnviarProducto(config, from, diaRD, buscarProducto);
+    }
+  }
+
+  /**
+   * Búsqueda de catálogo simple (no otra llamada a la IA, no cuenta contra
+   * `limiteRespuestasDiarias`) — solo manda foto si hay EXACTAMENTE 1
+   * coincidencia con imagen cargada (decisión confirmada con el usuario:
+   * mejor no mandar nada a que se adivine mal). Cualquier otro caso (0,
+   * 2+, o la única coincidencia sin foto) no hace nada, en silencio,
+   * mismo criterio que el resto de este servicio con casos no accionables.
+   */
+  private async intentarEnviarProducto(config: ConfigBot, from: string, diaRD: string, textoBusqueda: string) {
+    const { twilioAccountSid, twilioAuthTokenCifrado, twilioWhatsappFrom } = config;
+    if (!twilioAccountSid || !twilioAuthTokenCifrado || !twilioWhatsappFrom) return;
+    const origen = resolverOrigenPublicoWhatsapp();
+    if (!origen) return;
+
+    const candidatos = await this.prisma.producto.findMany({
+      where: {
+        tenantId: config.tenantId,
+        activo: true,
+        OR: [{ nombre: { contains: textoBusqueda, mode: 'insensitive' } }, { codigo: { contains: textoBusqueda, mode: 'insensitive' } }],
+      },
+      select: {
+        id: true,
+        nombre: true,
+        imagen: true,
+        variantes: {
+          take: 1,
+          orderBy: { createdAt: 'asc' },
+          select: { precios: { where: { listaPrecio: 'GENERAL', vigenteHasta: null }, select: { precioVenta: true }, take: 1 } },
+        },
+      },
+      take: 2,
+    });
+
+    if (candidatos.length !== 1 || !candidatos[0].imagen) return;
+
+    const producto = candidatos[0];
+    const precio = producto.variantes[0]?.precios[0]?.precioVenta;
+    const caption = precio != null ? `${producto.nombre} — RD$ ${Number(precio).toFixed(2)}` : producto.nombre;
+    const mediaUrl = `${origen}/api/public/productos/${producto.id}/imagen`;
+
+    const enviado = await enviarWhatsappTwilio({
+      accountSid: twilioAccountSid,
+      authToken: descifrar(twilioAuthTokenCifrado),
+      from: `whatsapp:${twilioWhatsappFrom}`,
+      to: from.replace(/^whatsapp:/, ''),
+      body: caption,
+      mediaUrl,
+    });
+    if (!enviado) return;
+
+    await this.whatsappMensajesRepository.crear({ tenantId: config.tenantId, telefono: from, rol: 'ASISTENTE', contenido: caption, diaRD });
   }
 
   private async responderYEscalar(config: ConfigBot, from: string, diaRD: string, mensajeEntranteId: string, mensaje: string) {
@@ -133,17 +192,21 @@ export class WhatsappBotService {
     if (!enviado) this.logger.error(`Twilio respondió con error al contestar a ${to}`);
   }
 
-  private parsearRespuestaIa(texto: string | null): { respuesta: string; requiereHumano: boolean } {
-    if (!texto) return { respuesta: MENSAJE_FALLBACK, requiereHumano: true };
+  private parsearRespuestaIa(texto: string | null): { respuesta: string; requiereHumano: boolean; buscarProducto: string | null } {
+    if (!texto) return { respuesta: MENSAJE_FALLBACK, requiereHumano: true, buscarProducto: null };
     try {
-      const parseado = JSON.parse(texto) as { respuesta?: unknown; requiereHumano?: unknown };
+      const parseado = JSON.parse(texto) as { respuesta?: unknown; requiereHumano?: unknown; buscarProducto?: unknown };
       if (typeof parseado.respuesta === 'string') {
-        return { respuesta: parseado.respuesta, requiereHumano: Boolean(parseado.requiereHumano) };
+        return {
+          respuesta: parseado.respuesta,
+          requiereHumano: Boolean(parseado.requiereHumano),
+          buscarProducto: typeof parseado.buscarProducto === 'string' && parseado.buscarProducto.trim() ? parseado.buscarProducto.trim() : null,
+        };
       }
     } catch {
       // sigue al fallback de abajo
     }
     this.logger.warn('La IA no devolvió el JSON esperado — fail-safe a requiereHumano');
-    return { respuesta: MENSAJE_FALLBACK, requiereHumano: true };
+    return { respuesta: MENSAJE_FALLBACK, requiereHumano: true, buscarProducto: null };
   }
 }

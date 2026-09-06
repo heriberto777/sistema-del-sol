@@ -4,7 +4,6 @@ import { UsuariosPanel } from '../components/organisms/UsuariosPanel/UsuariosPan
 import { RolesPanel } from '../components/organisms/RolesPanel/RolesPanel';
 import { WebhooksPanel } from '../components/organisms/WebhooksPanel/WebhooksPanel';
 import { WhatsappConfigPanel } from '../components/organisms/WhatsappConfigPanel/WhatsappConfigPanel';
-import { BandejaWhatsappPanel } from '../components/organisms/BandejaWhatsappPanel/BandejaWhatsappPanel';
 import { ConfiguracionesPanel } from '../components/organisms/ConfiguracionesPanel/ConfiguracionesPanel';
 import { NcfPanel } from '../components/organisms/NcfPanel/NcfPanel';
 import { TenantEmpresaPanel } from '../components/organisms/TenantEmpresaPanel/TenantEmpresaPanel';
@@ -95,7 +94,6 @@ const CATEGORIAS: Categoria[] = [
     pestanas: [
       { id: 'webhooks', etiqueta: 'Webhooks', permiso: 'admin.configuracion', panel: WebhooksPanel },
       { id: 'whatsapp', etiqueta: 'WhatsApp', permiso: 'admin.configuracion', panel: WhatsappConfigPanel },
-      { id: 'whatsapp-bandeja', etiqueta: 'Bandeja WhatsApp', permiso: 'admin.configuracion', panel: BandejaWhatsappPanel },
     ],
   },
 ];
