@@ -26,6 +26,7 @@ describe('WhatsappBandejaService', () => {
   beforeEach(() => {
     whatsappMensajesRepository = {
       listarPendientes: jest.fn(),
+      listarConversaciones: jest.fn(),
       obtenerConversacion: jest.fn(),
       crearRespuestaManual: jest.fn(),
       marcarAtendidosPorTelefono: jest.fn(),
@@ -119,6 +120,13 @@ describe('WhatsappBandejaService', () => {
       await expect(service.responder('t1', 'whatsapp:+18095551234', 'Mirá esto', 'p1')).rejects.toThrow(ServiceUnavailableException);
 
       process.env.WHATSAPP_WEBHOOK_URL = original;
+    });
+  });
+
+  describe('listarConversaciones', () => {
+    it('delega en el repositorio (inbox completo de la página "Mensajes")', async () => {
+      await service.listarConversaciones();
+      expect(whatsappMensajesRepository.listarConversaciones).toHaveBeenCalled();
     });
   });
 

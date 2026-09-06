@@ -21,6 +21,7 @@ export class WhatsappMensajesRepository {
     telefono: string;
     rol: 'USUARIO' | 'ASISTENTE' | 'HUMANO';
     contenido: string;
+    perfilNombre?: string | null;
     requiereAtencionHumana?: boolean;
     diaRD: string;
   }) {

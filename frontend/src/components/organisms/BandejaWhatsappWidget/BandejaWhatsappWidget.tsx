@@ -84,7 +84,7 @@ export function BandejaWhatsappWidget() {
             <MessageCircle size={16} className="mt-0.5 shrink-0 text-sol-600 dark:text-sol-400" />
             <div className="min-w-0 flex-1">
               <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Necesita atención humana</p>
-              <p className="truncate text-xs text-slate-500 dark:text-slate-400">{toast.telefono.replace(/^whatsapp:/, '')}</p>
+              <p className="truncate text-xs text-slate-500 dark:text-slate-400">{toast.perfilNombre ?? toast.telefono.replace(/^whatsapp:/, '')}</p>
               <p className="mt-0.5 truncate text-xs text-slate-600 dark:text-slate-300">{toast.contenido}</p>
             </div>
             <button

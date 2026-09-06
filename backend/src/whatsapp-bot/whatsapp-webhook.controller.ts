@@ -2,6 +2,7 @@ import { BadRequestException, Body, Controller, Headers, HttpCode, Post } from '
 import { ApiTags } from '@nestjs/swagger';
 import { WhatsappBotService } from './whatsapp-bot.service';
 import { Public } from '../common/decorators/public.decorator';
+import { resolverPerfilNombre } from './resolver-perfil-nombre.util';
 
 /**
  * Webhook entrante de Twilio (ítem H-2b) — `@Public()`, sin JWT. Todos
@@ -32,7 +33,7 @@ export class WhatsappWebhookController {
       throw new BadRequestException('Firma de webhook inválida');
     }
 
-    await this.whatsappBotService.procesarMensajeEntrante(config, from, mensaje);
+    await this.whatsappBotService.procesarMensajeEntrante(config, from, mensaje, resolverPerfilNombre(body));
     return {};
   }
 }

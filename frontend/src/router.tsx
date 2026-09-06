@@ -29,6 +29,7 @@ import { Pos } from './pages/Pos';
 import { PosCaja } from './pages/PosCaja';
 import { Ia } from './pages/Ia';
 import { Notificaciones } from './pages/Notificaciones';
+import { Mensajes } from './pages/Mensajes';
 import { Bancos } from './pages/Bancos';
 import { GastosMenores } from './pages/GastosMenores';
 import { TiendaOnline } from './pages/TiendaOnline';
@@ -177,6 +178,7 @@ const RUTAS_ADMIN = [
           { path: '/pos', element: <Pos /> },
           { path: '/ia', element: <Ia /> },
           { path: '/notificaciones', element: <Notificaciones /> },
+          { path: '/mensajes', element: <Mensajes /> },
           { path: '/admin', element: <Admin /> },
         ],
       },

@@ -21,6 +21,11 @@ export class WhatsappBandejaService {
     return this.whatsappMensajesRepository.listarPendientes();
   }
 
+  /** Inbox completo para la página "Mensajes" (`whatsapp.mensajes.ver`) — ver WhatsappMensajesAdminRepository.listarConversaciones. */
+  listarConversaciones() {
+    return this.whatsappMensajesRepository.listarConversaciones();
+  }
+
   obtenerConversacion(telefono: string) {
     return this.whatsappMensajesRepository.obtenerConversacion(telefono);
   }

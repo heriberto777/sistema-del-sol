@@ -87,6 +87,20 @@ describe('WhatsappBotService', () => {
       expect(opciones?.system).toContain('Horario: L-V 9am-5pm.');
     });
 
+    it('guarda el perfilNombre (Username/ProfileName de Twilio) en el mensaje USUARIO', async () => {
+      await service.procesarMensajeEntrante(CONFIG_BASE, 'whatsapp:+18095551234', 'hola', 'Rosa Martínez');
+
+      const llamadaUsuario = whatsappMensajesRepository.crear.mock.calls.find((c) => c[0].rol === 'USUARIO');
+      expect(llamadaUsuario?.[0]).toMatchObject({ perfilNombre: 'Rosa Martínez' });
+    });
+
+    it('sin perfilNombre: guarda null, no rompe nada', async () => {
+      await service.procesarMensajeEntrante(CONFIG_BASE, 'whatsapp:+18095551234', 'hola');
+
+      const llamadaUsuario = whatsappMensajesRepository.crear.mock.calls.find((c) => c[0].rol === 'USUARIO');
+      expect(llamadaUsuario?.[0]).toMatchObject({ perfilNombre: null });
+    });
+
     it('tope diario alcanzado: no llama a la IA, marca requiereHumano y emite el evento', async () => {
       whatsappMensajesRepository.contarRespuestasHoy.mockResolvedValue(50);
 

@@ -942,9 +942,14 @@ model WhatsappMensaje {
   id                     String   @id @default(uuid())
   tenantId               String
   tenant                 Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  telefono               String // remitente tal cual lo manda Twilio (whatsapp:+...)
+  telefono               String // remitente tal cual lo manda Twilio (whatsapp:+... o un BSUID "CC.alfanumérico" si el contacto usa un username de WhatsApp en vez de compartir su número — ver Username/ProfileName abajo)
   rol                    String // 'USUARIO' | 'ASISTENTE' | 'HUMANO' (staff respondiendo desde la bandeja)
   contenido              String
+  // Nombre de perfil de WhatsApp del contacto (campo `Username` de Twilio,
+  // o `ProfileName` si no vino `Username`) — solo se completa en mensajes
+  // `rol: 'USUARIO'`. Es la única forma legible de identificar a un
+  // contacto cuando `telefono` es un BSUID en vez de un número real.
+  perfilNombre           String?
   requiereAtencionHumana Boolean  @default(false)
   atendido               Boolean  @default(false)
   diaRD                  String

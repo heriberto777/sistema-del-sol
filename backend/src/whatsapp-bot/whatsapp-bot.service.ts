@@ -68,11 +68,11 @@ export class WhatsappBotService {
   }
 
   /** `from` tal cual lo manda Twilio (prefijo `whatsapp:` incluido) — es el remitente, el cliente. */
-  async procesarMensajeEntrante(config: ConfigBot, from: string, body: string) {
+  async procesarMensajeEntrante(config: ConfigBot, from: string, body: string, perfilNombre: string | null = null) {
     const { tenantId } = config;
     const diaRD = fechaHoyRD();
 
-    const mensajeEntrante = await this.whatsappMensajesRepository.crear({ tenantId, telefono: from, rol: 'USUARIO', contenido: body, diaRD });
+    const mensajeEntrante = await this.whatsappMensajesRepository.crear({ tenantId, telefono: from, rol: 'USUARIO', contenido: body, perfilNombre, diaRD });
 
     const respuestasHoy = await this.whatsappMensajesRepository.contarRespuestasHoy(tenantId, diaRD);
     if (respuestasHoy >= config.limiteRespuestasDiarias) {

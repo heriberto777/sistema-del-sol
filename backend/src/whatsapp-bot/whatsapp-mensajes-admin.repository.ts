@@ -26,6 +26,20 @@ export class WhatsappMensajesAdminRepository {
     });
   }
 
+  /**
+   * Inbox completo (página "Mensajes", `whatsapp.mensajes.ver") — TODAS
+   * las conversaciones, no solo las pendientes de atención (a diferencia
+   * de `listarPendientes`). `distinct: ['telefono']` + `orderBy:
+   * createdAt desc` le da a Prisma el mensaje MÁS RECIENTE de cada
+   * teléfono directo, sin SQL crudo ni agregación manual.
+   */
+  listarConversaciones() {
+    return this.tenantPrisma.client.whatsappMensaje.findMany({
+      distinct: ['telefono'],
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
   marcarAtendidosPorTelefono(telefono: string) {
     return this.tenantPrisma.client.whatsappMensaje.updateMany({
       where: { telefono, requiereAtencionHumana: true, atendido: false },

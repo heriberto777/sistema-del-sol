@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
+import { Body, Controller, ForbiddenException, Get, Param, Patch, Post } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { WhatsappBandejaService } from './whatsapp-bandeja.service';
 import { ResponderWhatsappDto } from './dto/responder-whatsapp.dto';
@@ -25,9 +25,26 @@ export class WhatsappBandejaController {
     return this.whatsappBandejaService.listarPendientes();
   }
 
+  /** Inbox completo de la página "Mensajes" — permiso DISTINTO (más restringido) que el resto de esta bandeja, ver roles-base.ts. */
+  @Get('conversaciones')
+  @Permissions('whatsapp.mensajes.ver')
+  conversaciones() {
+    return this.whatsappBandejaService.listarConversaciones();
+  }
+
+  /**
+   * Compartido por el drawer (`whatsapp.bandeja.usar`, todos los
+   * atendedores) y la página "Mensajes" (`whatsapp.mensajes.ver`, solo
+   * Gerente/Admin Total) — `@Permissions` exige TODOS los permisos que le
+   * pasás (AND), no "cualquiera de estos" (OR), así que ninguno de los dos
+   * alcanza acá solo: se valida a mano contra los DOS.
+   */
   @Get(':telefono/conversacion')
-  @Permissions('whatsapp.bandeja.usar')
-  conversacion(@Param('telefono') telefono: string) {
+  conversacion(@Param('telefono') telefono: string, @CurrentUser() user: JwtPayloadUser) {
+    const permisos = new Set(user.permisos);
+    if (!permisos.has('whatsapp.bandeja.usar') && !permisos.has('whatsapp.mensajes.ver')) {
+      throw new ForbiddenException('Requiere el/los permiso(s): whatsapp.bandeja.usar, whatsapp.mensajes.ver');
+    }
     return this.whatsappBandejaService.obtenerConversacion(telefono);
   }
 

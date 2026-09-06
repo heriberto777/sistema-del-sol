@@ -38,6 +38,15 @@ export const PERMISOS_BASE = [
   // este permiso es que Cajero/Vendedor atiendan clientes sin pasar por
   // Administración, no que un admin más lo use.
   'whatsapp.bandeja.usar',
+  // Ver la página "Mensajes" (inbox completo, TODAS las conversaciones,
+  // no solo las pendientes de atención) — a propósito MÁS restringido que
+  // `whatsapp.bandeja.usar`: sin prefijo `admin.` así que Gerente lo hereda
+  // igual que Admin Total (ambos ya tienen `whatsapp.bandeja.usar` también,
+  // así que el composer/buscador de producto reusado en esa página les
+  // sigue funcionando), pero NO se lo damos a Vendedor/Cajero/Supervisor de
+  // Caja — ellos siguen atendiendo solo desde el drawer, sin ver el
+  // historial completo de todos los clientes.
+  'whatsapp.mensajes.ver',
 ];
 
 export const ROLES_BASE: Record<string, string[]> = {
