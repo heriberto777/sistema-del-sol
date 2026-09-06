@@ -1,3 +1,4 @@
+import { ServiceUnavailableException } from '@nestjs/common';
 import { OpenAiConversacionAdapter } from './openai-conversacion.adapter';
 
 describe('OpenAiConversacionAdapter', () => {
@@ -54,5 +55,33 @@ describe('OpenAiConversacionAdapter', () => {
     fetchMock.mockRejectedValue(new Error('ECONNRESET'));
     const resultado = await adapter.completar([{ role: 'user', content: 'hola' }], { apiKey: 'sk-oa-tenant' });
     expect(resultado).toBeNull();
+  });
+
+  describe('listarModelos', () => {
+    it('filtra el catálogo completo a solo familias de chat/visión conocidas', async () => {
+      fetchMock.mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          data: [{ id: 'gpt-4o' }, { id: 'gpt-4o-mini' }, { id: 'whisper-1' }, { id: 'text-embedding-3-small' }, { id: 'gpt-4o-mini-tts' }, { id: 'dall-e-3' }],
+        }),
+      });
+
+      const resultado = await adapter.listarModelos('sk-oa-tenant');
+
+      expect(resultado).toEqual([{ id: 'gpt-4o', nombre: 'gpt-4o' }, { id: 'gpt-4o-mini', nombre: 'gpt-4o-mini' }]);
+      const [url, opciones] = fetchMock.mock.calls[0];
+      expect(url).toBe('https://api.openai.com/v1/models');
+      expect(opciones.headers.Authorization).toBe('Bearer sk-oa-tenant');
+    });
+
+    it('lanza ServiceUnavailableException si OpenAI responde con error', async () => {
+      fetchMock.mockResolvedValue({ ok: false, status: 401, text: async () => 'unauthorized' });
+      await expect(adapter.listarModelos('sk-oa-tenant')).rejects.toThrow(ServiceUnavailableException);
+    });
+
+    it('lanza ServiceUnavailableException si la petición falla', async () => {
+      fetchMock.mockRejectedValue(new Error('ECONNRESET'));
+      await expect(adapter.listarModelos('sk-oa-tenant')).rejects.toThrow(ServiceUnavailableException);
+    });
   });
 });

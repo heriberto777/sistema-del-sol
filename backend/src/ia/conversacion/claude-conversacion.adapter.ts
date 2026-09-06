@@ -1,5 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { ConversacionIaAdapter, MensajeConversacion, OpcionesConversacionIa } from './conversacion-ia.interface';
+import { ModeloIa } from '../analizador-imagen/analizador-imagen.interface';
 
 /**
  * Anthropic Messages API — misma llamada que ya usaba
@@ -40,5 +41,26 @@ export class ClaudeConversacionAdapter implements ConversacionIaAdapter {
       this.logger.error('Fallo al llamar a la API de Anthropic (conversación)', error as Error);
       return null;
     }
+  }
+
+  async listarModelos(apiKey: string): Promise<ModeloIa[]> {
+    let respuesta: Response;
+    try {
+      respuesta = await fetch('https://api.anthropic.com/v1/models?limit=100', {
+        headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+      });
+    } catch (error) {
+      this.logger.error('Fallo al listar modelos de Anthropic', error as Error);
+      throw new ServiceUnavailableException('No se pudo contactar a Claude para listar los modelos');
+    }
+
+    if (!respuesta.ok) {
+      const detalle = await respuesta.text();
+      this.logger.error(`Anthropic respondió ${respuesta.status} al listar modelos: ${detalle}`);
+      throw new ServiceUnavailableException('Claude no pudo devolver la lista de modelos — revisa la API key');
+    }
+
+    const cuerpo = (await respuesta.json()) as { data?: { id: string; display_name?: string }[] };
+    return (cuerpo.data ?? []).map((m) => ({ id: m.id, nombre: m.display_name || m.id }));
   }
 }

@@ -1,11 +1,18 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Sparkles } from 'lucide-react';
 import { apiClient } from '../../../lib/api-client';
 import { Card } from '../../atoms/Card/Card';
 import { Button } from '../../atoms/Button/Button';
 import { Badge } from '../../atoms/Badge/Badge';
 import { FormField } from '../../molecules/FormField/FormField';
+import { SelectorModeloIa, ModeloIa } from '../../molecules/SelectorModeloIa/SelectorModeloIa';
 import { mensajeErrorApi } from '../../../lib/mensaje-error-api';
+
+/** "Cargar modelos" del bot usa la API key YA GUARDADA de este tenant — ver SelectorModeloIa/WhatsappConfigService.listarModelos. */
+async function cargarModelosWhatsapp(proveedor: string): Promise<ModeloIa[]> {
+  return (await apiClient.get<{ modelos: ModeloIa[] }>('/admin/whatsapp-config/modelos', { params: { proveedor } })).data.modelos;
+}
 
 const NOMBRES_PROVEEDOR_IA: Record<string, string> = {
   ANTHROPIC: 'Claude (Anthropic)',
@@ -49,6 +56,7 @@ export function WhatsappConfigPanel() {
   const [iaPromptNegocio, setIaPromptNegocio] = useState('');
   const [limiteRespuestasDiarias, setLimiteRespuestasDiarias] = useState('50');
   const [error, setError] = useState<string | null>(null);
+  const [errorSugerencia, setErrorSugerencia] = useState<string | null>(null);
 
   const { data: config } = useQuery({
     queryKey: ['whatsapp-config'],
@@ -87,6 +95,19 @@ export function WhatsappConfigPanel() {
       queryClient.invalidateQueries({ queryKey: ['whatsapp-config'] });
     },
     onError: (err) => setError(mensajeErrorApi(err, 'No se pudo guardar la configuración.')),
+  });
+
+  // Borrador a partir de datos reales del negocio (nombre, categorías/
+  // productos ya cargados) — solo llena el textarea, nunca guarda solo
+  // (el admin revisa y recién ahí toca "Guardar"). Requiere que el
+  // proveedor de IA de arriba ya esté configurado y guardado.
+  const sugerirComportamiento = useMutation({
+    mutationFn: async () => (await apiClient.post<{ texto: string }>('/admin/whatsapp-config/sugerir-comportamiento')).data,
+    onSuccess: (data) => {
+      setErrorSugerencia(null);
+      setIaPromptNegocio(data.texto);
+    },
+    onError: (err) => setErrorSugerencia(mensajeErrorApi(err, 'No se pudo generar una sugerencia — probá de nuevo.')),
   });
 
   return (
@@ -143,11 +164,12 @@ export function WhatsappConfigPanel() {
               <option value="GEMINI">Google Gemini</option>
             </select>
           </div>
-          <FormField
-            id="whatsapp-ia-modelo"
+          <SelectorModeloIa
+            proveedor={iaProveedor}
             label="Modelo"
             value={iaModelo}
-            onChange={(e) => setIaModelo(e.target.value)}
+            onChange={setIaModelo}
+            cargarModelos={cargarModelosWhatsapp}
             disabled={!iaProveedor}
           />
           <FormField
@@ -172,9 +194,24 @@ export function WhatsappConfigPanel() {
         <div className="space-y-3 border-t border-slate-200 pt-3 dark:border-slate-800">
           <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Comportamiento del bot</p>
           <div className="flex flex-col gap-1">
-            <label htmlFor="whatsapp-prompt-negocio" className="text-sm font-medium text-slate-700 dark:text-slate-300">
-              Información del negocio (horario, dirección, tono)
-            </label>
+            <div className="flex items-center justify-between gap-2">
+              <label htmlFor="whatsapp-prompt-negocio" className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                Información del negocio (horario, dirección, tono)
+              </label>
+              <Button
+                type="button"
+                variante="secundario"
+                onClick={() => {
+                  setErrorSugerencia(null);
+                  sugerirComportamiento.mutate();
+                }}
+                disabled={!iaProveedor || !config?.iaApiKeyConfigurado || sugerirComportamiento.isPending}
+                className="flex shrink-0 items-center gap-1.5"
+              >
+                <Sparkles size={14} />
+                {sugerirComportamiento.isPending ? 'Generando…' : 'Sugerir con IA'}
+              </Button>
+            </div>
             <textarea
               id="whatsapp-prompt-negocio"
               value={iaPromptNegocio}
@@ -183,6 +220,10 @@ export function WhatsappConfigPanel() {
               placeholder="Ej: Horario L-V 9am-5pm, sábados 9am-1pm. Dirección: Av. Principal #123. Tono cercano y breve."
               className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
             />
+            {errorSugerencia && <p className="text-xs text-red-600 dark:text-red-400">{errorSugerencia}</p>}
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              "Sugerir con IA" arma un borrador con el nombre de tu tienda y tus productos/categorías ya cargados — revisalo y ajustalo antes de guardar. Requiere un proveedor de IA ya configurado arriba.
+            </p>
             <p className="text-xs text-slate-500 dark:text-slate-400">
               El bot nunca inventa datos de facturas o pedidos — si le preguntan eso, deriva a un representante.
             </p>

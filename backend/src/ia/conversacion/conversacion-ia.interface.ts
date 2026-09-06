@@ -1,3 +1,5 @@
+import { ModeloIa } from '../analizador-imagen/analizador-imagen.interface';
+
 export interface MensajeConversacion {
   role: 'user' | 'assistant';
   content: string;
@@ -17,4 +19,6 @@ export interface ConversacionIaAdapter {
   readonly clave: string;
   /** `null` en cualquier falla (key inválida, proveedor caído, respuesta vacía) — nunca lanza, el bot cae a su heurística sin IA. */
   completar(mensajes: MensajeConversacion[], opciones: OpcionesConversacionIa): Promise<string | null>;
+  /** Lista real de modelos disponibles para esta key — mismo criterio que AnalizadorImagenAdapter.listarModelos, pero acá la key la recibe como parámetro (viene del tenant en cada llamada), nunca de `process.env`. */
+  listarModelos(apiKey: string): Promise<ModeloIa[]>;
 }

@@ -1,6 +1,7 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ServiceUnavailableException } from '@nestjs/common';
 import { WhatsappConfigService } from './whatsapp-config.service';
 import { WhatsappConfigRepository } from './whatsapp-config.repository';
+import { ConversacionIaService } from '../ia/conversacion/conversacion-ia.service';
 import { cifrar } from '../common/utils/encriptado.util';
 
 const CONFIG_VACIA = {
@@ -23,6 +24,7 @@ const CONFIG_VACIA = {
 describe('WhatsappConfigService', () => {
   let service: WhatsappConfigService;
   let repo: jest.Mocked<WhatsappConfigRepository>;
+  let conversacionIaService: jest.Mocked<ConversacionIaService>;
   const ENV_ORIGINAL = { ...process.env };
 
   beforeEach(() => {
@@ -30,8 +32,13 @@ describe('WhatsappConfigService', () => {
     repo = {
       obtenerOCrear: jest.fn().mockResolvedValue(CONFIG_VACIA),
       actualizar: jest.fn(),
+      obtenerContextoNegocio: jest.fn().mockResolvedValue({ nombre: 'Emelinda dCloset', direccion: null, categorias: [], productos: [] }),
     } as unknown as jest.Mocked<WhatsappConfigRepository>;
-    service = new WhatsappConfigService(repo);
+    conversacionIaService = {
+      listarModelos: jest.fn().mockResolvedValue([{ id: 'claude-sonnet-5', nombre: 'Claude Sonnet 5' }]),
+      completar: jest.fn().mockResolvedValue('Somos una tienda de ropa…'),
+    } as unknown as jest.Mocked<ConversacionIaService>;
+    service = new WhatsappConfigService(repo, conversacionIaService);
   });
 
   afterEach(() => {
@@ -114,6 +121,61 @@ describe('WhatsappConfigService', () => {
 
       expect(repo.obtenerOCrear).toHaveBeenCalledWith('t2');
       expect(repo.actualizar).toHaveBeenCalledWith('w-tenant-2', expect.objectContaining({ habilitado: true }));
+    });
+  });
+
+  describe('listarModelos', () => {
+    it('rechaza con 400 si el tenant todavía no guardó una API key', async () => {
+      await expect(service.listarModelos('t1', 'ANTHROPIC')).rejects.toThrow(BadRequestException);
+      expect(conversacionIaService.listarModelos).not.toHaveBeenCalled();
+    });
+
+    it('descifra la key ya guardada y se la pasa al proveedor elegido', async () => {
+      repo.obtenerOCrear.mockResolvedValue({ ...CONFIG_VACIA, iaApiKeyCifrado: cifrar('sk-ant-real') } as never);
+
+      const resultado = await service.listarModelos('t1', 'ANTHROPIC');
+
+      expect(resultado).toEqual([{ id: 'claude-sonnet-5', nombre: 'Claude Sonnet 5' }]);
+      expect(conversacionIaService.listarModelos).toHaveBeenCalledWith('ANTHROPIC', 'sk-ant-real');
+    });
+  });
+
+  describe('sugerirComportamiento', () => {
+    it('rechaza con 400 si falta proveedor o API key configurados', async () => {
+      await expect(service.sugerirComportamiento('t1')).rejects.toThrow(BadRequestException);
+      expect(conversacionIaService.completar).not.toHaveBeenCalled();
+    });
+
+    it('arma el prompt con el contexto real del negocio y devuelve el texto generado', async () => {
+      repo.obtenerOCrear.mockResolvedValue({
+        ...CONFIG_VACIA,
+        iaProveedor: 'ANTHROPIC',
+        iaModelo: 'claude-sonnet-5',
+        iaApiKeyCifrado: cifrar('sk-ant-real'),
+      } as never);
+      repo.obtenerContextoNegocio.mockResolvedValue({
+        nombre: "Emelinda d'Closet",
+        direccion: 'Av. Principal #123',
+        categorias: ['Ropa', 'Zapatos'],
+        productos: ['Camisa azul', 'Zapato deportivo'],
+      });
+
+      const resultado = await service.sugerirComportamiento('t1');
+
+      expect(resultado).toEqual({ texto: 'Somos una tienda de ropa…' });
+      const [proveedor, mensajes, opciones] = conversacionIaService.completar.mock.calls[0];
+      expect(proveedor).toBe('ANTHROPIC');
+      expect(mensajes[0].content).toContain("Emelinda d'Closet");
+      expect(mensajes[0].content).toContain('Av. Principal #123');
+      expect(mensajes[0].content).toContain('Ropa, Zapatos');
+      expect(opciones).toEqual(expect.objectContaining({ apiKey: 'sk-ant-real', modelo: 'claude-sonnet-5' }));
+    });
+
+    it('lanza ServiceUnavailableException si la IA no devuelve texto', async () => {
+      repo.obtenerOCrear.mockResolvedValue({ ...CONFIG_VACIA, iaProveedor: 'ANTHROPIC', iaApiKeyCifrado: cifrar('sk-ant-real') } as never);
+      conversacionIaService.completar.mockResolvedValue(null);
+
+      await expect(service.sugerirComportamiento('t1')).rejects.toThrow(ServiceUnavailableException);
     });
   });
 });

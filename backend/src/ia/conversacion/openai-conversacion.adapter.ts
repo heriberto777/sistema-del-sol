@@ -1,5 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { ConversacionIaAdapter, MensajeConversacion, OpcionesConversacionIa } from './conversacion-ia.interface';
+import { ModeloIa } from '../analizador-imagen/analizador-imagen.interface';
 
 /**
  * Chat Completions API de OpenAI — a diferencia de Anthropic, el prompt
@@ -34,5 +35,31 @@ export class OpenAiConversacionAdapter implements ConversacionIaAdapter {
       this.logger.error('Fallo al llamar a la API de OpenAI (conversación)', error as Error);
       return null;
     }
+  }
+
+  /** Mismo filtro heurístico que OpenAiVisionAdapter.listarModelos — GET /v1/models no distingue familias de chat del resto del catálogo. */
+  async listarModelos(apiKey: string): Promise<ModeloIa[]> {
+    let respuesta: Response;
+    try {
+      respuesta = await fetch('https://api.openai.com/v1/models', {
+        headers: { Authorization: `Bearer ${apiKey}` },
+      });
+    } catch (error) {
+      this.logger.error('Fallo al listar modelos de OpenAI', error as Error);
+      throw new ServiceUnavailableException('No se pudo contactar a OpenAI para listar los modelos');
+    }
+
+    if (!respuesta.ok) {
+      const detalle = await respuesta.text();
+      this.logger.error(`OpenAI respondió ${respuesta.status} al listar modelos: ${detalle}`);
+      throw new ServiceUnavailableException('OpenAI no pudo devolver la lista de modelos — revisa la API key');
+    }
+
+    const cuerpo = (await respuesta.json()) as { data?: { id: string }[] };
+    const ids = (cuerpo.data ?? [])
+      .map((m) => m.id)
+      .filter((id) => /^(gpt-4|gpt-5|chatgpt|o1|o3|o4)/.test(id) && !/(audio|realtime|transcribe|tts|instruct|search|embedding)/.test(id))
+      .sort();
+    return ids.map((id) => ({ id, nombre: id }));
   }
 }

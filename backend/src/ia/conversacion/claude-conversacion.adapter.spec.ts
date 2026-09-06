@@ -1,3 +1,4 @@
+import { ServiceUnavailableException } from '@nestjs/common';
 import { ClaudeConversacionAdapter } from './claude-conversacion.adapter';
 
 describe('ClaudeConversacionAdapter', () => {
@@ -60,5 +61,34 @@ describe('ClaudeConversacionAdapter', () => {
     fetchMock.mockRejectedValue(new Error('ECONNRESET'));
     const resultado = await adapter.completar([{ role: 'user', content: 'hola' }], { apiKey: 'sk-ant-tenant' });
     expect(resultado).toBeNull();
+  });
+
+  describe('listarModelos', () => {
+    it('consulta GET /v1/models con la apiKey del tenant y devuelve id + display_name', async () => {
+      fetchMock.mockResolvedValue({
+        ok: true,
+        json: async () => ({ data: [{ id: 'claude-sonnet-5', display_name: 'Claude Sonnet 5' }, { id: 'claude-haiku-4-5' }] }),
+      });
+
+      const resultado = await adapter.listarModelos('sk-ant-tenant');
+
+      expect(resultado).toEqual([
+        { id: 'claude-sonnet-5', nombre: 'Claude Sonnet 5' },
+        { id: 'claude-haiku-4-5', nombre: 'claude-haiku-4-5' },
+      ]);
+      const [url, opciones] = fetchMock.mock.calls[0];
+      expect(url).toBe('https://api.anthropic.com/v1/models?limit=100');
+      expect(opciones.headers['x-api-key']).toBe('sk-ant-tenant');
+    });
+
+    it('lanza ServiceUnavailableException si Anthropic responde con error', async () => {
+      fetchMock.mockResolvedValue({ ok: false, status: 401, text: async () => 'unauthorized' });
+      await expect(adapter.listarModelos('sk-ant-tenant')).rejects.toThrow(ServiceUnavailableException);
+    });
+
+    it('lanza ServiceUnavailableException si la petición falla', async () => {
+      fetchMock.mockRejectedValue(new Error('ECONNRESET'));
+      await expect(adapter.listarModelos('sk-ant-tenant')).rejects.toThrow(ServiceUnavailableException);
+    });
   });
 });

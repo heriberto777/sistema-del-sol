@@ -1,8 +1,9 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { ClaudeConversacionAdapter } from './claude-conversacion.adapter';
 import { OpenAiConversacionAdapter } from './openai-conversacion.adapter';
 import { GeminiConversacionAdapter } from './gemini-conversacion.adapter';
 import { ConversacionIaAdapter, MensajeConversacion, OpcionesConversacionIa } from './conversacion-ia.interface';
+import { ModeloIa } from '../analizador-imagen/analizador-imagen.interface';
 
 /**
  * Resuelve qué proveedor usar para el bot de WhatsApp de un tenant
@@ -27,5 +28,12 @@ export class ConversacionIaService {
   async completar(proveedor: string | null | undefined, mensajes: MensajeConversacion[], opciones: OpcionesConversacionIa): Promise<string | null> {
     const adapter = (proveedor && this.adaptadores[proveedor]) || this.claudeAdapter;
     return adapter.completar(mensajes, opciones);
+  }
+
+  /** Lista de modelos reales de UN proveedor puntual, usando la API key ya guardada de ESE tenant — para el selector de WhatsappConfigPanel. */
+  async listarModelos(proveedor: string, apiKey: string): Promise<ModeloIa[]> {
+    const adapter = this.adaptadores[proveedor];
+    if (!adapter) throw new BadRequestException(`Proveedor "${proveedor}" no reconocido`);
+    return adapter.listarModelos(apiKey);
   }
 }

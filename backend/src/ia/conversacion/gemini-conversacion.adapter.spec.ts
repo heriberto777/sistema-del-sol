@@ -1,3 +1,4 @@
+import { ServiceUnavailableException } from '@nestjs/common';
 import { GeminiConversacionAdapter } from './gemini-conversacion.adapter';
 
 describe('GeminiConversacionAdapter', () => {
@@ -62,5 +63,35 @@ describe('GeminiConversacionAdapter', () => {
     fetchMock.mockRejectedValue(new Error('ECONNRESET'));
     const resultado = await adapter.completar([{ role: 'user', content: 'hola' }], { apiKey: 'gm-tenant' });
     expect(resultado).toBeNull();
+  });
+
+  describe('listarModelos', () => {
+    it('filtra a los que soportan generateContent y saca el prefijo "models/"', async () => {
+      fetchMock.mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          models: [
+            { name: 'models/gemini-2.0-flash', displayName: 'Gemini 2.0 Flash', supportedGenerationMethods: ['generateContent'] },
+            { name: 'models/embedding-001', supportedGenerationMethods: ['embedContent'] },
+          ],
+        }),
+      });
+
+      const resultado = await adapter.listarModelos('gm-tenant');
+
+      expect(resultado).toEqual([{ id: 'gemini-2.0-flash', nombre: 'Gemini 2.0 Flash' }]);
+      const [url] = fetchMock.mock.calls[0];
+      expect(url).toBe('https://generativelanguage.googleapis.com/v1beta/models?key=gm-tenant');
+    });
+
+    it('lanza ServiceUnavailableException si Gemini responde con error', async () => {
+      fetchMock.mockResolvedValue({ ok: false, status: 401, text: async () => 'unauthorized' });
+      await expect(adapter.listarModelos('gm-tenant')).rejects.toThrow(ServiceUnavailableException);
+    });
+
+    it('lanza ServiceUnavailableException si la petición falla', async () => {
+      fetchMock.mockRejectedValue(new Error('ECONNRESET'));
+      await expect(adapter.listarModelos('gm-tenant')).rejects.toThrow(ServiceUnavailableException);
+    });
   });
 });

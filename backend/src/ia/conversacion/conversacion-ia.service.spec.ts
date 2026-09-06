@@ -1,3 +1,4 @@
+import { BadRequestException } from '@nestjs/common';
 import { ConversacionIaService } from './conversacion-ia.service';
 import { ClaudeConversacionAdapter } from './claude-conversacion.adapter';
 import { OpenAiConversacionAdapter } from './openai-conversacion.adapter';
@@ -10,9 +11,21 @@ describe('ConversacionIaService', () => {
   let geminiAdapter: jest.Mocked<GeminiConversacionAdapter>;
 
   beforeEach(() => {
-    claudeAdapter = { clave: 'ANTHROPIC', completar: jest.fn().mockResolvedValue('respuesta-claude') } as unknown as jest.Mocked<ClaudeConversacionAdapter>;
-    openAiAdapter = { clave: 'OPENAI', completar: jest.fn().mockResolvedValue('respuesta-openai') } as unknown as jest.Mocked<OpenAiConversacionAdapter>;
-    geminiAdapter = { clave: 'GEMINI', completar: jest.fn().mockResolvedValue('respuesta-gemini') } as unknown as jest.Mocked<GeminiConversacionAdapter>;
+    claudeAdapter = {
+      clave: 'ANTHROPIC',
+      completar: jest.fn().mockResolvedValue('respuesta-claude'),
+      listarModelos: jest.fn().mockResolvedValue([{ id: 'claude-sonnet-5', nombre: 'Claude Sonnet 5' }]),
+    } as unknown as jest.Mocked<ClaudeConversacionAdapter>;
+    openAiAdapter = {
+      clave: 'OPENAI',
+      completar: jest.fn().mockResolvedValue('respuesta-openai'),
+      listarModelos: jest.fn().mockResolvedValue([{ id: 'gpt-4o', nombre: 'gpt-4o' }]),
+    } as unknown as jest.Mocked<OpenAiConversacionAdapter>;
+    geminiAdapter = {
+      clave: 'GEMINI',
+      completar: jest.fn().mockResolvedValue('respuesta-gemini'),
+      listarModelos: jest.fn().mockResolvedValue([{ id: 'gemini-2.0-flash', nombre: 'Gemini 2.0 Flash' }]),
+    } as unknown as jest.Mocked<GeminiConversacionAdapter>;
     service = new ConversacionIaService(claudeAdapter, openAiAdapter, geminiAdapter);
   });
 
@@ -39,5 +52,18 @@ describe('ConversacionIaService', () => {
     const resultado = await service.completar('VERCEL', [{ role: 'user', content: 'hola' }], { apiKey: 'x' });
     expect(resultado).toBe('respuesta-claude');
     expect(claudeAdapter.completar).toHaveBeenCalled();
+  });
+
+  describe('listarModelos', () => {
+    it('resuelve el adaptador según el proveedor y le pasa la apiKey', async () => {
+      const resultado = await service.listarModelos('OPENAI', 'sk-oa-1');
+      expect(resultado).toEqual([{ id: 'gpt-4o', nombre: 'gpt-4o' }]);
+      expect(openAiAdapter.listarModelos).toHaveBeenCalledWith('sk-oa-1');
+      expect(claudeAdapter.listarModelos).not.toHaveBeenCalled();
+    });
+
+    it('lanza BadRequestException si el proveedor no se reconoce', async () => {
+      await expect(service.listarModelos('VERCEL', 'x')).rejects.toThrow(BadRequestException);
+    });
   });
 });

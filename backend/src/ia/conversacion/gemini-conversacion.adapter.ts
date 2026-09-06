@@ -1,5 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { ConversacionIaAdapter, MensajeConversacion, OpcionesConversacionIa } from './conversacion-ia.interface';
+import { ModeloIa } from '../analizador-imagen/analizador-imagen.interface';
 
 /**
  * Generative Language API de Google — dos diferencias con Anthropic/
@@ -35,5 +36,28 @@ export class GeminiConversacionAdapter implements ConversacionIaAdapter {
       this.logger.error('Fallo al llamar a la API de Gemini (conversación)', error as Error);
       return null;
     }
+  }
+
+  async listarModelos(apiKey: string): Promise<ModeloIa[]> {
+    let respuesta: Response;
+    try {
+      respuesta = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+    } catch (error) {
+      this.logger.error('Fallo al listar modelos de Gemini', error as Error);
+      throw new ServiceUnavailableException('No se pudo contactar a Gemini para listar los modelos');
+    }
+
+    if (!respuesta.ok) {
+      const detalle = await respuesta.text();
+      this.logger.error(`Gemini respondió ${respuesta.status} al listar modelos: ${detalle}`);
+      throw new ServiceUnavailableException('Gemini no pudo devolver la lista de modelos — revisa la API key');
+    }
+
+    const cuerpo = (await respuesta.json()) as {
+      models?: { name: string; displayName?: string; supportedGenerationMethods?: string[] }[];
+    };
+    return (cuerpo.models ?? [])
+      .filter((m) => m.supportedGenerationMethods?.includes('generateContent'))
+      .map((m) => ({ id: m.name.replace(/^models\//, ''), nombre: m.displayName || m.name }));
   }
 }
