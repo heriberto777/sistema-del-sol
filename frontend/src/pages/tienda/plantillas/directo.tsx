@@ -12,11 +12,21 @@ import { ProductosRelacionados } from '../ProductosRelacionados';
 import { FilaPrecioOferta } from '../OfertaEnTarjeta';
 import { EtiquetaSinExistenciaVariante } from '../InsigniaSinStock';
 import { ToggleTemaTienda } from '../ToggleTemaTienda';
+import { useTiendaTema } from '../TiendaTemaContext';
 import type { Plantilla, PropsCarrito, PropsHome, PropsProducto } from './tipos';
 
 const ACCENT_DEFAULT = '#c77d2e';
 const FONT_DISPLAY = "'Manrope', sans-serif";
 const FONT_BODY = "'Karla', sans-serif";
+// Directo/Mercado nunca llaman a `variablesCssTema()` (no usan CSS vars,
+// pintan con hex fijo) — los componentes compartidos (SeccionDestacados/
+// SeccionOfertas/SeccionesDinamicas/ProductosRelacionados) por eso reciben
+// `defaults` explícito acá, calculado según el modo, en vez de depender
+// del fallback genérico de esos componentes (pensado solo para modo claro
+// — bug real: card oscura + precio en el fallback fijo #111827, invisible).
+function defaultsCompartidos(accent: string, modo: 'claro' | 'oscuro') {
+  return modo === 'oscuro' ? { acento: accent, superficie: '#1f1b15', texto: '#f1ece2' } : { acento: accent, superficie: '#ffffff', texto: '#1c1a17' };
+}
 
 function Nav({ nombre, logo, subdominio, cantidadCarrito, accent }: { nombre: string; logo: string | null; subdominio: string; cantidadCarrito: number; accent: string }) {
   const { autenticado } = useClienteTienda(subdominio);
@@ -52,7 +62,7 @@ function Nav({ nombre, logo, subdominio, cantidadCarrito, accent }: { nombre: st
 
 function Footer({ nombre }: { nombre: string }) {
   return (
-    <div className="flex justify-between border-t border-[#eae3d6] px-6 py-6 text-xs text-[#7a7266] dark:border-[#332c22] sm:px-10">
+    <div className="flex justify-between border-t border-[#eae3d6] px-6 py-6 text-xs text-[#7a7266] dark:border-[#332c22] dark:text-[#b6ab97] sm:px-10">
       <span>© {nombre}</span>
       <span>Powered by Sistema del Sol</span>
     </div>
@@ -61,6 +71,8 @@ function Footer({ nombre }: { nombre: string }) {
 
 function DirectoHome({ config, subdominio, carrito }: PropsHome) {
   const accent = config.colorAcento || ACCENT_DEFAULT;
+  const { modo } = useTiendaTema();
+  const defaults = defaultsCompartidos(accent, modo);
   const { data: destacados = [] } = useProductosDestacados(subdominio);
   const { data: ofertas = [] } = useOfertasTienda(subdominio);
   const { data: secciones = [] } = useSeccionesTienda(subdominio);
@@ -79,9 +91,9 @@ function DirectoHome({ config, subdominio, carrito }: PropsHome) {
         <p className="text-sm leading-relaxed text-[#7a7266] dark:text-[#b6ab97]">Todo el surtido, con precio y disponibilidad reales.</p>
       </div>
 
-      <SeccionDestacados productos={destacados} subdominio={subdominio} estiloInsignia={config.tema.estiloInsigniaOferta} estiloInsigniaSinStock={config.tema.estiloInsigniaSinStock} />
-      <SeccionOfertas ofertas={ofertas} mostrar={config.tema.mostrarSeccionOfertas} />
-      <SeccionesDinamicas secciones={secciones} subdominio={subdominio} estiloInsignia={config.tema.estiloInsigniaOferta} estiloInsigniaSinStock={config.tema.estiloInsigniaSinStock} />
+      <SeccionDestacados productos={destacados} subdominio={subdominio} defaults={defaults} estiloInsignia={config.tema.estiloInsigniaOferta} estiloInsigniaSinStock={config.tema.estiloInsigniaSinStock} />
+      <SeccionOfertas ofertas={ofertas} defaults={defaults} mostrar={config.tema.mostrarSeccionOfertas} />
+      <SeccionesDinamicas secciones={secciones} subdominio={subdominio} defaults={defaults} estiloInsignia={config.tema.estiloInsigniaOferta} estiloInsigniaSinStock={config.tema.estiloInsigniaSinStock} />
 
       <Footer nombre={config.nombre} />
     </div>
@@ -90,6 +102,8 @@ function DirectoHome({ config, subdominio, carrito }: PropsHome) {
 
 function DirectoProducto({ config, subdominio, carrito, producto, varianteSeleccionada, onSeleccionarVariante, cantidad, onCantidadChange, onAgregar }: PropsProducto) {
   const accent = config.colorAcento || ACCENT_DEFAULT;
+  const { modo } = useTiendaTema();
+  const defaults = defaultsCompartidos(accent, modo);
   const debeElegirVariante = producto.variantes.length > 1;
   const galeria = [producto.imagen, ...producto.imagenesAdicionales].filter((img): img is string => !!img);
   const [imagenActiva, setImagenActiva] = useState(galeria[0] ?? null);
@@ -118,7 +132,7 @@ function DirectoProducto({ config, subdominio, carrito, producto, varianteSelecc
           )}
         </div>
         <div>
-          {producto.categoria && <div className="text-xs font-bold uppercase tracking-wide text-[#7a7266]">{producto.categoria.nombre}</div>}
+          {producto.categoria && <div className="text-xs font-bold uppercase tracking-wide text-[#7a7266] dark:text-[#b6ab97]">{producto.categoria.nombre}</div>}
           <h1 className="my-2 text-2xl font-extrabold" style={{ fontFamily: FONT_DISPLAY }}>
             {producto.nombre}
           </h1>
@@ -148,7 +162,7 @@ function DirectoProducto({ config, subdominio, carrito, producto, varianteSelecc
                     <span>{v.etiqueta || '(sin atributos)'}</span>
                     {v.stock !== null &&
                       (v.stock > 0 ? (
-                        <span className="text-xs text-[#7a7266]">{v.stock} disponibles</span>
+                        <span className="text-xs text-[#7a7266] dark:text-[#b6ab97]">{v.stock} disponibles</span>
                       ) : (
                         <EtiquetaSinExistenciaVariante estilo={config.tema.estiloInsigniaSinStock} />
                       ))}
@@ -162,7 +176,7 @@ function DirectoProducto({ config, subdominio, carrito, producto, varianteSelecc
           )}
 
           {varianteSeleccionada && varianteSeleccionada.stock !== null && (
-            <p className="mb-6 text-sm text-[#7a7266]">
+            <p className="mb-6 text-sm text-[#7a7266] dark:text-[#b6ab97]">
               {varianteSeleccionada.stock > 0 ? `${varianteSeleccionada.stock} disponibles` : <EtiquetaSinExistenciaVariante estilo={config.tema.estiloInsigniaSinStock} />}
             </p>
           )}
@@ -186,7 +200,7 @@ function DirectoProducto({ config, subdominio, carrito, producto, varianteSelecc
           </button>
         </div>
       </div>
-      <ProductosRelacionados productos={producto.relacionados} subdominio={subdominio} estiloInsignia={config.tema.estiloInsigniaOferta} estiloInsigniaSinStock={config.tema.estiloInsigniaSinStock} />
+      <ProductosRelacionados productos={producto.relacionados} subdominio={subdominio} defaults={defaults} estiloInsignia={config.tema.estiloInsigniaOferta} estiloInsigniaSinStock={config.tema.estiloInsigniaSinStock} />
       <Footer nombre={config.nombre} />
     </div>
   );
@@ -201,7 +215,7 @@ function DirectoCarrito({ config, subdominio, carrito }: PropsCarrito) {
         <h1 className="mb-6 text-2xl font-extrabold" style={{ fontFamily: FONT_DISPLAY }}>
           Tu carrito
         </h1>
-        {carrito.items.length === 0 && <p className="text-sm text-[#7a7266]">Tu carrito está vacío.</p>}
+        {carrito.items.length === 0 && <p className="text-sm text-[#7a7266] dark:text-[#b6ab97]">Tu carrito está vacío.</p>}
         <div className="flex flex-col gap-4">
           {carrito.items.map((item) => (
             <div key={item.varianteId} className="flex items-center gap-4 rounded-xl border border-[#eae3d6] bg-white p-3 dark:border-[#332c22] dark:bg-[#1f1b15]">
@@ -210,8 +224,8 @@ function DirectoCarrito({ config, subdominio, carrito }: PropsCarrito) {
               </div>
               <div className="flex-1">
                 <p className="text-sm font-semibold">{item.nombre}</p>
-                {item.varianteEtiqueta && <p className="text-xs text-[#7a7266]">{item.varianteEtiqueta}</p>}
-                <p className="text-xs text-[#7a7266]">{formatearPrecio(item.precio)} c/u</p>
+                {item.varianteEtiqueta && <p className="text-xs text-[#7a7266] dark:text-[#b6ab97]">{item.varianteEtiqueta}</p>}
+                <p className="text-xs text-[#7a7266] dark:text-[#b6ab97]">{formatearPrecio(item.precio)} c/u</p>
               </div>
               <div className="flex items-center gap-2">
                 <button type="button" onClick={() => carrito.actualizarCantidad(item.varianteId, item.cantidad - 1)} className="flex h-7 w-7 items-center justify-center rounded-lg border border-[#eae3d6] dark:border-[#332c22]">
@@ -223,7 +237,7 @@ function DirectoCarrito({ config, subdominio, carrito }: PropsCarrito) {
                 </button>
               </div>
               <span className="w-20 text-right text-sm font-bold">{formatearPrecio(item.precio * item.cantidad)}</span>
-              <button type="button" onClick={() => carrito.quitar(item.varianteId)} className="text-[#7a7266] hover:text-red-600">
+              <button type="button" onClick={() => carrito.quitar(item.varianteId)} className="text-[#7a7266] hover:text-red-600 dark:text-[#b6ab97]">
                 <Trash2 size={16} />
               </button>
             </div>
