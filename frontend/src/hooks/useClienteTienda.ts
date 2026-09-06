@@ -89,12 +89,20 @@ export function useClienteTienda(subdominio: string) {
   );
 
   const cerrarSesion = useCallback(() => {
+    // Revoca el token del lado del servidor (auditoría de seguridad
+    // 2026-09-06 — antes solo se borraba acá, el JWT seguía siendo
+    // válido hasta sus 30 días). Best-effort: si falla (offline, token
+    // ya vencido), la sesión local se cierra igual — nunca bloqueamos
+    // ni mostramos error por esto.
+    if (token) {
+      tiendaApiClient.post(`/tienda/${subdominio}/auth/logout`, null, { headers: { Authorization: `Bearer ${token}` } }).catch(() => {});
+    }
     localStorage.removeItem(claveToken(subdominio));
     localStorage.removeItem(claveCliente(subdominio));
     notificarCambioSesion(subdominio);
     setToken(null);
     setCliente(null);
-  }, [subdominio]);
+  }, [subdominio, token]);
 
   const registro = useCallback(
     async (dto: { nombre: string; email: string; password: string; telefono?: string }) => {

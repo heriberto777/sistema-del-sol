@@ -2,6 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 
@@ -11,6 +12,14 @@ async function bootstrap() {
   // único que necesita el webhook de Stripe para verificar la firma
   // (exige el body crudo, no el ya parseado a objeto).
   const app = await NestFactory.create<NestExpressApplication>(AppModule, { rawBody: true });
+
+  // CSP desactivado a propósito: el ticket térmico (GET .../imprimir,
+  // `documento-ticket.ts`) es la única página HTML propia de esta API y
+  // usa <script>/<style> inline (`window.print()`) — el CSP por defecto
+  // de helmet los bloquearía. El resto de protecciones (X-Frame-Options,
+  // X-Content-Type-Options, Strict-Transport-Security, etc.) sí aplican
+  // normal; auditoría de seguridad 2026-09-06.
+  app.use(helmet({ contentSecurityPolicy: false }));
 
   // useBodyParser() ANTES de que Nest registre su parser default (eso
   // pasa recién al bindear el server, así que llegar primero alcanza

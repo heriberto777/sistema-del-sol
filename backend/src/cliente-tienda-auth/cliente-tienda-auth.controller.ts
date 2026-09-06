@@ -1,5 +1,7 @@
-import { Body, Controller, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Param, Patch, Post, Req, UseGuards } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
+import { ExtractJwt } from 'passport-jwt';
+import type { Request } from 'express';
 import { limiteLogin } from '../common/utils/limite-login.util';
 import { ApiTags } from '@nestjs/swagger';
 import { ClienteTiendaAuthService } from './cliente-tienda-auth.service';
@@ -38,5 +40,14 @@ export class ClienteTiendaAuthController {
     @Body() dto: CambiarPasswordClienteTiendaDto,
   ) {
     return this.clienteTiendaAuthService.cambiarPassword(subdominio, cliente, dto);
+  }
+
+  /** Revoca el token actual (auditoría de seguridad 2026-09-06) — ver ClienteTiendaAuthService.logout. */
+  @Post('logout')
+  @UseGuards(ClienteTiendaAuthGuard)
+  async logout(@Req() req: Request) {
+    const token = ExtractJwt.fromAuthHeaderAsBearerToken()(req);
+    if (token) await this.clienteTiendaAuthService.logout(token);
+    return { ok: true };
   }
 }

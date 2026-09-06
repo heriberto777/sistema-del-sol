@@ -14,6 +14,7 @@ describe('ClienteTiendaAuthService', () => {
     configuracion: { findMany: jest.Mock };
     cliente: { findFirst: jest.Mock; create: jest.Mock; findUniqueOrThrow: jest.Mock; update: jest.Mock };
   };
+  let redis: { client: { get: jest.Mock; set: jest.Mock } };
 
   beforeEach(() => {
     prisma = {
@@ -22,8 +23,9 @@ describe('ClienteTiendaAuthService', () => {
       configuracion: { findMany: jest.fn().mockResolvedValue([{ clave: 'TIENDA_ACTIVA', valor: 'true' }]) },
       cliente: { findFirst: jest.fn(), create: jest.fn(), findUniqueOrThrow: jest.fn(), update: jest.fn() },
     };
+    redis = { client: { get: jest.fn(), set: jest.fn() } };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    service = new ClienteTiendaAuthService(prisma as any, new JwtService());
+    service = new ClienteTiendaAuthService(prisma as any, new JwtService(), redis as any);
   });
 
   describe('registro', () => {
@@ -128,6 +130,29 @@ describe('ClienteTiendaAuthService', () => {
     it('rechaza si el token es de un tenant distinto al del subdominio pedido', async () => {
       await expect(service.cambiarPassword('demo', { ...CLIENTE, tenantId: 'otro-tenant' }, dto)).rejects.toThrow(UnauthorizedException);
       expect(prisma.cliente.findUniqueOrThrow).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('logout', () => {
+    it('guarda el token en Redis con el TTL que le queda hasta expirar (exp del propio JWT)', async () => {
+      const dentroDe10Min = Math.floor(Date.now() / 1000) + 600;
+      const payload = Buffer.from(JSON.stringify({ exp: dentroDe10Min })).toString('base64url');
+      const token = `header.${payload}.firma`;
+
+      await service.logout(token);
+
+      expect(redis.client.set).toHaveBeenCalledTimes(1);
+      const [clave, valor, modo, ttl] = redis.client.set.mock.calls[0];
+      expect(clave).toMatch(/^cliente-tienda-token-revocado:[0-9a-f]{64}$/);
+      expect(valor).toBe('1');
+      expect(modo).toBe('EX');
+      expect(ttl).toBeGreaterThan(590);
+      expect(ttl).toBeLessThanOrEqual(600);
+    });
+
+    it('no hace nada si el token no trae un exp parseable', async () => {
+      await service.logout('esto-no-es-un-jwt');
+      expect(redis.client.set).not.toHaveBeenCalled();
     });
   });
 });

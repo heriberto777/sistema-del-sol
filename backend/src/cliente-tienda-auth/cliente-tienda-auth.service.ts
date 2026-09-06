@@ -2,12 +2,14 @@ import { ConflictException, ForbiddenException, Injectable, UnauthorizedExceptio
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../prisma/prisma.service';
+import { RedisService } from '../redis/redis.service';
 import { resolverTiendaPublica } from '../ecommerce/resolver-tienda-publica';
 import { ClienteTiendaPayload } from './cliente-tienda-authenticated-request';
 import { CLIENTE_TIENDA_JWT_EXPIRATION, CLIENTE_TIENDA_JWT_SECRET } from './cliente-tienda-jwt.constants';
 import { RegistroClienteTiendaDto } from './dto/registro-cliente-tienda.dto';
 import { LoginClienteTiendaDto } from './dto/login-cliente-tienda.dto';
 import { CambiarPasswordClienteTiendaDto } from './dto/cambiar-password-cliente-tienda.dto';
+import { claveTokenRevocado, segundosHastaExpirar } from './token-revocado.util';
 
 type ClienteBasico = { id: string; nombre: string; email: string | null; telefono: string | null; puntosLealtad: number };
 
@@ -29,6 +31,7 @@ export class ClienteTiendaAuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
+    private readonly redis: RedisService,
   ) {}
 
   async registro(subdominio: string, dto: RegistroClienteTiendaDto) {
@@ -85,6 +88,19 @@ export class ClienteTiendaAuthService {
     const passwordHash = await bcrypt.hash(dto.passwordNueva, 10);
     await this.prisma.cliente.update({ where: { id: cliente.id }, data: { passwordHash } });
     return { ok: true };
+  }
+
+  /**
+   * Revoca el token ACTUAL en Redis (auditoría de seguridad 2026-09-06 —
+   * antes "cerrar sesión" solo borraba el token del lado del navegador,
+   * el JWT seguía siendo válido en el servidor hasta sus 30 días). La
+   * entrada expira sola con el TTL que le queda al token — nunca crece
+   * sin límite en Redis.
+   */
+  async logout(tokenCrudo: string): Promise<void> {
+    const segundos = segundosHastaExpirar(tokenCrudo);
+    if (segundos === null) return; // token sin `exp` parseable — nada que revocar
+    await this.redis.client.set(claveTokenRevocado(tokenCrudo), '1', 'EX', segundos);
   }
 
   private emitirToken(cliente: ClienteBasico, tenantId: string) {
