@@ -107,7 +107,7 @@ export function TiendaProductos() {
             <button
               type="button"
               onClick={() => setCategoriaId(undefined)}
-              className="whitespace-nowrap rounded-full border px-3.5 py-1.5 text-xs font-semibold"
+              className={`whitespace-nowrap rounded-full border px-3.5 py-1.5 text-xs font-semibold ${!categoriaId ? '' : 'text-slate-700 dark:text-slate-300'}`}
               style={{
                 background: !categoriaId ? accent : 'transparent',
                 color: !categoriaId ? '#fff' : undefined,
@@ -121,7 +121,7 @@ export function TiendaProductos() {
                 key={c.id}
                 type="button"
                 onClick={() => setCategoriaId(c.id)}
-                className="whitespace-nowrap rounded-full border px-3.5 py-1.5 text-xs font-semibold"
+                className={`whitespace-nowrap rounded-full border px-3.5 py-1.5 text-xs font-semibold ${categoriaId === c.id ? '' : 'text-slate-700 dark:text-slate-300'}`}
                 style={{
                   background: categoriaId === c.id ? accent : 'transparent',
                   color: categoriaId === c.id ? '#fff' : undefined,
