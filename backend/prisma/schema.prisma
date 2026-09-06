@@ -3307,7 +3307,13 @@ model Webhook {
   tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   url       String
   eventos   String[]
-  secret    String
+  // DEPRECADO — texto plano legado (auditoría de seguridad 2026-09-06:
+  // era el único secreto de terceros de todo el sistema sin cifrar). Ya
+  // no se escribe, se mantiene solo por compatibilidad con filas viejas
+  // hasta correr `backfill-webhook-secrets` en cada entorno; recién ahí
+  // se puede sacar en una migración aparte.
+  secret    String?
+  secretCifrado String?
   activo    Boolean  @default(true)
   createdAt DateTime @default(now())
 

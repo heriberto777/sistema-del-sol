@@ -1,7 +1,10 @@
+process.env.ENCRYPTION_KEY ??= 'clave-de-prueba';
+
 import { BadRequestException } from '@nestjs/common';
 import { WebhooksService } from './webhooks.service';
 import { WebhooksRepository } from './webhooks.repository';
 import * as ssrfGuard from './ssrf-guard';
+import { cifrar } from '../common/utils/encriptado.util';
 
 jest.mock('./ssrf-guard');
 
@@ -10,7 +13,7 @@ describe('WebhooksService — reintento de entrega', () => {
   let repository: jest.Mocked<WebhooksRepository>;
   let fetchMock: jest.Mock;
 
-  const webhook = { id: 'w1', url: 'https://ejemplo.test/hook', secret: 'shh', eventos: ['factura.creada'] };
+  const webhook = { id: 'w1', url: 'https://ejemplo.test/hook', secret: null, secretCifrado: cifrar('shh'), eventos: ['factura.creada'] };
 
   beforeEach(() => {
     jest.useFakeTimers();
@@ -115,13 +118,17 @@ describe('WebhooksService — crear', () => {
     expect(repository.crear).not.toHaveBeenCalled();
   });
 
-  it('crea el webhook con un secret generado cuando la URL es válida', async () => {
+  it('crea el webhook con un secret generado, cifrado antes de guardar, y lo devuelve en claro SOLO en la respuesta', async () => {
     jest.spyOn(ssrfGuard, 'validarUrlWebhook').mockResolvedValue(undefined);
-    repository.crear.mockResolvedValue({ id: 'w1' } as never);
+    repository.crear.mockResolvedValue({ id: 'w1', url: 'https://example.com/hook', eventos: ['factura.creada'], activo: true, createdAt: new Date() } as never);
 
-    await service.crear({ url: 'https://example.com/hook', eventos: ['factura.creada'] }, 'tenant-1');
+    const resultado = await service.crear({ url: 'https://example.com/hook', eventos: ['factura.creada'] }, 'tenant-1');
 
-    expect(repository.crear).toHaveBeenCalledWith('https://example.com/hook', ['factura.creada'], expect.any(String), 'tenant-1');
+    const [, , secretGuardado] = repository.crear.mock.calls[0];
+    expect(secretGuardado).not.toBe(resultado.secret); // se guarda cifrado, no el valor en claro
+    expect(secretGuardado.split('.')).toHaveLength(3); // formato iv.authTag.cifrado de cifrar()
+    expect(resultado.secret).toMatch(/^[0-9a-f]{64}$/); // randomBytes(32).toString('hex')
+    expect(resultado).not.toHaveProperty('secretCifrado'); // nunca se expone la columna cifrada
   });
 });
 

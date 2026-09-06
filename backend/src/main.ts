@@ -39,19 +39,26 @@ async function bootstrap() {
   app.useGlobalFilters(new HttpExceptionFilter());
   app.setGlobalPrefix('api');
 
-  const swaggerConfig = new DocumentBuilder()
-    .setTitle('El Sistema del Sol')
-    .setDescription('API de la plataforma SaaS de facturación modular')
-    .setVersion('0.1.0')
-    .addBearerAuth()
-    .build();
-  const document = SwaggerModule.createDocument(app, swaggerConfig);
-  SwaggerModule.setup('api/docs', app, document);
+  // Nunca en producción — Swagger expone el 100% de la superficie de API
+  // (incluidas rutas de plataforma) sin ningún guard propio; auditoría de
+  // seguridad 2026-09-06. Si algún día hace falta verlo en producción, la
+  // forma correcta es un flag explícito aparte, no reactivarlo siempre.
+  const swaggerHabilitado = process.env.NODE_ENV !== 'production';
+  if (swaggerHabilitado) {
+    const swaggerConfig = new DocumentBuilder()
+      .setTitle('El Sistema del Sol')
+      .setDescription('API de la plataforma SaaS de facturación modular')
+      .setVersion('0.1.0')
+      .addBearerAuth()
+      .build();
+    const document = SwaggerModule.createDocument(app, swaggerConfig);
+    SwaggerModule.setup('api/docs', app, document);
+  }
 
   const port = process.env.BACKEND_PORT ?? 3000;
   await app.listen(port);
   console.log(`API corriendo en http://localhost:${port}/api`);
-  console.log(`Swagger en http://localhost:${port}/api/docs`);
+  if (swaggerHabilitado) console.log(`Swagger en http://localhost:${port}/api/docs`);
 }
 
 bootstrap();

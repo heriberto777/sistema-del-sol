@@ -8,6 +8,7 @@ import { CrearWebhookDto } from './dto/crear-webhook.dto';
 import { EVENTOS } from '../event-bus/events';
 import { ListadoQueryDto } from '../common/dto/listado-query.dto';
 import { paginar } from '../common/types/pagina-resultado';
+import { cifrar, descifrar } from '../common/utils/encriptado.util';
 
 const MAX_INTENTOS = 3;
 // Sin espera en el primer intento; backoff creciente en los reintentos.
@@ -33,8 +34,14 @@ export class WebhooksService {
     } catch (error) {
       throw new BadRequestException((error as Error).message || 'URL de webhook inválida');
     }
+    // El secreto se cifra antes de guardar (auditoría de seguridad
+    // 2026-09-06: era el único secreto de terceros del sistema en texto
+    // plano) — el valor real solo se devuelve ACÁ, en la respuesta de esta
+    // creación; nunca se vuelve a exponer (ver `listar()`, que ni siquiera
+    // selecciona la columna).
     const secret = randomBytes(32).toString('hex');
-    return this.webhooksRepository.crear(dto.url, dto.eventos, secret, tenantId);
+    const webhook = await this.webhooksRepository.crear(dto.url, dto.eventos, cifrar(secret), tenantId);
+    return { id: webhook.id, url: webhook.url, eventos: webhook.eventos, activo: webhook.activo, createdAt: webhook.createdAt, secret };
   }
 
   listar() {
@@ -58,8 +65,16 @@ export class WebhooksService {
 
     await Promise.all(
       webhooks.map(async (webhook) => {
+        // `secretCifrado` es la única fuente hoy — `secret` (texto plano)
+        // queda solo por compatibilidad con filas viejas sin migrar, ver
+        // comentario en schema.prisma.
+        const secretoPlano = webhook.secretCifrado ? descifrar(webhook.secretCifrado) : webhook.secret;
+        if (!secretoPlano) {
+          this.logger.error(`Webhook ${webhook.id} (${evento}) sin secreto configurado — no se puede firmar la entrega`);
+          return;
+        }
         const cuerpo = JSON.stringify({ evento, payload, timestamp: new Date().toISOString() });
-        const firma = createHmac('sha256', webhook.secret).update(cuerpo).digest('hex');
+        const firma = createHmac('sha256', secretoPlano).update(cuerpo).digest('hex');
 
         const { statusCode, exitoso, intentos } = await this.intentarEntrega(webhook, evento, cuerpo, firma);
         await this.webhooksRepository.registrarEntrega(webhook.id, evento, payload, statusCode, exitoso, intentos);

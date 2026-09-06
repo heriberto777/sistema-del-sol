@@ -13,12 +13,15 @@ export class WebhooksRepository {
     return this.tenantPrisma.client;
   }
 
-  crear(url: string, eventos: string[], secret: string, tenantId: string) {
-    return this.db.webhook.create({ data: { url, eventos, secret, tenantId } });
+  crear(url: string, eventos: string[], secretCifrado: string, tenantId: string) {
+    return this.db.webhook.create({ data: { url, eventos, secretCifrado, tenantId } });
   }
 
+  /** Nunca selecciona `secret`/`secretCifrado` — el secreto solo se revela una vez, en la respuesta de `crear()`. */
   listar() {
-    return this.db.webhook.findMany();
+    return this.db.webhook.findMany({
+      select: { id: true, url: true, eventos: true, activo: true, createdAt: true },
+    });
   }
 
   buscarPorId(id: string) {
