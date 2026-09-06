@@ -26,7 +26,12 @@ const MENSAJE_ENTRANTE = { id: 'm1', tenantId: 't1', telefono: 'whatsapp:+180955
 
 describe('WhatsappBotService', () => {
   let service: WhatsappBotService;
-  let prisma: { whatsappConfigTenant: { findUnique: jest.Mock }; whatsappMensaje: { update: jest.Mock }; producto: { findMany: jest.Mock } };
+  let prisma: {
+    whatsappConfigTenant: { findUnique: jest.Mock };
+    whatsappMensaje: { update: jest.Mock };
+    producto: { findMany: jest.Mock };
+    categoria: { findMany: jest.Mock };
+  };
   let whatsappMensajesRepository: jest.Mocked<WhatsappMensajesRepository>;
   let conversacionIaService: jest.Mocked<ConversacionIaService>;
   let eventBus: jest.Mocked<EventBusService>;
@@ -37,6 +42,7 @@ describe('WhatsappBotService', () => {
       whatsappConfigTenant: { findUnique: jest.fn() },
       whatsappMensaje: { update: jest.fn() },
       producto: { findMany: jest.fn().mockResolvedValue([]) },
+      categoria: { findMany: jest.fn().mockResolvedValue([]) },
     };
     whatsappMensajesRepository = {
       crear: jest.fn().mockResolvedValue(MENSAJE_ENTRANTE),
@@ -161,6 +167,19 @@ describe('WhatsappBotService', () => {
       expect(body.get('Body')).toBe('Yogurt Fresa — RD$ 59.00');
     });
 
+    it('con categoría y descripción de tienda: el caption las incluye', async () => {
+      conversacionIaService.completar.mockResolvedValue('{"respuesta":"Sí, mirá","requiereHumano":false,"buscarProducto":"yogurt"}');
+      prisma.producto.findMany.mockResolvedValue([
+        { ...PRODUCTO_CON_PRECIO, categoria: { nombre: 'Lácteos' }, descripcionTienda: 'Yogurt natural sabor fresa.' },
+      ]);
+
+      await service.procesarMensajeEntrante(CONFIG_BASE, 'whatsapp:+18095551234', 'tienen yogurt?');
+
+      const [, opciones] = fetchMock.mock.calls[1];
+      const body = opciones.body as URLSearchParams;
+      expect(body.get('Body')).toBe('Yogurt Fresa — RD$ 59.00\nCategoría: Lácteos\nYogurt natural sabor fresa.');
+    });
+
     it('0 coincidencias: no manda un segundo mensaje', async () => {
       conversacionIaService.completar.mockResolvedValue('{"respuesta":"No tengo eso","requiereHumano":false,"buscarProducto":"algo raro"}');
       prisma.producto.findMany.mockResolvedValue([]);
@@ -195,6 +214,94 @@ describe('WhatsappBotService', () => {
 
       expect(prisma.producto.findMany).not.toHaveBeenCalled();
       expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('procesarMensajeEntrante — buscarCategoria', () => {
+    const PRODUCTOS_LACTEOS = [
+      { id: 'p1', nombre: 'Yogurt Fresa', imagen: 'data:image/png;base64,abc', categoria: { nombre: 'Lácteos' }, descripcionTienda: null, variantes: [{ precios: [{ precioVenta: '59.00' }] }] },
+      { id: 'p2', nombre: 'Yogurt Vainilla', imagen: 'data:image/png;base64,def', categoria: { nombre: 'Lácteos' }, descripcionTienda: null, variantes: [{ precios: [{ precioVenta: '55.00' }] }] },
+    ];
+
+    it('exactamente 1 categoría: manda una foto por cada producto de esa categoría, en secuencia', async () => {
+      conversacionIaService.completar.mockResolvedValue('{"respuesta":"Mirá lo que tenemos","requiereHumano":false,"buscarCategoria":"lacteos"}');
+      prisma.categoria.findMany.mockResolvedValue([{ id: 'cat1' }]);
+      prisma.producto.findMany.mockResolvedValue(PRODUCTOS_LACTEOS);
+
+      await service.procesarMensajeEntrante(CONFIG_BASE, 'whatsapp:+18095551234', 'qué tienen de lácteos?');
+
+      expect(prisma.categoria.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: expect.objectContaining({ tenantId: 't1', activa: true }) }),
+      );
+      // 1 respuesta de texto + 2 fotos (una por producto) = 3 llamadas a fetch, en orden.
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+      const body1 = (fetchMock.mock.calls[1][1].body as URLSearchParams);
+      const body2 = (fetchMock.mock.calls[2][1].body as URLSearchParams);
+      expect(body1.get('MediaUrl')).toBe('https://app.ciguadev.com/api/public/productos/p1/imagen');
+      expect(body2.get('MediaUrl')).toBe('https://app.ciguadev.com/api/public/productos/p2/imagen');
+    });
+
+    it('0 categorías coincidentes: no manda nada extra', async () => {
+      conversacionIaService.completar.mockResolvedValue('{"respuesta":"No tengo esa categoría","requiereHumano":false,"buscarCategoria":"electrodomésticos"}');
+      prisma.categoria.findMany.mockResolvedValue([]);
+
+      await service.procesarMensajeEntrante(CONFIG_BASE, 'whatsapp:+18095551234', 'qué tienen de electrodomésticos?');
+
+      expect(prisma.producto.findMany).not.toHaveBeenCalled();
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('2+ categorías coincidentes: no adivina, no manda nada extra', async () => {
+      conversacionIaService.completar.mockResolvedValue('{"respuesta":"Tenemos varias secciones","requiereHumano":false,"buscarCategoria":"ropa"}');
+      prisma.categoria.findMany.mockResolvedValue([{ id: 'cat1' }, { id: 'cat2' }]);
+
+      await service.procesarMensajeEntrante(CONFIG_BASE, 'whatsapp:+18095551234', 'qué tienen de ropa?');
+
+      expect(prisma.producto.findMany).not.toHaveBeenCalled();
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('categoría encontrada pero sin productos con foto: no manda nada extra', async () => {
+      conversacionIaService.completar.mockResolvedValue('{"respuesta":"Tenemos, pero sin fotos cargadas","requiereHumano":false,"buscarCategoria":"lacteos"}');
+      prisma.categoria.findMany.mockResolvedValue([{ id: 'cat1' }]);
+      prisma.producto.findMany.mockResolvedValue([]);
+
+      await service.procesarMensajeEntrante(CONFIG_BASE, 'whatsapp:+18095551234', 'qué tienen de lácteos?');
+
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('si un envío del lote falla, sigue mandando los demás en vez de abortar', async () => {
+      conversacionIaService.completar.mockResolvedValue('{"respuesta":"Mirá lo que tenemos","requiereHumano":false,"buscarCategoria":"lacteos"}');
+      prisma.categoria.findMany.mockResolvedValue([{ id: 'cat1' }]);
+      prisma.producto.findMany.mockResolvedValue(PRODUCTOS_LACTEOS);
+      fetchMock
+        .mockResolvedValueOnce({ ok: true }) // respuesta de texto
+        .mockResolvedValueOnce({ ok: false }) // falla la foto del producto 1
+        .mockResolvedValueOnce({ ok: true }); // la foto del producto 2 igual se manda
+
+      await service.procesarMensajeEntrante(CONFIG_BASE, 'whatsapp:+18095551234', 'qué tienen de lácteos?');
+
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+    });
+
+    it('buscarProducto y buscarCategoria juntos: prioriza buscarProducto, ignora buscarCategoria', async () => {
+      conversacionIaService.completar.mockResolvedValue(
+        '{"respuesta":"Mirá","requiereHumano":false,"buscarProducto":"yogurt","buscarCategoria":"lacteos"}',
+      );
+      prisma.producto.findMany.mockResolvedValue([]);
+
+      await service.procesarMensajeEntrante(CONFIG_BASE, 'whatsapp:+18095551234', 'tienen yogurt de lácteos?');
+
+      expect(prisma.categoria.findMany).not.toHaveBeenCalled();
+    });
+
+    it('buscarCategoria null: nunca busca categorías', async () => {
+      conversacionIaService.completar.mockResolvedValue('{"respuesta":"Hola!","requiereHumano":false,"buscarCategoria":null}');
+
+      await service.procesarMensajeEntrante(CONFIG_BASE, 'whatsapp:+18095551234', 'hola');
+
+      expect(prisma.categoria.findMany).not.toHaveBeenCalled();
     });
   });
 

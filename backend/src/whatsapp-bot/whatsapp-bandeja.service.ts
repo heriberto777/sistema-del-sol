@@ -5,6 +5,7 @@ import { ProductosService } from '../productos/productos.service';
 import { descifrar } from '../common/utils/encriptado.util';
 import { enviarWhatsappTwilio } from '../common/utils/twilio-whatsapp.util';
 import { resolverOrigenPublicoWhatsapp } from '../common/utils/origen-publico-whatsapp.util';
+import { construirCaptionProducto } from './construir-caption-producto.util';
 import { fechaHoyRD } from '../common/utils/zona-horaria-rd.util';
 
 /** Bandeja de Admin para la escalación a humano del bot de WhatsApp (ítem H-2b) — sin chat en vivo, solo listar/responder/marcar atendido. */
@@ -31,12 +32,20 @@ export class WhatsappBandejaService {
     }
 
     let mediaUrl: string | undefined;
+    // Con producto, el caption se arma acá con sus datos reales (nombre +
+    // categoría + descripción de tienda si existen) — se ignora el
+    // `contenido` que mandó el frontend (hoy solo manda el nombre "a
+    // ciegas"), así el mensaje real queda igual de enriquecido que el que
+    // manda el bot automático. `buscarPorId()` no trae precio (evita una
+    // consulta extra solo para esto) — el envío manual queda sin precio,
+    // a diferencia del automático.
     if (productoId) {
       const producto = await this.productosService.buscarPorId(productoId);
       if (!producto.imagen) throw new BadRequestException('Este producto no tiene foto cargada');
       const origen = resolverOrigenPublicoWhatsapp();
       if (!origen) throw new ServiceUnavailableException('WHATSAPP_WEBHOOK_URL no está configurada — no se puede armar el link de la foto');
       mediaUrl = `${origen}/api/public/productos/${producto.id}/imagen`;
+      contenido = construirCaptionProducto(producto, null);
     }
 
     const enviado = await enviarWhatsappTwilio({

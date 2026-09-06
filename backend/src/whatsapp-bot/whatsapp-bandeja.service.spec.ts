@@ -62,7 +62,7 @@ describe('WhatsappBandejaService', () => {
     });
 
     it('con productoId: arma la mediaUrl del endpoint público y la manda a Twilio', async () => {
-      productosService.buscarPorId.mockResolvedValue({ id: 'p1', imagen: 'data:image/png;base64,abc' } as never);
+      productosService.buscarPorId.mockResolvedValue({ id: 'p1', nombre: 'Yogurt Fresa', imagen: 'data:image/png;base64,abc' } as never);
 
       await service.responder('t1', 'whatsapp:+18095551234', 'Mirá esto', 'p1');
 
@@ -70,6 +70,38 @@ describe('WhatsappBandejaService', () => {
       const [, opciones] = fetchMock.mock.calls[0];
       const body = opciones.body as URLSearchParams;
       expect(body.get('MediaUrl')).toBe('https://app.ciguadev.com/api/public/productos/p1/imagen');
+    });
+
+    it('con productoId: ignora el "contenido" del frontend y arma el caption con los datos reales del producto (sin precio)', async () => {
+      productosService.buscarPorId.mockResolvedValue({
+        id: 'p1',
+        nombre: 'Yogurt Fresa',
+        imagen: 'data:image/png;base64,abc',
+        categoria: { nombre: 'Lácteos' },
+        descripcionTienda: 'Yogurt natural sabor fresa.',
+      } as never);
+
+      await service.responder('t1', 'whatsapp:+18095551234', 'Mirá esto', 'p1');
+
+      const [, opciones] = fetchMock.mock.calls[0];
+      const body = opciones.body as URLSearchParams;
+      expect(body.get('Body')).toBe('Yogurt Fresa\nCategoría: Lácteos\nYogurt natural sabor fresa.');
+      expect(whatsappMensajesRepository.crearRespuestaManual).toHaveBeenCalledWith(
+        't1',
+        'whatsapp:+18095551234',
+        'Yogurt Fresa\nCategoría: Lácteos\nYogurt natural sabor fresa.',
+        expect.any(String),
+      );
+    });
+
+    it('con productoId sin categoría ni descripción: el caption queda solo con el nombre', async () => {
+      productosService.buscarPorId.mockResolvedValue({ id: 'p1', nombre: 'Yogurt Fresa', imagen: 'data:image/png;base64,abc' } as never);
+
+      await service.responder('t1', 'whatsapp:+18095551234', 'Mirá esto', 'p1');
+
+      const [, opciones] = fetchMock.mock.calls[0];
+      const body = opciones.body as URLSearchParams;
+      expect(body.get('Body')).toBe('Yogurt Fresa');
     });
 
     it('con productoId sin imagen cargada: rechaza sin llamar a Twilio', async () => {

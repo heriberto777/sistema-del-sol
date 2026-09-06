@@ -2,7 +2,9 @@ import { createContext, ReactNode, useContext, useMemo, useState } from 'react';
 
 interface BandejaWhatsappDrawerState {
   abierto: boolean;
-  abrir: () => void;
+  /** Si `abrir(telefono)` lo pasó, el drawer arranca directo en esa conversación en vez de la lista (ver toast de aviso urgente). */
+  telefonoInicial: string | null;
+  abrir: (telefono?: string) => void;
   cerrar: () => void;
 }
 
@@ -15,9 +17,18 @@ const BandejaWhatsappDrawerContext = createContext<BandejaWhatsappDrawerState | 
  */
 export function BandejaWhatsappDrawerProvider({ children }: { children: ReactNode }) {
   const [abierto, setAbierto] = useState(false);
+  const [telefonoInicial, setTelefonoInicial] = useState<string | null>(null);
   const valor = useMemo<BandejaWhatsappDrawerState>(
-    () => ({ abierto, abrir: () => setAbierto(true), cerrar: () => setAbierto(false) }),
-    [abierto],
+    () => ({
+      abierto,
+      telefonoInicial,
+      abrir: (telefono) => {
+        setTelefonoInicial(telefono ?? null);
+        setAbierto(true);
+      },
+      cerrar: () => setAbierto(false),
+    }),
+    [abierto, telefonoInicial],
   );
   return <BandejaWhatsappDrawerContext.Provider value={valor}>{children}</BandejaWhatsappDrawerContext.Provider>;
 }

@@ -39,7 +39,7 @@ function formatoRD(valor: string) {
  * es más simple que meterlo en el context, y nada más lo necesita.
  */
 export function BandejaWhatsappDrawer() {
-  const { abierto, cerrar } = useBandejaWhatsappDrawer();
+  const { abierto, telefonoInicial, cerrar } = useBandejaWhatsappDrawer();
   const queryClient = useQueryClient();
   const [telefonoActivo, setTelefonoActivo] = useState<string | null>(null);
   const [texto, setTexto] = useState('');
@@ -70,6 +70,12 @@ export function BandejaWhatsappDrawer() {
       setError(null);
     }
   }, [abierto]);
+
+  // Abrir desde el toast de aviso urgente salta directo a esa conversación
+  // en vez de la lista (ver BandejaWhatsappWidget).
+  useEffect(() => {
+    if (abierto && telefonoInicial) setTelefonoActivo(telefonoInicial);
+  }, [abierto, telefonoInicial]);
 
   const { data: pendientes, isLoading: cargandoPendientes } = useQuery({
     queryKey: QUERY_KEY_PENDIENTES,
