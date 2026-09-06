@@ -11,6 +11,7 @@ import { SeccionesDinamicas } from '../SeccionesDinamicas';
 import { ProductosRelacionados } from '../ProductosRelacionados';
 import { FilaPrecioOferta } from '../OfertaEnTarjeta';
 import { EtiquetaSinExistenciaVariante } from '../InsigniaSinStock';
+import { BotonWhatsAppProducto } from '../BotonWhatsAppProducto';
 import type { Plantilla, PropsCarrito, PropsHome, PropsProducto } from './tipos';
 
 // Boutique es oscura y sin tokens (Fase 7) — los componentes compartidos
@@ -189,6 +190,14 @@ function BoutiqueProducto({ config, subdominio, carrito, producto, varianteSelec
           >
             Agregar a la bolsa
           </button>
+          <BotonWhatsAppProducto
+            numero={config.whatsapp}
+            nombreProducto={producto.nombre}
+            precio={varianteSeleccionada?.precio ?? producto.variantes[0]?.precio ?? null}
+            subdominio={subdominio}
+            productoId={producto.id}
+            className="mt-3 flex w-full items-center justify-center gap-2 border border-[#37312a] px-8 py-3 text-[11px] font-semibold uppercase tracking-widest text-[#f4ede3]"
+          />
         </div>
       </div>
       <ProductosRelacionados

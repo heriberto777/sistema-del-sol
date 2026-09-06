@@ -14,6 +14,7 @@ import { EtiquetaSinExistenciaVariante } from '../InsigniaSinStock';
 import { ClaveMenuTienda, DefaultsTemaPlantilla, menuVisibleOrdenado, useCargarFuentesTienda, variablesCssTema } from '../tema';
 import { useTiendaTema } from '../TiendaTemaContext';
 import { ToggleTemaTienda } from '../ToggleTemaTienda';
+import { BotonWhatsAppProducto } from '../BotonWhatsAppProducto';
 import type { Plantilla, PropsCarrito, PropsHome, PropsProducto } from './tipos';
 
 // Fase 8 — ropa básica de uso diario, insp. Uniqlo/Everlane: carmesí+malva
@@ -194,6 +195,14 @@ function BaseProducto({ config, subdominio, carrito, producto, varianteSeleccion
           <button type="button" onClick={onAgregar} disabled={!varianteSeleccionada || (varianteSeleccionada.stock !== null && varianteSeleccionada.stock <= 0)} className="rounded px-6 py-3 text-[0.85em] font-bold text-white disabled:cursor-not-allowed disabled:opacity-50" style={{ background: 'var(--tienda-color-acento)' }}>
             Agregar a la bolsa
           </button>
+          <BotonWhatsAppProducto
+            numero={config.whatsapp}
+            nombreProducto={producto.nombre}
+            precio={varianteSeleccionada?.precio ?? producto.variantes[0]?.precio ?? null}
+            subdominio={subdominio}
+            productoId={producto.id}
+            className="mt-3 flex w-full items-center justify-center gap-2 rounded border border-[color:var(--tienda-color-texto)]/15 px-6 py-3 text-[0.85em] font-semibold"
+          />
         </div>
       </div>
       <ProductosRelacionados productos={producto.relacionados} subdominio={subdominio} estiloInsignia={tema.estiloInsigniaOferta} estiloInsigniaSinStock={tema.estiloInsigniaSinStock} />

@@ -83,6 +83,7 @@ export class EcommerceService {
       logo: config.logo ?? null,
       banner: config.banner ?? null,
       colorAcento: config.colorAcento ?? null,
+      whatsapp: config.whatsapp ?? null,
       tema: config.tema,
       bannerAnuncio: config.bannerAnuncio,
       plantillaPedido: config.plantillaPedido,

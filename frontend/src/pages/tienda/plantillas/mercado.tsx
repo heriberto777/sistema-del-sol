@@ -12,6 +12,7 @@ import { ProductosRelacionados } from '../ProductosRelacionados';
 import { FilaPrecioOferta } from '../OfertaEnTarjeta';
 import { EtiquetaSinExistenciaVariante } from '../InsigniaSinStock';
 import { ToggleTemaTienda } from '../ToggleTemaTienda';
+import { BotonWhatsAppProducto } from '../BotonWhatsAppProducto';
 import { useTiendaTema } from '../TiendaTemaContext';
 import type { Plantilla, PropsCarrito, PropsHome, PropsProducto } from './tipos';
 
@@ -212,6 +213,14 @@ function MercadoProducto({ config, subdominio, carrito, producto, varianteSelecc
           >
             Agregar al carrito
           </button>
+          <BotonWhatsAppProducto
+            numero={config.whatsapp}
+            nombreProducto={producto.nombre}
+            precio={varianteSeleccionada?.precio ?? producto.variantes[0]?.precio ?? null}
+            subdominio={subdominio}
+            productoId={producto.id}
+            className="mt-3 flex w-full items-center justify-center gap-2 rounded-full bg-white px-6 py-3 text-sm font-bold text-[#0d5c58] shadow-sm dark:bg-[#12302e] dark:text-[#e7f3f1]"
+          />
         </div>
       </div>
       <ProductosRelacionados productos={producto.relacionados} subdominio={subdominio} defaults={defaults} estiloInsignia={config.tema.estiloInsigniaOferta} estiloInsigniaSinStock={config.tema.estiloInsigniaSinStock} />

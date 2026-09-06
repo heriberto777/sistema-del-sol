@@ -10,6 +10,7 @@ export const CLAVE_TIENDA_BODEGA_ID = 'TIENDA_BODEGA_ID';
 export const CLAVE_TIENDA_TEMA = 'TIENDA_TEMA';
 export const CLAVE_TIENDA_BANNER_TEXTO = 'TIENDA_BANNER_TEXTO';
 export const CLAVE_TIENDA_PLANTILLA_PEDIDO = 'TIENDA_PLANTILLA_PEDIDO';
+export const CLAVE_TIENDA_WHATSAPP = 'TIENDA_WHATSAPP';
 
 export const PLANTILLAS_TIENDA = [
   'DIRECTO',
@@ -53,6 +54,7 @@ const CLAVES_TIENDA = [
   CLAVE_TIENDA_TEMA,
   CLAVE_TIENDA_BANNER_TEXTO,
   CLAVE_TIENDA_PLANTILLA_PEDIDO,
+  CLAVE_TIENDA_WHATSAPP,
 ];
 
 export interface ConfigTienda {
@@ -63,6 +65,8 @@ export interface ConfigTienda {
   banner?: string;
   colorAcento?: string;
   bodegaId?: string;
+  /** Número de WhatsApp de contacto (con código de país, ej. "18095551234") para el botón "Preguntar por WhatsApp" en la ficha de producto — click-to-chat (`wa.me`), sin Twilio ni API de por medio. `undefined` = tenant nunca lo configuró, el botón no se muestra. */
+  whatsapp?: string;
   tema: TemaTienda;
   /** Fase 11 (extendida): slide de mensajes de texto para la barra de anuncio arriba del Nav (distinto de TIENDA_BANNER, que es una imagen usada solo por la plantilla "mercado"). */
   bannerAnuncio: BannerAnuncioTienda;
@@ -301,6 +305,7 @@ export async function resolverConfigTienda(prisma: PrismaService, tenantId: stri
     banner: valor(CLAVE_TIENDA_BANNER),
     colorAcento: valor(CLAVE_TIENDA_COLOR_ACENTO),
     bodegaId: valor(CLAVE_TIENDA_BODEGA_ID),
+    whatsapp: valor(CLAVE_TIENDA_WHATSAPP),
     tema: resolverTemaTienda(valor(CLAVE_TIENDA_TEMA), valor(CLAVE_TIENDA_COLOR_ACENTO)),
     bannerAnuncio: resolverBannerAnuncio(valor(CLAVE_TIENDA_BANNER_TEXTO)),
     plantillaPedido: (PLANTILLAS_PEDIDO_TIENDA as readonly string[]).includes(plantillaPedido ?? '')

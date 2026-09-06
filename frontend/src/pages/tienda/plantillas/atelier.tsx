@@ -14,6 +14,7 @@ import { EtiquetaSinExistenciaVariante } from '../InsigniaSinStock';
 import { ClaveMenuTienda, DefaultsTemaPlantilla, menuVisibleOrdenado, useCargarFuentesTienda, variablesCssTema } from '../tema';
 import { useTiendaTema } from '../TiendaTemaContext';
 import { ToggleTemaTienda } from '../ToggleTemaTienda';
+import { BotonWhatsAppProducto } from '../BotonWhatsAppProducto';
 import type { Plantilla, PropsCarrito, PropsHome, PropsProducto } from './tipos';
 
 // Fase 8 — alta costura minimalista: lujo silencioso, blanco/negro absoluto,
@@ -198,6 +199,14 @@ function AtelierProducto({ config, subdominio, carrito, producto, varianteSelecc
           >
             Agregar a la bolsa
           </button>
+          <BotonWhatsAppProducto
+            numero={config.whatsapp}
+            nombreProducto={producto.nombre}
+            precio={varianteSeleccionada?.precio ?? producto.variantes[0]?.precio ?? null}
+            subdominio={subdominio}
+            productoId={producto.id}
+            className="mt-3 flex w-full items-center justify-center gap-2 border border-[var(--tienda-color-texto)]/40 px-6 py-3 text-[0.75em] uppercase tracking-[0.08em]"
+          />
         </div>
       </div>
       <ProductosRelacionados productos={producto.relacionados} subdominio={subdominio} estiloInsignia={tema.estiloInsigniaOferta} estiloInsigniaSinStock={tema.estiloInsigniaSinStock} />

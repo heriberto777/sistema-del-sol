@@ -56,6 +56,7 @@ const CLAVE_LOGO = 'TIENDA_LOGO';
 const CLAVE_BANNER = 'TIENDA_BANNER';
 const CLAVE_COLOR_ACENTO = 'TIENDA_COLOR_ACENTO';
 const CLAVE_BODEGA_ID = 'TIENDA_BODEGA_ID';
+const CLAVE_WHATSAPP = 'TIENDA_WHATSAPP';
 const CLAVE_TEMA = 'TIENDA_TEMA';
 const CLAVE_BANNER_TEXTO = 'TIENDA_BANNER_TEXTO';
 const CLAVE_PLANTILLA_PEDIDO = 'TIENDA_PLANTILLA_PEDIDO';
@@ -298,6 +299,7 @@ export function TiendaOnlineConfigPanel() {
   const [banner, setBanner] = useState<string | null>(null);
   const [colorAcento, setColorAcento] = useState('#f59e0b');
   const [bodegaId, setBodegaId] = useState('');
+  const [whatsapp, setWhatsapp] = useState('');
   const [bannerAnuncio, setBannerAnuncio] = useState<BannerAnuncioForm>(BANNER_ANUNCIO_DEFAULT);
   const [tema, setTema] = useState<TemaTienda>(TEMA_DEFAULT);
   const [plantillaPedido, setPlantillaPedido] = useState<PlantillaPedidoTienda>('MARCA');
@@ -317,6 +319,7 @@ export function TiendaOnlineConfigPanel() {
     setBanner(valor(CLAVE_BANNER) || null);
     setColorAcento(valor(CLAVE_COLOR_ACENTO) || '#f59e0b');
     setBodegaId(valor(CLAVE_BODEGA_ID));
+    setWhatsapp(valor(CLAVE_WHATSAPP));
     setBannerAnuncio(parsearBannerAnuncioGuardado(valor(CLAVE_BANNER_TEXTO), valor(CLAVE_COLOR_ACENTO) || '#111827'));
     const plantillaPedidoGuardada = valor(CLAVE_PLANTILLA_PEDIDO);
     setPlantillaPedido(
@@ -336,6 +339,7 @@ export function TiendaOnlineConfigPanel() {
         apiClient.put(`/admin/configuraciones/${CLAVE_BANNER}`, { valor: banner ?? '' }),
         apiClient.put(`/admin/configuraciones/${CLAVE_COLOR_ACENTO}`, { valor: colorAcento }),
         apiClient.put(`/admin/configuraciones/${CLAVE_BODEGA_ID}`, { valor: bodegaId }),
+        apiClient.put(`/admin/configuraciones/${CLAVE_WHATSAPP}`, { valor: whatsapp }),
         apiClient.put(`/admin/configuraciones/${CLAVE_TEMA}`, { valor: JSON.stringify(tema) }),
         apiClient.put(`/admin/configuraciones/${CLAVE_BANNER_TEXTO}`, { valor: JSON.stringify(bannerAnuncio) }),
         apiClient.put(`/admin/configuraciones/${CLAVE_PLANTILLA_PEDIDO}`, { valor: plantillaPedido }),
@@ -465,6 +469,19 @@ export function TiendaOnlineConfigPanel() {
                   onChange={(e) => setNombre(e.target.value)}
                   placeholder="Se usa el nombre de la empresa si se deja vacío"
                 />
+
+                <div className="flex flex-col gap-1">
+                  <FormField
+                    id="tienda-whatsapp"
+                    label="WhatsApp de contacto (opcional)"
+                    value={whatsapp}
+                    onChange={(e) => setWhatsapp(e.target.value.replace(/[^\d]/g, ''))}
+                    placeholder="Código de país + número, ej. 18095551234"
+                  />
+                  <span className="text-xs text-slate-500 dark:text-slate-400">
+                    Muestra un botón "Preguntar por WhatsApp" en la ficha de cada producto, con el nombre y el link ya redactados. Dejalo vacío para no mostrarlo.
+                  </span>
+                </div>
               </div>
             )}
 

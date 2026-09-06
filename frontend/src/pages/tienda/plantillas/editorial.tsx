@@ -14,6 +14,7 @@ import { EtiquetaSinExistenciaVariante } from '../InsigniaSinStock';
 import { ClaveMenuTienda, DefaultsTemaPlantilla, menuVisibleOrdenado, useCargarFuentesTienda, variablesCssTema } from '../tema';
 import { useTiendaTema } from '../TiendaTemaContext';
 import { ToggleTemaTienda } from '../ToggleTemaTienda';
+import { BotonWhatsAppProducto } from '../BotonWhatsAppProducto';
 import type { Plantilla, PropsCarrito, PropsHome, PropsProducto } from './tipos';
 
 // Fase 8 — ropa "fast fashion", insp. Zara: casi monocromo, fotografía en
@@ -210,6 +211,14 @@ function EditorialProducto({ config, subdominio, carrito, producto, varianteSele
           >
             Agregar a la bolsa
           </button>
+          <BotonWhatsAppProducto
+            numero={config.whatsapp}
+            nombreProducto={producto.nombre}
+            precio={varianteSeleccionada?.precio ?? producto.variantes[0]?.precio ?? null}
+            subdominio={subdominio}
+            productoId={producto.id}
+            className="mt-3 flex w-full items-center justify-center gap-2 border border-[color:var(--tienda-color-texto)]/15 px-6 py-3 text-[0.8em] font-semibold uppercase tracking-[0.04em]"
+          />
         </div>
       </div>
       <ProductosRelacionados productos={producto.relacionados} subdominio={subdominio} estiloInsignia={tema.estiloInsigniaOferta} estiloInsigniaSinStock={tema.estiloInsigniaSinStock} />

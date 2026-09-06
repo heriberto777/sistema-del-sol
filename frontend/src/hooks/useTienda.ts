@@ -32,6 +32,8 @@ export interface ConfigTienda {
   logo: string | null;
   banner: string | null;
   colorAcento: string | null;
+  /** Número de WhatsApp de contacto (con código de país) para el botón "Preguntar por WhatsApp" en la ficha de producto — `null` = tenant nunca lo configuró, el botón no se muestra. */
+  whatsapp: string | null;
   /** Fase 7 — personalización sobre la plantilla elegida (siempre resuelto con defaults, nunca null). */
   tema: TemaTienda;
   /** Fase 11 (extendida) — slide de mensajes para la barra de anuncio arriba del Nav; `mensajes: []` = no mostrar nada. */
