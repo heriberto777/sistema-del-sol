@@ -51,6 +51,7 @@ export function ConversacionWhatsapp({
     queryKey: ['whatsapp-bandeja-conversacion', telefono],
     queryFn: async () => (await apiClient.get<MensajeConversacion[]>(`/admin/whatsapp-bandeja/${encodeURIComponent(telefono)}/conversacion`)).data,
     refetchInterval: 10_000,
+    refetchIntervalInBackground: true,
   });
 
   const { data: resultadosProducto, isFetching: buscandoProducto } = useQuery({

@@ -32,6 +32,11 @@ export function BandejaWhatsappWidget() {
     queryKey: QUERY_KEY_PENDIENTES,
     queryFn: async () => (await apiClient.get<MensajePendiente[]>('/admin/whatsapp-bandeja')).data,
     refetchInterval: 20_000,
+    // Sin esto, react-query pausa el polling cuando la pestaña pierde el
+    // foco (default de la librería) — el aviso urgente necesita seguir
+    // consultando en segundo plano, no solo cuando el empleado vuelve a
+    // hacer clic en la pestaña.
+    refetchIntervalInBackground: true,
     enabled: tienePermisoBandeja,
   });
 

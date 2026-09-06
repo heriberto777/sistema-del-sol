@@ -55,6 +55,7 @@ export function BandejaWhatsappDrawer() {
     queryKey: QUERY_KEY_PENDIENTES,
     queryFn: async () => (await apiClient.get<MensajePendiente[]>('/admin/whatsapp-bandeja')).data,
     refetchInterval: 20_000,
+    refetchIntervalInBackground: true,
     enabled: abierto,
   });
 
