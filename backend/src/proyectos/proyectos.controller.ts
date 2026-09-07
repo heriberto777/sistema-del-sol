@@ -73,4 +73,12 @@ export class ProyectosController {
   eliminarHito(@Param('id') id: string) {
     return this.proyectosService.eliminarHito(id);
   }
+
+  // Fase 4 — permiso separado de `.editar`: generar una Factura real es
+  // una acción fiscal, no una edición más del hito (ver roles-base.ts).
+  @Post('hitos/:id/facturar')
+  @Permissions('proyectos.facturar')
+  facturarHito(@Param('id') id: string, @CurrentUser() user: JwtPayloadUser) {
+    return this.proyectosService.facturarHito(id, user.tenantId, user.userId);
+  }
 }

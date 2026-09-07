@@ -1176,6 +1176,7 @@ model Factura {
   recargos           FacturaRecargo[]
   cotizacionOrigen   Cotizacion?
   remisionOrigen     Remision?
+  hitoProyectoOrigen HitoProyecto?
   pagos              Pago[]
   pagosVenta         PagoVenta[]
   comisiones         ComisionVenta[]
@@ -3759,6 +3760,11 @@ model HitoProyecto {
   montoFijo     Decimal?           @db.Decimal(14, 2)
   estado        EstadoHitoProyecto @default(PENDIENTE)
   createdAt     DateTime           @default(now())
+  // Fase 4 — la Factura real generada desde este hito (ver
+  // ProyectosService.facturarHito). @unique: un hito nunca se factura
+  // dos veces, es el mismo guard que ya usa Cotizacion/Remisión.
+  facturaId     String?            @unique
+  factura       Factura?           @relation(fields: [facturaId], references: [id])
 
   tareas TareaProyecto[]
 

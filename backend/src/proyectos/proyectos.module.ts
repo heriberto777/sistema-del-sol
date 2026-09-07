@@ -7,6 +7,7 @@ import { TareasProyectoController } from './tareas-proyecto.controller';
 import { ClientesModule } from '../clientes/clientes.module';
 import { NominaModule } from '../nomina/nomina.module';
 import { ConfiguracionesModule } from '../configuraciones/configuraciones.module';
+import { FacturacionModule } from '../facturacion/facturacion.module';
 
 /**
  * Plugin de Proyectos (Fase 1) — ver plugins/proyectos/README.md. Gateado
@@ -16,7 +17,7 @@ import { ConfiguracionesModule } from '../configuraciones/configuraciones.module
  * activa el propio tenant.
  */
 @Module({
-  imports: [ClientesModule, NominaModule, ConfiguracionesModule],
+  imports: [ClientesModule, NominaModule, ConfiguracionesModule, FacturacionModule],
   controllers: [ProyectosController, TareasProyectoController],
   providers: [ProyectosService, ProyectosRepository, TareasProyectoService],
   exports: [ProyectosRepository],

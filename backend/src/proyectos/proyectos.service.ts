@@ -1,8 +1,9 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { ProyectosRepository } from './proyectos.repository';
 import { ClientesService } from '../clientes/clientes.service';
 import { EmpleadosRepository } from '../nomina/empleados.repository';
 import { ConfiguracionesService } from '../configuraciones/configuraciones.service';
+import { FacturacionService } from '../facturacion/facturacion.service';
 import { CONFIGURACIONES_BASE } from '../tenants/roles-base';
 import { costoHora } from './costo-hora.util';
 import { CrearProyectoDto } from './dto/crear-proyecto.dto';
@@ -19,6 +20,7 @@ export class ProyectosService {
     private readonly clientesService: ClientesService,
     private readonly empleadosRepository: EmpleadosRepository,
     private readonly configuracionesService: ConfiguracionesService,
+    private readonly facturacionService: FacturacionService,
   ) {}
 
   async crear(dto: CrearProyectoDto, tenantId: string) {
@@ -74,6 +76,52 @@ export class ProyectosService {
   async eliminarHito(id: string) {
     await this.proyectosRepository.buscarHitoPorId(id);
     return this.proyectosRepository.eliminarHito(id);
+  }
+
+  /**
+   * Fase 4 — genera la Factura real de un hito, reusando
+   * `FacturacionService.crear()` (nunca se duplica lógica de NCF/ITBIS
+   * acá). `montoFijo`/`tarifaHoraFacturable` están cargados ANTES de
+   * ITBIS (decisión confirmada con el usuario) — se mandan tal cual como
+   * `precioUnitario` de una línea manual, el ITBIS lo suma `crear()` solo
+   * con la tasa general del tenant.
+   */
+  async facturarHito(hitoId: string, tenantId: string, vendedorId: string) {
+    const hito = await this.proyectosRepository.buscarHitoPorId(hitoId);
+    if (hito.facturaId) throw new BadRequestException('Este hito ya fue facturado');
+
+    const proyecto = await this.proyectosRepository.buscarProyectoPorId(hito.proyectoId);
+
+    let monto: number;
+    if (proyecto.modoFacturacion === 'PRECIO_FIJO') {
+      if (hito.montoFijo == null) throw new BadRequestException('Este hito no tiene un monto fijo cargado');
+      monto = Number(hito.montoFijo);
+    } else {
+      const horas = await this.proyectosRepository.sumarHorasDelHito(hitoId);
+      if (horas <= 0) throw new BadRequestException('No hay horas registradas para facturar en este hito');
+      if (proyecto.tarifaHoraFacturable == null) {
+        throw new BadRequestException('El proyecto no tiene una tarifa por hora facturable configurada');
+      }
+      monto = horas * Number(proyecto.tarifaHoraFacturable);
+    }
+
+    const bodega = await this.proyectosRepository.buscarBodegaActivaPorDefecto();
+    if (!bodega) throw new BadRequestException('Este tenant no tiene ninguna bodega activa configurada — no se puede facturar');
+
+    const factura = await this.facturacionService.crear(
+      {
+        clienteId: proyecto.clienteId,
+        bodegaId: bodega.id,
+        tipoFactura: 'CONTADO',
+        lineas: [{ descripcionManual: `${proyecto.nombre} — ${hito.nombre}`, cantidad: 1, precioUnitario: monto, aplicaItbis: true }],
+      },
+      tenantId,
+      vendedorId,
+      { sinMovimientoInventario: true },
+    );
+
+    await this.proyectosRepository.marcarHitoFacturado(hitoId, factura.id);
+    return { facturaId: factura.id, numero: factura.numero, total: factura.total };
   }
 
   /**

@@ -92,6 +92,24 @@ export class ProyectosRepository {
     return this.db.hitoProyecto.findUniqueOrThrow({ where: { id } });
   }
 
+  /** Fase 4 — total de horas registradas en TODAS las tareas de este hito, para facturar en modo POR_HORAS. */
+  async sumarHorasDelHito(hitoId: string): Promise<number> {
+    const resultado = await this.db.registroHoraProyecto.aggregate({
+      where: { tarea: { hitoId } },
+      _sum: { horas: true },
+    });
+    return Number(resultado._sum.horas ?? 0);
+  }
+
+  marcarHitoFacturado(id: string, facturaId: string) {
+    return this.db.hitoProyecto.update({ where: { id }, data: { estado: 'FACTURADO', facturaId } });
+  }
+
+  /** Fase 4 — sin ningún campo "principal" en Bodega (confirmado en schema.prisma); ordenar por nombre es lo único determinístico disponible. */
+  buscarBodegaActivaPorDefecto() {
+    return this.db.bodega.findFirst({ where: { activa: true }, orderBy: { nombre: 'asc' } });
+  }
+
   actualizarHito(id: string, dto: Partial<CrearHitoDto>) {
     return this.db.hitoProyecto.update({ where: { id }, data: { ...dto, fechaObjetivo: aFecha(dto.fechaObjetivo) } });
   }

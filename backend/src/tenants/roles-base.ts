@@ -58,7 +58,9 @@ export const PERMISOS_BASE = [
   // `proyectos.horas.registrar` separado de `.editar` a propósito: un
   // empleado al que solo le den este permiso puede cargar sus propias
   // horas trabajadas sin poder editar la tarea/proyecto entero.
-  'proyectos.ver', 'proyectos.crear', 'proyectos.editar', 'proyectos.horas.registrar',
+  // `proyectos.facturar` (Fase 4) separado también — generar una Factura
+  // real es una acción fiscal, no una edición más del hito.
+  'proyectos.ver', 'proyectos.crear', 'proyectos.editar', 'proyectos.horas.registrar', 'proyectos.facturar',
 ];
 
 export const ROLES_BASE: Record<string, string[]> = {

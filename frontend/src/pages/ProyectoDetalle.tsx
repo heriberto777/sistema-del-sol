@@ -18,6 +18,7 @@ interface Hito {
   fechaObjetivo: string | null;
   montoFijo: string | null;
   estado: string;
+  facturaId: string | null;
 }
 
 interface RegistroHora {
@@ -77,6 +78,7 @@ export function ProyectoDetalle() {
   const [nuevaTarea, setNuevaTarea] = useState('');
   const [tareaAbierta, setTareaAbierta] = useState<Tarea | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [mensajeFactura, setMensajeFactura] = useState<string | null>(null);
 
   const { data: proyecto, isLoading } = useQuery({
     queryKey: ['proyecto', id],
@@ -111,6 +113,16 @@ export function ProyectoDetalle() {
     mutationFn: async ({ hitoId, estado }: { hitoId: string; estado: string }) => apiClient.patch(`/admin/proyectos/hitos/${hitoId}`, { estado }),
     onSuccess: invalidar,
     onError: (err) => setError(mensajeErrorApi(err, 'No se pudo cambiar el estado del hito.')),
+  });
+
+  const facturarHito = useMutation({
+    mutationFn: async (hitoId: string) => (await apiClient.post<{ facturaId: string; numero: string | null; total: string }>(`/admin/proyectos/hitos/${hitoId}/facturar`)).data,
+    onSuccess: (factura) => {
+      setError(null);
+      setMensajeFactura(`Factura ${factura.numero ?? factura.facturaId} generada por RD$ ${Number(factura.total).toLocaleString('es-DO')}.`);
+      invalidar();
+    },
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo facturar el hito.')),
   });
 
   const crearTarea = useMutation({
@@ -186,6 +198,7 @@ export function ProyectoDetalle() {
         </Card>
 
         {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+        {mensajeFactura && <p className="text-sm text-emerald-600 dark:text-emerald-400">{mensajeFactura}</p>}
 
         <Card titulo="Hitos" descripcion="Entregas o cortes de facturación del proyecto.">
           <div className="space-y-2">
@@ -196,16 +209,35 @@ export function ProyectoDetalle() {
                   <p className="font-medium text-slate-900 dark:text-slate-100">{h.nombre}</p>
                   {h.montoFijo && <p className="text-xs text-slate-500 dark:text-slate-400">RD$ {Number(h.montoFijo).toLocaleString('es-DO')}</p>}
                 </div>
-                <Select
-                  value={h.estado}
-                  onChange={(e) => cambiarEstadoHito.mutate({ hitoId: h.id, estado: e.target.value })}
-                  className="w-auto"
-                >
-                  <option value="PENDIENTE">Pendiente</option>
-                  <option value="EN_CURSO">En curso</option>
-                  <option value="COMPLETADO">Completado</option>
-                  <option value="FACTURADO">Facturado</option>
-                </Select>
+                <div className="flex items-center gap-2">
+                  {!h.facturaId && (
+                    <RequierePermiso permiso="proyectos.facturar">
+                      <Button
+                        type="button"
+                        variante="secundario"
+                        onClick={() => {
+                          setError(null);
+                          setMensajeFactura(null);
+                          facturarHito.mutate(h.id);
+                        }}
+                        disabled={facturarHito.isPending}
+                      >
+                        {facturarHito.isPending ? 'Facturando…' : 'Facturar'}
+                      </Button>
+                    </RequierePermiso>
+                  )}
+                  <Select
+                    value={h.estado}
+                    onChange={(e) => cambiarEstadoHito.mutate({ hitoId: h.id, estado: e.target.value })}
+                    disabled={!!h.facturaId}
+                    className="w-auto"
+                  >
+                    <option value="PENDIENTE">Pendiente</option>
+                    <option value="EN_CURSO">En curso</option>
+                    <option value="COMPLETADO">Completado</option>
+                    <option value="FACTURADO">Facturado</option>
+                  </Select>
+                </div>
               </div>
             ))}
             <form
