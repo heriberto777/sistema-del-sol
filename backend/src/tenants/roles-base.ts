@@ -47,6 +47,18 @@ export const PERMISOS_BASE = [
   // Caja — ellos siguen atendiendo solo desde el drawer, sin ver el
   // historial completo de todos los clientes.
   'whatsapp.mensajes.ver',
+  // Plugin de Proyectos (Fase 1) — opt-in a propósito (pedido explícito
+  // del usuario), mismo criterio real que `productos.ia_generar`: como
+  // ninguno de los 4 empieza con `admin.`, Admin Total (hereda TODO
+  // PERMISOS_BASE) y Gerente (`PERMISOS_BASE.filter(!admin.*)`) los
+  // reciben igual de forma automática por el propio mecanismo de
+  // herencia — no hay forma de excluirlos de ahí sin tocar ese mecanismo.
+  // Cualquier otro rol (Cajero/Vendedor/etc.) NO los trae de fábrica,
+  // hay que asignárselos a mano desde Roles y Permisos.
+  // `proyectos.horas.registrar` separado de `.editar` a propósito: un
+  // empleado al que solo le den este permiso puede cargar sus propias
+  // horas trabajadas sin poder editar la tarea/proyecto entero.
+  'proyectos.ver', 'proyectos.crear', 'proyectos.editar', 'proyectos.horas.registrar',
 ];
 
 export const ROLES_BASE: Record<string, string[]> = {
@@ -129,4 +141,9 @@ export const CONFIGURACIONES_BASE: Record<string, string> = {
   NOMINA_TASA_INFOTEP_EMPLEADOR: '1',
   NOMINA_TOPE_SFS: '232230',
   NOMINA_TOPE_AFP: '464460',
+  // Plugin de Proyectos (Fase 1) — divide Empleado.salarioBrutoMensual
+  // para estimar el costo interno de cada hora trabajada (ver
+  // costo-hora.util.ts). Default = jornada estándar 40h/semana
+  // (40 * 52 / 12 ≈ 173.33) — configurable si el tenant usa otra jornada.
+  PROYECTOS_HORAS_LABORABLES_MES: '173.33',
 };

@@ -49,6 +49,13 @@ export class GastosMenoresService {
     const fecha = dto.fecha ? new Date(dto.fecha) : new Date();
     await this.cierrePeriodoService.validarFechaAbierta(fecha);
 
+    // Plugin de Proyectos (opcional) — findFirstOrThrow tenant-scoped (vía
+    // $transaction, ya trae el SET LOCAL de esta conexión) para no permitir
+    // asociar el gasto a un proyecto de otro tenant.
+    if (dto.proyectoId) {
+      await this.tenantPrisma.client.proyecto.findUniqueOrThrow({ where: { id: dto.proyectoId } });
+    }
+
     const gastoMenor = await this.tenantPrisma.client.$transaction(async (tx) => {
       const ncf = await this.gastosMenoresRepository.siguienteNumeroEnTx(tx, tipoNcf);
       return this.gastosMenoresRepository.crearEnTx(tx, {
@@ -61,6 +68,7 @@ export class GastosMenoresService {
         monto,
         itbis,
         total,
+        proyectoId: dto.proyectoId,
         lineas: lineasCalculadas,
       });
     });

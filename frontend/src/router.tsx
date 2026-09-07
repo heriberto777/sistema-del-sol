@@ -32,6 +32,8 @@ import { Notificaciones } from './pages/Notificaciones';
 import { Mensajes } from './pages/Mensajes';
 import { Bancos } from './pages/Bancos';
 import { GastosMenores } from './pages/GastosMenores';
+import { Proyectos } from './pages/Proyectos';
+import { ProyectoDetalle } from './pages/ProyectoDetalle';
 import { TiendaOnline } from './pages/TiendaOnline';
 import { Admin } from './pages/Admin';
 import { PlatformLogin } from './pages/PlatformLogin';
@@ -172,6 +174,8 @@ const RUTAS_ADMIN = [
           { path: '/contabilidad', element: <Contabilidad /> },
           { path: '/bancos', element: <Bancos /> },
           { path: '/gastos-menores', element: <GastosMenores /> },
+          { path: '/proyectos', element: <Proyectos /> },
+          { path: '/proyectos/:id', element: <ProyectoDetalle /> },
           { path: '/tienda-online', element: <TiendaOnline /> },
           { path: '/nomina', element: <Nomina /> },
           { path: '/rrhh', element: <RRHH /> },

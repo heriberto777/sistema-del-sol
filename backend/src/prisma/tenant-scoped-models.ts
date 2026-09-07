@@ -80,4 +80,12 @@ export const TENANT_SCOPED_MODELS = new Set([
   'PedidoTienda',
   'SeccionTienda',
   'TenantDominio',
+  // Plugin de Proyectos (Fase 1) — `TareaProyectoResponsable` queda AFUERA
+  // a propósito, mismo criterio que LineaFactura/LineaGastoMenor: no tiene
+  // tenantId propio, su aislamiento depende de llegar siempre vía una
+  // TareaProyecto ya resuelta contra el tenant.
+  'Proyecto',
+  'HitoProyecto',
+  'TareaProyecto',
+  'RegistroHoraProyecto',
 ]);

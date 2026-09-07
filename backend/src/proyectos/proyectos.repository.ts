@@ -1,0 +1,156 @@
+import { Injectable } from '@nestjs/common';
+import { TenantPrismaService } from '../prisma/tenant-prisma.service';
+import { CrearProyectoDto } from './dto/crear-proyecto.dto';
+import { CrearHitoDto } from './dto/crear-hito.dto';
+import { CrearTareaProyectoDto } from './dto/crear-tarea-proyecto.dto';
+import { CrearRegistroHoraDto } from './dto/crear-registro-hora.dto';
+import { aFecha } from './fecha-input.util';
+
+const INCLUDE_PROYECTO = {
+  cliente: { select: { id: true, nombre: true } },
+  responsable: { select: { id: true, nombre: true } },
+} as const;
+
+const INCLUDE_TAREA = {
+  responsables: { include: { empleado: { select: { id: true, nombre: true } } } },
+  registrosHoras: { include: { empleado: { select: { id: true, nombre: true } } }, orderBy: { fecha: 'desc' as const } },
+} as const;
+
+/**
+ * Un solo repositorio para todo el plugin de Proyectos (Proyecto, Hito,
+ * Tarea, responsables, registro de horas) — mismo criterio de "no
+ * fragmentar de más" que `facturacion.repository.ts` con sus líneas.
+ */
+@Injectable()
+export class ProyectosRepository {
+  constructor(private readonly tenantPrisma: TenantPrismaService) {}
+
+  private get db() {
+    return this.tenantPrisma.client;
+  }
+
+  // ---------- Proyecto ----------
+
+  crearProyecto(dto: CrearProyectoDto, tenantId: string) {
+    return this.db.proyecto.create({
+      data: {
+        nombre: dto.nombre,
+        descripcion: dto.descripcion,
+        clienteId: dto.clienteId,
+        responsableId: dto.responsableId,
+        presupuesto: dto.presupuesto,
+        modoFacturacion: dto.modoFacturacion,
+        tarifaHoraFacturable: dto.tarifaHoraFacturable,
+        estado: dto.estado,
+        fechaInicio: aFecha(dto.fechaInicio),
+        fechaFinEstimada: aFecha(dto.fechaFinEstimada),
+        tenantId,
+      },
+      include: INCLUDE_PROYECTO,
+    });
+  }
+
+  listarProyectos(params: { skip: number; take: number; busqueda?: string }) {
+    const where = params.busqueda ? { nombre: { contains: params.busqueda, mode: 'insensitive' as const } } : {};
+    return Promise.all([
+      this.db.proyecto.findMany({ where, orderBy: { createdAt: 'desc' }, skip: params.skip, take: params.take, include: INCLUDE_PROYECTO }),
+      this.db.proyecto.count({ where }),
+    ]);
+  }
+
+  buscarProyectoPorId(id: string) {
+    return this.db.proyecto.findUniqueOrThrow({
+      where: { id },
+      include: {
+        ...INCLUDE_PROYECTO,
+        hitos: { orderBy: { createdAt: 'asc' } },
+        tareas: { include: INCLUDE_TAREA, orderBy: { createdAt: 'asc' } },
+      },
+    });
+  }
+
+  actualizarProyecto(id: string, dto: Partial<CrearProyectoDto>) {
+    return this.db.proyecto.update({
+      where: { id },
+      data: { ...dto, fechaInicio: aFecha(dto.fechaInicio), fechaFinEstimada: aFecha(dto.fechaFinEstimada) },
+      include: INCLUDE_PROYECTO,
+    });
+  }
+
+  eliminarProyecto(id: string) {
+    // Cascade en schema.prisma se encarga de hitos/tareas/registros de hora.
+    return this.db.proyecto.delete({ where: { id } });
+  }
+
+  // ---------- Hito ----------
+
+  crearHito(proyectoId: string, dto: CrearHitoDto, tenantId: string) {
+    return this.db.hitoProyecto.create({ data: { ...dto, fechaObjetivo: aFecha(dto.fechaObjetivo), proyectoId, tenantId } });
+  }
+
+  buscarHitoPorId(id: string) {
+    return this.db.hitoProyecto.findUniqueOrThrow({ where: { id } });
+  }
+
+  actualizarHito(id: string, dto: Partial<CrearHitoDto>) {
+    return this.db.hitoProyecto.update({ where: { id }, data: { ...dto, fechaObjetivo: aFecha(dto.fechaObjetivo) } });
+  }
+
+  eliminarHito(id: string) {
+    return this.db.hitoProyecto.delete({ where: { id } });
+  }
+
+  // ---------- Tarea ----------
+
+  crearTarea(proyectoId: string, dto: CrearTareaProyectoDto, tenantId: string) {
+    return this.db.tareaProyecto.create({
+      data: { ...dto, fechaVencimiento: aFecha(dto.fechaVencimiento), proyectoId, tenantId },
+      include: INCLUDE_TAREA,
+    });
+  }
+
+  buscarTareaPorId(id: string) {
+    return this.db.tareaProyecto.findUniqueOrThrow({ where: { id }, include: INCLUDE_TAREA });
+  }
+
+  actualizarTarea(id: string, dto: Partial<CrearTareaProyectoDto>) {
+    return this.db.tareaProyecto.update({
+      where: { id },
+      data: { ...dto, fechaVencimiento: aFecha(dto.fechaVencimiento) },
+      include: INCLUDE_TAREA,
+    });
+  }
+
+  eliminarTarea(id: string) {
+    return this.db.tareaProyecto.delete({ where: { id } });
+  }
+
+  // ---------- Responsables de tarea ----------
+
+  /** `upsert` sobre el `@@unique([tareaId, empleadoId])` — asignar dos veces al mismo empleado no duplica ni tira error. */
+  asignarResponsable(tareaId: string, empleadoId: string) {
+    return this.db.tareaProyectoResponsable.upsert({
+      where: { tareaId_empleadoId: { tareaId, empleadoId } },
+      create: { tareaId, empleadoId },
+      update: {},
+    });
+  }
+
+  quitarResponsable(tareaId: string, empleadoId: string) {
+    return this.db.tareaProyectoResponsable.deleteMany({ where: { tareaId, empleadoId } });
+  }
+
+  // ---------- Registro de horas ----------
+
+  crearRegistroHora(tareaId: string, dto: CrearRegistroHoraDto, tenantId: string) {
+    return this.db.registroHoraProyecto.create({ data: { ...dto, fecha: aFecha(dto.fecha) as Date, tareaId, tenantId } });
+  }
+
+  buscarRegistroHoraPorId(id: string) {
+    return this.db.registroHoraProyecto.findUniqueOrThrow({ where: { id } });
+  }
+
+  eliminarRegistroHora(id: string) {
+    return this.db.registroHoraProyecto.delete({ where: { id } });
+  }
+}

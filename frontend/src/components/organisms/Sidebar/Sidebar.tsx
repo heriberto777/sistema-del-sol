@@ -13,6 +13,7 @@ import {
   Contact,
   ExternalLink,
   FileText,
+  FolderKanban,
   Globe,
   HandCoins,
   LayoutDashboard,
@@ -108,6 +109,7 @@ const GRUPOS: Grupo[] = [
       { ruta: '/notas-credito', etiqueta: 'Notas de crédito/débito', icono: RotateCcw, permisos: ['facturacion.ver'], modulo: 'facturacion' },
       { ruta: '/pos', etiqueta: 'Punto de venta', icono: Store, permisos: ['pos.ver'], modulo: 'pos' },
       { ruta: '/tienda-online', etiqueta: 'Tienda Online', icono: Globe, permisos: ['admin.configuracion'], modulo: 'ecommerce' },
+      { ruta: '/proyectos', etiqueta: 'Proyectos', icono: FolderKanban, permisos: ['proyectos.ver'], modulo: 'proyectos' },
       // Sirve tanto a Ventas (clientes) como a Compras (proveedores) —
       // se prioriza acá por ser el uso más frecuente.
       { ruta: '/contactos', etiqueta: 'Contactos', icono: Contact, permisos: ['clientes.ver', 'compras.ver'] },

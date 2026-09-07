@@ -52,4 +52,9 @@ export class CrearGastoMenorDto {
   @ValidateNested({ each: true })
   @Type(() => LineaGastoMenorDto)
   lineas: LineaGastoMenorDto[];
+
+  @ApiProperty({ required: false, description: 'Plugin de Proyectos (opcional) — asocia este gasto al costo de un proyecto puntual' })
+  @IsOptional()
+  @IsUUID()
+  proyectoId?: string;
 }

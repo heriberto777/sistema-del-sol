@@ -109,6 +109,10 @@ model Tenant {
   pedidosTienda             PedidoTienda[]
   seccionesTienda           SeccionTienda[]
   dominios                  TenantDominio[]
+  proyectos                 Proyecto[]
+  hitosProyecto             HitoProyecto[]
+  tareasProyecto            TareaProyecto[]
+  registrosHoraProyecto     RegistroHoraProyecto[]
 
   @@map("tenants")
 }
@@ -1477,6 +1481,12 @@ model GastoMenor {
   itbis            Decimal        @db.Decimal(14, 2)
   total            Decimal        @db.Decimal(14, 2)
   createdAt        DateTime       @default(now())
+  // Plugin de Proyectos (Fase 1) — opcional, reusa el flujo de creación de
+  // gastos ya existente, solo lo asocia a un proyecto puntual para sumarlo
+  // a su costo. onDelete SetNull: borrar el proyecto no debe borrar el
+  // gasto contable ya registrado.
+  proyectoId       String?
+  proyecto         Proyecto?      @relation(fields: [proyectoId], references: [id], onDelete: SetNull)
 
   lineas LineaGastoMenor[]
 
@@ -1645,6 +1655,9 @@ model Empleado {
   registrosAsistencia RegistroAsistencia[]
   ausencias           Ausencia[]
   comisionesVenta     ComisionVenta[]
+  proyectosResponsable      Proyecto[]
+  tareasProyectoResponsable TareaProyectoResponsable[]
+  registrosHoraProyecto     RegistroHoraProyecto[]
 
   @@unique([tenantId, cedula])
   @@map("empleados")
@@ -3241,6 +3254,7 @@ model Cliente {
   ventasAparcadas    VentaAparcada[]
   movimientosLealtad MovimientoLealtad[]
   carritosBorrador   CarritoBorrador[]
+  proyectos          Proyecto[]
 
   @@map("clientes")
 }
@@ -3657,4 +3671,148 @@ model Bono {
 
   @@unique([tenantId, codigo])
   @@map("bonos")
+}
+
+// ============================================================
+// PROYECTOS (plugin) — Fase 1, ver plugins/proyectos/README.md
+// ============================================================
+
+enum EstadoProyecto {
+  PLANIFICADO
+  EN_CURSO
+  PAUSADO
+  TERMINADO
+  CANCELADO
+}
+
+/// PRECIO_FIJO: cada HitoProyecto tiene su propio `montoFijo`, pactado de
+/// antemano. POR_HORAS: el monto a facturar de cada hito se calcula
+/// aparte (horas registradas x `tarifaHoraFacturable`), no se guarda un
+/// monto fijo por hito. Decisión explícita del usuario: elegible por
+/// proyecto, no un único modo global.
+enum ModoFacturacionProyecto {
+  PRECIO_FIJO
+  POR_HORAS
+}
+
+enum EstadoHitoProyecto {
+  PENDIENTE
+  EN_CURSO
+  COMPLETADO
+  FACTURADO
+}
+
+enum EstadoTareaProyecto {
+  PENDIENTE
+  EN_CURSO
+  EN_REVISION
+  TERMINADA
+}
+
+enum PrioridadTareaProyecto {
+  BAJA
+  MEDIA
+  ALTA
+  URGENTE
+}
+
+model Proyecto {
+  id                   String                  @id @default(uuid())
+  tenantId             String
+  tenant               Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  nombre               String
+  descripcion          String?
+  clienteId            String
+  cliente              Cliente                 @relation(fields: [clienteId], references: [id])
+  responsableId        String?
+  responsable          Empleado?               @relation(fields: [responsableId], references: [id], onDelete: SetNull)
+  presupuesto          Decimal?                @db.Decimal(14, 2)
+  modoFacturacion      ModoFacturacionProyecto @default(PRECIO_FIJO)
+  // Solo aplica si modoFacturacion = POR_HORAS — tarifa que se le COBRA AL
+  // CLIENTE por hora. Distinta del costo interno (se deriva de
+  // Empleado.salarioBrutoMensual / CONFIGURACIONES_BASE.PROYECTOS_HORAS_LABORABLES_MES,
+  // ver costo-hora.util.ts — nunca se guarda, se calcula al vuelo).
+  tarifaHoraFacturable Decimal?                @db.Decimal(14, 2)
+  estado               EstadoProyecto          @default(PLANIFICADO)
+  fechaInicio          DateTime?
+  fechaFinEstimada     DateTime?
+  createdAt            DateTime                @default(now())
+  updatedAt            DateTime                @updatedAt
+
+  hitos  HitoProyecto[]
+  tareas TareaProyecto[]
+  gastos GastoMenor[]
+
+  @@map("proyectos")
+}
+
+model HitoProyecto {
+  id            String             @id @default(uuid())
+  tenantId      String
+  tenant        Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  proyectoId    String
+  proyecto      Proyecto           @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
+  nombre        String
+  fechaObjetivo DateTime?
+  // Solo si el Proyecto es PRECIO_FIJO — monto pactado de antemano para
+  // este hito puntual (ver Fase 4: generar la Factura real desde acá).
+  montoFijo     Decimal?           @db.Decimal(14, 2)
+  estado        EstadoHitoProyecto @default(PENDIENTE)
+  createdAt     DateTime           @default(now())
+
+  tareas TareaProyecto[]
+
+  @@map("hitos_proyecto")
+}
+
+model TareaProyecto {
+  id               String                 @id @default(uuid())
+  tenantId         String
+  tenant           Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  proyectoId       String
+  proyecto         Proyecto               @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
+  hitoId           String?
+  hito             HitoProyecto?          @relation(fields: [hitoId], references: [id], onDelete: SetNull)
+  titulo           String
+  descripcion      String?
+  estado           EstadoTareaProyecto    @default(PENDIENTE)
+  prioridad        PrioridadTareaProyecto @default(MEDIA)
+  fechaVencimiento DateTime?
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+
+  responsables   TareaProyectoResponsable[]
+  registrosHoras RegistroHoraProyecto[]
+
+  @@map("tareas_proyecto")
+}
+
+/// Tabla hija sin tenantId propio (mismo patrón que LineaFactura/
+/// LineaGastoMenor) — su aislamiento depende de llegar siempre vía una
+/// TareaProyecto ya resuelta contra el tenant.
+model TareaProyectoResponsable {
+  id         String        @id @default(uuid())
+  tareaId    String
+  tarea      TareaProyecto @relation(fields: [tareaId], references: [id], onDelete: Cascade)
+  empleadoId String
+  empleado   Empleado      @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+
+  @@unique([tareaId, empleadoId])
+  @@map("tarea_proyecto_responsables")
+}
+
+model RegistroHoraProyecto {
+  id         String        @id @default(uuid())
+  tenantId   String
+  tenant     Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tareaId    String
+  tarea      TareaProyecto @relation(fields: [tareaId], references: [id], onDelete: Cascade)
+  empleadoId String
+  empleado   Empleado      @relation(fields: [empleadoId], references: [id])
+  fecha      DateTime
+  horas      Decimal       @db.Decimal(5, 2)
+  nota       String?
+  createdAt  DateTime      @default(now())
+
+  @@map("registros_hora_proyecto")
 }

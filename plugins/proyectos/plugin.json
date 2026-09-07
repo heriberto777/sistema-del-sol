@@ -1,0 +1,6 @@
+{
+  "key": "proyectos",
+  "nombre": "Proyectos",
+  "version": "0.1.0",
+  "descripcion": "Gestión de proyectos con hitos, tareas, horas y costos — integrado a Contactos/Empleados/Facturación existentes, no un tablero aislado. Implementación real en backend/src/proyectos/ — ver README.md."
+}

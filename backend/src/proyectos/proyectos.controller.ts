@@ -1,0 +1,76 @@
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { ProyectosService } from './proyectos.service';
+import { CrearProyectoDto } from './dto/crear-proyecto.dto';
+import { CrearHitoDto } from './dto/crear-hito.dto';
+import { Permissions } from '../common/decorators/permissions.decorator';
+import { RequiereModulo } from '../common/decorators/requiere-modulo.decorator';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { JwtPayloadUser } from '../common/types/authenticated-request';
+import { ListadoQueryDto } from '../common/dto/listado-query.dto';
+
+@ApiBearerAuth()
+@ApiTags('proyectos')
+@RequiereModulo('proyectos')
+@Controller('admin/proyectos')
+export class ProyectosController {
+  constructor(private readonly proyectosService: ProyectosService) {}
+
+  @Post()
+  @Permissions('proyectos.crear')
+  crear(@Body() dto: CrearProyectoDto, @CurrentUser() user: JwtPayloadUser) {
+    return this.proyectosService.crear(dto, user.tenantId);
+  }
+
+  @Get()
+  @Permissions('proyectos.ver')
+  listar(@Query() query: ListadoQueryDto) {
+    return this.proyectosService.listar(query);
+  }
+
+  // Ruta literal antes de ':id' a propósito (mismo cuidado de orden que
+  // otros controllers de este proyecto, ej. FacturacionController).
+  @Get('empleados')
+  @Permissions('proyectos.ver')
+  listarEmpleadosDisponibles() {
+    return this.proyectosService.listarEmpleadosDisponibles();
+  }
+
+  @Get(':id')
+  @Permissions('proyectos.ver')
+  buscarPorId(@Param('id') id: string) {
+    return this.proyectosService.buscarPorId(id);
+  }
+
+  @Patch(':id')
+  @Permissions('proyectos.editar')
+  actualizar(@Param('id') id: string, @Body() dto: Partial<CrearProyectoDto>) {
+    return this.proyectosService.actualizar(id, dto);
+  }
+
+  @Delete(':id')
+  @Permissions('proyectos.editar')
+  eliminar(@Param('id') id: string) {
+    return this.proyectosService.eliminar(id);
+  }
+
+  // ---------- Hitos ----------
+
+  @Post(':proyectoId/hitos')
+  @Permissions('proyectos.crear')
+  crearHito(@Param('proyectoId') proyectoId: string, @Body() dto: CrearHitoDto, @CurrentUser() user: JwtPayloadUser) {
+    return this.proyectosService.crearHito(proyectoId, dto, user.tenantId);
+  }
+
+  @Patch('hitos/:id')
+  @Permissions('proyectos.editar')
+  actualizarHito(@Param('id') id: string, @Body() dto: Partial<CrearHitoDto>) {
+    return this.proyectosService.actualizarHito(id, dto);
+  }
+
+  @Delete('hitos/:id')
+  @Permissions('proyectos.editar')
+  eliminarHito(@Param('id') id: string) {
+    return this.proyectosService.eliminarHito(id);
+  }
+}

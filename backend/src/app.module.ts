@@ -59,6 +59,7 @@ import { PosModule } from './pos/pos.module';
 import { IaModule } from './ia/ia.module';
 import { BancosModule } from './bancos/bancos.module';
 import { GastosMenoresModule } from './gastos-menores/gastos-menores.module';
+import { ProyectosModule } from './proyectos/proyectos.module';
 import { FormasPagoModule } from './formas-pago/formas-pago.module';
 import { CategoriasModule } from './categorias/categorias.module';
 import { CategoriasClienteModule } from './categorias-cliente/categorias-cliente.module';
@@ -151,6 +152,7 @@ import { TenantMiddleware } from './common/middleware/tenant.middleware';
     AtributosModule,
     VariantesModule,
     GastosMenoresModule,
+    ProyectosModule,
     OfertasModule,
     ComisionesModule,
     LealtadModule,

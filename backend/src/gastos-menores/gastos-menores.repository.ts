@@ -71,6 +71,7 @@ export class GastosMenoresRepository {
       monto: number;
       itbis: number;
       total: number;
+      proyectoId?: string;
       lineas: LineaCalculada[];
     },
   ) {
@@ -85,6 +86,7 @@ export class GastosMenoresRepository {
         monto: params.monto,
         itbis: params.itbis,
         total: params.total,
+        proyectoId: params.proyectoId,
         lineas: {
           create: params.lineas.map((linea) => ({
             cuentaContableId: linea.cuentaContableId,
