@@ -150,6 +150,20 @@ describe('ConteoFisicoService', () => {
       expect(repository.marcarAplicado).toHaveBeenCalledWith('cf1', 'aj-1');
     });
 
+    it('si cambiarEstado a CONFIRMADO falla (ej. PIN incorrecto), cancela el Ajuste recién creado en vez de dejarlo huérfano en BORRADOR', async () => {
+      repository.buscarPorId.mockResolvedValue(conteoBase as never);
+      const errorPin = new BadRequestException('PIN incorrecto');
+      ajustesInventarioService.cambiarEstado.mockImplementation((_id, dto) =>
+        (dto as { estado: string }).estado === 'CONFIRMADO' ? Promise.reject(errorPin) : Promise.resolve(undefined as never),
+      );
+
+      await expect(service.aplicar('cf1', 't1', 'u1', 'mal-pin')).rejects.toThrow(errorPin);
+
+      expect(ajustesInventarioService.cambiarEstado).toHaveBeenNthCalledWith(1, 'aj-1', { estado: 'CONFIRMADO', pin: 'mal-pin' }, 't1', 'u1');
+      expect(ajustesInventarioService.cambiarEstado).toHaveBeenNthCalledWith(2, 'aj-1', { estado: 'CANCELADO' }, 't1', 'u1');
+      expect(repository.marcarAplicado).not.toHaveBeenCalled();
+    });
+
     it('no genera ningún Ajuste si ninguna línea tuvo diferencia real', async () => {
       repository.buscarPorId.mockResolvedValue({
         ...conteoBase,

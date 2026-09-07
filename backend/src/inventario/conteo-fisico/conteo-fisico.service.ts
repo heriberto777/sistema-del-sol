@@ -124,7 +124,18 @@ export class ConteoFisicoService {
         tenantId,
         userId,
       );
-      await this.ajustesInventarioService.cambiarEstado(ajuste.id, { estado: 'CONFIRMADO', pin }, tenantId, userId);
+      try {
+        await this.ajustesInventarioService.cambiarEstado(ajuste.id, { estado: 'CONFIRMADO', pin }, tenantId, userId);
+      } catch (error) {
+        // Si el PIN es incorrecto (u otro rechazo de cambiarEstado), el
+        // Ajuste ya quedó creado en BORRADOR — cancelarlo (transición
+        // segura, sin PIN ni movimiento de stock) para no dejarlo huérfano
+        // sin ningún ConteoFisico que lo referencie (bug real encontrado
+        // en la verificación en vivo: un PIN incorrecto dejaba un Ajuste
+        // BORRADOR fantasma para siempre).
+        await this.ajustesInventarioService.cambiarEstado(ajuste.id, { estado: 'CANCELADO' }, tenantId, userId);
+        throw error;
+      }
       ajusteId = ajuste.id;
     }
 
