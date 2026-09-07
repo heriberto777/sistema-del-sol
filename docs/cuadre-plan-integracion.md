@@ -465,7 +465,7 @@ Resumen de lo que cambió (detalle en cada ítem más abajo):
   funcionalidad de cuentas por cobrar más grande, candidata a su propia
   sesión de diseño. Migración `20260821160000_forma_pago_tipo`. Entregado
   2026-08-21.
-- [ ] **E-12** 🟧 — **Página dedicada de Alertas de Inventario + popup
+- [x] **E-12** 🟧 — **Página dedicada de Alertas de Inventario + popup
   proactivo al iniciar sesión**. *Confirmado (Parte 8, auditoría en
   vivo): `/inventory-alerts` en Cuadre es una página propia (4 tabs:
   Resumen/Stock Bajo/Sin Stock/Por Vencer) con drill-down real —
@@ -476,16 +476,16 @@ Resumen de lo que cambió (detalle en cada ítem más abajo):
   "Ver Alertas →". Nuestro E-4 (entregado 2026-08-24) solo cubre las 4
   tarjetas de conteo en `Dashboard.tsx` — sin página propia navegable
   y sin ningún aviso proactivo: si nadie entra al Dashboard a mirar,
-  nadie se entera.* Alcance propuesto: página nueva (ej.
-  `/inventario/alertas`, reusa los 4 números que ya calcula `GET
-  /reportes/dashboard`) con 4 tabs y un endpoint de listado por
-  categoría (`GET /inventario/alertas?categoria=sinStock|stockBajo|
-  porVencer|vencidos`, paginado igual que el resto de listados); popup
-  al primer acceso al Dashboard de la sesión (sessionStorage en el
-  frontend para no repetir — no hace falta persistir "ya visto" en el
-  backend). Diseño primero: confirmar con el usuario si el popup debe
-  respetar permisos (ej. no mostrarse a un Cajero sin `inventario.ver`)
-  antes de implementar.
+  nadie se entera.* Entregado: `GET /inventario/alertas?categoria=
+  sinStock|stockBajo|porVencer|vencidos` (paginado, permiso
+  `inventario.ver`); página `/inventario/alertas` con 5 tabs (Resumen +
+  una por cada categoría real del sistema, que ya distingue "vencidos"
+  de "por vencer" a diferencia de Cuadre); popup proactivo una vez por
+  sesión de pestaña (`sessionStorage`), gateado por `inventario.ver`
+  (decisión confirmada con el usuario, `AskUserQuestion`) — de paso se
+  corrigió que las 4 tarjetas de `Dashboard.tsx` (E-4) no tenían ningún
+  gate de permiso propio. Migración: ninguna (no toca schema). Entregado
+  2026-09-07.
 
 ## F — POS
 
@@ -1180,16 +1180,26 @@ descuenta de verdad — hallazgo nuevo, no tenía ítem propio) y B-9
 Diseño completo en
 `C:\Users\longb\.claude\plans\memoized-noodling-moore.md`.
 
-Lo que queda, por categoría:
-- **No bloqueante, sin implementar**: E-1 (Patrón Borrador→Confirmado en
-  Compras/Ajustes/Transferencias, matiz).
-- **🟥, pendientes de su propia conversación de diseño**: A-4,
-  B-5, F-9, G-9 (hardware), J-4 (API keys, reclasificado — no aplica
-  sin una API pública).
+**Actualización 2026-09-07**: al revisar los 7 ítems que seguían
+abiertos antes de atacar E-1/E-12, se encontró que **A-4, B-5 y E-1 ya
+estaban resueltos** (de sesiones/iniciativas anteriores, sin que este
+checklist se actualizara) y se entregó **E-12** (página de Alertas de
+Inventario + popup, con el fix de un gap de permisos en el Dashboard
+encontrado de paso). Ver el detalle de cada uno arriba, en su propio
+ítem.
 
-Todos los 🟥 restantes necesitan una conversación de alcance ANTES de
-tocar código — mismo criterio que Sucursales (Fase 8), PIN (Fase 9) y
-D-1:
-presentar el diseño, resolver casos límite con el usuario, y recién
-después ejecutar. Ninguno se debe empezar a implementar directo desde
-este documento.
+Lo que queda, por categoría — **todos 🟥, pendientes de su propia
+conversación de diseño**, ninguno bloqueante para la operación normal
+del sistema (ver el artifact "Brechas Grandes de Cuadre",
+2026-09-07, para el detalle de impacto de cada uno):
+- **F-9** — Impresión local ESC/POS (la apertura de gaveta ya está
+  resuelta vía `agente-caja/`; falta extenderlo para imprimir).
+- **G-9** — Integración con relojes biométricos (depende de hardware
+  específico del cliente).
+- **J-4** — API keys con scopes granulares (bloqueado hasta que exista
+  una API pública real que las necesite).
+
+Ninguno de los tres se debe empezar a implementar directo desde este
+documento — mismo criterio que Sucursales (Fase 8), PIN (Fase 9) y
+D-1: presentar el diseño, resolver casos límite con el usuario, y
+recién después ejecutar.
