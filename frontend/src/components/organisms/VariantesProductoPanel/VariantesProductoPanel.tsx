@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../../lib/api-client';
 import { Button } from '../../atoms/Button/Button';
 import { Badge } from '../../atoms/Badge/Badge';
+import { Modal } from '../../molecules/Modal/Modal';
 import { useVariantesProducto, etiquetaVariante, type VarianteProducto } from '../../../hooks/useVariantesProducto';
 import { imprimirEtiquetas, descargarZplEtiquetas, descargarEplEtiquetas } from '../../../lib/etiquetas-codigo-barras';
 
@@ -39,6 +40,7 @@ export function VariantesProductoPanel({ productoId, nombreProducto }: { product
   const [inicializado, setInicializado] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [menuGenerarAbierto, setMenuGenerarAbierto] = useState<string | null>(null);
+  const [confirmarReemplazo, setConfirmarReemplazo] = useState<{ variante: VarianteProducto; formato: 'EAN13' | 'CODE128' } | null>(null);
 
   const { data: atributos } = useQuery({
     queryKey: ['atributos'],
@@ -102,7 +104,8 @@ export function VariantesProductoPanel({ productoId, nombreProducto }: { product
 
   function elegirGenerar(variante: VarianteProducto, formato: 'EAN13' | 'CODE128') {
     setMenuGenerarAbierto(null);
-    if (variante.codigoBarras && !confirm(`Esta variante ya tiene el código "${variante.codigoBarras}" cargado — ¿generar uno nuevo y reemplazarlo?`)) {
+    if (variante.codigoBarras) {
+      setConfirmarReemplazo({ variante, formato });
       return;
     }
     generarCodigoBarras.mutate({ varianteId: variante.id, formato });
@@ -246,6 +249,31 @@ export function VariantesProductoPanel({ productoId, nombreProducto }: { product
             </div>
           ))}
         </div>
+      )}
+
+      {confirmarReemplazo && (
+        <Modal titulo="Reemplazar código de barras" onClose={() => setConfirmarReemplazo(null)}>
+          <div className="space-y-4">
+            <p className="text-sm text-slate-600 dark:text-slate-400">
+              Esta variante ya tiene el código <span className="font-mono font-medium text-slate-900 dark:text-slate-100">{confirmarReemplazo.variante.codigoBarras}</span> cargado
+              — ¿generar uno nuevo y reemplazarlo?
+            </p>
+            <div className="flex justify-end gap-2">
+              <Button type="button" variante="secundario" onClick={() => setConfirmarReemplazo(null)}>
+                Cancelar
+              </Button>
+              <Button
+                type="button"
+                onClick={() => {
+                  generarCodigoBarras.mutate({ varianteId: confirmarReemplazo.variante.id, formato: confirmarReemplazo.formato });
+                  setConfirmarReemplazo(null);
+                }}
+              >
+                Reemplazar
+              </Button>
+            </div>
+          </div>
+        </Modal>
       )}
     </div>
   );

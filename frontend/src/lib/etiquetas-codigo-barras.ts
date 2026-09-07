@@ -1,5 +1,5 @@
 import JsBarcode from 'jsbarcode';
-import { abrirBlob, descargarBlob } from './descargar-archivo';
+import { descargarBlob } from './descargar-archivo';
 
 export interface EtiquetaCodigoBarras {
   codigoBarras: string;
@@ -94,9 +94,28 @@ export function generarHtmlEtiquetas(etiquetas: EtiquetaCodigoBarras[]): string 
 </html>`;
 }
 
+/**
+ * `window.open()` (vía `abrirBlob`) queda a merced del bloqueador de
+ * popups del navegador — sin ningún aviso claro para el usuario más allá
+ * de un ícono chico en la barra de direcciones, así que un clic en
+ * "Imprimir etiquetas" podía no mostrar nada. Un `<iframe>` oculto en la
+ * misma página no abre ninguna ventana nueva, así que ningún bloqueador
+ * de popups puede interceptarlo — el propio HTML generado ya dispara
+ * `window.print()` en su `onload` (ver `generarHtmlEtiquetas`), que
+ * dentro del iframe imprime (con vista previa) el contenido del iframe.
+ */
 export function imprimirEtiquetas(etiquetas: EtiquetaCodigoBarras[]) {
   const html = generarHtmlEtiquetas(etiquetas);
-  abrirBlob(new Blob([html], { type: 'text/html' }));
+  const iframe = document.createElement('iframe');
+  iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;';
+  document.body.appendChild(iframe);
+  iframe.addEventListener('load', () => {
+    const quitar = () => iframe.remove();
+    iframe.contentWindow?.addEventListener('afterprint', quitar, { once: true });
+    // Red de seguridad: no todos los navegadores disparan 'afterprint' de forma consistente dentro de un iframe.
+    setTimeout(quitar, 60_000);
+  });
+  iframe.srcdoc = html;
 }
 
 /**
