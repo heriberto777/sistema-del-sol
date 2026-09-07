@@ -11,6 +11,7 @@ import {
   CalendarClock,
   ChevronsLeft,
   ChevronsRight,
+  ClipboardCheck,
   Contact,
   ExternalLink,
   FileText,
@@ -150,6 +151,9 @@ const GRUPOS: Grupo[] = [
       // Ítem E-12 — página dedicada de Alertas (Sin Stock/Stock Bajo/Por
       // Vencer/Vencidos), antes solo tarjetas de conteo en el Dashboard.
       { ruta: '/inventario/alertas', etiqueta: 'Alertas de inventario', icono: AlertTriangle, permisos: ['inventario.ver'], modulo: 'inventario' },
+      // Conteo Físico vs Teórico — cuenta a ciegas, compara contra el
+      // stock teórico, genera un Ajuste real solo con las diferencias.
+      { ruta: '/inventario/conteos', etiqueta: 'Conteos físicos', icono: ClipboardCheck, permisos: ['inventario.ver'], modulo: 'inventario' },
       { ruta: '/compras', etiqueta: 'Compras', icono: ShoppingBag, permisos: ['compras.ver'], modulo: 'compras' },
       { ruta: '/productos', etiqueta: 'Productos', icono: Tag, permisos: ['precios.ver'], modulo: 'productos' },
     ],

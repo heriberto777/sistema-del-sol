@@ -14,7 +14,12 @@ export const PERMISOS_BASE = [
   'pos.ver', 'pos.editar', 'pos.supervisar',
   'ia.usar',
   'notificaciones.ver',
-  'inventario.ver', 'inventario.ajustar', 'inventario.transferir',
+  // Conteo Físico vs Teórico — 'inventario.contar' separado de
+  // 'inventario.ajustar' a propósito: permite que quien cuenta
+  // físicamente capture cantidades sin poder mover stock a mano
+  // libremente vía Ajustes. Aplicar un conteo (lo que sí mueve stock,
+  // generando un Ajuste real) sigue exigiendo 'inventario.ajustar'.
+  'inventario.ver', 'inventario.ajustar', 'inventario.transferir', 'inventario.contar',
   'sucursales.ver', 'sucursales.editar',
   'precios.ver', 'precios.editar',
   // Adicional opt-in (ítem "Generar con IA" al crear un producto) — no lo
@@ -98,7 +103,7 @@ export const ROLES_BASE: Record<string, string[]> = {
     'clientes.crear', 'clientes.ver', 'precios.ver', 'bonos.ver', 'lealtad.ver',
     'pos.ver', 'pos.editar', 'pos.supervisar', 'ia.usar', 'notificaciones.ver', 'whatsapp.bandeja.usar',
   ],
-  Almacenero: ['inventario.ver', 'inventario.ajustar', 'inventario.transferir', 'compras.recibir', 'remisiones.ver'],
+  Almacenero: ['inventario.ver', 'inventario.ajustar', 'inventario.transferir', 'inventario.contar', 'compras.recibir', 'remisiones.ver'],
   Contador: ['facturacion.ver', 'facturacion.cobrar', 'facturacion.imprimir', 'cuentasporcobrar.ver', 'compras.ver', 'compras.pagar', 'cuentasporpagar.ver', 'reportes.ver', 'comisiones.ver', 'precios.ver', 'contabilidad.ver', 'contabilidad.editar', 'contabilidad.anular', 'contabilidad.cerrarperiodo', 'contabilidad.conciliar', 'bancos.ver', 'bancos.editar', 'gastosmenores.ver', 'gastosmenores.crear', 'nomina.ver', 'nomina.editar', 'rrhh.ver', 'ia.usar', 'notificaciones.ver'],
   Auditor: ['auditoria.ver', 'facturacion.ver', 'facturacion.imprimir', 'inventario.ver', 'compras.ver', 'reportes.ver', 'cotizaciones.ver', 'remisiones.ver', 'contabilidad.ver', 'bancos.ver', 'gastosmenores.ver', 'nomina.ver', 'rrhh.ver', 'sucursales.ver', 'notificaciones.ver'],
 };

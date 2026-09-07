@@ -17,4 +17,5 @@ export const CORRELATIVOS_BASE: TipoCorrelativo[] = [
   'FACTURA',
   'AJUSTE',
   'TRANSFERENCIA',
+  'CONTEO_FISICO',
 ];

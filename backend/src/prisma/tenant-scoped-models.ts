@@ -25,6 +25,7 @@ export const TENANT_SCOPED_MODELS = new Set([
   'RecepcionCompra',
   'AjusteInventario',
   'TransferenciaInventario',
+  'ConteoFisico',
   'Cliente',
   'Webhook',
   'NotificacionPlantilla',

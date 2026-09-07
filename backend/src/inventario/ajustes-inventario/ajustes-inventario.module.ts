@@ -11,5 +11,9 @@ import { CorrelativosModule } from '../../correlativos/correlativos.module';
   imports: [InventarioModule, VariantesModule, AuthModule, CorrelativosModule],
   controllers: [AjustesInventarioController],
   providers: [AjustesInventarioService, AjustesInventarioRepository],
+  // Conteo Físico vs Teórico reusa AjustesInventarioService.crear()/
+  // cambiarEstado() tal cual para aplicar las diferencias contadas —
+  // necesita poder inyectarlo.
+  exports: [AjustesInventarioService],
 })
 export class AjustesInventarioModule {}

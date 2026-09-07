@@ -17,6 +17,7 @@ import { CuentasPorPagarModule } from './cuentas-por-pagar/cuentas-por-pagar.mod
 import { InventarioModule } from './inventario/inventario.module';
 import { AjustesInventarioModule } from './inventario/ajustes-inventario/ajustes-inventario.module';
 import { TransferenciasInventarioModule } from './inventario/transferencias-inventario/transferencias-inventario.module';
+import { ConteoFisicoModule } from './inventario/conteo-fisico/conteo-fisico.module';
 import { ProductosModule } from './productos/productos.module';
 import { PreciosModule } from './precios/precios.module';
 import { ComprasModule } from './compras/compras.module';
@@ -104,6 +105,7 @@ import { TenantMiddleware } from './common/middleware/tenant.middleware';
     InventarioModule,
     AjustesInventarioModule,
     TransferenciasInventarioModule,
+    ConteoFisicoModule,
     ProductosModule,
     PreciosModule,
     ComprasModule,

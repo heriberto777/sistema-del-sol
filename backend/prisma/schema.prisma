@@ -76,6 +76,7 @@ model Tenant {
   ordenesCompra             OrdenCompra[]
   ajustesInventario         AjusteInventario[]
   transferenciasInventario  TransferenciaInventario[]
+  conteosFisicos            ConteoFisico[]
   webhooks                  Webhook[]
   notificaciones            Notificacion[]
   plantillasNotificacion    NotificacionPlantilla[]
@@ -688,6 +689,7 @@ model User {
   ordenesCompra                  OrdenCompra[]
   ajustesInventario              AjusteInventario[]
   transferenciasInventario       TransferenciaInventario[]
+  conteosFisicos                 ConteoFisico[]
   cotizaciones                   Cotizacion[]
   remisiones                     Remision[]
   turnosCaja                     TurnoCaja[]
@@ -877,6 +879,9 @@ enum TipoCorrelativo {
   // cabecera, ver AjusteInventario/TransferenciaInventario).
   AJUSTE
   TRANSFERENCIA
+  // Conteo Físico vs Teórico — documento propio con número, distinto de
+  // AJUSTE (ver ConteoFisico).
+  CONTEO_FISICO
 }
 
 /// Correlativo automático genérico (plan de integración Cuadre, ítem de
@@ -2487,6 +2492,7 @@ model Producto {
   lineasVentaAparcada           VentaAparcadaLinea[]
   lineasAjusteInventario        LineaAjusteInventario[]
   lineasTransferenciaInventario LineaTransferenciaInventario[]
+  lineasConteoFisico            LineaConteoFisico[]
   // Fotos adicionales para la Tienda Online (Fase 5) — `imagen` sigue
   // siendo la portada, esto es la galería que se suma abajo.
   imagenesAdicionales           ImagenProducto[]
@@ -2575,6 +2581,7 @@ model VarianteProducto {
   lineasVentaAparcada           VentaAparcadaLinea[]
   lineasAjusteInventario        LineaAjusteInventario[]
   lineasTransferenciaInventario LineaTransferenciaInventario[]
+  lineasConteoFisico            LineaConteoFisico[]
 
   @@unique([tenantId, codigoBarras])
   @@map("variantes_producto")
@@ -2709,6 +2716,7 @@ model Bodega {
   ajustesInventario     AjusteInventario[]
   transferenciasOrigen  TransferenciaInventario[] @relation("TransferenciaOrigen")
   transferenciasDestino TransferenciaInventario[] @relation("TransferenciaDestino")
+  conteosFisicos        ConteoFisico[]
 
   @@unique([tenantId, nombre])
   @@map("bodegas")
@@ -2998,6 +3006,9 @@ model AjusteInventario {
   createdAt DateTime               @default(now())
 
   lineas LineaAjusteInventario[]
+  // El ConteoFisico que generó este Ajuste al aplicarse (null si el
+  // Ajuste se creó directo, sin pasar por un conteo).
+  conteoFisicoOrigen ConteoFisico?
 
   @@unique([tenantId, numero])
   @@map("ajuste_inventario")
@@ -3024,6 +3035,76 @@ model LineaAjusteInventario {
   loteId           String?
 
   @@map("linea_ajuste_inventario")
+}
+
+/// Conteo Físico vs Teórico — proceso DISTINTO de AjusteInventario: acá el
+/// usuario no sabe el delta de antemano, cuenta a ciegas y el sistema
+/// calcula la diferencia contra `cantidadTeorica` (snapshot de
+/// Stock.cantidadActual tomado al ABRIR el conteo, nunca se vuelve a leer
+/// Stock para esa comparación — si no, una venta a mitad de conteo
+/// desincroniza la comparación sin que nadie se dé cuenta). Al aplicar, no
+/// mueve stock por sí mismo: genera y confirma un AjusteInventario real
+/// (motivo CORRECCION_CONTEO) solo con las líneas que tuvieron diferencia
+/// — mismo criterio que "Cotizaciones se convierte en Factura reusando
+/// FacturacionService.crear()". `diferencia` NO es una columna — se
+/// calcula en el service (cantidadContada - cantidadTeorica) para no
+/// tener un dato derivado que se pueda desincronizar.
+enum AlcanceConteoFisico {
+  TOTAL
+  SELECCION
+}
+
+enum EstadoConteoFisico {
+  ABIERTO
+  APLICADO
+  CANCELADO
+}
+
+model ConteoFisico {
+  id            String              @id @default(uuid())
+  tenantId      String
+  tenant        Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  numero        String
+  bodegaId      String
+  bodega        Bodega              @relation(fields: [bodegaId], references: [id])
+  alcance       AlcanceConteoFisico
+  estado        EstadoConteoFisico  @default(ABIERTO)
+  notas         String?
+  userId        String
+  user          User                @relation(fields: [userId], references: [id])
+  // El Ajuste real generado al aplicar (solo si hubo alguna línea con
+  // diferencia) — @unique: un conteo nunca genera más de un Ajuste.
+  ajusteId      String?             @unique
+  ajuste        AjusteInventario?   @relation(fields: [ajusteId], references: [id])
+  fechaInicio   DateTime            @default(now())
+  fechaAplicado DateTime?
+  createdAt     DateTime            @default(now())
+
+  lineas LineaConteoFisico[]
+
+  @@unique([tenantId, numero])
+  @@map("conteos_fisicos")
+}
+
+model LineaConteoFisico {
+  id              String       @id @default(uuid())
+  conteoId        String
+  conteo          ConteoFisico @relation(fields: [conteoId], references: [id], onDelete: Cascade)
+  productoId      String
+  producto        Producto     @relation(fields: [productoId], references: [id], onDelete: Cascade)
+  varianteId      String
+  variante        VarianteProducto @relation(fields: [varianteId], references: [id])
+  // Snapshot de Stock.cantidadActual al ABRIR el conteo — nunca se
+  // recalcula después.
+  cantidadTeorica Decimal      @db.Decimal(14, 4)
+  // Null = todavía no se contó esta línea (permite aplicar un conteo
+  // incompleto — decisión de diseño confirmada).
+  cantidadContada Decimal?     @db.Decimal(14, 4)
+  contadoPorId    String?
+  contadoEn       DateTime?
+
+  @@unique([conteoId, varianteId])
+  @@map("lineas_conteo_fisico")
 }
 
 // Ítem E-1 — mismo patrón que AjusteInventario, para Transferencias entre
