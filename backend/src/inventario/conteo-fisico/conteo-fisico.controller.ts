@@ -5,6 +5,7 @@ import { CrearConteoFisicoDto } from './dto/crear-conteo-fisico.dto';
 import { CapturarLineaConteoDto } from './dto/capturar-linea-conteo.dto';
 import { AplicarConteoDto } from './dto/aplicar-conteo.dto';
 import { ListarConteoFisicoQueryDto } from './dto/listar-conteo-fisico-query.dto';
+import { ListarLineasConteoQueryDto } from './dto/listar-lineas-conteo-query.dto';
 import { Permissions } from '../../common/decorators/permissions.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { JwtPayloadUser } from '../../common/types/authenticated-request';
@@ -34,8 +35,14 @@ export class ConteoFisicoController {
 
   @Get(':id')
   @Permissions('inventario.ver')
-  buscarPorId(@Param('id') id: string) {
-    return this.conteoFisicoService.buscarPorId(id);
+  buscarResumen(@Param('id') id: string) {
+    return this.conteoFisicoService.buscarResumen(id);
+  }
+
+  @Get(':id/lineas')
+  @Permissions('inventario.ver')
+  listarLineas(@Param('id') id: string, @Query() query: ListarLineasConteoQueryDto) {
+    return this.conteoFisicoService.listarLineas(id, query);
   }
 
   @Patch(':id/lineas/:lineaId')

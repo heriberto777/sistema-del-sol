@@ -28,7 +28,8 @@ interface ConteoResumen {
   estado: 'ABIERTO' | 'APLICADO' | 'CANCELADO';
   fechaInicio: string;
   bodega: Bodega;
-  lineas: { cantidadContada: string | null }[];
+  totalLineas: number;
+  lineasContadas: number;
 }
 
 interface FilaStockBodega {
@@ -90,13 +91,12 @@ export function Conteos() {
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {conteos.map((c) => {
-                  const contadas = c.lineas.filter((l) => l.cantidadContada !== null).length;
                   return (
                     <tr key={c.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
                       <td className="px-5 py-3 font-mono text-xs">{c.numero}</td>
                       <td className="px-5 py-3">{c.bodega.nombre}</td>
                       <td className="px-5 py-3">{c.alcance === 'TOTAL' ? 'Todo el catálogo' : 'Selección'}</td>
-                      <td className="px-5 py-3 text-slate-600 dark:text-slate-300">{contadas}/{c.lineas.length} contados</td>
+                      <td className="px-5 py-3 text-slate-600 dark:text-slate-300">{c.lineasContadas}/{c.totalLineas} contados</td>
                       <td className="px-5 py-3">
                         <Badge tono={TONO_ESTADO[c.estado]}>{ETIQUETA_ESTADO[c.estado]}</Badge>
                       </td>

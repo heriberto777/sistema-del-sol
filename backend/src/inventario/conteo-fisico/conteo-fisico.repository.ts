@@ -124,7 +124,14 @@ export class ConteoFisicoRepository {
     };
   }
 
-  listar(params: { skip: number; take: number; busqueda?: string; bodegaId?: string; estado?: string }) {
+  /**
+   * Devuelve `totalLineas`/`lineasContadas` ya calculados por conteo en
+   * vez de embeber `lineas` completas (que con 1000+ artículos por conteo
+   * sería un payload pesado solo para mostrar "X/Y contados" en la lista).
+   * N+1 de 2 counts por fila aceptado a propósito: esta paginación es de
+   * CONTEOS (decenas por página como mucho), no de líneas.
+   */
+  async listar(params: { skip: number; take: number; busqueda?: string; bodegaId?: string; estado?: string }) {
     const where = {
       ...(params.bodegaId ? { bodegaId: params.bodegaId } : {}),
       ...(params.estado ? { estado: params.estado as never } : {}),
@@ -132,16 +139,160 @@ export class ConteoFisicoRepository {
         ? { OR: [{ numero: { contains: params.busqueda, mode: 'insensitive' as const } }, { bodega: { nombre: { contains: params.busqueda, mode: 'insensitive' as const } } }] }
         : {}),
     };
-    return Promise.all([
+    const [conteos, total] = await Promise.all([
       this.db.conteoFisico.findMany({
         where,
         orderBy: { fechaInicio: 'desc' },
-        include: { bodega: true, lineas: { select: { cantidadContada: true } } },
+        include: { bodega: true },
         skip: params.skip,
         take: params.take,
       }),
       this.db.conteoFisico.count({ where }),
     ]);
+
+    const datos = await Promise.all(
+      conteos.map(async (c) => {
+        const [totalLineas, lineasContadas] = await Promise.all([
+          this.db.lineaConteoFisico.count({ where: { conteoId: c.id } }),
+          this.db.lineaConteoFisico.count({ where: { conteoId: c.id, cantidadContada: { not: null } } }),
+        ]);
+        return { ...c, totalLineas, lineasContadas };
+      }),
+    );
+
+    return [datos, total] as const;
+  }
+
+  /**
+   * Cabecera liviana para `GET /:id` — SIN el array de líneas (con 1000+
+   * artículos por conteo, mandarlas todas de una sola respuesta HTTP es
+   * justo lo que hay que evitar). Los agregados (`lineasConFaltante`,
+   * `sumaFaltante`, etc.) alimentan el resumen del modal "Aplicar conteo"
+   * (ver ConteoDetalle.tsx) sin necesitar la lista completa en el
+   * frontend. Se calculan trayendo SOLO `{cantidadTeorica, cantidadContada}`
+   * de todas las líneas (sin relaciones/nombres) — liviano, mismo
+   * trade-off ya aceptado en `InventarioRepository.listarAlertas` (E-12)
+   * para comparar columna contra columna, que Prisma no expresa en un
+   * `where`.
+   */
+  async buscarResumen(id: string) {
+    const conteo = await this.db.conteoFisico.findUniqueOrThrow({
+      where: { id },
+      include: {
+        bodega: true,
+        user: { select: { id: true, nombre: true } },
+        ajuste: { select: { id: true, numero: true } },
+      },
+    });
+
+    const lineas = await this.db.lineaConteoFisico.findMany({
+      where: { conteoId: id },
+      select: { cantidadTeorica: true, cantidadContada: true },
+    });
+
+    let lineasContadas = 0;
+    let lineasConFaltante = 0;
+    let lineasConSobrante = 0;
+    let lineasSinDiferencia = 0;
+    let sumaFaltante = 0;
+    let sumaSobrante = 0;
+
+    for (const linea of lineas) {
+      if (linea.cantidadContada === null) continue;
+      lineasContadas++;
+      const teorica = Number(linea.cantidadTeorica);
+      const contada = Number(linea.cantidadContada);
+      if (contada < teorica) {
+        lineasConFaltante++;
+        sumaFaltante += teorica - contada;
+      } else if (contada > teorica) {
+        lineasConSobrante++;
+        sumaSobrante += contada - teorica;
+      } else {
+        lineasSinDiferencia++;
+      }
+    }
+
+    return {
+      ...conteo,
+      totalLineas: lineas.length,
+      lineasContadas,
+      lineasConFaltante,
+      lineasConSobrante,
+      lineasSinDiferencia,
+      sumaFaltante,
+      sumaSobrante,
+    };
+  }
+
+  /**
+   * Líneas paginadas y buscables/filtrables de UN conteo, para la tabla
+   * de captura/revisión. `TODAS`/`CONTADAS`/`SIN_CONTAR` son filtros
+   * literales sobre `cantidadContada IS (NOT) NULL` — paginan 100% en
+   * SQL. `CON_FALTANTE`/`CON_SOBRANTE`/`SIN_DIFERENCIA` comparan
+   * `cantidadContada` contra `cantidadTeorica` (columna contra columna,
+   * Prisma no lo expresa en un `where`) — mismo trade-off ya aceptado en
+   * `listarAlertas` (E-12): se trae el universo acotado por
+   * `cantidadContada: {not: null}` y se filtra/pagina en JS.
+   */
+  async listarLineas(
+    conteoId: string,
+    params: { skip: number; take: number; busqueda?: string; filtro?: string },
+  ) {
+    const filtroBusqueda = params.busqueda
+      ? {
+          OR: [
+            { producto: { nombre: { contains: params.busqueda, mode: 'insensitive' as const } } },
+            { producto: { codigo: { contains: params.busqueda, mode: 'insensitive' as const } } },
+            { variante: { sku: { contains: params.busqueda, mode: 'insensitive' as const } } },
+            { variante: { codigoBarras: { contains: params.busqueda, mode: 'insensitive' as const } } },
+          ],
+        }
+      : {};
+
+    if (!params.filtro || params.filtro === 'TODAS' || params.filtro === 'CONTADAS' || params.filtro === 'SIN_CONTAR') {
+      const where = {
+        conteoId,
+        ...filtroBusqueda,
+        ...(params.filtro === 'CONTADAS' ? { cantidadContada: { not: null } } : {}),
+        ...(params.filtro === 'SIN_CONTAR' ? { cantidadContada: null } : {}),
+      };
+      const [filas, total] = await Promise.all([
+        this.db.lineaConteoFisico.findMany({
+          where,
+          include: INCLUDE_LINEA,
+          orderBy: { producto: { nombre: 'asc' } },
+          skip: params.skip,
+          take: params.take,
+        }),
+        this.db.lineaConteoFisico.count({ where }),
+      ]);
+      const datos = filas.map(({ variante, ...linea }) => ({
+        ...linea,
+        valoresAtributo: variante.valoresAtributo.map((va) => ({ atributo: va.valorAtributo.atributo.nombre, valor: va.valorAtributo.valor })),
+      }));
+      return [datos, total] as const;
+    }
+
+    const where = { conteoId, cantidadContada: { not: null }, ...filtroBusqueda };
+    const filas = await this.db.lineaConteoFisico.findMany({
+      where,
+      include: INCLUDE_LINEA,
+      orderBy: { producto: { nombre: 'asc' } },
+    });
+    const filtradas = filas.filter((f) => {
+      const teorica = Number(f.cantidadTeorica);
+      const contada = Number(f.cantidadContada);
+      if (params.filtro === 'CON_FALTANTE') return contada < teorica;
+      if (params.filtro === 'CON_SOBRANTE') return contada > teorica;
+      return contada === teorica; // SIN_DIFERENCIA
+    });
+    const pagina = filtradas.slice(params.skip, params.skip + params.take);
+    const datos = pagina.map(({ variante, ...linea }) => ({
+      ...linea,
+      valoresAtributo: variante.valoresAtributo.map((va) => ({ atributo: va.valorAtributo.atributo.nombre, valor: va.valorAtributo.valor })),
+    }));
+    return [datos, filtradas.length] as const;
   }
 
   /**

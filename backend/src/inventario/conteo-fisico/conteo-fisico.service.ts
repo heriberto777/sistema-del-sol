@@ -2,6 +2,7 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { ConteoFisicoRepository } from './conteo-fisico.repository';
 import { CrearConteoFisicoDto } from './dto/crear-conteo-fisico.dto';
 import { ListarConteoFisicoQueryDto } from './dto/listar-conteo-fisico-query.dto';
+import { ListarLineasConteoQueryDto } from './dto/listar-lineas-conteo-query.dto';
 import { InventarioService } from '../inventario.service';
 import { AjustesInventarioService } from '../ajustes-inventario/ajustes-inventario.service';
 import { CorrelativosRepository } from '../../correlativos/correlativos.repository';
@@ -74,8 +75,21 @@ export class ConteoFisicoService {
       .then(([datos, total]) => ({ datos, total, pagina, tamanoPagina }));
   }
 
+  /** Uso INTERNO (capturarLinea/aplicar/cancelar) — trae todas las líneas completas, nunca se expone tal cual por HTTP (ver buscarResumen/listarLineas para lo que consume el frontend). */
   buscarPorId(id: string) {
     return this.conteoFisicoRepository.buscarPorId(id);
+  }
+
+  /** `GET /:id` — cabecera liviana + agregados, sin el array de líneas (con 1000+ artículos por conteo, mandarlas todas de una sería el mismo problema que evita `listarLineas`). */
+  buscarResumen(id: string) {
+    return this.conteoFisicoRepository.buscarResumen(id);
+  }
+
+  listarLineas(conteoId: string, query: ListarLineasConteoQueryDto) {
+    const { pagina, tamanoPagina, skip, take } = paginar(query.pagina, query.tamanoPagina);
+    return this.conteoFisicoRepository
+      .listarLineas(conteoId, { skip, take, busqueda: query.busqueda, filtro: query.filtro })
+      .then(([datos, total]) => ({ datos, total, pagina, tamanoPagina }));
   }
 
   /**
