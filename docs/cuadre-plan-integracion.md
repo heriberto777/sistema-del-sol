@@ -110,10 +110,14 @@ Resumen de lo que cambió (detalle en cada ítem más abajo):
   historial en Contactos, hint de saldo en el checkout del POS.
   Migraciones `20260829090000_lealtad_puntos_enum` +
   `20260829090001_lealtad_puntos`. Entregado 2026-08-24.
-- [ ] **A-4** 🟥 *diseño primero, alcance grande* — **Tienda online**:
-  subdominio propio por tenant + Site Builder + pedidos + checkout. Producto
-  nuevo completo — merece su propia conversación de alcance separada.
-  *Sin verificar (obviamente no construido, no hace falta confirmar).*
+- [x] **A-4** 🟥→✅ *(corrección — ya resuelto)* — **Tienda online**:
+  subdominio propio por tenant + Site Builder + pedidos + checkout. Este
+  ítem quedó desactualizado: se resolvió por completo en el roadmap
+  propio del plugin Tienda Online (iniciativa separada, no parte de este
+  catálogo) — 17 plantillas, personalización, carrito+checkout+pedidos,
+  Secciones Dinámicas, y dominio propio real por tenant (`TenantDominio`
+  + Nginx Proxy Manager + Let's Encrypt). Sin brecha pendiente.
+  Verificado 2026-09-07.
 
 ## B — Fiscal y DGII
 
@@ -179,11 +183,15 @@ Resumen de lo que cambió (detalle en cada ítem más abajo):
   Migración `20260826014413_factura_recargos`. Verificado en vivo
   (factura de prueba con un recargo gravado — totales exactos
   confirmados contra la base de datos). Entregado 2026-08-26.
-- [ ] **B-5** 🟥 *diseño primero* — **e-CF real (firma y envío a la DGII)**:
-  Cuadre integra un proveedor certificado ("Pascal ECF") en vez de construir
-  el firmador propio. *Confirmado: brecha real, ya documentada en
-  ARCHITECTURE.md ("e-NCF propio... la firma/envío quedan fuera de esta
-  fase a propósito").*
+- [x] **B-5** 🟥→✅ *(corrección — ya resuelto)* — **e-CF real (firma y envío
+  a la DGII)**: Cuadre integra un proveedor certificado ("Pascal ECF") en
+  vez de construir el firmador propio. Este ítem también quedó
+  desactualizado: `backend/src/emision-ecf/` integra **Alanube**
+  (proveedor certificado equivalente), con adapter real, webhook de
+  confirmación y degradación "fail-soft" sin credencial (mismo criterio
+  que Stripe/IA — nunca bloquea la venta). Solo falta el trámite
+  administrativo de activar la cuenta real con Alanube y cargar
+  `ALANUBE_API_TOKEN` — no es código pendiente. Verificado 2026-09-07.
 - [x] **B-6** 🟧→🟨 *(alcance reducido — falso positivo)* — **Condición de
   pago con plazo explícito** (15/30/45/60/90 días) con vencimiento
   auto-calculado. *Corrección: `Factura.plazoPagoDias` YA existía
@@ -327,17 +335,22 @@ Resumen de lo que cambió (detalle en cada ítem más abajo):
 
 ## E — Operación diaria / Inventario
 
-- [ ] **E-1** 🟧 *(matiz importante)* — **Patrón Borrador → Confirmado** en
-  Compras, Ajustes y Transferencias. *Parcialmente construido y NO
-  utilizado: `EstadoOrdenCompra` YA tiene `BORRADOR`/`ENVIADA` en el enum
-  (además de `RECIBIDA_PARCIAL`/`RECIBIDA_TOTAL`/`CANCELADA`), pero
-  `ComprasService`/`ComprasRepository` nunca transicionan a `ENVIADA` ni
-  ofrecen un endpoint de "editar borrador" o "confirmar" — una OC nueva
-  queda huérfana en `BORRADOR` hasta que alguien la recibe directo. Son
-  estados vestigiales sin flujo real detrás. Ajustes/Transferencias no
-  tienen ningún campo de estado — ahí la brecha es completa. Alcance real:
-  activar el flujo que ya sugiere el enum de Compras + agregarlo desde
-  cero a Ajustes/Transferencias.*
+- [x] **E-1** 🟧→✅ *(corrección — ya resuelto)* — **Patrón Borrador →
+  Confirmado** en Compras, Ajustes y Transferencias. Este ítem también
+  quedó desactualizado: el código ya tiene el flujo completo, con
+  comentarios explícitos "Ítem E-1" en los tres módulos. `ComprasService.
+  cambiarEstado()` activa `BORRADOR→ENVIADA` (confirmar) y
+  `BORRADOR|ENVIADA→CANCELADA`; `actualizar()` solo permite editar
+  líneas en `BORRADOR`; `recibir()` sigue siendo el único método que
+  mueve stock (`RECIBIDA_PARCIAL`/`RECIBIDA_TOTAL`). `AjusteInventario`/
+  `TransferenciaInventario` ganaron su propio enum
+  (`BORRADOR/CONFIRMADO/CANCELADO`) — crear queda en `BORRADOR` sin
+  tocar stock, y solo al confirmar se dispara el movimiento real
+  (`ajustarCantidadEnTx`/`transferirEnTx`); un ajuste que resta stock
+  pide PIN al confirmar (Fase 9). Todo con UI (`Compras.tsx`/
+  `Inventario.tsx`, acciones "Editar"/"Confirmar"/"Cancelar" según
+  estado) y 46 tests en verde. Verificado 2026-09-07 — no se tocó nada,
+  solo se confirmó y se corrigió el checklist.
 - [x] **E-2** 🟨 — **Motivo de ajuste estructurado**: enum
   `MotivoAjusteInventario` (Merma / Robo-Pérdida / Daño / Vencimiento /
   Corrección de conteo / Otro), requerido en `AjustarStockDto`; el texto
