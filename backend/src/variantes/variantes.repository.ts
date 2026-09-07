@@ -32,6 +32,11 @@ export class VariantesRepository {
     return this.db.varianteProducto.findMany({ where: { productoId }, select: { id: true }, orderBy: { createdAt: 'asc' } });
   }
 
+  /** Igual que `listarIdsPorProducto`, para cuando el caller ya está dentro de una transacción abierta — ver VariantesService.resolverObligatoriaEnTx. */
+  listarIdsPorProductoEnTx(tx: Prisma.TransactionClient, productoId: string) {
+    return tx.varianteProducto.findMany({ where: { productoId }, select: { id: true }, orderBy: { createdAt: 'asc' } });
+  }
+
   /** `codigoBarras: null` explícito quita el código asignado — ver ProductosRepository.whereBusqueda (Fase 3d). */
   actualizarCodigoBarras(id: string, codigoBarras: string | null) {
     return this.db.varianteProducto.update({ where: { id }, data: { codigoBarras } });

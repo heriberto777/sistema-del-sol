@@ -21,15 +21,29 @@ BEGIN
       'ncf_asignados', 'facturas',
       'productos', 'bodegas', 'movimiento_inventario',
       'proveedores', 'orden_compra', 'recepcion_compra',
-      'ajuste_inventario', 'transferencia_inventario',
+      'ajuste_inventario', 'transferencia_inventario', 'conteos_fisicos',
       'clientes',
       'webhooks',
       'notificacion_plantillas', 'notificaciones',
       'cotizaciones', 'remisiones',
-      'cuentas_contables', 'asientos_contables',
+      'cuentas_contables', 'asientos_contables', 'periodos_contables_cerrados',
       'empleados', 'periodos_nomina', 'turnos_caja',
       'pagos', 'devolucion_compra',
-      'cuentas_bancarias', 'gastos_menores'
+      'cuentas_bancarias', 'gastos_menores',
+      'formas_pago', 'ventas_aparcadas', 'categorias', 'listas_precio',
+      'variantes_producto', 'atributos',
+      'ofertas', 'bonos', 'lotes',
+      'horarios_empleado', 'registros_asistencia', 'ausencias',
+      'sucursales', 'categorias_cliente', 'feriados', 'puestos',
+      'leyes_fiscales', 'plantillas_horario', 'tipos_ausencia_config',
+      'codigos_autorizacion', 'comisiones_venta',
+      'configuraciones_lealtad', 'movimientos_lealtad',
+      'cajas', 'tasas_cambio', 'correlativos',
+      'whatsapp_config_tenant', 'pasarela_config_tenant',
+      'sesiones_cobro_factura', 'whatsapp_mensajes',
+      'carritos_borrador', 'pedidos_tienda', 'secciones_tienda',
+      'tenant_dominios',
+      'proyectos', 'hitos_proyecto', 'tareas_proyecto', 'registros_hora_proyecto'
     ])
   LOOP
     EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY;', tabla);

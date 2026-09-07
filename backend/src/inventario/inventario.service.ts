@@ -208,7 +208,7 @@ export class InventarioService {
       { productoId: params.productoId, bodegaId: params.bodegaId, userId: params.userId },
       tx,
     );
-    const varianteId = await this.variantesService.resolverObligatoria(params.productoId, params.varianteId);
+    const varianteId = await this.variantesService.resolverObligatoriaEnTx(tx, params.productoId, params.varianteId);
 
     const stock = await this.inventarioRepository.descontarStockCondicionalEnTx(tx, {
       tenantId: params.tenantId,
@@ -257,7 +257,7 @@ export class InventarioService {
       { productoId: params.productoId, bodegaId: params.bodegaId, userId: params.userId },
       tx,
     );
-    const varianteId = await this.variantesService.resolverObligatoria(params.productoId, params.varianteId);
+    const varianteId = await this.variantesService.resolverObligatoriaEnTx(tx, params.productoId, params.varianteId);
     return this.inventarioRepository.ajustarCantidadEnTx(tx, {
       tenantId: params.tenantId,
       productoId: params.productoId,
@@ -401,7 +401,7 @@ export class InventarioService {
       this.validarPertenencia({ productoId: params.productoId, bodegaId: params.bodegaOrigenId, userId: params.userId }, tx),
       this.validarPertenencia({ bodegaId: params.bodegaDestinoId, userId: params.userId }, tx),
     ]);
-    const varianteId = await this.variantesService.resolverObligatoria(params.productoId, params.varianteId);
+    const varianteId = await this.variantesService.resolverObligatoriaEnTx(tx, params.productoId, params.varianteId);
     return this.inventarioRepository.transferirEnTx(tx, { ...params, varianteId, controlaVencimiento: producto!.controlaVencimiento });
   }
 

@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { VariantesRepository } from './variantes.repository';
 import { AtributosRepository } from '../atributos/atributos.repository';
 import { CorrelativosRepository } from '../correlativos/correlativos.repository';
@@ -106,6 +107,37 @@ export class VariantesService {
    */
   async resolverObligatoria(productoId: string, varianteId?: string): Promise<string> {
     const variantes = await this.variantesRepository.listarIdsPorProducto(productoId);
+    return this.validarYResolverVariante(productoId, variantes, varianteId);
+  }
+
+  /**
+   * Igual que `resolverObligatoria`, para cuando el caller YA está dentro
+   * de una transacción abierta por otro servicio (`InventarioService.
+   * verificarYDescontarStockEnTx`/`entradaStockEnTx`/`transferirStockEnTx`,
+   * que a su vez llaman esto durante `FacturacionService.crear()`,
+   * `ComprasService.recibir()`/`registrarDevolucion()`,
+   * `RemisionesService.cambiarEstado()`,
+   * `TransferenciasInventarioService.confirmar()`).
+   *
+   * Bug real encontrado auditando el proyecto antes de expandir
+   * `enable-rls.sql` a las tablas que le faltaban (ver
+   * TENANT_SCOPED_MODELS vs. la lista vieja, mucho más corta, del
+   * script): las 3 llamadas de arriba usaban `resolverObligatoria` (sin
+   * `tx`) DESDE ADENTRO de su propia transacción — con RLS activo en
+   * `variantes_producto`, esa consulta corría en OTRA conexión sin el
+   * `SET LOCAL app.tenant_id` de esa transacción (ver el comentario de
+   * `TenantPrismaService.$allOperations` sobre `alsSetLocal`) y Postgres
+   * la filtraba a cero filas — el síntoma era "la variante indicada no
+   * pertenece al producto" para una variante que sí pertenecía. Mismo
+   * patrón que ya documentaba `docs/ARCHITECTURE.md` para
+   * `InventarioService.validarPertenencia`, ahora encontrado de nuevo acá.
+   */
+  async resolverObligatoriaEnTx(tx: Prisma.TransactionClient, productoId: string, varianteId?: string): Promise<string> {
+    const variantes = await this.variantesRepository.listarIdsPorProductoEnTx(tx, productoId);
+    return this.validarYResolverVariante(productoId, variantes, varianteId);
+  }
+
+  private validarYResolverVariante(productoId: string, variantes: { id: string }[], varianteId?: string): string {
     if (varianteId) {
       if (!variantes.some((v) => v.id === varianteId)) {
         throw new BadRequestException(`La variante indicada no pertenece al producto ${productoId}`);
