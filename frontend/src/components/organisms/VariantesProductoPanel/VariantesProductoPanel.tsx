@@ -38,6 +38,7 @@ export function VariantesProductoPanel({ productoId, nombreProducto }: { product
   const [seleccion, setSeleccion] = useState<Record<string, Set<string>>>({});
   const [inicializado, setInicializado] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [menuGenerarAbierto, setMenuGenerarAbierto] = useState<string | null>(null);
 
   const { data: atributos } = useQuery({
     queryKey: ['atributos'],
@@ -91,6 +92,21 @@ export function VariantesProductoPanel({ productoId, nombreProducto }: { product
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['variantes-producto', productoId] }),
     onError: (err: unknown) => setError(mensajeError(err, 'No se pudo guardar el código de barras.')),
   });
+
+  const generarCodigoBarras = useMutation({
+    mutationFn: async ({ varianteId, formato }: { varianteId: string; formato: 'EAN13' | 'CODE128' }) =>
+      apiClient.post(`/productos/${productoId}/variantes/${varianteId}/codigo-barras/generar`, { formato }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['variantes-producto', productoId] }),
+    onError: (err: unknown) => setError(mensajeError(err, 'No se pudo generar el código de barras.')),
+  });
+
+  function elegirGenerar(variante: VarianteProducto, formato: 'EAN13' | 'CODE128') {
+    setMenuGenerarAbierto(null);
+    if (variante.codigoBarras && !confirm(`Esta variante ya tiene el código "${variante.codigoBarras}" cargado — ¿generar uno nuevo y reemplazarlo?`)) {
+      return;
+    }
+    generarCodigoBarras.mutate({ varianteId: variante.id, formato });
+  }
 
   const combinacionesPrevistas = Object.values(seleccion).filter((v) => v.size > 0);
   const totalPrevisto = combinacionesPrevistas.reduce((acc, v) => acc * v.size, 1);
@@ -198,6 +214,34 @@ export function VariantesProductoPanel({ productoId, nombreProducto }: { product
                 }}
                 className="w-36 rounded-md border border-slate-300 px-2 py-1 text-xs dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
               />
+              <div className="relative">
+                <button
+                  type="button"
+                  disabled={generarCodigoBarras.isPending}
+                  onClick={() => setMenuGenerarAbierto((actual) => (actual === v.id ? null : v.id))}
+                  className="rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-600 hover:border-slate-400 dark:border-slate-700 dark:text-slate-400"
+                >
+                  Generar
+                </button>
+                {menuGenerarAbierto === v.id && (
+                  <div className="absolute right-0 z-10 mt-1 w-40 rounded-md border border-slate-200 bg-white py-1 shadow-lg dark:border-slate-700 dark:bg-slate-800">
+                    <button
+                      type="button"
+                      onClick={() => elegirGenerar(v, 'EAN13')}
+                      className="block w-full px-3 py-1.5 text-left text-xs text-slate-700 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-700"
+                    >
+                      EAN-13
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => elegirGenerar(v, 'CODE128')}
+                      className="block w-full px-3 py-1.5 text-left text-xs text-slate-700 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-700"
+                    >
+                      Code128 interno
+                    </button>
+                  </div>
+                )}
+              </div>
               <Badge tono={v.activa ? 'exito' : 'neutro'}>{v.activa ? 'Activa' : 'Inactiva'}</Badge>
             </div>
           ))}

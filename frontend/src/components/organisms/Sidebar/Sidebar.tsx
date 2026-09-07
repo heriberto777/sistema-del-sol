@@ -3,6 +3,7 @@ import { NavLink, useLocation } from 'react-router-dom';
 import clsx from 'clsx';
 import {
   AlertTriangle,
+  Barcode,
   BarChart3,
   Bell,
   BookOpen,
@@ -156,6 +157,9 @@ const GRUPOS: Grupo[] = [
       { ruta: '/inventario/conteos', etiqueta: 'Conteos físicos', icono: ClipboardCheck, permisos: ['inventario.ver'], modulo: 'inventario' },
       { ruta: '/compras', etiqueta: 'Compras', icono: ShoppingBag, permisos: ['compras.ver'], modulo: 'compras' },
       { ruta: '/productos', etiqueta: 'Productos', icono: Tag, permisos: ['precios.ver'], modulo: 'productos' },
+      // Generación + impresión masiva de códigos de barra a través de
+      // todo el catálogo — mismo permiso que ver Productos.
+      { ruta: '/productos/etiquetas', etiqueta: 'Etiquetas de código de barras', icono: Barcode, permisos: ['precios.ver'], modulo: 'productos' },
     ],
   },
   {

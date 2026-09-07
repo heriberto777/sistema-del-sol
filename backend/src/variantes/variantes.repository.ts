@@ -1,5 +1,11 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { TenantPrismaService } from '../prisma/tenant-prisma.service';
+
+const INCLUDE_BUSQUEDA = {
+  producto: { select: { id: true, nombre: true, codigo: true } },
+  valoresAtributo: { include: { valorAtributo: { include: { atributo: true } } } },
+} as const;
 
 @Injectable()
 export class VariantesRepository {
@@ -29,6 +35,55 @@ export class VariantesRepository {
   /** `codigoBarras: null` explícito quita el código asignado — ver ProductosRepository.whereBusqueda (Fase 3d). */
   actualizarCodigoBarras(id: string, codigoBarras: string | null) {
     return this.db.varianteProducto.update({ where: { id }, data: { codigoBarras } });
+  }
+
+  /** Participa en la transacción del correlativo (`VariantesService.generarCodigoBarras`) — todo o nada. */
+  actualizarCodigoBarrasEnTx(tx: Prisma.TransactionClient, id: string, codigoBarras: string) {
+    return tx.varianteProducto.update({ where: { id }, data: { codigoBarras } });
+  }
+
+  /**
+   * Búsqueda de variantes A TRAVÉS DE TODO EL CATÁLOGO del tenant (no
+   * acotada a un producto ni a una bodega) — para la pantalla de
+   * impresión masiva de etiquetas (`EtiquetasCodigoBarras.tsx`), que
+   * necesita juntar variantes de productos distintos en una sola
+   * selección. Solo `tipo: 'PRODUCTO'` — un SERVICIO/COMBO no tiene
+   * sentido como etiqueta física (mismo criterio ya usado en Conteo
+   * Físico). Aplana `valoresAtributo` igual que
+   * `ConteoFisicoRepository`/`InventarioRepository.listarStockPorBodega`
+   * — nunca se spreadea el resto de campos de `VarianteProducto` sobre
+   * la fila.
+   */
+  async buscarEnCatalogo(params: { skip: number; take: number; busqueda?: string }) {
+    const where = {
+      producto: { tipo: 'PRODUCTO' as const },
+      ...(params.busqueda
+        ? {
+            OR: [
+              { producto: { nombre: { contains: params.busqueda, mode: 'insensitive' as const } } },
+              { producto: { codigo: { contains: params.busqueda, mode: 'insensitive' as const } } },
+              { sku: { contains: params.busqueda, mode: 'insensitive' as const } },
+              { codigoBarras: { contains: params.busqueda, mode: 'insensitive' as const } },
+            ],
+          }
+        : {}),
+    };
+    const [filas, total] = await Promise.all([
+      this.db.varianteProducto.findMany({
+        where,
+        include: INCLUDE_BUSQUEDA,
+        orderBy: { producto: { nombre: 'asc' } },
+        skip: params.skip,
+        take: params.take,
+      }),
+      this.db.varianteProducto.count({ where }),
+    ]);
+    const datos = filas.map(({ producto, valoresAtributo, ...variante }) => ({
+      ...variante,
+      producto,
+      valoresAtributo: valoresAtributo.map((va) => ({ atributo: va.valorAtributo.atributo.nombre, valor: va.valorAtributo.valor })),
+    }));
+    return [datos, total] as const;
   }
 
   contarMovimientos(varianteIds: string[]) {

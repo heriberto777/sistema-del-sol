@@ -24,6 +24,7 @@ import { Sucursales } from './pages/Sucursales';
 import { Compras } from './pages/Compras';
 import { Contactos } from './pages/Contactos';
 import { Productos } from './pages/Productos';
+import { EtiquetasCodigoBarras } from './pages/EtiquetasCodigoBarras';
 import { Reportes } from './pages/Reportes';
 import { Contabilidad } from './pages/Contabilidad';
 import { Nomina } from './pages/Nomina';
@@ -176,6 +177,7 @@ const RUTAS_ADMIN = [
           { path: '/contactos', element: <Contactos /> },
           { path: '/clientes', element: <Navigate to="/contactos" replace /> },
           { path: '/productos', element: <Productos /> },
+          { path: '/productos/etiquetas', element: <EtiquetasCodigoBarras /> },
           { path: '/reportes', element: <Reportes /> },
           { path: '/contabilidad', element: <Contabilidad /> },
           { path: '/bancos', element: <Bancos /> },

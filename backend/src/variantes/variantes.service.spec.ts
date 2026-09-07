@@ -2,11 +2,17 @@ import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { VariantesService } from './variantes.service';
 import { VariantesRepository } from './variantes.repository';
 import { AtributosRepository } from '../atributos/atributos.repository';
+import { CorrelativosRepository } from '../correlativos/correlativos.repository';
+import { TenantPrismaService } from '../prisma/tenant-prisma.service';
 
 describe('VariantesService', () => {
   let service: VariantesService;
   let variantesRepository: jest.Mocked<VariantesRepository>;
   let atributosRepository: jest.Mocked<AtributosRepository>;
+  let correlativosRepository: jest.Mocked<CorrelativosRepository>;
+  let tenantPrisma: { client: { $transaction: jest.Mock } };
+
+  const TX = { esTransaccion: true };
 
   beforeEach(() => {
     variantesRepository = {
@@ -16,11 +22,22 @@ describe('VariantesService', () => {
       contarUsoEnLineas: jest.fn().mockResolvedValue(0),
       regenerar: jest.fn().mockResolvedValue([{ id: 'v1' }]),
       actualizarCodigoBarras: jest.fn(),
+      actualizarCodigoBarrasEnTx: jest.fn(),
+      buscarEnCatalogo: jest.fn().mockResolvedValue([[], 0]),
     } as unknown as jest.Mocked<VariantesRepository>;
     atributosRepository = {
       buscarPorId: jest.fn(),
     } as unknown as jest.Mocked<AtributosRepository>;
-    service = new VariantesService(variantesRepository, atributosRepository);
+    correlativosRepository = {
+      siguienteEnTx: jest.fn().mockResolvedValue('1'),
+    } as unknown as jest.Mocked<CorrelativosRepository>;
+    tenantPrisma = { client: { $transaction: jest.fn((cb: (tx: unknown) => unknown) => cb(TX)) } };
+    service = new VariantesService(
+      variantesRepository,
+      atributosRepository,
+      correlativosRepository,
+      tenantPrisma as unknown as TenantPrismaService,
+    );
   });
 
   describe('listarPorProducto', () => {
@@ -181,6 +198,60 @@ describe('VariantesService', () => {
         BadRequestException,
       );
       expect(variantesRepository.actualizarCodigoBarras).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('generarCodigoBarras', () => {
+    it('rechaza (400) si la variante indicada no pertenece al producto', async () => {
+      variantesRepository.listarIdsPorProducto.mockResolvedValue([{ id: 'v1' }] as never);
+
+      await expect(service.generarCodigoBarras('p1', 'v-ajena', 'EAN13', 't1')).rejects.toThrow(BadRequestException);
+      expect(correlativosRepository.siguienteEnTx).not.toHaveBeenCalled();
+      expect(variantesRepository.actualizarCodigoBarrasEnTx).not.toHaveBeenCalled();
+    });
+
+    it('formato EAN13 genera un código de 13 dígitos con prefijo "20" y lo guarda dentro de la transacción del correlativo', async () => {
+      variantesRepository.listarIdsPorProducto.mockResolvedValue([{ id: 'v1' }] as never);
+      correlativosRepository.siguienteEnTx.mockResolvedValue('7');
+
+      await service.generarCodigoBarras('p1', 'v1', 'EAN13', 't1');
+
+      expect(correlativosRepository.siguienteEnTx).toHaveBeenCalledWith(TX, 't1', 'CODIGO_BARRAS');
+      const [tx, varianteId, codigo] = variantesRepository.actualizarCodigoBarrasEnTx.mock.calls[0];
+      expect(tx).toBe(TX);
+      expect(varianteId).toBe('v1');
+      expect(codigo).toMatch(/^20\d{11}$/);
+    });
+
+    it('formato CODE128 genera un código con prefijo "INT"', async () => {
+      variantesRepository.listarIdsPorProducto.mockResolvedValue([{ id: 'v1' }] as never);
+      correlativosRepository.siguienteEnTx.mockResolvedValue('3');
+
+      await service.generarCodigoBarras('p1', 'v1', 'CODE128', 't1');
+
+      const [, , codigo] = variantesRepository.actualizarCodigoBarrasEnTx.mock.calls[0];
+      expect(codigo).toBe('INT0000000003');
+    });
+
+    it('extrae el secuencial correctamente aunque el correlativo tenga un prefijo alfabético configurado (editable desde /admin → Consecutivos, esa pantalla no sabe que este tipo debe quedar puramente numérico)', async () => {
+      variantesRepository.listarIdsPorProducto.mockResolvedValue([{ id: 'v1' }] as never);
+      correlativosRepository.siguienteEnTx.mockResolvedValue('COD-00042');
+
+      await service.generarCodigoBarras('p1', 'v1', 'CODE128', 't1');
+
+      const [, , codigo] = variantesRepository.actualizarCodigoBarrasEnTx.mock.calls[0];
+      expect(codigo).toBe('INT0000000042');
+    });
+  });
+
+  describe('buscarEnCatalogo', () => {
+    it('pagina con los defaults cuando no vienen pagina/tamanoPagina', async () => {
+      variantesRepository.buscarEnCatalogo.mockResolvedValue([[{ id: 'v1' }], 1] as never);
+
+      const resultado = await service.buscarEnCatalogo({} as never);
+
+      expect(variantesRepository.buscarEnCatalogo).toHaveBeenCalledWith({ skip: 0, take: 20, busqueda: undefined });
+      expect(resultado).toEqual({ datos: [{ id: 'v1' }], total: 1, pagina: 1, tamanoPagina: 20 });
     });
   });
 });

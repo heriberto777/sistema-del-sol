@@ -18,4 +18,5 @@ export const CORRELATIVOS_BASE: TipoCorrelativo[] = [
   'AJUSTE',
   'TRANSFERENCIA',
   'CONTEO_FISICO',
+  'CODIGO_BARRAS',
 ];

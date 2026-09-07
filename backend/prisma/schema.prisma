@@ -882,6 +882,10 @@ enum TipoCorrelativo {
   // Conteo Físico vs Teórico — documento propio con número, distinto de
   // AJUSTE (ver ConteoFisico).
   CONTEO_FISICO
+  // Secuencial atómico para el generador interno de códigos de barra
+  // (ver generador-codigo-barras.util.ts) — nunca es el código en sí,
+  // solo el número que se embebe en él.
+  CODIGO_BARRAS
 }
 
 /// Correlativo automático genérico (plan de integración Cuadre, ítem de

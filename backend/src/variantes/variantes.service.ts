@@ -1,6 +1,11 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { VariantesRepository } from './variantes.repository';
 import { AtributosRepository } from '../atributos/atributos.repository';
+import { CorrelativosRepository } from '../correlativos/correlativos.repository';
+import { TenantPrismaService } from '../prisma/tenant-prisma.service';
+import { ListadoQueryDto } from '../common/dto/listado-query.dto';
+import { paginar } from '../common/types/pagina-resultado';
+import { generarCode128Interno, generarEan13Interno } from './generador-codigo-barras.util';
 
 /** Salvavidas contra una combinatoria descontrolada (varios atributos con muchos valores cada uno) — no es un límite de negocio, solo evita que un request dispare miles de inserts. */
 const MAX_COMBINACIONES = 400;
@@ -15,6 +20,8 @@ export class VariantesService {
   constructor(
     private readonly variantesRepository: VariantesRepository,
     private readonly atributosRepository: AtributosRepository,
+    private readonly correlativosRepository: CorrelativosRepository,
+    private readonly tenantPrisma: TenantPrismaService,
   ) {}
 
   /**
@@ -49,6 +56,43 @@ export class VariantesService {
       throw new BadRequestException(`La variante indicada no pertenece al producto ${productoId}`);
     }
     return this.variantesRepository.actualizarCodigoBarras(varianteId, codigoBarras);
+  }
+
+  /**
+   * Genera un código de barras interno bajo demanda (botón "Generar" en
+   * `VariantesProductoPanel.tsx`) — nunca automático, nunca pisa un
+   * código ya cargado sin que el frontend confirme antes con el usuario
+   * (esa confirmación es responsabilidad del frontend, acá no se valida
+   * si ya había un valor). Mismo guard IDOR que `actualizarCodigoBarras`.
+   * El secuencial sale de `CorrelativosRepository.siguienteEnTx`
+   * (`TipoCorrelativo.CODIGO_BARRAS`, atómico) dentro de la misma
+   * transacción que graba el código — todo o nada.
+   */
+  async generarCodigoBarras(productoId: string, varianteId: string, formato: 'EAN13' | 'CODE128', tenantId: string) {
+    const variantes = await this.variantesRepository.listarIdsPorProducto(productoId);
+    if (!variantes.some((v) => v.id === varianteId)) {
+      throw new BadRequestException(`La variante indicada no pertenece al producto ${productoId}`);
+    }
+    return this.tenantPrisma.client.$transaction(async (tx) => {
+      const numeroFormateado = await this.correlativosRepository.siguienteEnTx(tx, tenantId, 'CODIGO_BARRAS');
+      // `siguienteEnTx` devuelve `${prefijo}${dígitos}` — `prefijo` es
+      // editable libremente desde /admin → "Consecutivos" (pantalla
+      // genérica de Correlativo, sin saber que ESTE tipo debe quedar
+      // puramente numérico). Un `Number(...)` directo se rompe en NaN si
+      // alguna vez un admin le pone un prefijo alfabético a este tipo —
+      // se extraen solo los dígitos para que el secuencial real siga
+      // siendo válido pase lo que pase con el prefijo configurado.
+      const secuencial = Number(numeroFormateado.replace(/\D/g, ''));
+      const codigo = formato === 'EAN13' ? generarEan13Interno(secuencial) : generarCode128Interno(secuencial);
+      return this.variantesRepository.actualizarCodigoBarrasEnTx(tx, varianteId, codigo);
+    });
+  }
+
+  /** Búsqueda de variantes en TODO el catálogo del tenant — ver VariantesRepository.buscarEnCatalogo (pantalla de impresión masiva de etiquetas). */
+  async buscarEnCatalogo(query: ListadoQueryDto) {
+    const { pagina, tamanoPagina, skip, take } = paginar(query.pagina, query.tamanoPagina);
+    const [datos, total] = await this.variantesRepository.buscarEnCatalogo({ skip, take, busqueda: query.busqueda });
+    return { datos, total, pagina, tamanoPagina };
   }
 
   /**
