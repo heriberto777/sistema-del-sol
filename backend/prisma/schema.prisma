@@ -3737,6 +3737,11 @@ model Proyecto {
   estado               EstadoProyecto          @default(PLANIFICADO)
   fechaInicio          DateTime?
   fechaFinEstimada     DateTime?
+  // Notificaciones (Event Bus) — evita reenviar el aviso de presupuesto
+  // superado en cada registro de hora/gasto nuevo mientras siga excedido
+  // (ver PresupuestoProyectoListener). Se resetea a false si se edita el
+  // presupuesto (ProyectosRepository.actualizarProyecto).
+  alertaPresupuestoEnviada Boolean              @default(false)
   createdAt            DateTime                @default(now())
   updatedAt            DateTime                @updatedAt
 
@@ -3759,6 +3764,11 @@ model HitoProyecto {
   // este hito puntual (ver Fase 4: generar la Factura real desde acá).
   montoFijo     Decimal?           @db.Decimal(14, 2)
   estado        EstadoHitoProyecto @default(PENDIENTE)
+  // Notificaciones (Event Bus) — evita reenviar el aviso de "próximo a
+  // vencer" todos los días mientras el hito siga sin resolverse (ver
+  // HitosProyectoCronService). Se resetea a false si se edita
+  // fechaObjetivo (ProyectosRepository.actualizarHito).
+  alertaVencimientoEnviada Boolean @default(false)
   createdAt     DateTime           @default(now())
   // Fase 4 — la Factura real generada desde este hito (ver
   // ProyectosService.facturarHito). @unique: un hito nunca se factura

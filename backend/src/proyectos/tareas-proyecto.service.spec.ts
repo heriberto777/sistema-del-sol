@@ -3,12 +3,15 @@ import { TareasProyectoService } from './tareas-proyecto.service';
 import { ProyectosRepository } from './proyectos.repository';
 import { ProyectosService } from './proyectos.service';
 import { EmpleadosRepository } from '../nomina/empleados.repository';
+import { EventBusService } from '../event-bus/event-bus.service';
+import { EVENTOS } from '../event-bus/events';
 
 describe('TareasProyectoService', () => {
   let service: TareasProyectoService;
   let repository: jest.Mocked<ProyectosRepository>;
   let proyectosService: jest.Mocked<ProyectosService>;
   let empleadosRepository: jest.Mocked<EmpleadosRepository>;
+  let eventBus: jest.Mocked<EventBusService>;
 
   beforeEach(() => {
     repository = {
@@ -21,7 +24,8 @@ describe('TareasProyectoService', () => {
     } as unknown as jest.Mocked<ProyectosRepository>;
     proyectosService = { buscarPorId: jest.fn().mockResolvedValue({ id: 'p1' }) } as unknown as jest.Mocked<ProyectosService>;
     empleadosRepository = { buscarPorId: jest.fn().mockResolvedValue({ id: 'e1' }) } as unknown as jest.Mocked<EmpleadosRepository>;
-    service = new TareasProyectoService(repository, proyectosService, empleadosRepository);
+    eventBus = { emit: jest.fn(), on: jest.fn() } as unknown as jest.Mocked<EventBusService>;
+    service = new TareasProyectoService(repository, proyectosService, empleadosRepository, eventBus);
   });
 
   describe('crear', () => {
@@ -63,10 +67,17 @@ describe('TareasProyectoService', () => {
 
   describe('registrarHora', () => {
     it('valida tarea y empleado antes de registrar', async () => {
-      repository.buscarTareaPorId.mockResolvedValue({ id: 't1' } as never);
+      repository.buscarTareaPorId.mockResolvedValue({ id: 't1', proyectoId: 'p1' } as never);
       const dto = { empleadoId: 'e1', fecha: '2026-09-06', horas: 4 } as never;
       await service.registrarHora('t1', dto, 'tenant1');
       expect(repository.crearRegistroHora).toHaveBeenCalledWith('t1', dto, 'tenant1');
+    });
+
+    it('emite HORAS_PROYECTO_REGISTRADAS con el proyectoId de la tarea (dispara la verificación de presupuesto)', async () => {
+      repository.buscarTareaPorId.mockResolvedValue({ id: 't1', proyectoId: 'p1' } as never);
+      const dto = { empleadoId: 'e1', fecha: '2026-09-06', horas: 4 } as never;
+      await service.registrarHora('t1', dto, 'tenant1');
+      expect(eventBus.emit).toHaveBeenCalledWith(EVENTOS.HORAS_PROYECTO_REGISTRADAS, { tenantId: 'tenant1', proyectoId: 'p1' });
     });
   });
 });

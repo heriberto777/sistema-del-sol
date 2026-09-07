@@ -152,4 +152,9 @@ export const CONFIGURACIONES_BASE: Record<string, string> = {
   // costo-hora.util.ts). Default = jornada estándar 40h/semana
   // (40 * 52 / 12 ≈ 173.33) — configurable si el tenant usa otra jornada.
   PROYECTOS_HORAS_LABORABLES_MES: '173.33',
+  // Plugin de Proyectos — notificaciones (Event Bus): días de anticipación
+  // antes de HitoProyecto.fechaObjetivo para avisar "próximo a vencer"
+  // (ver HitosProyectoCronService). Configurable por tenant, mismo criterio
+  // que PROYECTOS_HORAS_LABORABLES_MES arriba.
+  PROYECTOS_DIAS_ALERTA_HITO: '3',
 };

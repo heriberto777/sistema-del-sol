@@ -9,8 +9,10 @@ import {
   CotizacionEnviadaPayload,
   EVENTOS,
   FacturaCreadaPayload,
+  HitoProyectoPorVencerPayload,
   LotePorVencerPayload,
   NcfPorAgotarsePayload,
+  ProyectoPresupuestoSuperadoPayload,
   StockBajoPayload,
   WhatsappRequiereAtencionPayload,
 } from '../event-bus/events';
@@ -256,5 +258,55 @@ export class NotificacionesService {
         },
       });
     }
+  }
+
+  /** Plugin de Proyectos — hito próximo a vencer (ver HitosProyectoCronService). */
+  @OnEvent(EVENTOS.HITO_PROYECTO_POR_VENCER)
+  async alVencerHitoProyecto(payload: HitoProyectoPorVencerPayload) {
+    const destinatarios = await this.resolverDestinatariosProyecto(payload.tenantId, payload.responsableUserId);
+    for (const destinatario of destinatarios) {
+      await this.enviar({
+        tenantId: payload.tenantId,
+        canal: 'EMAIL',
+        clave: 'hito_proyecto_por_vencer',
+        destinatario,
+        variables: {
+          hito_nombre: payload.hitoNombre,
+          proyecto_nombre: payload.proyectoNombre,
+          fecha_objetivo: payload.fechaObjetivo,
+        },
+      });
+    }
+  }
+
+  /** Plugin de Proyectos — costo real (horas + gastos) superó el presupuesto (ver PresupuestoProyectoListener). */
+  @OnEvent(EVENTOS.PROYECTO_PRESUPUESTO_SUPERADO)
+  async alSuperarPresupuestoProyecto(payload: ProyectoPresupuestoSuperadoPayload) {
+    const destinatarios = await this.resolverDestinatariosProyecto(payload.tenantId, payload.responsableUserId);
+    for (const destinatario of destinatarios) {
+      await this.enviar({
+        tenantId: payload.tenantId,
+        canal: 'EMAIL',
+        clave: 'proyecto_presupuesto_superado',
+        destinatario,
+        variables: {
+          proyecto_nombre: payload.proyectoNombre,
+          presupuesto: payload.presupuesto,
+          costo_total: payload.costoTotal,
+        },
+      });
+    }
+  }
+
+  /** Responsable del proyecto si tiene usuario del sistema; si no, fallback a todos los Admin Total del tenant — mismo criterio de `alBajarStock`/`alVencerLote`. */
+  private async resolverDestinatariosProyecto(tenantId: string, responsableUserId: string | null): Promise<string[]> {
+    if (responsableUserId) {
+      const usuario = await this.prisma.user.findUnique({ where: { id: responsableUserId } });
+      if (usuario) return [usuario.email];
+    }
+    const admins = await this.prisma.user.findMany({
+      where: { tenantId, roles: { some: { role: { nombre: 'Admin Total' } } } },
+    });
+    return admins.map((admin) => admin.email);
   }
 }

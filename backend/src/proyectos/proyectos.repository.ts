@@ -72,7 +72,14 @@ export class ProyectosRepository {
   actualizarProyecto(id: string, dto: Partial<CrearProyectoDto>) {
     return this.db.proyecto.update({
       where: { id },
-      data: { ...dto, fechaInicio: aFecha(dto.fechaInicio), fechaFinEstimada: aFecha(dto.fechaFinEstimada) },
+      data: {
+        ...dto,
+        fechaInicio: aFecha(dto.fechaInicio),
+        fechaFinEstimada: aFecha(dto.fechaFinEstimada),
+        // Editar el presupuesto reabre la posibilidad de un nuevo aviso de
+        // "presupuesto superado" (ver PresupuestoProyectoListener).
+        ...(dto.presupuesto !== undefined ? { alertaPresupuestoEnviada: false } : {}),
+      },
       include: INCLUDE_PROYECTO,
     });
   }
@@ -111,7 +118,16 @@ export class ProyectosRepository {
   }
 
   actualizarHito(id: string, dto: Partial<CrearHitoDto>) {
-    return this.db.hitoProyecto.update({ where: { id }, data: { ...dto, fechaObjetivo: aFecha(dto.fechaObjetivo) } });
+    return this.db.hitoProyecto.update({
+      where: { id },
+      data: {
+        ...dto,
+        fechaObjetivo: aFecha(dto.fechaObjetivo),
+        // Editar la fecha objetivo reabre la posibilidad de un nuevo aviso
+        // de "próximo a vencer" (ver HitosProyectoCronService).
+        ...(dto.fechaObjetivo !== undefined ? { alertaVencimientoEnviada: false } : {}),
+      },
+    });
   }
 
   eliminarHito(id: string) {

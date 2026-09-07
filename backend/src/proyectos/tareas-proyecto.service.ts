@@ -4,6 +4,8 @@ import { ProyectosService } from './proyectos.service';
 import { EmpleadosRepository } from '../nomina/empleados.repository';
 import { CrearTareaProyectoDto } from './dto/crear-tarea-proyecto.dto';
 import { CrearRegistroHoraDto } from './dto/crear-registro-hora.dto';
+import { EventBusService } from '../event-bus/event-bus.service';
+import { EVENTOS } from '../event-bus/events';
 
 @Injectable()
 export class TareasProyectoService {
@@ -11,6 +13,7 @@ export class TareasProyectoService {
     private readonly proyectosRepository: ProyectosRepository,
     private readonly proyectosService: ProyectosService,
     private readonly empleadosRepository: EmpleadosRepository,
+    private readonly eventBus: EventBusService,
   ) {}
 
   async crear(proyectoId: string, dto: CrearTareaProyectoDto, tenantId: string) {
@@ -52,9 +55,12 @@ export class TareasProyectoService {
   // ---------- Registro de horas ----------
 
   async registrarHora(tareaId: string, dto: CrearRegistroHoraDto, tenantId: string) {
-    await this.proyectosRepository.buscarTareaPorId(tareaId);
+    const tarea = await this.proyectosRepository.buscarTareaPorId(tareaId);
     await this.empleadosRepository.buscarPorId(dto.empleadoId);
-    return this.proyectosRepository.crearRegistroHora(tareaId, dto, tenantId);
+    const registro = await this.proyectosRepository.crearRegistroHora(tareaId, dto, tenantId);
+    // Dispara la verificación de presupuesto superado en PresupuestoProyectoListener.
+    this.eventBus.emit(EVENTOS.HORAS_PROYECTO_REGISTRADAS, { tenantId, proyectoId: tarea.proyectoId });
+    return registro;
   }
 
   async eliminarRegistroHora(id: string) {

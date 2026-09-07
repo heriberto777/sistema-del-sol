@@ -8,6 +8,8 @@ import { ClientesModule } from '../clientes/clientes.module';
 import { NominaModule } from '../nomina/nomina.module';
 import { ConfiguracionesModule } from '../configuraciones/configuraciones.module';
 import { FacturacionModule } from '../facturacion/facturacion.module';
+import { HitosProyectoCronService } from './hitos-proyecto-cron.service';
+import { PresupuestoProyectoListener } from './presupuesto-proyecto.listener';
 
 /**
  * Plugin de Proyectos (Fase 1) — ver plugins/proyectos/README.md. Gateado
@@ -19,7 +21,7 @@ import { FacturacionModule } from '../facturacion/facturacion.module';
 @Module({
   imports: [ClientesModule, NominaModule, ConfiguracionesModule, FacturacionModule],
   controllers: [ProyectosController, TareasProyectoController],
-  providers: [ProyectosService, ProyectosRepository, TareasProyectoService],
+  providers: [ProyectosService, ProyectosRepository, TareasProyectoService, HitosProyectoCronService, PresupuestoProyectoListener],
   exports: [ProyectosRepository],
 })
 export class ProyectosModule {}

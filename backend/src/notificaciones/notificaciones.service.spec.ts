@@ -22,7 +22,7 @@ describe('NotificacionesService', () => {
     } as unknown as jest.Mocked<NotificacionesRepository>;
     emailChannel = { enviar: jest.fn() } as unknown as jest.Mocked<EmailChannel>;
     whatsAppChannel = { enviar: jest.fn() } as unknown as jest.Mocked<WhatsAppChannel>;
-    prisma = { cliente: { findUnique: jest.fn() }, user: { findMany: jest.fn() } };
+    prisma = { cliente: { findUnique: jest.fn() }, user: { findMany: jest.fn(), findUnique: jest.fn() } };
     service = new NotificacionesService(repository, emailChannel, whatsAppChannel, prisma as unknown as PrismaService);
   });
 
@@ -233,6 +233,70 @@ describe('NotificacionesService', () => {
       });
       expect(repository.buscarPlantilla).toHaveBeenCalledWith('t1', 'EMAIL', 'whatsapp_requiere_atencion');
       expect(emailChannel.enviar).toHaveBeenCalledWith('admin@x.com', '', 'Atender WhatsApp whatsapp:+18095551234', undefined);
+    });
+  });
+
+  describe('alVencerHitoProyecto / alSuperarPresupuestoProyecto (Proyectos)', () => {
+    it('con responsableUserId presente y con usuario real, notifica SOLO a ese usuario', async () => {
+      prisma.user.findUnique.mockResolvedValue({ id: 'u-resp', email: 'responsable@x.com' });
+      repository.buscarPlantilla.mockResolvedValue({ activa: true, asunto: null, cuerpo: 'x' } as never);
+      repository.crearNotificacion.mockResolvedValue({ id: 'n1' } as never);
+      emailChannel.enviar.mockResolvedValue(true);
+
+      await service.alVencerHitoProyecto({
+        tenantId: 't1',
+        hitoId: 'h1',
+        hitoNombre: 'Entrega 1',
+        proyectoNombre: 'Proyecto X',
+        fechaObjetivo: '2026-09-10T00:00:00.000Z',
+        responsableUserId: 'u-resp',
+      });
+
+      expect(prisma.user.findUnique).toHaveBeenCalledWith({ where: { id: 'u-resp' } });
+      expect(prisma.user.findMany).not.toHaveBeenCalled();
+      expect(emailChannel.enviar).toHaveBeenCalledTimes(1);
+      expect(repository.buscarPlantilla).toHaveBeenCalledWith('t1', 'EMAIL', 'hito_proyecto_por_vencer');
+    });
+
+    it('sin responsableUserId, cae al fallback de todos los Admin Total del tenant', async () => {
+      prisma.user.findMany.mockResolvedValue([{ id: 'a1', email: 'admin1@x.com' }, { id: 'a2', email: 'admin2@x.com' }]);
+      repository.buscarPlantilla.mockResolvedValue({ activa: true, asunto: null, cuerpo: 'x' } as never);
+      repository.crearNotificacion.mockResolvedValue({ id: 'n1' } as never);
+      emailChannel.enviar.mockResolvedValue(true);
+
+      await service.alVencerHitoProyecto({
+        tenantId: 't1',
+        hitoId: 'h1',
+        hitoNombre: 'Entrega 1',
+        proyectoNombre: 'Proyecto X',
+        fechaObjetivo: '2026-09-10T00:00:00.000Z',
+        responsableUserId: null,
+      });
+
+      expect(prisma.user.findUnique).not.toHaveBeenCalled();
+      expect(prisma.user.findMany).toHaveBeenCalledWith({ where: { tenantId: 't1', roles: { some: { role: { nombre: 'Admin Total' } } } } });
+      expect(emailChannel.enviar).toHaveBeenCalledTimes(2);
+    });
+
+    it('con responsableUserId de un usuario que ya no existe, también cae al fallback de Admin Total', async () => {
+      prisma.user.findUnique.mockResolvedValue(null);
+      prisma.user.findMany.mockResolvedValue([{ id: 'a1', email: 'admin1@x.com' }]);
+      repository.buscarPlantilla.mockResolvedValue({ activa: true, asunto: null, cuerpo: 'x' } as never);
+      repository.crearNotificacion.mockResolvedValue({ id: 'n1' } as never);
+      emailChannel.enviar.mockResolvedValue(true);
+
+      await service.alSuperarPresupuestoProyecto({
+        tenantId: 't1',
+        proyectoId: 'p1',
+        proyectoNombre: 'Proyecto X',
+        presupuesto: '10000',
+        costoTotal: '12000',
+        responsableUserId: 'u-borrado',
+      });
+
+      expect(prisma.user.findMany).toHaveBeenCalled();
+      expect(repository.buscarPlantilla).toHaveBeenCalledWith('t1', 'EMAIL', 'proyecto_presupuesto_superado');
+      expect(emailChannel.enviar).toHaveBeenCalledTimes(1);
     });
   });
 });

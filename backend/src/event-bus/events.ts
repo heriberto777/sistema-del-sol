@@ -15,6 +15,9 @@ export const EVENTOS = {
   LOTE_POR_VENCER: 'inventario.lote_por_vencer',
   NCF_POR_AGOTARSE: 'ncf.por_agotarse',
   WHATSAPP_REQUIERE_ATENCION: 'whatsapp.requiere_atencion',
+  HITO_PROYECTO_POR_VENCER: 'proyectos.hito_por_vencer',
+  PROYECTO_PRESUPUESTO_SUPERADO: 'proyectos.presupuesto_superado',
+  HORAS_PROYECTO_REGISTRADAS: 'proyectos.horas_registradas',
 } as const;
 
 export type NombreEvento = (typeof EVENTOS)[keyof typeof EVENTOS];
@@ -135,4 +138,30 @@ export interface WhatsappRequiereAtencionPayload {
   tenantId: string;
   mensajeId: string;
   telefono: string;
+}
+
+/** Emitido por HitosProyectoCronService — un hito de Proyectos entró en la ventana de días configurada por el tenant (CONFIGURACIONES_BASE.PROYECTOS_DIAS_ALERTA_HITO) sin haberse avisado todavía. */
+export interface HitoProyectoPorVencerPayload {
+  tenantId: string;
+  hitoId: string;
+  hitoNombre: string;
+  proyectoNombre: string;
+  fechaObjetivo: string;
+  responsableUserId: string | null;
+}
+
+/** Emitido por PresupuestoProyectoListener cuando el costo real (horas + gastos) de un proyecto supera su presupuesto por primera vez. */
+export interface ProyectoPresupuestoSuperadoPayload {
+  tenantId: string;
+  proyectoId: string;
+  proyectoNombre: string;
+  presupuesto: string;
+  costoTotal: string;
+  responsableUserId: string | null;
+}
+
+/** Emitido por TareasProyectoService.registrarHora — dispara la verificación de presupuesto superado en PresupuestoProyectoListener. */
+export interface HorasProyectoRegistradasPayload {
+  tenantId: string;
+  proyectoId: string;
 }
