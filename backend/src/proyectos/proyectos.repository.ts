@@ -171,4 +171,41 @@ export class ProyectosRepository {
   eliminarRegistroHora(id: string) {
     return this.db.registroHoraProyecto.delete({ where: { id } });
   }
+
+  // ---------- Rentabilidad ----------
+
+  /**
+   * Facturas reales generadas desde los hitos de este proyecto (Fase 4),
+   * excluyendo las ANULADAS. Usa `subtotal` (antes de ITBIS), no `total`
+   * — mismo criterio que `ReportesService.reporteRentabilidad`
+   * (`ventaNeta = cantidad*precioUnitario - descuento`): el ITBIS es un
+   * impuesto que se cobra por cuenta de la DGII, no ingreso real, y
+   * mezclarlo infla el margen en la tasa de ITBIS del tenant.
+   */
+  async sumarFacturadoDelProyecto(proyectoId: string): Promise<number> {
+    const facturas = await this.db.factura.findMany({
+      where: { hitoProyectoOrigen: { proyectoId }, estado: { not: 'ANULADA' } },
+      select: { subtotal: true },
+    });
+    return facturas.reduce((acc, f) => acc + Number(f.subtotal), 0);
+  }
+
+  /** Horas de TODAS las tareas del proyecto (con o sin hito), agrupadas por empleado — para costear con `costoHoraEmpleado()` de cada uno. */
+  async agruparHorasDelProyectoPorEmpleado(proyectoId: string): Promise<Array<{ empleadoId: string; horas: number }>> {
+    const filas = await this.db.registroHoraProyecto.groupBy({
+      by: ['empleadoId'],
+      where: { tarea: { proyectoId } },
+      _sum: { horas: true },
+    });
+    return filas.map((f) => ({ empleadoId: f.empleadoId, horas: Number(f._sum.horas ?? 0) }));
+  }
+
+  /** Gastos menores asociados a este proyecto (sin concepto de anulado en GastoMenor, se suman todos). */
+  async sumarGastosDelProyecto(proyectoId: string): Promise<number> {
+    const resultado = await this.db.gastoMenor.aggregate({
+      where: { proyectoId },
+      _sum: { total: true },
+    });
+    return Number(resultado._sum.total ?? 0);
+  }
 }

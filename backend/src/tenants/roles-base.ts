@@ -60,7 +60,11 @@ export const PERMISOS_BASE = [
   // horas trabajadas sin poder editar la tarea/proyecto entero.
   // `proyectos.facturar` (Fase 4) separado también — generar una Factura
   // real es una acción fiscal, no una edición más del hito.
-  'proyectos.ver', 'proyectos.crear', 'proyectos.editar', 'proyectos.horas.registrar', 'proyectos.facturar',
+  // `proyectos.rentabilidad.ver` (dashboard de rentabilidad) separado de
+  // `proyectos.ver` — expone costo interno derivado del salario de los
+  // empleados (agregado, no por persona, pero más sensible que solo ver
+  // el proyecto), a propósito no incluido en el permiso básico de ver.
+  'proyectos.ver', 'proyectos.crear', 'proyectos.editar', 'proyectos.horas.registrar', 'proyectos.facturar', 'proyectos.rentabilidad.ver',
 ];
 
 export const ROLES_BASE: Record<string, string[]> = {

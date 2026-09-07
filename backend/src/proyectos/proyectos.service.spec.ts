@@ -26,6 +26,9 @@ describe('ProyectosService', () => {
       sumarHorasDelHito: jest.fn(),
       marcarHitoFacturado: jest.fn(),
       buscarBodegaActivaPorDefecto: jest.fn(),
+      sumarFacturadoDelProyecto: jest.fn(),
+      agruparHorasDelProyectoPorEmpleado: jest.fn(),
+      sumarGastosDelProyecto: jest.fn(),
     } as unknown as jest.Mocked<ProyectosRepository>;
     clientesService = { buscarPorId: jest.fn().mockResolvedValue({ id: 'c1' }) } as unknown as jest.Mocked<ClientesService>;
     empleadosRepository = {
@@ -150,6 +153,70 @@ describe('ProyectosService', () => {
       repository.buscarProyectoPorId.mockResolvedValue({ id: 'p1', modoFacturacion: 'PRECIO_FIJO' } as never);
       repository.buscarBodegaActivaPorDefecto.mockResolvedValue(null as never);
       await expect(service.facturarHito('h1', 't1', 'u1')).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('calcularRentabilidad', () => {
+    beforeEach(() => {
+      repository.buscarProyectoPorId.mockResolvedValue({ id: 'p1' } as never);
+      repository.sumarFacturadoDelProyecto.mockResolvedValue(0);
+      repository.agruparHorasDelProyectoPorEmpleado.mockResolvedValue([]);
+      repository.sumarGastosDelProyecto.mockResolvedValue(0);
+    });
+
+    it('valida que el proyecto exista y pertenezca al tenant (404 si no)', async () => {
+      repository.buscarProyectoPorId.mockRejectedValue(new Error('no encontrado'));
+      await expect(service.calcularRentabilidad('p1', 't1')).rejects.toThrow('no encontrado');
+    });
+
+    it('un proyecto sin nada facturado/gastado/con horas devuelve todo en 0 sin explotar', async () => {
+      const resultado = await service.calcularRentabilidad('p1', 't1');
+      expect(resultado).toEqual({ facturado: 0, costoHoras: 0, costoGastos: 0, costoTotal: 0, margen: 0, margenPorcentaje: null });
+    });
+
+    it('excluye facturas ANULADAS del facturado (ya resuelto por el repositorio, acá solo se confirma que se usa el valor tal cual)', async () => {
+      repository.sumarFacturadoDelProyecto.mockResolvedValue(59000);
+      const resultado = await service.calcularRentabilidad('p1', 't1');
+      expect(repository.sumarFacturadoDelProyecto).toHaveBeenCalledWith('p1');
+      expect(resultado.facturado).toBe(59000);
+    });
+
+    it('suma el costo de horas de varios empleados con costoHora distinto', async () => {
+      repository.agruparHorasDelProyectoPorEmpleado.mockResolvedValue([
+        { empleadoId: 'e1', horas: 10 },
+        { empleadoId: 'e2', horas: 5 },
+      ]);
+      empleadosRepository.buscarPorId.mockImplementation(((id: string) =>
+        Promise.resolve({ id, salarioBrutoMensual: id === 'e1' ? '34666' : '17333' })) as never);
+
+      const resultado = await service.calcularRentabilidad('p1', 't1');
+
+      // e1: 34666/173.33 ≈ 200/h × 10h = 2000; e2: 17333/173.33 ≈ 100/h × 5h = 500
+      expect(resultado.costoHoras).toBeCloseTo(2500, 0);
+    });
+
+    it('suma los gastos menores asociados al proyecto', async () => {
+      repository.sumarGastosDelProyecto.mockResolvedValue(1500);
+      const resultado = await service.calcularRentabilidad('p1', 't1');
+      expect(resultado.costoGastos).toBe(1500);
+      expect(resultado.costoTotal).toBe(1500);
+    });
+
+    it('calcula margen y margen% correctamente', async () => {
+      repository.sumarFacturadoDelProyecto.mockResolvedValue(10000);
+      repository.sumarGastosDelProyecto.mockResolvedValue(2000);
+      repository.agruparHorasDelProyectoPorEmpleado.mockResolvedValue([{ empleadoId: 'e1', horas: 10 }]);
+      // costoHora e1 ≈ 200 → costoHoras ≈ 2000; costoTotal ≈ 4000; margen ≈ 6000; margen% = 60
+      const resultado = await service.calcularRentabilidad('p1', 't1');
+      expect(resultado.margen).toBeCloseTo(6000, 0);
+      expect(resultado.margenPorcentaje).toBeCloseTo(60, 0);
+    });
+
+    it('margenPorcentaje es null cuando no hay nada facturado (evita dividir por cero)', async () => {
+      repository.sumarGastosDelProyecto.mockResolvedValue(500);
+      const resultado = await service.calcularRentabilidad('p1', 't1');
+      expect(resultado.facturado).toBe(0);
+      expect(resultado.margenPorcentaje).toBeNull();
     });
   });
 });

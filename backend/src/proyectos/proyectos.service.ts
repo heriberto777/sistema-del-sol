@@ -139,4 +139,34 @@ export class ProyectosService {
     );
     return costoHora(empleado.salarioBrutoMensual.toString(), horasLaborablesMes);
   }
+
+  /**
+   * Dashboard de rentabilidad: facturado real (Facturas emitidas desde los
+   * hitos de este proyecto, ver `facturarHito`) vs. costo real (horas de
+   * TODAS las tareas del proyecto × costo interno de cada empleado, más
+   * gastos menores asociados). Gateado con un permiso propio
+   * (`proyectos.rentabilidad.ver`, ver roles-base.ts) porque el costo de
+   * horas se deriva del salario de los empleados — más sensible que solo
+   * `proyectos.ver`.
+   */
+  async calcularRentabilidad(proyectoId: string, tenantId: string) {
+    await this.buscarPorId(proyectoId); // 404 si el proyecto no existe/no es de este tenant
+
+    const [facturado, horasPorEmpleado, costoGastos] = await Promise.all([
+      this.proyectosRepository.sumarFacturadoDelProyecto(proyectoId),
+      this.proyectosRepository.agruparHorasDelProyectoPorEmpleado(proyectoId),
+      this.proyectosRepository.sumarGastosDelProyecto(proyectoId),
+    ]);
+
+    const costosPorEmpleado = await Promise.all(
+      horasPorEmpleado.map(async ({ empleadoId, horas }) => horas * (await this.costoHoraEmpleado(empleadoId, tenantId))),
+    );
+    const costoHoras = costosPorEmpleado.reduce((acc, c) => acc + c, 0);
+
+    const costoTotal = costoHoras + costoGastos;
+    const margen = facturado - costoTotal;
+    const margenPorcentaje = facturado > 0 ? (margen / facturado) * 100 : null;
+
+    return { facturado, costoHoras, costoGastos, costoTotal, margen, margenPorcentaje };
+  }
 }

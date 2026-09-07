@@ -11,6 +11,7 @@ import { FormField } from '../components/molecules/FormField/FormField';
 import { Modal } from '../components/molecules/Modal/Modal';
 import { EstadoVacio } from '../components/molecules/EstadoVacio/EstadoVacio';
 import { RequierePermiso } from '../components/organisms/RequierePermiso/RequierePermiso';
+import { useAuth } from '../hooks/useAuth';
 
 interface Hito {
   id: string;
@@ -62,6 +63,15 @@ interface EmpleadoOpcion {
   nombre: string;
 }
 
+interface Rentabilidad {
+  facturado: number;
+  costoHoras: number;
+  costoGastos: number;
+  costoTotal: number;
+  margen: number;
+  margenPorcentaje: number | null;
+}
+
 const ESTADOS_TAREA = ['PENDIENTE', 'EN_CURSO', 'EN_REVISION', 'TERMINADA'];
 const ETIQUETA_ESTADO_TAREA: Record<string, string> = {
   PENDIENTE: 'Pendiente',
@@ -74,6 +84,8 @@ const ESTADOS_PROYECTO = ['PLANIFICADO', 'EN_CURSO', 'PAUSADO', 'TERMINADO', 'CA
 export function ProyectoDetalle() {
   const { id } = useParams<{ id: string }>();
   const queryClient = useQueryClient();
+  const { tienePermiso } = useAuth();
+  const puedeVerRentabilidad = tienePermiso('proyectos.rentabilidad.ver');
   const [nuevoHito, setNuevoHito] = useState('');
   const [nuevaTarea, setNuevaTarea] = useState('');
   const [tareaAbierta, setTareaAbierta] = useState<Tarea | null>(null);
@@ -90,6 +102,12 @@ export function ProyectoDetalle() {
     queryKey: ['proyectos-empleados-opciones'],
     queryFn: async () => (await apiClient.get<EmpleadoOpcion[]>('/admin/proyectos/empleados')).data,
     enabled: !!tareaAbierta,
+  });
+
+  const { data: rentabilidad } = useQuery({
+    queryKey: ['proyecto-rentabilidad', id],
+    queryFn: async () => (await apiClient.get<Rentabilidad>(`/admin/proyectos/${id}/rentabilidad`)).data,
+    enabled: !!id && puedeVerRentabilidad,
   });
 
   const invalidar = () => queryClient.invalidateQueries({ queryKey: ['proyecto', id] });
@@ -254,6 +272,40 @@ export function ProyectoDetalle() {
             </form>
           </div>
         </Card>
+
+        <RequierePermiso permiso="proyectos.rentabilidad.ver">
+          {rentabilidad && (
+            <Card titulo="Rentabilidad" descripcion="Facturado real vs. costo (horas + gastos asociados).">
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+                <div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Facturado</p>
+                  <p className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                    RD$ {rentabilidad.facturado.toLocaleString('es-DO', { maximumFractionDigits: 2 })}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Costo horas</p>
+                  <p className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                    RD$ {rentabilidad.costoHoras.toLocaleString('es-DO', { maximumFractionDigits: 2 })}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Costo gastos</p>
+                  <p className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                    RD$ {rentabilidad.costoGastos.toLocaleString('es-DO', { maximumFractionDigits: 2 })}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Margen</p>
+                  <p className={`text-lg font-semibold ${rentabilidad.margen >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+                    RD$ {rentabilidad.margen.toLocaleString('es-DO', { maximumFractionDigits: 2 })}
+                    {rentabilidad.margenPorcentaje !== null && ` (${rentabilidad.margenPorcentaje.toFixed(1)}%)`}
+                  </p>
+                </div>
+              </div>
+            </Card>
+          )}
+        </RequierePermiso>
 
         <Card titulo="Tareas">
           <div className="space-y-2">

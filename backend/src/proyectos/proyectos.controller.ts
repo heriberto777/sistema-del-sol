@@ -42,6 +42,14 @@ export class ProyectosController {
     return this.proyectosService.buscarPorId(id);
   }
 
+  // Permiso propio, separado de `proyectos.ver` a propósito — expone costo
+  // interno derivado del salario de los empleados (ver roles-base.ts).
+  @Get(':id/rentabilidad')
+  @Permissions('proyectos.rentabilidad.ver')
+  calcularRentabilidad(@Param('id') id: string, @CurrentUser() user: JwtPayloadUser) {
+    return this.proyectosService.calcularRentabilidad(id, user.tenantId);
+  }
+
   @Patch(':id')
   @Permissions('proyectos.editar')
   actualizar(@Param('id') id: string, @Body() dto: Partial<CrearProyectoDto>) {
