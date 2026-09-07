@@ -55,6 +55,11 @@ jobs:
       APP_DATABASE_URL: postgresql://sol:sol@localhost:5432/sistema_del_sol_test?connection_limit=20
       REDIS_URL: redis://localhost:6379
       JWT_SECRET: test-secret
+      # WebhooksService.crear cifra el secret con AES-256-GCM
+      # (encriptado.util.ts) desde la auditoría de seguridad 2026-09-06 —
+      # sin esto, cualquier e2e que cree un webhook falla con 500 (bug real
+      # encontrado en CI: nunca se agregó esta variable acá al sumar el cifrado).
+      ENCRYPTION_KEY: test-encryption-key-e2e
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
