@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { AlertTriangle, ArrowRight, Banknote, CalendarClock, Globe, PackageX, Receipt, ShoppingCart, Store, type LucideIcon, XOctagon } from 'lucide-react';
 import { StatCard } from '../components/molecules/StatCard/StatCard';
@@ -135,31 +135,45 @@ export function Dashboard() {
           </p>
         )}
 
-        <div>
-          <h2 className="mb-3 text-sm font-semibold text-slate-700 dark:text-slate-300">Alertas de inventario</h2>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <StatCard
-              etiqueta="Sin stock"
-              valor={isLoading ? '…' : String(data?.alertasInventario.sinStock ?? 0)}
-              icono={PackageX}
-            />
-            <StatCard
-              etiqueta="Stock bajo"
-              valor={isLoading ? '…' : String(data?.alertasInventario.stockBajo ?? 0)}
-              icono={AlertTriangle}
-            />
-            <StatCard
-              etiqueta="Por vencer (7 días)"
-              valor={isLoading ? '…' : String(data?.alertasInventario.porVencer7Dias ?? 0)}
-              icono={CalendarClock}
-            />
-            <StatCard
-              etiqueta="Vencidos"
-              valor={isLoading ? '…' : String(data?.alertasInventario.vencidos ?? 0)}
-              icono={XOctagon}
-            />
+        {/* Ítem E-12 — antes sin gate propio: cualquier rol con reportes.ver
+            veía el detalle de inventario aunque no tuviera inventario.ver
+            (ej. Contador). Ocultado en silencio (no un RequierePermiso con
+            banner, que quedaría raro en medio del dashboard) — mismo
+            criterio que puedeIrAlPos más arriba. El resto de las tarjetas
+            de arriba es agregado de ventas/compras, no de inventario, así
+            que se queda solo con reportes.ver. */}
+        {tienePermiso('inventario.ver') && (
+          <div>
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-300">Alertas de inventario</h2>
+              <Link to="/inventario/alertas" className="flex items-center gap-1 text-xs font-medium text-sol-600 hover:text-sol-700 dark:text-sol-400">
+                Ver alertas <ArrowRight size={12} />
+              </Link>
+            </div>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <StatCard
+                etiqueta="Sin stock"
+                valor={isLoading ? '…' : String(data?.alertasInventario.sinStock ?? 0)}
+                icono={PackageX}
+              />
+              <StatCard
+                etiqueta="Stock bajo"
+                valor={isLoading ? '…' : String(data?.alertasInventario.stockBajo ?? 0)}
+                icono={AlertTriangle}
+              />
+              <StatCard
+                etiqueta="Por vencer (7 días)"
+                valor={isLoading ? '…' : String(data?.alertasInventario.porVencer7Dias ?? 0)}
+                icono={CalendarClock}
+              />
+              <StatCard
+                etiqueta="Vencidos"
+                valor={isLoading ? '…' : String(data?.alertasInventario.vencidos ?? 0)}
+                icono={XOctagon}
+              />
+            </div>
           </div>
-        </div>
+        )}
       </RequierePermiso>
     </div>
   );

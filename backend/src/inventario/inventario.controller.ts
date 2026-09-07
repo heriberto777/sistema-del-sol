@@ -9,6 +9,7 @@ import { ListadoQueryDto } from '../common/dto/listado-query.dto';
 import { KardexQueryDto } from './dto/kardex-query.dto';
 import { LotesQueryDto } from './dto/lotes-query.dto';
 import { VencimientosQueryDto } from './dto/vencimientos-query.dto';
+import { AlertasInventarioQueryDto } from './dto/alertas-inventario-query.dto';
 import { Permissions } from '../common/decorators/permissions.decorator';
 import { RequiereModulo } from '../common/decorators/requiere-modulo.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -78,6 +79,14 @@ export class InventarioController {
   @Permissions('inventario.ver')
   vencimientos(@Query() query: VencimientosQueryDto) {
     return this.inventarioService.vencimientos(query.diasProximidad);
+  }
+
+  // Ítem E-12 — listado paginado detrás de las 4 tarjetas de conteo de
+  // `GET /reportes/dashboard` (ítem E-4) y del popup proactivo.
+  @Get('alertas')
+  @Permissions('inventario.ver')
+  alertas(@Query() query: AlertasInventarioQueryDto, @CurrentUser() user: JwtPayloadUser) {
+    return this.inventarioService.listarAlertas(user.tenantId, query);
   }
 
   @Post('ajustar')

@@ -260,6 +260,111 @@ export class InventarioRepository {
   }
 
   /**
+   * Resuelve un `sucursalId` a los ids de sus bodegas — mismo cuerpo que
+   * `ReportesRepository.bodegaIdsDeSucursal`, duplicado a propósito
+   * (`InventarioModule` no importa `ReportesModule` por una query de una
+   * línea — mismo criterio que `GastosMenoresRepository.
+   * obtenerModalidadFacturacion`).
+   */
+  async bodegaIdsDeSucursal(sucursalId: string) {
+    const bodegas = await this.db.bodega.findMany({ where: { sucursalId }, select: { id: true } });
+    return bodegas.map((b) => b.id);
+  }
+
+  private static readonly INCLUDE_VARIANTE = {
+    producto: true,
+    valoresAtributo: { include: { valorAtributo: { include: { atributo: true } } } },
+  } as const;
+
+  /**
+   * Solo `varianteId`/`producto`/`valoresAtributo` — nunca spreadear el
+   * resto de campos de `VarianteProducto` (`id`, `sku`, `createdAt`, etc.)
+   * en la fila del padre (`Stock`/`Lote`): `variante.id` pisaría
+   * silenciosamente el `id` real de la fila si se spreadeara después
+   * (bug real encontrado por el test de `listarAlertas` — un `.id`
+   * devuelto era el de la variante, no el del `Stock`/`Lote`).
+   */
+  private mapearVariante(variante: {
+    id: string;
+    producto: unknown;
+    valoresAtributo: { valorAtributo: { atributo: { nombre: string }; valor: string } }[];
+  }) {
+    return {
+      varianteId: variante.id,
+      producto: variante.producto,
+      valoresAtributo: variante.valoresAtributo.map((va) => ({
+        atributo: va.valorAtributo.atributo.nombre,
+        valor: va.valorAtributo.valor,
+      })),
+    };
+  }
+
+  /**
+   * Ítem E-12 — listado paginado detrás de las 4 tarjetas de
+   * `ReportesRepository.alertasInventarioSegmentadas` (ítem E-4), que solo
+   * devuelve conteos. `sinStock` pagina en SQL directo (filtro literal);
+   * `stockBajo` necesita comparar `cantidadActual` contra `stockMinimo`
+   * (columna contra columna, que Prisma no expresa en un `where`) — mismo
+   * trade-off que ya acepta `alertasInventarioSegmentadas`: se trae el
+   * universo acotado por `cantidadActual > 0` y se filtra/pagina en JS.
+   * `porVencer`/`vencidos` son `Lote` (sí pagina en SQL directo).
+   */
+  async listarAlertas(
+    categoria: 'sinStock' | 'stockBajo' | 'porVencer' | 'vencidos',
+    tenantId: string,
+    bodegaIds: string[] | undefined,
+    skip: number,
+    take: number,
+  ) {
+    const filtroBodega = bodegaIds ? { bodegaId: { in: bodegaIds } } : {};
+
+    if (categoria === 'sinStock' || categoria === 'stockBajo') {
+      const where = {
+        variante: { producto: { tenantId } },
+        ...filtroBodega,
+        ...(categoria === 'sinStock' ? { cantidadActual: { lte: 0 } } : { cantidadActual: { gt: 0 } }),
+      };
+      const filas = await this.db.stock.findMany({
+        where,
+        include: { variante: { include: InventarioRepository.INCLUDE_VARIANTE }, bodega: true },
+        orderBy: { variante: { producto: { nombre: 'asc' } } },
+        // `stockBajo` filtra por `stockMinimo` (columna contra columna) recién
+        // después de traer las filas — no se puede acotar `take`/`skip` en SQL
+        // para esa categoría sin perder filas que sí corresponden.
+        ...(categoria === 'sinStock' ? { skip, take } : {}),
+      });
+      const filtradas =
+        categoria === 'stockBajo' ? filas.filter((f) => Number(f.cantidadActual) < Number(f.stockMinimo)) : filas;
+      const total = categoria === 'sinStock' ? await this.db.stock.count({ where }) : filtradas.length;
+      const pagina = categoria === 'sinStock' ? filtradas : filtradas.slice(skip, skip + take);
+
+      const datos = pagina.map(({ variante, ...stock }) => ({ ...stock, ...this.mapearVariante(variante) }));
+      return [datos, total] as const;
+    }
+
+    const hoy = new Date();
+    const enSieteDias = new Date(hoy.getTime() + 7 * 24 * 60 * 60 * 1000);
+    const where = {
+      tenantId,
+      ...filtroBodega,
+      cantidadActual: { gt: 0 },
+      fechaVencimiento: categoria === 'porVencer' ? { gte: hoy, lte: enSieteDias } : { lt: hoy },
+    };
+    const [filas, total] = await Promise.all([
+      this.db.lote.findMany({
+        where,
+        include: { variante: { include: InventarioRepository.INCLUDE_VARIANTE }, bodega: true },
+        orderBy: { fechaVencimiento: 'asc' },
+        skip,
+        take,
+      }),
+      this.db.lote.count({ where }),
+    ]);
+    const datos = filas.map(({ variante, ...lote }) => ({ ...lote, ...this.mapearVariante(variante) }));
+    return [datos, total] as const;
+  }
+
+  /**
    * Cuerpo puro (sin abrir transacción propia) — usado por `ajustarCantidad`
    * (un solo movimiento), por `transferir` (dos movimientos todo-o-nada), y
    * públicamente por `InventarioService.*EnTx` cuando quien orquesta la

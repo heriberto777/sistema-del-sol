@@ -214,3 +214,99 @@ describe('InventarioRepository — lotes/FEFO (Fase 5b)', () => {
     });
   });
 });
+
+describe('InventarioRepository — listarAlertas (ítem E-12)', () => {
+  let repository: InventarioRepository;
+  let db: any;
+
+  function variante(overrides: Record<string, unknown> = {}) {
+    return {
+      id: 'v1',
+      producto: { id: 'p1', nombre: 'Producto A' },
+      valoresAtributo: [{ valorAtributo: { atributo: { nombre: 'Talla' }, valor: 'M' } }],
+      ...overrides,
+    };
+  }
+
+  beforeEach(() => {
+    db = {
+      stock: { findMany: jest.fn(), count: jest.fn() },
+      lote: { findMany: jest.fn(), count: jest.fn() },
+      bodega: { findMany: jest.fn() },
+    };
+    const tenantPrisma = { client: db } as unknown as TenantPrismaService;
+    repository = new InventarioRepository(tenantPrisma);
+  });
+
+  it('sinStock pagina en SQL directo (cantidadActual <= 0)', async () => {
+    db.stock.findMany.mockResolvedValue([{ id: 'st1', cantidadActual: 0, stockMinimo: 5, bodega: { id: 'b1' }, variante: variante() }]);
+    db.stock.count.mockResolvedValue(1);
+
+    const [datos, total] = await repository.listarAlertas('sinStock', 't1', undefined, 0, 20);
+
+    expect(db.stock.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { variante: { producto: { tenantId: 't1' } }, cantidadActual: { lte: 0 } }, skip: 0, take: 20 }),
+    );
+    expect(total).toBe(1);
+    expect(datos[0]).toEqual(expect.objectContaining({ id: 'st1', producto: { id: 'p1', nombre: 'Producto A' }, valoresAtributo: [{ atributo: 'Talla', valor: 'M' }] }));
+  });
+
+  it('stockBajo filtra cantidadActual < stockMinimo en JS y pagina el resultado ya filtrado (columna contra columna, Prisma no lo expresa en where)', async () => {
+    db.stock.findMany.mockResolvedValue([
+      { id: 'st1', cantidadActual: 3, stockMinimo: 5, bodega: { id: 'b1' }, variante: variante() }, // bajo
+      { id: 'st2', cantidadActual: 20, stockMinimo: 5, bodega: { id: 'b1' }, variante: variante() }, // NO bajo, debe excluirse
+      { id: 'st3', cantidadActual: 1, stockMinimo: 10, bodega: { id: 'b1' }, variante: variante() }, // bajo
+    ]);
+
+    const [datos, total] = await repository.listarAlertas('stockBajo', 't1', undefined, 0, 20);
+
+    expect(db.stock.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ cantidadActual: { gt: 0 } }) }));
+    expect(db.stock.count).not.toHaveBeenCalled(); // el total sale de filtrar en JS, no de una segunda query
+    expect(total).toBe(2);
+    expect(datos.map((d: { id: string }) => d.id)).toEqual(['st1', 'st3']);
+  });
+
+  it('stockBajo pagina en JS sobre el resultado ya filtrado (skip/take no se le pasan a Prisma)', async () => {
+    db.stock.findMany.mockResolvedValue(
+      Array.from({ length: 5 }, (_, i) => ({ id: `st${i}`, cantidadActual: 1, stockMinimo: 10, bodega: { id: 'b1' }, variante: variante() })),
+    );
+
+    const [datos, total] = await repository.listarAlertas('stockBajo', 't1', undefined, 2, 2);
+
+    expect(total).toBe(5);
+    expect(datos.map((d: { id: string }) => d.id)).toEqual(['st2', 'st3']);
+  });
+
+  it('porVencer filtra Lote por los próximos 7 días y pagina en SQL', async () => {
+    db.lote.findMany.mockResolvedValue([{ id: 'l1', numeroLote: 'L1', fechaVencimiento: new Date(), bodega: { id: 'b1' }, variante: variante() }]);
+    db.lote.count.mockResolvedValue(1);
+
+    const [datos, total] = await repository.listarAlertas('porVencer', 't1', ['b1'], 0, 20);
+
+    expect(db.lote.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ tenantId: 't1', bodegaId: { in: ['b1'] }, cantidadActual: { gt: 0 } }), skip: 0, take: 20 }),
+    );
+    expect(total).toBe(1);
+    expect((datos[0] as { numeroLote: string }).numeroLote).toBe('L1');
+  });
+
+  it('vencidos filtra Lote con fechaVencimiento en el pasado', async () => {
+    db.lote.findMany.mockResolvedValue([]);
+    db.lote.count.mockResolvedValue(0);
+
+    await repository.listarAlertas('vencidos', 't1', undefined, 0, 20);
+
+    const where = db.lote.findMany.mock.calls[0][0].where;
+    expect(where.fechaVencimiento.lt).toBeInstanceOf(Date);
+    expect(where.fechaVencimiento.gte).toBeUndefined();
+  });
+
+  it('bodegaIdsDeSucursal delega en Bodega.findMany filtrado por sucursalId', async () => {
+    db.bodega.findMany.mockResolvedValue([{ id: 'b1' }, { id: 'b2' }]);
+
+    const resultado = await repository.bodegaIdsDeSucursal('s1');
+
+    expect(db.bodega.findMany).toHaveBeenCalledWith({ where: { sucursalId: 's1' }, select: { id: true } });
+    expect(resultado).toEqual(['b1', 'b2']);
+  });
+});

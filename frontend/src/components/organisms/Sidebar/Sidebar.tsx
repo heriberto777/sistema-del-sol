@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import clsx from 'clsx';
 import {
+  AlertTriangle,
   BarChart3,
   Bell,
   BookOpen,
@@ -146,6 +147,9 @@ const GRUPOS: Grupo[] = [
     etiqueta: 'Inventario y Compras',
     items: [
       { ruta: '/inventario', etiqueta: 'Inventario', icono: Boxes, permisos: ['inventario.ver'], modulo: 'inventario' },
+      // Ítem E-12 — página dedicada de Alertas (Sin Stock/Stock Bajo/Por
+      // Vencer/Vencidos), antes solo tarjetas de conteo en el Dashboard.
+      { ruta: '/inventario/alertas', etiqueta: 'Alertas de inventario', icono: AlertTriangle, permisos: ['inventario.ver'], modulo: 'inventario' },
       { ruta: '/compras', etiqueta: 'Compras', icono: ShoppingBag, permisos: ['compras.ver'], modulo: 'compras' },
       { ruta: '/productos', etiqueta: 'Productos', icono: Tag, permisos: ['precios.ver'], modulo: 'productos' },
     ],

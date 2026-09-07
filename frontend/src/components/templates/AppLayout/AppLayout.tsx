@@ -9,6 +9,7 @@ import { MarcarAsistenciaWidget } from '../../organisms/MarcarAsistenciaWidget/M
 import { BandejaWhatsappWidget } from '../../organisms/BandejaWhatsappWidget/BandejaWhatsappWidget';
 import { BandejaWhatsappDrawer } from '../../organisms/BandejaWhatsappDrawer/BandejaWhatsappDrawer';
 import { BandejaWhatsappDrawerProvider } from '../../organisms/BandejaWhatsappDrawer/BandejaWhatsappDrawerContext';
+import { PopupAlertasInventario } from '../../organisms/PopupAlertasInventario/PopupAlertasInventario';
 
 /**
  * El Sidebar tiene ancho fijo (w-60, o el rail de w-[4.5rem] colapsado) —
@@ -57,6 +58,7 @@ export function AppLayout() {
           </main>
         </div>
         <BandejaWhatsappDrawer />
+        <PopupAlertasInventario />
       </div>
     </BandejaWhatsappDrawerProvider>
   );

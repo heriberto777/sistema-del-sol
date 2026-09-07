@@ -7,6 +7,7 @@ import { SucursalesRepository } from '../sucursales/sucursales.repository';
 import { EventBusService } from '../event-bus/event-bus.service';
 import { EVENTOS } from '../event-bus/events';
 import { ListadoQueryDto } from '../common/dto/listado-query.dto';
+import { AlertasInventarioQueryDto } from './dto/alertas-inventario-query.dto';
 import { paginar } from '../common/types/pagina-resultado';
 import { AuthService } from '../auth/auth.service';
 
@@ -492,6 +493,14 @@ export class InventarioService {
     await this.validarPertenencia({ bodegaId });
     const { pagina, tamanoPagina, skip, take } = paginar(query.pagina, query.tamanoPagina);
     const [datos, total] = await this.inventarioRepository.listarStockPorBodega(bodegaId, { skip, take, busqueda: query.busqueda });
+    return { datos, total, pagina, tamanoPagina };
+  }
+
+  /** Ítem E-12 — detrás de la página de Alertas de Inventario y del popup proactivo del Dashboard. */
+  async listarAlertas(tenantId: string, query: AlertasInventarioQueryDto) {
+    const { pagina, tamanoPagina, skip, take } = paginar(query.pagina, query.tamanoPagina);
+    const bodegaIds = query.sucursalId ? await this.inventarioRepository.bodegaIdsDeSucursal(query.sucursalId) : undefined;
+    const [datos, total] = await this.inventarioRepository.listarAlertas(query.categoria, tenantId, bodegaIds, skip, take);
     return { datos, total, pagina, tamanoPagina };
   }
 

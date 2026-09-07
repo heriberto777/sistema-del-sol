@@ -17,6 +17,7 @@ import { NotasCredito } from './pages/NotasCredito';
 import { CuentasPorCobrar } from './pages/CuentasPorCobrar';
 import { CuentasPorPagar } from './pages/CuentasPorPagar';
 import { Inventario } from './pages/Inventario';
+import { InventarioAlertas } from './pages/InventarioAlertas';
 import { Sucursales } from './pages/Sucursales';
 import { Compras } from './pages/Compras';
 import { Contactos } from './pages/Contactos';
@@ -165,6 +166,7 @@ const RUTAS_ADMIN = [
           { path: '/cuentas-por-cobrar', element: <CuentasPorCobrar /> },
           { path: '/cuentas-por-pagar', element: <CuentasPorPagar /> },
           { path: '/inventario', element: <Inventario /> },
+          { path: '/inventario/alertas', element: <InventarioAlertas /> },
           { path: '/sucursales', element: <Sucursales /> },
           { path: '/compras', element: <Compras /> },
           { path: '/contactos', element: <Contactos /> },

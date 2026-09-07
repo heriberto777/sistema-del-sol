@@ -30,6 +30,8 @@ describe('InventarioService', () => {
       buscarBodegaPorId: jest.fn().mockResolvedValue({ id: 'b1', sucursalId: 's1' }),
       obtenerVarianteConProducto: jest.fn(),
       movimientosPorVarianteBodega: jest.fn(),
+      listarAlertas: jest.fn(),
+      bodegaIdsDeSucursal: jest.fn(),
     } as unknown as jest.Mocked<InventarioRepository>;
     productosService = { buscarPorId: jest.fn().mockResolvedValue({ id: 'p1' }) } as unknown as jest.Mocked<ProductosService>;
     variantesService = { resolverObligatoria: jest.fn().mockResolvedValue('v1') } as unknown as jest.Mocked<VariantesService>;
@@ -392,6 +394,45 @@ describe('InventarioService', () => {
         expect(resultado.movimientos[1].bodega).toEqual({ id: 'bB', nombre: 'Bodega B' });
         expect(resultado.saldoFinal).toBe(15);
       });
+    });
+  });
+
+  describe('listarAlertas (ítem E-12)', () => {
+    it('pagina con los defaults cuando no vienen pagina/tamanoPagina', async () => {
+      repository.listarAlertas.mockResolvedValue([[{ id: 'st1' }], 1] as never);
+
+      const resultado = await service.listarAlertas('t1', { categoria: 'sinStock' } as never);
+
+      expect(repository.listarAlertas).toHaveBeenCalledWith('sinStock', 't1', undefined, 0, 20);
+      expect(resultado).toEqual({ datos: [{ id: 'st1' }], total: 1, pagina: 1, tamanoPagina: 20 });
+    });
+
+    it('resuelve sucursalId a bodegaIds antes de delegar en el repositorio', async () => {
+      repository.bodegaIdsDeSucursal.mockResolvedValue(['b1', 'b2']);
+      repository.listarAlertas.mockResolvedValue([[], 0] as never);
+
+      await service.listarAlertas('t1', { categoria: 'stockBajo', sucursalId: 's1', pagina: 2, tamanoPagina: 10 } as never);
+
+      expect(repository.bodegaIdsDeSucursal).toHaveBeenCalledWith('s1');
+      expect(repository.listarAlertas).toHaveBeenCalledWith('stockBajo', 't1', ['b1', 'b2'], 10, 10);
+    });
+
+    it('sin sucursalId, no resuelve bodegaIds y pasa undefined', async () => {
+      repository.listarAlertas.mockResolvedValue([[], 0] as never);
+
+      await service.listarAlertas('t1', { categoria: 'porVencer' } as never);
+
+      expect(repository.bodegaIdsDeSucursal).not.toHaveBeenCalled();
+      expect(repository.listarAlertas).toHaveBeenCalledWith('porVencer', 't1', undefined, 0, 20);
+    });
+
+    it('funciona igual para la categoría vencidos', async () => {
+      repository.listarAlertas.mockResolvedValue([[{ id: 'l1' }], 1] as never);
+
+      const resultado = await service.listarAlertas('t1', { categoria: 'vencidos' } as never);
+
+      expect(repository.listarAlertas).toHaveBeenCalledWith('vencidos', 't1', undefined, 0, 20);
+      expect(resultado.total).toBe(1);
     });
   });
 });
