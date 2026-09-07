@@ -28,6 +28,11 @@ interface CuentaBancaria {
   numeroCuenta: string;
 }
 
+interface ProyectoOpcion {
+  id: string;
+  nombre: string;
+}
+
 interface GastoMenor {
   id: string;
   ncf: string | null;
@@ -37,6 +42,7 @@ interface GastoMenor {
   itbis: string;
   total: string;
   cuentaBancaria: CuentaBancaria;
+  proyecto: ProyectoOpcion | null;
 }
 
 interface LineaGastoMenorDetalle {
@@ -118,6 +124,7 @@ export function GastosMenores() {
                     <th className="px-5 py-3 font-medium">Notas</th>
                     <th className="px-5 py-3 font-medium">Fecha</th>
                     <th className="px-5 py-3 font-medium">Cuenta</th>
+                    <th className="px-5 py-3 font-medium">Proyecto</th>
                     <th className="px-5 py-3 font-medium">Monto</th>
                     <th className="px-5 py-3" />
                   </tr>
@@ -131,6 +138,7 @@ export function GastosMenores() {
                       <td className="px-5 py-3">
                         {g.cuentaBancaria.banco} — {g.cuentaBancaria.numeroCuenta}
                       </td>
+                      <td className="px-5 py-3">{g.proyecto?.nombre ?? '—'}</td>
                       <td className="px-5 py-3">RD$ {Number(g.total).toLocaleString('es-DO')}</td>
                       <td className="px-5 py-3 text-right">
                         <Button variante="secundario" onClick={() => setGastoViendo(g)}>
@@ -174,6 +182,7 @@ function ModalVerGastoMenor({ gasto, onClose }: { gasto: GastoMenor; onClose: ()
               Cuenta bancaria: <span className="font-medium">{data.cuentaBancaria.banco} — {data.cuentaBancaria.numeroCuenta}</span>
             </p>
             <p className="text-slate-500 dark:text-slate-400">Fecha: {new Date(data.fecha).toLocaleDateString('es-DO')}</p>
+            {data.proyecto && <p className="text-slate-500 dark:text-slate-400">Proyecto: {data.proyecto.nombre}</p>}
             {data.notas && <p className="text-slate-500 dark:text-slate-400">Notas: {data.notas}</p>}
           </div>
 
@@ -217,11 +226,15 @@ function ModalVerGastoMenor({ gasto, onClose }: { gasto: GastoMenor; onClose: ()
 
 function ModalNuevoGastoMenor({ onClose }: { onClose: () => void }) {
   const queryClient = useQueryClient();
+  const { tienePermiso, tieneModulo } = useAuth();
   const [cuentaBancariaId, setCuentaBancariaId] = useState('');
+  const [proyectoId, setProyectoId] = useState('');
   const [notas, setNotas] = useState('');
   const [fecha, setFecha] = useState('');
   const [lineas, setLineas] = useState([{ ...LINEA_VACIA }]);
   const [error, setError] = useState<string | null>(null);
+
+  const puedeAsociarProyecto = tieneModulo('proyectos') && tienePermiso('proyectos.ver');
 
   const { data: bancos } = useQuery({
     queryKey: ['bancos-select'],
@@ -233,6 +246,12 @@ function ModalNuevoGastoMenor({ onClose }: { onClose: () => void }) {
     queryFn: async () => (await apiClient.get<CuentaContable[]>('/contabilidad/cuentas')).data,
   });
   const cuentasGasto = (cuentas ?? []).filter((c) => c.tipo === 'GASTO');
+
+  const { data: proyectos } = useQuery({
+    queryKey: ['proyectos-opciones'],
+    queryFn: async () => (await apiClient.get<PaginaResultado<ProyectoOpcion>>('/admin/proyectos', { params: { tamanoPagina: 200 } })).data.datos,
+    enabled: puedeAsociarProyecto,
+  });
 
   function actualizarLinea(i: number, cambios: Partial<(typeof lineas)[number]>) {
     setLineas((prev) => prev.map((l, idx) => (idx === i ? { ...l, ...cambios } : l)));
@@ -249,6 +268,7 @@ function ModalNuevoGastoMenor({ onClose }: { onClose: () => void }) {
     mutationFn: async () =>
       apiClient.post('/gastos-menores', {
         cuentaBancariaId,
+        proyectoId: puedeAsociarProyecto && proyectoId ? proyectoId : undefined,
         notas: notas || undefined,
         fecha: fecha || undefined,
         lineas: lineas
@@ -294,6 +314,20 @@ function ModalNuevoGastoMenor({ onClose }: { onClose: () => void }) {
         </div>
         <FormField id="gasto-menor-fecha" label="Fecha (opcional)" type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
         <FormField id="gasto-menor-notas" label="Notas de egreso (opcional)" value={notas} onChange={(e) => setNotas(e.target.value)} />
+
+        {puedeAsociarProyecto && (
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Proyecto (opcional)</label>
+            <Select value={proyectoId} onChange={(e) => setProyectoId(e.target.value)}>
+              <option value="">Sin proyecto asociado</option>
+              {proyectos?.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.nombre}
+                </option>
+              ))}
+            </Select>
+          </div>
+        )}
 
         <div className="space-y-2">
           <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Cuentas contables</p>

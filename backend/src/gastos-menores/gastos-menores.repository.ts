@@ -118,7 +118,7 @@ export class GastosMenoresRepository {
         orderBy: { fecha: 'desc' },
         skip: params.skip,
         take: params.take,
-        include: { cuentaBancaria: true },
+        include: { cuentaBancaria: true, proyecto: { select: { id: true, nombre: true } } },
       }),
       this.db.gastoMenor.count({ where }),
     ]);
@@ -127,7 +127,11 @@ export class GastosMenoresRepository {
   buscarPorId(id: string) {
     return this.db.gastoMenor.findUniqueOrThrow({
       where: { id },
-      include: { lineas: { include: { cuentaContable: true } }, cuentaBancaria: true },
+      include: {
+        lineas: { include: { cuentaContable: true } },
+        cuentaBancaria: true,
+        proyecto: { select: { id: true, nombre: true } },
+      },
     });
   }
 }
