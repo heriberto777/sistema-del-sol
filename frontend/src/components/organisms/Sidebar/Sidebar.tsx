@@ -22,6 +22,7 @@ import {
   LayoutDashboard,
   Landmark,
   type LucideIcon,
+  Megaphone,
   MessageCircle,
   Receipt,
   RotateCcw,
@@ -113,6 +114,7 @@ const GRUPOS: Grupo[] = [
       { ruta: '/pos', etiqueta: 'Punto de venta', icono: Store, permisos: ['pos.ver'], modulo: 'pos' },
       { ruta: '/tienda-online', etiqueta: 'Tienda Online', icono: Globe, permisos: ['admin.configuracion'], modulo: 'ecommerce' },
       { ruta: '/proyectos', etiqueta: 'Proyectos', icono: FolderKanban, permisos: ['proyectos.ver'], modulo: 'proyectos' },
+      { ruta: '/publicaciones-sociales', etiqueta: 'Publicaciones Sociales', icono: Megaphone, permisos: ['publicacionessociales.ver'], modulo: 'publicacionessociales' },
       // Sirve tanto a Ventas (clientes) como a Compras (proveedores) —
       // se prioriza acá por ser el uso más frecuente.
       { ruta: '/contactos', etiqueta: 'Contactos', icono: Contact, permisos: ['clientes.ver', 'compras.ver'] },

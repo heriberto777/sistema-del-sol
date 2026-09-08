@@ -23,6 +23,7 @@ export const MODULOS_BASE: { clave: string; nombre: string }[] = [
   { clave: 'inmobiliaria', nombre: 'Inmobiliaria (plugin)' },
   { clave: 'ecommerce', nombre: 'Tienda Online (plugin)' },
   { clave: 'proyectos', nombre: 'Proyectos (plugin)' },
+  { clave: 'publicacionessociales', nombre: 'Publicaciones Sociales (plugin)' },
 ];
 
 export const PLANES_BASE: Record<string, { descripcion: string; modulos: string[] }> = {
@@ -39,6 +40,7 @@ export const PLANES_BASE: Record<string, { descripcion: string; modulos: string[
     modulos: [
       'facturacion', 'cotizaciones', 'remisiones', 'inventario', 'compras', 'productos',
       'pos', 'bancos', 'gastosmenores', 'nomina', 'ia', 'inmobiliaria', 'ecommerce', 'proyectos',
+      'publicacionessociales',
     ],
   },
 };

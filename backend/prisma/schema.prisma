@@ -114,6 +114,7 @@ model Tenant {
   hitosProyecto             HitoProyecto[]
   tareasProyecto            TareaProyecto[]
   registrosHoraProyecto     RegistroHoraProyecto[]
+  publicacionesSociales     PublicacionSocial[]
 
   @@map("tenants")
 }
@@ -701,6 +702,8 @@ model User {
   empleado                       Empleado?
   ausenciasSolicitadas           Ausencia[]                @relation("AusenciaSolicitadaPor")
   ausenciasAprobadas             Ausencia[]                @relation("AusenciaAprobadaPor")
+  publicacionesSocialesCreadas   PublicacionSocial[]       @relation("PublicacionSocialCreadaPor")
+  publicacionesSocialesAprobadas PublicacionSocial[]       @relation("PublicacionSocialAprobadaPor")
   asistenciasAprobadas           RegistroAsistencia[]      @relation("AsistenciaAprobadaPor")
   sucursales                     UsuarioSucursal[]
   codigosAutorizacionSolicitados CodigoAutorizacion[]
@@ -2500,6 +2503,7 @@ model Producto {
   // Fotos adicionales para la Tienda Online (Fase 5) — `imagen` sigue
   // siendo la portada, esto es la galería que se suma abajo.
   imagenesAdicionales           ImagenProducto[]
+  publicacionesSociales         PublicacionSocial[]
   // Componentes de ESTE producto cuando `tipo: COMBO`.
   componentes                   ComponenteCombo[]              @relation("ComboComponentes")
   // Combos de los que este producto forma parte (como componente).
@@ -3916,4 +3920,63 @@ model RegistroHoraProyecto {
   createdAt  DateTime      @default(now())
 
   @@map("registros_hora_proyecto")
+}
+
+// PUBLICACIONES SOCIALES (plugin) — Fase 1: solo imagen. Genera un banner
+// de producto (foto + nombre + precio + logo del tenant) a partir de una
+// plantilla predefinida; un responsable lo aprueba o rechaza; una vez
+// aprobado, el tenant se lo lleva por descarga o por WhatsApp (botones
+// manuales) — el plugin NUNCA publica directo en ninguna red social.
+enum EstadoPublicacionSocial {
+  BORRADOR
+  PENDIENTE_APROBACION
+  APROBADA
+  RECHAZADA
+}
+
+/// Catálogo GLOBAL de plantillas de banner (no tenant-scoped, mismo
+/// trato que Modulo/Plan) — sembrado desde
+/// PLANTILLAS_PUBLICACION_SOCIAL_BASE vía
+/// scripts/seed-plantillas-publicacion-social.ts.
+model PlantillaPublicacionSocial {
+  id        String   @id @default(uuid())
+  clave     String   @unique
+  nombre    String
+  activa    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  publicaciones PublicacionSocial[]
+
+  @@map("plantillas_publicacion_social")
+}
+
+model PublicacionSocial {
+  id          String                     @id @default(uuid())
+  tenantId    String
+  tenant      Tenant                     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  productoId  String
+  producto    Producto                   @relation(fields: [productoId], references: [id], onDelete: Cascade)
+  plantillaId String
+  plantilla   PlantillaPublicacionSocial @relation(fields: [plantillaId], references: [id])
+  // Data URI completa (data:image/png;base64,...), mismo patrón que
+  // Producto.imagen — generada síncronamente al crear, nunca subida por
+  // el usuario. Servida por el endpoint público (ver
+  // publicacion-social-imagen-publica.*), reusado tanto por el <img> del
+  // admin como por el mediaUrl del envío por WhatsApp.
+  imagen      String                     @db.Text
+  estado      EstadoPublicacionSocial    @default(BORRADOR)
+
+  creadoPorId String
+  creadoPor   User                       @relation("PublicacionSocialCreadaPor", fields: [creadoPorId], references: [id], onDelete: Cascade)
+
+  aprobadoPorId String?
+  aprobadoPor   User?                    @relation("PublicacionSocialAprobadaPor", fields: [aprobadoPorId], references: [id], onDelete: Cascade)
+  // Exigido en el service (no alcanza con class-validator, es
+  // condicional) cuando estado pasa a RECHAZADA.
+  motivoRechazo   String?
+  fechaResolucion DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@map("publicaciones_sociales")
 }

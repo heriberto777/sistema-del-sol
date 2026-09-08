@@ -43,7 +43,8 @@ BEGIN
       'sesiones_cobro_factura', 'whatsapp_mensajes',
       'carritos_borrador', 'pedidos_tienda', 'secciones_tienda',
       'tenant_dominios',
-      'proyectos', 'hitos_proyecto', 'tareas_proyecto', 'registros_hora_proyecto'
+      'proyectos', 'hitos_proyecto', 'tareas_proyecto', 'registros_hora_proyecto',
+      'publicaciones_sociales'
     ])
   LOOP
     EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY;', tabla);

@@ -89,4 +89,8 @@ export const TENANT_SCOPED_MODELS = new Set([
   'HitoProyecto',
   'TareaProyecto',
   'RegistroHoraProyecto',
+  // Plugin de Publicaciones Sociales (Fase 1) — `PlantillaPublicacionSocial`
+  // queda AFUERA a propósito: es catálogo GLOBAL (mismo trato que
+  // Modulo/Plan), no tiene tenantId propio.
+  'PublicacionSocial',
 ]);

@@ -70,6 +70,11 @@ export const PERMISOS_BASE = [
   // empleados (agregado, no por persona, pero más sensible que solo ver
   // el proyecto), a propósito no incluido en el permiso básico de ver.
   'proyectos.ver', 'proyectos.crear', 'proyectos.editar', 'proyectos.horas.registrar', 'proyectos.facturar', 'proyectos.rentabilidad.ver',
+  // Plugin de Publicaciones Sociales (Fase 1) — `.aprobar` separado de
+  // `.editar` a propósito, mismo criterio que `proyectos.facturar`: es
+  // la acción que habilita la entrega (descarga/WhatsApp) de un diseño,
+  // no una edición más.
+  'publicacionessociales.ver', 'publicacionessociales.crear', 'publicacionessociales.editar', 'publicacionessociales.aprobar',
 ];
 
 export const ROLES_BASE: Record<string, string[]> = {

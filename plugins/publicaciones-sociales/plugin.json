@@ -1,0 +1,6 @@
+{
+  "key": "publicacionessociales",
+  "nombre": "Publicaciones Sociales",
+  "version": "0.1.0",
+  "descripcion": "Genera banners de producto (plantillas + precio real) para publicar en redes sociales, con aprobación previa dentro de la plataforma — nunca publica directo en ninguna red. Implementación real en backend/src/publicaciones-sociales/ — ver README.md."
+}
