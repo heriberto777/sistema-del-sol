@@ -1,5 +1,5 @@
 import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
-import { GeneradorFondoAdapter, ImagenGenerada, ModeloIa } from './generador-fondo.interface';
+import { GeneradorFondoAdapter, ImagenGenerada, ImagenReferencia, ModeloIa } from './generador-fondo.interface';
 
 /**
  * `generateContent` de Gemini con `responseModalities: ['IMAGE']`
@@ -17,21 +17,27 @@ export class GeminiFondoAdapter implements GeneradorFondoAdapter {
     return Boolean(process.env.GEMINI_API_KEY);
   }
 
-  async generar(imagenBase64: string, mimeType: string, prompt: string): Promise<ImagenGenerada> {
+  async generar(imagenBase64: string, mimeType: string, prompt: string, logo?: ImagenReferencia): Promise<ImagenGenerada> {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
       throw new ServiceUnavailableException('Generar fondo con IA no está disponible todavía (falta configurar Gemini)');
     }
 
     const modelo = process.env.GEMINI_IMAGEN_MODEL || 'gemini-3-pro-image-preview';
+    const parts: Record<string, unknown>[] = [
+      { text: prompt },
+      { inline_data: { mime_type: mimeType, data: imagenBase64 } },
+    ];
+    if (logo) parts.push({ inline_data: { mime_type: logo.mimeType, data: logo.base64 } });
+
     let respuesta: Response;
     try {
       respuesta = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelo}:generateContent?key=${apiKey}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }, { inline_data: { mime_type: mimeType, data: imagenBase64 } }] }],
-          generationConfig: { responseModalities: ['IMAGE'] },
+          contents: [{ parts }],
+          generationConfig: { responseModalities: ['IMAGE'], imageConfig: { aspectRatio: '1:1' } },
         }),
       });
     } catch (error) {

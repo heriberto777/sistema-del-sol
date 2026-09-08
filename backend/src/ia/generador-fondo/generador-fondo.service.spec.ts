@@ -51,6 +51,22 @@ describe('GeneradorFondoService', () => {
       expect(geminiAdapter.generar).toHaveBeenCalledWith('AAAA', 'image/jpeg', 'fondo de cocina');
       expect(resultado).toBe('data:image/png;base64,RESULTADO');
     });
+
+    it('Fase 3 — pasa el logo (segunda imagen) al adapter cuando viene', async () => {
+      geminiAdapter.generar.mockResolvedValue({ base64: 'RESULTADO', mimeType: 'image/png' });
+
+      await service.generarDesdeDataUri('data:image/jpeg;base64,AAAA', 'fondo de cocina', 'data:image/png;base64,LOGO');
+
+      expect(geminiAdapter.generar).toHaveBeenCalledWith('AAAA', 'image/jpeg', 'fondo de cocina', { base64: 'LOGO', mimeType: 'image/png' });
+    });
+
+    it('Fase 3 — ignora un logoDataUri con formato inválido en vez de romper toda la generación', async () => {
+      geminiAdapter.generar.mockResolvedValue({ base64: 'RESULTADO', mimeType: 'image/png' });
+
+      await service.generarDesdeDataUri('data:image/jpeg;base64,AAAA', 'fondo de cocina', 'no-es-un-data-uri');
+
+      expect(geminiAdapter.generar).toHaveBeenCalledWith('AAAA', 'image/jpeg', 'fondo de cocina');
+    });
   });
 
   describe('listarModelos', () => {

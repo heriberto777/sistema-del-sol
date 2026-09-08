@@ -4,7 +4,19 @@ import { TenantPrismaService } from '../prisma/tenant-prisma.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 const INCLUDE_PUBLICACION = {
-  producto: { select: { id: true, nombre: true, codigo: true } },
+  producto: {
+    select: {
+      id: true,
+      nombre: true,
+      codigo: true,
+      categoriaId: true,
+      variantes: {
+        take: 1,
+        orderBy: { createdAt: 'asc' as const },
+        select: { precios: { where: { listaPrecio: 'GENERAL', vigenteHasta: null }, select: { precioVenta: true }, take: 1 } },
+      },
+    },
+  },
   plantilla: { select: { id: true, clave: true, nombre: true } },
   creadoPor: { select: { id: true, nombre: true } },
   aprobadoPor: { select: { id: true, nombre: true } },
@@ -61,6 +73,7 @@ export class PublicacionesSocialesRepository {
         id: true,
         nombre: true,
         imagen: true,
+        categoriaId: true,
         variantes: {
           take: 1,
           orderBy: { createdAt: 'asc' as const },

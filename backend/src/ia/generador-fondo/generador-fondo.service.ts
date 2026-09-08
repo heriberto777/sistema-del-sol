@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { OpenAiFondoAdapter } from './openai-fondo.adapter';
 import { GeminiFondoAdapter } from './gemini-fondo.adapter';
-import { GeneradorFondoAdapter, ModeloIa } from './generador-fondo.interface';
+import { GeneradorFondoAdapter, ImagenReferencia, ModeloIa } from './generador-fondo.interface';
 
 /** Claude no participa — no genera imágenes. */
 export const PROVEEDORES_IA_FONDO = ['openai', 'gemini'] as const;
@@ -41,22 +41,29 @@ export class GeneradorFondoService {
   }
 
   /**
-   * `dataUriProducto` es la foto REAL del producto (`Producto.imagen`) —
-   * el resultado es un nuevo data URI con el mismo producto en un fondo/
-   * ambientación distinta según `prompt`, para que el motor de Canvas de
-   * Publicaciones Sociales (Fase 1) dibuje el texto/precio encima igual
-   * que si fuera la foto original.
+   * `dataUriProducto` es la foto REAL del producto (`Producto.imagen`).
+   * Desde la Fase 3, `prompt` ya trae el precio/oferta reales como
+   * texto y el resultado de esta llamada ES la imagen final — no hay
+   * overlay de Canvas después (a diferencia de la Fase 2). `logoDataUri`
+   * (opcional) es el logo del tenant, pasado como segunda imagen de
+   * referencia para que la IA lo incluya nítido en el diseño.
    */
-  async generarDesdeDataUri(dataUriProducto: string, prompt: string): Promise<string> {
+  async generarDesdeDataUri(dataUriProducto: string, prompt: string, logoDataUri?: string): Promise<string> {
     const match = PATRON_DATA_URI.exec(dataUriProducto);
     if (!match) throw new BadRequestException('La foto del producto no tiene un formato válido');
     const [, mimeType, base64] = match;
+
+    let logo: ImagenReferencia | undefined;
+    if (logoDataUri) {
+      const matchLogo = PATRON_DATA_URI.exec(logoDataUri);
+      if (matchLogo) logo = { mimeType: matchLogo[1], base64: matchLogo[2] };
+    }
 
     const adapter = this.activo;
     if (!adapter.habilitado) {
       throw new ServiceUnavailableException(`Generar fondo con IA no está disponible todavía (proveedor "${adapter.clave}" sin configurar)`);
     }
-    const resultado = await adapter.generar(base64, mimeType, prompt);
+    const resultado = logo ? await adapter.generar(base64, mimeType, prompt, logo) : await adapter.generar(base64, mimeType, prompt);
     return `data:${resultado.mimeType};base64,${resultado.base64}`;
   }
 }

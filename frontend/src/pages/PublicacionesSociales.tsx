@@ -18,11 +18,23 @@ import { PaginaResultado } from '../types/pagina-resultado';
 
 type EstadoPublicacion = 'BORRADOR' | 'PENDIENTE_APROBACION' | 'APROBADA' | 'RECHAZADA';
 
+type OfertaVisible =
+  | { tipo: 'DESCUENTO'; precioConDescuento: number; ahorro: number; porcentaje: number }
+  | { tipo: 'BOGO'; comprarCantidad: number; llevarCantidad: number; porcentajeDescuentoLlevar: number };
+
 interface PublicacionSocialResumen {
   id: string;
   estado: EstadoPublicacion;
   origen: 'FOTO_PRODUCTO' | 'IA';
-  producto: { id: string; nombre: string; codigo: string };
+  producto: {
+    id: string;
+    nombre: string;
+    codigo: string;
+    /** Solo vienen en el detalle (`GET /:id`), no en el listado — precio/oferta REALES, para comparar contra lo que dibujó la IA. */
+    precioFormateado?: string | null;
+    precioConDescuentoFormateado?: string | null;
+    oferta?: OfertaVisible | null;
+  };
   plantilla: { id: string; nombre: string };
   creadoPor: { id: string; nombre: string };
   aprobadoPor: { id: string; nombre: string } | null;
@@ -217,7 +229,9 @@ export function PublicacionesSociales() {
                   className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none transition-colors placeholder:text-slate-400 focus:border-sol-500 focus:ring-2 focus:ring-sol-500/30 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500"
                 />
                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Genera un fondo profesional con IA a partir de tu foto — puede tardar unos segundos. Dejalo vacío para usar la foto tal cual.
+                  Si completás esto, la IA diseña la publicación completa (incluido el precio real y la oferta/descuento vigente, si tenés
+                  uno) — solo describí el estilo o la ambientación que querés, no hace falta escribir el precio. Puede tardar unos segundos.
+                  Dejalo vacío para usar la plantilla fija con la foto tal cual.
                 </p>
               </div>
 
@@ -348,6 +362,30 @@ function DetallePublicacionSocial({ id, onClose, tienePermiso }: DetalleProps) {
             <div>
               <p className="text-sm text-slate-500 dark:text-slate-400">Producto</p>
               <p className="font-medium text-slate-900 dark:text-slate-100">{publicacion.producto.nombre}</p>
+            </div>
+            <div>
+              <p className="text-sm text-slate-500 dark:text-slate-400">Precio real (para comparar contra la imagen)</p>
+              <p className="font-medium text-slate-900 dark:text-slate-100">
+                {publicacion.producto.oferta?.tipo === 'DESCUENTO' ? (
+                  <>
+                    <span className="mr-2 text-slate-400 line-through dark:text-slate-500">{publicacion.producto.precioFormateado}</span>
+                    <span>{publicacion.producto.precioConDescuentoFormateado}</span>
+                    <span className="ml-2 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                      -{publicacion.producto.oferta.porcentaje}%
+                    </span>
+                  </>
+                ) : publicacion.producto.oferta?.tipo === 'BOGO' ? (
+                  <>
+                    {publicacion.producto.precioFormateado}
+                    <span className="ml-2 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                      Compra {publicacion.producto.oferta.comprarCantidad}, llevá {publicacion.producto.oferta.llevarCantidad} (
+                      {publicacion.producto.oferta.porcentajeDescuentoLlevar}% en las llevadas)
+                    </span>
+                  </>
+                ) : (
+                  (publicacion.producto.precioFormateado ?? '—')
+                )}
+              </p>
             </div>
             <div>
               <p className="text-sm text-slate-500 dark:text-slate-400">Plantilla</p>

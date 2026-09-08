@@ -13,6 +13,8 @@ import { resolverOrigenPublicoWhatsapp } from '../common/utils/origen-publico-wh
 import { paginar } from '../common/types/pagina-resultado';
 import { GeneradorFondoService } from '../ia/generador-fondo/generador-fondo.service';
 import { OrigenImagenPublicacionSocial } from '@prisma/client';
+import { OfertasService } from '../ofertas/ofertas.service';
+import { construirPromptFondoIa } from './construir-prompt-fondo-ia';
 
 @Injectable()
 export class PublicacionesSocialesService {
@@ -21,9 +23,19 @@ export class PublicacionesSocialesService {
     private readonly prisma: PrismaService,
     private readonly whatsappConfigRepository: WhatsappConfigRepository,
     private readonly generadorFondoService: GeneradorFondoService,
+    private readonly ofertasService: OfertasService,
   ) {}
 
-  /** Genera el banner de forma síncrona (no hace falta cola para una sola imagen, ver el plan de Fase 1) y lo deja en BORRADOR — previsualizable antes de enviarlo a aprobación. */
+  /**
+   * Genera el banner de forma síncrona (no hace falta cola, ver el plan
+   * de Fase 1) y lo deja en BORRADOR — previsualizable antes de
+   * enviarlo a aprobación. Dos caminos posibles, sin mezclar:
+   * - Sin `promptIa`: plantilla fija + Canvas (Fase 1), sin cambios.
+   * - Con `promptIa` (Fase 3): la IA diseña la pieza COMPLETA (incluido
+   *   precio/oferta reales, ya armados en el prompt) — el resultado de
+   *   la IA ES la imagen final, nunca se le superpone Canvas encima
+   *   (evita el bug real de dos precios distintos en la misma imagen).
+   */
   async crear(dto: CrearPublicacionSocialDto, tenantId: string, creadoPorId: string) {
     const producto = await this.publicacionesSocialesRepository.buscarProductoParaGenerar(dto.productoId);
     if (!producto.imagen) {
@@ -39,12 +51,11 @@ export class PublicacionesSocialesService {
       throw new BadRequestException(`La plantilla "${plantilla.nombre}" ya no está activa`);
     }
 
-    // Fase 2 — fondo por IA (opcional): si viene un prompt, reemplaza la
-    // foto cruda del producto por una versión ambientada por IA ANTES de
-    // pasar por el motor de Canvas — el texto/precio se sigue dibujando
-    // igual, sobre esa nueva imagen.
-    let imagenProductoDataUri = producto.imagen;
-    let origenImagen: OrigenImagenPublicacionSocial = 'FOTO_PRODUCTO';
+    const { logo } = await resolverPersonalizacionDocumento(this.prisma, tenantId);
+
+    let imagen: string;
+    let origenImagen: OrigenImagenPublicacionSocial;
+
     if (dto.promptIa?.trim()) {
       const [usadas, limite] = await Promise.all([
         this.publicacionesSocialesRepository.contarGeneracionesIaDelMes(tenantId),
@@ -53,19 +64,28 @@ export class PublicacionesSocialesService {
       if (usadas >= limite) {
         throw new BadRequestException(`Alcanzaste el límite de ${limite} generación(es) con IA este mes para este negocio`);
       }
-      imagenProductoDataUri = await this.generadorFondoService.generarDesdeDataUri(producto.imagen, dto.promptIa);
+
+      const oferta = await this.ofertasService.resolverOfertaVisibleProducto(producto.id, producto.categoriaId, Number(precioVenta));
+      const prompt = construirPromptFondoIa({
+        productoNombre: producto.nombre,
+        precioFormateado: formatearMontoDop(Number(precioVenta)),
+        oferta,
+        plantillaClave: plantilla.clave,
+        promptUsuario: dto.promptIa,
+        tieneLogo: Boolean(logo),
+      });
+      imagen = await this.generadorFondoService.generarDesdeDataUri(producto.imagen, prompt, logo);
       origenImagen = 'IA';
+    } else {
+      imagen = await generarImagenPublicacionSocial({
+        plantillaClave: plantilla.clave,
+        productoNombre: producto.nombre,
+        precioFormateado: formatearMontoDop(Number(precioVenta)),
+        imagenProductoDataUri: producto.imagen,
+        logoTenantDataUri: logo,
+      });
+      origenImagen = 'FOTO_PRODUCTO';
     }
-
-    const { logo } = await resolverPersonalizacionDocumento(this.prisma, tenantId);
-
-    const imagen = await generarImagenPublicacionSocial({
-      plantillaClave: plantilla.clave,
-      productoNombre: producto.nombre,
-      precioFormateado: formatearMontoDop(Number(precioVenta)),
-      imagenProductoDataUri,
-      logoTenantDataUri: logo,
-    });
 
     return this.publicacionesSocialesRepository.crear({
       tenantId,
@@ -78,8 +98,23 @@ export class PublicacionesSocialesService {
     });
   }
 
-  buscarPorId(id: string) {
-    return this.publicacionesSocialesRepository.buscarPorId(id);
+  /** Enriquece con el precio/oferta REAL del producto — visible al lado de la imagen para que quien aprueba pueda comparar contra lo que dibujó la IA (Fase 3). */
+  async buscarPorId(id: string) {
+    const publicacion = await this.publicacionesSocialesRepository.buscarPorId(id);
+    const precioVenta = publicacion.producto.variantes[0]?.precios[0]?.precioVenta;
+    const oferta =
+      precioVenta != null
+        ? await this.ofertasService.resolverOfertaVisibleProducto(publicacion.producto.id, publicacion.producto.categoriaId, Number(precioVenta))
+        : null;
+    return {
+      ...publicacion,
+      producto: {
+        ...publicacion.producto,
+        precioFormateado: precioVenta != null ? formatearMontoDop(Number(precioVenta)) : null,
+        precioConDescuentoFormateado: oferta?.tipo === 'DESCUENTO' ? formatearMontoDop(oferta.precioConDescuento) : null,
+        oferta,
+      },
+    };
   }
 
   async listar(query: ListarPublicacionesSocialesQueryDto) {
