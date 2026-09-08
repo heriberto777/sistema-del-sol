@@ -209,4 +209,28 @@ export class ActualizarPlataformaConfigDto {
   @IsOptional()
   @IsString()
   iaGeminiModelo?: string;
+
+  // Publicaciones Sociales (Fase 2) — generación de FONDO de banner por
+  // IA. Reusa iaOpenaiApiKey/iaGeminiApiKey de arriba, Claude no
+  // participa (no genera imágenes).
+  @ApiProperty({ required: false, enum: ['openai', 'gemini'] })
+  @IsOptional()
+  @IsString()
+  iaFondoProveedorActivo?: string;
+
+  @ApiProperty({ required: false, description: 'Elegido de GET .../ia-fondo/modelos, no tipeado a mano' })
+  @IsOptional()
+  @IsString()
+  iaOpenaiModeloFondo?: string;
+
+  @ApiProperty({ required: false, description: 'Elegido de GET .../ia-fondo/modelos, no tipeado a mano' })
+  @IsOptional()
+  @IsString()
+  iaGeminiModeloFondo?: string;
+
+  @ApiProperty({ required: false, description: 'Tope de generaciones con IA por tenant por mes — el costo por imagen lo paga la plataforma' })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  iaFondoLimiteMensual?: number;
 }

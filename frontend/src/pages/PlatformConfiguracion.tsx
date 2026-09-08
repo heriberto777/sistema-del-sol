@@ -17,6 +17,11 @@ async function cargarModelosPlataforma(proveedor: string): Promise<ModeloIa[]> {
   return (await platformApiClient.get<{ modelos: ModeloIa[] }>('/platform/configuracion/ia-imagen/modelos', { params: { proveedor } })).data.modelos;
 }
 
+/** Publicaciones Sociales (Fase 2) — modelos de GENERACIÓN de imagen, familia distinta a los de arriba (vision/chat). */
+async function cargarModelosFondo(proveedor: string): Promise<ModeloIa[]> {
+  return (await platformApiClient.get<{ modelos: ModeloIa[] }>('/platform/configuracion/ia-fondo/modelos', { params: { proveedor } })).data.modelos;
+}
+
 export interface ConfiguracionPlataforma {
   general: {
     nombreNegocio: string | null;
@@ -73,6 +78,12 @@ export interface ConfiguracionPlataforma {
     claudeModelo: string | null;
     openaiModelo: string | null;
     geminiModelo: string | null;
+  };
+  iaFondo: {
+    proveedorActivo: string | null;
+    openaiModelo: string | null;
+    geminiModelo: string | null;
+    limiteMensual: number;
   };
 }
 
@@ -133,7 +144,12 @@ export function PlatformConfiguracion() {
           {tab === 'NCF / e-CF' && <NcfPlataformaPanel config={config} guardar={guardar} />}
           {tab === 'Notificaciones' && <SeccionNotificaciones config={config} guardar={guardar} />}
           {tab === 'Pasarela de pago' && <SeccionPasarela config={config} guardar={guardar} />}
-          {tab === 'IA para productos' && <SeccionIaImagen config={config} guardar={guardar} />}
+          {tab === 'IA para productos' && (
+            <div className="space-y-6">
+              <SeccionIaImagen config={config} guardar={guardar} />
+              <SeccionIaFondo config={config} guardar={guardar} />
+            </div>
+          )}
           {tab === 'Webhook' && <SeccionWebhook config={config} guardar={guardar} />}
           {tab === 'Vencimientos' && <SeccionVencimientos config={config} guardar={guardar} />}
           {tab === 'Dominio propio' && <SeccionDominioPropio config={config} guardar={guardar} />}
@@ -470,6 +486,89 @@ function SeccionIaImagen({ config, guardar }: SeccionProps) {
           />
           <SelectorModeloIa proveedor="gemini" label="Modelo de Gemini" value={geminiModelo} onChange={setGeminiModelo} cargarModelos={cargarModelosPlataforma} />
         </div>
+        <Button type="submit" disabled={guardar.isPending}>
+          {guardar.isPending ? 'Guardando…' : 'Guardar'}
+        </Button>
+      </form>
+    </Card>
+  );
+}
+
+/**
+ * Publicaciones Sociales (Fase 2) — generación del FONDO del banner por
+ * IA (imagen + prompt -> imagen nueva; el texto/precio lo dibuja Canvas
+ * aparte). Reusa las API keys de OpenAI/Gemini ya cargadas arriba en
+ * "IA para productos" — Claude no participa, no genera imágenes.
+ */
+function SeccionIaFondo({ config, guardar }: SeccionProps) {
+  const iaFondo = config.iaFondo;
+  const iaImagen = config.iaImagen;
+  const [proveedorActivo, setProveedorActivo] = useState(iaFondo.proveedorActivo ?? 'gemini');
+  const [openaiModelo, setOpenaiModelo] = useState(iaFondo.openaiModelo ?? '');
+  const [geminiModelo, setGeminiModelo] = useState(iaFondo.geminiModelo ?? '');
+  const [limiteMensual, setLimiteMensual] = useState(String(iaFondo.limiteMensual));
+
+  useEffect(() => {
+    setProveedorActivo(iaFondo.proveedorActivo ?? 'gemini');
+    setOpenaiModelo(iaFondo.openaiModelo ?? '');
+    setGeminiModelo(iaFondo.geminiModelo ?? '');
+    setLimiteMensual(String(iaFondo.limiteMensual));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [iaFondo.proveedorActivo, iaFondo.openaiModelo, iaFondo.geminiModelo, iaFondo.limiteMensual]);
+
+  function onSubmit(e: FormEvent) {
+    e.preventDefault();
+    guardar.mutate({
+      iaFondoProveedorActivo: proveedorActivo,
+      iaOpenaiModeloFondo: openaiModelo,
+      iaGeminiModeloFondo: geminiModelo,
+      iaFondoLimiteMensual: limiteMensual ? Number(limiteMensual) : undefined,
+    });
+  }
+
+  return (
+    <Card
+      titulo="Generación de fondo (Publicaciones Sociales)"
+      descripcion="Genera el fondo/ambientación del banner a partir de la foto real del producto + un prompt — el nombre y el precio se siguen dibujando exactos, nunca los escribe la IA. Usa las API keys de OpenAI/Gemini ya guardadas arriba."
+    >
+      <form onSubmit={onSubmit} className="max-w-md space-y-3">
+        <div>
+          <label htmlFor="iaFondoProveedorActivo" className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+            Proveedor activo
+          </label>
+          <Select id="iaFondoProveedorActivo" value={proveedorActivo} onChange={(e) => setProveedorActivo(e.target.value)}>
+            <option value="gemini">Google Gemini</option>
+            <option value="openai">OpenAI</option>
+          </Select>
+        </div>
+
+        <div className="space-y-3 border-t border-slate-200 pt-3 dark:border-slate-800">
+          <div className="flex items-center gap-2">
+            <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Google Gemini</p>
+            {proveedorActivo === 'gemini' && <Badge tono="exito">Activo ahora</Badge>}
+            {!iaImagen.geminiApiKeyConfigurado && <Badge tono="advertencia">Falta la API key de arriba</Badge>}
+          </div>
+          <SelectorModeloIa proveedor="gemini" label="Modelo de generación (Gemini)" value={geminiModelo} onChange={setGeminiModelo} cargarModelos={cargarModelosFondo} />
+        </div>
+
+        <div className="space-y-3 border-t border-slate-200 pt-3 dark:border-slate-800">
+          <div className="flex items-center gap-2">
+            <p className="text-sm font-medium text-slate-700 dark:text-slate-300">OpenAI</p>
+            {proveedorActivo === 'openai' && <Badge tono="exito">Activo ahora</Badge>}
+            {!iaImagen.openaiApiKeyConfigurado && <Badge tono="advertencia">Falta la API key de arriba</Badge>}
+          </div>
+          <SelectorModeloIa proveedor="openai" label="Modelo de generación (OpenAI)" value={openaiModelo} onChange={setOpenaiModelo} cargarModelos={cargarModelosFondo} />
+        </div>
+
+        <FormField
+          id="iaFondoLimiteMensual"
+          label="Límite de generaciones con IA por tenant por mes"
+          type="number"
+          min={0}
+          value={limiteMensual}
+          onChange={(e) => setLimiteMensual(e.target.value)}
+        />
+
         <Button type="submit" disabled={guardar.isPending}>
           {guardar.isPending ? 'Guardando…' : 'Guardar'}
         </Button>

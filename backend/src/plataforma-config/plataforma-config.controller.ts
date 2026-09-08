@@ -7,6 +7,7 @@ import { PlatformPermissions } from '../common/decorators/platform-permissions.d
 import { PlatformAuthGuard } from '../platform-auth/guards/platform-auth.guard';
 import { PlatformPermissionsGuard } from '../common/guards/platform-permissions.guard';
 import { AnalizadorImagenService } from '../ia/analizador-imagen/analizador-imagen.service';
+import { GeneradorFondoService } from '../ia/generador-fondo/generador-fondo.service';
 
 @ApiBearerAuth()
 @ApiTags('platform-configuracion')
@@ -17,6 +18,7 @@ export class PlataformaConfigController {
   constructor(
     private readonly plataformaConfigService: PlataformaConfigService,
     private readonly analizadorImagenService: AnalizadorImagenService,
+    private readonly generadorFondoService: GeneradorFondoService,
   ) {}
 
   @Get()
@@ -36,6 +38,14 @@ export class PlataformaConfigController {
   @PlatformPermissions('platform.configuracion.ver')
   async listarModelosIa(@Query('proveedor') proveedor: string) {
     const modelos = await this.analizadorImagenService.listarModelos(proveedor);
+    return { modelos };
+  }
+
+  /** Modelos de GENERACIÓN de imagen (Publicaciones Sociales, Fase 2) — familia distinta a los de `ia-imagen/modelos` (vision/chat). Solo openai/gemini, Claude no genera imágenes. */
+  @Get('ia-fondo/modelos')
+  @PlatformPermissions('platform.configuracion.ver')
+  async listarModelosFondo(@Query('proveedor') proveedor: string) {
+    const modelos = await this.generadorFondoService.listarModelos(proveedor);
     return { modelos };
   }
 }

@@ -12,6 +12,9 @@ import { ConversacionIaService } from './conversacion/conversacion-ia.service';
 import { ClaudeConversacionAdapter } from './conversacion/claude-conversacion.adapter';
 import { OpenAiConversacionAdapter } from './conversacion/openai-conversacion.adapter';
 import { GeminiConversacionAdapter } from './conversacion/gemini-conversacion.adapter';
+import { GeneradorFondoService } from './generador-fondo/generador-fondo.service';
+import { OpenAiFondoAdapter } from './generador-fondo/openai-fondo.adapter';
+import { GeminiFondoAdapter } from './generador-fondo/gemini-fondo.adapter';
 
 @Module({
   imports: [ReportesModule, ContabilidadModule],
@@ -27,7 +30,10 @@ import { GeminiConversacionAdapter } from './conversacion/gemini-conversacion.ad
     ClaudeConversacionAdapter,
     OpenAiConversacionAdapter,
     GeminiConversacionAdapter,
+    GeneradorFondoService,
+    OpenAiFondoAdapter,
+    GeminiFondoAdapter,
   ],
-  exports: [IaClientService, AnalizadorImagenService, ConversacionIaService],
+  exports: [IaClientService, AnalizadorImagenService, ConversacionIaService, GeneradorFondoService],
 })
 export class IaModule {}

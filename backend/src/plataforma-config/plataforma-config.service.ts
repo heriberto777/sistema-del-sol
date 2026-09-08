@@ -65,6 +65,10 @@ export class PlataformaConfigService implements OnModuleInit {
     if (dto.iaClaudeModelo !== undefined) data.iaClaudeModelo = dto.iaClaudeModelo;
     if (dto.iaOpenaiModelo !== undefined) data.iaOpenaiModelo = dto.iaOpenaiModelo;
     if (dto.iaGeminiModelo !== undefined) data.iaGeminiModelo = dto.iaGeminiModelo;
+    if (dto.iaFondoProveedorActivo !== undefined) data.iaFondoProveedorActivo = dto.iaFondoProveedorActivo;
+    if (dto.iaOpenaiModeloFondo !== undefined) data.iaOpenaiModeloFondo = dto.iaOpenaiModeloFondo;
+    if (dto.iaGeminiModeloFondo !== undefined) data.iaGeminiModeloFondo = dto.iaGeminiModeloFondo;
+    if (dto.iaFondoLimiteMensual !== undefined) data.iaFondoLimiteMensual = dto.iaFondoLimiteMensual;
 
     this.aplicarCampoSecreto(data, 'smtpPasswordCifrado', dto.smtpPassword);
     this.aplicarCampoSecreto(data, 'twilioAuthTokenCifrado', dto.twilioAuthToken);
@@ -121,6 +125,13 @@ export class PlataformaConfigService implements OnModuleInit {
     if (config.iaClaudeModelo) process.env.ANTHROPIC_MODEL = config.iaClaudeModelo;
     if (config.iaOpenaiModelo) process.env.OPENAI_MODEL = config.iaOpenaiModelo;
     if (config.iaGeminiModelo) process.env.GEMINI_MODEL = config.iaGeminiModelo;
+
+    // Publicaciones Sociales (Fase 2) — generación de fondo. Variables
+    // NUEVAS y distintas de OPENAI_MODEL/GEMINI_MODEL de arriba (modelos
+    // de generación de imagen son otra familia que los de vision/chat).
+    if (config.iaFondoProveedorActivo) process.env.IA_FONDO_PROVEEDOR_ACTIVO = config.iaFondoProveedorActivo;
+    if (config.iaOpenaiModeloFondo) process.env.OPENAI_IMAGEN_MODEL = config.iaOpenaiModeloFondo;
+    if (config.iaGeminiModeloFondo) process.env.GEMINI_IMAGEN_MODEL = config.iaGeminiModeloFondo;
   }
 
   /** Nunca expone un secreto en texto plano — solo si hay uno guardado (*Configurado). */
@@ -181,6 +192,12 @@ export class PlataformaConfigService implements OnModuleInit {
         claudeModelo: config.iaClaudeModelo,
         openaiModelo: config.iaOpenaiModelo,
         geminiModelo: config.iaGeminiModelo,
+      },
+      iaFondo: {
+        proveedorActivo: config.iaFondoProveedorActivo,
+        openaiModelo: config.iaOpenaiModeloFondo,
+        geminiModelo: config.iaGeminiModeloFondo,
+        limiteMensual: config.iaFondoLimiteMensual,
       },
     };
   }

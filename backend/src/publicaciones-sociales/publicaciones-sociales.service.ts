@@ -11,6 +11,8 @@ import { descifrar } from '../common/utils/encriptado.util';
 import { enviarWhatsappTwilio } from '../common/utils/twilio-whatsapp.util';
 import { resolverOrigenPublicoWhatsapp } from '../common/utils/origen-publico-whatsapp.util';
 import { paginar } from '../common/types/pagina-resultado';
+import { GeneradorFondoService } from '../ia/generador-fondo/generador-fondo.service';
+import { OrigenImagenPublicacionSocial } from '@prisma/client';
 
 @Injectable()
 export class PublicacionesSocialesService {
@@ -18,6 +20,7 @@ export class PublicacionesSocialesService {
     private readonly publicacionesSocialesRepository: PublicacionesSocialesRepository,
     private readonly prisma: PrismaService,
     private readonly whatsappConfigRepository: WhatsappConfigRepository,
+    private readonly generadorFondoService: GeneradorFondoService,
   ) {}
 
   /** Genera el banner de forma síncrona (no hace falta cola para una sola imagen, ver el plan de Fase 1) y lo deja en BORRADOR — previsualizable antes de enviarlo a aprobación. */
@@ -36,13 +39,31 @@ export class PublicacionesSocialesService {
       throw new BadRequestException(`La plantilla "${plantilla.nombre}" ya no está activa`);
     }
 
+    // Fase 2 — fondo por IA (opcional): si viene un prompt, reemplaza la
+    // foto cruda del producto por una versión ambientada por IA ANTES de
+    // pasar por el motor de Canvas — el texto/precio se sigue dibujando
+    // igual, sobre esa nueva imagen.
+    let imagenProductoDataUri = producto.imagen;
+    let origenImagen: OrigenImagenPublicacionSocial = 'FOTO_PRODUCTO';
+    if (dto.promptIa?.trim()) {
+      const [usadas, limite] = await Promise.all([
+        this.publicacionesSocialesRepository.contarGeneracionesIaDelMes(tenantId),
+        this.publicacionesSocialesRepository.buscarLimiteIaFondo(),
+      ]);
+      if (usadas >= limite) {
+        throw new BadRequestException(`Alcanzaste el límite de ${limite} generación(es) con IA este mes para este negocio`);
+      }
+      imagenProductoDataUri = await this.generadorFondoService.generarDesdeDataUri(producto.imagen, dto.promptIa);
+      origenImagen = 'IA';
+    }
+
     const { logo } = await resolverPersonalizacionDocumento(this.prisma, tenantId);
 
     const imagen = await generarImagenPublicacionSocial({
       plantillaClave: plantilla.clave,
       productoNombre: producto.nombre,
       precioFormateado: formatearMontoDop(Number(precioVenta)),
-      imagenProductoDataUri: producto.imagen,
+      imagenProductoDataUri,
       logoTenantDataUri: logo,
     });
 
@@ -52,6 +73,8 @@ export class PublicacionesSocialesService {
       plantillaId: dto.plantillaId,
       imagen,
       creadoPorId,
+      origen: origenImagen,
+      promptIa: dto.promptIa ?? null,
     });
   }
 

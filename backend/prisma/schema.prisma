@@ -613,6 +613,21 @@ model PlataformaConfiguracion {
   iaOpenaiModelo          String? @default("gpt-4o")
   iaGeminiModelo          String? @default("gemini-2.0-flash")
 
+  // Publicaciones Sociales (Fase 2) — generación de FONDO de banner por
+  // IA (imagen + prompt -> imagen nueva), nunca el texto/precio (eso lo
+  // sigue dibujando el motor de Canvas de la Fase 1). Reusa
+  // iaOpenaiApiKeyCifrado/iaGeminiApiKeyCifrado de arriba (misma cuenta
+  // de proveedor) — Claude no genera imágenes, por eso no participa acá.
+  // Modelo de generación de imagen es una familia distinta a los modelos
+  // de vision/chat de arriba (iaOpenaiModelo/iaGeminiModelo), de ahí
+  // campos separados.
+  iaFondoProveedorActivo String? @default("gemini")
+  iaOpenaiModeloFondo    String? @default("gpt-image-1.5")
+  iaGeminiModeloFondo    String? @default("gemini-3-pro-image-preview")
+  // Tope global (no por tenant/plan) de generaciones IA por tenant por
+  // mes — el costo por imagen lo paga la plataforma, no el tenant.
+  iaFondoLimiteMensual   Int     @default(20)
+
   @@map("plataforma_configuracion")
 }
 
@@ -3934,6 +3949,14 @@ enum EstadoPublicacionSocial {
   RECHAZADA
 }
 
+// Fase 2 — de dónde salió la foto de fondo del banner: la del producto
+// tal cual, o una generada por IA a partir de esa misma foto + un
+// prompt. El texto/precio se dibuja igual en ambos casos (Canvas).
+enum OrigenImagenPublicacionSocial {
+  FOTO_PRODUCTO
+  IA
+}
+
 /// Catálogo GLOBAL de plantillas de banner (no tenant-scoped, mismo
 /// trato que Modulo/Plan) — sembrado desde
 /// PLANTILLAS_PUBLICACION_SOCIAL_BASE vía
@@ -3975,6 +3998,11 @@ model PublicacionSocial {
   // condicional) cuando estado pasa a RECHAZADA.
   motivoRechazo   String?
   fechaResolucion DateTime?
+
+  // Fase 2 — IA (fondo). origen queda FOTO_PRODUCTO (default) cuando no
+  // se pidió IA, sin tocar el resto del flujo de Fase 1.
+  origen   OrigenImagenPublicacionSocial @default(FOTO_PRODUCTO)
+  promptIa String?
 
   createdAt DateTime @default(now())
 
