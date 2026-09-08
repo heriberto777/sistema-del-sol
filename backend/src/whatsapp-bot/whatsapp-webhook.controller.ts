@@ -3,6 +3,7 @@ import { ApiTags } from '@nestjs/swagger';
 import { WhatsappBotService } from './whatsapp-bot.service';
 import { Public } from '../common/decorators/public.decorator';
 import { resolverPerfilNombre } from './resolver-perfil-nombre.util';
+import { PublicacionesSocialesService } from '../publicaciones-sociales/publicaciones-sociales.service';
 
 /**
  * Webhook entrante de Twilio (ítem H-2b) — `@Public()`, sin JWT. Todos
@@ -17,7 +18,10 @@ import { resolverPerfilNombre } from './resolver-perfil-nombre.util';
 @Public()
 @Controller('webhooks/whatsapp')
 export class WhatsappWebhookController {
-  constructor(private readonly whatsappBotService: WhatsappBotService) {}
+  constructor(
+    private readonly whatsappBotService: WhatsappBotService,
+    private readonly publicacionesSocialesService: PublicacionesSocialesService,
+  ) {}
 
   @Post('inbound')
   @HttpCode(200)
@@ -31,6 +35,16 @@ export class WhatsappWebhookController {
     const urlCompleta = process.env.WHATSAPP_WEBHOOK_URL ?? '';
     if (!this.whatsappBotService.verificarFirma(config, urlCompleta, body, firma)) {
       throw new BadRequestException('Firma de webhook inválida');
+    }
+
+    // Fase 5 (Publicaciones Sociales) — botón "✅ Aprobar" de la
+    // plantilla de aprobación (Content API), intercepta ANTES del bot
+    // conversacional de clientes. Si el teléfono no es de un aprobador
+    // conocido, `intentarAprobarPorWhatsapp` devuelve `false` y sigue el
+    // flujo normal de abajo sin ningún efecto secundario.
+    if (body.ButtonPayload === 'APROBAR') {
+      const manejado = await this.publicacionesSocialesService.intentarAprobarPorWhatsapp(config.tenantId, from.replace(/^whatsapp:/, ''));
+      if (manejado) return {};
     }
 
     await this.whatsappBotService.procesarMensajeEntrante(config, from, mensaje, resolverPerfilNombre(body));

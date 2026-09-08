@@ -74,6 +74,7 @@ export class WhatsappConfigService {
     if (dto.historialMensajes !== undefined) data.historialMensajes = dto.historialMensajes;
     if (dto.iaPromptNegocio !== undefined) data.iaPromptNegocio = dto.iaPromptNegocio;
     if (dto.limiteRespuestasDiarias !== undefined) data.limiteRespuestasDiarias = dto.limiteRespuestasDiarias;
+    if (dto.twilioTemplateAprobacionSid !== undefined) data.twilioTemplateAprobacionSid = dto.twilioTemplateAprobacionSid;
 
     this.aplicarCampoSecreto(data, 'twilioAuthTokenCifrado', dto.twilioAuthToken);
     this.aplicarCampoSecreto(data, 'iaApiKeyCifrado', dto.iaApiKey);
@@ -109,6 +110,7 @@ export class WhatsappConfigService {
       historialMensajes: config.historialMensajes,
       iaPromptNegocio: config.iaPromptNegocio,
       limiteRespuestasDiarias: config.limiteRespuestasDiarias,
+      twilioTemplateAprobacionSid: config.twilioTemplateAprobacionSid,
     };
   }
 }

@@ -3,15 +3,17 @@ import { NotificacionesRepository } from './notificaciones.repository';
 import { EmailChannel } from './canales/email.channel';
 import { WhatsAppChannel } from './canales/whatsapp.channel';
 import { PrismaService } from '../prisma/prisma.service';
+import * as twilioWhatsappUtil from '../common/utils/twilio-whatsapp.util';
 
 describe('NotificacionesService', () => {
   let service: NotificacionesService;
   let repository: jest.Mocked<NotificacionesRepository>;
   let emailChannel: jest.Mocked<EmailChannel>;
   let whatsAppChannel: jest.Mocked<WhatsAppChannel>;
-  let prisma: { cliente: any; user: any };
+  let prisma: { cliente: any; user: any; whatsappConfigTenant: any };
 
   beforeEach(() => {
+    jest.restoreAllMocks();
     repository = {
       buscarPlantilla: jest.fn(),
       crearNotificacion: jest.fn(),
@@ -22,7 +24,11 @@ describe('NotificacionesService', () => {
     } as unknown as jest.Mocked<NotificacionesRepository>;
     emailChannel = { enviar: jest.fn() } as unknown as jest.Mocked<EmailChannel>;
     whatsAppChannel = { enviar: jest.fn() } as unknown as jest.Mocked<WhatsAppChannel>;
-    prisma = { cliente: { findUnique: jest.fn() }, user: { findMany: jest.fn(), findUnique: jest.fn() } };
+    prisma = {
+      cliente: { findUnique: jest.fn() },
+      user: { findMany: jest.fn(), findUnique: jest.fn() },
+      whatsappConfigTenant: { findUnique: jest.fn() },
+    };
     service = new NotificacionesService(repository, emailChannel, whatsAppChannel, prisma as unknown as PrismaService);
   });
 
@@ -297,6 +303,142 @@ describe('NotificacionesService', () => {
       expect(prisma.user.findMany).toHaveBeenCalled();
       expect(repository.buscarPlantilla).toHaveBeenCalledWith('t1', 'EMAIL', 'proyecto_presupuesto_superado');
       expect(emailChannel.enviar).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('alQuedarPendienteAprobacionPublicacionSocial (Fase 5)', () => {
+    it('resuelve destinatarios por el PERMISO publicacionessociales.aprobar, no por nombre de rol', async () => {
+      prisma.user.findMany.mockResolvedValue([{ id: 'u1', email: 'gerente@x.com', telefono: null }]);
+      repository.buscarPlantilla.mockResolvedValue({ activa: true, asunto: null, cuerpo: 'x' } as never);
+      repository.crearNotificacion.mockResolvedValue({ id: 'n1' } as never);
+      emailChannel.enviar.mockResolvedValue(true);
+
+      await service.alQuedarPendienteAprobacionPublicacionSocial({ tenantId: 't1', publicacionId: 'p1', productoNombre: 'Yogurt Fresa' });
+
+      expect(prisma.user.findMany).toHaveBeenCalledWith({
+        where: {
+          tenantId: 't1',
+          activo: true,
+          roles: { some: { role: { rolePermissions: { some: { permission: { clave: 'publicacionessociales.aprobar' } } } } } },
+        },
+      });
+      expect(repository.buscarPlantilla).toHaveBeenCalledWith('t1', 'EMAIL', 'publicacion_social_pendiente_aprobacion');
+    });
+
+    it('no intenta WhatsApp si el aprobador no tiene teléfono cargado', async () => {
+      prisma.user.findMany.mockResolvedValue([{ id: 'u1', email: 'gerente@x.com', telefono: null }]);
+      repository.buscarPlantilla.mockResolvedValue({ activa: true, asunto: null, cuerpo: 'x' } as never);
+      repository.crearNotificacion.mockResolvedValue({ id: 'n1' } as never);
+      emailChannel.enviar.mockResolvedValue(true);
+
+      await service.alQuedarPendienteAprobacionPublicacionSocial({ tenantId: 't1', publicacionId: 'p1', productoNombre: 'Yogurt Fresa' });
+
+      expect(prisma.whatsappConfigTenant.findUnique).not.toHaveBeenCalled();
+    });
+
+    it('manda el WhatsApp del TENANT (Content API) cuando el aprobador tiene teléfono y hay Content SID configurado', async () => {
+      prisma.user.findMany.mockResolvedValue([{ id: 'u1', email: 'gerente@x.com', telefono: '+18095551234' }]);
+      repository.buscarPlantilla.mockResolvedValue({ activa: true, asunto: null, cuerpo: 'x' } as never);
+      repository.crearNotificacion.mockResolvedValue({ id: 'n1' } as never);
+      emailChannel.enviar.mockResolvedValue(true);
+      prisma.whatsappConfigTenant.findUnique.mockResolvedValue({
+        twilioAccountSid: 'AC1',
+        twilioAuthTokenCifrado: 'iv:tag:cifrado',
+        twilioWhatsappFrom: '+15550001111',
+        twilioTemplateAprobacionSid: 'HXabc123',
+      } as never);
+      const encriptado = await import('../common/utils/encriptado.util');
+      jest.spyOn(encriptado, 'descifrar').mockReturnValue('token-real');
+      const enviarSpy = jest.spyOn(twilioWhatsappUtil, 'enviarWhatsappTwilio').mockResolvedValue(true);
+
+      await service.alQuedarPendienteAprobacionPublicacionSocial({ tenantId: 't1', publicacionId: 'p1', productoNombre: 'Yogurt Fresa' });
+
+      expect(enviarSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          accountSid: 'AC1',
+          from: 'whatsapp:+15550001111',
+          to: '+18095551234',
+          contentSid: 'HXabc123',
+          contentVariables: expect.objectContaining({ '1': 'Yogurt Fresa' }),
+        }),
+      );
+    });
+
+    it('degrada en silencio (sin WhatsApp, sin romper) si el tenant no configuró el Content SID de aprobación', async () => {
+      prisma.user.findMany.mockResolvedValue([{ id: 'u1', email: 'gerente@x.com', telefono: '+18095551234' }]);
+      repository.buscarPlantilla.mockResolvedValue({ activa: true, asunto: null, cuerpo: 'x' } as never);
+      repository.crearNotificacion.mockResolvedValue({ id: 'n1' } as never);
+      emailChannel.enviar.mockResolvedValue(true);
+      prisma.whatsappConfigTenant.findUnique.mockResolvedValue({
+        twilioAccountSid: 'AC1',
+        twilioAuthTokenCifrado: 'iv:tag:cifrado',
+        twilioWhatsappFrom: '+15550001111',
+        twilioTemplateAprobacionSid: null,
+      } as never);
+      const enviarSpy = jest.spyOn(twilioWhatsappUtil, 'enviarWhatsappTwilio');
+
+      await expect(
+        service.alQuedarPendienteAprobacionPublicacionSocial({ tenantId: 't1', publicacionId: 'p1', productoNombre: 'Yogurt Fresa' }),
+      ).resolves.not.toThrow();
+      expect(enviarSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('alPedirCambiosPublicacionSocial (Fase 5)', () => {
+    it('avisa al creador con el comentario del aprobador', async () => {
+      prisma.user.findUnique.mockResolvedValue({ id: 'creador1', email: 'creador@x.com' });
+      repository.buscarPlantilla.mockResolvedValue({ activa: true, asunto: null, cuerpo: 'Te pidieron: {{comentario}}' } as never);
+      repository.crearNotificacion.mockResolvedValue({ id: 'n1' } as never);
+      emailChannel.enviar.mockResolvedValue(true);
+
+      await service.alPedirCambiosPublicacionSocial({
+        tenantId: 't1',
+        publicacionId: 'p1',
+        productoNombre: 'Yogurt Fresa',
+        creadoPorId: 'creador1',
+        comentario: 'cambiale el color a azul',
+      });
+
+      expect(emailChannel.enviar).toHaveBeenCalledWith('creador@x.com', '', 'Te pidieron: cambiale el color a azul', undefined);
+    });
+
+    it('no falla si el creador ya no existe', async () => {
+      prisma.user.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.alPedirCambiosPublicacionSocial({ tenantId: 't1', publicacionId: 'p1', productoNombre: 'Yogurt Fresa', creadoPorId: 'x', comentario: 'algo' }),
+      ).resolves.not.toThrow();
+      expect(repository.buscarPlantilla).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('alAprobarsePublicacionSocial / alRechazarsePublicacionSocial (Fase 5)', () => {
+    it('avisa al creador cuando se aprueba', async () => {
+      prisma.user.findUnique.mockResolvedValue({ id: 'creador1', email: 'creador@x.com' });
+      repository.buscarPlantilla.mockResolvedValue({ activa: true, asunto: null, cuerpo: 'x' } as never);
+      repository.crearNotificacion.mockResolvedValue({ id: 'n1' } as never);
+      emailChannel.enviar.mockResolvedValue(true);
+
+      await service.alAprobarsePublicacionSocial({ tenantId: 't1', publicacionId: 'p1', productoNombre: 'Yogurt Fresa', creadoPorId: 'creador1' });
+
+      expect(repository.buscarPlantilla).toHaveBeenCalledWith('t1', 'EMAIL', 'publicacion_social_aprobada');
+    });
+
+    it('avisa al creador con el motivo cuando se rechaza', async () => {
+      prisma.user.findUnique.mockResolvedValue({ id: 'creador1', email: 'creador@x.com' });
+      repository.buscarPlantilla.mockResolvedValue({ activa: true, asunto: null, cuerpo: 'Motivo: {{motivo_rechazo}}' } as never);
+      repository.crearNotificacion.mockResolvedValue({ id: 'n1' } as never);
+      emailChannel.enviar.mockResolvedValue(true);
+
+      await service.alRechazarsePublicacionSocial({
+        tenantId: 't1',
+        publicacionId: 'p1',
+        productoNombre: 'Yogurt Fresa',
+        creadoPorId: 'creador1',
+        motivoRechazo: 'La foto sale borrosa',
+      });
+
+      expect(emailChannel.enviar).toHaveBeenCalledWith('creador@x.com', '', 'Motivo: La foto sale borrosa', undefined);
     });
   });
 });

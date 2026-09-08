@@ -22,6 +22,17 @@ const INCLUDE_PUBLICACION = {
   aprobadoPor: { select: { id: true, nombre: true } },
 } as const;
 
+// Fase 5 — historial completo, solo para el detalle (`buscarPorId`): cada
+// versión trae su imagen base64 completa, demasiado pesado para el listado
+// paginado — ahí se sigue usando INCLUDE_PUBLICACION tal cual.
+const INCLUDE_PUBLICACION_DETALLE = {
+  ...INCLUDE_PUBLICACION,
+  versiones: {
+    orderBy: { numero: 'asc' as const },
+    include: { creadoPor: { select: { id: true, nombre: true } } },
+  },
+} as const;
+
 /** Un solo repositorio para todo el plugin (mismo criterio que ProyectosRepository). `PlantillaPublicacionSocial` es catálogo global (no tenant-scoped) pero se consulta igual vía `TenantPrismaService.client` — solo pasa "sin filtro" de tenantId, sigue protegido por RLS/SET LOCAL como cualquier otra query de este cliente. */
 @Injectable()
 export class PublicacionesSocialesRepository {
@@ -34,6 +45,7 @@ export class PublicacionesSocialesRepository {
     return this.tenantPrisma.client;
   }
 
+  /** Fase 5 — inserta también la versión 1 en la misma escritura (nested create de Prisma) — es la primera fila del historial. */
   crear(data: {
     tenantId: string;
     productoId: string;
@@ -44,11 +56,75 @@ export class PublicacionesSocialesRepository {
     promptIa: string | null;
     formato: FormatoPublicacionSocial;
   }) {
-    return this.db.publicacionSocial.create({ data, include: INCLUDE_PUBLICACION });
+    return this.db.publicacionSocial.create({
+      data: {
+        ...data,
+        versiones: {
+          create: {
+            numero: 1,
+            imagen: data.imagen,
+            plantillaId: data.plantillaId,
+            origen: data.origen,
+            promptIa: data.promptIa,
+            formato: data.formato,
+            creadoPorId: data.creadoPorId,
+          },
+        },
+      },
+      include: INCLUDE_PUBLICACION,
+    });
   }
 
   buscarPorId(id: string) {
-    return this.db.publicacionSocial.findUniqueOrThrow({ where: { id }, include: INCLUDE_PUBLICACION });
+    return this.db.publicacionSocial.findUniqueOrThrow({ where: { id }, include: INCLUDE_PUBLICACION_DETALLE });
+  }
+
+  /** Fase 5 — el comentario de "pedime esto" queda para siempre en la versión que el aprobador estaba revisando. */
+  actualizarComentarioVersion(versionId: string, comentario: string) {
+    return this.db.publicacionSocialVersion.update({ where: { id: versionId }, data: { comentarioCambios: comentario } });
+  }
+
+  /**
+   * Fase 5 — el creador regeneró tras un pedido de cambios: actualiza los
+   * campos "vigentes" de la publicación Y agrega la versión N+1 en la
+   * misma escritura, y el estado vuelve a BORRADOR (listo para reenviar
+   * a aprobación).
+   */
+  regenerar(
+    id: string,
+    data: {
+      numero: number;
+      imagen: string;
+      plantillaId: string;
+      origen: OrigenImagenPublicacionSocial;
+      promptIa: string | null;
+      formato: FormatoPublicacionSocial;
+      creadoPorId: string;
+    },
+  ) {
+    return this.db.publicacionSocial.update({
+      where: { id },
+      data: {
+        estado: 'BORRADOR',
+        imagen: data.imagen,
+        plantillaId: data.plantillaId,
+        origen: data.origen,
+        promptIa: data.promptIa,
+        formato: data.formato,
+        versiones: {
+          create: {
+            numero: data.numero,
+            imagen: data.imagen,
+            plantillaId: data.plantillaId,
+            origen: data.origen,
+            promptIa: data.promptIa,
+            formato: data.formato,
+            creadoPorId: data.creadoPorId,
+          },
+        },
+      },
+      include: INCLUDE_PUBLICACION_DETALLE,
+    });
   }
 
   listar(params: { skip: number; take: number; estado?: EstadoPublicacionSocial }) {

@@ -13,6 +13,10 @@ import {
   LotePorVencerPayload,
   NcfPorAgotarsePayload,
   ProyectoPresupuestoSuperadoPayload,
+  PublicacionSocialAprobadaPayload,
+  PublicacionSocialCambiosSolicitadosPayload,
+  PublicacionSocialPendienteAprobacionPayload,
+  PublicacionSocialRechazadaPayload,
   StockBajoPayload,
   WhatsappRequiereAtencionPayload,
 } from '../event-bus/events';
@@ -23,6 +27,8 @@ import { paginar } from '../common/types/pagina-resultado';
 import { generarDocumentoPdf } from '../common/pdf/documento-pdf';
 import { mapearFacturaAParams } from '../facturacion/mapear-factura-pdf';
 import { mapearCotizacionAParams } from '../cotizaciones/mapear-cotizacion-pdf';
+import { descifrar } from '../common/utils/encriptado.util';
+import { enviarWhatsappTwilio } from '../common/utils/twilio-whatsapp.util';
 
 @Injectable()
 export class NotificacionesService {
@@ -308,5 +314,122 @@ export class NotificacionesService {
       where: { tenantId, roles: { some: { role: { nombre: 'Admin Total' } } } },
     });
     return admins.map((admin) => admin.email);
+  }
+
+  /**
+   * Fase 5 (Publicaciones Sociales) — a diferencia de todo lo de arriba
+   * (que resuelve por `role.nombre` hardcodeado), esto va por el
+   * PERMISO real `publicacionessociales.aprobar` — mismo JOIN que ya
+   * usa `AutorizacionesRepository.resolverDestinatarios`. Cualquier rol
+   * que tenga ese permiso avisa a sus usuarios, no solo Admin Total.
+   */
+  private resolverAprobadoresPublicacionesSociales(tenantId: string) {
+    return this.prisma.user.findMany({
+      where: {
+        tenantId,
+        activo: true,
+        roles: { some: { role: { rolePermissions: { some: { permission: { clave: 'publicacionessociales.aprobar' } } } } } },
+      },
+    });
+  }
+
+  private enlacePublicacionesSociales(): string {
+    return `${process.env.FRONTEND_URL ?? 'http://localhost:5173'}/publicaciones-sociales`;
+  }
+
+  /**
+   * Fase 5 — a diferencia de `whatsAppChannel` (credenciales de
+   * PLATAFORMA, un solo número para todo el SaaS), esto usa el WhatsApp
+   * del TENANT (Integraciones) — mismo criterio que
+   * `PublicacionesSocialesService.enviarPorWhatsapp`. Requiere además
+   * un Content SID de una plantilla YA aprobada por Meta (no hay forma
+   * de que el negocio inicie la conversación sin eso). Se degrada en
+   * silencio si falta cualquier credencial o el SID — el email ya salió
+   * por `enviar()`, nadie se queda sin enterarse.
+   *
+   * OJO: usa `this.prisma` (global) directo, NUNCA `WhatsappConfigRepository`
+   * — este handler corre desde un `@OnEvent`, fuera de todo contexto de
+   * request HTTP, y `WhatsappConfigRepository` usa `TenantPrismaService`
+   * (request-scoped), que revienta con `ForbiddenException` sin
+   * `request.user` (bug real encontrado probando esto en vivo).
+   */
+  private async enviarWhatsappAprobacionTenant(tenantId: string, telefono: string, productoNombre: string) {
+    const config = await this.prisma.whatsappConfigTenant.findUnique({ where: { tenantId } });
+    if (!config?.twilioAccountSid || !config.twilioAuthTokenCifrado || !config.twilioWhatsappFrom || !config.twilioTemplateAprobacionSid) {
+      this.logger.warn(
+        `WhatsApp de aprobación no enviado a ${telefono} — falta configurar Twilio o el Content SID de aprobación en Integraciones (tenant ${tenantId})`,
+      );
+      return;
+    }
+    const enviado = await enviarWhatsappTwilio({
+      accountSid: config.twilioAccountSid,
+      authToken: descifrar(config.twilioAuthTokenCifrado),
+      from: `whatsapp:${config.twilioWhatsappFrom}`,
+      to: telefono.replace(/^whatsapp:/, ''),
+      contentSid: config.twilioTemplateAprobacionSid,
+      contentVariables: { '1': productoNombre, '2': this.enlacePublicacionesSociales() },
+    });
+    if (!enviado) {
+      this.logger.error(`Twilio respondió con error al enviar el WhatsApp de aprobación a ${telefono} (tenant ${tenantId})`);
+    }
+  }
+
+  /** Avisa a TODOS los que tengan el permiso de aprobar — Email siempre, WhatsApp del negocio si el aprobador tiene teléfono y el tenant configuró el Content SID. */
+  @OnEvent(EVENTOS.PUBLICACION_SOCIAL_PENDIENTE_APROBACION)
+  async alQuedarPendienteAprobacionPublicacionSocial(payload: PublicacionSocialPendienteAprobacionPayload) {
+    const aprobadores = await this.resolverAprobadoresPublicacionesSociales(payload.tenantId);
+    for (const aprobador of aprobadores) {
+      await this.enviar({
+        tenantId: payload.tenantId,
+        canal: 'EMAIL',
+        clave: 'publicacion_social_pendiente_aprobacion',
+        destinatario: aprobador.email,
+        variables: { producto_nombre: payload.productoNombre, link: this.enlacePublicacionesSociales() },
+      });
+      if (aprobador.telefono) {
+        await this.enviarWhatsappAprobacionTenant(payload.tenantId, aprobador.telefono, payload.productoNombre);
+      }
+    }
+  }
+
+  /** Cierra el ciclo del lado del creador — le llega el comentario textual del aprobador. */
+  @OnEvent(EVENTOS.PUBLICACION_SOCIAL_CAMBIOS_SOLICITADOS)
+  async alPedirCambiosPublicacionSocial(payload: PublicacionSocialCambiosSolicitadosPayload) {
+    const creador = await this.prisma.user.findUnique({ where: { id: payload.creadoPorId } });
+    if (!creador) return;
+    await this.enviar({
+      tenantId: payload.tenantId,
+      canal: 'EMAIL',
+      clave: 'publicacion_social_cambios_solicitados',
+      destinatario: creador.email,
+      variables: { producto_nombre: payload.productoNombre, comentario: payload.comentario, link: this.enlacePublicacionesSociales() },
+    });
+  }
+
+  /** Avisos de cierre — informativos, sin WhatsApp con botones (no hay ninguna acción rápida que ofrecer acá). */
+  @OnEvent(EVENTOS.PUBLICACION_SOCIAL_APROBADA)
+  async alAprobarsePublicacionSocial(payload: PublicacionSocialAprobadaPayload) {
+    const creador = await this.prisma.user.findUnique({ where: { id: payload.creadoPorId } });
+    if (!creador) return;
+    await this.enviar({
+      tenantId: payload.tenantId,
+      canal: 'EMAIL',
+      clave: 'publicacion_social_aprobada',
+      destinatario: creador.email,
+      variables: { producto_nombre: payload.productoNombre, link: this.enlacePublicacionesSociales() },
+    });
+  }
+
+  @OnEvent(EVENTOS.PUBLICACION_SOCIAL_RECHAZADA)
+  async alRechazarsePublicacionSocial(payload: PublicacionSocialRechazadaPayload) {
+    const creador = await this.prisma.user.findUnique({ where: { id: payload.creadoPorId } });
+    if (!creador) return;
+    await this.enviar({
+      tenantId: payload.tenantId,
+      canal: 'EMAIL',
+      clave: 'publicacion_social_rechazada',
+      destinatario: creador.email,
+      variables: { producto_nombre: payload.productoNombre, motivo_rechazo: payload.motivoRechazo },
+    });
   }
 }

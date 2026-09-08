@@ -7,6 +7,9 @@ const SELECT_USUARIO = {
   email: true,
   nombre: true,
   activo: true,
+  // Fase 5 (Publicaciones Sociales) — opcional, usado para avisar por
+  // WhatsApp del negocio a los aprobadores que lo tengan cargado.
+  telefono: true,
   createdAt: true,
   roles: { select: { role: { select: { id: true, nombre: true } } } },
   sucursales: { select: { sucursal: { select: { id: true, nombre: true } } } },
@@ -20,13 +23,14 @@ export class UsuariosRepository {
     return this.tenantPrisma.client;
   }
 
-  crear(email: string, nombre: string, passwordHash: string, rolIds: string[], tenantId: string) {
+  crear(email: string, nombre: string, passwordHash: string, rolIds: string[], tenantId: string, telefono?: string) {
     return this.db.user.create({
       data: {
         tenantId,
         email,
         nombre,
         passwordHash,
+        telefono,
         roles: { create: rolIds.map((roleId) => ({ roleId })) },
       },
       select: SELECT_USUARIO,
@@ -52,7 +56,7 @@ export class UsuariosRepository {
     return this.db.user.findUniqueOrThrow({ where: { id }, select: SELECT_USUARIO });
   }
 
-  actualizarDatos(id: string, data: { nombre?: string; activo?: boolean }) {
+  actualizarDatos(id: string, data: { nombre?: string; activo?: boolean; telefono?: string }) {
     return this.db.user.update({ where: { id }, data, select: SELECT_USUARIO });
   }
 

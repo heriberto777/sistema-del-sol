@@ -18,4 +18,9 @@ export class ActualizarUsuarioDto {
   @ArrayMinSize(1)
   @IsUUID('4', { each: true })
   rolIds?: string[];
+
+  @ApiProperty({ required: false, description: 'Fase 5 (Publicaciones Sociales) — para avisar por WhatsApp del negocio si tiene el permiso de aprobar' })
+  @IsOptional()
+  @IsString()
+  telefono?: string;
 }

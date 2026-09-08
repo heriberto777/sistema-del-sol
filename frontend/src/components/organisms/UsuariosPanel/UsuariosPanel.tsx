@@ -28,6 +28,7 @@ interface Usuario {
   nombre: string;
   email: string;
   activo: boolean;
+  telefono: string | null;
   roles: { role: Rol }[];
   sucursales: { sucursal: Sucursal }[];
 }
@@ -155,6 +156,7 @@ function ModalNuevoUsuario({ onClose }: { onClose: () => void }) {
   const [email, setEmail] = useState('');
   const [nombre, setNombre] = useState('');
   const [password, setPassword] = useState('');
+  const [telefono, setTelefono] = useState('');
   const [rolIds, setRolIds] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
 
@@ -164,7 +166,7 @@ function ModalNuevoUsuario({ onClose }: { onClose: () => void }) {
   });
 
   const crearUsuario = useMutation({
-    mutationFn: async () => apiClient.post('/admin/usuarios', { email, nombre, password, rolIds }),
+    mutationFn: async () => apiClient.post('/admin/usuarios', { email, nombre, password, rolIds, telefono: telefono || undefined }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-usuarios'] });
       onClose();
@@ -192,6 +194,13 @@ function ModalNuevoUsuario({ onClose }: { onClose: () => void }) {
         <FormField id="nombre" label="Nombre" value={nombre} onChange={(e) => setNombre(e.target.value)} required />
         <FormField id="email" label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
         <FormField id="password" label="Contraseña" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8} />
+        <FormField
+          id="telefono"
+          label="Teléfono (opcional)"
+          placeholder="+18095551234"
+          value={telefono}
+          onChange={(e) => setTelefono(e.target.value)}
+        />
         <div>
           <p className="mb-1 text-sm font-medium text-slate-700 dark:text-slate-300">Roles</p>
           <div className="flex flex-wrap gap-2">
@@ -216,6 +225,7 @@ function ModalEditarUsuario({ usuario, onClose }: { usuario: Usuario; onClose: (
   const queryClient = useQueryClient();
   const [sucursalIds, setSucursalIds] = useState<string[]>(usuario.sucursales.map((s) => s.sucursal.id));
   const [rolIds, setRolIds] = useState<string[]>(usuario.roles.map((r) => r.role.id));
+  const [telefono, setTelefono] = useState(usuario.telefono ?? '');
   const [error, setError] = useState<string | null>(null);
 
   const { data: sucursales } = useQuery({
@@ -232,7 +242,7 @@ function ModalEditarUsuario({ usuario, onClose }: { usuario: Usuario; onClose: (
     mutationFn: async () =>
       Promise.all([
         apiClient.put(`/admin/usuarios/${usuario.id}/sucursales`, { sucursalIds }),
-        apiClient.patch(`/admin/usuarios/${usuario.id}`, { rolIds }),
+        apiClient.patch(`/admin/usuarios/${usuario.id}`, { rolIds, telefono }),
       ]),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-usuarios'] });
@@ -261,6 +271,13 @@ function ModalEditarUsuario({ usuario, onClose }: { usuario: Usuario; onClose: (
   return (
     <Modal titulo={`Editar usuario — ${usuario.nombre}`} onClose={onClose}>
       <div className="space-y-3">
+        <FormField
+          id="telefono-editar"
+          label="Teléfono (opcional)"
+          placeholder="+18095551234"
+          value={telefono}
+          onChange={(e) => setTelefono(e.target.value)}
+        />
         <div>
           <p className="mb-1 text-sm font-medium text-slate-700 dark:text-slate-300">Roles</p>
           <div className="flex flex-wrap gap-2">

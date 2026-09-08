@@ -3,6 +3,8 @@ import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { PublicacionesSocialesService } from './publicaciones-sociales.service';
 import { CrearPublicacionSocialDto } from './dto/crear-publicacion-social.dto';
 import { CambiarEstadoPublicacionSocialDto } from './dto/cambiar-estado-publicacion-social.dto';
+import { SolicitarCambiosPublicacionSocialDto } from './dto/solicitar-cambios-publicacion-social.dto';
+import { RegenerarPublicacionSocialDto } from './dto/regenerar-publicacion-social.dto';
 import { EnviarWhatsappPublicacionSocialDto } from './dto/enviar-whatsapp-publicacion-social.dto';
 import { ListarPublicacionesSocialesQueryDto } from './dto/listar-publicaciones-sociales-query.dto';
 import { Permissions } from '../common/decorators/permissions.decorator';
@@ -44,14 +46,26 @@ export class PublicacionesSocialesController {
 
   @Patch(':id/enviar-aprobacion')
   @Permissions('publicacionessociales.editar')
-  enviarAAprobacion(@Param('id') id: string) {
-    return this.publicacionesSocialesService.enviarAAprobacion(id);
+  enviarAAprobacion(@Param('id') id: string, @CurrentUser() user: JwtPayloadUser) {
+    return this.publicacionesSocialesService.enviarAAprobacion(id, user.tenantId);
   }
 
   @Patch(':id/estado')
   @Permissions('publicacionessociales.aprobar')
   cambiarEstado(@Param('id') id: string, @Body() dto: CambiarEstadoPublicacionSocialDto, @CurrentUser() user: JwtPayloadUser) {
-    return this.publicacionesSocialesService.cambiarEstado(id, dto.estado, user.userId, dto.motivoRechazo);
+    return this.publicacionesSocialesService.cambiarEstado(id, dto.estado, user.userId, user.tenantId, dto.motivoRechazo);
+  }
+
+  @Patch(':id/solicitar-cambios')
+  @Permissions('publicacionessociales.aprobar')
+  solicitarCambios(@Param('id') id: string, @Body() dto: SolicitarCambiosPublicacionSocialDto, @CurrentUser() user: JwtPayloadUser) {
+    return this.publicacionesSocialesService.solicitarCambios(id, user.tenantId, user.userId, dto.comentario);
+  }
+
+  @Patch(':id/regenerar')
+  @Permissions('publicacionessociales.editar')
+  regenerar(@Param('id') id: string, @Body() dto: RegenerarPublicacionSocialDto, @CurrentUser() user: JwtPayloadUser) {
+    return this.publicacionesSocialesService.regenerar(id, user.tenantId, user.userId, dto);
   }
 
   @Post(':id/enviar-whatsapp')

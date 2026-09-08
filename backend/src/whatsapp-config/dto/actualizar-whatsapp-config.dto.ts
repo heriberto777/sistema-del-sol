@@ -59,4 +59,13 @@ export class ActualizarWhatsappConfigDto {
   @IsInt()
   @Min(1)
   limiteRespuestasDiarias?: number;
+
+  @ApiProperty({
+    required: false,
+    description:
+      'Fase 5 (Publicaciones Sociales) — Content SID de Twilio de la plantilla de aprobación, YA aprobada por Meta. No es un secreto (no se cifra).',
+  })
+  @IsOptional()
+  @IsString()
+  twilioTemplateAprobacionSid?: string;
 }

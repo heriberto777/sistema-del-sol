@@ -7,6 +7,7 @@ import { FORMAS_PAGO_BASE } from './formas-pago-base';
 import { LISTAS_PRECIO_BASE } from './listas-precio-base';
 import { TIPOS_AUSENCIA_CONFIG_BASE } from './tipos-ausencia-config-base';
 import { CORRELATIVOS_BASE } from './correlativos-base';
+import { PLANTILLAS_PUBLICACIONES_SOCIALES_BASE } from '../notificaciones/plantillas-publicaciones-sociales-base';
 
 @Injectable()
 export class TenantsRepository {
@@ -120,6 +121,12 @@ export class TenantsRepository {
 
       await tx.correlativo.createMany({
         data: CORRELATIVOS_BASE.map((tipo) => ({ tenantId: tenant.id, tipo })),
+      });
+
+      // Fase 5 (Publicaciones Sociales) — contenido real por defecto, no
+      // en blanco (ver el comentario de PLANTILLAS_PUBLICACIONES_SOCIALES_BASE).
+      await tx.notificacionPlantilla.createMany({
+        data: PLANTILLAS_PUBLICACIONES_SOCIALES_BASE.map((p) => ({ tenantId: tenant.id, ...p })),
       });
 
       let adminRoleId: string | undefined;

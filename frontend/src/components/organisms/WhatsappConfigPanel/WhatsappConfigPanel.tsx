@@ -31,6 +31,7 @@ interface WhatsappConfig {
   historialMensajes: number;
   iaPromptNegocio: string | null;
   limiteRespuestasDiarias: number;
+  twilioTemplateAprobacionSid: string | null;
 }
 
 /**
@@ -55,6 +56,7 @@ export function WhatsappConfigPanel() {
   const [historialMensajes, setHistorialMensajes] = useState('10');
   const [iaPromptNegocio, setIaPromptNegocio] = useState('');
   const [limiteRespuestasDiarias, setLimiteRespuestasDiarias] = useState('50');
+  const [twilioTemplateAprobacionSid, setTwilioTemplateAprobacionSid] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [errorSugerencia, setErrorSugerencia] = useState<string | null>(null);
 
@@ -73,6 +75,7 @@ export function WhatsappConfigPanel() {
     setHistorialMensajes(String(config.historialMensajes));
     setIaPromptNegocio(config.iaPromptNegocio ?? '');
     setLimiteRespuestasDiarias(String(config.limiteRespuestasDiarias));
+    setTwilioTemplateAprobacionSid(config.twilioTemplateAprobacionSid ?? '');
   }, [config]);
 
   const guardar = useMutation({
@@ -86,6 +89,7 @@ export function WhatsappConfigPanel() {
         historialMensajes: Number(historialMensajes),
         iaPromptNegocio,
         limiteRespuestasDiarias: Number(limiteRespuestasDiarias),
+        twilioTemplateAprobacionSid,
         ...(twilioAuthToken !== '' ? { twilioAuthToken } : {}),
         ...(iaApiKey !== '' ? { iaApiKey } : {}),
       }),
@@ -143,6 +147,18 @@ export function WhatsappConfigPanel() {
             value={twilioWhatsappFrom}
             onChange={(e) => setTwilioWhatsappFrom(e.target.value)}
           />
+          <FormField
+            id="whatsapp-twilio-template-aprobacion"
+            label="Content SID de la plantilla de aprobación (opcional)"
+            value={twilioTemplateAprobacionSid}
+            onChange={(e) => setTwilioTemplateAprobacionSid(e.target.value)}
+            placeholder="HXxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+          />
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            Para que el aviso de "diseño pendiente de aprobar" (Publicaciones Sociales) llegue también por WhatsApp con un botón de
+            "Aprobar" — creá la plantilla en la consola de Twilio (Content Template Builder) y mandala a aprobar a Meta; pegá acá el
+            Content SID una vez aprobada. Sin esto, el aviso solo sale por email.
+          </p>
         </div>
 
         <div className="space-y-3 border-t border-slate-200 pt-3 dark:border-slate-800">

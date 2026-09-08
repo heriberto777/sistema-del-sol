@@ -19,7 +19,7 @@ export class UsuariosService {
 
   async crear(dto: CrearUsuarioDto, tenantId: string) {
     const passwordHash = await bcrypt.hash(dto.password, 10);
-    return this.usuariosRepository.crear(dto.email, dto.nombre, passwordHash, dto.rolIds, tenantId);
+    return this.usuariosRepository.crear(dto.email, dto.nombre, passwordHash, dto.rolIds, tenantId, dto.telefono);
   }
 
   async listar(query: ListadoQueryDto) {
@@ -33,8 +33,8 @@ export class UsuariosService {
   }
 
   async actualizar(id: string, dto: ActualizarUsuarioDto) {
-    if (dto.nombre !== undefined || dto.activo !== undefined) {
-      await this.usuariosRepository.actualizarDatos(id, { nombre: dto.nombre, activo: dto.activo });
+    if (dto.nombre !== undefined || dto.activo !== undefined || dto.telefono !== undefined) {
+      await this.usuariosRepository.actualizarDatos(id, { nombre: dto.nombre, activo: dto.activo, telefono: dto.telefono });
     }
     if (dto.rolIds) {
       return this.usuariosRepository.reemplazarRoles(id, dto.rolIds);

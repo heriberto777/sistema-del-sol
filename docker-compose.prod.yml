@@ -19,6 +19,12 @@ name: sistema-del-sol
 #     (roles-base.ts) para tenants ya existentes, solo cambia esquema.
 #     Olvidarlo deja el permiso nuevo invisible en Roles y permisos aunque
 #     el código y la migración ya estén desplegados (ver ARCHITECTURE.md).
+#   docker compose -f docker-compose.prod.yml exec api pnpm notificaciones:plantillas-publicaciones-sociales:backfill
+#     ↑ Mismo criterio — correrlo una vez después de la migración de la
+#     Fase 5 de Publicaciones Sociales (avisar aprobación/pedido de
+#     cambios). Sin esto, un tenant creado ANTES de esa fase nunca
+#     recibe el email (queda como no-op silencioso hasta que un admin
+#     cree la plantilla a mano desde Notificaciones → Plantillas).
 #
 # El `api` NO publica puerto al host — solo Nginx Proxy Manager (u otro
 # proxy en la misma red del servidor) llega a él a través de `web`, que sí

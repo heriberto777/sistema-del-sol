@@ -331,24 +331,24 @@ enum EstadoSuscripcion {
 // independientes: un tenant puede seguir ACTIVO para sus usuarios
 // mientras se resuelve algo de facturación a mano).
 model Suscripcion {
-  id                String            @id @default(uuid())
-  tenantId          String            @unique
-  tenant            Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  planId            String
-  plan              Plan              @relation(fields: [planId], references: [id])
-  estado            EstadoSuscripcion @default(ACTIVA)
-  fechaInicio       DateTime          @default(now())
-  fechaProximoCorte DateTime
+  id                  String            @id @default(uuid())
+  tenantId            String            @unique
+  tenant              Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  planId              String
+  plan                Plan              @relation(fields: [planId], references: [id])
+  estado              EstadoSuscripcion @default(ACTIVA)
+  fechaInicio         DateTime          @default(now())
+  fechaProximoCorte   DateTime
   // % de mora aplicado una sola vez cuando una factura pasa a VENCIDA.
-  feeMoraPct        Decimal           @default(5) @db.Decimal(5, 2)
+  feeMoraPct          Decimal           @default(5) @db.Decimal(5, 2)
   // Opt-in manual por tenant (no por Plan) — la próxima factura generada
   // por `generarDesdeSuscripcion` sale con descuento total (100%, ITBIS
   // incluido) y esta bandera se apaga sola al aplicarse. Independiente
   // de un cupón: si ambos aplican a la vez, el gratis manda (ver
   // FacturasPlataformaService.generarDesdeSuscripcion).
-  primerPeriodoGratis Boolean         @default(false)
-  createdAt         DateTime          @default(now())
-  updatedAt         DateTime          @updatedAt
+  primerPeriodoGratis Boolean           @default(false)
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
 
   facturas FacturaPlataforma[]
   cupones  SuscripcionCupon[]
@@ -695,33 +695,39 @@ model User {
   pinHash                String?
   pinIntentosFallidos    Int       @default(0)
   pinBloqueadoHasta      DateTime?
+  // Fase 5 (Publicaciones Sociales) — opcional, antes no existía ningún
+  // teléfono por usuario. Se usa para avisar por WhatsApp (número del
+  // TENANT en Integraciones, no el de plataforma) a los aprobadores que
+  // lo tengan cargado; sin teléfono, ese aprobador solo recibe el email.
+  telefono               String?
   createdAt              DateTime  @default(now())
   updatedAt              DateTime  @updatedAt
 
-  roles                          UserRole[]
-  auditLogs                      AuditLog[]
-  facturasVendedor               Factura[]                 @relation("FacturaVendedor")
-  movimientosInventario          MovimientoInventario[]
-  ordenesCompra                  OrdenCompra[]
-  ajustesInventario              AjusteInventario[]
-  transferenciasInventario       TransferenciaInventario[]
-  conteosFisicos                 ConteoFisico[]
-  cotizaciones                   Cotizacion[]
-  remisiones                     Remision[]
-  turnosCaja                     TurnoCaja[]
-  turnosCajaCerrados             TurnoCaja[]               @relation("TurnoCajaCerradoPor")
-  turnosCajaRevisados            TurnoCaja[]               @relation("TurnoCajaRevisadoPor")
-  pagos                          Pago[]
+  roles                                 UserRole[]
+  auditLogs                             AuditLog[]
+  facturasVendedor                      Factura[]                  @relation("FacturaVendedor")
+  movimientosInventario                 MovimientoInventario[]
+  ordenesCompra                         OrdenCompra[]
+  ajustesInventario                     AjusteInventario[]
+  transferenciasInventario              TransferenciaInventario[]
+  conteosFisicos                        ConteoFisico[]
+  cotizaciones                          Cotizacion[]
+  remisiones                            Remision[]
+  turnosCaja                            TurnoCaja[]
+  turnosCajaCerrados                    TurnoCaja[]                @relation("TurnoCajaCerradoPor")
+  turnosCajaRevisados                   TurnoCaja[]                @relation("TurnoCajaRevisadoPor")
+  pagos                                 Pago[]
   // Nullable: no todo User de sistema tiene un Empleado de nómina asociado
   // (ej. un Admin Total que no está en planilla).
-  empleado                       Empleado?
-  ausenciasSolicitadas           Ausencia[]                @relation("AusenciaSolicitadaPor")
-  ausenciasAprobadas             Ausencia[]                @relation("AusenciaAprobadaPor")
-  publicacionesSocialesCreadas   PublicacionSocial[]       @relation("PublicacionSocialCreadaPor")
-  publicacionesSocialesAprobadas PublicacionSocial[]       @relation("PublicacionSocialAprobadaPor")
-  asistenciasAprobadas           RegistroAsistencia[]      @relation("AsistenciaAprobadaPor")
-  sucursales                     UsuarioSucursal[]
-  codigosAutorizacionSolicitados CodigoAutorizacion[]
+  empleado                              Empleado?
+  ausenciasSolicitadas                  Ausencia[]                 @relation("AusenciaSolicitadaPor")
+  ausenciasAprobadas                    Ausencia[]                 @relation("AusenciaAprobadaPor")
+  publicacionesSocialesCreadas          PublicacionSocial[]        @relation("PublicacionSocialCreadaPor")
+  publicacionesSocialesAprobadas        PublicacionSocial[]        @relation("PublicacionSocialAprobadaPor")
+  publicacionesSocialesVersionesCreadas PublicacionSocialVersion[] @relation("PublicacionSocialVersionCreadaPor")
+  asistenciasAprobadas                  RegistroAsistencia[]       @relation("AsistenciaAprobadaPor")
+  sucursales                            UsuarioSucursal[]
+  codigosAutorizacionSolicitados        CodigoAutorizacion[]
 
   @@unique([tenantId, email])
   @@map("users")
@@ -936,30 +942,38 @@ model Correlativo {
 /// usa sus propias credenciales tenant-scoped vía
 /// `enviarWhatsappTwilio()` (`common/utils/twilio-whatsapp.util.ts`).
 model WhatsappConfigTenant {
-  id                      String   @id @default(uuid())
-  tenantId                String   @unique
-  tenant                  Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  habilitado              Boolean  @default(false)
-  twilioAccountSid        String?
-  twilioAuthTokenCifrado  String?
+  id                          String   @id @default(uuid())
+  tenantId                    String   @unique
+  tenant                      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  habilitado                  Boolean  @default(false)
+  twilioAccountSid            String?
+  twilioAuthTokenCifrado      String?
   // @unique: es la clave para resolver a qué tenant pertenece un
   // webhook entrante de Twilio (ver WhatsappWebhookController) — antes
   // de H-2b no tenía índice porque nadie lo consultaba por valor.
-  twilioWhatsappFrom      String?  @unique
-  iaProveedor             String?
-  iaModelo                String?
-  iaApiKeyCifrado         String?
-  historialMensajes       Int      @default(10)
+  twilioWhatsappFrom          String?  @unique
+  iaProveedor                 String?
+  iaModelo                    String?
+  iaApiKeyCifrado             String?
+  historialMensajes           Int      @default(10)
   // Texto libre del tenant (horario, dirección, tono) — se antepone al
   // scaffolding fijo del prompt de sistema (JSON de respuesta +
   // guardrail de no inventar datos reales), nunca lo reemplaza — ver
   // WhatsappBotService.
-  iaPromptNegocio         String?
+  iaPromptNegocio             String?
   // Tope de respuestas de IA por día calendario de RD (WhatsappMensaje.diaRD)
   // — al llegar acá, se responde un mensaje fijo sin llamar a la IA.
-  limiteRespuestasDiarias Int      @default(50)
-  createdAt               DateTime @default(now())
-  updatedAt               DateTime @updatedAt
+  limiteRespuestasDiarias     Int      @default(50)
+  // Fase 5 (Publicaciones Sociales) — Content SID de Twilio de la
+  // plantilla de aprobación (botones "Aprobar"/"Ver detalle"), YA
+  // aprobada por Meta — sin este SID, el aviso de aprobación pendiente
+  // solo sale por email (WhatsApp saliente iniciado por el negocio
+  // fuera de la ventana de 24hs exige una plantilla aprobada, no hay
+  // forma de evitarlo). Se crea/aprueba fuera del sistema, en la
+  // consola de Twilio/Meta.
+  twilioTemplateAprobacionSid String?
+  createdAt                   DateTime @default(now())
+  updatedAt                   DateTime @updatedAt
 
   @@map("whatsapp_config_tenant")
 }
@@ -1675,14 +1689,14 @@ model Empleado {
   userId              String?           @unique
   user                User?             @relation(fields: [userId], references: [id], onDelete: SetNull)
 
-  recibos             ReciboNomina[]
-  ventasComoVendedor  Factura[]
-  ventasAparcadas     VentaAparcada[]
-  carritosBorrador    CarritoBorrador[]
-  horarios            HorarioEmpleado[]
-  registrosAsistencia RegistroAsistencia[]
-  ausencias           Ausencia[]
-  comisionesVenta     ComisionVenta[]
+  recibos                   ReciboNomina[]
+  ventasComoVendedor        Factura[]
+  ventasAparcadas           VentaAparcada[]
+  carritosBorrador          CarritoBorrador[]
+  horarios                  HorarioEmpleado[]
+  registrosAsistencia       RegistroAsistencia[]
+  ausencias                 Ausencia[]
+  comisionesVenta           ComisionVenta[]
   proyectosResponsable      Proyecto[]
   tareasProyectoResponsable TareaProyectoResponsable[]
   registrosHoraProyecto     RegistroHoraProyecto[]
@@ -3028,7 +3042,7 @@ model AjusteInventario {
   user      User                   @relation(fields: [userId], references: [id])
   createdAt DateTime               @default(now())
 
-  lineas LineaAjusteInventario[]
+  lineas             LineaAjusteInventario[]
   // El ConteoFisico que generó este Ajuste al aplicarse (null si el
   // Ajuste se creó directo, sin pasar por un conteo).
   conteoFisicoOrigen ConteoFisico?
@@ -3110,19 +3124,19 @@ model ConteoFisico {
 }
 
 model LineaConteoFisico {
-  id              String       @id @default(uuid())
+  id              String           @id @default(uuid())
   conteoId        String
-  conteo          ConteoFisico @relation(fields: [conteoId], references: [id], onDelete: Cascade)
+  conteo          ConteoFisico     @relation(fields: [conteoId], references: [id], onDelete: Cascade)
   productoId      String
-  producto        Producto     @relation(fields: [productoId], references: [id], onDelete: Cascade)
+  producto        Producto         @relation(fields: [productoId], references: [id], onDelete: Cascade)
   varianteId      String
   variante        VarianteProducto @relation(fields: [varianteId], references: [id])
   // Snapshot de Stock.cantidadActual al ABRIR el conteo — nunca se
   // recalcula después.
-  cantidadTeorica Decimal      @db.Decimal(14, 4)
+  cantidadTeorica Decimal          @db.Decimal(14, 4)
   // Null = todavía no se contó esta línea (permite aplicar un conteo
   // incompleto — decisión de diseño confirmada).
-  cantidadContada Decimal?     @db.Decimal(14, 4)
+  cantidadContada Decimal?         @db.Decimal(14, 4)
   contadoPorId    String?
   contadoEn       DateTime?
 
@@ -3421,20 +3435,20 @@ model DireccionCliente {
 // ============================================================
 
 model Webhook {
-  id        String   @id @default(uuid())
-  tenantId  String
-  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  url       String
-  eventos   String[]
+  id            String   @id @default(uuid())
+  tenantId      String
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  url           String
+  eventos       String[]
   // DEPRECADO — texto plano legado (auditoría de seguridad 2026-09-06:
   // era el único secreto de terceros de todo el sistema sin cifrar). Ya
   // no se escribe, se mantiene solo por compatibilidad con filas viejas
   // hasta correr `backfill-webhook-secrets` en cada entorno; recién ahí
   // se puede sacar en una migración aparte.
-  secret    String?
+  secret        String?
   secretCifrado String?
-  activo    Boolean  @default(true)
-  createdAt DateTime @default(now())
+  activo        Boolean  @default(true)
+  createdAt     DateTime @default(now())
 
   entregas WebhookDelivery[]
 
@@ -3822,32 +3836,32 @@ enum PrioridadTareaProyecto {
 }
 
 model Proyecto {
-  id                   String                  @id @default(uuid())
-  tenantId             String
-  tenant               Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  nombre               String
-  descripcion          String?
-  clienteId            String
-  cliente              Cliente                 @relation(fields: [clienteId], references: [id])
-  responsableId        String?
-  responsable          Empleado?               @relation(fields: [responsableId], references: [id], onDelete: SetNull)
-  presupuesto          Decimal?                @db.Decimal(14, 2)
-  modoFacturacion      ModoFacturacionProyecto @default(PRECIO_FIJO)
+  id                       String                  @id @default(uuid())
+  tenantId                 String
+  tenant                   Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  nombre                   String
+  descripcion              String?
+  clienteId                String
+  cliente                  Cliente                 @relation(fields: [clienteId], references: [id])
+  responsableId            String?
+  responsable              Empleado?               @relation(fields: [responsableId], references: [id], onDelete: SetNull)
+  presupuesto              Decimal?                @db.Decimal(14, 2)
+  modoFacturacion          ModoFacturacionProyecto @default(PRECIO_FIJO)
   // Solo aplica si modoFacturacion = POR_HORAS — tarifa que se le COBRA AL
   // CLIENTE por hora. Distinta del costo interno (se deriva de
   // Empleado.salarioBrutoMensual / CONFIGURACIONES_BASE.PROYECTOS_HORAS_LABORABLES_MES,
   // ver costo-hora.util.ts — nunca se guarda, se calcula al vuelo).
-  tarifaHoraFacturable Decimal?                @db.Decimal(14, 2)
-  estado               EstadoProyecto          @default(PLANIFICADO)
-  fechaInicio          DateTime?
-  fechaFinEstimada     DateTime?
+  tarifaHoraFacturable     Decimal?                @db.Decimal(14, 2)
+  estado                   EstadoProyecto          @default(PLANIFICADO)
+  fechaInicio              DateTime?
+  fechaFinEstimada         DateTime?
   // Notificaciones (Event Bus) — evita reenviar el aviso de presupuesto
   // superado en cada registro de hora/gasto nuevo mientras siga excedido
   // (ver PresupuestoProyectoListener). Se resetea a false si se edita el
   // presupuesto (ProyectosRepository.actualizarProyecto).
-  alertaPresupuestoEnviada Boolean              @default(false)
-  createdAt            DateTime                @default(now())
-  updatedAt            DateTime                @updatedAt
+  alertaPresupuestoEnviada Boolean                 @default(false)
+  createdAt                DateTime                @default(now())
+  updatedAt                DateTime                @updatedAt
 
   hitos  HitoProyecto[]
   tareas TareaProyecto[]
@@ -3857,28 +3871,28 @@ model Proyecto {
 }
 
 model HitoProyecto {
-  id            String             @id @default(uuid())
-  tenantId      String
-  tenant        Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  proyectoId    String
-  proyecto      Proyecto           @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
-  nombre        String
-  fechaObjetivo DateTime?
+  id                       String             @id @default(uuid())
+  tenantId                 String
+  tenant                   Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  proyectoId               String
+  proyecto                 Proyecto           @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
+  nombre                   String
+  fechaObjetivo            DateTime?
   // Solo si el Proyecto es PRECIO_FIJO — monto pactado de antemano para
   // este hito puntual (ver Fase 4: generar la Factura real desde acá).
-  montoFijo     Decimal?           @db.Decimal(14, 2)
-  estado        EstadoHitoProyecto @default(PENDIENTE)
+  montoFijo                Decimal?           @db.Decimal(14, 2)
+  estado                   EstadoHitoProyecto @default(PENDIENTE)
   // Notificaciones (Event Bus) — evita reenviar el aviso de "próximo a
   // vencer" todos los días mientras el hito siga sin resolverse (ver
   // HitosProyectoCronService). Se resetea a false si se edita
   // fechaObjetivo (ProyectosRepository.actualizarHito).
-  alertaVencimientoEnviada Boolean @default(false)
-  createdAt     DateTime           @default(now())
+  alertaVencimientoEnviada Boolean            @default(false)
+  createdAt                DateTime           @default(now())
   // Fase 4 — la Factura real generada desde este hito (ver
   // ProyectosService.facturarHito). @unique: un hito nunca se factura
   // dos veces, es el mismo guard que ya usa Cotizacion/Remisión.
-  facturaId     String?            @unique
-  factura       Factura?           @relation(fields: [facturaId], references: [id])
+  facturaId                String?            @unique
+  factura                  Factura?           @relation(fields: [facturaId], references: [id])
 
   tareas TareaProyecto[]
 
@@ -3947,6 +3961,10 @@ enum EstadoPublicacionSocial {
   PENDIENTE_APROBACION
   APROBADA
   RECHAZADA
+  // Fase 5 — no es terminal como RECHAZADA: vuelve a BORRADOR en cuanto
+  // el creador regenera (ver PublicacionesSocialesService.regenerar) y
+  // se puede reenviar a aprobación las veces que haga falta.
+  CAMBIOS_SOLICITADOS
 }
 
 // Fase 2 — de dónde salió la foto de fondo del banner: la del producto
@@ -3977,6 +3995,7 @@ model PlantillaPublicacionSocial {
   createdAt DateTime @default(now())
 
   publicaciones PublicacionSocial[]
+  versiones     PublicacionSocialVersion[]
 
   @@map("plantillas_publicacion_social")
 }
@@ -3998,10 +4017,10 @@ model PublicacionSocial {
   estado      EstadoPublicacionSocial    @default(BORRADOR)
 
   creadoPorId String
-  creadoPor   User                       @relation("PublicacionSocialCreadaPor", fields: [creadoPorId], references: [id], onDelete: Cascade)
+  creadoPor   User   @relation("PublicacionSocialCreadaPor", fields: [creadoPorId], references: [id], onDelete: Cascade)
 
-  aprobadoPorId String?
-  aprobadoPor   User?                    @relation("PublicacionSocialAprobadaPor", fields: [aprobadoPorId], references: [id], onDelete: Cascade)
+  aprobadoPorId   String?
+  aprobadoPor     User?     @relation("PublicacionSocialAprobadaPor", fields: [aprobadoPorId], references: [id], onDelete: Cascade)
   // Exigido en el service (no alcanza con class-validator, es
   // condicional) cuando estado pasa a RECHAZADA.
   motivoRechazo   String?
@@ -4015,5 +4034,40 @@ model PublicacionSocial {
 
   createdAt DateTime @default(now())
 
+  // Fase 5 — historial de versiones (una fila por generación/
+  // regeneración, nunca se pisa). Los campos de arriba (imagen,
+  // plantillaId, origen, promptIa, formato) siguen siendo "la versión
+  // vigente" — nada del código que ya los lee directo se rompe.
+  versiones PublicacionSocialVersion[]
+
   @@map("publicaciones_sociales")
+}
+
+// Fase 5 — un row por cada vez que se generó o regeneró la imagen de una
+// PublicacionSocial. Mismo criterio que WhatsappMensaje (historial como
+// filas nuevas, nunca updates) — es el único patrón de ese tipo que ya
+// existía en el proyecto antes de esto.
+model PublicacionSocialVersion {
+  id                  String                        @id @default(uuid())
+  publicacionSocialId String
+  publicacionSocial   PublicacionSocial             @relation(fields: [publicacionSocialId], references: [id], onDelete: Cascade)
+  numero              Int
+  imagen              String                        @db.Text
+  plantillaId         String
+  plantilla           PlantillaPublicacionSocial    @relation(fields: [plantillaId], references: [id])
+  origen              OrigenImagenPublicacionSocial
+  promptIa            String?
+  formato             FormatoPublicacionSocial
+
+  creadoPorId String
+  creadoPor   User   @relation("PublicacionSocialVersionCreadaPor", fields: [creadoPorId], references: [id], onDelete: Cascade)
+
+  // El pedido del aprobador SOBRE esta versión puntual, si lo hubo —
+  // queda para siempre asociado a la ronda que lo generó, no se pisa.
+  comentarioCambios String?
+
+  createdAt DateTime @default(now())
+
+  @@unique([publicacionSocialId, numero])
+  @@map("publicaciones_sociales_versiones")
 }

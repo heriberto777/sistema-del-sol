@@ -103,15 +103,60 @@ diseños/formatos de imagen.
   negocio) que reemplazan el texto del textarea de `promptIa`, editable
   después. Se puede ampliar la lista sin migración ni cambio de API.
 
+## Fase 5 (entregada) — avisar aprobación pendiente + pedir cambios
+
+Antes de esta fase, nadie se enteraba de que había algo pendiente de
+aprobar — el estado pasaba a `PENDIENTE_APROBACION` sin disparar ningún
+aviso. Tampoco existía forma de pedir cambios sin rechazar
+definitivamente.
+
+- **Aviso por Email** (`NotificacionesService`, Event Bus): 4 eventos
+  nuevos (`publicaciones_sociales.{pendiente_aprobacion,
+  cambios_solicitados,aprobada,rechazada}`). Los destinatarios de
+  `pendiente_aprobacion` se resuelven por el **permiso real**
+  `publicacionessociales.aprobar` (JOIN vía `role.rolePermissions` —
+  mismo patrón que ya usaba `AutorizacionesRepository`), no por nombre
+  de rol hardcodeado como el resto de `NotificacionesService`.
+  Plantillas (`NotificacionPlantilla`) con contenido real por defecto
+  (`plantillas-publicaciones-sociales-base.ts`), sembradas en tenants
+  nuevos vía `TenantsRepository.crearConProvisioning` y en los ya
+  existentes vía `scripts/backfill-plantillas-publicaciones-sociales.ts`
+  (correr una vez tras el deploy, ver `docker-compose.prod.yml`).
+- **Aviso por WhatsApp (opcional)**: usa el número del **TENANT**
+  (Integraciones), no el de plataforma — requiere que el aprobador
+  tenga `User.telefono` cargado y el tenant tenga
+  `WhatsappConfigTenant.twilioTemplateAprobacionSid` configurado (una
+  plantilla de Content API de Twilio, creada y aprobada por Meta FUERA
+  del sistema — trámite externo, puede tardar). Sin eso, solo sale el
+  email — nunca queda nadie sin enterarse. Solo 2 botones: "✅ Aprobar"
+  (aprueba directo, interceptado en `WhatsappWebhookController` ANTES
+  del bot conversacional — solo si hay EXACTAMENTE una publicación
+  pendiente, si hay más de una no adivina) y "📋 Ver detalle" (manda a
+  la app). Rechazar/pedir cambios siempre se hacen en la app.
+- **Nuevo estado no-terminal**: `CAMBIOS_SOLICITADOS` — a diferencia de
+  `RECHAZADA`, el creador regenera (`PATCH :id/regenerar`) y vuelve a
+  `BORRADOR`, listo para reenviarse a aprobación cuantas veces haga
+  falta.
+- **Historial de versiones** (`PublicacionSocialVersion`, tabla hija,
+  nunca se pisa — mismo criterio que `WhatsappMensaje`): un row por
+  generación/regeneración, con el comentario del aprobador que
+  originó cada ronda.
+- **Bug real encontrado probando en vivo** (no lo agarraba ningún test
+  unitario): `WhatsappConfigRepository` usa `TenantPrismaService`
+  (request-scoped, exige `request.user.tenantId`) — llamarlo desde un
+  `@OnEvent` o desde el webhook público (sin JWT) revienta con
+  `ForbiddenException` y tumba el proceso entero. Fix: `this.prisma`
+  (global) directo en ambos casos, mismo criterio que
+  `WhatsappBotService`.
+
 ## Fases futuras (no implementadas, a propósito no se dejó nada a medio camino)
 
 - **Video** (reels/shorts): plantillas animadas (Remotion) y generación
   por IA (clips cortos concatenados, ej. Runway) — necesita una cola de
   trabajos en segundo plano (BullMQ sobre el Redis ya desplegado, hoy
   el proyecto solo tiene crons de intervalo fijo, nada on-demand).
-- Aprobación vía WhatsApp con botones nativos (Content API de Twilio +
-  plantilla de mensaje aprobada por Meta) — hoy la aprobación es
-  siempre dentro de la plataforma.
+- Rechazar o pedir cambios respondiendo texto libre por WhatsApp — solo
+  "Aprobar" tiene acción directa por botón (ver Fase 5).
 - Publicación directa en alguna red — fuera de alcance a propósito,
   ver el análisis de factibilidad previo a esta fase.
 - Elegir entre varias variantes de fondo por IA antes de guardar, y

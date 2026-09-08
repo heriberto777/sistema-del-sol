@@ -16,7 +16,7 @@ import { EstadoVacio } from '../components/molecules/EstadoVacio/EstadoVacio';
 import { RequierePermiso } from '../components/organisms/RequierePermiso/RequierePermiso';
 import { PaginaResultado } from '../types/pagina-resultado';
 
-type EstadoPublicacion = 'BORRADOR' | 'PENDIENTE_APROBACION' | 'APROBADA' | 'RECHAZADA';
+type EstadoPublicacion = 'BORRADOR' | 'PENDIENTE_APROBACION' | 'APROBADA' | 'RECHAZADA' | 'CAMBIOS_SOLICITADOS';
 
 type OfertaVisible =
   | { tipo: 'DESCUENTO'; precioConDescuento: number; ahorro: number; porcentaje: number }
@@ -29,6 +29,7 @@ interface PublicacionSocialResumen {
   estado: EstadoPublicacion;
   origen: 'FOTO_PRODUCTO' | 'IA';
   formato: FormatoPublicacion;
+  promptIa: string | null;
   producto: {
     id: string;
     nombre: string;
@@ -42,6 +43,16 @@ interface PublicacionSocialResumen {
   creadoPor: { id: string; nombre: string };
   aprobadoPor: { id: string; nombre: string } | null;
   motivoRechazo: string | null;
+  createdAt: string;
+  /** Fase 5 — historial completo, orden ascendente (la última es la vigente). */
+  versiones?: VersionPublicacion[];
+}
+
+interface VersionPublicacion {
+  id: string;
+  numero: number;
+  comentarioCambios: string | null;
+  creadoPor: { id: string; nombre: string };
   createdAt: string;
 }
 
@@ -62,6 +73,7 @@ const ETIQUETA_ESTADO: Record<EstadoPublicacion, string> = {
   PENDIENTE_APROBACION: 'Pendiente de aprobación',
   APROBADA: 'Aprobada',
   RECHAZADA: 'Rechazada',
+  CAMBIOS_SOLICITADOS: 'Cambios solicitados',
 };
 
 const TONO_ESTADO: Record<EstadoPublicacion, 'neutro' | 'advertencia' | 'exito' | 'peligro'> = {
@@ -69,6 +81,7 @@ const TONO_ESTADO: Record<EstadoPublicacion, 'neutro' | 'advertencia' | 'exito' 
   PENDIENTE_APROBACION: 'advertencia',
   APROBADA: 'exito',
   RECHAZADA: 'peligro',
+  CAMBIOS_SOLICITADOS: 'advertencia',
 };
 
 function urlImagenPublica(id: string) {
@@ -331,6 +344,11 @@ function DetallePublicacionSocial({ id, onClose, tienePermiso }: DetalleProps) {
   const queryClient = useQueryClient();
   const [formRechazoAbierto, setFormRechazoAbierto] = useState(false);
   const [motivoRechazo, setMotivoRechazo] = useState('');
+  const [formCambiosAbierto, setFormCambiosAbierto] = useState(false);
+  const [comentarioCambios, setComentarioCambios] = useState('');
+  const [regenPromptIaOverride, setRegenPromptIaOverride] = useState<string | undefined>(undefined);
+  const [regenPlantillaIdOverride, setRegenPlantillaIdOverride] = useState<string | undefined>(undefined);
+  const [regenFormatoOverride, setRegenFormatoOverride] = useState<FormatoPublicacion | undefined>(undefined);
   const [formWhatsappAbierto, setFormWhatsappAbierto] = useState(false);
   const [telefono, setTelefono] = useState('');
   const [descargando, setDescargando] = useState(false);
@@ -341,6 +359,16 @@ function DetallePublicacionSocial({ id, onClose, tienePermiso }: DetalleProps) {
     queryKey: ['publicaciones-sociales', id],
     queryFn: async () => (await apiClient.get<PublicacionSocialResumen>(`/admin/publicaciones-sociales/${id}`)).data,
   });
+
+  const { data: plantillas } = useQuery({
+    queryKey: ['publicaciones-sociales-plantillas'],
+    queryFn: async () => (await apiClient.get<PlantillaOpcion[]>('/admin/publicaciones-sociales/plantillas')).data,
+    enabled: publicacion?.estado === 'CAMBIOS_SOLICITADOS',
+  });
+
+  const regenPromptIa = regenPromptIaOverride ?? publicacion?.promptIa ?? '';
+  const regenPlantillaId = regenPlantillaIdOverride ?? publicacion?.plantilla.id ?? '';
+  const regenFormato = regenFormatoOverride ?? publicacion?.formato ?? 'CUADRADO';
 
   function invalidar() {
     queryClient.invalidateQueries({ queryKey: ['publicaciones-sociales'] });
@@ -376,6 +404,34 @@ function DetallePublicacionSocial({ id, onClose, tienePermiso }: DetalleProps) {
     onError: (err) => setError(mensajeErrorApi(err, 'No se pudo rechazar la publicación.')),
   });
 
+  const solicitarCambios = useMutation({
+    mutationFn: async () => apiClient.patch(`/admin/publicaciones-sociales/${id}/solicitar-cambios`, { comentario: comentarioCambios }),
+    onSuccess: () => {
+      setError(null);
+      setFormCambiosAbierto(false);
+      setComentarioCambios('');
+      invalidar();
+    },
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo enviar el pedido de cambios.')),
+  });
+
+  const regenerar = useMutation({
+    mutationFn: async () =>
+      apiClient.patch(`/admin/publicaciones-sociales/${id}/regenerar`, {
+        plantillaId: regenPlantillaId,
+        formato: regenFormato,
+        ...(regenPromptIa.trim() ? { promptIa: regenPromptIa.trim() } : {}),
+      }),
+    onSuccess: () => {
+      setError(null);
+      setRegenPromptIaOverride(undefined);
+      setRegenPlantillaIdOverride(undefined);
+      setRegenFormatoOverride(undefined);
+      invalidar();
+    },
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo regenerar el diseño.')),
+  });
+
   const enviarWhatsapp = useMutation({
     mutationFn: async () => apiClient.post(`/admin/publicaciones-sociales/${id}/enviar-whatsapp`, { telefono }),
     onSuccess: () => {
@@ -403,6 +459,16 @@ function DetallePublicacionSocial({ id, onClose, tienePermiso }: DetalleProps) {
   function onSubmitRechazo(e: FormEvent) {
     e.preventDefault();
     rechazar.mutate();
+  }
+
+  function onSubmitCambios(e: FormEvent) {
+    e.preventDefault();
+    solicitarCambios.mutate();
+  }
+
+  function onSubmitRegenerar(e: FormEvent) {
+    e.preventDefault();
+    regenerar.mutate();
   }
 
   function onSubmitWhatsapp(e: FormEvent) {
@@ -470,6 +536,20 @@ function DetallePublicacionSocial({ id, onClose, tienePermiso }: DetalleProps) {
               </div>
             )}
 
+            {publicacion.versiones && publicacion.versiones.length > 1 && (
+              <div>
+                <p className="text-sm text-slate-500 dark:text-slate-400">Historial de versiones</p>
+                <ul className="mt-1 space-y-1 text-sm text-slate-700 dark:text-slate-300">
+                  {publicacion.versiones.map((v) => (
+                    <li key={v.id}>
+                      <span className="font-medium">v{v.numero}</span> — {v.creadoPor.nombre} ({new Date(v.createdAt).toLocaleDateString()})
+                      {v.comentarioCambios && <span className="text-slate-500 dark:text-slate-400"> — pedido: "{v.comentarioCambios}"</span>}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
             {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
             {mensajeWhatsapp && <p className="text-sm text-emerald-600 dark:text-emerald-400">{mensajeWhatsapp}</p>}
 
@@ -480,16 +560,22 @@ function DetallePublicacionSocial({ id, onClose, tienePermiso }: DetalleProps) {
                 </Button>
               )}
 
-              {publicacion.estado === 'PENDIENTE_APROBACION' && tienePermiso('publicacionessociales.aprobar') && !formRechazoAbierto && (
-                <div className="flex gap-2">
-                  <Button onClick={() => aprobar.mutate()} disabled={aprobar.isPending}>
-                    {aprobar.isPending ? 'Aprobando…' : 'Aprobar'}
-                  </Button>
-                  <Button variante="secundario" onClick={() => setFormRechazoAbierto(true)}>
-                    Rechazar
-                  </Button>
-                </div>
-              )}
+              {publicacion.estado === 'PENDIENTE_APROBACION' &&
+                tienePermiso('publicacionessociales.aprobar') &&
+                !formRechazoAbierto &&
+                !formCambiosAbierto && (
+                  <div className="flex gap-2">
+                    <Button onClick={() => aprobar.mutate()} disabled={aprobar.isPending}>
+                      {aprobar.isPending ? 'Aprobando…' : 'Aprobar'}
+                    </Button>
+                    <Button variante="secundario" onClick={() => setFormCambiosAbierto(true)}>
+                      Solicitar cambios
+                    </Button>
+                    <Button variante="secundario" onClick={() => setFormRechazoAbierto(true)}>
+                      Rechazar
+                    </Button>
+                  </div>
+                )}
 
               {formRechazoAbierto && (
                 <form onSubmit={onSubmitRechazo} className="space-y-2 rounded-md border border-slate-200 p-3 dark:border-slate-700">
@@ -509,6 +595,80 @@ function DetallePublicacionSocial({ id, onClose, tienePermiso }: DetalleProps) {
                     </Button>
                   </div>
                 </form>
+              )}
+
+              {formCambiosAbierto && (
+                <form onSubmit={onSubmitCambios} className="space-y-2 rounded-md border border-slate-200 p-3 dark:border-slate-700">
+                  <FormField
+                    id="comentario-cambios"
+                    label="Qué hay que cambiar"
+                    value={comentarioCambios}
+                    onChange={(e) => setComentarioCambios(e.target.value)}
+                    required
+                  />
+                  <div className="flex justify-end gap-2">
+                    <Button type="button" variante="secundario" onClick={() => setFormCambiosAbierto(false)}>
+                      Cancelar
+                    </Button>
+                    <Button type="submit" disabled={solicitarCambios.isPending || !comentarioCambios.trim()}>
+                      {solicitarCambios.isPending ? 'Enviando…' : 'Enviar pedido de cambios'}
+                    </Button>
+                  </div>
+                </form>
+              )}
+
+              {publicacion.estado === 'CAMBIOS_SOLICITADOS' && (
+                <div className="space-y-3 rounded-md border border-amber-200 bg-amber-50 p-3 dark:border-amber-900/50 dark:bg-amber-900/10">
+                  <div>
+                    <p className="text-sm font-medium text-amber-800 dark:text-amber-300">Te pidieron estos cambios</p>
+                    <p className="text-sm text-slate-700 dark:text-slate-300">
+                      {publicacion.versiones?.[publicacion.versiones.length - 1]?.comentarioCambios}
+                    </p>
+                  </div>
+                  <form onSubmit={onSubmitRegenerar} className="space-y-2">
+                    <div className="flex flex-col gap-1">
+                      <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Plantilla</label>
+                      <Select value={regenPlantillaId} onChange={(e) => setRegenPlantillaIdOverride(e.target.value)}>
+                        {plantillas?.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.nombre}
+                          </option>
+                        ))}
+                      </Select>
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Formato</label>
+                      <Select value={regenFormato} onChange={(e) => setRegenFormatoOverride(e.target.value as FormatoPublicacion)}>
+                        {Object.entries(ETIQUETA_FORMATO).map(([valor, etiqueta]) => (
+                          <option key={valor} value={valor}>
+                            {etiqueta}
+                          </option>
+                        ))}
+                      </Select>
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label htmlFor="regen-prompt-ia" className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                        Ambientación con IA (opcional)
+                      </label>
+                      <textarea
+                        id="regen-prompt-ia"
+                        value={regenPromptIa}
+                        onChange={(e) => setRegenPromptIaOverride(e.target.value)}
+                        maxLength={500}
+                        rows={3}
+                        className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none transition-colors focus:border-sol-500 focus:ring-2 focus:ring-sol-500/30 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                      />
+                    </div>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      Después de regenerar, volvés a tener que pulsar "Enviar a aprobación".
+                    </p>
+                    <div className="flex justify-end">
+                      <Button type="submit" disabled={regenerar.isPending}>
+                        {regenerar.isPending ? 'Regenerando…' : 'Regenerar'}
+                      </Button>
+                    </div>
+                  </form>
+                </div>
               )}
 
               {publicacion.estado === 'APROBADA' && (

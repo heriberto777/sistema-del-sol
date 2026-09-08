@@ -22,5 +22,8 @@ import { OfertasModule } from '../ofertas/ofertas.module';
   imports: [WhatsappConfigModule, IaModule, OfertasModule],
   controllers: [PublicacionesSocialesController, PublicacionSocialImagenPublicaController],
   providers: [PublicacionesSocialesService, PublicacionesSocialesRepository, PublicacionSocialImagenPublicaService],
+  // Fase 5 — WhatsappBotModule necesita PublicacionesSocialesService para
+  // interceptar el botón "Aprobar" del webhook entrante antes del bot.
+  exports: [PublicacionesSocialesService],
 })
 export class PublicacionesSocialesModule {}

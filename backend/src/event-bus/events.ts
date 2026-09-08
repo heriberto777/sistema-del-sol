@@ -18,6 +18,10 @@ export const EVENTOS = {
   HITO_PROYECTO_POR_VENCER: 'proyectos.hito_por_vencer',
   PROYECTO_PRESUPUESTO_SUPERADO: 'proyectos.presupuesto_superado',
   HORAS_PROYECTO_REGISTRADAS: 'proyectos.horas_registradas',
+  PUBLICACION_SOCIAL_PENDIENTE_APROBACION: 'publicaciones_sociales.pendiente_aprobacion',
+  PUBLICACION_SOCIAL_CAMBIOS_SOLICITADOS: 'publicaciones_sociales.cambios_solicitados',
+  PUBLICACION_SOCIAL_APROBADA: 'publicaciones_sociales.aprobada',
+  PUBLICACION_SOCIAL_RECHAZADA: 'publicaciones_sociales.rechazada',
 } as const;
 
 export type NombreEvento = (typeof EVENTOS)[keyof typeof EVENTOS];
@@ -164,4 +168,37 @@ export interface ProyectoPresupuestoSuperadoPayload {
 export interface HorasProyectoRegistradasPayload {
   tenantId: string;
   proyectoId: string;
+}
+
+/** Emitido por PublicacionesSocialesService.enviarAAprobacion (Fase 5) — dispara el aviso a todos los usuarios con el permiso `publicacionessociales.aprobar`. */
+export interface PublicacionSocialPendienteAprobacionPayload {
+  tenantId: string;
+  publicacionId: string;
+  productoNombre: string;
+}
+
+/** Emitido por PublicacionesSocialesService.solicitarCambios (Fase 5) — avisa al creador con el comentario del aprobador. */
+export interface PublicacionSocialCambiosSolicitadosPayload {
+  tenantId: string;
+  publicacionId: string;
+  productoNombre: string;
+  creadoPorId: string;
+  comentario: string;
+}
+
+/** Emitido por PublicacionesSocialesService.cambiarEstado (Fase 5) — cierra el ciclo avisándole al creador el resultado final. */
+export interface PublicacionSocialAprobadaPayload {
+  tenantId: string;
+  publicacionId: string;
+  productoNombre: string;
+  creadoPorId: string;
+}
+
+/** Emitido por PublicacionesSocialesService.cambiarEstado (Fase 5) — mismo criterio que PublicacionSocialAprobadaPayload, incluye el motivo. */
+export interface PublicacionSocialRechazadaPayload {
+  tenantId: string;
+  publicacionId: string;
+  productoNombre: string;
+  creadoPorId: string;
+  motivoRechazo: string;
 }

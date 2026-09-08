@@ -21,6 +21,7 @@
     "permisos:backfill": "dotenv -e ../.env -- ts-node scripts/backfill-permisos.ts",
     "cuentas:backfill": "dotenv -e ../.env -- ts-node scripts/backfill-cuentas.ts",
     "configuraciones:backfill": "dotenv -e ../.env -- ts-node scripts/backfill-configuraciones.ts",
+    "notificaciones:plantillas-publicaciones-sociales:backfill": "dotenv -e ../.env -- ts-node scripts/backfill-plantillas-publicaciones-sociales.ts",
     "planes:seed": "dotenv -e ../.env -- ts-node scripts/seed-planes.ts",
     "tenant-plan:backfill": "dotenv -e ../.env -- ts-node scripts/backfill-tenant-plan.ts",
     "platform-roles:seed": "dotenv -e ../.env -- ts-node scripts/seed-platform-roles.ts",
