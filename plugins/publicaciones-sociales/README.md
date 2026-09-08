@@ -36,6 +36,24 @@ manifiesto que lee `PluginLoaderService` al boot, no el código).
   `MODULOS_BASE` — vía Plan o `TenantModuloOverride`, nunca la activa
   el propio tenant.
 
+## Fase 2 (entregada) — fondo de banner generado por IA
+
+- Antes de pasar por el Canvas de la Fase 1, un prompt de texto opcional
+  manda la foto real del producto a Gemini (`gemini-3-pro-image-preview`,
+  proveedor activo por defecto) u OpenAI (`gpt-image-1.5`, alternativa)
+  para generar un fondo/ambientación nuevo — el texto/precio se sigue
+  dibujando exacto con Canvas, ninguna IA lo escribe.
+- `backend/src/ia/generador-fondo/`: mismo patrón multi-proveedor que
+  `AnalizadorImagenService`, pero para generación (no vision) — Claude
+  no participa, no genera imágenes. Reusa las API keys de OpenAI/Gemini
+  ya guardadas en `/plataforma/configuración` → "IA para productos".
+- `PublicacionSocial.origen` (`FOTO_PRODUCTO | IA`) + `promptIa` —
+  visible como badge en el listado/detalle.
+- Límite fijo de generaciones IA por tenant por mes
+  (`PlataformaConfiguracion.iaFondoLimiteMensual`, default 20, global —
+  no por plan/tenant individual todavía) — el costo por imagen lo paga
+  la plataforma.
+
 ## Fases futuras (no implementadas, a propósito no se dejó nada a medio camino)
 
 - **Video** (reels/shorts): plantillas animadas (Remotion) y generación
@@ -47,3 +65,6 @@ manifiesto que lee `PluginLoaderService` al boot, no el código).
   siempre dentro de la plataforma.
 - Publicación directa en alguna red — fuera de alcance a propósito,
   ver el análisis de factibilidad previo a esta fase.
+- Elegir entre varias variantes de fondo por IA antes de guardar, y
+  límite configurable por plan/tenant individual (hoy es un solo número
+  global).
