@@ -37,6 +37,12 @@ export class PublicacionesSocialesService {
    *   (evita el bug real de dos precios distintos en la misma imagen).
    */
   async crear(dto: CrearPublicacionSocialDto, tenantId: string, creadoPorId: string) {
+    if (dto.formato === 'VERTICAL' && !dto.promptIa?.trim()) {
+      throw new BadRequestException(
+        'El formato vertical solo está disponible generando con IA — agregá una ambientación o elegí formato cuadrado',
+      );
+    }
+
     const producto = await this.publicacionesSocialesRepository.buscarProductoParaGenerar(dto.productoId);
     if (!producto.imagen) {
       throw new BadRequestException('Este producto no tiene foto cargada');
@@ -74,7 +80,7 @@ export class PublicacionesSocialesService {
         promptUsuario: dto.promptIa,
         tieneLogo: Boolean(logo),
       });
-      imagen = await this.generadorFondoService.generarDesdeDataUri(producto.imagen, prompt, logo);
+      imagen = await this.generadorFondoService.generarDesdeDataUri(producto.imagen, prompt, dto.formato ?? 'CUADRADO', logo);
       origenImagen = 'IA';
     } else {
       imagen = await generarImagenPublicacionSocial({
@@ -95,6 +101,7 @@ export class PublicacionesSocialesService {
       creadoPorId,
       origen: origenImagen,
       promptIa: dto.promptIa ?? null,
+      formato: dto.formato ?? 'CUADRADO',
     });
   }
 

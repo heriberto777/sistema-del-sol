@@ -1,5 +1,5 @@
 import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
-import { GeneradorFondoAdapter, ImagenGenerada, ImagenReferencia, ModeloIa } from './generador-fondo.interface';
+import { FormatoFondo, GeneradorFondoAdapter, ImagenGenerada, ImagenReferencia, ModeloIa } from './generador-fondo.interface';
 
 const EXTENSION_POR_MIME: Record<string, string> = {
   'image/jpeg': 'jpg',
@@ -26,7 +26,7 @@ export class OpenAiFondoAdapter implements GeneradorFondoAdapter {
     return Boolean(process.env.OPENAI_API_KEY);
   }
 
-  async generar(imagenBase64: string, mimeType: string, prompt: string, logo?: ImagenReferencia): Promise<ImagenGenerada> {
+  async generar(imagenBase64: string, mimeType: string, prompt: string, formato: FormatoFondo, logo?: ImagenReferencia): Promise<ImagenGenerada> {
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
       throw new ServiceUnavailableException('Generar fondo con IA no está disponible todavía (falta configurar OpenAI)');
@@ -36,7 +36,8 @@ export class OpenAiFondoAdapter implements GeneradorFondoAdapter {
     const form = new FormData();
     form.append('model', process.env.OPENAI_IMAGEN_MODEL || 'gpt-image-1.5');
     form.append('prompt', prompt);
-    form.append('size', '1024x1024');
+    // `images.edit` no soporta 9:16 exacto — 1024x1536 es la aproximación portrait (2:3) más cercana que ofrece.
+    form.append('size', formato === 'VERTICAL' ? '1024x1536' : '1024x1024');
     // `image[]` (campo repetido, no uno nuevo) — images.edit acepta
     // varias imágenes de referencia; la segunda es el logo del tenant.
     form.append('image[]', new Blob([Buffer.from(imagenBase64, 'base64')], { type: mimeType }), `producto.${extension}`);

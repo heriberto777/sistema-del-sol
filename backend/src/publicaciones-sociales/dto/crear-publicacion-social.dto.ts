@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
+import { IsIn, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
 
 export class CrearPublicacionSocialDto {
   @ApiProperty()
@@ -16,4 +16,10 @@ export class CrearPublicacionSocialDto {
   @IsString()
   @MaxLength(500)
   promptIa?: string;
+
+  /** Fase 4 — VERTICAL (Estados/Historias) solo válido junto con `promptIa` (se valida en el service); sin especificar, CUADRADO. */
+  @ApiProperty({ required: false, enum: ['CUADRADO', 'VERTICAL'] })
+  @IsOptional()
+  @IsIn(['CUADRADO', 'VERTICAL'])
+  formato?: 'CUADRADO' | 'VERTICAL';
 }

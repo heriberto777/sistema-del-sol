@@ -81,6 +81,28 @@ le vuelve a superponer Canvas encima.
   aprueba pueda comparar de un vistazo antes de aprobar — la aprobación
   humana sigue siendo la barrera real, igual que en la Fase 1.
 
+## Fase 4 (entregada) — formato por red + presets de estilo
+
+El usuario pidió poder publicar en distintas redes (Instagram, Facebook,
+WhatsApp) y no solo en el feed — explícitamente **no es video/reels**
+(sigue como fase futura grande, ver abajo), solo variedad de
+diseños/formatos de imagen.
+
+- `formato` (`CUADRADO` default / `VERTICAL`) en `PublicacionSocial`.
+  `VERTICAL` (9:16, Estados/Historias) **solo está disponible generando
+  con IA** — las 3 plantillas fijas de Canvas de la Fase 1 están
+  maquetadas en pixeles absolutos para 1080×1080; pedir `VERTICAL` sin
+  `promptIa` responde 400 con un mensaje claro
+  (`PublicacionesSocialesService.crear`).
+- Gemini soporta `generationConfig.imageConfig.aspectRatio: '9:16'`
+  directo; OpenAI's `images.edit` no tiene un tamaño 9:16 exacto —
+  `1024x1536` es la aproximación portrait (2:3) más cercana que soporta.
+- **Presets de estilo**: selector "Estilo sugerido" 100% frontend
+  (`PRESETS_ESTILO_IA` en `PublicacionesSociales.tsx`), sin tocar el
+  backend — 6 puntos de partida genéricos (sin importar el rubro del
+  negocio) que reemplazan el texto del textarea de `promptIa`, editable
+  después. Se puede ampliar la lista sin migración ni cambio de API.
+
 ## Fases futuras (no implementadas, a propósito no se dejó nada a medio camino)
 
 - **Video** (reels/shorts): plantillas animadas (Remotion) y generación
@@ -95,3 +117,6 @@ le vuelve a superponer Canvas encima.
 - Elegir entre varias variantes de fondo por IA antes de guardar, y
   límite configurable por plan/tenant individual (hoy es un solo número
   global).
+- Formato vertical para las 3 plantillas fijas de Canvas (Fase 1 sin
+  IA) — implicaría rehacer la matemática de layout de las 3.
+- Más presets de estilo, o presets editables por el tenant.

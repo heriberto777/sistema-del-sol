@@ -60,7 +60,7 @@ describe('PublicacionesSocialesService', () => {
 
       expect(generadorFondoService.generarDesdeDataUri).not.toHaveBeenCalled();
       expect(generarImagenPublicacionSocial).toHaveBeenCalled();
-      expect(repo.crear).toHaveBeenCalledWith(expect.objectContaining({ origen: 'FOTO_PRODUCTO', promptIa: null }));
+      expect(repo.crear).toHaveBeenCalledWith(expect.objectContaining({ origen: 'FOTO_PRODUCTO', promptIa: null, formato: 'CUADRADO' }));
     });
 
     it('con promptIa: arma un prompt con el precio real y NO dibuja con Canvas (evita el bug de dos precios)', async () => {
@@ -71,12 +71,33 @@ describe('PublicacionesSocialesService', () => {
       await service.crear({ productoId: 'prod1', plantillaId: 'pl1', promptIa: 'fondo de cocina moderna' }, 't1', 'u1');
 
       expect(ofertasService.resolverOfertaVisibleProducto).toHaveBeenCalledWith('prod1', null, 100);
-      const [imagenPasada, promptArmado] = generadorFondoService.generarDesdeDataUri.mock.calls[0];
+      const [imagenPasada, promptArmado, formatoPasado] = generadorFondoService.generarDesdeDataUri.mock.calls[0];
       expect(imagenPasada).toBe(PRODUCTO_CON_PRECIO.imagen);
       expect(promptArmado).toEqual(expect.stringContaining('RD$ 100.00'));
       expect(promptArmado).toEqual(expect.stringContaining('fondo de cocina moderna'));
+      expect(formatoPasado).toBe('CUADRADO');
       expect(generarImagenPublicacionSocial).not.toHaveBeenCalled();
-      expect(repo.crear).toHaveBeenCalledWith(expect.objectContaining({ origen: 'IA', promptIa: 'fondo de cocina moderna' }));
+      expect(repo.crear).toHaveBeenCalledWith(expect.objectContaining({ origen: 'IA', promptIa: 'fondo de cocina moderna', formato: 'CUADRADO' }));
+    });
+
+    it('Fase 4 — rechaza el formato VERTICAL sin promptIa', async () => {
+      await expect(
+        service.crear({ productoId: 'prod1', plantillaId: 'pl1', formato: 'VERTICAL' }, 't1', 'u1'),
+      ).rejects.toThrow(BadRequestException);
+      expect(generadorFondoService.generarDesdeDataUri).not.toHaveBeenCalled();
+      expect(repo.crear).not.toHaveBeenCalled();
+    });
+
+    it('Fase 4 — acepta VERTICAL junto con promptIa y lo reenvía/guarda', async () => {
+      repo.contarGeneracionesIaDelMes.mockResolvedValue(0);
+      repo.buscarLimiteIaFondo.mockResolvedValue(20);
+      generadorFondoService.generarDesdeDataUri.mockResolvedValue('data:image/png;base64,FONDO_IA');
+
+      await service.crear({ productoId: 'prod1', plantillaId: 'pl1', promptIa: 'fondo playero', formato: 'VERTICAL' }, 't1', 'u1');
+
+      const [, , formatoPasado] = generadorFondoService.generarDesdeDataUri.mock.calls[0];
+      expect(formatoPasado).toBe('VERTICAL');
+      expect(repo.crear).toHaveBeenCalledWith(expect.objectContaining({ formato: 'VERTICAL' }));
     });
 
     it('con oferta activa: el prompt incluye el precio con descuento real', async () => {

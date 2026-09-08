@@ -22,10 +22,13 @@ type OfertaVisible =
   | { tipo: 'DESCUENTO'; precioConDescuento: number; ahorro: number; porcentaje: number }
   | { tipo: 'BOGO'; comprarCantidad: number; llevarCantidad: number; porcentajeDescuentoLlevar: number };
 
+type FormatoPublicacion = 'CUADRADO' | 'VERTICAL';
+
 interface PublicacionSocialResumen {
   id: string;
   estado: EstadoPublicacion;
   origen: 'FOTO_PRODUCTO' | 'IA';
+  formato: FormatoPublicacion;
   producto: {
     id: string;
     nombre: string;
@@ -72,6 +75,21 @@ function urlImagenPublica(id: string) {
   return `/api/public/publicaciones-sociales/${id}/imagen`;
 }
 
+const ETIQUETA_FORMATO: Record<FormatoPublicacion, string> = {
+  CUADRADO: 'Cuadrado (feed de Instagram/Facebook)',
+  VERTICAL: 'Vertical (Estados/Historias)',
+};
+
+/** Puntos de partida genéricos, sin importar el rubro del negocio — solo frontend, reemplazan el texto del textarea (sigue editable después). */
+const PRESETS_ESTILO_IA = [
+  { etiqueta: 'Elegante y minimalista', texto: 'Diseño elegante y minimalista, fondo liso o con textura sutil, mucho espacio en blanco' },
+  { etiqueta: 'Vibrante y llamativo (oferta)', texto: 'Diseño vibrante y llamativo, colores saturados, ideal para una oferta o promoción' },
+  { etiqueta: 'Profesional y corporativo', texto: 'Diseño profesional y corporativo, colores sobrios, aspecto serio y confiable' },
+  { etiqueta: 'Cálido y acogedor', texto: 'Ambientación cálida y acogedora, luz suave, tonos tierra' },
+  { etiqueta: 'Moderno, colores vivos', texto: 'Diseño moderno con colores vivos y formas geométricas, estilo urbano' },
+  { etiqueta: 'Natural y orgánico', texto: 'Ambientación natural y orgánica, elementos vegetales, luz de día' },
+] as const;
+
 export function PublicacionesSociales() {
   const queryClient = useQueryClient();
   const { tienePermiso } = useAuth();
@@ -80,6 +98,7 @@ export function PublicacionesSociales() {
   const [productoSeleccionado, setProductoSeleccionado] = useState<ProductoOpcion | null>(null);
   const [plantillaId, setPlantillaId] = useState('');
   const [promptIa, setPromptIa] = useState('');
+  const [formato, setFormato] = useState<FormatoPublicacion>('CUADRADO');
   const [errorCrear, setErrorCrear] = useState<string | null>(null);
   const [detalleId, setDetalleId] = useState<string | null>(null);
 
@@ -101,6 +120,7 @@ export function PublicacionesSociales() {
         await apiClient.post('/admin/publicaciones-sociales', {
           productoId: productoSeleccionado?.id,
           plantillaId,
+          formato,
           ...(promptIa.trim() ? { promptIa: promptIa.trim() } : {}),
         })
       ).data as PublicacionSocialResumen,
@@ -110,6 +130,7 @@ export function PublicacionesSociales() {
       setProductoSeleccionado(null);
       setPlantillaId('');
       setPromptIa('');
+      setFormato('CUADRADO');
       setErrorCrear(null);
       setDetalleId(creada.id);
     },
@@ -216,6 +237,46 @@ export function PublicacionesSociales() {
               </div>
 
               <div className="flex flex-col gap-1">
+                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Formato</label>
+                <Select value={formato} onChange={(e) => setFormato(e.target.value as FormatoPublicacion)}>
+                  {Object.entries(ETIQUETA_FORMATO).map(([valor, etiqueta]) => (
+                    <option key={valor} value={valor}>
+                      {etiqueta}
+                    </option>
+                  ))}
+                </Select>
+                {formato === 'VERTICAL' && !promptIa.trim() && (
+                  <p className="text-xs text-amber-600 dark:text-amber-400">
+                    El formato vertical solo está disponible generando con IA — describí una ambientación abajo.
+                  </p>
+                )}
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label htmlFor="estilo-preset" className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                  Estilo sugerido (opcional)
+                </label>
+                <Select
+                  id="estilo-preset"
+                  value=""
+                  onChange={(e) => {
+                    const preset = PRESETS_ESTILO_IA.find((p) => p.etiqueta === e.target.value);
+                    if (preset) setPromptIa(preset.texto);
+                  }}
+                >
+                  <option value="">Elegí un punto de partida…</option>
+                  {PRESETS_ESTILO_IA.map((preset) => (
+                    <option key={preset.etiqueta} value={preset.etiqueta}>
+                      {preset.etiqueta}
+                    </option>
+                  ))}
+                </Select>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Reemplaza el texto de abajo con un punto de partida — podés editarlo después.
+                </p>
+              </div>
+
+              <div className="flex flex-col gap-1">
                 <label htmlFor="prompt-ia" className="text-sm font-medium text-slate-700 dark:text-slate-300">
                   Ambientación con IA (opcional)
                 </label>
@@ -241,7 +302,10 @@ export function PublicacionesSociales() {
                 <Button type="button" variante="secundario" onClick={() => setModalCrearAbierto(false)}>
                   Cancelar
                 </Button>
-                <Button type="submit" disabled={crear.isPending || !productoSeleccionado || !plantillaId}>
+                <Button
+                  type="submit"
+                  disabled={crear.isPending || !productoSeleccionado || !plantillaId || (formato === 'VERTICAL' && !promptIa.trim())}
+                >
                   {crear.isPending ? 'Generando…' : 'Generar diseño'}
                 </Button>
               </div>
@@ -393,6 +457,7 @@ function DetallePublicacionSocial({ id, onClose, tienePermiso }: DetalleProps) {
                 {publicacion.plantilla.nombre}
                 {publicacion.origen === 'IA' && <Badge tono="neutro">Generado con IA</Badge>}
               </p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">{ETIQUETA_FORMATO[publicacion.formato]}</p>
             </div>
             <div>
               <p className="text-sm text-slate-500 dark:text-slate-400">Estado</p>

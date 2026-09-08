@@ -3957,6 +3957,14 @@ enum OrigenImagenPublicacionSocial {
   IA
 }
 
+// Fase 4 — formato de salida. VERTICAL (9:16, Estados/Historias) solo
+// disponible generando con IA — las 3 plantillas fijas de Canvas están
+// maquetadas en pixeles absolutos para 1080x1080, siempre CUADRADO.
+enum FormatoPublicacionSocial {
+  CUADRADO
+  VERTICAL
+}
+
 /// Catálogo GLOBAL de plantillas de banner (no tenant-scoped, mismo
 /// trato que Modulo/Plan) — sembrado desde
 /// PLANTILLAS_PUBLICACION_SOCIAL_BASE vía
@@ -4003,6 +4011,7 @@ model PublicacionSocial {
   // se pidió IA, sin tocar el resto del flujo de Fase 1.
   origen   OrigenImagenPublicacionSocial @default(FOTO_PRODUCTO)
   promptIa String?
+  formato  FormatoPublicacionSocial      @default(CUADRADO)
 
   createdAt DateTime @default(now())
 

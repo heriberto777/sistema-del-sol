@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { EstadoPublicacionSocial, OrigenImagenPublicacionSocial } from '@prisma/client';
+import { EstadoPublicacionSocial, FormatoPublicacionSocial, OrigenImagenPublicacionSocial } from '@prisma/client';
 import { TenantPrismaService } from '../prisma/tenant-prisma.service';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -42,6 +42,7 @@ export class PublicacionesSocialesRepository {
     creadoPorId: string;
     origen: OrigenImagenPublicacionSocial;
     promptIa: string | null;
+    formato: FormatoPublicacionSocial;
   }) {
     return this.db.publicacionSocial.create({ data, include: INCLUDE_PUBLICACION });
   }

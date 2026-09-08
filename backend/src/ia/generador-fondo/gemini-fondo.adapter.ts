@@ -1,5 +1,5 @@
 import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
-import { GeneradorFondoAdapter, ImagenGenerada, ImagenReferencia, ModeloIa } from './generador-fondo.interface';
+import { FormatoFondo, GeneradorFondoAdapter, ImagenGenerada, ImagenReferencia, ModeloIa } from './generador-fondo.interface';
 
 /**
  * `generateContent` de Gemini con `responseModalities: ['IMAGE']`
@@ -17,7 +17,7 @@ export class GeminiFondoAdapter implements GeneradorFondoAdapter {
     return Boolean(process.env.GEMINI_API_KEY);
   }
 
-  async generar(imagenBase64: string, mimeType: string, prompt: string, logo?: ImagenReferencia): Promise<ImagenGenerada> {
+  async generar(imagenBase64: string, mimeType: string, prompt: string, formato: FormatoFondo, logo?: ImagenReferencia): Promise<ImagenGenerada> {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
       throw new ServiceUnavailableException('Generar fondo con IA no está disponible todavía (falta configurar Gemini)');
@@ -37,7 +37,7 @@ export class GeminiFondoAdapter implements GeneradorFondoAdapter {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: [{ parts }],
-          generationConfig: { responseModalities: ['IMAGE'], imageConfig: { aspectRatio: '1:1' } },
+          generationConfig: { responseModalities: ['IMAGE'], imageConfig: { aspectRatio: formato === 'VERTICAL' ? '9:16' : '1:1' } },
         }),
       });
     } catch (error) {
