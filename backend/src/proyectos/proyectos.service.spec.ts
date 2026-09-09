@@ -62,6 +62,21 @@ describe('ProyectosService', () => {
     });
   });
 
+  describe('miEmpleadoId', () => {
+    it('devuelve el id del empleado vinculado al usuario logueado', async () => {
+      empleadosRepository.buscarPorUserId = jest.fn().mockResolvedValue({ id: 'e1' });
+      const resultado = await service.miEmpleadoId('u1');
+      expect(empleadosRepository.buscarPorUserId).toHaveBeenCalledWith('u1');
+      expect(resultado).toBe('e1');
+    });
+
+    it('devuelve null si el usuario no tiene ningún empleado de RRHH vinculado', async () => {
+      empleadosRepository.buscarPorUserId = jest.fn().mockResolvedValue(null);
+      const resultado = await service.miEmpleadoId('u1');
+      expect(resultado).toBeNull();
+    });
+  });
+
   describe('costoHoraEmpleado', () => {
     it('resuelve el salario del empleado y la config de horas laborables, y calcula el costo por hora', async () => {
       const resultado = await service.costoHoraEmpleado('e1', 't1');
@@ -217,6 +232,42 @@ describe('ProyectosService', () => {
       const resultado = await service.calcularRentabilidad('p1', 't1');
       expect(resultado.facturado).toBe(0);
       expect(resultado.margenPorcentaje).toBeNull();
+    });
+  });
+
+  describe('calcularCostoHorasPorHito', () => {
+    it('valida que el proyecto exista y pertenezca al tenant (404 si no)', async () => {
+      repository.buscarProyectoPorId.mockRejectedValue(new Error('no encontrado'));
+      await expect(service.calcularCostoHorasPorHito('p1', 't1')).rejects.toThrow('no encontrado');
+    });
+
+    it('devuelve un objeto vacío si ninguna tarea tiene hito u horas cargadas', async () => {
+      repository.buscarProyectoPorId.mockResolvedValue({ id: 'p1', tareas: [] } as never);
+      const resultado = await service.calcularCostoHorasPorHito('p1', 't1');
+      expect(resultado).toEqual({});
+    });
+
+    it('agrupa por hito, sumando el costo de horas de todos los empleados de todas sus tareas, e ignora las tareas sin hito', async () => {
+      repository.buscarProyectoPorId.mockResolvedValue({
+        id: 'p1',
+        tareas: [
+          { hitoId: 'h1', registrosHoras: [{ empleadoId: 'e1', horas: 10 }, { empleadoId: 'e2', horas: 5 }] },
+          { hitoId: 'h1', registrosHoras: [{ empleadoId: 'e1', horas: 2 }] },
+          { hitoId: 'h2', registrosHoras: [{ empleadoId: 'e1', horas: 3 }] },
+          { hitoId: null, registrosHoras: [{ empleadoId: 'e1', horas: 100 }] },
+        ],
+      } as never);
+      empleadosRepository.buscarPorId.mockImplementation(((id: string) =>
+        Promise.resolve({ id, salarioBrutoMensual: id === 'e1' ? '34666' : '17333' })) as never);
+
+      const resultado = await service.calcularCostoHorasPorHito('p1', 't1');
+
+      // costoHora e1 ≈ 200/h, e2 ≈ 100/h (mismos valores que el resto del spec)
+      expect(resultado.h1.horasTotales).toBe(17); // 10 + 5 + 2
+      expect(resultado.h1.costoHoras).toBeCloseTo(12 * 200 + 5 * 100, 0); // 2900
+      expect(resultado.h2.horasTotales).toBe(3);
+      expect(resultado.h2.costoHoras).toBeCloseTo(3 * 200, 0);
+      expect(resultado['sin-hito']).toBeUndefined();
     });
   });
 });

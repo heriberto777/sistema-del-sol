@@ -36,6 +36,13 @@ export class ProyectosController {
     return this.proyectosService.listarEmpleadosDisponibles();
   }
 
+  // Fase 6 (cronómetro) — ruta literal antes de ':id' por el mismo motivo que 'empleados'.
+  @Get('mi-empleado')
+  @Permissions('proyectos.ver')
+  async miEmpleado(@CurrentUser() user: JwtPayloadUser) {
+    return { empleadoId: await this.proyectosService.miEmpleadoId(user.userId) };
+  }
+
   @Get(':id')
   @Permissions('proyectos.ver')
   buscarPorId(@Param('id') id: string) {
@@ -48,6 +55,15 @@ export class ProyectosController {
   @Permissions('proyectos.rentabilidad.ver')
   calcularRentabilidad(@Param('id') id: string, @CurrentUser() user: JwtPayloadUser) {
     return this.proyectosService.calcularRentabilidad(id, user.tenantId);
+  }
+
+  // Fase 5 — mismo permiso que `rentabilidad` (deriva del salario de los
+  // empleados): costo interno de horas ya cargadas, por Hito, para avisar
+  // en la UI si el `montoFijo` pactado no lo cubre.
+  @Get(':id/costo-horas-hitos')
+  @Permissions('proyectos.rentabilidad.ver')
+  calcularCostoHorasHitos(@Param('id') id: string, @CurrentUser() user: JwtPayloadUser) {
+    return this.proyectosService.calcularCostoHorasPorHito(id, user.tenantId);
   }
 
   @Patch(':id')

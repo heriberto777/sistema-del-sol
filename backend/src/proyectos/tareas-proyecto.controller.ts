@@ -70,4 +70,21 @@ export class TareasProyectoController {
   eliminarRegistroHora(@Param('id') id: string) {
     return this.tareasProyectoService.eliminarRegistroHora(id);
   }
+
+  // ---------- Cronómetro (Fase 6) ----------
+  // Mismo permiso que registrar hora manual — un empleado con
+  // `proyectos.horas.registrar` puede correr su propio cronómetro sin
+  // necesitar `.editar`.
+
+  @Post('tareas/:id/cronometro/iniciar')
+  @Permissions('proyectos.horas.registrar')
+  iniciarCronometro(@Param('id') id: string, @CurrentUser() user: JwtPayloadUser) {
+    return this.tareasProyectoService.iniciarSesionTrabajo(id, user.userId);
+  }
+
+  @Post('tareas/:id/cronometro/pausar')
+  @Permissions('proyectos.horas.registrar')
+  pausarCronometro(@Param('id') id: string, @CurrentUser() user: JwtPayloadUser) {
+    return this.tareasProyectoService.pausarSesionTrabajo(id, user.userId);
+  }
 }

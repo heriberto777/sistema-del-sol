@@ -121,6 +121,7 @@ model Tenant {
   hitosProyecto             HitoProyecto[]
   tareasProyecto            TareaProyecto[]
   registrosHoraProyecto     RegistroHoraProyecto[]
+  sesionesTrabajoTarea      SesionTrabajoTarea[]
   publicacionesSociales     PublicacionSocial[]
 
   @@map("tenants")
@@ -1707,6 +1708,7 @@ model Empleado {
   proyectosResponsable      Proyecto[]
   tareasProyectoResponsable TareaProyectoResponsable[]
   registrosHoraProyecto     RegistroHoraProyecto[]
+  sesionesTrabajoTarea      SesionTrabajoTarea[]
 
   @@unique([tenantId, cedula])
   @@map("empleados")
@@ -3943,10 +3945,32 @@ model TareaProyecto {
   createdAt        DateTime               @default(now())
   updatedAt        DateTime               @updatedAt
 
-  responsables   TareaProyectoResponsable[]
-  registrosHoras RegistroHoraProyecto[]
+  responsables    TareaProyectoResponsable[]
+  registrosHoras  RegistroHoraProyecto[]
+  sesionesTrabajo SesionTrabajoTarea[]
 
   @@map("tareas_proyecto")
+}
+
+/// Fase 6 — cronómetro real por tarea/empleado ("Iniciar"/"Pausar" en el
+/// Tablero). `fin = null` significa sesión ABIERTA (corriendo ahora mismo);
+/// al pausar se completa `fin` y se crea automáticamente el
+/// `RegistroHoraProyecto` correspondiente — la sesión en sí nunca se usa
+/// directo para facturar/rentabilidad, sigue siendo siempre
+/// `RegistroHoraProyecto` (así `facturarHito`/`calcularRentabilidad`/
+/// `calcularCostoHorasPorHito` no necesitan saber que esto existe).
+model SesionTrabajoTarea {
+  id         String        @id @default(uuid())
+  tenantId   String
+  tenant     Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tareaId    String
+  tarea      TareaProyecto @relation(fields: [tareaId], references: [id], onDelete: Cascade)
+  empleadoId String
+  empleado   Empleado      @relation(fields: [empleadoId], references: [id])
+  inicio     DateTime      @default(now())
+  fin        DateTime?
+
+  @@map("sesiones_trabajo_tarea")
 }
 
 /// Tabla hija sin tenantId propio (mismo patrón que LineaFactura/

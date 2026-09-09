@@ -19,6 +19,14 @@ export interface Responsable {
   empleado: { id: string; nombre: string };
 }
 
+/** Fase 6 — cronómetro. El backend solo devuelve las ABIERTAS (fin siempre null acá). */
+export interface SesionTrabajo {
+  id: string;
+  empleadoId: string;
+  empleado: { id: string; nombre: string };
+  inicio: string;
+}
+
 export interface Tarea {
   id: string;
   titulo: string;
@@ -29,6 +37,7 @@ export interface Tarea {
   fechaVencimiento: string | null;
   responsables: Responsable[];
   registrosHoras: RegistroHora[];
+  sesionesTrabajo: SesionTrabajo[];
 }
 
 export interface ProyectoDetalleDto {

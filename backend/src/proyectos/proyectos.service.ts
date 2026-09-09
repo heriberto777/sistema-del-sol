@@ -42,6 +42,17 @@ export class ProyectosService {
   }
 
   /**
+   * "¿Quién soy yo como empleado?" (Fase 6, cronómetro) — el frontend lo
+   * necesita para decidir si muestra "Iniciar" o "Pausar" en cada tarea,
+   * sin exponer nada del salario (a diferencia de `costoHoraEmpleado`).
+   * `null` si el usuario logueado no tiene un Empleado de RRHH vinculado.
+   */
+  async miEmpleadoId(userId: string): Promise<string | null> {
+    const empleado = await this.empleadosRepository.buscarPorUserId(userId);
+    return empleado?.id ?? null;
+  }
+
+  /**
    * Lista liviana de empleados para los selects de "responsable"
    * (Proyecto/Tarea) — mismo criterio que `PosService.listarVendedores`:
    * expuesta bajo el permiso de ESTE módulo (`proyectos.ver`), no
@@ -168,5 +179,49 @@ export class ProyectosService {
     const margenPorcentaje = facturado > 0 ? (margen / facturado) * 100 : null;
 
     return { facturado, costoHoras, costoGastos, costoTotal, margen, margenPorcentaje };
+  }
+
+  /**
+   * Costo interno estimado (salario de los empleados) de las horas YA
+   * cargadas en las tareas de cada Hito de este proyecto — para que la UI
+   * pueda avisar si `HitoProyecto.montoFijo` (lo pactado con el cliente) no
+   * alcanza a cubrir lo que en verdad costó ese trabajo. Mismo permiso que
+   * `calcularRentabilidad` (`proyectos.rentabilidad.ver`): también deriva
+   * del salario de los empleados.
+   *
+   * Reusa `buscarPorId` (ya trae `tareas[].registrosHoras` con `empleadoId`)
+   * en vez de una query de agregación nueva — el volumen de horas de un
+   * proyecto es chico, y así no hay que sumarle a Prisma un `groupBy` por
+   * un campo (`hitoId`) que vive en la tabla padre (`TareaProyecto`), no en
+   * `RegistroHoraProyecto`.
+   */
+  async calcularCostoHorasPorHito(proyectoId: string, tenantId: string): Promise<Record<string, { horasTotales: number; costoHoras: number }>> {
+    const proyecto = await this.buscarPorId(proyectoId); // 404 si el proyecto no existe/no es de este tenant
+
+    const horasPorHitoYEmpleado = new Map<string, Map<string, number>>();
+    for (const tarea of proyecto.tareas) {
+      if (!tarea.hitoId) continue;
+      const porEmpleado = horasPorHitoYEmpleado.get(tarea.hitoId) ?? new Map<string, number>();
+      horasPorHitoYEmpleado.set(tarea.hitoId, porEmpleado);
+      for (const registro of tarea.registrosHoras) {
+        porEmpleado.set(registro.empleadoId, (porEmpleado.get(registro.empleadoId) ?? 0) + Number(registro.horas));
+      }
+    }
+
+    const costoPorEmpleado = new Map<string, number>();
+    const resultado: Record<string, { horasTotales: number; costoHoras: number }> = {};
+    for (const [hitoId, porEmpleado] of horasPorHitoYEmpleado) {
+      let horasTotales = 0;
+      let costoHoras = 0;
+      for (const [empleadoId, horas] of porEmpleado) {
+        if (!costoPorEmpleado.has(empleadoId)) {
+          costoPorEmpleado.set(empleadoId, await this.costoHoraEmpleado(empleadoId, tenantId));
+        }
+        horasTotales += horas;
+        costoHoras += horas * costoPorEmpleado.get(empleadoId)!;
+      }
+      resultado[hitoId] = { horasTotales, costoHoras };
+    }
+    return resultado;
   }
 }

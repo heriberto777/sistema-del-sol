@@ -44,6 +44,7 @@ BEGIN
       'carritos_borrador', 'pedidos_tienda', 'secciones_tienda',
       'tenant_dominios',
       'proyectos', 'hitos_proyecto', 'tareas_proyecto', 'registros_hora_proyecto',
+      'sesiones_trabajo_tarea',
       'publicaciones_sociales'
     ])
   LOOP

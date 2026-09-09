@@ -14,6 +14,10 @@ const INCLUDE_PROYECTO = {
 const INCLUDE_TAREA = {
   responsables: { include: { empleado: { select: { id: true, nombre: true } } } },
   registrosHoras: { include: { empleado: { select: { id: true, nombre: true } } }, orderBy: { fecha: 'desc' as const } },
+  // Fase 6 — solo las ABIERTAS (fin: null): son las que la UI necesita para
+  // decidir "Iniciar" vs "Pausar" y mostrar el tiempo corriendo; las
+  // cerradas ya viven como filas normales de `registrosHoras`.
+  sesionesTrabajo: { where: { fin: null }, include: { empleado: { select: { id: true, nombre: true } } } },
 } as const;
 
 /**
@@ -157,6 +161,31 @@ export class ProyectosRepository {
 
   eliminarTarea(id: string) {
     return this.db.tareaProyecto.delete({ where: { id } });
+  }
+
+  // ---------- Sesiones de trabajo (cronómetro, Fase 6) ----------
+
+  /** Sesión abierta de este empleado en CUALQUIER tarea — un cronómetro a la vez por empleado. */
+  buscarSesionAbiertaDelEmpleado(empleadoId: string) {
+    return this.db.sesionTrabajoTarea.findFirst({ where: { empleadoId, fin: null } });
+  }
+
+  /** La sesión abierta de ESTE empleado en ESTA tarea puntual (para pausarla). */
+  buscarSesionAbiertaDeTareaYEmpleado(tareaId: string, empleadoId: string) {
+    return this.db.sesionTrabajoTarea.findFirst({ where: { tareaId, empleadoId, fin: null } });
+  }
+
+  /** Todas las sesiones abiertas de una tarea (puede haber una por cada responsable) — para pausarlas todas al cerrar la tarea. */
+  buscarSesionesAbiertasDeTarea(tareaId: string) {
+    return this.db.sesionTrabajoTarea.findMany({ where: { tareaId, fin: null } });
+  }
+
+  crearSesionTrabajo(tareaId: string, empleadoId: string, tenantId: string) {
+    return this.db.sesionTrabajoTarea.create({ data: { tareaId, empleadoId, tenantId } });
+  }
+
+  cerrarSesionTrabajo(id: string, fin: Date) {
+    return this.db.sesionTrabajoTarea.update({ where: { id }, data: { fin } });
   }
 
   // ---------- Responsables de tarea ----------

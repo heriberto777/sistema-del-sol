@@ -1,6 +1,7 @@
-import { DragEvent, useEffect, useState } from 'react';
+import { DragEvent, MouseEvent, useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
+import { Pause, Play } from 'lucide-react';
 import { apiClient } from '../../../lib/api-client';
 import { mensajeErrorApi } from '../../../lib/mensaje-error-api';
 import { Button } from '../../atoms/Button/Button';
@@ -13,6 +14,23 @@ import { RowActionsMenu } from '../../molecules/RowActionsMenu/RowActionsMenu';
 import { RequierePermiso } from '../RequierePermiso/RequierePermiso';
 import { TareaFormModal, TareaFormValues } from '../TareaFormModal/TareaFormModal';
 import { EmpleadoOpcion, ESTILO_PRIORIDAD_TAREA, ETIQUETA_PRIORIDAD_TAREA, Hito, Tarea } from '../../../types/proyectos';
+
+/** Re-renderiza el Kanban cada `intervaloMs` para que el tiempo del cronómetro corriendo se vea en vivo, sin pedirle nada nuevo al backend hasta que se pause. */
+function useAhora(intervaloMs: number): number {
+  const [ahora, setAhora] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setAhora(Date.now()), intervaloMs);
+    return () => clearInterval(id);
+  }, [intervaloMs]);
+  return ahora;
+}
+
+function formatearDuracion(ms: number): string {
+  const minutos = Math.max(0, Math.floor(ms / 60_000));
+  const horas = Math.floor(minutos / 60);
+  const minutosRestantes = minutos % 60;
+  return horas > 0 ? `${horas}h ${minutosRestantes}m` : `${minutosRestantes}m`;
+}
 
 const CLAVE_VISTA = 'proyectos-kanban-vista';
 
@@ -57,10 +75,19 @@ export function KanbanTareas({ proyectoId, tareas, hitos, onInvalidar, onError }
   const [tareaEditando, setTareaEditando] = useState<Tarea | null>(null);
   const [tareaAEliminar, setTareaAEliminar] = useState<Tarea | null>(null);
   const [errorForm, setErrorForm] = useState<string | null>(null);
+  const ahora = useAhora(30_000);
 
   useEffect(() => {
     localStorage.setItem(CLAVE_VISTA, vista);
   }, [vista]);
+
+  // Fase 6 — "¿quién soy yo como empleado?" para saber si el cronómetro de
+  // esta tarea es mío (mostrar Pausar) o de otro responsable (solo lectura).
+  const { data: miEmpleado } = useQuery({
+    queryKey: ['proyectos-mi-empleado'],
+    queryFn: async () => (await apiClient.get<{ empleadoId: string | null }>('/admin/proyectos/mi-empleado')).data,
+  });
+  const miEmpleadoId = miEmpleado?.empleadoId ?? null;
 
   const { data: empleados } = useQuery({
     queryKey: ['proyectos-empleados-opciones'],
@@ -111,6 +138,18 @@ export function KanbanTareas({ proyectoId, tareas, hitos, onInvalidar, onError }
     onError: (err) => onError(mensajeErrorApi(err, 'No se pudo cambiar el estado de la tarea.')),
   });
 
+  const iniciarCronometro = useMutation({
+    mutationFn: async (tareaId: string) => apiClient.post(`/admin/proyectos/tareas/${tareaId}/cronometro/iniciar`),
+    onSuccess: invalidar,
+    onError: (err) => onError(mensajeErrorApi(err, 'No se pudo iniciar el cronómetro.')),
+  });
+
+  const pausarCronometro = useMutation({
+    mutationFn: async (tareaId: string) => apiClient.post(`/admin/proyectos/tareas/${tareaId}/cronometro/pausar`),
+    onSuccess: invalidar,
+    onError: (err) => onError(mensajeErrorApi(err, 'No se pudo pausar el cronómetro.')),
+  });
+
   const asignarResponsable = useMutation({
     mutationFn: async ({ tareaId, empleadoId }: { tareaId: string; empleadoId: string }) =>
       apiClient.post(`/admin/proyectos/tareas/${tareaId}/responsables/${empleadoId}`),
@@ -154,6 +193,70 @@ export function KanbanTareas({ proyectoId, tareas, hitos, onInvalidar, onError }
       { etiqueta: 'Editar', onClick: () => setTareaEditando(t) },
       { etiqueta: 'Eliminar', tono: 'peligro' as const, onClick: () => setTareaAEliminar(t) },
     ];
+  }
+
+  function alternarCronometro(e: MouseEvent, tareaId: string, corriendo: boolean) {
+    e.stopPropagation();
+    if (corriendo) pausarCronometro.mutate(tareaId);
+    else iniciarCronometro.mutate(tareaId);
+  }
+
+  /** Chip completo (vista Clásico) — botón Iniciar/Pausar si soy responsable, más quién más está trabajando ahora mismo. */
+  function chipCronometro(t: Tarea) {
+    const miSesion = t.sesionesTrabajo.find((s) => s.empleadoId === miEmpleadoId);
+    const otras = t.sesionesTrabajo.filter((s) => s.empleadoId !== miEmpleadoId);
+    const soyResponsable = miEmpleadoId != null && t.responsables.some((r) => r.empleado.id === miEmpleadoId);
+    if (!soyResponsable && otras.length === 0) return null;
+    return (
+      <div className="flex items-center gap-2">
+        {soyResponsable && (
+          <button
+            type="button"
+            onClick={(e) => alternarCronometro(e, t.id, !!miSesion)}
+            disabled={iniciarCronometro.isPending || pausarCronometro.isPending}
+            className={clsx(
+              'flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold',
+              miSesion
+                ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
+                : 'bg-slate-100 text-slate-500 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400',
+            )}
+          >
+            {miSesion ? <Pause size={10} /> : <Play size={10} />}
+            {miSesion ? formatearDuracion(ahora - new Date(miSesion.inicio).getTime()) : 'Iniciar'}
+          </button>
+        )}
+        {otras.length > 0 && (
+          <span
+            className="flex items-center gap-1 text-[10px] font-medium text-emerald-600 dark:text-emerald-400"
+            title={otras.map((s) => s.empleado.nombre).join(', ')}
+          >
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+            {otras.length === 1 ? otras[0].empleado.nombre : `${otras.length} trabajando`}
+          </span>
+        )}
+      </div>
+    );
+  }
+
+  /** Icono compacto (vista Compacto) — mismo control, sin duración a la vista para no romper la fila angosta. */
+  function iconoCronometro(t: Tarea) {
+    const miSesion = t.sesionesTrabajo.find((s) => s.empleadoId === miEmpleadoId);
+    const soyResponsable = miEmpleadoId != null && t.responsables.some((r) => r.empleado.id === miEmpleadoId);
+    if (!soyResponsable) return null;
+    return (
+      <button
+        type="button"
+        onClick={(e) => alternarCronometro(e, t.id, !!miSesion)}
+        disabled={iniciarCronometro.isPending || pausarCronometro.isPending}
+        title={miSesion ? `Pausar (${formatearDuracion(ahora - new Date(miSesion.inicio).getTime())})` : 'Iniciar cronómetro'}
+        className={clsx(
+          'shrink-0 rounded p-0.5',
+          miSesion ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300',
+        )}
+      >
+        {miSesion ? <Pause size={12} /> : <Play size={12} />}
+      </button>
+    );
   }
 
   return (
@@ -260,6 +363,7 @@ export function KanbanTareas({ proyectoId, tareas, hitos, onInvalidar, onError }
                               </div>
                             )}
                           </div>
+                          {chipCronometro(t)}
                           {t.fechaVencimiento && (
                             <p className="text-xs text-slate-400">Vence {new Date(t.fechaVencimiento).toLocaleDateString('es-DO')}</p>
                           )}
@@ -276,8 +380,12 @@ export function KanbanTareas({ proyectoId, tareas, hitos, onInvalidar, onError }
                           <div className="flex min-w-0 items-center gap-2">
                             <span className={clsx('h-2 w-2 shrink-0 rounded-full', PUNTO_PRIORIDAD[t.prioridad])} />
                             <span className="truncate font-medium text-slate-800 dark:text-slate-200">{t.titulo}</span>
+                            {t.sesionesTrabajo.some((s) => s.empleadoId !== miEmpleadoId) && (
+                              <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" title="alguien más está trabajando en esto ahora" />
+                            )}
                           </div>
-                          <div onClick={(e) => e.stopPropagation()}>
+                          <div className="flex shrink-0 items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                            {iconoCronometro(t)}
                             <RowActionsMenu acciones={accionesTarea(t)} />
                           </div>
                         </div>
