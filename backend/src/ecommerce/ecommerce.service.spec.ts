@@ -551,6 +551,34 @@ describe('EcommerceService', () => {
         await service.crearSeccion({ tipo: 'MINIGRID', titulo: 'X', categoriaIds } as never, 't1');
         expect(seccionesTiendaRepository.crear).toHaveBeenCalledWith('t1', { tipo: 'MINIGRID', titulo: 'X', categoriaIds });
       });
+
+      it('FRANJA_CONFIANZA con 1 solo ítem: rechaza (mínimo 2)', async () => {
+        await expect(
+          service.crearSeccion({ tipo: 'FRANJA_CONFIANZA', titulo: 'X', contenido: [{ icono: 'Truck', texto: 'Envíos' }] } as never, 't1'),
+        ).rejects.toThrow(BadRequestException);
+      });
+
+      it('FRANJA_CONFIANZA con 5 ítems: rechaza (máximo 4)', async () => {
+        const contenido = Array.from({ length: 5 }, (_, i) => ({ icono: 'Truck', texto: `Item ${i}` }));
+        await expect(service.crearSeccion({ tipo: 'FRANJA_CONFIANZA', titulo: 'X', contenido } as never, 't1')).rejects.toThrow(
+          BadRequestException,
+        );
+      });
+
+      it('FRANJA_CONFIANZA con 3 ítems: crea', async () => {
+        const contenido = [
+          { icono: 'Truck', texto: 'Envíos' },
+          { icono: 'ShieldCheck', texto: 'Pago seguro' },
+          { icono: 'ShoppingCart', texto: 'Compra fácil' },
+        ];
+        await service.crearSeccion({ tipo: 'FRANJA_CONFIANZA', titulo: 'X', contenido } as never, 't1');
+        expect(seccionesTiendaRepository.crear).toHaveBeenCalledWith('t1', { tipo: 'FRANJA_CONFIANZA', titulo: 'X', contenido });
+      });
+
+      it.each(['HERO', 'DESTACADOS', 'OFERTAS'] as const)('%s solo necesita título: crea sin nada más', async (tipo) => {
+        await service.crearSeccion({ tipo, titulo: 'X' } as never, 't1');
+        expect(seccionesTiendaRepository.crear).toHaveBeenCalledWith('t1', { tipo, titulo: 'X' });
+      });
     });
 
     describe('actualizarSeccion — combina con lo ya guardado antes de revalidar', () => {

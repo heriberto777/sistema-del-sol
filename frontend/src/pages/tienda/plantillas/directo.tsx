@@ -5,8 +5,6 @@ import { formatearPrecio, useOfertasTienda, useProductosDestacados, useSecciones
 import { useClienteTienda } from '../../../hooks/useClienteTienda';
 import { useCarritoDrawer } from '../CarritoDrawerContext';
 import { BannerAnuncio } from '../BannerAnuncio';
-import { SeccionDestacados } from '../SeccionDestacados';
-import { SeccionOfertas } from '../SeccionOfertas';
 import { SeccionesDinamicas } from '../SeccionesDinamicas';
 import { ProductosRelacionados } from '../ProductosRelacionados';
 import { FilaPrecioOferta } from '../OfertaEnTarjeta';
@@ -82,19 +80,7 @@ function DirectoHome({ config, subdominio, carrito }: PropsHome) {
       <BannerAnuncio mensajes={config.bannerAnuncio.mensajes} intervaloSegundos={config.bannerAnuncio.intervaloSegundos} />
       <Nav nombre={config.nombre} logo={config.logo} subdominio={subdominio} cantidadCarrito={carrito.cantidadTotal} accent={accent} />
 
-      <div className="max-w-xl px-6 pb-14 pt-16 sm:px-10">
-        <div className="mb-3 text-xs font-bold uppercase tracking-wider" style={{ color: accent }}>
-          Bienvenido
-        </div>
-        <h1 className="mb-4 text-4xl font-extrabold leading-tight tracking-tight" style={{ fontFamily: FONT_DISPLAY }}>
-          {config.nombre}
-        </h1>
-        <p className="text-sm leading-relaxed text-[#7a7266] dark:text-[#b6ab97]">Todo el surtido, con precio y disponibilidad reales.</p>
-      </div>
-
-      <SeccionDestacados productos={destacados} subdominio={subdominio} defaults={defaults} estiloInsignia={config.tema.estiloInsigniaOferta} estiloInsigniaSinStock={config.tema.estiloInsigniaSinStock} />
-      <SeccionOfertas ofertas={ofertas} defaults={defaults} mostrar={config.tema.mostrarSeccionOfertas} />
-      <SeccionesDinamicas secciones={secciones} subdominio={subdominio} defaults={defaults} estiloInsignia={config.tema.estiloInsigniaOferta} estiloInsigniaSinStock={config.tema.estiloInsigniaSinStock} />
+      <SeccionesDinamicas secciones={secciones} destacados={destacados} ofertas={ofertas} subdominio={subdominio} defaults={defaults} estiloInsignia={config.tema.estiloInsigniaOferta} estiloInsigniaSinStock={config.tema.estiloInsigniaSinStock} />
 
       <Footer nombre={config.nombre} />
     </div>

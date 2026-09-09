@@ -5,8 +5,6 @@ import { formatearPrecio, useOfertasTienda, useProductosDestacados, useSecciones
 import { useClienteTienda } from '../../../hooks/useClienteTienda';
 import { useCarritoDrawer } from '../CarritoDrawerContext';
 import { BannerAnuncio } from '../BannerAnuncio';
-import { SeccionDestacados } from '../SeccionDestacados';
-import { SeccionOfertas } from '../SeccionOfertas';
 import { SeccionesDinamicas } from '../SeccionesDinamicas';
 import { ProductosRelacionados } from '../ProductosRelacionados';
 import { FilaPrecioOferta } from '../OfertaEnTarjeta';
@@ -67,26 +65,10 @@ function BoutiqueHome({ config, subdominio, carrito }: PropsHome) {
       <BannerAnuncio mensajes={config.bannerAnuncio.mensajes} intervaloSegundos={config.bannerAnuncio.intervaloSegundos} colorAcento={accent} />
       <Nav nombre={config.nombre} logo={config.logo} subdominio={subdominio} cantidadCarrito={carrito.cantidadTotal} accent={accent} />
 
-      <div className="px-8 py-16 text-center sm:py-20">
-        <div className="text-[11px] font-medium uppercase tracking-[0.22em]" style={{ color: accent }}>
-          Colección
-        </div>
-        <h1 className="mx-auto my-4 max-w-xl text-4xl font-semibold sm:text-5xl" style={{ fontFamily: FONT_DISPLAY }}>
-          {config.nombre}
-        </h1>
-        <p className="mx-auto max-w-md text-sm leading-relaxed text-[#bdb2a1]">Piezas seleccionadas, disponibilidad real.</p>
-      </div>
-
-      <SeccionDestacados
-        productos={destacados}
-        subdominio={subdominio}
-        defaults={{ acento: accent, ...DEFAULTS_COMPARTIDOS }}
-        estiloInsignia={config.tema.estiloInsigniaOferta}
-        estiloInsigniaSinStock={config.tema.estiloInsigniaSinStock}
-      />
-      <SeccionOfertas ofertas={ofertas} defaults={{ acento: accent, ...DEFAULTS_COMPARTIDOS }} mostrar={config.tema.mostrarSeccionOfertas} />
       <SeccionesDinamicas
         secciones={secciones}
+        destacados={destacados}
+        ofertas={ofertas}
         subdominio={subdominio}
         defaults={{ acento: accent, ...DEFAULTS_COMPARTIDOS }}
         estiloInsignia={config.tema.estiloInsigniaOferta}

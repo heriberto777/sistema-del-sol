@@ -455,6 +455,7 @@ export class EcommerceService {
       categoriaId: dto.categoriaId !== undefined ? dto.categoriaId : (actual.categoriaId ?? undefined),
       productoIds: dto.productoIds ?? actual.productos.map((p) => p.productoId),
       categoriaIds: dto.categoriaIds ?? actual.categorias.map((c) => c.categoriaId),
+      contenido: dto.contenido !== undefined ? dto.contenido : ((actual.contenido as { icono: string; texto: string }[] | null) ?? undefined),
     };
     this.validarTipoSeccion(combinado);
     return this.seccionesTiendaRepository.actualizar(id, dto);
@@ -473,8 +474,10 @@ export class EcommerceService {
    * (todos nullable), se valida acá, mismo criterio que
    * `OfertasService.validarAlcance`. `BANNER` comparte la validación de
    * `PRODUCTOS` (misma tabla `productos`, solo cambia el renderizado).
+   * `HERO`/`DESTACADOS`/`OFERTAS` no necesitan nada más allá de
+   * `titulo` (ya obligatorio en el DTO base).
    */
-  private validarTipoSeccion(dto: Pick<CrearSeccionTiendaDto, 'tipo' | 'categoriaId' | 'productoIds' | 'categoriaIds'>) {
+  private validarTipoSeccion(dto: Pick<CrearSeccionTiendaDto, 'tipo' | 'categoriaId' | 'productoIds' | 'categoriaIds' | 'contenido'>) {
     if (dto.tipo === 'PRODUCTOS' || dto.tipo === 'BANNER') {
       if (!dto.productoIds || dto.productoIds.length === 0) {
         throw new BadRequestException(`Una sección de tipo ${dto.tipo} necesita al menos un producto elegido a mano`);
@@ -484,6 +487,10 @@ export class EcommerceService {
     } else if (dto.tipo === 'MINIGRID') {
       if (!dto.categoriaIds || dto.categoriaIds.length < 2 || dto.categoriaIds.length > 4) {
         throw new BadRequestException('Una sección de tipo MINIGRID necesita entre 2 y 4 categorías');
+      }
+    } else if (dto.tipo === 'FRANJA_CONFIANZA') {
+      if (!dto.contenido || dto.contenido.length < 2 || dto.contenido.length > 4) {
+        throw new BadRequestException('Una sección de tipo FRANJA_CONFIANZA necesita entre 2 y 4 ítems');
       }
     }
   }

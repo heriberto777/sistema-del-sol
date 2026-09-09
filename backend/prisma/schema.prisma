@@ -3597,6 +3597,23 @@ enum TipoSeccionTienda {
   BANNER
   /// 2 a 4 categorías en mini-tarjetas lado a lado.
   MINIGRID
+  /// Home 100% dinámico — reemplaza el bloque de bienvenida hardcodeado
+  /// que tenía cada plantilla. Usa titulo/subtitulo/imagen(fondo)/color
+  /// ya existentes, sin campos nuevos.
+  HERO
+  /// Home 100% dinámico — reemplaza <SeccionDestacados> hardcodeada.
+  /// Solo controla titulo/orden/visibilidad — los productos siguen
+  /// siendo los que tengan Producto.destacado=true, sin cambios.
+  DESTACADOS
+  /// Home 100% dinámico — reemplaza <SeccionOfertas> hardcodeada (antes
+  /// un toggle global en tema.mostrarSeccionOfertas). Solo controla
+  /// titulo/orden/visibilidad — las ofertas siguen siendo las vigentes
+  /// del motor de Ofertas, sin cambios.
+  OFERTAS
+  /// Home 100% dinámico — generaliza bloques únicos tipo "franja de
+  /// confianza" (ej. Vitrina: Envío/Pago seguro/Compra fácil). Lista de
+  /// 2 a 4 ítems ícono+texto en `contenido`.
+  FRANJA_CONFIANZA
 }
 
 /// Constructor de secciones del Home de la Tienda Online (Fase 17,
@@ -3615,13 +3632,17 @@ model SeccionTienda {
   titulo      String
   subtitulo   String?
   ctaTexto    String?
-  /// Solo CATEGORIA — decorativa, la tarjeta ya linkea a `categoriaId`; sin uso en PRODUCTOS/BANNER/MINIGRID.
+  /// Solo CATEGORIA — decorativa, la tarjeta ya linkea a `categoriaId`; sin uso en PRODUCTOS/BANNER/MINIGRID. También usada por HERO como imagen de fondo.
   imagen      String?           @db.Text
   color       String?
   categoriaId String?
   categoria   Categoria?        @relation("SeccionCategoriaUnica", fields: [categoriaId], references: [id], onDelete: Cascade)
   orden       Int               @default(0)
   activa      Boolean           @default(true)
+  /// Config flexible por tipo — hoy solo FRANJA_CONFIANZA la usa (lista
+  /// de 2-4 {icono, texto}). El resto de los tipos usa los campos ya
+  /// existentes (titulo/subtitulo/imagen/color) y deja esto en null.
+  contenido   Json?
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
 

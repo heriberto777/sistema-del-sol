@@ -5,8 +5,6 @@ import { formatearPrecio, useOfertasTienda, useProductosDestacados, useSecciones
 import { useClienteTienda } from '../../../hooks/useClienteTienda';
 import { useCarritoDrawer } from '../CarritoDrawerContext';
 import { BannerAnuncio } from '../BannerAnuncio';
-import { SeccionDestacados } from '../SeccionDestacados';
-import { SeccionOfertas } from '../SeccionOfertas';
 import { SeccionesDinamicas } from '../SeccionesDinamicas';
 import { ProductosRelacionados } from '../ProductosRelacionados';
 import { FilaPrecioOferta } from '../OfertaEnTarjeta';
@@ -129,21 +127,7 @@ function BazarHome({ config, subdominio, carrito }: PropsHome) {
         </div>
       </form>
 
-      <div className="p-4 sm:p-6">
-        <div className="rounded-lg p-8 text-white sm:p-12" style={{ background: `linear-gradient(120deg, ${HEADER_BG}, ${HEADER_BG_2})`, borderRadius: 'var(--tienda-radio-tarjeta)' }}>
-          <div className="mb-2 text-[0.7em] font-bold uppercase tracking-[0.08em]" style={{ color: 'var(--tienda-color-acento)' }}>
-            Bienvenido a
-          </div>
-          <h1 className="mb-2 max-w-lg text-[1.9em] font-extrabold leading-tight" style={{ fontFamily: 'var(--tienda-fuente-display)' }}>
-            {nombre}
-          </h1>
-          <p className="max-w-md text-[0.85em] text-white/70">Encontrá lo que buscás — catálogo completo, precio y disponibilidad reales.</p>
-        </div>
-      </div>
-
-      <SeccionOfertas ofertas={ofertas} mostrar={tema.mostrarSeccionOfertas} />
-      <SeccionDestacados productos={destacados} subdominio={subdominio} estiloInsignia={tema.estiloInsigniaOferta} estiloInsigniaSinStock={tema.estiloInsigniaSinStock} />
-      <SeccionesDinamicas secciones={secciones} subdominio={subdominio} estiloInsignia={tema.estiloInsigniaOferta} estiloInsigniaSinStock={tema.estiloInsigniaSinStock} />
+      <SeccionesDinamicas secciones={secciones} destacados={destacados} ofertas={ofertas} subdominio={subdominio} estiloInsignia={tema.estiloInsigniaOferta} estiloInsigniaSinStock={tema.estiloInsigniaSinStock} />
 
       <div className="mx-4 mb-6 overflow-hidden sm:mx-6" style={{ borderRadius: 'var(--tienda-radio-tarjeta)' }}>
         {config.banner ? (

@@ -5,8 +5,6 @@ import { formatearPrecio, useOfertasTienda, useProductosDestacados, useSecciones
 import { useClienteTienda } from '../../../hooks/useClienteTienda';
 import { useCarritoDrawer } from '../CarritoDrawerContext';
 import { BannerAnuncio } from '../BannerAnuncio';
-import { SeccionDestacados } from '../SeccionDestacados';
-import { SeccionOfertas } from '../SeccionOfertas';
 import { SeccionesDinamicas } from '../SeccionesDinamicas';
 import { ProductosRelacionados } from '../ProductosRelacionados';
 import { FilaPrecioOferta } from '../OfertaEnTarjeta';
@@ -132,19 +130,7 @@ function BloqueHome({ config, subdominio, carrito }: PropsHome) {
       <BannerAnuncio mensajes={config.bannerAnuncio.mensajes} intervaloSegundos={config.bannerAnuncio.intervaloSegundos} />
       <Nav nombre={nombre} logo={logo} subdominio={subdominio} cantidadCarrito={carrito.cantidadTotal} menu={menu} />
 
-      <div className="px-6 pb-6 pt-12 sm:px-10">
-        <div className="mb-2 text-[0.72em] font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--tienda-color-acento)' }}>
-          Nueva colección
-        </div>
-        <h1 className="mb-2 text-[2.6em] uppercase leading-[0.95]" style={{ fontFamily: 'var(--tienda-fuente-display)' }}>
-          {nombre}
-        </h1>
-        <p className="max-w-md text-[0.85em] opacity-60">Piezas limitadas, sin restock — lo que se agota, se agotó.</p>
-      </div>
-
-      <SeccionDestacados productos={destacados} subdominio={subdominio} estiloInsignia={tema.estiloInsigniaOferta} estiloInsigniaSinStock={tema.estiloInsigniaSinStock} />
-      <SeccionOfertas ofertas={ofertas} mostrar={tema.mostrarSeccionOfertas} />
-      <SeccionesDinamicas secciones={secciones} subdominio={subdominio} estiloInsignia={tema.estiloInsigniaOferta} estiloInsigniaSinStock={tema.estiloInsigniaSinStock} />
+      <SeccionesDinamicas secciones={secciones} destacados={destacados} ofertas={ofertas} subdominio={subdominio} estiloInsignia={tema.estiloInsigniaOferta} estiloInsigniaSinStock={tema.estiloInsigniaSinStock} />
 
       <Footer nombre={nombre} />
     </div>

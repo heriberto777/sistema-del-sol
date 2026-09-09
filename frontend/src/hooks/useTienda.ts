@@ -197,7 +197,12 @@ export function useCategoriasTienda(subdominio: string) {
   });
 }
 
-export type TipoSeccionTienda = 'PRODUCTOS' | 'CATEGORIA' | 'BANNER' | 'MINIGRID';
+export type TipoSeccionTienda = 'PRODUCTOS' | 'CATEGORIA' | 'BANNER' | 'MINIGRID' | 'HERO' | 'DESTACADOS' | 'OFERTAS' | 'FRANJA_CONFIANZA';
+
+export interface ItemFranjaConfianza {
+  icono: string;
+  texto: string;
+}
 
 /**
  * Bloque del Home armado por el admin (Fase 17, "Secciones Dinámicas") —
@@ -214,6 +219,8 @@ export interface SeccionTienda {
   ctaTexto: string | null;
   imagen: string | null;
   color: string | null;
+  /** Solo FRANJA_CONFIANZA (2-4 ítems ícono+texto) — null en el resto de los tipos. */
+  contenido: ItemFranjaConfianza[] | null;
   categoria: { id: string; nombre: string } | null;
   categorias: { id: string; nombre: string }[];
   productos: ProductoTienda[];

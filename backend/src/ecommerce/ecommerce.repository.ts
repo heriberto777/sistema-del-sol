@@ -430,6 +430,7 @@ export class EcommerceRepository {
         ctaTexto: true,
         imagen: true,
         color: true,
+        contenido: true,
         categoria: { select: { id: true, nombre: true } },
         categorias: { orderBy: { orden: 'asc' }, select: { categoria: { select: { id: true, nombre: true } } } },
         productos: { orderBy: { orden: 'asc' }, select: { productoId: true } },

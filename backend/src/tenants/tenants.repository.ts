@@ -86,6 +86,17 @@ export class TenantsRepository {
           configuraciones: {
             create: Object.entries(CONFIGURACIONES_BASE).map(([clave, valor]) => ({ clave, valor })),
           },
+          // Home 100% dinámico (Fase 18) — sin esto, un tenant nuevo
+          // vería la Tienda vacía entre Nav y Footer hasta que alguien
+          // entre a "Secciones del Home" a crear algo. Título/subtítulo
+          // genéricos, editables desde el día uno.
+          seccionesTienda: {
+            create: [
+              { tipo: 'HERO', titulo: params.nombre, subtitulo: 'Bienvenido a nuestra tienda', orden: 0 },
+              { tipo: 'DESTACADOS', titulo: 'Destacados', orden: 1 },
+              { tipo: 'OFERTAS', titulo: 'Ofertas', orden: 2 },
+            ],
+          },
         },
       });
 

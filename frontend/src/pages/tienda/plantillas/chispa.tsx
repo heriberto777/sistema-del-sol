@@ -5,8 +5,6 @@ import { formatearPrecio, useOfertasTienda, useProductosDestacados, useSecciones
 import { useClienteTienda } from '../../../hooks/useClienteTienda';
 import { useCarritoDrawer } from '../CarritoDrawerContext';
 import { BannerAnuncio } from '../BannerAnuncio';
-import { SeccionDestacados } from '../SeccionDestacados';
-import { SeccionOfertas } from '../SeccionOfertas';
 import { SeccionesDinamicas } from '../SeccionesDinamicas';
 import { ProductosRelacionados } from '../ProductosRelacionados';
 import { FilaPrecioOferta } from '../OfertaEnTarjeta';
@@ -108,19 +106,8 @@ function ChispaHome({ config, subdominio, carrito }: PropsHome) {
     <div className="min-h-screen bg-[var(--tienda-color-fondo)] text-[var(--tienda-color-texto)]" style={{ ...variablesCssTema(tema, DEFAULTS, modo), fontFamily: 'var(--tienda-fuente-body)', fontSize: 'var(--tienda-tamano-fuente)' }}>
       <BannerAnuncio mensajes={config.bannerAnuncio.mensajes} intervaloSegundos={config.bannerAnuncio.intervaloSegundos} />
       <Nav nombre={nombre} logo={logo} subdominio={subdominio} cantidadCarrito={carrito.cantidadTotal} menu={menu} />
-      <div className="mx-4 rounded-[28px] px-6 py-10 text-center sm:mx-10" style={{ background: 'linear-gradient(120deg, color-mix(in srgb, var(--tienda-color-acento) 22%, var(--tienda-color-fondo)), color-mix(in srgb, #6a3bff 18%, var(--tienda-color-fondo)))' }}>
-        <div className="mb-2 text-[0.7em] font-bold uppercase tracking-[0.1em]" style={{ color: 'var(--tienda-color-acento)' }}>
-          Restock
-        </div>
-        <h1 className="mb-2 text-[1.7em] font-bold" style={{ fontFamily: 'var(--tienda-fuente-display)' }}>
-          {nombre}
-        </h1>
-        <p className="mx-auto max-w-sm text-[0.85em] opacity-70">Accesorios y regalitos que alegran el feed y el bolsillo.</p>
-      </div>
 
-      <SeccionDestacados productos={destacados} subdominio={subdominio} estiloInsignia={tema.estiloInsigniaOferta} estiloInsigniaSinStock={tema.estiloInsigniaSinStock} />
-      <SeccionOfertas ofertas={ofertas} mostrar={tema.mostrarSeccionOfertas} />
-      <SeccionesDinamicas secciones={secciones} subdominio={subdominio} estiloInsignia={tema.estiloInsigniaOferta} estiloInsigniaSinStock={tema.estiloInsigniaSinStock} />
+      <SeccionesDinamicas secciones={secciones} destacados={destacados} ofertas={ofertas} subdominio={subdominio} estiloInsignia={tema.estiloInsigniaOferta} estiloInsigniaSinStock={tema.estiloInsigniaSinStock} />
 
       <Footer nombre={nombre} />
     </div>

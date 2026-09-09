@@ -5,8 +5,6 @@ import { formatearPrecio, useOfertasTienda, useProductosDestacados, useSecciones
 import { useClienteTienda } from '../../../hooks/useClienteTienda';
 import { useCarritoDrawer } from '../CarritoDrawerContext';
 import { BannerAnuncio } from '../BannerAnuncio';
-import { SeccionDestacados } from '../SeccionDestacados';
-import { SeccionOfertas } from '../SeccionOfertas';
 import { SeccionesDinamicas } from '../SeccionesDinamicas';
 import { ProductosRelacionados } from '../ProductosRelacionados';
 import { FilaPrecioOferta } from '../OfertaEnTarjeta';
@@ -106,19 +104,8 @@ function NodoHome({ config, subdominio, carrito }: PropsHome) {
     <div className="min-h-screen bg-[var(--tienda-color-fondo)] text-[var(--tienda-color-texto)]" style={{ ...variablesCssTema(tema, DEFAULTS, modo), fontFamily: 'var(--tienda-fuente-body)', fontSize: 'var(--tienda-tamano-fuente)' }}>
       <BannerAnuncio mensajes={config.bannerAnuncio.mensajes} intervaloSegundos={config.bannerAnuncio.intervaloSegundos} />
       <Nav nombre={nombre} logo={logo} subdominio={subdominio} cantidadCarrito={carrito.cantidadTotal} menu={menu} />
-      <div className="max-w-md px-6 pb-6 pt-14 sm:px-10">
-        <div className="mb-2 text-[0.7em] font-semibold uppercase tracking-[0.1em]" style={{ color: 'var(--tienda-color-acento)' }}>
-          Nuevo
-        </div>
-        <h1 className="mb-3 text-[1.9em] font-bold leading-tight" style={{ fontFamily: 'var(--tienda-fuente-display)' }}>
-          {nombre}
-        </h1>
-        <p className="text-[0.85em] opacity-60">Lo último en tecnología, con garantía y soporte local.</p>
-      </div>
 
-      <SeccionDestacados productos={destacados} subdominio={subdominio} estiloInsignia={tema.estiloInsigniaOferta} estiloInsigniaSinStock={tema.estiloInsigniaSinStock} />
-      <SeccionOfertas ofertas={ofertas} mostrar={tema.mostrarSeccionOfertas} />
-      <SeccionesDinamicas secciones={secciones} subdominio={subdominio} estiloInsignia={tema.estiloInsigniaOferta} estiloInsigniaSinStock={tema.estiloInsigniaSinStock} />
+      <SeccionesDinamicas secciones={secciones} destacados={destacados} ofertas={ofertas} subdominio={subdominio} estiloInsignia={tema.estiloInsigniaOferta} estiloInsigniaSinStock={tema.estiloInsigniaSinStock} />
 
       <Footer nombre={nombre} />
     </div>

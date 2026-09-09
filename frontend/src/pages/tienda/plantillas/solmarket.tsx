@@ -5,8 +5,6 @@ import { formatearPrecio, useOfertasTienda, useProductosDestacados, useSecciones
 import { useClienteTienda } from '../../../hooks/useClienteTienda';
 import { useCarritoDrawer } from '../CarritoDrawerContext';
 import { BannerAnuncio } from '../BannerAnuncio';
-import { SeccionDestacados } from '../SeccionDestacados';
-import { SeccionOfertas } from '../SeccionOfertas';
 import { SeccionesDinamicas } from '../SeccionesDinamicas';
 import { ProductosRelacionados } from '../ProductosRelacionados';
 import { FilaPrecioOferta } from '../OfertaEnTarjeta';
@@ -108,10 +106,6 @@ function SolMarketHome({ config, subdominio, carrito }: PropsHome) {
       <Nav nombre={nombre} logo={logo} subdominio={subdominio} cantidadCarrito={carrito.cantidadTotal} menu={menu} />
 
       <div className="mx-4 mb-6 overflow-hidden p-8 text-center sm:mx-6 sm:p-14" style={{ borderRadius: 'var(--tienda-radio-tarjeta)', background: 'linear-gradient(120deg, var(--tienda-color-acento), #ff3d81 55%, #7a2bd1)' }}>
-        <h1 className="mx-auto mb-3 max-w-lg text-[1.9em] font-bold leading-tight text-white sm:text-[2.3em]" style={{ fontFamily: 'var(--tienda-fuente-display)' }}>
-          {nombre}
-        </h1>
-        <p className="mx-auto mb-6 max-w-sm text-[0.85em] text-white/80">Piezas seleccionadas, todo bajo el mismo sol.</p>
         <form
           className="relative mx-auto max-w-md"
           onSubmit={(e) => {
@@ -129,9 +123,7 @@ function SolMarketHome({ config, subdominio, carrito }: PropsHome) {
         </form>
       </div>
 
-      <SeccionOfertas ofertas={ofertas} mostrar={tema.mostrarSeccionOfertas} />
-      <SeccionDestacados productos={destacados} subdominio={subdominio} estiloInsignia={tema.estiloInsigniaOferta} estiloInsigniaSinStock={tema.estiloInsigniaSinStock} />
-      <SeccionesDinamicas secciones={secciones} subdominio={subdominio} estiloInsignia={tema.estiloInsigniaOferta} estiloInsigniaSinStock={tema.estiloInsigniaSinStock} />
+      <SeccionesDinamicas secciones={secciones} destacados={destacados} ofertas={ofertas} subdominio={subdominio} estiloInsignia={tema.estiloInsigniaOferta} estiloInsigniaSinStock={tema.estiloInsigniaSinStock} />
 
       <Link
         to={`/tienda/${subdominio}/productos`}

@@ -1,12 +1,10 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Minus, Plus, Search, ShieldCheck, ShoppingCart, Trash2, Truck, User } from 'lucide-react';
+import { Minus, Plus, Search, ShoppingCart, Trash2, User } from 'lucide-react';
 import { formatearPrecio, useOfertasTienda, useProductosDestacados, useSeccionesTienda } from '../../../hooks/useTienda';
 import { useClienteTienda } from '../../../hooks/useClienteTienda';
 import { useCarritoDrawer } from '../CarritoDrawerContext';
 import { BannerAnuncio } from '../BannerAnuncio';
-import { SeccionDestacados } from '../SeccionDestacados';
-import { SeccionOfertas } from '../SeccionOfertas';
 import { SeccionesDinamicas } from '../SeccionesDinamicas';
 import { ProductosRelacionados } from '../ProductosRelacionados';
 import { FilaPrecioOferta } from '../OfertaEnTarjeta';
@@ -130,22 +128,14 @@ function VitrinaHome({ config, subdominio, carrito }: PropsHome) {
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-3 px-4 pb-6 text-center sm:px-6">
-        {[
-          { icon: Truck, label: 'Envío a todo el país' },
-          { icon: ShieldCheck, label: 'Pago seguro' },
-          { icon: ShoppingCart, label: 'Compra fácil' },
-        ].map(({ icon: Icon, label }) => (
-          <div key={label} className="flex flex-col items-center gap-1.5 bg-[var(--tienda-color-superficie)] p-3" style={{ borderRadius: 'var(--tienda-radio-tarjeta)', boxShadow: 'var(--tienda-sombra-tarjeta)' }}>
-            <Icon size={18} style={{ color: 'var(--tienda-color-acento)' }} />
-            <span className="text-[0.68em] font-semibold opacity-70">{label}</span>
-          </div>
-        ))}
-      </div>
-
-      <SeccionOfertas ofertas={ofertas} mostrar={tema.mostrarSeccionOfertas} />
-      <SeccionDestacados productos={destacados} subdominio={subdominio} estiloInsignia={tema.estiloInsigniaOferta} estiloInsigniaSinStock={tema.estiloInsigniaSinStock} />
-      <SeccionesDinamicas secciones={secciones} subdominio={subdominio} estiloInsignia={tema.estiloInsigniaOferta} estiloInsigniaSinStock={tema.estiloInsigniaSinStock} />
+      <SeccionesDinamicas
+        secciones={secciones}
+        destacados={destacados}
+        ofertas={ofertas}
+        subdominio={subdominio}
+        estiloInsignia={tema.estiloInsigniaOferta}
+        estiloInsigniaSinStock={tema.estiloInsigniaSinStock}
+      />
 
       <Link
         to={`/tienda/${subdominio}/productos`}

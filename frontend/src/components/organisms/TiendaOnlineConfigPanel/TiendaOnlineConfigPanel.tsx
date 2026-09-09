@@ -147,7 +147,6 @@ const TEMA_DEFAULT: TemaTienda = {
   proporcionImagen: 'CUADRADA',
   menu: MENU_DEFAULT,
   estiloInsigniaOferta: 'CLASICO',
-  mostrarSeccionOfertas: true,
   estiloInsigniaSinStock: 'ETIQUETA',
 };
 
@@ -748,17 +747,10 @@ export function TiendaOnlineConfigPanel() {
             {seccion === 'ofertas' && (
               <div className="divide-y divide-slate-100 dark:divide-slate-800">
                 <SeccionPersonalizacion titulo="Sección de Ofertas" descripcion='Franja informativa con las ofertas vigentes (ej. "10% OFF en Camisas"), arriba del catálogo en el Home.'>
-                  <label className="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-300">
-                    <input
-                      type="checkbox"
-                      checked={tema.mostrarSeccionOfertas}
-                      onChange={(e) => setTema({ ...tema, mostrarSeccionOfertas: e.target.checked })}
-                      className="h-4 w-4 rounded"
-                    />
-                    Mostrar la sección de Ofertas en el Home
-                  </label>
                   <p className="text-xs text-slate-500 dark:text-slate-400">
-                    Apagarla no oculta la insignia de oferta en cada producto (más abajo) — solo esta franja aparte.
+                    Para mostrarla, ocultarla o cambiarle el título, andá a la pestaña "Secciones del Home" — ahí es una
+                    sección más, como cualquier otra, y podés reordenarla. Apagarla no oculta la insignia de oferta en
+                    cada producto (más abajo) — solo esta franja aparte.
                   </p>
                 </SeccionPersonalizacion>
 

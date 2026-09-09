@@ -9,12 +9,15 @@ export function SeccionDestacados({
   defaults,
   estiloInsignia = 'CLASICO',
   estiloInsigniaSinStock = 'ETIQUETA',
+  titulo = 'Destacados',
 }: {
   productos: ProductoTienda[];
   subdominio: string;
   defaults?: DefaultsColorTienda;
   estiloInsignia?: EstiloInsigniaOfertaTienda;
   estiloInsigniaSinStock?: EstiloInsigniaSinStockTienda;
+  /** Home 100% dinámico (Fase 18) — título editable desde "Secciones del Home"; sin eso, sigue siendo "Destacados". */
+  titulo?: string;
 }) {
   if (!productos.length) return null;
   return (
@@ -23,7 +26,7 @@ export function SeccionDestacados({
         className="mb-3 text-[1.05em] font-semibold"
         style={{ fontFamily: 'var(--tienda-fuente-display, inherit)', color: `var(--tienda-color-texto, ${defaults?.texto ?? 'inherit'})` }}
       >
-        Destacados
+        {titulo}
       </h2>
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         {productos.map((p) => (

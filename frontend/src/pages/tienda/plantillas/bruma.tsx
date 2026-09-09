@@ -5,8 +5,6 @@ import { formatearPrecio, useOfertasTienda, useProductosDestacados, useSecciones
 import { useClienteTienda } from '../../../hooks/useClienteTienda';
 import { useCarritoDrawer } from '../CarritoDrawerContext';
 import { BannerAnuncio } from '../BannerAnuncio';
-import { SeccionDestacados } from '../SeccionDestacados';
-import { SeccionOfertas } from '../SeccionOfertas';
 import { SeccionesDinamicas } from '../SeccionesDinamicas';
 import { ProductosRelacionados } from '../ProductosRelacionados';
 import { FilaPrecioOferta } from '../OfertaEnTarjeta';
@@ -128,19 +126,7 @@ function BrumaHome({ config, subdominio, carrito }: PropsHome) {
       <BannerAnuncio mensajes={config.bannerAnuncio.mensajes} intervaloSegundos={config.bannerAnuncio.intervaloSegundos} />
       <Nav nombre={nombre} logo={logo} subdominio={subdominio} cantidadCarrito={carrito.cantidadTotal} menu={menu} />
 
-      <div className="px-6 pb-8 pt-14 text-center sm:px-10">
-        <div className="mb-3 text-[0.7em] font-bold uppercase tracking-[0.12em]" style={{ color: 'var(--tienda-color-acento)' }}>
-          Edición cápsula
-        </div>
-        <h1 className="mx-auto mb-3 max-w-lg text-[1.9em] font-semibold leading-tight" style={{ fontFamily: 'var(--tienda-fuente-display)' }}>
-          {nombre}
-        </h1>
-        <p className="mx-auto max-w-md text-[0.85em] leading-relaxed opacity-70">Fórmulas simples, empaques honestos — pensado para vos.</p>
-      </div>
-
-      <SeccionDestacados productos={destacados} subdominio={subdominio} estiloInsignia={tema.estiloInsigniaOferta} estiloInsigniaSinStock={tema.estiloInsigniaSinStock} />
-      <SeccionOfertas ofertas={ofertas} mostrar={tema.mostrarSeccionOfertas} />
-      <SeccionesDinamicas secciones={secciones} subdominio={subdominio} estiloInsignia={tema.estiloInsigniaOferta} estiloInsigniaSinStock={tema.estiloInsigniaSinStock} />
+      <SeccionesDinamicas secciones={secciones} destacados={destacados} ofertas={ofertas} subdominio={subdominio} estiloInsignia={tema.estiloInsigniaOferta} estiloInsigniaSinStock={tema.estiloInsigniaSinStock} />
 
       <Footer nombre={nombre} />
     </div>

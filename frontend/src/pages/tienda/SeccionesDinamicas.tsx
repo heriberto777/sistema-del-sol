@@ -1,8 +1,12 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { formatearPrecio, SeccionTienda } from '../../hooks/useTienda';
+import { formatearPrecio, OfertaTienda, ProductoTienda, SeccionTienda } from '../../hooks/useTienda';
 import { TarjetaProductoTienda, DefaultsColorTienda } from './TarjetaProductoTienda';
 import { EstiloInsigniaOfertaTienda, EstiloInsigniaSinStockTienda } from './tema';
+import { SeccionDestacados } from './SeccionDestacados';
+import { SeccionOfertas } from './SeccionOfertas';
+import { SeccionHero } from './SeccionHero';
+import { SeccionFranjaConfianza } from './SeccionFranjaConfianza';
 
 interface PropsComunes {
   subdominio: string;
@@ -12,19 +16,43 @@ interface PropsComunes {
 }
 
 /**
- * Secciones del Home armadas por el admin (Fase 17, "Secciones
- * Dinámicas") — componente compartido entre las 17 plantillas, mismo
- * criterio que `SeccionDestacados`/`SeccionOfertas`: no renderiza nada si
- * el admin no creó ninguna, así el Home de un tenant que nunca las usó
- * queda exactamente igual que antes. `BANNER` reusa la misma data que
- * `PRODUCTOS` (el backend ya las resuelve igual) — solo cambia a
- * slideshow en vez de grilla.
+ * Home 100% administrable (Fase 18) — único punto que arma TODO el
+ * contenido entre Nav y Footer, en el orden que definió el admin desde
+ * "Secciones del Home". Antes de esto, cada una de las 17 plantillas
+ * tenía su propio Hero hardcodeado en JSX + llamadas separadas a
+ * `<SeccionDestacados>`/`<SeccionOfertas>` en posiciones fijas — ahora
+ * esas 3 son secciones más (tipos HERO/DESTACADOS/OFERTAS), reordenables
+ * y ocultables igual que PRODUCTOS/CATEGORIA/BANNER/MINIGRID/
+ * FRANJA_CONFIANZA. `destacados`/`ofertas` siguen viniendo de sus hooks
+ * de siempre (`useProductosDestacados`/`useOfertasTienda`) — DESTACADOS/
+ * OFERTAS solo controlan título/orden/visibilidad, nunca reinventan esa
+ * data.
  */
-export function SeccionesDinamicas({ secciones, ...props }: PropsComunes & { secciones: SeccionTienda[] }) {
+export function SeccionesDinamicas({
+  secciones,
+  destacados = [],
+  ofertas = [],
+  ...props
+}: PropsComunes & { secciones: SeccionTienda[]; destacados?: ProductoTienda[]; ofertas?: OfertaTienda[] }) {
   if (!secciones.length) return null;
   return (
     <>
       {secciones.map((s) => {
+        if (s.tipo === 'HERO') return <SeccionHero key={s.id} titulo={s.titulo} subtitulo={s.subtitulo} imagen={s.imagen} color={s.color} ctaTexto={s.ctaTexto} defaults={props.defaults} />;
+        if (s.tipo === 'DESTACADOS')
+          return (
+            <SeccionDestacados
+              key={s.id}
+              productos={destacados}
+              subdominio={props.subdominio}
+              defaults={props.defaults}
+              estiloInsignia={props.estiloInsignia}
+              estiloInsigniaSinStock={props.estiloInsigniaSinStock}
+              titulo={s.titulo}
+            />
+          );
+        if (s.tipo === 'OFERTAS') return <SeccionOfertas key={s.id} ofertas={ofertas} defaults={props.defaults} titulo={s.titulo} />;
+        if (s.tipo === 'FRANJA_CONFIANZA') return <SeccionFranjaConfianza key={s.id} items={s.contenido ?? []} titulo={s.titulo} defaults={props.defaults} />;
         if (s.tipo === 'PRODUCTOS') return <SeccionProductos key={s.id} seccion={s} {...props} />;
         if (s.tipo === 'BANNER') return <SeccionBanner key={s.id} seccion={s} subdominio={props.subdominio} />;
         if (s.tipo === 'CATEGORIA') return <SeccionCategoria key={s.id} seccion={s} {...props} />;

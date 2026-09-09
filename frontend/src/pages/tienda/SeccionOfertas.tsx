@@ -6,11 +6,14 @@ export function SeccionOfertas({
   ofertas,
   defaults,
   mostrar = true,
+  titulo = 'Ofertas',
 }: {
   ofertas: OfertaTienda[];
   defaults?: DefaultsColorTienda;
   /** Fase 16 — el admin puede apagar esta sección desde Personalización (independiente de la insignia por producto, que sigue mostrándose siempre). */
   mostrar?: boolean;
+  /** Home 100% dinámico (Fase 18) — título editable desde "Secciones del Home"; sin eso, sigue siendo "Ofertas". */
+  titulo?: string;
 }) {
   if (!mostrar || !ofertas.length) return null;
   const acento = defaults?.acento ?? '#111827';
@@ -19,7 +22,7 @@ export function SeccionOfertas({
   return (
     <div className="px-6 pb-6 sm:px-10">
       <h2 className="mb-3 text-[1.05em] font-semibold" style={{ fontFamily: 'var(--tienda-fuente-display, inherit)', color: `var(--tienda-color-texto, ${texto})` }}>
-        Ofertas
+        {titulo}
       </h2>
       <div className="flex flex-wrap gap-3">
         {ofertas.map((o) => (

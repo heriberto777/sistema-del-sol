@@ -12,13 +12,19 @@ import { Modal } from '../../molecules/Modal/Modal';
 import { ComboboxBusqueda } from '../../molecules/ComboboxBusqueda/ComboboxBusqueda';
 import { CampoImagen } from '../../molecules/CampoImagen/CampoImagen';
 import { PaginaResultado } from '../../../types/pagina-resultado';
+import { ICONOS_FRANJA_CONFIANZA } from '../../../pages/tienda/SeccionFranjaConfianza';
 
-type TipoSeccion = 'PRODUCTOS' | 'CATEGORIA' | 'BANNER' | 'MINIGRID';
+type TipoSeccion = 'PRODUCTOS' | 'CATEGORIA' | 'BANNER' | 'MINIGRID' | 'HERO' | 'DESTACADOS' | 'OFERTAS' | 'FRANJA_CONFIANZA';
 
 interface ProductoBusqueda {
   id: string;
   codigo: string;
   nombre: string;
+}
+
+interface ItemFranjaConfianza {
+  icono: string;
+  texto: string;
 }
 
 interface SeccionTiendaAdmin {
@@ -29,6 +35,7 @@ interface SeccionTiendaAdmin {
   ctaTexto: string | null;
   imagen: string | null;
   color: string | null;
+  contenido: ItemFranjaConfianza[] | null;
   orden: number;
   activa: boolean;
   categoria: { id: string; nombre: string } | null;
@@ -47,20 +54,29 @@ interface PayloadSeccion {
   categoriaId?: string;
   productoIds?: string[];
   categoriaIds?: string[];
+  contenido?: ItemFranjaConfianza[];
 }
 
 const ETIQUETA_TIPO: Record<TipoSeccion, string> = {
+  HERO: 'Portada (bienvenida)',
+  DESTACADOS: 'Destacados',
+  OFERTAS: 'Ofertas',
   PRODUCTOS: 'Grilla de productos',
   CATEGORIA: 'Categoría destacada',
   BANNER: 'Banner (slideshow de productos)',
   MINIGRID: 'Mini-grid de categorías',
+  FRANJA_CONFIANZA: 'Franja de confianza (íconos)',
 };
 
 const DESCRIPCION_TIPO: Record<TipoSeccion, string> = {
+  HERO: 'El bloque de bienvenida arriba de todo — título, subtítulo y una imagen de fondo opcional.',
+  DESTACADOS: 'Los productos marcados como "Destacado" en su ficha — acá solo controlás el título y dónde aparece.',
+  OFERTAS: 'Las ofertas vigentes ahora mismo (mismo motor de POS/Facturación) — acá solo controlás el título y dónde aparece.',
   PRODUCTOS: 'Elegís a mano qué productos aparecen, en el orden que quieras — se muestran en una grilla, como "Combinalo con...".',
   CATEGORIA: 'Una tarjeta grande que promociona una categoría — clic lleva al catálogo filtrado por esa categoría.',
   BANNER: 'Los mismos productos que "Grilla", pero se muestran como slideshow: cada slide es un producto, clic va a su detalle.',
   MINIGRID: 'Entre 2 y 4 categorías en mini-tarjetas lado a lado.',
+  FRANJA_CONFIANZA: 'Entre 2 y 4 íconos con un texto corto cada uno (ej. "Envío a todo el país").',
 };
 
 /**
@@ -125,7 +141,7 @@ export function SeccionesTiendaPanel() {
 
       {!isLoading && secciones?.length === 0 && (
         <p className="py-8 text-center text-sm text-slate-400">
-          Todavía no creaste ninguna sección — el Home usa solo Destacados/Ofertas builtin (pestaña Personalización).
+          Todavía no creaste ninguna sección — tu Home no va a mostrar nada entre el menú y el pie de página.
         </p>
       )}
 
@@ -162,7 +178,15 @@ export function SeccionesTiendaPanel() {
                   ? `${s.productos.length} producto${s.productos.length === 1 ? '' : 's'} elegido${s.productos.length === 1 ? '' : 's'} a mano`
                   : s.tipo === 'CATEGORIA'
                     ? `Vincula a categoría: ${s.categoria?.nombre ?? '—'}`
-                    : `${s.categorias.length} categorías`}
+                    : s.tipo === 'MINIGRID'
+                      ? `${s.categorias.length} categorías`
+                      : s.tipo === 'HERO'
+                        ? (s.subtitulo ?? 'Bloque de bienvenida')
+                        : s.tipo === 'DESTACADOS'
+                          ? 'Productos marcados como destacados'
+                          : s.tipo === 'OFERTAS'
+                            ? 'Ofertas vigentes ahora mismo'
+                            : `${s.contenido?.length ?? 0} ítems`}
               </p>
             </div>
 
@@ -216,6 +240,7 @@ function ModalSeccionTienda({
     seccion?.productos.map((p) => ({ id: p.productoId, nombre: p.producto.nombre })) ?? [],
   );
   const [categoriaIds, setCategoriaIds] = useState<string[]>(seccion?.categorias.map((c) => c.categoriaId) ?? []);
+  const [contenido, setContenido] = useState<ItemFranjaConfianza[]>(seccion?.contenido ?? []);
   const [error, setError] = useState<string | null>(null);
 
   const { data: categoriasArbol } = useQuery({
@@ -263,17 +288,35 @@ function ModalSeccionTienda({
       setError('Elegí al menos 2 categorías.');
       return;
     }
+    if (tipo === 'FRANJA_CONFIANZA' && (contenido.length < 2 || contenido.some((c) => !c.texto.trim()))) {
+      setError('Agregá entre 2 y 4 ítems, todos con texto.');
+      return;
+    }
     guardar.mutate({
       tipo,
       titulo,
       subtitulo: subtitulo || undefined,
       ctaTexto: ctaTexto || undefined,
-      imagen: tipo === 'CATEGORIA' ? imagen ?? undefined : undefined,
+      imagen: tipo === 'CATEGORIA' || tipo === 'HERO' ? (imagen ?? undefined) : undefined,
       color: color || undefined,
       categoriaId: tipo === 'CATEGORIA' ? categoriaId : undefined,
       productoIds: tipo === 'PRODUCTOS' || tipo === 'BANNER' ? productos.map((p) => p.id) : undefined,
       categoriaIds: tipo === 'MINIGRID' ? categoriaIds : undefined,
+      contenido: tipo === 'FRANJA_CONFIANZA' ? contenido : undefined,
     });
+  }
+
+  function agregarItemFranja() {
+    if (contenido.length >= 4) return;
+    setContenido((prev) => [...prev, { icono: 'Truck', texto: '' }]);
+  }
+
+  function quitarItemFranja(indice: number) {
+    setContenido((prev) => prev.filter((_, i) => i !== indice));
+  }
+
+  function actualizarItemFranja(indice: number, cambios: Partial<ItemFranjaConfianza>) {
+    setContenido((prev) => prev.map((item, i) => (i === indice ? { ...item, ...cambios } : item)));
   }
 
   return (
@@ -363,6 +406,42 @@ function ModalSeccionTienda({
               </Select>
             </div>
             <CampoImagen valor={imagen} onChange={setImagen} label="Imagen (opcional)" />
+          </div>
+        )}
+
+        {tipo === 'HERO' && <CampoImagen valor={imagen} onChange={setImagen} label="Imagen de fondo (opcional)" />}
+
+        {tipo === 'FRANJA_CONFIANZA' && (
+          <div className="flex flex-col gap-2">
+            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Ítems (2 a 4)</label>
+            {contenido.map((item, i) => (
+              <div key={i} className="flex items-center gap-2">
+                <Select value={item.icono} onChange={(e) => actualizarItemFranja(i, { icono: e.target.value })} className="!w-36 shrink-0">
+                  {Object.keys(ICONOS_FRANJA_CONFIANZA).map((nombre) => (
+                    <option key={nombre} value={nombre}>
+                      {nombre}
+                    </option>
+                  ))}
+                </Select>
+                <input
+                  type="text"
+                  value={item.texto}
+                  onChange={(e) => actualizarItemFranja(i, { texto: e.target.value })}
+                  placeholder="Ej. Envío a todo el país"
+                  maxLength={60}
+                  className="flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                />
+                <button type="button" onClick={() => quitarItemFranja(i)} className="shrink-0 text-slate-400 hover:text-red-600" aria-label="Quitar ítem">
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            ))}
+            {contenido.length < 4 && (
+              <Button type="button" variante="secundario" onClick={agregarItemFranja} className="flex w-fit items-center gap-1.5">
+                <Plus size={14} />
+                Agregar ítem
+              </Button>
+            )}
           </div>
         )}
 

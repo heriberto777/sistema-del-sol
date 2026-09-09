@@ -56,4 +56,15 @@ export class CrearSeccionTiendaDto {
   @ArrayMaxSize(4)
   @IsUUID('4', { each: true })
   categoriaIds?: string[];
+
+  @ApiProperty({
+    required: false,
+    type: [Object],
+    description: 'Obligatorio si tipo=FRANJA_CONFIANZA — entre 2 y 4 ítems {icono, texto}',
+  })
+  @ValidateIf((o) => o.tipo === 'FRANJA_CONFIANZA')
+  @IsArray()
+  @ArrayMinSize(2)
+  @ArrayMaxSize(4)
+  contenido?: { icono: string; texto: string }[];
 }

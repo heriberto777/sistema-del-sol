@@ -171,8 +171,6 @@ export interface TemaTienda {
   menu: ItemMenuTienda[];
   /** Fase 13 — default CLASICO si el tenant nunca lo configuró. */
   estiloInsigniaOferta: EstiloInsigniaOfertaTienda;
-  /** Fase 16 — sección "Ofertas" informativa del Home (chips agregados, alcance CARRITO incluido) — default `true`. Independiente de la insignia por producto (Fase 13), que sigue mostrándose siempre que haya oferta vigente. */
-  mostrarSeccionOfertas: boolean;
   /** Ítem "etiqueta de sin stock" — default ETIQUETA si el tenant nunca lo configuró. */
   estiloInsigniaSinStock: EstiloInsigniaSinStockTienda;
 }
@@ -234,7 +232,6 @@ export function resolverTemaTienda(valorJson: string | undefined, colorAcentoLeg
     estiloInsigniaOferta: (ESTILOS_INSIGNIA_OFERTA_TIENDA as readonly string[]).includes(bruto.estiloInsigniaOferta as string)
       ? (bruto.estiloInsigniaOferta as EstiloInsigniaOfertaTienda)
       : 'CLASICO',
-    mostrarSeccionOfertas: typeof bruto.mostrarSeccionOfertas === 'boolean' ? bruto.mostrarSeccionOfertas : true,
     estiloInsigniaSinStock: (ESTILOS_INSIGNIA_SIN_STOCK_TIENDA as readonly string[]).includes(bruto.estiloInsigniaSinStock as string)
       ? (bruto.estiloInsigniaSinStock as EstiloInsigniaSinStockTienda)
       : 'ETIQUETA',

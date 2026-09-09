@@ -325,7 +325,7 @@ describe('App (e2e)', () => {
         .send({ email: 'admin@e2e-a.com' })
         .expect(201);
 
-      expect(respuesta.body.empresas).toEqual([{ subdominio: SUBDOMINIO_A, nombre: `E2E ${SUBDOMINIO_A}` }]);
+      expect(respuesta.body.empresas).toEqual([{ subdominio: SUBDOMINIO_A, nombre: `E2E ${SUBDOMINIO_A}`, logo: null }]);
     });
 
     it('resolver-empresas devuelve una lista vacía para un email desconocido, sin filtrar información', async () => {

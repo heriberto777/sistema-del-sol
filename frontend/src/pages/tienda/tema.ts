@@ -65,7 +65,6 @@ export interface TemaTienda {
   proporcionImagen: ProporcionImagenTienda;
   menu: ItemMenuTienda[];
   estiloInsigniaOferta: EstiloInsigniaOfertaTienda;
-  mostrarSeccionOfertas: boolean;
   estiloInsigniaSinStock: EstiloInsigniaSinStockTienda;
 }
 
