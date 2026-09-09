@@ -8,6 +8,7 @@ import { LISTAS_PRECIO_BASE } from './listas-precio-base';
 import { TIPOS_AUSENCIA_CONFIG_BASE } from './tipos-ausencia-config-base';
 import { CORRELATIVOS_BASE } from './correlativos-base';
 import { PLANTILLAS_PUBLICACIONES_SOCIALES_BASE } from '../notificaciones/plantillas-publicaciones-sociales-base';
+import { PLANTILLAS_COMENTARIOS_TAREA_BASE } from '../notificaciones/plantillas-comentarios-tarea-base';
 
 @Injectable()
 export class TenantsRepository {
@@ -141,6 +142,12 @@ export class TenantsRepository {
       // en blanco (ver el comentario de PLANTILLAS_PUBLICACIONES_SOCIALES_BASE).
       await tx.notificacionPlantilla.createMany({
         data: PLANTILLAS_PUBLICACIONES_SOCIALES_BASE.map((p) => ({ tenantId: tenant.id, ...p })),
+      });
+
+      // Fase 8 (Comentarios de tarea) — mismo criterio, ver el comentario
+      // de PLANTILLAS_COMENTARIOS_TAREA_BASE.
+      await tx.notificacionPlantilla.createMany({
+        data: PLANTILLAS_COMENTARIOS_TAREA_BASE.map((p) => ({ tenantId: tenant.id, ...p })),
       });
 
       let adminRoleId: string | undefined;

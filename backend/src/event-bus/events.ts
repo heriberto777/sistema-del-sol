@@ -22,6 +22,7 @@ export const EVENTOS = {
   PUBLICACION_SOCIAL_CAMBIOS_SOLICITADOS: 'publicaciones_sociales.cambios_solicitados',
   PUBLICACION_SOCIAL_APROBADA: 'publicaciones_sociales.aprobada',
   PUBLICACION_SOCIAL_RECHAZADA: 'publicaciones_sociales.rechazada',
+  TAREA_PROYECTO_COMENTADA: 'proyectos.tarea_comentada',
 } as const;
 
 export type NombreEvento = (typeof EVENTOS)[keyof typeof EVENTOS];
@@ -201,4 +202,19 @@ export interface PublicacionSocialRechazadaPayload {
   productoNombre: string;
   creadoPorId: string;
   motivoRechazo: string;
+}
+
+/**
+ * Emitido por TareasProyectoService.agregarComentario (Fase 8) — avisa a
+ * los responsables de la tarea con un User vinculado (`Empleado.userId`),
+ * excluyendo siempre al propio autor del comentario.
+ */
+export interface TareaProyectoComentadaPayload {
+  tenantId: string;
+  tareaId: string;
+  tareaTitulo: string;
+  proyectoNombre: string;
+  autorNombre: string;
+  contenido: string;
+  destinatariosUserId: string[];
 }

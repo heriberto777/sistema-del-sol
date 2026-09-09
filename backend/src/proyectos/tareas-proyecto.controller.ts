@@ -3,6 +3,7 @@ import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { TareasProyectoService } from './tareas-proyecto.service';
 import { CrearTareaProyectoDto } from './dto/crear-tarea-proyecto.dto';
 import { CrearRegistroHoraDto } from './dto/crear-registro-hora.dto';
+import { CrearComentarioTareaDto } from './dto/crear-comentario-tarea.dto';
 import { Permissions } from '../common/decorators/permissions.decorator';
 import { RequiereModulo } from '../common/decorators/requiere-modulo.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -86,5 +87,22 @@ export class TareasProyectoController {
   @Permissions('proyectos.horas.registrar')
   pausarCronometro(@Param('id') id: string, @CurrentUser() user: JwtPayloadUser) {
     return this.tareasProyectoService.pausarSesionTrabajo(id, user.userId);
+  }
+
+  // ---------- Comentarios (Fase 8) ----------
+  // `proyectos.ver` a propósito — comentar es participar de la
+  // conversación del equipo, no editar la tarea; cualquiera que vea el
+  // proyecto puede sumarse.
+
+  @Post('tareas/:id/comentarios')
+  @Permissions('proyectos.ver')
+  agregarComentario(@Param('id') id: string, @Body() dto: CrearComentarioTareaDto, @CurrentUser() user: JwtPayloadUser) {
+    return this.tareasProyectoService.agregarComentario(id, user.userId, dto.contenido, user.tenantId);
+  }
+
+  @Delete('comentarios/:id')
+  @Permissions('proyectos.ver')
+  eliminarComentario(@Param('id') id: string, @CurrentUser() user: JwtPayloadUser) {
+    return this.tareasProyectoService.eliminarComentario(id, user.userId, user.permisos);
   }
 }

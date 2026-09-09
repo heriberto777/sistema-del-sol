@@ -736,6 +736,7 @@ model User {
   asistenciasAprobadas                  RegistroAsistencia[]       @relation("AsistenciaAprobadaPor")
   sucursales                            UsuarioSucursal[]
   codigosAutorizacionSolicitados        CodigoAutorizacion[]
+  comentariosTareaProyecto              ComentarioTareaProyecto[]
 
   @@unique([tenantId, email])
   @@map("users")
@@ -3948,8 +3949,31 @@ model TareaProyecto {
   responsables    TareaProyectoResponsable[]
   registrosHoras  RegistroHoraProyecto[]
   sesionesTrabajo SesionTrabajoTarea[]
+  comentarios     ComentarioTareaProyecto[]
 
   @@map("tareas_proyecto")
+}
+
+/// Fase 8 — comentarios de equipo sobre una tarea (tipo Trello/Jira).
+/// Tabla hija SIN tenantId propio a propósito, mismo criterio que
+/// TareaProyectoResponsable: su aislamiento depende de llegar siempre vía
+/// una TareaProyecto ya resuelta contra el tenant — por eso queda AFUERA
+/// de TENANT_SCOPED_MODELS y de enable-rls.sql (ninguno de los dos
+/// funciona sin una columna `tenantId` real). Vinculado a `User` (no a
+/// `Empleado`): cualquier usuario con acceso al proyecto puede comentar,
+/// no solo personal de nómina. Se puede ELIMINAR (autor o alguien con
+/// `proyectos.editar`) pero nunca editar — mismo espíritu que
+/// `PublicacionSocialVersion.comentarioCambios` ("nunca se pisa").
+model ComentarioTareaProyecto {
+  id        String        @id @default(uuid())
+  tareaId   String
+  tarea     TareaProyecto @relation(fields: [tareaId], references: [id], onDelete: Cascade)
+  autorId   String
+  autor     User          @relation(fields: [autorId], references: [id], onDelete: Cascade)
+  contenido String        @db.Text
+  createdAt DateTime      @default(now())
+
+  @@map("comentarios_tarea_proyecto")
 }
 
 /// Fase 6 — cronómetro real por tarea/empleado ("Iniciar"/"Pausar" en el

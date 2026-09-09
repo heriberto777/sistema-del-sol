@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
 import { ProyectosRepository } from './proyectos.repository';
 import { ProyectosService } from './proyectos.service';
 import { EmpleadosRepository } from '../nomina/empleados.repository';
@@ -159,6 +159,52 @@ export class TareasProyectoService {
     for (const sesion of abiertas) {
       await this.cerrarYRegistrarSesion(sesion);
     }
+  }
+
+  // ---------- Comentarios (Fase 8) ----------
+  // Confirmado con el usuario: se puede eliminar (autor propio o alguien
+  // con `proyectos.editar`) pero nunca editar — mismo espíritu "nunca se
+  // pisa" que el resto de historiales del sistema.
+
+  async agregarComentario(tareaId: string, autorId: string, contenido: string, tenantId: string) {
+    const tarea = await this.proyectosRepository.buscarTareaPorId(tareaId); // 404 si la tarea no es de este tenant
+    const comentario = await this.proyectosRepository.crearComentario(tareaId, autorId, contenido);
+
+    // Avisa a los responsables con User vinculado, salvo al propio autor
+    // (no tiene sentido notificarte de tu propio comentario).
+    const userIdsResponsables = await this.proyectosRepository.listarUserIdsResponsablesDeTarea(tareaId);
+    const destinatariosUserId = userIdsResponsables.filter((id) => id !== autorId);
+    if (destinatariosUserId.length > 0) {
+      const proyecto = await this.proyectosRepository.buscarNombreProyecto(tarea.proyectoId);
+      this.eventBus.emit(EVENTOS.TAREA_PROYECTO_COMENTADA, {
+        tenantId,
+        tareaId,
+        tareaTitulo: tarea.titulo,
+        proyectoNombre: proyecto.nombre,
+        autorNombre: comentario.autor.nombre,
+        contenido,
+        destinatariosUserId,
+      });
+    }
+
+    return comentario;
+  }
+
+  async eliminarComentario(comentarioId: string, userId: string, permisos: string[]) {
+    // `ComentarioTareaProyecto` no tiene tenantId propio (no pasa por
+    // TenantPrismaService) — SIEMPRE hay que resolver primero la tarea
+    // padre (esa sí tenant-scoped) antes de confiar en nada del
+    // comentario, o cualquier id ajeno pasaría (mismo IDOR ya documentado
+    // para tablas hijas, ver ARCHITECTURE.md).
+    const comentario = await this.proyectosRepository.buscarComentarioPorId(comentarioId);
+    await this.proyectosRepository.buscarTareaPorId(comentario.tareaId); // 404 si la tarea (y por ende el comentario) no es de este tenant
+
+    const esAutor = comentario.autorId === userId;
+    const puedeModerar = permisos.includes('proyectos.editar');
+    if (!esAutor && !puedeModerar) {
+      throw new ForbiddenException('Solo el autor del comentario o un administrador puede eliminarlo.');
+    }
+    return this.proyectosRepository.eliminarComentario(comentarioId);
   }
 
   /** Un hito de OTRO proyecto no se puede asignar acá — mismo criterio de IDOR que el resto de FKs suministradas por el cliente. */

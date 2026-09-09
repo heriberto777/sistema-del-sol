@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { TareasProyectoService } from './tareas-proyecto.service';
 import { ProyectosRepository } from './proyectos.repository';
 import { ProyectosService } from './proyectos.service';
@@ -27,6 +27,11 @@ describe('TareasProyectoService', () => {
       buscarSesionesAbiertasDeTarea: jest.fn().mockResolvedValue([]),
       crearSesionTrabajo: jest.fn(),
       cerrarSesionTrabajo: jest.fn(),
+      crearComentario: jest.fn(),
+      buscarComentarioPorId: jest.fn(),
+      eliminarComentario: jest.fn(),
+      listarUserIdsResponsablesDeTarea: jest.fn().mockResolvedValue([]),
+      buscarNombreProyecto: jest.fn().mockResolvedValue({ nombre: 'Proyecto X' }),
     } as unknown as jest.Mocked<ProyectosRepository>;
     proyectosService = { buscarPorId: jest.fn().mockResolvedValue({ id: 'p1' }) } as unknown as jest.Mocked<ProyectosService>;
     empleadosRepository = {
@@ -240,6 +245,78 @@ describe('TareasProyectoService', () => {
           'tenant1',
         );
         jest.useRealTimers();
+      });
+    });
+  });
+
+  describe('comentarios (Fase 8)', () => {
+    describe('agregarComentario', () => {
+      it('crea el comentario y no emite ningún evento si la tarea no tiene responsables con User vinculado', async () => {
+        repository.buscarTareaPorId.mockResolvedValue({ id: 't1', proyectoId: 'p1', titulo: 'Cotizar materiales' } as never);
+        repository.crearComentario.mockResolvedValue({ id: 'c1', autor: { id: 'u1', nombre: 'Fulano' } } as never);
+        repository.listarUserIdsResponsablesDeTarea.mockResolvedValue([]);
+
+        const resultado = await service.agregarComentario('t1', 'u1', 'hola equipo', 'tenant1');
+
+        expect(repository.crearComentario).toHaveBeenCalledWith('t1', 'u1', 'hola equipo');
+        expect(eventBus.emit).not.toHaveBeenCalled();
+        expect(resultado).toEqual({ id: 'c1', autor: { id: 'u1', nombre: 'Fulano' } });
+      });
+
+      it('emite TAREA_PROYECTO_COMENTADA con los responsables, excluyendo al propio autor', async () => {
+        repository.buscarTareaPorId.mockResolvedValue({ id: 't1', proyectoId: 'p1', titulo: 'Cotizar materiales' } as never);
+        repository.crearComentario.mockResolvedValue({ id: 'c1', autor: { id: 'u1', nombre: 'Fulano' } } as never);
+        repository.listarUserIdsResponsablesDeTarea.mockResolvedValue(['u1', 'u2', 'u3']);
+        repository.buscarNombreProyecto.mockResolvedValue({ nombre: 'Remodelación Piantini' } as never);
+
+        await service.agregarComentario('t1', 'u1', 'hola equipo', 'tenant1');
+
+        expect(eventBus.emit).toHaveBeenCalledWith(EVENTOS.TAREA_PROYECTO_COMENTADA, {
+          tenantId: 'tenant1',
+          tareaId: 't1',
+          tareaTitulo: 'Cotizar materiales',
+          proyectoNombre: 'Remodelación Piantini',
+          autorNombre: 'Fulano',
+          contenido: 'hola equipo',
+          destinatariosUserId: ['u2', 'u3'],
+        });
+      });
+    });
+
+    describe('eliminarComentario', () => {
+      it('permite al propio autor eliminar su comentario', async () => {
+        repository.buscarComentarioPorId.mockResolvedValue({ id: 'c1', tareaId: 't1', autorId: 'u1' } as never);
+        repository.buscarTareaPorId.mockResolvedValue({ id: 't1' } as never);
+
+        await service.eliminarComentario('c1', 'u1', []);
+
+        expect(repository.eliminarComentario).toHaveBeenCalledWith('c1');
+      });
+
+      it('permite a un administrador (proyectos.editar) eliminar el comentario de otro', async () => {
+        repository.buscarComentarioPorId.mockResolvedValue({ id: 'c1', tareaId: 't1', autorId: 'otro-user' } as never);
+        repository.buscarTareaPorId.mockResolvedValue({ id: 't1' } as never);
+
+        await service.eliminarComentario('c1', 'u1', ['proyectos.editar']);
+
+        expect(repository.eliminarComentario).toHaveBeenCalledWith('c1');
+      });
+
+      it('rechaza si no es el autor ni tiene proyectos.editar', async () => {
+        repository.buscarComentarioPorId.mockResolvedValue({ id: 'c1', tareaId: 't1', autorId: 'otro-user' } as never);
+        repository.buscarTareaPorId.mockResolvedValue({ id: 't1' } as never);
+
+        await expect(service.eliminarComentario('c1', 'u1', [])).rejects.toThrow(ForbiddenException);
+        expect(repository.eliminarComentario).not.toHaveBeenCalled();
+      });
+
+      it('valida que la tarea del comentario pertenezca a este tenant antes de confiar en el autorId (prevención de IDOR — tabla sin tenantId propio)', async () => {
+        repository.buscarComentarioPorId.mockResolvedValue({ id: 'c1', tareaId: 't-de-otro-tenant', autorId: 'u1' } as never);
+        repository.buscarTareaPorId.mockRejectedValue(new Error('no encontrado'));
+
+        await expect(service.eliminarComentario('c1', 'u1', [])).rejects.toThrow('no encontrado');
+        expect(repository.buscarTareaPorId).toHaveBeenCalledWith('t-de-otro-tenant');
+        expect(repository.eliminarComentario).not.toHaveBeenCalled();
       });
     });
   });

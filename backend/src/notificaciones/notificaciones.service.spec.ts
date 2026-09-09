@@ -306,6 +306,72 @@ describe('NotificacionesService', () => {
     });
   });
 
+  describe('alComentarTareaProyecto (Fase 8)', () => {
+    beforeEach(() => {
+      repository.buscarPlantilla.mockResolvedValue({ activa: true, asunto: 'x', cuerpo: 'x' } as never);
+      repository.crearNotificacion.mockResolvedValue({ id: 'n1' } as never);
+      emailChannel.enviar.mockResolvedValue(true);
+      whatsAppChannel.enviar.mockResolvedValue(true);
+    });
+
+    it('no hace nada si no hay destinatarios (tarea sin responsables con User vinculado)', async () => {
+      await service.alComentarTareaProyecto({
+        tenantId: 't1',
+        tareaId: 'ta1',
+        tareaTitulo: 'Cotizar materiales',
+        proyectoNombre: 'Proyecto X',
+        autorNombre: 'Fulano',
+        contenido: 'hola',
+        destinatariosUserId: [],
+      });
+      expect(prisma.user.findMany).not.toHaveBeenCalled();
+      expect(emailChannel.enviar).not.toHaveBeenCalled();
+    });
+
+    it('envía EMAIL a cada destinatario', async () => {
+      prisma.user.findMany.mockResolvedValue([
+        { id: 'u1', email: 'u1@x.com', telefono: null },
+        { id: 'u2', email: 'u2@x.com', telefono: null },
+      ]);
+
+      await service.alComentarTareaProyecto({
+        tenantId: 't1',
+        tareaId: 'ta1',
+        tareaTitulo: 'Cotizar materiales',
+        proyectoNombre: 'Proyecto X',
+        autorNombre: 'Fulano',
+        contenido: 'hola equipo',
+        destinatariosUserId: ['u1', 'u2'],
+      });
+
+      expect(prisma.user.findMany).toHaveBeenCalledWith({ where: { id: { in: ['u1', 'u2'] } } });
+      expect(repository.buscarPlantilla).toHaveBeenCalledWith('t1', 'EMAIL', 'tarea_proyecto_comentario_nuevo');
+      expect(emailChannel.enviar).toHaveBeenCalledTimes(2);
+      expect(whatsAppChannel.enviar).not.toHaveBeenCalled();
+    });
+
+    it('además manda WHATSAPP solo a quien tiene teléfono guardado', async () => {
+      prisma.user.findMany.mockResolvedValue([
+        { id: 'u1', email: 'u1@x.com', telefono: '18095551234' },
+        { id: 'u2', email: 'u2@x.com', telefono: null },
+      ]);
+
+      await service.alComentarTareaProyecto({
+        tenantId: 't1',
+        tareaId: 'ta1',
+        tareaTitulo: 'Cotizar materiales',
+        proyectoNombre: 'Proyecto X',
+        autorNombre: 'Fulano',
+        contenido: 'hola equipo',
+        destinatariosUserId: ['u1', 'u2'],
+      });
+
+      expect(emailChannel.enviar).toHaveBeenCalledTimes(2);
+      expect(whatsAppChannel.enviar).toHaveBeenCalledTimes(1);
+      expect(repository.buscarPlantilla).toHaveBeenCalledWith('t1', 'WHATSAPP', 'tarea_proyecto_comentario_nuevo');
+    });
+  });
+
   describe('alQuedarPendienteAprobacionPublicacionSocial (Fase 5)', () => {
     it('resuelve destinatarios por el PERMISO publicacionessociales.aprobar, no por nombre de rol', async () => {
       prisma.user.findMany.mockResolvedValue([{ id: 'u1', email: 'gerente@x.com', telefono: null }]);

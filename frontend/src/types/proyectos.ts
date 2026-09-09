@@ -27,6 +27,14 @@ export interface SesionTrabajo {
   inicio: string;
 }
 
+/** Fase 8 — comentarios de equipo. Solo se puede crear/eliminar, nunca editar. */
+export interface Comentario {
+  id: string;
+  autor: { id: string; nombre: string };
+  contenido: string;
+  createdAt: string;
+}
+
 export interface Tarea {
   id: string;
   titulo: string;
@@ -38,6 +46,7 @@ export interface Tarea {
   responsables: Responsable[];
   registrosHoras: RegistroHora[];
   sesionesTrabajo: SesionTrabajo[];
+  comentarios: Comentario[];
 }
 
 export interface ProyectoDetalleDto {

@@ -18,6 +18,9 @@ const INCLUDE_TAREA = {
   // decidir "Iniciar" vs "Pausar" y mostrar el tiempo corriendo; las
   // cerradas ya viven como filas normales de `registrosHoras`.
   sesionesTrabajo: { where: { fin: null }, include: { empleado: { select: { id: true, nombre: true } } } },
+  // Fase 8 — comentarios de equipo, orden cronológico (más viejo primero,
+  // como un chat).
+  comentarios: { include: { autor: { select: { id: true, nombre: true } } }, orderBy: { createdAt: 'asc' as const } },
 } as const;
 
 /**
@@ -252,5 +255,36 @@ export class ProyectosRepository {
       _sum: { total: true },
     });
     return Number(resultado._sum.total ?? 0);
+  }
+
+  // ---------- Comentarios de tarea (Fase 8) ----------
+
+  /** Liviano a propósito — para el email de aviso no hace falta traer hitos/tareas completos como sí hace `buscarProyectoPorId`. */
+  buscarNombreProyecto(proyectoId: string) {
+    return this.db.proyecto.findUniqueOrThrow({ where: { id: proyectoId }, select: { nombre: true } });
+  }
+
+  crearComentario(tareaId: string, autorId: string, contenido: string) {
+    return this.db.comentarioTareaProyecto.create({
+      data: { tareaId, autorId, contenido },
+      include: { autor: { select: { id: true, nombre: true } } },
+    });
+  }
+
+  buscarComentarioPorId(id: string) {
+    return this.db.comentarioTareaProyecto.findUniqueOrThrow({ where: { id } });
+  }
+
+  eliminarComentario(id: string) {
+    return this.db.comentarioTareaProyecto.delete({ where: { id } });
+  }
+
+  /** `User.id` de cada responsable de la tarea que tiene un Empleado vinculado a un usuario del sistema — para armar los destinatarios del aviso de "nuevo comentario" (ver `TareasProyectoService.agregarComentario`). */
+  async listarUserIdsResponsablesDeTarea(tareaId: string): Promise<string[]> {
+    const filas = await this.db.tareaProyectoResponsable.findMany({
+      where: { tareaId },
+      include: { empleado: { select: { userId: true } } },
+    });
+    return filas.map((f) => f.empleado.userId).filter((id): id is string => id !== null);
   }
 }

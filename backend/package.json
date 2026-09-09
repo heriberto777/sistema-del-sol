@@ -22,6 +22,7 @@
     "cuentas:backfill": "dotenv -e ../.env -- ts-node scripts/backfill-cuentas.ts",
     "configuraciones:backfill": "dotenv -e ../.env -- ts-node scripts/backfill-configuraciones.ts",
     "notificaciones:plantillas-publicaciones-sociales:backfill": "dotenv -e ../.env -- ts-node scripts/backfill-plantillas-publicaciones-sociales.ts",
+    "notificaciones:plantillas-comentarios-tarea:backfill": "dotenv -e ../.env -- ts-node scripts/backfill-plantillas-comentarios-tarea.ts",
     "secciones-home:backfill": "dotenv -e ../.env -- ts-node scripts/migrar-secciones-home.ts",
     "planes:seed": "dotenv -e ../.env -- ts-node scripts/seed-planes.ts",
     "tenant-plan:backfill": "dotenv -e ../.env -- ts-node scripts/backfill-tenant-plan.ts",

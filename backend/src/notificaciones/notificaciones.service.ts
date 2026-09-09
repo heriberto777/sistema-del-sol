@@ -18,6 +18,7 @@ import {
   PublicacionSocialPendienteAprobacionPayload,
   PublicacionSocialRechazadaPayload,
   StockBajoPayload,
+  TareaProyectoComentadaPayload,
   WhatsappRequiereAtencionPayload,
 } from '../event-bus/events';
 import { PrismaService } from '../prisma/prisma.service';
@@ -301,6 +302,38 @@ export class NotificacionesService {
           costo_total: payload.costoTotal,
         },
       });
+    }
+  }
+
+  /**
+   * Plugin de Proyectos (Fase 8) — nuevo comentario en una tarea. A
+   * diferencia de `alVencerHitoProyecto`/`alSuperarPresupuestoProyecto`
+   * (un solo `responsableUserId` con fallback a Admin Total), acá puede
+   * haber VARIOS responsables — el emisor (`TareasProyectoService`) ya
+   * resolvió `Empleado.userId` de cada uno y excluyó al propio autor, así
+   * que este listener solo busca esos `User` y les manda EMAIL siempre +
+   * WHATSAPP si tienen teléfono guardado (canal compartido de Plataforma,
+   * ver el comentario de `PLANTILLAS_COMENTARIOS_TAREA_BASE`). Sin
+   * destinatarios (tarea sin responsables con User vinculado), no manda
+   * nada — a propósito, no hay fallback a Admin Total acá: un comentario
+   * de tarea no es tan crítico como un hito por vencer o un presupuesto
+   * superado.
+   */
+  @OnEvent(EVENTOS.TAREA_PROYECTO_COMENTADA)
+  async alComentarTareaProyecto(payload: TareaProyectoComentadaPayload) {
+    if (payload.destinatariosUserId.length === 0) return;
+    const usuarios = await this.prisma.user.findMany({ where: { id: { in: payload.destinatariosUserId } } });
+    const variables = {
+      autor_nombre: payload.autorNombre,
+      tarea_titulo: payload.tareaTitulo,
+      proyecto_nombre: payload.proyectoNombre,
+      contenido: payload.contenido,
+    };
+    for (const usuario of usuarios) {
+      await this.enviar({ tenantId: payload.tenantId, canal: 'EMAIL', clave: 'tarea_proyecto_comentario_nuevo', destinatario: usuario.email, variables });
+      if (usuario.telefono) {
+        await this.enviar({ tenantId: payload.tenantId, canal: 'WHATSAPP', clave: 'tarea_proyecto_comentario_nuevo', destinatario: usuario.telefono, variables });
+      }
     }
   }
 

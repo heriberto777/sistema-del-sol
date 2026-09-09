@@ -1,9 +1,10 @@
 import { DragEvent, MouseEvent, useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown, Pause, Play, Sparkles } from 'lucide-react';
+import { ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown, MessageSquare, Pause, Play, Sparkles, Trash2 } from 'lucide-react';
 import { apiClient } from '../../../lib/api-client';
 import { mensajeErrorApi } from '../../../lib/mensaje-error-api';
+import { useAuth } from '../../../hooks/useAuth';
 import { Button } from '../../atoms/Button/Button';
 import { Card } from '../../atoms/Card/Card';
 import { Select } from '../../atoms/Select/Select';
@@ -70,6 +71,8 @@ interface KanbanTareasProps {
 
 export function KanbanTareas({ proyectoId, proyectoNombre, proyectoDescripcion, tareas, hitos, onInvalidar, onError }: KanbanTareasProps) {
   const queryClient = useQueryClient();
+  const { usuario, tienePermiso } = useAuth();
+  const puedeModerarComentarios = tienePermiso('proyectos.editar');
   const [vista, setVista] = useState<'clasico' | 'compacto'>(() => {
     const guardada = localStorage.getItem(CLAVE_VISTA);
     return guardada === 'compacto' ? 'compacto' : 'clasico';
@@ -215,6 +218,19 @@ export function KanbanTareas({ proyectoId, proyectoNombre, proyectoDescripcion, 
       apiClient.post(`/admin/proyectos/tareas/${tareaId}/horas`, { empleadoId, fecha, horas: Number(horas) }),
     onSuccess: invalidar,
     onError: (err) => onError(mensajeErrorApi(err, 'No se pudo registrar la hora.')),
+  });
+
+  const agregarComentario = useMutation({
+    mutationFn: async ({ tareaId, contenido }: { tareaId: string; contenido: string }) =>
+      apiClient.post(`/admin/proyectos/tareas/${tareaId}/comentarios`, { contenido }),
+    onSuccess: invalidar,
+    onError: (err) => onError(mensajeErrorApi(err, 'No se pudo agregar el comentario.')),
+  });
+
+  const eliminarComentario = useMutation({
+    mutationFn: async (comentarioId: string) => apiClient.delete(`/admin/proyectos/comentarios/${comentarioId}`),
+    onSuccess: invalidar,
+    onError: (err) => onError(mensajeErrorApi(err, 'No se pudo eliminar el comentario.')),
   });
 
   const tareaActual = tareaAbierta ? tareas.find((t) => t.id === tareaAbierta.id) ?? tareaAbierta : null;
@@ -484,6 +500,11 @@ export function KanbanTareas({ proyectoId, proyectoNombre, proyectoDescripcion, 
                               <div className="flex min-w-0 items-center gap-1.5">
                                 <span className={clsx('h-2 w-2 shrink-0 rounded-full', PUNTO_PRIORIDAD[t.prioridad])} />
                                 <span className="truncate text-sm font-medium text-slate-900 dark:text-slate-100">{t.titulo}</span>
+                                {t.comentarios.length > 0 && (
+                                  <span className="flex shrink-0 items-center gap-0.5 text-[10px] text-slate-400" title={`${t.comentarios.length} comentario(s)`}>
+                                    <MessageSquare size={11} /> {t.comentarios.length}
+                                  </span>
+                                )}
                               </div>
                               <div className="flex shrink-0 items-center gap-1" onClick={(e) => e.stopPropagation()}>
                                 <button
@@ -548,6 +569,11 @@ export function KanbanTareas({ proyectoId, proyectoNombre, proyectoDescripcion, 
                             <span className="truncate font-medium text-slate-800 dark:text-slate-200">{t.titulo}</span>
                             {t.sesionesTrabajo.some((s) => s.empleadoId !== miEmpleadoId) && (
                               <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" title="alguien más está trabajando en esto ahora" />
+                            )}
+                            {t.comentarios.length > 0 && (
+                              <span className="flex shrink-0 items-center gap-0.5 text-[10px] text-slate-400" title={`${t.comentarios.length} comentario(s)`}>
+                                <MessageSquare size={10} /> {t.comentarios.length}
+                              </span>
                             )}
                           </div>
                           <div className="flex shrink-0 items-center gap-1" onClick={(e) => e.stopPropagation()}>
@@ -674,6 +700,40 @@ export function KanbanTareas({ proyectoId, proyectoNombre, proyectoDescripcion, 
                 guardando={registrarHora.isPending}
               />
             </div>
+
+            <div>
+              <h3 className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-300">Comentarios</h3>
+              <div className="max-h-56 space-y-2 overflow-y-auto pr-1">
+                {tareaActual.comentarios.length === 0 && <p className="text-xs text-slate-400">Sin comentarios todavía.</p>}
+                {tareaActual.comentarios.map((c) => (
+                  <div key={c.id} className="rounded-lg bg-slate-50 px-3 py-2 dark:bg-slate-800/60">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="text-xs">
+                        <span className="font-semibold text-slate-700 dark:text-slate-200">{c.autor.nombre}</span>{' '}
+                        <span className="text-slate-400">
+                          {new Date(c.createdAt).toLocaleDateString('es-DO')} {new Date(c.createdAt).toLocaleTimeString('es-DO', { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      </div>
+                      {(c.autor.id === usuario?.id || puedeModerarComentarios) && (
+                        <button
+                          type="button"
+                          onClick={() => eliminarComentario.mutate(c.id)}
+                          className="text-slate-400 hover:text-red-600"
+                          aria-label="Eliminar comentario"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      )}
+                    </div>
+                    <p className="mt-1 whitespace-pre-wrap text-sm text-slate-700 dark:text-slate-300">{c.contenido}</p>
+                  </div>
+                ))}
+              </div>
+              <FormularioComentario
+                onComentar={(contenido) => agregarComentario.mutate({ tareaId: tareaActual.id, contenido })}
+                guardando={agregarComentario.isPending}
+              />
+            </div>
           </div>
         </Modal>
       )}
@@ -717,6 +777,34 @@ function FormularioHora({
       <FormField id="hora-cantidad" label="" type="number" min="0" step="0.5" placeholder="Horas" value={horas} onChange={(e) => setHoras(e.target.value)} className="w-24" />
       <Button type="submit" variante="secundario" disabled={guardando}>
         Registrar
+      </Button>
+    </form>
+  );
+}
+
+function FormularioComentario({ onComentar, guardando }: { onComentar: (contenido: string) => void; guardando: boolean }) {
+  const [contenido, setContenido] = useState('');
+
+  return (
+    <form
+      className="mt-3 flex items-end gap-2"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (contenido.trim()) {
+          onComentar(contenido.trim());
+          setContenido('');
+        }
+      }}
+    >
+      <textarea
+        rows={2}
+        placeholder="Escribí un comentario para el equipo…"
+        value={contenido}
+        onChange={(e) => setContenido(e.target.value)}
+        className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none transition-colors placeholder:text-slate-400 focus:border-sol-500 focus:ring-2 focus:ring-sol-500/30 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500"
+      />
+      <Button type="submit" variante="secundario" disabled={!contenido.trim() || guardando}>
+        {guardando ? 'Enviando…' : 'Comentar'}
       </Button>
     </form>
   );
