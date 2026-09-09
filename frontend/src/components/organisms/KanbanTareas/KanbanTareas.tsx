@@ -1,7 +1,7 @@
 import { DragEvent, MouseEvent, useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { Pause, Play, Sparkles } from 'lucide-react';
+import { ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown, Pause, Play, Sparkles } from 'lucide-react';
 import { apiClient } from '../../../lib/api-client';
 import { mensajeErrorApi } from '../../../lib/mensaje-error-api';
 import { Button } from '../../atoms/Button/Button';
@@ -9,6 +9,7 @@ import { Card } from '../../atoms/Card/Card';
 import { Select } from '../../atoms/Select/Select';
 import { FormField } from '../../molecules/FormField/FormField';
 import { Modal } from '../../molecules/Modal/Modal';
+import { SearchInput } from '../../molecules/SearchInput/SearchInput';
 import { ConfirmModal } from '../../molecules/ConfirmModal/ConfirmModal';
 import { RowActionsMenu } from '../../molecules/RowActionsMenu/RowActionsMenu';
 import { RequierePermiso } from '../RequierePermiso/RequierePermiso';
@@ -34,6 +35,7 @@ function formatearDuracion(ms: number): string {
 }
 
 const CLAVE_VISTA = 'proyectos-kanban-vista';
+const CLAVE_COLUMNAS_COLAPSADAS = 'proyectos-kanban-columnas-colapsadas';
 
 const COLUMNAS: { estado: string; etiqueta: string; dot: string }[] = [
   { estado: 'PENDIENTE', etiqueta: 'Pendiente', dot: 'bg-slate-400' },
@@ -80,11 +82,28 @@ export function KanbanTareas({ proyectoId, proyectoNombre, proyectoDescripcion, 
   const [errorForm, setErrorForm] = useState<string | null>(null);
   const [modalIaAbierto, setModalIaAbierto] = useState(false);
   const [creandoDesdeIa, setCreandoDesdeIa] = useState(false);
+  const [busqueda, setBusqueda] = useState('');
+  const [columnasColapsadas, setColumnasColapsadas] = useState<Set<string>>(() => {
+    try {
+      const guardadas = JSON.parse(localStorage.getItem(CLAVE_COLUMNAS_COLAPSADAS) ?? '[]');
+      return new Set(Array.isArray(guardadas) ? guardadas : []);
+    } catch {
+      return new Set();
+    }
+  });
+  // Tarjetas expandidas manualmente (solo vista Clásico) — a propósito NO
+  // persistido: la lista de tareas cambia todo el tiempo, un set de ids
+  // guardado entre sesiones quedaría obsoleto casi de inmediato.
+  const [tarjetasExpandidas, setTarjetasExpandidas] = useState<Set<string>>(new Set());
   const ahora = useAhora(30_000);
 
   useEffect(() => {
     localStorage.setItem(CLAVE_VISTA, vista);
   }, [vista]);
+
+  useEffect(() => {
+    localStorage.setItem(CLAVE_COLUMNAS_COLAPSADAS, JSON.stringify(Array.from(columnasColapsadas)));
+  }, [columnasColapsadas]);
 
   // Fase 6 — "¿quién soy yo como empleado?" para saber si el cronómetro de
   // esta tarea es mío (mostrar Pausar) o de otro responsable (solo lectura).
@@ -215,6 +234,36 @@ export function KanbanTareas({ proyectoId, proyectoNombre, proyectoDescripcion, 
     cambiarEstadoTarea.mutate({ tareaId, estado });
   }
 
+  function coincideConBusqueda(t: Tarea): boolean {
+    const termino = busqueda.trim().toLowerCase();
+    if (!termino) return true;
+    return t.titulo.toLowerCase().includes(termino) || t.responsables.some((r) => r.empleado.nombre.toLowerCase().includes(termino));
+  }
+
+  function alternarColumna(estado: string) {
+    setColumnasColapsadas((actual) => {
+      const nuevo = new Set(actual);
+      if (nuevo.has(estado)) nuevo.delete(estado);
+      else nuevo.add(estado);
+      return nuevo;
+    });
+  }
+
+  function alternarTarjeta(tareaId: string) {
+    setTarjetasExpandidas((actual) => {
+      const nuevo = new Set(actual);
+      if (nuevo.has(tareaId)) nuevo.delete(tareaId);
+      else nuevo.add(tareaId);
+      return nuevo;
+    });
+  }
+
+  const hayAlgunaExpandida = tarjetasExpandidas.size > 0;
+
+  function alternarTodasLasTarjetas() {
+    setTarjetasExpandidas((actual) => (actual.size > 0 ? new Set() : new Set(tareas.filter(coincideConBusqueda).map((t) => t.id))));
+  }
+
   function accionesTarea(t: Tarea) {
     return [
       { etiqueta: 'Editar', onClick: () => setTareaEditando(t) },
@@ -299,7 +348,19 @@ export function KanbanTareas({ proyectoId, proyectoNombre, proyectoDescripcion, 
       titulo="Tablero"
       descripcion="Arrastrá una tarea a otra columna para cambiar su estado."
       acciones={
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <SearchInput value={busqueda} onChange={setBusqueda} placeholder="Buscar tarea o responsable…" />
+          {vista === 'clasico' && (
+            <button
+              type="button"
+              onClick={alternarTodasLasTarjetas}
+              className="flex items-center gap-1 rounded-md border border-slate-200 px-2 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800"
+              title={hayAlgunaExpandida ? 'Contraer todas las tarjetas' : 'Expandir todas las tarjetas'}
+            >
+              {hayAlgunaExpandida ? <ChevronsDownUp size={14} /> : <ChevronsUpDown size={14} />}
+              {hayAlgunaExpandida ? 'Contraer todo' : 'Expandir todo'}
+            </button>
+          )}
           <div className="inline-flex rounded-lg border border-slate-200 p-0.5 dark:border-slate-800">
             {(['clasico', 'compacto'] as const).map((v) => (
               <button
@@ -331,7 +392,43 @@ export function KanbanTareas({ proyectoId, proyectoNombre, proyectoDescripcion, 
       ) : (
         <div className="flex gap-3 overflow-x-auto pb-2">
           {COLUMNAS.map((col) => {
-            const tareasColumna = tareas.filter((t) => t.estado === col.estado);
+            const tareasColumnaTotal = tareas.filter((t) => t.estado === col.estado);
+            const tareasColumna = tareasColumnaTotal.filter(coincideConBusqueda);
+            const colapsada = columnasColapsadas.has(col.estado);
+
+            if (colapsada) {
+              return (
+                <div
+                  key={col.estado}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setColumnaDestacada(col.estado);
+                  }}
+                  onDragLeave={() => setColumnaDestacada((c) => (c === col.estado ? null : c))}
+                  onDrop={(e) => onDropColumna(e, col.estado)}
+                  className={clsx(
+                    'flex w-11 shrink-0 flex-col items-center gap-2 rounded-lg border p-2 transition-colors',
+                    columnaDestacada === col.estado
+                      ? 'border-sol-400 bg-sol-50/60 dark:border-sol-500/60 dark:bg-sol-500/5'
+                      : 'border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-800/30',
+                  )}
+                >
+                  <button
+                    type="button"
+                    onClick={() => alternarColumna(col.estado)}
+                    className="rounded p-0.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                    title={`Expandir ${col.etiqueta}`}
+                  >
+                    <ChevronRight size={14} />
+                  </button>
+                  <span className={clsx('h-2 w-2 shrink-0 rounded-full', col.dot)} />
+                  <span className="rounded-full bg-white px-1.5 text-[10px] text-slate-400 dark:bg-slate-900 dark:text-slate-500">
+                    {tareasColumnaTotal.length}
+                  </span>
+                </div>
+              );
+            }
+
             return (
               <div
                 key={col.estado}
@@ -352,63 +449,92 @@ export function KanbanTareas({ proyectoId, proyectoNombre, proyectoDescripcion, 
                   <span className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300">
                     <span className={clsx('h-2 w-2 rounded-full', col.dot)} /> {col.etiqueta}
                   </span>
-                  <span className="rounded-full bg-white px-1.5 text-[10px] text-slate-400 dark:bg-slate-900 dark:text-slate-500">
-                    {tareasColumna.length}
-                  </span>
+                  <div className="flex items-center gap-1">
+                    <span className="rounded-full bg-white px-1.5 text-[10px] text-slate-400 dark:bg-slate-900 dark:text-slate-500">
+                      {busqueda ? `${tareasColumna.length}/${tareasColumnaTotal.length}` : tareasColumnaTotal.length}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => alternarColumna(col.estado)}
+                      className="rounded p-0.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                      title={`Contraer ${col.etiqueta}`}
+                    >
+                      <ChevronDown size={14} />
+                    </button>
+                  </div>
                 </div>
 
                 <div className="flex flex-col gap-2">
-                  {tareasColumna.length === 0 && <p className="px-1 text-xs text-slate-400">Sin tareas</p>}
+                  {tareasColumna.length === 0 && (
+                    <p className="px-1 text-xs text-slate-400">{busqueda ? 'Sin coincidencias' : 'Sin tareas'}</p>
+                  )}
 
                   {vista === 'clasico'
-                    ? tareasColumna.map((t) => (
-                        <div
-                          key={t.id}
-                          draggable
-                          onDragStart={(e) => onDragStart(e, t.id)}
-                          onClick={() => setTareaAbierta(t)}
-                          className="cursor-pointer space-y-2 rounded-lg border border-slate-200 bg-white p-3 shadow-sm hover:border-sol-300 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-sol-500/50"
-                        >
-                          <div className="flex items-start justify-between gap-2">
-                            {t.hitoId && hitoPorId[t.hitoId] ? (
-                              <span className="truncate rounded bg-sol-50 px-1.5 py-0.5 text-[10px] font-medium text-sol-700 dark:bg-sol-500/10 dark:text-sol-400">
-                                {hitoPorId[t.hitoId]}
-                              </span>
-                            ) : (
-                              <span />
-                            )}
-                            <div onClick={(e) => e.stopPropagation()}>
-                              <RowActionsMenu acciones={accionesTarea(t)} />
+                    ? tareasColumna.map((t) => {
+                        const expandida = tarjetasExpandidas.has(t.id);
+                        return (
+                          <div
+                            key={t.id}
+                            draggable
+                            onDragStart={(e) => onDragStart(e, t.id)}
+                            onClick={() => setTareaAbierta(t)}
+                            className="cursor-pointer rounded-lg border border-slate-200 bg-white p-3 shadow-sm hover:border-sol-300 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-sol-500/50"
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex min-w-0 items-center gap-1.5">
+                                <span className={clsx('h-2 w-2 shrink-0 rounded-full', PUNTO_PRIORIDAD[t.prioridad])} />
+                                <span className="truncate text-sm font-medium text-slate-900 dark:text-slate-100">{t.titulo}</span>
+                              </div>
+                              <div className="flex shrink-0 items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                                <button
+                                  type="button"
+                                  onClick={() => alternarTarjeta(t.id)}
+                                  className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                                  aria-label={expandida ? 'Contraer tarjeta' : 'Expandir tarjeta'}
+                                >
+                                  {expandida ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                                </button>
+                                <RowActionsMenu acciones={accionesTarea(t)} />
+                              </div>
                             </div>
-                          </div>
-                          <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{t.titulo}</p>
-                          <div className="flex items-center justify-between">
-                            <span className={clsx('rounded-full px-2 py-0.5 text-[10px] font-semibold', ESTILO_PRIORIDAD_TAREA[t.prioridad])}>
-                              {ETIQUETA_PRIORIDAD_TAREA[t.prioridad]}
-                            </span>
-                            {t.responsables.length > 0 && (
-                              <div className="flex -space-x-1.5">
-                                {t.responsables.map((r, i) => (
-                                  <span
-                                    key={r.empleado.id}
-                                    title={r.empleado.nombre}
-                                    className={clsx(
-                                      'flex h-5 w-5 items-center justify-center rounded-full border-2 border-white text-[9px] font-bold text-white dark:border-slate-900',
-                                      PALETA_AVATAR[i % PALETA_AVATAR.length],
-                                    )}
-                                  >
-                                    {inicialesDe(r.empleado.nombre)}
+
+                            {expandida && (
+                              <div className="mt-2 space-y-2">
+                                {t.hitoId && hitoPorId[t.hitoId] && (
+                                  <span className="inline-block truncate rounded bg-sol-50 px-1.5 py-0.5 text-[10px] font-medium text-sol-700 dark:bg-sol-500/10 dark:text-sol-400">
+                                    {hitoPorId[t.hitoId]}
                                   </span>
-                                ))}
+                                )}
+                                <div className="flex items-center justify-between">
+                                  <span className={clsx('rounded-full px-2 py-0.5 text-[10px] font-semibold', ESTILO_PRIORIDAD_TAREA[t.prioridad])}>
+                                    {ETIQUETA_PRIORIDAD_TAREA[t.prioridad]}
+                                  </span>
+                                  {t.responsables.length > 0 && (
+                                    <div className="flex -space-x-1.5">
+                                      {t.responsables.map((r, i) => (
+                                        <span
+                                          key={r.empleado.id}
+                                          title={r.empleado.nombre}
+                                          className={clsx(
+                                            'flex h-5 w-5 items-center justify-center rounded-full border-2 border-white text-[9px] font-bold text-white dark:border-slate-900',
+                                            PALETA_AVATAR[i % PALETA_AVATAR.length],
+                                          )}
+                                        >
+                                          {inicialesDe(r.empleado.nombre)}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                                {chipCronometro(t)}
+                                {t.fechaVencimiento && (
+                                  <p className="text-xs text-slate-400">Vence {new Date(t.fechaVencimiento).toLocaleDateString('es-DO')}</p>
+                                )}
                               </div>
                             )}
                           </div>
-                          {chipCronometro(t)}
-                          {t.fechaVencimiento && (
-                            <p className="text-xs text-slate-400">Vence {new Date(t.fechaVencimiento).toLocaleDateString('es-DO')}</p>
-                          )}
-                        </div>
-                      ))
+                        );
+                      })
                     : tareasColumna.map((t) => (
                         <div
                           key={t.id}
