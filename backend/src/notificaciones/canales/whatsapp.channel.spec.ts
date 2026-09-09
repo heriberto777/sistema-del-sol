@@ -30,7 +30,7 @@ describe('WhatsAppChannel', () => {
   it('llama a la API de Twilio con Basic Auth y el prefijo whatsapp: en To/From', async () => {
     process.env.TWILIO_ACCOUNT_SID = 'ACxxx';
     process.env.TWILIO_AUTH_TOKEN = 'token-secreto';
-    process.env.TWILIO_WHATSAPP_FROM = 'whatsapp:+14155238886';
+    process.env.TWILIO_WHATSAPP_FROM = '+14155238886';
     fetchMock.mockResolvedValue({ ok: true, status: 201 });
 
     const resultado = await channel.enviar('+18095551234', 'asunto', 'Tu factura fue emitida');
@@ -55,7 +55,7 @@ describe('WhatsAppChannel', () => {
   it('devuelve false si Twilio responde con error', async () => {
     process.env.TWILIO_ACCOUNT_SID = 'ACxxx';
     process.env.TWILIO_AUTH_TOKEN = 'token';
-    process.env.TWILIO_WHATSAPP_FROM = 'whatsapp:+14155238886';
+    process.env.TWILIO_WHATSAPP_FROM = '+14155238886';
     fetchMock.mockResolvedValue({ ok: false, status: 401 });
 
     const resultado = await channel.enviar('+18095551234', 'asunto', 'cuerpo');
@@ -66,7 +66,7 @@ describe('WhatsAppChannel', () => {
   it('devuelve false si la petición falla (red caída, etc.)', async () => {
     process.env.TWILIO_ACCOUNT_SID = 'ACxxx';
     process.env.TWILIO_AUTH_TOKEN = 'token';
-    process.env.TWILIO_WHATSAPP_FROM = 'whatsapp:+14155238886';
+    process.env.TWILIO_WHATSAPP_FROM = '+14155238886';
     fetchMock.mockRejectedValue(new Error('ECONNRESET'));
 
     const resultado = await channel.enviar('+18095551234', 'asunto', 'cuerpo');

@@ -27,7 +27,12 @@ export class WhatsAppChannel {
     }
 
     try {
-      const enviado = await enviarWhatsappTwilio({ accountSid, authToken, from, to: destinatario, body: cuerpo });
+      // Twilio exige el prefijo "whatsapp:" en AMBOS extremos (From y To) para
+      // enrutar como WhatsApp — sin él en "From", lo trata como SMS normal y
+      // lo rechaza (número no habilitado para SMS). Mismo criterio que ya
+      // usan whatsapp-bot/publicaciones-sociales/notificaciones (aprobación
+      // por tenant) al armar este mismo `from`.
+      const enviado = await enviarWhatsappTwilio({ accountSid, authToken, from: `whatsapp:${from}`, to: destinatario, body: cuerpo });
       if (!enviado) {
         this.logger.error(`Twilio respondió con error al enviar WhatsApp a ${destinatario}`);
       }
