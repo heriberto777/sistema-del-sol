@@ -1,0 +1,439 @@
+import { DragEvent, useEffect, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import clsx from 'clsx';
+import { apiClient } from '../../../lib/api-client';
+import { mensajeErrorApi } from '../../../lib/mensaje-error-api';
+import { Button } from '../../atoms/Button/Button';
+import { Card } from '../../atoms/Card/Card';
+import { Select } from '../../atoms/Select/Select';
+import { FormField } from '../../molecules/FormField/FormField';
+import { Modal } from '../../molecules/Modal/Modal';
+import { ConfirmModal } from '../../molecules/ConfirmModal/ConfirmModal';
+import { RowActionsMenu } from '../../molecules/RowActionsMenu/RowActionsMenu';
+import { RequierePermiso } from '../RequierePermiso/RequierePermiso';
+import { TareaFormModal, TareaFormValues } from '../TareaFormModal/TareaFormModal';
+import { EmpleadoOpcion, ESTILO_PRIORIDAD_TAREA, ETIQUETA_PRIORIDAD_TAREA, Hito, Tarea } from '../../../types/proyectos';
+
+const CLAVE_VISTA = 'proyectos-kanban-vista';
+
+const COLUMNAS: { estado: string; etiqueta: string; dot: string }[] = [
+  { estado: 'PENDIENTE', etiqueta: 'Pendiente', dot: 'bg-slate-400' },
+  { estado: 'EN_CURSO', etiqueta: 'En curso', dot: 'bg-blue-500' },
+  { estado: 'EN_REVISION', etiqueta: 'En revisión', dot: 'bg-amber-500' },
+  { estado: 'TERMINADA', etiqueta: 'Terminada', dot: 'bg-emerald-500' },
+];
+
+const PUNTO_PRIORIDAD: Record<string, string> = {
+  BAJA: 'bg-slate-400',
+  MEDIA: 'bg-blue-500',
+  ALTA: 'bg-amber-500',
+  URGENTE: 'bg-red-500',
+};
+
+const PALETA_AVATAR = ['bg-sol-500', 'bg-blue-500', 'bg-emerald-500', 'bg-purple-500', 'bg-pink-500'];
+
+function inicialesDe(nombre: string): string {
+  const partes = nombre.trim().split(/\s+/);
+  return ((partes[0]?.[0] ?? '') + (partes[1]?.[0] ?? '')).toUpperCase();
+}
+
+interface KanbanTareasProps {
+  proyectoId: string;
+  tareas: Tarea[];
+  hitos: Hito[];
+  onInvalidar: () => void;
+  onError: (mensaje: string | null) => void;
+}
+
+export function KanbanTareas({ proyectoId, tareas, hitos, onInvalidar, onError }: KanbanTareasProps) {
+  const queryClient = useQueryClient();
+  const [vista, setVista] = useState<'clasico' | 'compacto'>(() => {
+    const guardada = localStorage.getItem(CLAVE_VISTA);
+    return guardada === 'compacto' ? 'compacto' : 'clasico';
+  });
+  const [columnaDestacada, setColumnaDestacada] = useState<string | null>(null);
+  const [tareaAbierta, setTareaAbierta] = useState<Tarea | null>(null);
+  const [modalCrearAbierto, setModalCrearAbierto] = useState(false);
+  const [tareaEditando, setTareaEditando] = useState<Tarea | null>(null);
+  const [tareaAEliminar, setTareaAEliminar] = useState<Tarea | null>(null);
+  const [errorForm, setErrorForm] = useState<string | null>(null);
+
+  useEffect(() => {
+    localStorage.setItem(CLAVE_VISTA, vista);
+  }, [vista]);
+
+  const { data: empleados } = useQuery({
+    queryKey: ['proyectos-empleados-opciones'],
+    queryFn: async () => (await apiClient.get<EmpleadoOpcion[]>('/admin/proyectos/empleados')).data,
+    enabled: !!tareaAbierta,
+  });
+
+  const invalidar = () => {
+    queryClient.invalidateQueries({ queryKey: ['proyecto', proyectoId] });
+    onInvalidar();
+  };
+
+  const crearTarea = useMutation({
+    mutationFn: async (valores: TareaFormValues) => apiClient.post(`/admin/proyectos/${proyectoId}/tareas`, valores),
+    onSuccess: () => {
+      setModalCrearAbierto(false);
+      setErrorForm(null);
+      invalidar();
+    },
+    onError: (err) => setErrorForm(mensajeErrorApi(err, 'No se pudo crear la tarea.')),
+  });
+
+  const editarTarea = useMutation({
+    mutationFn: async (valores: TareaFormValues) => apiClient.patch(`/admin/proyectos/tareas/${tareaEditando?.id}`, valores),
+    onSuccess: () => {
+      setTareaEditando(null);
+      setErrorForm(null);
+      invalidar();
+    },
+    onError: (err) => setErrorForm(mensajeErrorApi(err, 'No se pudo guardar la tarea.')),
+  });
+
+  const eliminarTarea = useMutation({
+    mutationFn: async (tareaId: string) => apiClient.delete(`/admin/proyectos/tareas/${tareaId}`),
+    onSuccess: () => {
+      setTareaAEliminar(null);
+      invalidar();
+    },
+    onError: (err) => {
+      onError(mensajeErrorApi(err, 'No se pudo eliminar la tarea.'));
+      setTareaAEliminar(null);
+    },
+  });
+
+  const cambiarEstadoTarea = useMutation({
+    mutationFn: async ({ tareaId, estado }: { tareaId: string; estado: string }) => apiClient.patch(`/admin/proyectos/tareas/${tareaId}`, { estado }),
+    onSuccess: invalidar,
+    onError: (err) => onError(mensajeErrorApi(err, 'No se pudo cambiar el estado de la tarea.')),
+  });
+
+  const asignarResponsable = useMutation({
+    mutationFn: async ({ tareaId, empleadoId }: { tareaId: string; empleadoId: string }) =>
+      apiClient.post(`/admin/proyectos/tareas/${tareaId}/responsables/${empleadoId}`),
+    onSuccess: invalidar,
+    onError: (err) => onError(mensajeErrorApi(err, 'No se pudo asignar el responsable.')),
+  });
+
+  const quitarResponsable = useMutation({
+    mutationFn: async ({ tareaId, empleadoId }: { tareaId: string; empleadoId: string }) =>
+      apiClient.delete(`/admin/proyectos/tareas/${tareaId}/responsables/${empleadoId}`),
+    onSuccess: invalidar,
+    onError: (err) => onError(mensajeErrorApi(err, 'No se pudo quitar el responsable.')),
+  });
+
+  const registrarHora = useMutation({
+    mutationFn: async ({ tareaId, empleadoId, fecha, horas }: { tareaId: string; empleadoId: string; fecha: string; horas: string }) =>
+      apiClient.post(`/admin/proyectos/tareas/${tareaId}/horas`, { empleadoId, fecha, horas: Number(horas) }),
+    onSuccess: invalidar,
+    onError: (err) => onError(mensajeErrorApi(err, 'No se pudo registrar la hora.')),
+  });
+
+  const tareaActual = tareaAbierta ? tareas.find((t) => t.id === tareaAbierta.id) ?? tareaAbierta : null;
+  const hitoPorId = Object.fromEntries(hitos.map((h) => [h.id, h.nombre]));
+
+  function onDragStart(e: DragEvent<HTMLDivElement>, tareaId: string) {
+    e.dataTransfer.setData('text/plain', tareaId);
+    e.dataTransfer.effectAllowed = 'move';
+  }
+
+  function onDropColumna(e: DragEvent<HTMLDivElement>, estado: string) {
+    e.preventDefault();
+    setColumnaDestacada(null);
+    const tareaId = e.dataTransfer.getData('text/plain');
+    const tarea = tareas.find((t) => t.id === tareaId);
+    if (!tarea || tarea.estado === estado) return;
+    cambiarEstadoTarea.mutate({ tareaId, estado });
+  }
+
+  function accionesTarea(t: Tarea) {
+    return [
+      { etiqueta: 'Editar', onClick: () => setTareaEditando(t) },
+      { etiqueta: 'Eliminar', tono: 'peligro' as const, onClick: () => setTareaAEliminar(t) },
+    ];
+  }
+
+  return (
+    <Card
+      titulo="Tablero"
+      descripcion="Arrastrá una tarea a otra columna para cambiar su estado."
+      acciones={
+        <div className="flex items-center gap-2">
+          <div className="inline-flex rounded-lg border border-slate-200 p-0.5 dark:border-slate-800">
+            {(['clasico', 'compacto'] as const).map((v) => (
+              <button
+                key={v}
+                type="button"
+                onClick={() => setVista(v)}
+                className={clsx(
+                  'rounded-md px-2.5 py-1 text-xs font-medium capitalize transition-colors',
+                  vista === v ? 'bg-sol-500 text-white' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200',
+                )}
+              >
+                {v}
+              </button>
+            ))}
+          </div>
+          <RequierePermiso permiso="proyectos.crear">
+            <Button onClick={() => setModalCrearAbierto(true)}>Nueva tarea</Button>
+          </RequierePermiso>
+        </div>
+      }
+    >
+      {tareas.length === 0 ? (
+        <p className="text-sm text-slate-400">Sin tareas todavía — creá la primera con "Nueva tarea".</p>
+      ) : (
+        <div className="flex gap-3 overflow-x-auto pb-2">
+          {COLUMNAS.map((col) => {
+            const tareasColumna = tareas.filter((t) => t.estado === col.estado);
+            return (
+              <div
+                key={col.estado}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setColumnaDestacada(col.estado);
+                }}
+                onDragLeave={() => setColumnaDestacada((c) => (c === col.estado ? null : c))}
+                onDrop={(e) => onDropColumna(e, col.estado)}
+                className={clsx(
+                  'flex min-w-[250px] flex-1 flex-col gap-2 rounded-lg border p-2 transition-colors',
+                  columnaDestacada === col.estado
+                    ? 'border-sol-400 bg-sol-50/60 dark:border-sol-500/60 dark:bg-sol-500/5'
+                    : 'border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-800/30',
+                )}
+              >
+                <div className="flex items-center justify-between px-1 pb-1">
+                  <span className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300">
+                    <span className={clsx('h-2 w-2 rounded-full', col.dot)} /> {col.etiqueta}
+                  </span>
+                  <span className="rounded-full bg-white px-1.5 text-[10px] text-slate-400 dark:bg-slate-900 dark:text-slate-500">
+                    {tareasColumna.length}
+                  </span>
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  {tareasColumna.length === 0 && <p className="px-1 text-xs text-slate-400">Sin tareas</p>}
+
+                  {vista === 'clasico'
+                    ? tareasColumna.map((t) => (
+                        <div
+                          key={t.id}
+                          draggable
+                          onDragStart={(e) => onDragStart(e, t.id)}
+                          onClick={() => setTareaAbierta(t)}
+                          className="cursor-pointer space-y-2 rounded-lg border border-slate-200 bg-white p-3 shadow-sm hover:border-sol-300 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-sol-500/50"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            {t.hitoId && hitoPorId[t.hitoId] ? (
+                              <span className="truncate rounded bg-sol-50 px-1.5 py-0.5 text-[10px] font-medium text-sol-700 dark:bg-sol-500/10 dark:text-sol-400">
+                                {hitoPorId[t.hitoId]}
+                              </span>
+                            ) : (
+                              <span />
+                            )}
+                            <div onClick={(e) => e.stopPropagation()}>
+                              <RowActionsMenu acciones={accionesTarea(t)} />
+                            </div>
+                          </div>
+                          <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{t.titulo}</p>
+                          <div className="flex items-center justify-between">
+                            <span className={clsx('rounded-full px-2 py-0.5 text-[10px] font-semibold', ESTILO_PRIORIDAD_TAREA[t.prioridad])}>
+                              {ETIQUETA_PRIORIDAD_TAREA[t.prioridad]}
+                            </span>
+                            {t.responsables.length > 0 && (
+                              <div className="flex -space-x-1.5">
+                                {t.responsables.map((r, i) => (
+                                  <span
+                                    key={r.empleado.id}
+                                    title={r.empleado.nombre}
+                                    className={clsx(
+                                      'flex h-5 w-5 items-center justify-center rounded-full border-2 border-white text-[9px] font-bold text-white dark:border-slate-900',
+                                      PALETA_AVATAR[i % PALETA_AVATAR.length],
+                                    )}
+                                  >
+                                    {inicialesDe(r.empleado.nombre)}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                          {t.fechaVencimiento && (
+                            <p className="text-xs text-slate-400">Vence {new Date(t.fechaVencimiento).toLocaleDateString('es-DO')}</p>
+                          )}
+                        </div>
+                      ))
+                    : tareasColumna.map((t) => (
+                        <div
+                          key={t.id}
+                          draggable
+                          onDragStart={(e) => onDragStart(e, t.id)}
+                          onClick={() => setTareaAbierta(t)}
+                          className="flex cursor-pointer items-center justify-between gap-2 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs hover:border-sol-300 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-sol-500/50"
+                        >
+                          <div className="flex min-w-0 items-center gap-2">
+                            <span className={clsx('h-2 w-2 shrink-0 rounded-full', PUNTO_PRIORIDAD[t.prioridad])} />
+                            <span className="truncate font-medium text-slate-800 dark:text-slate-200">{t.titulo}</span>
+                          </div>
+                          <div onClick={(e) => e.stopPropagation()}>
+                            <RowActionsMenu acciones={accionesTarea(t)} />
+                          </div>
+                        </div>
+                      ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {modalCrearAbierto && (
+        <TareaFormModal
+          hitos={hitos}
+          guardando={crearTarea.isPending}
+          error={errorForm}
+          onClose={() => {
+            setModalCrearAbierto(false);
+            setErrorForm(null);
+          }}
+          onGuardar={(valores) => crearTarea.mutate(valores)}
+        />
+      )}
+
+      {tareaEditando && (
+        <TareaFormModal
+          tareaInicial={tareaEditando}
+          hitos={hitos}
+          guardando={editarTarea.isPending}
+          error={errorForm}
+          onClose={() => {
+            setTareaEditando(null);
+            setErrorForm(null);
+          }}
+          onGuardar={(valores) => editarTarea.mutate(valores)}
+        />
+      )}
+
+      {tareaAEliminar && (
+        <ConfirmModal
+          titulo="¿Eliminar esta tarea?"
+          descripcion={
+            <>
+              Se eliminará <b>{tareaAEliminar.titulo}</b>
+              {tareaAEliminar.registrosHoras.length > 0 && ' junto con las horas ya registradas en ella'}.
+            </>
+          }
+          confirmando={eliminarTarea.isPending}
+          onConfirmar={() => eliminarTarea.mutate(tareaAEliminar.id)}
+          onCancelar={() => setTareaAEliminar(null)}
+        />
+      )}
+
+      {tareaActual && (
+        <Modal titulo={tareaActual.titulo} onClose={() => setTareaAbierta(null)}>
+          <div className="space-y-5">
+            <div>
+              <h3 className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-300">Responsables</h3>
+              <div className="flex flex-wrap gap-2">
+                {tareaActual.responsables.map((r) => (
+                  <span
+                    key={r.empleado.id}
+                    className="flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                  >
+                    {r.empleado.nombre}
+                    <button
+                      type="button"
+                      onClick={() => quitarResponsable.mutate({ tareaId: tareaActual.id, empleadoId: r.empleado.id })}
+                      className="text-slate-400 hover:text-red-600"
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
+              <Select
+                className="mt-2"
+                value=""
+                onChange={(e) => {
+                  if (e.target.value) asignarResponsable.mutate({ tareaId: tareaActual.id, empleadoId: e.target.value });
+                }}
+              >
+                <option value="">Agregar responsable…</option>
+                {empleados
+                  ?.filter((emp) => !tareaActual.responsables.some((r) => r.empleado.id === emp.id))
+                  .map((emp) => (
+                    <option key={emp.id} value={emp.id}>
+                      {emp.nombre}
+                    </option>
+                  ))}
+              </Select>
+            </div>
+
+            <div>
+              <h3 className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-300">Horas registradas</h3>
+              <div className="space-y-1">
+                {tareaActual.registrosHoras.length === 0 && <p className="text-xs text-slate-400">Sin horas cargadas todavía.</p>}
+                {tareaActual.registrosHoras.map((r) => (
+                  <div key={r.id} className="flex justify-between text-xs text-slate-600 dark:text-slate-300">
+                    <span>
+                      {r.empleado.nombre} — {new Date(r.fecha).toLocaleDateString('es-DO')}
+                    </span>
+                    <span className="font-medium">{r.horas}h</span>
+                  </div>
+                ))}
+              </div>
+              <FormularioHora
+                empleados={empleados ?? []}
+                onRegistrar={(empleadoId, fecha, horas) => registrarHora.mutate({ tareaId: tareaActual.id, empleadoId, fecha, horas })}
+                guardando={registrarHora.isPending}
+              />
+            </div>
+          </div>
+        </Modal>
+      )}
+    </Card>
+  );
+}
+
+function FormularioHora({
+  empleados,
+  onRegistrar,
+  guardando,
+}: {
+  empleados: EmpleadoOpcion[];
+  onRegistrar: (empleadoId: string, fecha: string, horas: string) => void;
+  guardando: boolean;
+}) {
+  const [empleadoId, setEmpleadoId] = useState('');
+  const [fecha, setFecha] = useState(() => new Date().toISOString().slice(0, 10));
+  const [horas, setHoras] = useState('');
+
+  return (
+    <form
+      className="mt-3 flex flex-wrap items-end gap-2"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (empleadoId && horas) {
+          onRegistrar(empleadoId, fecha, horas);
+          setHoras('');
+        }
+      }}
+    >
+      <Select value={empleadoId} onChange={(e) => setEmpleadoId(e.target.value)} className="w-auto">
+        <option value="">Empleado…</option>
+        {empleados.map((emp) => (
+          <option key={emp.id} value={emp.id}>
+            {emp.nombre}
+          </option>
+        ))}
+      </Select>
+      <FormField id="hora-fecha" label="" type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} className="w-auto" />
+      <FormField id="hora-cantidad" label="" type="number" min="0" step="0.5" placeholder="Horas" value={horas} onChange={(e) => setHoras(e.target.value)} className="w-24" />
+      <Button type="submit" variante="secundario" disabled={guardando}>
+        Registrar
+      </Button>
+    </form>
+  );
+}
