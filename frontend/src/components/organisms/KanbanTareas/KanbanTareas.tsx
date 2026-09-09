@@ -201,15 +201,22 @@ export function KanbanTareas({ proyectoId, tareas, hitos, onInvalidar, onError }
     else iniciarCronometro.mutate(tareaId);
   }
 
-  /** Chip completo (vista Clásico) — botón Iniciar/Pausar si soy responsable, más quién más está trabajando ahora mismo. */
+  /**
+   * Chip completo (vista Clásico) — botón Iniciar/Pausar si soy responsable,
+   * más quién más está trabajando ahora mismo. En una tarea Terminada el
+   * botón "Iniciar" queda oculto (confirmado con el usuario) — hay que
+   * reabrirla cambiando el estado antes de poder volver a cronometrarla;
+   * "Pausar" sigue visible si por algún motivo quedó una sesión abierta.
+   */
   function chipCronometro(t: Tarea) {
     const miSesion = t.sesionesTrabajo.find((s) => s.empleadoId === miEmpleadoId);
     const otras = t.sesionesTrabajo.filter((s) => s.empleadoId !== miEmpleadoId);
     const soyResponsable = miEmpleadoId != null && t.responsables.some((r) => r.empleado.id === miEmpleadoId);
-    if (!soyResponsable && otras.length === 0) return null;
+    const puedeMostrarBoton = soyResponsable && (!!miSesion || t.estado !== 'TERMINADA');
+    if (!puedeMostrarBoton && otras.length === 0) return null;
     return (
       <div className="flex items-center gap-2">
-        {soyResponsable && (
+        {puedeMostrarBoton && (
           <button
             type="button"
             onClick={(e) => alternarCronometro(e, t.id, !!miSesion)}
@@ -238,11 +245,12 @@ export function KanbanTareas({ proyectoId, tareas, hitos, onInvalidar, onError }
     );
   }
 
-  /** Icono compacto (vista Compacto) — mismo control, sin duración a la vista para no romper la fila angosta. */
+  /** Icono compacto (vista Compacto) — mismo control y misma regla de Terminada, sin duración a la vista para no romper la fila angosta. */
   function iconoCronometro(t: Tarea) {
     const miSesion = t.sesionesTrabajo.find((s) => s.empleadoId === miEmpleadoId);
     const soyResponsable = miEmpleadoId != null && t.responsables.some((r) => r.empleado.id === miEmpleadoId);
-    if (!soyResponsable) return null;
+    const puedeMostrarBoton = soyResponsable && (!!miSesion || t.estado !== 'TERMINADA');
+    if (!puedeMostrarBoton) return null;
     return (
       <button
         type="button"

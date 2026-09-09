@@ -136,19 +136,44 @@ describe('TareasProyectoService', () => {
       });
 
       it('rechaza si el empleado no es responsable de la tarea', async () => {
-        repository.buscarTareaPorId.mockResolvedValue({ id: 't1', tenantId: 'tenant1', responsables: [{ empleadoId: 'otro' }] } as never);
+        repository.buscarTareaPorId.mockResolvedValue({ id: 't1', tenantId: 'tenant1', estado: 'PENDIENTE', responsables: [{ empleadoId: 'otro' }] } as never);
         await expect(service.iniciarSesionTrabajo('t1', 'u1')).rejects.toThrow('Solo un responsable');
         expect(repository.crearSesionTrabajo).not.toHaveBeenCalled();
       });
 
+      it('rechaza si la tarea está Terminada (hay que reabrirla a mano primero)', async () => {
+        repository.buscarTareaPorId.mockResolvedValue({ id: 't1', tenantId: 'tenant1', estado: 'TERMINADA', responsables: [{ empleadoId: 'e1' }] } as never);
+        await expect(service.iniciarSesionTrabajo('t1', 'u1')).rejects.toThrow('Terminada');
+        expect(repository.crearSesionTrabajo).not.toHaveBeenCalled();
+        expect(repository.actualizarTarea).not.toHaveBeenCalled();
+      });
+
       it('crea la sesión si el empleado es responsable y no tiene otra corriendo', async () => {
-        repository.buscarTareaPorId.mockResolvedValue({ id: 't1', tenantId: 'tenant1', responsables: [{ empleadoId: 'e1' }] } as never);
+        repository.buscarTareaPorId.mockResolvedValue({ id: 't1', tenantId: 'tenant1', estado: 'EN_CURSO', responsables: [{ empleadoId: 'e1' }] } as never);
         await service.iniciarSesionTrabajo('t1', 'u1');
         expect(repository.crearSesionTrabajo).toHaveBeenCalledWith('t1', 'e1', 'tenant1');
       });
 
+      it('si la tarea está Pendiente, la pasa a En Curso al iniciar el cronómetro', async () => {
+        repository.buscarTareaPorId.mockResolvedValue({ id: 't1', tenantId: 'tenant1', estado: 'PENDIENTE', responsables: [{ empleadoId: 'e1' }] } as never);
+        await service.iniciarSesionTrabajo('t1', 'u1');
+        expect(repository.actualizarTarea).toHaveBeenCalledWith('t1', { estado: 'EN_CURSO' });
+      });
+
+      it('si la tarea está En Revisión, también la pasa a En Curso al iniciar', async () => {
+        repository.buscarTareaPorId.mockResolvedValue({ id: 't1', tenantId: 'tenant1', estado: 'EN_REVISION', responsables: [{ empleadoId: 'e1' }] } as never);
+        await service.iniciarSesionTrabajo('t1', 'u1');
+        expect(repository.actualizarTarea).toHaveBeenCalledWith('t1', { estado: 'EN_CURSO' });
+      });
+
+      it('si ya está En Curso, no llama actualizarTarea de nuevo', async () => {
+        repository.buscarTareaPorId.mockResolvedValue({ id: 't1', tenantId: 'tenant1', estado: 'EN_CURSO', responsables: [{ empleadoId: 'e1' }] } as never);
+        await service.iniciarSesionTrabajo('t1', 'u1');
+        expect(repository.actualizarTarea).not.toHaveBeenCalled();
+      });
+
       it('si ya tenía un cronómetro corriendo en OTRA tarea, lo pausa (y registra) antes de arrancar el nuevo', async () => {
-        repository.buscarTareaPorId.mockResolvedValue({ id: 't1', tenantId: 'tenant1', responsables: [{ empleadoId: 'e1' }] } as never);
+        repository.buscarTareaPorId.mockResolvedValue({ id: 't1', tenantId: 'tenant1', estado: 'EN_CURSO', responsables: [{ empleadoId: 'e1' }] } as never);
         repository.buscarSesionAbiertaDelEmpleado.mockResolvedValue({
           id: 's-vieja',
           tareaId: 't-otra',

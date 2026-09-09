@@ -89,11 +89,22 @@ export class TareasProyectoService {
     if (!esResponsable) {
       throw new BadRequestException('Solo un responsable de la tarea puede iniciar su cronómetro.');
     }
+    // Confirmado con el usuario: una tarea Terminada no se reabre sola por
+    // arrancar el cronómetro — hay que cambiarle el estado a mano primero.
+    if (tarea.estado === 'TERMINADA') {
+      throw new BadRequestException('Esta tarea está Terminada — cambiale el estado antes de volver a cronometrarla.');
+    }
 
     // Un cronómetro a la vez por empleado, en TODO el sistema — si ya tenía
     // uno corriendo en otra tarea, se pausa solo antes de arrancar este.
     const abiertaEnOtraTarea = await this.proyectosRepository.buscarSesionAbiertaDelEmpleado(empleado.id);
     if (abiertaEnOtraTarea) await this.cerrarYRegistrarSesion(abiertaEnOtraTarea);
+
+    // Empezar a trabajar activamente implica que la tarea está en curso —
+    // sea que estuviera Pendiente o En Revisión (confirmado con el usuario).
+    if (tarea.estado !== 'EN_CURSO') {
+      await this.proyectosRepository.actualizarTarea(tareaId, { estado: 'EN_CURSO' });
+    }
 
     return this.proyectosRepository.crearSesionTrabajo(tareaId, empleado.id, tarea.tenantId);
   }
