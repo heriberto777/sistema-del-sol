@@ -14,8 +14,8 @@ export class ConfiguracionesController {
 
   @Get()
   @Permissions('admin.configuracion')
-  listar() {
-    return this.configuracionesService.listar();
+  listar(@CurrentUser() user: JwtPayloadUser) {
+    return this.configuracionesService.listar(user.tenantId);
   }
 
   @Put(':clave')

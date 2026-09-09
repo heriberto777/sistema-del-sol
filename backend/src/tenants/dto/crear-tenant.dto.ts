@@ -37,6 +37,11 @@ export class CrearTenantDto {
   @IsEmail()
   email?: string;
 
+  @ApiProperty({ required: false, description: 'Logo del tenant (data URI) — el tenant también puede cambiarlo después desde Personalización de documentos' })
+  @IsOptional()
+  @IsString()
+  logo?: string;
+
   @ApiProperty({ example: 'admin@distribuidora-ejemplo.com' })
   @IsEmail()
   adminEmail: string;

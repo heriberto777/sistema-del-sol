@@ -28,6 +28,13 @@ model Tenant {
   direccion            String?
   telefono             String?
   email                String?
+  // Antes vivía escondido en Configuracion[DOCUMENTO_LOGO] (tenant-scoped,
+  // solo el propio tenant lo veía/editaba) — promovido a campo propio
+  // para que Plataforma también pueda asignarlo/verlo desde
+  // /plataforma/tenants (PrismaService global, sin pasar por RLS de
+  // Configuracion). `resolverPersonalizacionDocumento` sigue siendo el
+  // único punto que lo resuelve para documentos/IA.
+  logo                 String?              @db.Text
   subdominio           String               @unique
   estado               EstadoTenant         @default(ACTIVO)
   // Qué módulos tiene disponibles este tenant — ver ModuloActivoGuard.

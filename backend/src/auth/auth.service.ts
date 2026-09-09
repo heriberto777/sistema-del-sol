@@ -43,7 +43,7 @@ export class AuthService {
     });
 
     return {
-      empresas: usuarios.map((u) => ({ subdominio: u.tenant.subdominio, nombre: u.tenant.nombre })),
+      empresas: usuarios.map((u) => ({ subdominio: u.tenant.subdominio, nombre: u.tenant.nombre, logo: u.tenant.logo })),
     };
   }
 

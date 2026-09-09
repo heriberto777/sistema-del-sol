@@ -120,27 +120,27 @@ describe('AuthService — recuperación de contraseña', () => {
   });
 
   describe('resolverEmpresas', () => {
-    it('devuelve una sola empresa si el email pertenece a un único tenant activo', async () => {
+    it('devuelve una sola empresa (con su logo) si el email pertenece a un único tenant activo', async () => {
       prisma.user.findMany.mockResolvedValue([
-        { tenant: { subdominio: 'demo', nombre: 'Empresa Demo' } },
+        { tenant: { subdominio: 'demo', nombre: 'Empresa Demo', logo: 'data:image/png;base64,abc' } },
       ]);
 
       const resultado = await service.resolverEmpresas('admin@demo.com');
 
-      expect(resultado.empresas).toEqual([{ subdominio: 'demo', nombre: 'Empresa Demo' }]);
+      expect(resultado.empresas).toEqual([{ subdominio: 'demo', nombre: 'Empresa Demo', logo: 'data:image/png;base64,abc' }]);
     });
 
     it('devuelve varias empresas si el mismo email existe en más de un tenant', async () => {
       prisma.user.findMany.mockResolvedValue([
-        { tenant: { subdominio: 'empresa-a', nombre: 'Empresa A' } },
-        { tenant: { subdominio: 'empresa-b', nombre: 'Empresa B' } },
+        { tenant: { subdominio: 'empresa-a', nombre: 'Empresa A', logo: null } },
+        { tenant: { subdominio: 'empresa-b', nombre: 'Empresa B', logo: null } },
       ]);
 
       const resultado = await service.resolverEmpresas('compartido@ejemplo.com');
 
       expect(resultado.empresas).toEqual([
-        { subdominio: 'empresa-a', nombre: 'Empresa A' },
-        { subdominio: 'empresa-b', nombre: 'Empresa B' },
+        { subdominio: 'empresa-a', nombre: 'Empresa A', logo: null },
+        { subdominio: 'empresa-b', nombre: 'Empresa B', logo: null },
       ]);
     });
 

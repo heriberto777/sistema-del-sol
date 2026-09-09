@@ -10,6 +10,7 @@ import { Select } from '../components/atoms/Select/Select';
 import { Switch } from '../components/atoms/Switch/Switch';
 import { Modal } from '../components/molecules/Modal/Modal';
 import { RowActionsMenu } from '../components/molecules/RowActionsMenu/RowActionsMenu';
+import { CampoImagen } from '../components/molecules/CampoImagen/CampoImagen';
 
 interface Tenant {
   id: string;
@@ -19,6 +20,7 @@ interface Tenant {
   direccion: string | null;
   telefono: string | null;
   email: string | null;
+  logo: string | null;
   estado: 'ACTIVO' | 'SUSPENDIDO' | 'CANCELADO';
   planId: string | null;
   plan: { id: string; nombre: string } | null;
@@ -533,7 +535,18 @@ export function PlatformTenants() {
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
               {tenants?.map((tenant) => (
                 <tr key={tenant.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                  <td className="px-5 py-3">{tenant.nombre}</td>
+                  <td className="px-5 py-3">
+                    <div className="flex items-center gap-2">
+                      {tenant.logo ? (
+                        <img src={tenant.logo} alt="" className="h-7 w-7 shrink-0 rounded object-contain" />
+                      ) : (
+                        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-slate-100 text-xs text-slate-400 dark:bg-slate-800">
+                          —
+                        </div>
+                      )}
+                      {tenant.nombre}
+                    </div>
+                  </td>
                   <td className="px-5 py-3 font-mono text-xs">{tenant.subdominio}</td>
                   <td className="px-5 py-3">
                     <Select
@@ -606,6 +619,7 @@ function ModalNuevoTenant({ planes, onClose }: { planes: Plan[]; onClose: () => 
   const [direccion, setDireccion] = useState('');
   const [telefono, setTelefono] = useState('');
   const [email, setEmail] = useState('');
+  const [logo, setLogo] = useState<string | null>(null);
   const [planId, setPlanId] = useState('');
   const [adminEmail, setAdminEmail] = useState('');
   const [adminNombre, setAdminNombre] = useState('');
@@ -621,6 +635,7 @@ function ModalNuevoTenant({ planes, onClose }: { planes: Plan[]; onClose: () => 
         direccion: direccion || undefined,
         telefono: telefono || undefined,
         email: email || undefined,
+        logo: logo || undefined,
         planId,
         adminEmail,
         adminNombre,
@@ -648,6 +663,7 @@ function ModalNuevoTenant({ planes, onClose }: { planes: Plan[]; onClose: () => 
         <FormField id="direccion" label="Dirección (opcional)" value={direccion} onChange={(e) => setDireccion(e.target.value)} />
         <FormField id="telefono" label="Teléfono (opcional)" value={telefono} onChange={(e) => setTelefono(e.target.value)} />
         <FormField id="email" label="Correo de la empresa (opcional)" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+        <CampoImagen valor={logo} onChange={setLogo} label="Logo (opcional)" />
         <div>
           <label htmlFor="plan" className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
             Plan
@@ -685,6 +701,7 @@ function ModalEditarTenant({ tenant, onClose }: { tenant: Tenant; onClose: () =>
   const [direccion, setDireccion] = useState(tenant.direccion ?? '');
   const [telefono, setTelefono] = useState(tenant.telefono ?? '');
   const [email, setEmail] = useState(tenant.email ?? '');
+  const [logo, setLogo] = useState<string | null>(tenant.logo);
   const [error, setError] = useState<string | null>(null);
 
   const guardar = useMutation({
@@ -696,6 +713,7 @@ function ModalEditarTenant({ tenant, onClose }: { tenant: Tenant; onClose: () =>
         direccion: direccion || undefined,
         telefono: telefono || undefined,
         email: email || undefined,
+        logo: logo ?? '',
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['platform-tenants'] });
@@ -719,6 +737,7 @@ function ModalEditarTenant({ tenant, onClose }: { tenant: Tenant; onClose: () =>
         <FormField id="editar-direccion" label="Dirección (opcional)" value={direccion} onChange={(e) => setDireccion(e.target.value)} />
         <FormField id="editar-telefono" label="Teléfono (opcional)" value={telefono} onChange={(e) => setTelefono(e.target.value)} />
         <FormField id="editar-email" label="Correo de la empresa (opcional)" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+        <CampoImagen valor={logo} onChange={setLogo} label="Logo (opcional)" />
         {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
         <Button type="submit" disabled={guardar.isPending} className="w-full">
           {guardar.isPending ? 'Guardando…' : 'Guardar cambios'}

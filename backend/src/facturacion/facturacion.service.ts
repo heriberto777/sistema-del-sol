@@ -613,7 +613,8 @@ export class FacturacionService {
   /** @deprecated usar generarImpreso — se mantiene por compatibilidad de la ruta /pdf ya existente. */
   async generarPdf(id: string) {
     const factura = await this.facturacionRepository.buscarPorId(id);
-    return generarDocumentoPdf(mapearFacturaAParams(factura));
+    const personalizacion = await resolverPersonalizacionDocumento(this.prisma, factura.tenantId);
+    return generarDocumentoPdf({ ...mapearFacturaAParams(factura), ...personalizacion });
   }
 
   async generarImpreso(id: string, formatoSolicitado: FormatoImpresion | undefined, tenantId: string) {

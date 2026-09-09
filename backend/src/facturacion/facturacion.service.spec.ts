@@ -96,6 +96,7 @@ describe('FacturacionService', () => {
     prisma = {
       bodega: { findFirst: jest.fn().mockResolvedValue(null) },
       configuracion: { findUnique: jest.fn().mockResolvedValue(null), findMany: jest.fn().mockResolvedValue([]) },
+      tenant: { findUnique: jest.fn().mockResolvedValue(null) },
     } as unknown as jest.Mocked<PrismaService>;
     clientesService = {
       buscarPorId: jest.fn().mockResolvedValue({ id: 'cliente-1', listaPrecio: null }),
@@ -1580,6 +1581,7 @@ describe('FacturacionService', () => {
     it('genera un PDF a partir de la factura y sus líneas', async () => {
       repository.buscarPorId.mockResolvedValue({
         id: 'f1',
+        tenantId: 'tenant-1',
         ncf: 'B0200000001',
         tipoFactura: 'CONTADO',
         fecha: new Date('2026-01-15'),
@@ -1597,10 +1599,32 @@ describe('FacturacionService', () => {
       expect(buffer).toBeInstanceOf(Buffer);
       expect(buffer.subarray(0, 5).toString('latin1')).toBe('%PDF-');
     });
+
+    it('también incluye el logo del tenant (deja de ser "sin ninguna personalización")', async () => {
+      repository.buscarPorId.mockResolvedValue({
+        id: 'f1',
+        tenantId: 'tenant-1',
+        ncf: 'B0200000001',
+        tipoFactura: 'CONTADO',
+        fecha: new Date('2026-01-15'),
+        cliente: { nombre: 'Cliente Demo' },
+        subtotal: 200,
+        descuento: 0,
+        itbis: 36,
+        total: 236,
+        lineas: [{ producto: { nombre: 'Producto A' }, cantidad: 2, precioUnitario: 100, montoTotal: 236 }],
+        recargos: [],
+      } as never);
+      (prisma.tenant.findUnique as jest.Mock).mockResolvedValue({ logo: 'data:image/png;base64,abc' });
+
+      await service.generarPdf('f1');
+
+      expect(prisma.tenant.findUnique).toHaveBeenCalledWith({ where: { id: 'tenant-1' }, select: { logo: true } });
+    });
   });
 
   describe('generarImpreso — personalización de documentos (plan de integración Cuadre, ítem H-3)', () => {
-    it('incluye el logo/nota de pie configurados por el tenant', async () => {
+    it('incluye el logo (Tenant.logo) y la nota de pie (Configuracion) configurados por el tenant', async () => {
       repository.buscarPorId.mockResolvedValue({
         id: 'f1',
         ncf: 'B0200000001',
@@ -1615,18 +1639,14 @@ describe('FacturacionService', () => {
         lineas: [{ producto: { nombre: 'Producto A' }, cantidad: 2, precioUnitario: 100, montoTotal: 236 }],
         recargos: [],
       } as never);
-      (prisma.configuracion.findMany as jest.Mock).mockResolvedValue([
-        { clave: 'DOCUMENTO_LOGO', valor: 'data:image/png;base64,abc' },
-        { clave: 'DOCUMENTO_NOTA_PIE', valor: 'Gracias por su compra' },
-      ]);
+      (prisma.tenant.findUnique as jest.Mock).mockResolvedValue({ logo: 'data:image/png;base64,abc' });
+      (prisma.configuracion.findUnique as jest.Mock).mockResolvedValue({ clave: 'DOCUMENTO_NOTA_PIE', valor: 'Gracias por su compra' });
 
       const { buffer, contentType } = await service.generarImpreso('f1', 'CARTA', 'tenant-1');
 
       expect(contentType).toBe('application/pdf');
       expect(buffer.subarray(0, 5).toString('latin1')).toBe('%PDF-');
-      expect(prisma.configuracion.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ where: expect.objectContaining({ tenantId: 'tenant-1' }) }),
-      );
+      expect(prisma.tenant.findUnique).toHaveBeenCalledWith({ where: { id: 'tenant-1' }, select: { logo: true } });
     });
   });
 

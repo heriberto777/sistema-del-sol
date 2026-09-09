@@ -62,4 +62,17 @@ describe('TenantsService', () => {
     service.actualizar('t1', { estado: 'SUSPENDIDO' });
     expect(repository.actualizar).toHaveBeenCalledWith('t1', { estado: 'SUSPENDIDO' });
   });
+
+  it('propaga el logo al crear (Plataforma puede pre-cargarlo)', async () => {
+    repository.crearConProvisioning.mockResolvedValue({ id: 't1' } as never);
+
+    await service.crear({ ...dto, logo: 'data:image/png;base64,abc' });
+
+    expect(repository.crearConProvisioning).toHaveBeenCalledWith(expect.objectContaining({ logo: 'data:image/png;base64,abc' }));
+  });
+
+  it('propaga el logo al actualizar, incluido "" para borrarlo', () => {
+    service.actualizar('t1', { logo: '' });
+    expect(repository.actualizar).toHaveBeenCalledWith('t1', { logo: '' });
+  });
 });

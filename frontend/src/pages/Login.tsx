@@ -14,6 +14,7 @@ const GRADIENTE_APP = { claro: 'linear-gradient(150deg,#f8fafc,#e2e8f0 55%,#cbd5
 interface Empresa {
   subdominio: string;
   nombre: string;
+  logo: string | null;
 }
 
 type Paso = 'email' | 'elegir-empresa' | 'password';
@@ -31,12 +32,17 @@ export function Login() {
 
   // Sin sesión, sin tenant resuelto todavía — GET público, ver
   // PlataformaConfigPublicaController. Sin logo configurado, se sigue
-  // mostrando el título de texto de siempre.
+  // mostrando el título de texto de siempre. Se usa SOLO en el paso
+  // 'email' — en cuanto se sabe qué tenant es (empresaElegida), nunca
+  // más se muestra el logo de PLATAFORMA (bug real reportado: antes se
+  // mostraba siempre, incluso con el tenant ya resuelto).
   const { data: branding } = useQuery({
     queryKey: ['platform-branding'],
     queryFn: async () => (await apiClient.get<{ logo: string | null }>('/platform/branding')).data,
     staleTime: 5 * 60 * 1000,
   });
+
+  const logoAMostrar = paso === 'email' ? branding?.logo : empresaElegida?.logo;
 
   async function onContinuar(e: FormEvent) {
     e.preventDefault();
@@ -102,8 +108,8 @@ export function Login() {
       caracteristicas={['NCF e ITBIS calculados al instante', 'Stock sincronizado en todas tus sucursales', 'Reportes fiscales listos para la DGII']}
     >
       <div className="space-y-4">
-        {branding?.logo ? (
-          <img src={branding.logo} alt="Logo" className="mx-auto h-16 max-w-[220px] object-contain" />
+        {logoAMostrar ? (
+          <img src={logoAMostrar} alt="Logo" className="mx-auto h-16 max-w-[220px] object-contain" />
         ) : (
           <h1 className="text-lg font-semibold text-sol-600 dark:text-sol-400">El Sistema del Sol</h1>
         )}

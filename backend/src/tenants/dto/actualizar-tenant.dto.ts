@@ -45,4 +45,9 @@ export class ActualizarTenantDto {
   @IsOptional()
   @IsEmail()
   email?: string;
+
+  @ApiProperty({ required: false, description: 'Logo del tenant (data URI) — "" borra el logo actual' })
+  @IsOptional()
+  @IsString()
+  logo?: string;
 }

@@ -32,6 +32,7 @@ export class TenantsRepository {
       direccion?: string;
       telefono?: string;
       email?: string;
+      logo?: string;
     },
   ) {
     return this.prisma.$transaction(async (tx) => {
@@ -60,6 +61,7 @@ export class TenantsRepository {
     direccion?: string;
     telefono?: string;
     email?: string;
+    logo?: string;
     planId: string;
     adminEmail: string;
     adminNombre: string;
@@ -78,6 +80,7 @@ export class TenantsRepository {
           direccion: params.direccion,
           telefono: params.telefono,
           email: params.email,
+          logo: params.logo,
           planId: params.planId,
           settings: { create: {} },
           configuraciones: {

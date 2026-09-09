@@ -17,6 +17,7 @@ export class TenantsService {
       direccion: dto.direccion,
       telefono: dto.telefono,
       email: dto.email,
+      logo: dto.logo,
       planId: dto.planId,
       adminEmail: dto.adminEmail,
       adminNombre: dto.adminNombre,
