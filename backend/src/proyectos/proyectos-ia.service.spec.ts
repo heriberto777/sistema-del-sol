@@ -24,7 +24,7 @@ describe('ProyectosIaService', () => {
       obtenerOCrear: jest.fn().mockResolvedValue(CONFIG_VACIA),
     } as unknown as jest.Mocked<WhatsappConfigRepository>;
     conversacionIaService = {
-      completar: jest.fn().mockResolvedValue('{"tareas":[{"titulo":"Cotizar materiales","prioridad":"ALTA"}]}'),
+      completar: jest.fn().mockResolvedValue('{"hitos":[],"tareasSinHito":[{"titulo":"Cotizar materiales","prioridad":"ALTA"}]}'),
     } as unknown as jest.Mocked<ConversacionIaService>;
     service = new ProyectosIaService(whatsappConfigRepository, conversacionIaService);
   });
@@ -66,9 +66,9 @@ describe('ProyectosIaService', () => {
     await expect(service.generarTareas('t1', 'x', 'descripción de prueba')).rejects.toThrow(ServiceUnavailableException);
   });
 
-  it('parsea la lista de tareas sugeridas de la respuesta de la IA', async () => {
+  it('parsea el plan (hitos + tareas sueltas) de la respuesta de la IA', async () => {
     whatsappConfigRepository.obtenerOCrear.mockResolvedValue({ ...CONFIG_VACIA, iaProveedor: 'ANTHROPIC', iaApiKeyCifrado: cifrar('sk-ant-real') } as never);
     const resultado = await service.generarTareas('t1', 'Remodelación', 'Remodelar el local de Piantini');
-    expect(resultado).toEqual({ tareas: [{ titulo: 'Cotizar materiales', prioridad: 'ALTA' }] });
+    expect(resultado).toEqual({ hitos: [], tareasSinHito: [{ titulo: 'Cotizar materiales', prioridad: 'ALTA' }] });
   });
 });

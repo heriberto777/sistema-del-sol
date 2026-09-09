@@ -13,7 +13,7 @@ import { ConfirmModal } from '../../molecules/ConfirmModal/ConfirmModal';
 import { RowActionsMenu } from '../../molecules/RowActionsMenu/RowActionsMenu';
 import { RequierePermiso } from '../RequierePermiso/RequierePermiso';
 import { TareaFormModal, TareaFormValues } from '../TareaFormModal/TareaFormModal';
-import { GenerarTareasIaModal } from '../GenerarTareasIaModal/GenerarTareasIaModal';
+import { GenerarTareasIaModal, PlanIaParaCrear } from '../GenerarTareasIaModal/GenerarTareasIaModal';
 import { EmpleadoOpcion, ESTILO_PRIORIDAD_TAREA, ETIQUETA_PRIORIDAD_TAREA, Hito, Tarea } from '../../../types/proyectos';
 
 /** Re-renderiza el Kanban cada `intervaloMs` para que el tiempo del cronómetro corriendo se vea en vivo, sin pedirle nada nuevo al backend hasta que se pause. */
@@ -115,11 +115,17 @@ export function KanbanTareas({ proyectoId, proyectoNombre, proyectoDescripcion, 
     onError: (err) => setErrorForm(mensajeErrorApi(err, 'No se pudo crear la tarea.')),
   });
 
-  async function crearTareasDesdeIa(sugerencias: { titulo: string; prioridad: string }[]) {
+  async function crearPlanDesdeIa(plan: PlanIaParaCrear) {
     setCreandoDesdeIa(true);
     try {
-      for (const s of sugerencias) {
-        await apiClient.post(`/admin/proyectos/${proyectoId}/tareas`, { titulo: s.titulo, prioridad: s.prioridad, hitoId: null });
+      for (const h of plan.hitos) {
+        const { data: hito } = await apiClient.post<{ id: string }>(`/admin/proyectos/${proyectoId}/hitos`, { nombre: h.nombre });
+        for (const t of h.tareas) {
+          await apiClient.post(`/admin/proyectos/${proyectoId}/tareas`, { titulo: t.titulo, prioridad: t.prioridad, hitoId: hito.id });
+        }
+      }
+      for (const t of plan.sueltas) {
+        await apiClient.post(`/admin/proyectos/${proyectoId}/tareas`, { titulo: t.titulo, prioridad: t.prioridad, hitoId: null });
       }
       setModalIaAbierto(false);
       onError(null);
@@ -449,7 +455,7 @@ export function KanbanTareas({ proyectoId, proyectoNombre, proyectoDescripcion, 
           nombreProyecto={proyectoNombre}
           descripcionInicial={proyectoDescripcion ?? undefined}
           onClose={() => setModalIaAbierto(false)}
-          onCrear={crearTareasDesdeIa}
+          onCrear={crearPlanDesdeIa}
           creando={creandoDesdeIa}
         />
       )}

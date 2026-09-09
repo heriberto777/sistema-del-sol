@@ -13,14 +13,11 @@ import { SearchInput } from '../components/molecules/SearchInput/SearchInput';
 import { Paginacion } from '../components/molecules/Paginacion/Paginacion';
 import { EstadoVacio } from '../components/molecules/EstadoVacio/EstadoVacio';
 import { RequierePermiso } from '../components/organisms/RequierePermiso/RequierePermiso';
-import { GenerarTareasIaModal } from '../components/organisms/GenerarTareasIaModal/GenerarTareasIaModal';
+import { GenerarTareasIaModal, PlanIaParaCrear } from '../components/organisms/GenerarTareasIaModal/GenerarTareasIaModal';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { PaginaResultado } from '../types/pagina-resultado';
 
-interface TareaIaPendiente {
-  titulo: string;
-  prioridad: string;
-}
+const PLAN_IA_VACIO: PlanIaParaCrear = { hitos: [], sueltas: [] };
 
 interface ProyectoResumen {
   id: string;
@@ -61,7 +58,7 @@ export function Proyectos() {
   const [form, setForm] = useState(FORM_VACIO);
   const [error, setError] = useState<string | null>(null);
   const [modalIaAbierto, setModalIaAbierto] = useState(false);
-  const [tareasIaPendientes, setTareasIaPendientes] = useState<TareaIaPendiente[]>([]);
+  const [planIaPendiente, setPlanIaPendiente] = useState<PlanIaParaCrear>(PLAN_IA_VACIO);
 
   const { data, isLoading } = useQuery({
     queryKey: ['proyectos', pagina, busquedaDebounced],
@@ -91,10 +88,16 @@ export function Proyectos() {
         modoFacturacion: form.modoFacturacion,
         tarifaHoraFacturable: form.modoFacturacion === 'POR_HORAS' && form.tarifaHoraFacturable ? Number(form.tarifaHoraFacturable) : undefined,
       });
-      // Las tareas sugeridas por IA (si el usuario generó alguna antes de
-      // enviar el formulario) recién se pueden crear una vez que el
-      // proyecto existe de verdad — ver GenerarTareasIaModal.
-      for (const t of tareasIaPendientes) {
+      // El plan sugerido por IA (si el usuario generó uno antes de enviar
+      // el formulario) recién se puede crear una vez que el proyecto
+      // existe de verdad — ver GenerarTareasIaModal.
+      for (const h of planIaPendiente.hitos) {
+        const { data: hito } = await apiClient.post<{ id: string }>(`/admin/proyectos/${proyecto.id}/hitos`, { nombre: h.nombre });
+        for (const t of h.tareas) {
+          await apiClient.post(`/admin/proyectos/${proyecto.id}/tareas`, { titulo: t.titulo, prioridad: t.prioridad, hitoId: hito.id });
+        }
+      }
+      for (const t of planIaPendiente.sueltas) {
         await apiClient.post(`/admin/proyectos/${proyecto.id}/tareas`, { titulo: t.titulo, prioridad: t.prioridad, hitoId: null });
       }
       return proyecto;
@@ -103,7 +106,7 @@ export function Proyectos() {
       queryClient.invalidateQueries({ queryKey: ['proyectos'] });
       setModalAbierto(false);
       setForm(FORM_VACIO);
-      setTareasIaPendientes([]);
+      setPlanIaPendiente(PLAN_IA_VACIO);
       setError(null);
     },
     onError: (err) => setError(mensajeErrorApi(err, 'No se pudo crear el proyecto.')),
@@ -241,18 +244,34 @@ export function Proyectos() {
                     Generar tareas con IA
                   </Button>
                 </RequierePermiso>
-                {tareasIaPendientes.length > 0 && (
+                {(planIaPendiente.hitos.length > 0 || planIaPendiente.sueltas.length > 0) && (
                   <div className="flex flex-wrap gap-1.5">
-                    {tareasIaPendientes.map((t, i) => (
+                    {planIaPendiente.hitos.map((h, i) => (
                       <span
-                        key={i}
+                        key={`hito-${i}`}
                         className="flex items-center gap-1 rounded-full bg-sol-50 px-2.5 py-1 text-xs text-sol-700 dark:bg-sol-500/10 dark:text-sol-400"
+                      >
+                        {h.nombre} ({h.tareas.length})
+                        <button
+                          type="button"
+                          onClick={() => setPlanIaPendiente((actual) => ({ ...actual, hitos: actual.hitos.filter((_, j) => j !== i) }))}
+                          className="text-sol-400 hover:text-red-600"
+                          aria-label="Quitar"
+                        >
+                          <X size={12} />
+                        </button>
+                      </span>
+                    ))}
+                    {planIaPendiente.sueltas.map((t, i) => (
+                      <span
+                        key={`suelta-${i}`}
+                        className="flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-xs text-slate-600 dark:bg-slate-800 dark:text-slate-300"
                       >
                         {t.titulo}
                         <button
                           type="button"
-                          onClick={() => setTareasIaPendientes((actual) => actual.filter((_, j) => j !== i))}
-                          className="text-sol-400 hover:text-red-600"
+                          onClick={() => setPlanIaPendiente((actual) => ({ ...actual, sueltas: actual.sueltas.filter((_, j) => j !== i) }))}
+                          className="text-slate-400 hover:text-red-600"
                           aria-label="Quitar"
                         >
                           <X size={12} />
@@ -272,7 +291,7 @@ export function Proyectos() {
                   variante="secundario"
                   onClick={() => {
                     setModalAbierto(false);
-                    setTareasIaPendientes([]);
+                    setPlanIaPendiente(PLAN_IA_VACIO);
                   }}
                 >
                   Cancelar
@@ -289,8 +308,8 @@ export function Proyectos() {
           <GenerarTareasIaModal
             nombreProyecto={form.nombre}
             onClose={() => setModalIaAbierto(false)}
-            onCrear={(tareas) => {
-              setTareasIaPendientes((actual) => [...actual, ...tareas]);
+            onCrear={(plan) => {
+              setPlanIaPendiente((actual) => ({ hitos: [...actual.hitos, ...plan.hitos], sueltas: [...actual.sueltas, ...plan.sueltas] }));
               setModalIaAbierto(false);
             }}
           />

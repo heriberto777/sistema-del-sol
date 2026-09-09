@@ -2,7 +2,7 @@ import { BadRequestException, Injectable, ServiceUnavailableException } from '@n
 import { WhatsappConfigRepository } from '../whatsapp-config/whatsapp-config.repository';
 import { ConversacionIaService } from '../ia/conversacion/conversacion-ia.service';
 import { descifrar } from '../common/utils/encriptado.util';
-import { construirPromptGenerarTareas, parsearTareasSugeridas, TareaSugerida } from './generar-tareas-ia.prompt';
+import { construirPromptGenerarTareas, parsearPlanSugerido, PlanSugerido } from './generar-tareas-ia.prompt';
 
 /**
  * Fase 7 — "Generar tareas con IA". Reusa deliberadamente la IA que el
@@ -20,7 +20,7 @@ export class ProyectosIaService {
     private readonly conversacionIaService: ConversacionIaService,
   ) {}
 
-  async generarTareas(tenantId: string, nombreProyecto: string, descripcion: string): Promise<{ tareas: TareaSugerida[] }> {
+  async generarTareas(tenantId: string, nombreProyecto: string, descripcion: string): Promise<PlanSugerido> {
     const config = await this.whatsappConfigRepository.obtenerOCrear(tenantId);
     if (!config.iaProveedor || !config.iaApiKeyCifrado) {
       throw new BadRequestException(
@@ -39,6 +39,6 @@ export class ProyectosIaService {
       throw new ServiceUnavailableException('No se pudieron generar tareas con IA — probá de nuevo en un momento.');
     }
 
-    return { tareas: parsearTareasSugeridas(texto) };
+    return parsearPlanSugerido(texto);
   }
 }
