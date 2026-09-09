@@ -1,6 +1,7 @@
 import { FormEvent, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
+import { Sparkles, X } from 'lucide-react';
 import { apiClient } from '../lib/api-client';
 import { mensajeErrorApi } from '../lib/mensaje-error-api';
 import { Button } from '../components/atoms/Button/Button';
@@ -12,8 +13,14 @@ import { SearchInput } from '../components/molecules/SearchInput/SearchInput';
 import { Paginacion } from '../components/molecules/Paginacion/Paginacion';
 import { EstadoVacio } from '../components/molecules/EstadoVacio/EstadoVacio';
 import { RequierePermiso } from '../components/organisms/RequierePermiso/RequierePermiso';
+import { GenerarTareasIaModal } from '../components/organisms/GenerarTareasIaModal/GenerarTareasIaModal';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { PaginaResultado } from '../types/pagina-resultado';
+
+interface TareaIaPendiente {
+  titulo: string;
+  prioridad: string;
+}
 
 interface ProyectoResumen {
   id: string;
@@ -53,6 +60,8 @@ export function Proyectos() {
   const [modalAbierto, setModalAbierto] = useState(false);
   const [form, setForm] = useState(FORM_VACIO);
   const [error, setError] = useState<string | null>(null);
+  const [modalIaAbierto, setModalIaAbierto] = useState(false);
+  const [tareasIaPendientes, setTareasIaPendientes] = useState<TareaIaPendiente[]>([]);
 
   const { data, isLoading } = useQuery({
     queryKey: ['proyectos', pagina, busquedaDebounced],
@@ -73,19 +82,28 @@ export function Proyectos() {
   });
 
   const crear = useMutation({
-    mutationFn: async () =>
-      apiClient.post('/admin/proyectos', {
+    mutationFn: async () => {
+      const { data: proyecto } = await apiClient.post<{ id: string }>('/admin/proyectos', {
         nombre: form.nombre,
         clienteId: form.clienteId,
         responsableId: form.responsableId || undefined,
         presupuesto: form.presupuesto ? Number(form.presupuesto) : undefined,
         modoFacturacion: form.modoFacturacion,
         tarifaHoraFacturable: form.modoFacturacion === 'POR_HORAS' && form.tarifaHoraFacturable ? Number(form.tarifaHoraFacturable) : undefined,
-      }),
+      });
+      // Las tareas sugeridas por IA (si el usuario generó alguna antes de
+      // enviar el formulario) recién se pueden crear una vez que el
+      // proyecto existe de verdad — ver GenerarTareasIaModal.
+      for (const t of tareasIaPendientes) {
+        await apiClient.post(`/admin/proyectos/${proyecto.id}/tareas`, { titulo: t.titulo, prioridad: t.prioridad, hitoId: null });
+      }
+      return proyecto;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['proyectos'] });
       setModalAbierto(false);
       setForm(FORM_VACIO);
+      setTareasIaPendientes([]);
       setError(null);
     },
     onError: (err) => setError(mensajeErrorApi(err, 'No se pudo crear el proyecto.')),
@@ -217,10 +235,46 @@ export function Proyectos() {
                 />
               )}
 
+              <div className="flex flex-col gap-1.5 border-t border-slate-100 pt-3 dark:border-slate-800">
+                <RequierePermiso permiso="proyectos.ia_generar">
+                  <Button type="button" variante="secundario" icon={Sparkles} disabled={!form.nombre.trim()} onClick={() => setModalIaAbierto(true)}>
+                    Generar tareas con IA
+                  </Button>
+                </RequierePermiso>
+                {tareasIaPendientes.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {tareasIaPendientes.map((t, i) => (
+                      <span
+                        key={i}
+                        className="flex items-center gap-1 rounded-full bg-sol-50 px-2.5 py-1 text-xs text-sol-700 dark:bg-sol-500/10 dark:text-sol-400"
+                      >
+                        {t.titulo}
+                        <button
+                          type="button"
+                          onClick={() => setTareasIaPendientes((actual) => actual.filter((_, j) => j !== i))}
+                          className="text-sol-400 hover:text-red-600"
+                          aria-label="Quitar"
+                        >
+                          <X size={12} />
+                        </button>
+                      </span>
+                    ))}
+                    <span className="text-xs text-slate-400">se crearán junto con el proyecto</span>
+                  </div>
+                )}
+              </div>
+
               {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
 
               <div className="flex justify-end gap-2 pt-2">
-                <Button type="button" variante="secundario" onClick={() => setModalAbierto(false)}>
+                <Button
+                  type="button"
+                  variante="secundario"
+                  onClick={() => {
+                    setModalAbierto(false);
+                    setTareasIaPendientes([]);
+                  }}
+                >
                   Cancelar
                 </Button>
                 <Button type="submit" disabled={crear.isPending}>
@@ -229,6 +283,17 @@ export function Proyectos() {
               </div>
             </form>
           </Modal>
+        )}
+
+        {modalIaAbierto && (
+          <GenerarTareasIaModal
+            nombreProyecto={form.nombre}
+            onClose={() => setModalIaAbierto(false)}
+            onCrear={(tareas) => {
+              setTareasIaPendientes((actual) => [...actual, ...tareas]);
+              setModalIaAbierto(false);
+            }}
+          />
         )}
       </div>
     </RequierePermiso>

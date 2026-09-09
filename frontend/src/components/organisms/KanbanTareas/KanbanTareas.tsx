@@ -1,7 +1,7 @@
 import { DragEvent, MouseEvent, useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { Pause, Play } from 'lucide-react';
+import { Pause, Play, Sparkles } from 'lucide-react';
 import { apiClient } from '../../../lib/api-client';
 import { mensajeErrorApi } from '../../../lib/mensaje-error-api';
 import { Button } from '../../atoms/Button/Button';
@@ -13,6 +13,7 @@ import { ConfirmModal } from '../../molecules/ConfirmModal/ConfirmModal';
 import { RowActionsMenu } from '../../molecules/RowActionsMenu/RowActionsMenu';
 import { RequierePermiso } from '../RequierePermiso/RequierePermiso';
 import { TareaFormModal, TareaFormValues } from '../TareaFormModal/TareaFormModal';
+import { GenerarTareasIaModal } from '../GenerarTareasIaModal/GenerarTareasIaModal';
 import { EmpleadoOpcion, ESTILO_PRIORIDAD_TAREA, ETIQUETA_PRIORIDAD_TAREA, Hito, Tarea } from '../../../types/proyectos';
 
 /** Re-renderiza el Kanban cada `intervaloMs` para que el tiempo del cronómetro corriendo se vea en vivo, sin pedirle nada nuevo al backend hasta que se pause. */
@@ -57,13 +58,15 @@ function inicialesDe(nombre: string): string {
 
 interface KanbanTareasProps {
   proyectoId: string;
+  proyectoNombre: string;
+  proyectoDescripcion: string | null;
   tareas: Tarea[];
   hitos: Hito[];
   onInvalidar: () => void;
   onError: (mensaje: string | null) => void;
 }
 
-export function KanbanTareas({ proyectoId, tareas, hitos, onInvalidar, onError }: KanbanTareasProps) {
+export function KanbanTareas({ proyectoId, proyectoNombre, proyectoDescripcion, tareas, hitos, onInvalidar, onError }: KanbanTareasProps) {
   const queryClient = useQueryClient();
   const [vista, setVista] = useState<'clasico' | 'compacto'>(() => {
     const guardada = localStorage.getItem(CLAVE_VISTA);
@@ -75,6 +78,8 @@ export function KanbanTareas({ proyectoId, tareas, hitos, onInvalidar, onError }
   const [tareaEditando, setTareaEditando] = useState<Tarea | null>(null);
   const [tareaAEliminar, setTareaAEliminar] = useState<Tarea | null>(null);
   const [errorForm, setErrorForm] = useState<string | null>(null);
+  const [modalIaAbierto, setModalIaAbierto] = useState(false);
+  const [creandoDesdeIa, setCreandoDesdeIa] = useState(false);
   const ahora = useAhora(30_000);
 
   useEffect(() => {
@@ -109,6 +114,22 @@ export function KanbanTareas({ proyectoId, tareas, hitos, onInvalidar, onError }
     },
     onError: (err) => setErrorForm(mensajeErrorApi(err, 'No se pudo crear la tarea.')),
   });
+
+  async function crearTareasDesdeIa(sugerencias: { titulo: string; prioridad: string }[]) {
+    setCreandoDesdeIa(true);
+    try {
+      for (const s of sugerencias) {
+        await apiClient.post(`/admin/proyectos/${proyectoId}/tareas`, { titulo: s.titulo, prioridad: s.prioridad, hitoId: null });
+      }
+      setModalIaAbierto(false);
+      onError(null);
+      invalidar();
+    } catch (err) {
+      onError(mensajeErrorApi(err, 'No se pudieron crear todas las tareas.'));
+    } finally {
+      setCreandoDesdeIa(false);
+    }
+  }
 
   const editarTarea = useMutation({
     mutationFn: async (valores: TareaFormValues) => apiClient.patch(`/admin/proyectos/tareas/${tareaEditando?.id}`, valores),
@@ -288,6 +309,11 @@ export function KanbanTareas({ proyectoId, tareas, hitos, onInvalidar, onError }
               </button>
             ))}
           </div>
+          <RequierePermiso permiso="proyectos.ia_generar">
+            <Button variante="secundario" icon={Sparkles} onClick={() => setModalIaAbierto(true)}>
+              Generar con IA
+            </Button>
+          </RequierePermiso>
           <RequierePermiso permiso="proyectos.crear">
             <Button onClick={() => setModalCrearAbierto(true)}>Nueva tarea</Button>
           </RequierePermiso>
@@ -415,6 +441,16 @@ export function KanbanTareas({ proyectoId, tareas, hitos, onInvalidar, onError }
             setErrorForm(null);
           }}
           onGuardar={(valores) => crearTarea.mutate(valores)}
+        />
+      )}
+
+      {modalIaAbierto && (
+        <GenerarTareasIaModal
+          nombreProyecto={proyectoNombre}
+          descripcionInicial={proyectoDescripcion ?? undefined}
+          onClose={() => setModalIaAbierto(false)}
+          onCrear={crearTareasDesdeIa}
+          creando={creandoDesdeIa}
         />
       )}
 

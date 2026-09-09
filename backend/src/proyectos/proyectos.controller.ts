@@ -1,8 +1,10 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { ProyectosService } from './proyectos.service';
+import { ProyectosIaService } from './proyectos-ia.service';
 import { CrearProyectoDto } from './dto/crear-proyecto.dto';
 import { CrearHitoDto } from './dto/crear-hito.dto';
+import { GenerarTareasIaDto } from './dto/generar-tareas-ia.dto';
 import { Permissions } from '../common/decorators/permissions.decorator';
 import { RequiereModulo } from '../common/decorators/requiere-modulo.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -14,12 +16,24 @@ import { ListadoQueryDto } from '../common/dto/listado-query.dto';
 @RequiereModulo('proyectos')
 @Controller('admin/proyectos')
 export class ProyectosController {
-  constructor(private readonly proyectosService: ProyectosService) {}
+  constructor(
+    private readonly proyectosService: ProyectosService,
+    private readonly proyectosIaService: ProyectosIaService,
+  ) {}
 
   @Post()
   @Permissions('proyectos.crear')
   crear(@Body() dto: CrearProyectoDto, @CurrentUser() user: JwtPayloadUser) {
     return this.proyectosService.crear(dto, user.tenantId);
+  }
+
+  // Fase 7 — sin `:id` a propósito: sirve tanto para un proyecto ya creado
+  // como para el modal de "Nuevo proyecto" (todavía sin id). Permiso opt-in
+  // separado de `proyectos.crear` (ver roles-base.ts).
+  @Post('generar-tareas-ia')
+  @Permissions('proyectos.ia_generar')
+  generarTareasConIa(@Body() dto: GenerarTareasIaDto, @CurrentUser() user: JwtPayloadUser) {
+    return this.proyectosIaService.generarTareas(user.tenantId, dto.nombreProyecto, dto.descripcion);
   }
 
   @Get()

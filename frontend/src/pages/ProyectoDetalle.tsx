@@ -201,6 +201,8 @@ export function ProyectoDetalle() {
         {pestana === 'tablero' && (
           <KanbanTareas
             proyectoId={proyecto.id}
+            proyectoNombre={proyecto.nombre}
+            proyectoDescripcion={proyecto.descripcion}
             tareas={proyecto.tareas}
             hitos={proyecto.hitos}
             onInvalidar={invalidar}

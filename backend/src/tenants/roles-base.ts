@@ -69,7 +69,11 @@ export const PERMISOS_BASE = [
   // `proyectos.ver` — expone costo interno derivado del salario de los
   // empleados (agregado, no por persona, pero más sensible que solo ver
   // el proyecto), a propósito no incluido en el permiso básico de ver.
-  'proyectos.ver', 'proyectos.crear', 'proyectos.editar', 'proyectos.horas.registrar', 'proyectos.facturar', 'proyectos.rentabilidad.ver',
+  // `proyectos.ia_generar` (Fase 7 — "Generar tareas con IA") — mismo
+  // criterio opt-in que `productos.ia_generar`: reusa la IA que el tenant
+  // ya configuró para el Bot de WhatsApp (Configuraciones → Integraciones),
+  // no crea una credencial propia.
+  'proyectos.ver', 'proyectos.crear', 'proyectos.editar', 'proyectos.horas.registrar', 'proyectos.facturar', 'proyectos.rentabilidad.ver', 'proyectos.ia_generar',
   // Plugin de Publicaciones Sociales (Fase 1) — `.aprobar` separado de
   // `.editar` a propósito, mismo criterio que `proyectos.facturar`: es
   // la acción que habilita la entrega (descarga/WhatsApp) de un diseño,
