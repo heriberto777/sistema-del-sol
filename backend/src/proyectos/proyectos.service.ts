@@ -97,24 +97,74 @@ export class ProyectosService {
    * `precioUnitario` de una línea manual, el ITBIS lo suma `crear()` solo
    * con la tasa general del tenant.
    */
-  async facturarHito(hitoId: string, tenantId: string, vendedorId: string) {
+  /**
+   * Cuerpo puro del cálculo de monto — reusado por `facturarHito` (factura
+   * real) y `previsualizarFacturaHito` (modal de confirmación, no factura
+   * nada). Mismas reglas/mismos mensajes de error en los dos casos, para
+   * que la previsualización nunca prometa algo que `facturarHito` termine
+   * rechazando.
+   */
+  private async calcularMontoHito(
+    hito: { id: string; montoFijo: unknown },
+    proyecto: { modoFacturacion: string; tarifaHoraFacturable: unknown },
+  ): Promise<{ monto: number; horas?: number; tarifaHora?: number }> {
+    if (proyecto.modoFacturacion === 'PRECIO_FIJO') {
+      if (hito.montoFijo == null) throw new BadRequestException('Este hito no tiene un monto fijo cargado');
+      return { monto: Number(hito.montoFijo) };
+    }
+    const horas = await this.proyectosRepository.sumarHorasDelHito(hito.id);
+    if (horas <= 0) throw new BadRequestException('No hay horas registradas para facturar en este hito');
+    if (proyecto.tarifaHoraFacturable == null) {
+      throw new BadRequestException('El proyecto no tiene una tarifa por hora facturable configurada');
+    }
+    const tarifaHora = Number(proyecto.tarifaHoraFacturable);
+    return { monto: horas * tarifaHora, horas, tarifaHora };
+  }
+
+  /**
+   * Fase 9 (Proyectos) — datos para el modal de confirmación ANTES de
+   * facturar de verdad: mismo cálculo de monto que `facturarHito`, más
+   * `tareasPendientes`/`puedeFacturar` para que el frontend deshabilite el
+   * botón de confirmar si todavía hay tareas sin terminar (la validación
+   * real y no saltable sigue siendo la de `facturarHito`, esto es solo
+   * para avisar antes de intentarlo).
+   */
+  async previsualizarFacturaHito(hitoId: string) {
     const hito = await this.proyectosRepository.buscarHitoPorId(hitoId);
     if (hito.facturaId) throw new BadRequestException('Este hito ya fue facturado');
 
     const proyecto = await this.proyectosRepository.buscarProyectoPorId(hito.proyectoId);
+    const tareasPendientes = await this.proyectosRepository.contarTareasVigentesDelHito(hitoId);
+    const { monto, horas, tarifaHora } = await this.calcularMontoHito(hito, proyecto);
 
-    let monto: number;
-    if (proyecto.modoFacturacion === 'PRECIO_FIJO') {
-      if (hito.montoFijo == null) throw new BadRequestException('Este hito no tiene un monto fijo cargado');
-      monto = Number(hito.montoFijo);
-    } else {
-      const horas = await this.proyectosRepository.sumarHorasDelHito(hitoId);
-      if (horas <= 0) throw new BadRequestException('No hay horas registradas para facturar en este hito');
-      if (proyecto.tarifaHoraFacturable == null) {
-        throw new BadRequestException('El proyecto no tiene una tarifa por hora facturable configurada');
-      }
-      monto = horas * Number(proyecto.tarifaHoraFacturable);
+    return {
+      proyectoNombre: proyecto.nombre,
+      clienteNombre: proyecto.cliente.nombre,
+      hitoNombre: hito.nombre,
+      modoFacturacion: proyecto.modoFacturacion,
+      monto,
+      horas,
+      tarifaHora,
+      tareasPendientes,
+      puedeFacturar: tareasPendientes === 0,
+    };
+  }
+
+  async facturarHito(hitoId: string, tenantId: string, vendedorId: string) {
+    const hito = await this.proyectosRepository.buscarHitoPorId(hitoId);
+    if (hito.facturaId) throw new BadRequestException('Este hito ya fue facturado');
+
+    // Confirmado con el usuario — no se puede facturar mientras el hito
+    // tenga tareas sin terminar (Pendiente/En curso/En revisión).
+    const tareasPendientes = await this.proyectosRepository.contarTareasVigentesDelHito(hitoId);
+    if (tareasPendientes > 0) {
+      throw new BadRequestException(
+        `Este hito tiene ${tareasPendientes} tarea(s) sin terminar — no se puede facturar hasta que todas estén Terminadas.`,
+      );
     }
+
+    const proyecto = await this.proyectosRepository.buscarProyectoPorId(hito.proyectoId);
+    const { monto } = await this.calcularMontoHito(hito, proyecto);
 
     const bodega = await this.proyectosRepository.buscarBodegaActivaPorDefecto();
     if (!bodega) throw new BadRequestException('Este tenant no tiene ninguna bodega activa configurada — no se puede facturar');

@@ -119,6 +119,11 @@ export class ProyectosRepository {
     return this.db.hitoProyecto.update({ where: { id }, data: { estado: 'FACTURADO', facturaId } });
   }
 
+  /** Confirmado con el usuario — bloquea facturar un hito con tareas sin terminar. */
+  contarTareasVigentesDelHito(hitoId: string): Promise<number> {
+    return this.db.tareaProyecto.count({ where: { hitoId, estado: { not: 'TERMINADA' } } });
+  }
+
   /** Fase 4 — sin ningún campo "principal" en Bodega (confirmado en schema.prisma); ordenar por nombre es lo único determinístico disponible. */
   buscarBodegaActivaPorDefecto() {
     return this.db.bodega.findFirst({ where: { activa: true }, orderBy: { nombre: 'asc' } });

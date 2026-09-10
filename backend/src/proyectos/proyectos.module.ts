@@ -13,6 +13,7 @@ import { IaModule } from '../ia/ia.module';
 import { WhatsappConfigModule } from '../whatsapp-config/whatsapp-config.module';
 import { HitosProyectoCronService } from './hitos-proyecto-cron.service';
 import { PresupuestoProyectoListener } from './presupuesto-proyecto.listener';
+import { HitoFacturaAnuladaListener } from './hito-factura-anulada.listener';
 
 /**
  * Plugin de Proyectos (Fase 1) — ver plugins/proyectos/README.md. Gateado
@@ -28,7 +29,15 @@ import { PresupuestoProyectoListener } from './presupuesto-proyecto.listener';
 @Module({
   imports: [ClientesModule, NominaModule, ConfiguracionesModule, FacturacionModule, IaModule, WhatsappConfigModule],
   controllers: [ProyectosController, TareasProyectoController],
-  providers: [ProyectosService, ProyectosRepository, ProyectosIaService, TareasProyectoService, HitosProyectoCronService, PresupuestoProyectoListener],
+  providers: [
+    ProyectosService,
+    ProyectosRepository,
+    ProyectosIaService,
+    TareasProyectoService,
+    HitosProyectoCronService,
+    PresupuestoProyectoListener,
+    HitoFacturaAnuladaListener,
+  ],
   exports: [ProyectosRepository],
 })
 export class ProyectosModule {}

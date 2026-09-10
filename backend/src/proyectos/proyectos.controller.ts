@@ -119,4 +119,12 @@ export class ProyectosController {
   facturarHito(@Param('id') id: string, @CurrentUser() user: JwtPayloadUser) {
     return this.proyectosService.facturarHito(id, user.tenantId, user.userId);
   }
+
+  // Datos para el modal de confirmación previo a facturar (mismo permiso — es
+  // parte del mismo flujo fiscal, no una consulta de solo-lectura cualquiera).
+  @Get('hitos/:id/previsualizar-factura')
+  @Permissions('proyectos.facturar')
+  previsualizarFacturaHito(@Param('id') id: string) {
+    return this.proyectosService.previsualizarFacturaHito(id);
+  }
 }

@@ -26,6 +26,7 @@ describe('ProyectosService', () => {
       sumarHorasDelHito: jest.fn(),
       marcarHitoFacturado: jest.fn(),
       buscarBodegaActivaPorDefecto: jest.fn(),
+      contarTareasVigentesDelHito: jest.fn(),
       sumarFacturadoDelProyecto: jest.fn(),
       agruparHorasDelProyectoPorEmpleado: jest.fn(),
       sumarGastosDelProyecto: jest.fn(),
@@ -91,12 +92,24 @@ describe('ProyectosService', () => {
 
     beforeEach(() => {
       repository.buscarBodegaActivaPorDefecto.mockResolvedValue(BODEGA as never);
+      repository.contarTareasVigentesDelHito.mockResolvedValue(0);
       facturacionService.crear.mockResolvedValue(FACTURA as never);
     });
 
     it('rechaza si el hito ya fue facturado', async () => {
       repository.buscarHitoPorId.mockResolvedValue({ id: 'h1', facturaId: 'f-viejo' } as never);
       await expect(service.facturarHito('h1', 't1', 'u1')).rejects.toThrow('Este hito ya fue facturado');
+      expect(facturacionService.crear).not.toHaveBeenCalled();
+    });
+
+    it('la mas importante (pedido explícito del usuario): rechaza si el hito tiene tareas sin terminar', async () => {
+      repository.buscarHitoPorId.mockResolvedValue({ id: 'h1', proyectoId: 'p1', facturaId: null } as never);
+      repository.contarTareasVigentesDelHito.mockResolvedValue(2);
+
+      await expect(service.facturarHito('h1', 't1', 'u1')).rejects.toThrow(
+        'Este hito tiene 2 tarea(s) sin terminar — no se puede facturar hasta que todas estén Terminadas.',
+      );
+      expect(repository.contarTareasVigentesDelHito).toHaveBeenCalledWith('h1');
       expect(facturacionService.crear).not.toHaveBeenCalled();
     });
 
@@ -168,6 +181,57 @@ describe('ProyectosService', () => {
       repository.buscarProyectoPorId.mockResolvedValue({ id: 'p1', modoFacturacion: 'PRECIO_FIJO' } as never);
       repository.buscarBodegaActivaPorDefecto.mockResolvedValue(null as never);
       await expect(service.facturarHito('h1', 't1', 'u1')).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('previsualizarFacturaHito', () => {
+    it('rechaza si el hito ya fue facturado (mismo criterio que facturarHito)', async () => {
+      repository.buscarHitoPorId.mockResolvedValue({ id: 'h1', facturaId: 'f-viejo' } as never);
+      await expect(service.previsualizarFacturaHito('h1')).rejects.toThrow('Este hito ya fue facturado');
+    });
+
+    it('PRECIO_FIJO: devuelve el monto y si se puede facturar según las tareas pendientes', async () => {
+      repository.buscarHitoPorId.mockResolvedValue({ id: 'h1', proyectoId: 'p1', nombre: 'Entrega de diseño', facturaId: null, montoFijo: 50000 } as never);
+      repository.buscarProyectoPorId.mockResolvedValue({
+        id: 'p1',
+        nombre: 'Rediseño',
+        cliente: { nombre: 'ACME SRL' },
+        modoFacturacion: 'PRECIO_FIJO',
+      } as never);
+      repository.contarTareasVigentesDelHito.mockResolvedValue(3);
+
+      const resultado = await service.previsualizarFacturaHito('h1');
+
+      expect(resultado).toEqual({
+        proyectoNombre: 'Rediseño',
+        clienteNombre: 'ACME SRL',
+        hitoNombre: 'Entrega de diseño',
+        modoFacturacion: 'PRECIO_FIJO',
+        monto: 50000,
+        horas: undefined,
+        tarifaHora: undefined,
+        tareasPendientes: 3,
+        puedeFacturar: false,
+      });
+    });
+
+    it('POR_HORAS: incluye horas y tarifa, y puedeFacturar en true sin tareas pendientes', async () => {
+      repository.buscarHitoPorId.mockResolvedValue({ id: 'h1', proyectoId: 'p1', nombre: 'Sprint 1', facturaId: null } as never);
+      repository.buscarProyectoPorId.mockResolvedValue({
+        id: 'p1',
+        nombre: 'Consultoría',
+        cliente: { nombre: 'Beta EIRL' },
+        modoFacturacion: 'POR_HORAS',
+        tarifaHoraFacturable: 1200,
+      } as never);
+      repository.sumarHorasDelHito.mockResolvedValue(10);
+      repository.contarTareasVigentesDelHito.mockResolvedValue(0);
+
+      const resultado = await service.previsualizarFacturaHito('h1');
+
+      expect(resultado).toEqual(
+        expect.objectContaining({ monto: 12000, horas: 10, tarifaHora: 1200, tareasPendientes: 0, puedeFacturar: true }),
+      );
     });
   });
 

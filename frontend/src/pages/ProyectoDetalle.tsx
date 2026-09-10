@@ -214,6 +214,7 @@ export function ProyectoDetalle() {
           <ProyectoHitosTab
             proyectoId={proyecto.id}
             hitos={proyecto.hitos}
+            tareas={proyecto.tareas}
             onInvalidar={invalidar}
             onError={setError}
             onFacturado={setMensajeFactura}

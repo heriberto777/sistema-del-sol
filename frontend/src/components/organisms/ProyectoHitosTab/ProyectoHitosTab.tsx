@@ -11,8 +11,9 @@ import { RowActionsMenu } from '../../molecules/RowActionsMenu/RowActionsMenu';
 import { ConfirmModal } from '../../molecules/ConfirmModal/ConfirmModal';
 import { RequierePermiso } from '../RequierePermiso/RequierePermiso';
 import { HitoFormModal, HitoFormValues } from '../HitoFormModal/HitoFormModal';
+import { FacturarHitoModal } from '../FacturarHitoModal/FacturarHitoModal';
 import { useAuth } from '../../../hooks/useAuth';
-import { ESTADOS_HITO, ETIQUETA_ESTADO_HITO, Hito } from '../../../types/proyectos';
+import { ESTADOS_HITO, ETIQUETA_ESTADO_HITO, Hito, Tarea } from '../../../types/proyectos';
 
 interface CostoHorasHito {
   horasTotales: number;
@@ -22,18 +23,20 @@ interface CostoHorasHito {
 interface ProyectoHitosTabProps {
   proyectoId: string;
   hitos: Hito[];
+  tareas: Tarea[];
   onInvalidar: () => void;
   onError: (mensaje: string | null) => void;
   onFacturado: (mensaje: string) => void;
 }
 
-export function ProyectoHitosTab({ proyectoId, hitos, onInvalidar, onError, onFacturado }: ProyectoHitosTabProps) {
+export function ProyectoHitosTab({ proyectoId, hitos, tareas, onInvalidar, onError, onFacturado }: ProyectoHitosTabProps) {
   const queryClient = useQueryClient();
   const { tienePermiso } = useAuth();
   const puedeVerCosto = tienePermiso('proyectos.rentabilidad.ver');
   const [modalAbierto, setModalAbierto] = useState(false);
   const [hitoEditando, setHitoEditando] = useState<Hito | null>(null);
   const [hitoAEliminar, setHitoAEliminar] = useState<Hito | null>(null);
+  const [hitoAFacturar, setHitoAFacturar] = useState<Hito | null>(null);
   const [errorForm, setErrorForm] = useState<string | null>(null);
 
   // Fase 5 — costo interno (salario) de las horas ya cargadas en cada hito,
@@ -93,10 +96,20 @@ export function ProyectoHitosTab({ proyectoId, hitos, onInvalidar, onError, onFa
     onSuccess: (factura) => {
       onError(null);
       onFacturado(`Factura ${factura.numero ?? factura.facturaId} generada por RD$ ${Number(factura.total).toLocaleString('es-DO')}.`);
+      setHitoAFacturar(null);
       invalidar();
     },
     onError: (err) => onError(mensajeErrorApi(err, 'No se pudo facturar el hito.')),
   });
+
+  // Puntos 1 y 2 del pedido del usuario (2026-09-10): cantidad de tareas
+  // asignadas a cada hito y su % de progreso (Terminadas ÷ total).
+  const tareasDelHito = (hitoId: string) => tareas.filter((t) => t.hitoId === hitoId);
+  const progresoHito = (hitoId: string) => {
+    const delHito = tareasDelHito(hitoId);
+    const terminadas = delHito.filter((t) => t.estado === 'TERMINADA').length;
+    return { total: delHito.length, terminadas, porcentaje: delHito.length === 0 ? 0 : Math.round((terminadas / delHito.length) * 100) };
+  };
 
   return (
     <Card
@@ -113,6 +126,7 @@ export function ProyectoHitosTab({ proyectoId, hitos, onInvalidar, onError, onFa
         {hitos.map((h) => {
           const costo = costoPorHito?.[h.id];
           const montoInsuficiente = costo && costo.horasTotales > 0 && h.montoFijo != null && Number(h.montoFijo) < costo.costoHoras;
+          const progreso = progresoHito(h.id);
           return (
           <div key={h.id} className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2 dark:border-slate-800">
             <div>
@@ -121,6 +135,8 @@ export function ProyectoHitosTab({ proyectoId, hitos, onInvalidar, onError, onFa
                 {h.fechaObjetivo && `Vence ${new Date(h.fechaObjetivo).toLocaleDateString('es-DO')}`}
                 {h.fechaObjetivo && h.montoFijo && ' · '}
                 {h.montoFijo && `RD$ ${Number(h.montoFijo).toLocaleString('es-DO')}`}
+                {(h.fechaObjetivo || h.montoFijo) && progreso.total > 0 && ' · '}
+                {progreso.total > 0 && `${progreso.terminadas}/${progreso.total} tarea(s) · ${progreso.porcentaje}% completado`}
               </p>
               {puedeVerCosto && costo && costo.horasTotales > 0 && (
                 <p className={clsx('mt-0.5 text-xs', montoInsuficiente ? 'font-medium text-red-600 dark:text-red-400' : 'text-slate-400 dark:text-slate-500')}>
@@ -128,17 +144,17 @@ export function ProyectoHitosTab({ proyectoId, hitos, onInvalidar, onError, onFa
                   {montoInsuficiente && ' — supera el monto fijo pactado'}
                 </p>
               )}
+              {h.facturaId && (
+                <p className="mt-0.5 text-xs text-slate-400 dark:text-slate-500">
+                  Ya facturado — para revertirlo, anular la factura desde Facturación.
+                </p>
+              )}
             </div>
             <div className="flex items-center gap-2">
               {!h.facturaId && (
                 <RequierePermiso permiso="proyectos.facturar">
-                  <Button
-                    type="button"
-                    variante="secundario"
-                    onClick={() => facturarHito.mutate(h.id)}
-                    disabled={facturarHito.isPending}
-                  >
-                    {facturarHito.isPending ? 'Facturando…' : 'Facturar'}
+                  <Button type="button" variante="secundario" onClick={() => setHitoAFacturar(h)}>
+                    Facturar
                   </Button>
                 </RequierePermiso>
               )}
@@ -190,6 +206,15 @@ export function ProyectoHitosTab({ proyectoId, hitos, onInvalidar, onError, onFa
             setErrorForm(null);
           }}
           onGuardar={(valores) => editarHito.mutate(valores)}
+        />
+      )}
+
+      {hitoAFacturar && (
+        <FacturarHitoModal
+          hitoId={hitoAFacturar.id}
+          confirmando={facturarHito.isPending}
+          onConfirmar={() => facturarHito.mutate(hitoAFacturar.id)}
+          onCancelar={() => setHitoAFacturar(null)}
         />
       )}
 
