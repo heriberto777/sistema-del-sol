@@ -79,6 +79,25 @@ export const PERMISOS_BASE = [
   // la acción que habilita la entrega (descarga/WhatsApp) de un diseño,
   // no una edición más.
   'publicacionessociales.ver', 'publicacionessociales.crear', 'publicacionessociales.editar', 'publicacionessociales.aprobar',
+  // Plugin de Inmobiliaria (Fase 1) — mismo criterio opt-in que Proyectos/
+  // Publicaciones Sociales: ninguno empieza con 'admin.', así que Admin
+  // Total y Gerente los heredan automático vía PERMISOS_BASE; el resto de
+  // roles no los trae de fábrica, hay que asignárselos a mano.
+  'inmobiliaria.propiedades.ver', 'inmobiliaria.propiedades.crear', 'inmobiliaria.propiedades.editar', 'inmobiliaria.propiedades.eliminar',
+  // Fase 3 — separado de `.propiedades.*` a propósito: cerrar un negocio
+  // (y con eso, generar una comisión) es una acción de negocio más
+  // sensible que solo editar el listado, mismo criterio que
+  // `proyectos.facturar` separado de `proyectos.editar`.
+  'inmobiliaria.contratos.ver', 'inmobiliaria.contratos.crear', 'inmobiliaria.contratos.anular',
+  // Modelo 2 (administradora de alquileres) — `.gestionar` cubre cobrar/
+  // facturar/liquidar (todas acciones financieras, mismo criterio de
+  // agrupar que `inmobiliaria.contratos.crear` con "marcar comisión
+  // pagada"); `.ver` es de solo lectura para el listado de cobros.
+  'inmobiliaria.alquileres.ver', 'inmobiliaria.alquileres.gestionar',
+  // Modelo 3 (preventa) — inicia/desvincula el Proyecto de preventa de una
+  // propiedad; ver/gestionar los hitos en sí queda del lado de Proyectos
+  // (`proyectos.ver`/`.crear`/`.facturar`), sin permiso duplicado acá.
+  'inmobiliaria.preventas.crear',
 ];
 
 export const ROLES_BASE: Record<string, string[]> = {

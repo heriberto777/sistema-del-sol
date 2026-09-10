@@ -123,6 +123,10 @@ model Tenant {
   registrosHoraProyecto     RegistroHoraProyecto[]
   sesionesTrabajoTarea      SesionTrabajoTarea[]
   publicacionesSociales     PublicacionSocial[]
+  propiedades               Propiedad[]
+  contratosPropiedad        ContratoPropiedad[]
+  alertasBusquedaPropiedad  AlertaBusquedaPropiedad[]
+  cobrosAlquiler            CobroAlquiler[]
 
   @@map("tenants")
 }
@@ -1222,15 +1226,16 @@ model Factura {
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
 
-  lineas             LineaFactura[]
-  recargos           FacturaRecargo[]
-  cotizacionOrigen   Cotizacion?
-  remisionOrigen     Remision?
-  hitoProyectoOrigen HitoProyecto?
-  pagos              Pago[]
-  pagosVenta         PagoVenta[]
-  comisiones         ComisionVenta[]
-  movimientosLealtad MovimientoLealtad[]
+  lineas              LineaFactura[]
+  recargos            FacturaRecargo[]
+  cotizacionOrigen    Cotizacion?
+  remisionOrigen      Remision?
+  hitoProyectoOrigen  HitoProyecto?
+  cobroAlquilerOrigen CobroAlquiler?
+  pagos               Pago[]
+  pagosVenta          PagoVenta[]
+  comisiones          ComisionVenta[]
+  movimientosLealtad  MovimientoLealtad[]
 
   @@unique([tenantId, ncf])
   @@unique([tenantId, numero])
@@ -1698,18 +1703,20 @@ model Empleado {
   userId              String?           @unique
   user                User?             @relation(fields: [userId], references: [id], onDelete: SetNull)
 
-  recibos                   ReciboNomina[]
-  ventasComoVendedor        Factura[]
-  ventasAparcadas           VentaAparcada[]
-  carritosBorrador          CarritoBorrador[]
-  horarios                  HorarioEmpleado[]
-  registrosAsistencia       RegistroAsistencia[]
-  ausencias                 Ausencia[]
-  comisionesVenta           ComisionVenta[]
-  proyectosResponsable      Proyecto[]
-  tareasProyectoResponsable TareaProyectoResponsable[]
-  registrosHoraProyecto     RegistroHoraProyecto[]
-  sesionesTrabajoTarea      SesionTrabajoTarea[]
+  recibos                      ReciboNomina[]
+  ventasComoVendedor           Factura[]
+  ventasAparcadas              VentaAparcada[]
+  carritosBorrador             CarritoBorrador[]
+  horarios                     HorarioEmpleado[]
+  registrosAsistencia          RegistroAsistencia[]
+  ausencias                    Ausencia[]
+  comisionesVenta              ComisionVenta[]
+  proyectosResponsable         Proyecto[]
+  tareasProyectoResponsable    TareaProyectoResponsable[]
+  registrosHoraProyecto        RegistroHoraProyecto[]
+  sesionesTrabajoTarea         SesionTrabajoTarea[]
+  propiedadesAsignadas         Propiedad[]
+  contratosPropiedadComoAgente ContratoPropiedad[]
 
   @@unique([tenantId, cedula])
   @@map("empleados")
@@ -3376,14 +3383,16 @@ model Cliente {
   // `LealtadService` para no tener que agregar en cada lectura.
   puntosLealtad               Int                    @default(0)
 
-  direcciones        DireccionCliente[]
-  facturas           Factura[]
-  cotizaciones       Cotizacion[]
-  remisiones         Remision[]
-  ventasAparcadas    VentaAparcada[]
-  movimientosLealtad MovimientoLealtad[]
-  carritosBorrador   CarritoBorrador[]
-  proyectos          Proyecto[]
+  direcciones                 DireccionCliente[]
+  facturas                    Factura[]
+  cotizaciones                Cotizacion[]
+  remisiones                  Remision[]
+  ventasAparcadas             VentaAparcada[]
+  movimientosLealtad          MovimientoLealtad[]
+  carritosBorrador            CarritoBorrador[]
+  proyectos                   Proyecto[]
+  contratosPropiedad          ContratoPropiedad[]
+  propiedadesEnAdministracion Propiedad[]
 
   @@map("clientes")
 }
@@ -3894,9 +3903,11 @@ model Proyecto {
   createdAt                DateTime                @default(now())
   updatedAt                DateTime                @updatedAt
 
-  hitos  HitoProyecto[]
-  tareas TareaProyecto[]
-  gastos GastoMenor[]
+  hitos             HitoProyecto[]
+  tareas            TareaProyecto[]
+  gastos            GastoMenor[]
+  // Modelo 3 de Inmobiliaria (preventa) — reverso de Propiedad.proyectoPreventaId.
+  propiedadPreventa Propiedad?
 
   @@map("proyectos")
 }
@@ -4146,4 +4157,226 @@ model PublicacionSocialVersion {
 
   @@unique([publicacionSocialId, numero])
   @@map("publicaciones_sociales_versiones")
+}
+
+// ============================================================
+// INMOBILIARIA (plugin) — Fase 1: catálogo de propiedades, sin
+// contratos/comisiones/página pública todavía (ver plugins/inmobiliaria/README.md).
+// ============================================================
+
+enum TipoPropiedad {
+  APARTAMENTO
+  CASA
+  VILLA
+  PENTHOUSE
+  CONDOMINIO
+  SOLAR
+  LOCAL_COMERCIAL
+  OFICINA
+  NAVE_INDUSTRIAL
+  EDIFICIO
+  FINCA
+}
+
+enum OperacionPropiedad {
+  VENTA
+  ALQUILER
+}
+
+enum EstadoPropiedad {
+  ACTIVA
+  PAUSADA
+  RESERVADA
+  VENDIDA
+  ALQUILADA
+}
+
+model Propiedad {
+  id                 String             @id @default(uuid())
+  tenantId           String
+  tenant             Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  codigo             String
+  titulo             String
+  tipo               TipoPropiedad
+  operacion          OperacionPropiedad
+  estado             EstadoPropiedad    @default(ACTIVA)
+  precio             Decimal            @db.Decimal(14, 2)
+  moneda             String             @default("USD")
+  ubicacion          String
+  habitaciones       Int?
+  banos              Decimal?           @db.Decimal(4, 1)
+  parqueos           Int?
+  metrosConstruccion Decimal?           @db.Decimal(10, 2)
+  metrosTerreno      Decimal?           @db.Decimal(10, 2)
+  descripcion        String?            @db.Text
+  // Lista libre de amenidades (ej. "Piscina", "Gimnasio") — sin catálogo
+  // aparte a propósito en esta fase, mismo criterio que Webhook.eventos;
+  // si más adelante hace falta un catálogo por tenant, se migra ahí.
+  amenidades         String[]
+  // Empleado (agente) responsable de esta propiedad — SetNull: borrar el
+  // empleado no debe borrar el listado, solo desasignarlo.
+  agenteId           String?
+  agente             Empleado?          @relation(fields: [agenteId], references: [id], onDelete: SetNull)
+  // Modelo 2 (administradora de alquileres) — dueño real del inmueble,
+  // distinto del agente (empleado interno que gestiona la propiedad).
+  // Solo se usa cuando la agencia administra el alquiler en nombre de un
+  // tercero; SetNull porque borrar el contacto no debe borrar el listado.
+  propietarioId      String?
+  propietario        Cliente?           @relation(fields: [propietarioId], references: [id], onDelete: SetNull)
+  // Modelo 3 (preventa) — en vez de un sistema de hitos propio, reusa el
+  // plugin de Proyectos: cada pago del plan de preventa es un
+  // HitoProyecto (modoFacturacion PRECIO_FIJO) de este Proyecto.
+  // SetNull: borrar el proyecto no debe borrar la propiedad, solo
+  // desvincularla (ver InmobiliariaService.desvincularPreventa).
+  proyectoPreventaId String?            @unique
+  proyectoPreventa   Proyecto?          @relation(fields: [proyectoPreventaId], references: [id], onDelete: SetNull)
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  imagenes  ImagenPropiedad[]
+  contratos ContratoPropiedad[]
+
+  @@unique([tenantId, codigo])
+  @@map("propiedades")
+}
+
+/// Galería de fotos de una Propiedad — mismo patrón que ImagenProducto:
+/// hija sin tenantId propio, su aislamiento depende de llegar siempre vía
+/// una Propiedad ya resuelta contra el tenant.
+model ImagenPropiedad {
+  id          String    @id @default(uuid())
+  propiedadId String
+  propiedad   Propiedad @relation(fields: [propiedadId], references: [id], onDelete: Cascade)
+  imagen      String    @db.Text
+  orden       Int       @default(0)
+  createdAt   DateTime  @default(now())
+
+  @@map("imagenes_propiedad")
+}
+
+enum EstadoContratoPropiedad {
+  ACTIVO
+  ANULADO
+}
+
+/// Registro de un negocio cerrado (venta o alquiler) sobre una Propiedad —
+/// Fase 3. Deliberadamente NO reusa `ComisionVenta` (atada a
+/// Factura/LineaFactura del flujo de POS/facturación, que Inmobiliaria
+/// todavía no integra) — la comisión vive embebida acá mismo
+/// (`montoComision`/`comisionPagada`), 1:1 con el contrato, sin tabla
+/// aparte (YAGNI: si algún día hace falta dividir una comisión entre
+/// varios agentes o pagarla en cuotas, ESE es el momento de separarla).
+/// `propiedad`/`cliente` sin `onDelete` (default Restrict de Postgres):
+/// un contrato es un registro de negocio ya cerrado, nunca debe
+/// desaparecer por cascada al borrar la propiedad o el cliente — el
+/// filtro global ya mapea esa violación de FK a un 409 legible (ver
+/// http-exception.filter.ts, código P2003).
+model ContratoPropiedad {
+  id                 String                  @id @default(uuid())
+  tenantId           String
+  tenant             Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  propiedadId        String
+  propiedad          Propiedad               @relation(fields: [propiedadId], references: [id])
+  clienteId          String
+  cliente            Cliente                 @relation(fields: [clienteId], references: [id])
+  // Snapshot de Propiedad.operacion al momento de cerrar — igual criterio
+  // que cualquier otro snapshot de este proyecto (ej. LineaFactura.precioUnitario):
+  // si la propiedad cambiara de operación más adelante, este contrato ya
+  // cerrado no debe reinterpretarse.
+  tipo               OperacionPropiedad
+  monto              Decimal                 @db.Decimal(14, 2)
+  moneda             String                  @default("USD")
+  fecha              DateTime                @default(now())
+  // Quién gestionó el cierre — normalmente el mismo agente de la
+  // propiedad, pero editable por si otro agente cerró el negocio.
+  agenteId           String?
+  agente             Empleado?               @relation(fields: [agenteId], references: [id], onDelete: SetNull)
+  porcentajeComision Decimal?                @db.Decimal(5, 2)
+  montoComision      Decimal                 @default(0) @db.Decimal(14, 2)
+  comisionPagada     Boolean                 @default(false)
+  comisionPagadaEn   DateTime?
+  estado             EstadoContratoPropiedad @default(ACTIVO)
+  notas              String?
+  createdAt          DateTime                @default(now())
+  updatedAt          DateTime                @updatedAt
+
+  // Modelo 2 (administradora de alquileres) — solo aplica a contratos
+  // tipo ALQUILER cuya Propiedad tiene `propietarioId` asignado.
+  // `administracionActiva` se puede pausar sin perder la fecha del
+  // próximo cobro (útil si el propietario retira temporalmente la
+  // administración). Ver `CobrosAlquilerCronService`.
+  administracionActiva             Boolean   @default(false)
+  porcentajeComisionAdministracion Decimal?  @db.Decimal(5, 2)
+  proximoCobroAlquilerEn           DateTime?
+
+  cobrosAlquiler CobroAlquiler[]
+
+  @@map("contratos_propiedad")
+}
+
+enum EstadoCobroAlquiler {
+  PENDIENTE
+  COBRADO
+  LIQUIDADO
+}
+
+/// Modelo 2 (administradora de alquileres) — un cobro mensual de renta
+/// generado por `CobrosAlquilerCronService` para un `ContratoPropiedad`
+/// bajo administración. Ciclo de vida en dos pasos, cada uno con su
+/// propio dinero real: PENDIENTE (generado, sin cobrar al inquilino) →
+/// COBRADO (ya se cobró al inquilino, con o sin Factura real — ver
+/// `facturaId`) → LIQUIDADO (ya se le pagó al propietario su parte,
+/// descontada `montoComisionAdmin`). `montoAlquiler`/
+/// `porcentajeComisionAdmin` son snapshots al momento de generarse (si
+/// el contrato cambia su % después, los cobros ya generados no
+/// reinterpretan el valor — mismo criterio que `LineaFactura.precioUnitario`).
+model CobroAlquiler {
+  id                      String              @id @default(uuid())
+  tenantId                String
+  tenant                  Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  contratoPropiedadId     String
+  contratoPropiedad       ContratoPropiedad   @relation(fields: [contratoPropiedadId], references: [id])
+  // "AAAA-MM" — un cobro por contrato y mes, ver @@unique abajo.
+  periodo                 String
+  montoAlquiler           Decimal             @db.Decimal(14, 2)
+  porcentajeComisionAdmin Decimal?            @db.Decimal(5, 2)
+  montoComisionAdmin      Decimal             @default(0) @db.Decimal(14, 2)
+  montoPropietario        Decimal             @db.Decimal(14, 2)
+  estado                  EstadoCobroAlquiler @default(PENDIENTE)
+  // Factura real opcional (con NCF o e-CF según la modalidad del
+  // tenant) — null si se cobró "sin comprobante" (registro interno).
+  // @unique: un cobro nunca genera dos facturas, mismo guard que
+  // HitoProyecto.facturaId.
+  facturaId               String?             @unique
+  factura                 Factura?            @relation(fields: [facturaId], references: [id])
+  fechaCobro              DateTime?
+  fechaLiquidacion        DateTime?
+  createdAt               DateTime            @default(now())
+
+  @@unique([contratoPropiedadId, periodo])
+  @@map("cobros_alquiler")
+}
+
+/// Alerta de búsqueda guardada por un visitante del catálogo público
+/// (Fase 4) — sin cuenta/login (Inmobiliaria no tiene auth de cliente
+/// propia, a diferencia de ClienteTiendaAuth): solo email + criterios.
+/// `ultimaNotificacionEn` es lo que le permite al cron notificar solo
+/// propiedades NUEVAS desde el último aviso (o desde que se creó la
+/// alerta, si nunca se avisó) — mismo criterio de "no repetir aviso" que
+/// `HitoProyecto.alertaVencimientoEnviada`.
+model AlertaBusquedaPropiedad {
+  id                   String              @id @default(uuid())
+  tenantId             String
+  tenant               Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  email                String
+  operacion            OperacionPropiedad?
+  tipo                 TipoPropiedad?
+  ubicacion            String?
+  precioMax            Decimal?            @db.Decimal(14, 2)
+  habitacionesMin      Int?
+  activa               Boolean             @default(true)
+  ultimaNotificacionEn DateTime?
+  createdAt            DateTime            @default(now())
+
+  @@map("alertas_busqueda_propiedad")
 }

@@ -94,4 +94,12 @@ export const TENANT_SCOPED_MODELS = new Set([
   // queda AFUERA a propósito: es catálogo GLOBAL (mismo trato que
   // Modulo/Plan), no tiene tenantId propio.
   'PublicacionSocial',
+  // Plugin de Inmobiliaria (Fase 1) — `ImagenPropiedad` queda AFUERA a
+  // propósito, mismo criterio que ImagenProducto: sin tenantId propio, su
+  // aislamiento depende de llegar siempre vía una Propiedad ya resuelta
+  // contra el tenant.
+  'Propiedad',
+  'ContratoPropiedad',
+  'AlertaBusquedaPropiedad',
+  'CobroAlquiler',
 ]);

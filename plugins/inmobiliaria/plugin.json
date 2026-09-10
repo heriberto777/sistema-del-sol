@@ -1,6 +1,6 @@
 {
   "key": "inmobiliaria",
   "nombre": "Inmobiliaria",
-  "version": "0.1.0",
-  "descripcion": "Gestión de propiedades, contratos de alquiler/venta y cobros asociados."
+  "version": "1.2.0",
+  "descripcion": "Catálogo de propiedades (venta/alquiler/preventa) con agente asignado, contratos+comisión, administración de alquileres, preventa (reusa Proyectos), portal público, comparador/hipoteca/favoritos/alertas — implementación real en backend/src/inmobiliaria/, ver README.md."
 }
