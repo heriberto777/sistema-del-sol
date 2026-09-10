@@ -37,6 +37,13 @@ import { Mensajes } from './pages/Mensajes';
 import { Bancos } from './pages/Bancos';
 import { GastosMenores } from './pages/GastosMenores';
 import { Proyectos } from './pages/Proyectos';
+import { Propiedades } from './pages/Propiedades';
+import { Contratos } from './pages/Contratos';
+import { CobrosAlquiler } from './pages/CobrosAlquiler';
+import { InmobiliariaPublicaLayout } from './pages/inmobiliaria/InmobiliariaPublicaLayout';
+import { PropiedadesPublico } from './pages/inmobiliaria/PropiedadesPublico';
+import { PropiedadPublicoDetalle } from './pages/inmobiliaria/PropiedadPublicoDetalle';
+import { PropiedadesFavoritas } from './pages/inmobiliaria/PropiedadesFavoritas';
 import { ProyectoDetalle } from './pages/ProyectoDetalle';
 import { PublicacionesSociales } from './pages/PublicacionesSociales';
 import { TiendaOnline } from './pages/TiendaOnline';
@@ -133,6 +140,17 @@ const RUTAS_ADMIN = [
     element: <TiendaLayout />,
     children: RUTAS_TIENDA_PUBLICA,
   },
+  // Catálogo público del plugin Inmobiliaria (Fase 2) — sin AppLayout/auth,
+  // mismo criterio que /tienda/:subdominio arriba.
+  {
+    path: '/inmobiliaria/:subdominio',
+    element: <InmobiliariaPublicaLayout />,
+    children: [
+      { index: true, element: <PropiedadesPublico /> },
+      { path: 'favoritos', element: <PropiedadesFavoritas /> },
+      { path: ':propiedadId', element: <PropiedadPublicoDetalle /> },
+    ],
+  },
   {
     element: <RutaProtegidaPlataforma />,
     children: [
@@ -185,6 +203,9 @@ const RUTAS_ADMIN = [
           { path: '/gastos-menores', element: <GastosMenores /> },
           { path: '/proyectos', element: <Proyectos /> },
           { path: '/proyectos/:id', element: <ProyectoDetalle /> },
+          { path: '/propiedades', element: <Propiedades /> },
+          { path: '/contratos-propiedad', element: <Contratos /> },
+          { path: '/alquileres', element: <CobrosAlquiler /> },
           { path: '/publicaciones-sociales', element: <PublicacionesSociales /> },
           { path: '/tienda-online', element: <TiendaOnline /> },
           { path: '/nomina', element: <Nomina /> },
