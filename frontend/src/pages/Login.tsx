@@ -8,6 +8,7 @@ import { AuthSplitLayout } from '../components/organisms/AuthSplitLayout/AuthSpl
 import { useAuth } from '../hooks/useAuth';
 import { usaPosComoInicio } from '../contexts/AuthContext';
 import { apiClient } from '../lib/api-client';
+import { mensajeErrorApi } from '../lib/mensaje-error-api';
 
 const GRADIENTE_APP = { claro: 'linear-gradient(150deg,#f8fafc,#e2e8f0 55%,#cbd5e1)', oscuro: 'linear-gradient(150deg,#111827,#1e293b 60%,#334155)' };
 
@@ -59,8 +60,8 @@ export function Login() {
         setEmpresas(data.empresas);
         setPaso('elegir-empresa');
       }
-    } catch {
-      setError('No pudimos verificar el correo. Intenta de nuevo.');
+    } catch (err) {
+      setError(mensajeErrorApi(err, 'No pudimos verificar el correo. Intenta de nuevo.'));
     } finally {
       setBuscando(false);
     }
@@ -89,8 +90,8 @@ export function Login() {
       // (ninguno tiene reportes.ver) — ver docs/ARCHITECTURE.md, "Roles
       // de POS: Cajero, Vendedor, Supervisor de Caja".
       navigate(usaPosComoInicio(usuarioLogueado) ? '/pos' : '/');
-    } catch {
-      setError('Credenciales inválidas');
+    } catch (err) {
+      setError(mensajeErrorApi(err, 'Credenciales inválidas'));
     }
   }
 

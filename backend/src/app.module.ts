@@ -2,7 +2,7 @@ import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
-import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { ThrottlerGuard, ThrottlerModule, ThrottlerLimitDetail } from '@nestjs/throttler';
 import { RedisModule } from './redis/redis.module';
 import { RedisService } from './redis/redis.service';
 import { RedisThrottlerStorage } from './redis/redis-throttler-storage.service';
@@ -93,6 +93,13 @@ import { TenantMiddleware } from './common/middleware/tenant.middleware';
       useFactory: (redis: RedisService) => ({
         throttlers: [{ ttl: 60_000, limit: 120 }],
         storage: new RedisThrottlerStorage(redis),
+        // Antes tiraba el genérico "ThrottlerException: Too Many Requests" —
+        // sin decir POR QUÉ ni CUÁNTO esperar, un bloqueo real (ej. tope de
+        // intentos de login) se veía indistinguible de un error random en el
+        // frontend. `timeToBlockExpire` ya viene en segundos (ver
+        // RedisThrottlerStorage.increment).
+        errorMessage: (_ctx, detalle: ThrottlerLimitDetail) =>
+          `Demasiados intentos — esperá ${Math.max(1, Math.ceil(detalle.timeToBlockExpire / 60))} minuto(s) e intentá de nuevo.`,
       }),
     }),
     HealthModule,

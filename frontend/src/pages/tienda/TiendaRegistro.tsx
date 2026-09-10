@@ -1,7 +1,7 @@
 import { FormEvent, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useSubdominioTienda } from '../../hooks/useSubdominioTienda';
-import { isAxiosError } from 'axios';
+import { mensajeErrorApi } from '../../lib/mensaje-error-api';
 import { useTiendaConfig } from '../../hooks/useTienda';
 import { useClienteTienda } from '../../hooks/useClienteTienda';
 import { TiendaCargando, TiendaNoEncontrada } from './TiendaNoEncontrada';
@@ -35,7 +35,7 @@ export function TiendaRegistro() {
       await registro({ nombre, email, password, telefono: telefono || undefined });
       navigate(destino);
     } catch (err) {
-      setError(isAxiosError(err) && err.response?.status === 409 ? 'Ya existe una cuenta con ese correo.' : 'No se pudo crear la cuenta.');
+      setError(mensajeErrorApi(err, 'No se pudo crear la cuenta.'));
     } finally {
       setEnviando(false);
     }

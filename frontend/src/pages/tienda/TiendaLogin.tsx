@@ -1,7 +1,7 @@
 import { FormEvent, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useSubdominioTienda } from '../../hooks/useSubdominioTienda';
-import { isAxiosError } from 'axios';
+import { mensajeErrorApi } from '../../lib/mensaje-error-api';
 import { useTiendaConfig } from '../../hooks/useTienda';
 import { useClienteTienda } from '../../hooks/useClienteTienda';
 import { TiendaCargando, TiendaNoEncontrada } from './TiendaNoEncontrada';
@@ -38,7 +38,7 @@ export function TiendaLogin() {
       await login({ email, password });
       navigate(destino);
     } catch (err) {
-      setError(isAxiosError(err) && err.response?.status === 401 ? 'Correo o contraseña incorrectos.' : 'No se pudo iniciar sesión.');
+      setError(mensajeErrorApi(err, 'No se pudo iniciar sesión.'));
     } finally {
       setEnviando(false);
     }

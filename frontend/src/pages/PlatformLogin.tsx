@@ -7,6 +7,7 @@ import { ThemeToggle } from '../components/molecules/ThemeToggle/ThemeToggle';
 import { AuthSplitLayout } from '../components/organisms/AuthSplitLayout/AuthSplitLayout';
 import { usePlatformAuth } from '../hooks/usePlatformAuth';
 import { apiClient } from '../lib/api-client';
+import { mensajeErrorApi } from '../lib/mensaje-error-api';
 
 const GRADIENTE_PLATAFORMA = { claro: 'linear-gradient(150deg,#fff8e6,#ffedbf 55%,#ffc94a)', oscuro: 'linear-gradient(150deg,#171a23,#2b2114 60%,#4a3410)' };
 
@@ -30,8 +31,8 @@ export function PlatformLogin() {
     try {
       await login(email, password);
       navigate('/plataforma/dashboard');
-    } catch {
-      setError('Credenciales inválidas');
+    } catch (err) {
+      setError(mensajeErrorApi(err, 'Credenciales inválidas'));
     }
   }
 

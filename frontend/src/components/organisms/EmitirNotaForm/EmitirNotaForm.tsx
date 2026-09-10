@@ -1,6 +1,7 @@
 import { FormEvent, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../../lib/api-client';
+import { mensajeErrorApi } from '../../../lib/mensaje-error-api';
 import { SearchInput } from '../../molecules/SearchInput/SearchInput';
 import { Badge } from '../../atoms/Badge/Badge';
 import { Button } from '../../atoms/Button/Button';
@@ -69,8 +70,8 @@ export function EmitirNotaForm({ onClose }: { onClose: () => void }) {
       // este flujo (no hay contra qué hacer match); fuera de alcance,
       // igual criterio que la devolución de POS.
       setCantidades(Object.fromEntries(detalle.lineas.filter((l) => l.productoId).map((l) => [l.productoId as string, l.cantidad])));
-    } catch {
-      setError('No se pudo cargar el detalle de la factura.');
+    } catch (err) {
+      setError(mensajeErrorApi(err, 'No se pudo cargar el detalle de la factura.'));
     } finally {
       setCargandoDetalle(false);
     }

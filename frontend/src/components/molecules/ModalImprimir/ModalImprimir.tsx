@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { apiClient } from '../../../lib/api-client';
+import { mensajeErrorApi } from '../../../lib/mensaje-error-api';
 import { abrirBlob } from '../../../lib/descargar-archivo';
 import { FORMATOS_IMPRESION, FormatoImpresion } from '../../../constants/formato-impresion';
 import { Modal } from '../Modal/Modal';
@@ -44,8 +45,8 @@ export function ModalImprimir({ urlBase, titulo, onClose }: ModalImprimirProps) 
       const contentType = String(respuesta.headers['content-type'] ?? 'application/pdf');
       abrirBlob(new Blob([respuesta.data], { type: contentType }));
       onClose();
-    } catch {
-      setError('No se pudo generar el documento.');
+    } catch (err) {
+      setError(mensajeErrorApi(err, 'No se pudo generar el documento.'));
     } finally {
       setImprimiendo(false);
     }
@@ -60,8 +61,8 @@ export function ModalImprimir({ urlBase, titulo, onClose }: ModalImprimirProps) 
       setMensajeEnvio(
         data.enviado ? 'Recibo enviado.' : 'No hay una plantilla de notificación activa para este canal — configurala en Admin → Notificaciones.',
       );
-    } catch {
-      setMensajeEnvio('No se pudo enviar el recibo.');
+    } catch (err) {
+      setMensajeEnvio(mensajeErrorApi(err, 'No se pudo enviar el recibo.'));
     } finally {
       setEnviando(false);
     }

@@ -1,6 +1,7 @@
 import { FormEvent, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { platformApiClient } from '../lib/platform-api-client';
+import { mensajeErrorApi } from '../lib/mensaje-error-api';
 import { FormField } from '../components/molecules/FormField/FormField';
 import { Button } from '../components/atoms/Button/Button';
 import { ThemeToggle } from '../components/molecules/ThemeToggle/ThemeToggle';
@@ -27,8 +28,8 @@ export function PlatformRestablecerPassword() {
       await platformApiClient.post('/platform/auth/password/restablecer', { token, password });
       setListo(true);
       setTimeout(() => navigate('/plataforma/login'), 2000);
-    } catch {
-      setError('El enlace es inválido o venció. Solicita uno nuevo.');
+    } catch (err) {
+      setError(mensajeErrorApi(err, 'El enlace es inválido o venció. Solicita uno nuevo.'));
     } finally {
       setEnviando(false);
     }
