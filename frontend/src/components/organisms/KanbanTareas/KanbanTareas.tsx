@@ -37,6 +37,8 @@ function formatearDuracion(ms: number): string {
 
 const CLAVE_VISTA = 'proyectos-kanban-vista';
 const CLAVE_COLUMNAS_COLAPSADAS = 'proyectos-kanban-columnas-colapsadas';
+/** Valor del filtro de Hito para "tareas sin ningún hito asignado" — distinto de '' (que significa "todos los hitos"). */
+const SIN_HITO = '__sin-hito__';
 
 const COLUMNAS: { estado: string; etiqueta: string; dot: string }[] = [
   { estado: 'PENDIENTE', etiqueta: 'Pendiente', dot: 'bg-slate-400' },
@@ -86,6 +88,7 @@ export function KanbanTareas({ proyectoId, proyectoNombre, proyectoDescripcion, 
   const [modalIaAbierto, setModalIaAbierto] = useState(false);
   const [creandoDesdeIa, setCreandoDesdeIa] = useState(false);
   const [busqueda, setBusqueda] = useState('');
+  const [filtroHito, setFiltroHito] = useState('');
   const [columnasColapsadas, setColumnasColapsadas] = useState<Set<string>>(() => {
     try {
       const guardadas = JSON.parse(localStorage.getItem(CLAVE_COLUMNAS_COLAPSADAS) ?? '[]');
@@ -256,6 +259,18 @@ export function KanbanTareas({ proyectoId, proyectoNombre, proyectoDescripcion, 
     return t.titulo.toLowerCase().includes(termino) || t.responsables.some((r) => r.empleado.nombre.toLowerCase().includes(termino));
   }
 
+  function coincideConFiltroHito(t: Tarea): boolean {
+    if (!filtroHito) return true;
+    if (filtroHito === SIN_HITO) return t.hitoId === null;
+    return t.hitoId === filtroHito;
+  }
+
+  function pasaFiltros(t: Tarea): boolean {
+    return coincideConBusqueda(t) && coincideConFiltroHito(t);
+  }
+
+  const hayFiltroActivo = !!busqueda || !!filtroHito;
+
   function alternarColumna(estado: string) {
     setColumnasColapsadas((actual) => {
       const nuevo = new Set(actual);
@@ -277,7 +292,7 @@ export function KanbanTareas({ proyectoId, proyectoNombre, proyectoDescripcion, 
   const hayAlgunaExpandida = tarjetasExpandidas.size > 0;
 
   function alternarTodasLasTarjetas() {
-    setTarjetasExpandidas((actual) => (actual.size > 0 ? new Set() : new Set(tareas.filter(coincideConBusqueda).map((t) => t.id))));
+    setTarjetasExpandidas((actual) => (actual.size > 0 ? new Set() : new Set(tareas.filter(pasaFiltros).map((t) => t.id))));
   }
 
   function accionesTarea(t: Tarea) {
@@ -364,8 +379,31 @@ export function KanbanTareas({ proyectoId, proyectoNombre, proyectoDescripcion, 
       titulo="Tablero"
       descripcion="Arrastrá una tarea a otra columna para cambiar su estado."
       acciones={
-        <div className="flex flex-wrap items-center gap-2">
-          <SearchInput value={busqueda} onChange={setBusqueda} placeholder="Buscar tarea o responsable…" />
+        <div className="flex items-center gap-2">
+          <RequierePermiso permiso="proyectos.ia_generar">
+            <Button variante="secundario" icon={Sparkles} onClick={() => setModalIaAbierto(true)}>
+              Generar con IA
+            </Button>
+          </RequierePermiso>
+          <RequierePermiso permiso="proyectos.crear">
+            <Button onClick={() => setModalCrearAbierto(true)}>Nueva tarea</Button>
+          </RequierePermiso>
+        </div>
+      }
+    >
+      <div className="mb-3 flex flex-wrap items-center gap-2 border-b border-slate-100 pb-3 dark:border-slate-800">
+        <SearchInput value={busqueda} onChange={setBusqueda} placeholder="Buscar tarea o responsable…" />
+        <Select value={filtroHito} onChange={(e) => setFiltroHito(e.target.value)} className="w-auto">
+          <option value="">Todos los hitos</option>
+          <option value={SIN_HITO}>Sin hito</option>
+          {hitos.map((h) => (
+            <option key={h.id} value={h.id}>
+              {h.nombre}
+            </option>
+          ))}
+        </Select>
+
+        <div className="ml-auto flex items-center gap-2">
           {vista === 'clasico' && (
             <button
               type="button"
@@ -392,24 +430,16 @@ export function KanbanTareas({ proyectoId, proyectoNombre, proyectoDescripcion, 
               </button>
             ))}
           </div>
-          <RequierePermiso permiso="proyectos.ia_generar">
-            <Button variante="secundario" icon={Sparkles} onClick={() => setModalIaAbierto(true)}>
-              Generar con IA
-            </Button>
-          </RequierePermiso>
-          <RequierePermiso permiso="proyectos.crear">
-            <Button onClick={() => setModalCrearAbierto(true)}>Nueva tarea</Button>
-          </RequierePermiso>
         </div>
-      }
-    >
+      </div>
+
       {tareas.length === 0 ? (
         <p className="text-sm text-slate-400">Sin tareas todavía — creá la primera con "Nueva tarea".</p>
       ) : (
         <div className="flex gap-3 overflow-x-auto pb-2">
           {COLUMNAS.map((col) => {
             const tareasColumnaTotal = tareas.filter((t) => t.estado === col.estado);
-            const tareasColumna = tareasColumnaTotal.filter(coincideConBusqueda);
+            const tareasColumna = tareasColumnaTotal.filter(pasaFiltros);
             const colapsada = columnasColapsadas.has(col.estado);
 
             if (colapsada) {
@@ -467,7 +497,7 @@ export function KanbanTareas({ proyectoId, proyectoNombre, proyectoDescripcion, 
                   </span>
                   <div className="flex items-center gap-1">
                     <span className="rounded-full bg-white px-1.5 text-[10px] text-slate-400 dark:bg-slate-900 dark:text-slate-500">
-                      {busqueda ? `${tareasColumna.length}/${tareasColumnaTotal.length}` : tareasColumnaTotal.length}
+                      {hayFiltroActivo ? `${tareasColumna.length}/${tareasColumnaTotal.length}` : tareasColumnaTotal.length}
                     </span>
                     <button
                       type="button"
@@ -482,7 +512,7 @@ export function KanbanTareas({ proyectoId, proyectoNombre, proyectoDescripcion, 
 
                 <div className="flex flex-col gap-2">
                   {tareasColumna.length === 0 && (
-                    <p className="px-1 text-xs text-slate-400">{busqueda ? 'Sin coincidencias' : 'Sin tareas'}</p>
+                    <p className="px-1 text-xs text-slate-400">{hayFiltroActivo ? 'Sin coincidencias' : 'Sin tareas'}</p>
                   )}
 
                   {vista === 'clasico'
