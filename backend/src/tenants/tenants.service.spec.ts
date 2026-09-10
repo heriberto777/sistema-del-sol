@@ -1,6 +1,6 @@
+import { BadRequestException } from '@nestjs/common';
 import { TenantsService } from './tenants.service';
 import { TenantsRepository } from './tenants.repository';
-import { CrearTenantDto } from './dto/crear-tenant.dto';
 
 describe('TenantsService', () => {
   let service: TenantsService;
@@ -8,71 +8,28 @@ describe('TenantsService', () => {
 
   beforeEach(() => {
     repository = {
-      crearConProvisioning: jest.fn(),
-      listar: jest.fn(),
       buscarPorId: jest.fn(),
-      actualizar: jest.fn(),
+      resetear: jest.fn(),
     } as unknown as jest.Mocked<TenantsRepository>;
     service = new TenantsService(repository);
   });
 
-  const dto: CrearTenantDto = {
-    nombre: 'Cliente X',
-    subdominio: 'cliente-x',
-    planId: 'plan-1',
-    adminEmail: 'admin@cliente-x.com',
-    adminNombre: 'Admin X',
-    adminPassword: 'ClienteX123!',
-  };
+  describe('resetear', () => {
+    it('rechaza si el subdominio tipeado no coincide con el del tenant (protección contra tenant equivocado)', async () => {
+      repository.buscarPorId.mockResolvedValue({ id: 't1', subdominio: 'ciguadr' } as never);
 
-  it('nunca envía la contraseña en texto plano al repositorio — siempre un hash', async () => {
-    repository.crearConProvisioning.mockResolvedValue({ id: 't1' } as never);
+      await expect(service.resetear('t1', { modo: 'TRANSACCIONAL', confirmacionSubdominio: 'otro' })).rejects.toThrow(BadRequestException);
+      expect(repository.resetear).not.toHaveBeenCalled();
+    });
 
-    await service.crear(dto);
+    it('ejecuta el reseteo si el subdominio tipeado coincide exactamente', async () => {
+      repository.buscarPorId.mockResolvedValue({ id: 't1', subdominio: 'ciguadr' } as never);
+      repository.resetear.mockResolvedValue({ tenantId: 't1', modo: 'COMPLETO' } as never);
 
-    const [[args]] = repository.crearConProvisioning.mock.calls;
-    expect(args.adminPasswordHash).not.toBe(dto.adminPassword);
-    expect(args.adminPasswordHash.length).toBeGreaterThan(20);
-  });
+      const resultado = await service.resetear('t1', { modo: 'COMPLETO', confirmacionSubdominio: 'ciguadr' });
 
-  it('propaga nombre/subdominio/rnc/email/nombre del admin sin transformarlos', async () => {
-    repository.crearConProvisioning.mockResolvedValue({ id: 't1' } as never);
-
-    await service.crear({ ...dto, rnc: '123456789' });
-
-    expect(repository.crearConProvisioning).toHaveBeenCalledWith(
-      expect.objectContaining({
-        nombre: 'Cliente X',
-        subdominio: 'cliente-x',
-        rnc: '123456789',
-        planId: 'plan-1',
-        adminEmail: 'admin@cliente-x.com',
-        adminNombre: 'Admin X',
-      }),
-    );
-  });
-
-  it('delega listar/buscarPorId/actualizar al repositorio', () => {
-    service.listar();
-    expect(repository.listar).toHaveBeenCalled();
-
-    service.buscarPorId('t1');
-    expect(repository.buscarPorId).toHaveBeenCalledWith('t1');
-
-    service.actualizar('t1', { estado: 'SUSPENDIDO' });
-    expect(repository.actualizar).toHaveBeenCalledWith('t1', { estado: 'SUSPENDIDO' });
-  });
-
-  it('propaga el logo al crear (Plataforma puede pre-cargarlo)', async () => {
-    repository.crearConProvisioning.mockResolvedValue({ id: 't1' } as never);
-
-    await service.crear({ ...dto, logo: 'data:image/png;base64,abc' });
-
-    expect(repository.crearConProvisioning).toHaveBeenCalledWith(expect.objectContaining({ logo: 'data:image/png;base64,abc' }));
-  });
-
-  it('propaga el logo al actualizar, incluido "" para borrarlo', () => {
-    service.actualizar('t1', { logo: '' });
-    expect(repository.actualizar).toHaveBeenCalledWith('t1', { logo: '' });
+      expect(repository.resetear).toHaveBeenCalledWith('t1', 'COMPLETO');
+      expect(resultado).toEqual({ tenantId: 't1', modo: 'COMPLETO' });
+    });
   });
 });

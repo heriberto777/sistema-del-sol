@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { platformApiClient } from '../lib/platform-api-client';
 import { mensajeErrorApi } from '../lib/mensaje-error-api';
+import { usePlatformAuth } from '../hooks/usePlatformAuth';
 import { FormField } from '../components/molecules/FormField/FormField';
 import { Button } from '../components/atoms/Button/Button';
 import { Badge } from '../components/atoms/Badge/Badge';
@@ -480,14 +481,105 @@ function PanelDominiosTenant({ tenant, onClose }: { tenant: Tenant; onClose: () 
   );
 }
 
+type ModoReseteoTenant = 'TRANSACCIONAL' | 'COMPLETO';
+
+const DESCRIPCION_MODO_RESETEO: Record<ModoReseteoTenant, string> = {
+  TRANSACCIONAL:
+    'Borra solo lo generado: facturas, cotizaciones, remisiones, pagos, asientos contables, movimientos de inventario, ' +
+    'proyectos, nómina procesada, turnos de caja, pedidos de la tienda, publicaciones sociales, notificaciones y auditoría. ' +
+    'Preserva Productos, Clientes, Empleados, Roles, Configuración, Cuentas contables, Formas de pago, Listas de precio y NCF.',
+  COMPLETO:
+    'Todo lo de "Solo movimientos" MÁS vacía Productos, Clientes y Empleados, y reinicia a sus valores base Roles/Permisos, ' +
+    'Cuentas contables, Formas de pago, Listas de precio, Correlativos, Configuración y Secciones del Home. ' +
+    'Los NCF configurados se borran sin recrear (hay que volver a cargar los rangos reales de la DGII). ' +
+    'El Tenant y los usuarios (logins) NUNCA se borran, en ningún modo.',
+};
+
+/** Pedido del usuario (2026-09-10) — reiniciar los datos de un tenant sin recrearlo, en dos modos. Acción irreversible: confirmación por subdominio tipeado, mismo criterio que un borrado (ver `feedback_no_confirm_nativo`). */
+function ModalResetearTenant({ tenant, onClose }: { tenant: Tenant; onClose: () => void }) {
+  const queryClient = useQueryClient();
+  const [modo, setModo] = useState<ModoReseteoTenant>('TRANSACCIONAL');
+  const [confirmacion, setConfirmacion] = useState('');
+  const [error, setError] = useState<string | null>(null);
+
+  const resetear = useMutation({
+    mutationFn: async () =>
+      platformApiClient.post(`/platform/tenants/${tenant.id}/resetear`, { modo, confirmacionSubdominio: confirmacion }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['platform-tenants'] });
+      onClose();
+    },
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo resetear el tenant.')),
+  });
+
+  const confirmacionValida = confirmacion === tenant.subdominio;
+
+  return (
+    <Modal titulo={`Reiniciar "${tenant.nombre}"`} onClose={onClose}>
+      <div className="space-y-4">
+        <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-900/30 dark:text-red-300">
+          Esta acción es irreversible. Se aplica solo a este tenant — el resto de la plataforma no se ve afectado.
+        </p>
+
+        <div>
+          <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Modo</label>
+          <div className="space-y-2">
+            {(['TRANSACCIONAL', 'COMPLETO'] as const).map((opcion) => (
+              <label
+                key={opcion}
+                className="flex cursor-pointer items-start gap-2 rounded-lg border border-slate-200 p-3 text-sm dark:border-slate-800"
+              >
+                <input
+                  type="radio"
+                  name="modo-reseteo"
+                  className="mt-1"
+                  checked={modo === opcion}
+                  onChange={() => setModo(opcion)}
+                />
+                <span>
+                  <span className="block font-medium text-slate-900 dark:text-slate-100">
+                    {opcion === 'TRANSACCIONAL' ? 'Solo movimientos/transacciones' : 'Global — desde cero'}
+                  </span>
+                  <span className="text-xs text-slate-500 dark:text-slate-400">{DESCRIPCION_MODO_RESETEO[opcion]}</span>
+                </span>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        <FormField
+          id="confirmacion-subdominio"
+          label={`Para confirmar, escribe el subdominio exacto: ${tenant.subdominio}`}
+          value={confirmacion}
+          onChange={(e) => setConfirmacion(e.target.value)}
+        />
+
+        {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+
+        <Button
+          variante="peligro"
+          className="w-full"
+          disabled={!confirmacionValida || resetear.isPending}
+          onClick={() => resetear.mutate()}
+        >
+          {resetear.isPending ? 'Reiniciando…' : 'Reiniciar tenant'}
+        </Button>
+      </div>
+    </Modal>
+  );
+}
+
 export function PlatformTenants() {
   const queryClient = useQueryClient();
+  const { tienePermiso } = usePlatformAuth();
+  const puedeResetear = tienePermiso('platform.tenants.resetear');
 
   const [modalNuevoAbierto, setModalNuevoAbierto] = useState(false);
   const [tenantEditando, setTenantEditando] = useState<Tenant | null>(null);
   const [tenantModulos, setTenantModulos] = useState<Tenant | null>(null);
   const [tenantSuscripcion, setTenantSuscripcion] = useState<Tenant | null>(null);
   const [tenantDominios, setTenantDominios] = useState<Tenant | null>(null);
+  const [tenantAResetear, setTenantAResetear] = useState<Tenant | null>(null);
 
   const { data: tenants } = useQuery({
     queryKey: ['platform-tenants'],
@@ -585,6 +677,9 @@ export function PlatformTenants() {
                               onClick: () => cambiarEstado.mutate({ id: tenant.id, estado: 'SUSPENDIDO' }),
                             }
                           : { etiqueta: 'Reactivar', onClick: () => cambiarEstado.mutate({ id: tenant.id, estado: 'ACTIVO' }) },
+                        ...(puedeResetear
+                          ? [{ etiqueta: 'Reiniciar…', tono: 'peligro' as const, onClick: () => setTenantAResetear(tenant) }]
+                          : []),
                       ]}
                     />
                   </td>
@@ -607,6 +702,7 @@ export function PlatformTenants() {
       {tenantModulos && <PanelModulosTenant tenant={tenantModulos} onClose={() => setTenantModulos(null)} />}
       {tenantSuscripcion && <PanelSuscripcionTenant tenant={tenantSuscripcion} onClose={() => setTenantSuscripcion(null)} />}
       {tenantDominios && <PanelDominiosTenant tenant={tenantDominios} onClose={() => setTenantDominios(null)} />}
+      {tenantAResetear && <ModalResetearTenant tenant={tenantAResetear} onClose={() => setTenantAResetear(null)} />}
     </div>
   );
 }

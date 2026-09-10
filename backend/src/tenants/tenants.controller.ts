@@ -4,6 +4,7 @@ import { TenantsService } from './tenants.service';
 import { TenantDominiosService } from './tenant-dominios.service';
 import { CrearTenantDto } from './dto/crear-tenant.dto';
 import { ActualizarTenantDto } from './dto/actualizar-tenant.dto';
+import { ResetearTenantDto } from './dto/resetear-tenant.dto';
 import { AgregarTenantDominioDto } from './dto/agregar-tenant-dominio.dto';
 import { Public } from '../common/decorators/public.decorator';
 import { PlatformPermissions } from '../common/decorators/platform-permissions.decorator';
@@ -43,6 +44,15 @@ export class TenantsController {
   @PlatformPermissions('platform.tenants.gestionar')
   actualizar(@Param('id') id: string, @Body() dto: ActualizarTenantDto) {
     return this.tenantsService.actualizar(id, dto);
+  }
+
+  // Pedido del usuario (2026-09-10) — reiniciar los datos de UN tenant sin
+  // recrearlo. Permiso propio (no `.gestionar`) a propósito: es una acción
+  // destructiva/irreversible, mucho más sensible que editar nombre/plan.
+  @Post(':id/resetear')
+  @PlatformPermissions('platform.tenants.resetear')
+  resetear(@Param('id') id: string, @Body() dto: ResetearTenantDto) {
+    return this.tenantsService.resetear(id, dto);
   }
 
   @Get(':id/dominios')
