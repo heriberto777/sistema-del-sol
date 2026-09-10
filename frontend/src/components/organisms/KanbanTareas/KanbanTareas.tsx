@@ -519,6 +519,9 @@ export function KanbanTareas({ proyectoId, proyectoNombre, proyectoDescripcion, 
                               </div>
                             </div>
 
+                            {/* Siempre visible (colapsada o no) — es una ACCIÓN (Iniciar/Pausar), no un detalle a esconder; mismo criterio que la vista Compacto, que también lo muestra siempre. */}
+                            <div onClick={(e) => e.stopPropagation()}>{chipCronometro(t)}</div>
+
                             {expandida && (
                               <div className="mt-2 space-y-2">
                                 {t.hitoId && hitoPorId[t.hitoId] && (
@@ -547,7 +550,6 @@ export function KanbanTareas({ proyectoId, proyectoNombre, proyectoDescripcion, 
                                     </div>
                                   )}
                                 </div>
-                                {chipCronometro(t)}
                                 {t.fechaVencimiento && (
                                   <p className="text-xs text-slate-400">Vence {new Date(t.fechaVencimiento).toLocaleDateString('es-DO')}</p>
                                 )}
