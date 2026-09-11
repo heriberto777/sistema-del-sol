@@ -121,7 +121,7 @@ export function ModalRegistrarPagoOrdenCompra({
                   Lo retenido no se le paga al proveedor — se declara luego a la DGII. Ver tasas de referencia en Admin →
                   Configuración general.
                 </p>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                   <FormField
                     id="pago-oc-retencion-isr"
                     label="Retención ISR (RD$)"

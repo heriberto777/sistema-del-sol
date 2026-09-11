@@ -682,7 +682,7 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
             </div>
 
             <div className="space-y-3 lg:col-span-2">
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 <div className="flex flex-col gap-1">
                   <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Cliente</label>
                   <ComboboxBusqueda<Cliente>
@@ -753,7 +753,7 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
                     </Select>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                     <div className="flex flex-col gap-1">
                       <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Opción de pago</label>
                       <Select value={tipoFactura} onChange={(e) => setTipoFactura(e.target.value as 'CONTADO' | 'CREDITO')}>

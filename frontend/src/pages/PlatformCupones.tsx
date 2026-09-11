@@ -199,7 +199,7 @@ function ModalCupon({ cupon, onClose }: { cupon: Cupon | null; onClose: () => vo
           </p>
         )}
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
             <label htmlFor="cupon-tipo" className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
               Tipo
@@ -233,7 +233,7 @@ function ModalCupon({ cupon, onClose }: { cupon: Cupon | null; onClose: () => vo
           disabled={Boolean(cupon)}
         />
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <FormField
             id="cupon-expiracion"
             label="Expira el (opcional)"

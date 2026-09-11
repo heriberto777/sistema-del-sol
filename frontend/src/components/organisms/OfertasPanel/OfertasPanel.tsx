@@ -277,7 +277,7 @@ export function OfertasPanel() {
           </div>
 
           {tipoDescuento === 'BOGO' && (
-            <div className="grid grid-cols-3 gap-2 rounded-md border border-slate-200 p-3 dark:border-slate-800">
+            <div className="grid grid-cols-1 gap-2 rounded-md border border-slate-200 p-3 dark:border-slate-800 sm:grid-cols-3">
               <FormField id="oferta-comprar" label="Compra (unidades)" type="number" min={1} value={comprarCantidad} onChange={(e) => setComprarCantidad(e.target.value)} required />
               <FormField id="oferta-llevar" label="Lleva (unidades)" type="number" min={1} value={llevarCantidad} onChange={(e) => setLlevarCantidad(e.target.value)} required />
               <FormField

@@ -60,7 +60,7 @@ export function TareaFormModal({ tareaInicial, hitos, guardando, error, onClose,
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div className="flex flex-col gap-1">
             <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Hito (opcional)</label>
             <Select value={hitoId} onChange={(e) => setHitoId(e.target.value)}>
@@ -84,7 +84,7 @@ export function TareaFormModal({ tareaInicial, hitos, guardando, error, onClose,
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <FormField
             id="tarea-fecha-vencimiento"
             label="Fecha de vencimiento (opcional)"

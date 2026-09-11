@@ -144,7 +144,7 @@ function PanelFactura({ factura, onClose }: { factura: FacturaPlataforma; onClos
 
         {editable && puedeGestionar && (
           <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <FormField id="descuento" label="Descuento (RD$)" type="number" min="0" step="0.01" value={descuento} onChange={(e) => setDescuento(e.target.value)} />
               <FormField id="mora" label="Mora (RD$)" type="number" min="0" step="0.01" value={montoMora} onChange={(e) => setMontoMora(e.target.value)} />
             </div>
@@ -180,7 +180,7 @@ function PanelFactura({ factura, onClose }: { factura: FacturaPlataforma; onClos
         {puedeRegistrarPago && pendiente > 0 && factura.estado !== 'ANULADA' && (
           <div className="space-y-2 rounded-lg border border-slate-200 p-3 dark:border-slate-800">
             <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Registrar pago</p>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               <FormField id="pago-monto" label="Monto" type="number" min="0" step="0.01" value={monto} onChange={(e) => setMonto(e.target.value)} />
               <div>
                 <label htmlFor="pago-metodo" className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">

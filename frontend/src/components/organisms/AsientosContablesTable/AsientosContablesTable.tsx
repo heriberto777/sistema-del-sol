@@ -214,12 +214,12 @@ function ModalNuevoAsiento({ onClose }: { onClose: () => void }) {
 
         <div className="space-y-2">
           {lineas.map((linea, indice) => (
-            <div key={indice} className="flex items-center gap-2">
+            <div key={indice} className="flex flex-wrap items-center gap-2">
               <select
                 value={linea.cuentaContableId}
                 onChange={(e) => actualizarLinea(indice, { cuentaContableId: e.target.value })}
                 required
-                className="flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                className="min-w-[180px] flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
               >
                 <option value="">Seleccionar cuenta…</option>
                 {cuentas?.map((c) => (

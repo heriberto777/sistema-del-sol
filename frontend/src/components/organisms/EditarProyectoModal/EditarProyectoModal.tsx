@@ -116,7 +116,7 @@ export function EditarProyectoModal({ proyecto, onClose, onGuardado }: EditarPro
           </Select>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <FormField
             id="editar-proyecto-fecha-inicio"
             label="Fecha de inicio (opcional)"

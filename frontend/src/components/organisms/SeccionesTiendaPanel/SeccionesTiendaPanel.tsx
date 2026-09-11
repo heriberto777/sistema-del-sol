@@ -324,7 +324,7 @@ function ModalSeccionTienda({
       <form onSubmit={onSubmit} className="space-y-4">
         <div className="flex flex-col gap-1">
           <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Tipo de sección</label>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             {(Object.keys(ETIQUETA_TIPO) as TipoSeccion[]).map((t) => (
               <button
                 key={t}
@@ -343,7 +343,7 @@ function ModalSeccionTienda({
           <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{DESCRIPCION_TIPO[tipo]}</p>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <FormField id="seccion-titulo" label="Título" value={titulo} onChange={(e) => setTitulo(e.target.value)} required />
           <FormField id="seccion-subtitulo" label="Subtítulo (opcional)" value={subtitulo} onChange={(e) => setSubtitulo(e.target.value)} />
         </div>
@@ -390,7 +390,7 @@ function ModalSeccionTienda({
         )}
 
         {tipo === 'CATEGORIA' && (
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="flex flex-col gap-1">
               <label htmlFor="seccion-categoria" className="text-sm font-medium text-slate-700 dark:text-slate-300">
                 Categoría
@@ -415,7 +415,7 @@ function ModalSeccionTienda({
           <div className="flex flex-col gap-2">
             <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Ítems (2 a 4)</label>
             {contenido.map((item, i) => (
-              <div key={i} className="flex items-center gap-2">
+              <div key={i} className="flex flex-wrap items-center gap-2">
                 <Select value={item.icono} onChange={(e) => actualizarItemFranja(i, { icono: e.target.value })} className="!w-36 shrink-0">
                   {Object.keys(ICONOS_FRANJA_CONFIANZA).map((nombre) => (
                     <option key={nombre} value={nombre}>
@@ -429,7 +429,7 @@ function ModalSeccionTienda({
                   onChange={(e) => actualizarItemFranja(i, { texto: e.target.value })}
                   placeholder="Ej. Envío a todo el país"
                   maxLength={60}
-                  className="flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                  className="min-w-[140px] flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
                 />
                 <button type="button" onClick={() => quitarItemFranja(i)} className="shrink-0 text-slate-400 hover:text-red-600" aria-label="Quitar ítem">
                   <Trash2 size={16} />

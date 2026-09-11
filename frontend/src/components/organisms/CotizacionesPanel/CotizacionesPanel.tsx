@@ -512,7 +512,7 @@ function ModalEditarCotizacion({
         <div className="space-y-2">
           <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Líneas</p>
           {valores.lineas.map((linea, i) => (
-            <div key={i} className="flex items-center gap-2">
+            <div key={i} className="flex flex-wrap items-center gap-2">
               {linea.esManual ? (
                 <input
                   type="text"
@@ -521,7 +521,7 @@ function ModalEditarCotizacion({
                   onChange={(e) =>
                     setValores({ ...valores, lineas: valores.lineas.map((l, idx) => (idx === i ? { ...l, descripcionManual: e.target.value } : l)) })
                   }
-                  className="flex-1 rounded-md border border-slate-300 px-2 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                  className="min-w-[160px] flex-1 rounded-md border border-slate-300 px-2 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
                 />
               ) : (
                 <SelectorLineaProducto
@@ -534,7 +534,7 @@ function ModalEditarCotizacion({
                       lineas: valores.lineas.map((l, idx) => (idx === i ? { ...l, productoId, varianteId } : l)),
                     })
                   }
-                  className="flex-1"
+                  className="min-w-[160px] flex-1"
                 />
               )}
               <input

@@ -541,7 +541,7 @@ export function TiendaOnlineConfigPanel() {
                 </p>
 
                 <SeccionPersonalizacion titulo="Colores">
-                  <div className="grid grid-cols-4 gap-3">
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                     {(
                       [
                         ['colorAcento', 'Acento'],
@@ -564,7 +564,7 @@ export function TiendaOnlineConfigPanel() {
                 </SeccionPersonalizacion>
 
                 <SeccionPersonalizacion titulo="Tipografía">
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div className="flex flex-col gap-1">
                       <label htmlFor="tema-fuente-display" className="text-sm font-medium text-slate-700 dark:text-slate-300">
                         Fuente de títulos
@@ -616,7 +616,7 @@ export function TiendaOnlineConfigPanel() {
                 </SeccionPersonalizacion>
 
                 <SeccionPersonalizacion titulo="Tarjetas de producto">
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div className="flex flex-col gap-1">
                       <label htmlFor="tema-radio" className="text-sm font-medium text-slate-700 dark:text-slate-300">
                         Esquinas de tarjeta
@@ -758,7 +758,7 @@ export function TiendaOnlineConfigPanel() {
                   titulo="Insignia de oferta en la tarjeta"
                   descripcion='Cómo se muestra un producto con oferta vigente en catálogo, Destacados y "También te puede interesar".'
                 >
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                     {ESTILOS_INSIGNIA_OFERTA_TIENDA.map((estilo) => (
                       <button
                         key={estilo}
@@ -799,7 +799,7 @@ export function TiendaOnlineConfigPanel() {
                   titulo="Etiqueta de sin stock"
                   descripcion="Cómo se muestra un producto o variante agotado en catálogo, Destacados, y en el selector de opciones del detalle. Reemplaza a la insignia de oferta cuando ambas aplicarían a la vez."
                 >
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                     {ESTILOS_INSIGNIA_SIN_STOCK_TIENDA.map((estilo) => (
                       <button
                         key={estilo}

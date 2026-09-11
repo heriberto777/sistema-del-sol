@@ -246,7 +246,7 @@ function ModalDetalleRemision({ remision, onClose, onImprimir }: { remision: Rem
           )}
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div className="rounded-lg border border-slate-200 p-3 text-sm dark:border-slate-800">
             <p className="text-slate-500 dark:text-slate-400">Cliente</p>
             <p className="font-medium text-slate-900 dark:text-slate-100">{remision.cliente?.nombre}</p>
@@ -516,7 +516,7 @@ function ModalEditarRemision({
         <div className="space-y-2">
           <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Líneas</p>
           {valores.lineas.map((linea, i) => (
-            <div key={i} className="flex items-center gap-2">
+            <div key={i} className="flex flex-wrap items-center gap-2">
               <SelectorLineaProducto
                 productos={productos}
                 productoId={linea.productoId}
@@ -527,7 +527,7 @@ function ModalEditarRemision({
                     lineas: valores.lineas.map((l, idx) => (idx === i ? { ...l, productoId, varianteId } : l)),
                   })
                 }
-                className="flex-1"
+                className="min-w-[160px] flex-1"
               />
               <input
                 type="number"

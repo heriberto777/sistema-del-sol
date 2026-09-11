@@ -705,12 +705,12 @@ function FormularioProducto({ producto, onGuardado }: { producto: Producto | nul
             Componentes (se descuentan del inventario al facturar el combo)
           </p>
           {componentes.map((componente, i) => (
-            <div key={i} className="flex gap-2">
+            <div key={i} className="flex flex-wrap gap-2">
               <Select
                 value={componente.productoId}
                 onChange={(e) => actualizarComponente(i, { productoId: e.target.value })}
                 required
-                className="flex-1"
+                className="min-w-[160px] flex-1"
               >
                 <option value="">Producto…</option>
                 {opcionesComponente.map((p) => (

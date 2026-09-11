@@ -234,7 +234,7 @@ function ModalPlan({ plan, onClose }: { plan: Plan | null; onClose: () => void }
       <form onSubmit={onSubmit} className="space-y-4">
         <FormField id="plan-nombre" label="Nombre" value={nombre} onChange={(e) => setNombre(e.target.value)} required />
         <FormField id="plan-descripcion" label="Descripción (opcional)" value={descripcion} onChange={(e) => setDescripcion(e.target.value)} />
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <FormField
             id="plan-precio"
             label="Precio (RD$)"
