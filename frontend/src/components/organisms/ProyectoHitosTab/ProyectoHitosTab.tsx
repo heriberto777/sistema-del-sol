@@ -140,7 +140,8 @@ export function ProyectoHitosTab({ proyectoId, hitos, tareas, onInvalidar, onErr
               </p>
               {puedeVerCosto && costo && costo.horasTotales > 0 && (
                 <p className={clsx('mt-0.5 text-xs', montoInsuficiente ? 'font-medium text-red-600 dark:text-red-400' : 'text-slate-400 dark:text-slate-500')}>
-                  Costo interno de horas trabajadas: RD$ {costo.costoHoras.toLocaleString('es-DO', { maximumFractionDigits: 0 })} ({costo.horasTotales}h)
+                  Costo interno de horas trabajadas: RD$ {costo.costoHoras.toLocaleString('es-DO', { maximumFractionDigits: 0 })} (
+                  {costo.horasTotales.toLocaleString('es-DO', { maximumFractionDigits: 2 })}h)
                   {montoInsuficiente && ' — supera el monto fijo pactado'}
                 </p>
               )}

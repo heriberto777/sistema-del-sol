@@ -333,5 +333,21 @@ describe('ProyectosService', () => {
       expect(resultado.h2.costoHoras).toBeCloseTo(3 * 200, 0);
       expect(resultado['sin-hito']).toBeUndefined();
     });
+
+    it('redondea a 2 decimales — sin esto, sumar horas decimales en JS deja ruido de punto flotante (ej. "6.539999999999999h" en vez de "6.54h")', async () => {
+      repository.buscarProyectoPorId.mockResolvedValue({
+        id: 'p1',
+        tareas: [
+          // 0.1 + 0.2 es el ejemplo clásico de imprecisión de punto flotante en JS (da 0.30000000000000004).
+          { hitoId: 'h1', registrosHoras: [{ empleadoId: 'e1', horas: 0.1 }, { empleadoId: 'e1', horas: 0.2 }] },
+        ],
+      } as never);
+      empleadosRepository.buscarPorId.mockResolvedValue({ id: 'e1', salarioBrutoMensual: '34666' } as never);
+
+      const resultado = await service.calcularCostoHorasPorHito('p1', 't1');
+
+      expect(resultado.h1.horasTotales).toBe(0.3);
+      expect(Number.isInteger(resultado.h1.costoHoras * 100)).toBe(true);
+    });
   });
 });

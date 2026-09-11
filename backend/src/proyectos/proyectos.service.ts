@@ -270,7 +270,11 @@ export class ProyectosService {
         horasTotales += horas;
         costoHoras += horas * costoPorEmpleado.get(empleadoId)!;
       }
-      resultado[hitoId] = { horasTotales, costoHoras };
+      // Redondeo a 2 decimales — `RegistroHoraProyecto.horas` es Decimal(5,2),
+      // nunca tiene más precisión real que esa; sin este redondeo, la suma
+      // en JS de varios registros arrastra error de punto flotante y termina
+      // mostrando cosas como "6.539999999999999h" en vez de "6.54h".
+      resultado[hitoId] = { horasTotales: Math.round(horasTotales * 100) / 100, costoHoras: Math.round(costoHoras * 100) / 100 };
     }
     return resultado;
   }
