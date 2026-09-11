@@ -139,8 +139,13 @@ export function TareaPersonalModal({ tarea, onClose }: { tarea: TareaPersonal; o
 
   return (
     <Modal titulo={tarea.titulo} onClose={onClose} ancho="xl">
-      <div className="grid gap-5 md:grid-cols-[minmax(0,1fr)_300px]">
-        <div className="space-y-4">
+      <div className="space-y-4">
+        {/* Campos compactos en una sola fila — antes vivían en una columna
+            angosta que quedaba con mucho espacio vacío debajo, mientras las
+            Notas se apretaban en un panel lateral de 300px (el motivo real
+            de que un bloque de código necesitara scroll horizontal). Ahora
+            las Notas usan todo el ancho del modal. */}
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-[2fr_1fr_1fr_1fr]">
           <div className="flex flex-col gap-1">
             <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Título</label>
             <input
@@ -149,48 +154,45 @@ export function TareaPersonalModal({ tarea, onClose }: { tarea: TareaPersonal; o
               className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
             />
           </div>
-
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <div className="flex flex-col gap-1">
-              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Estado</label>
-              <Select value={tarea.estado} onChange={(e) => actualizar.mutate({ estado: e.target.value as TareaPersonal['estado'] })}>
-                {ESTADOS_TAREA_PERSONAL.map((es) => (
-                  <option key={es} value={es}>
-                    {ETIQUETA_ESTADO_TAREA_PERSONAL[es]}
-                  </option>
-                ))}
-              </Select>
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Prioridad</label>
-              <Select value={tarea.prioridad} onChange={(e) => actualizar.mutate({ prioridad: e.target.value as TareaPersonal['prioridad'] })}>
-                {PRIORIDADES_TAREA_PERSONAL.map((p) => (
-                  <option key={p} value={p}>
-                    {ETIQUETA_PRIORIDAD_TAREA_PERSONAL[p]}
-                  </option>
-                ))}
-              </Select>
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Fecha (opcional)</label>
-              <input
-                type="date"
-                defaultValue={tarea.fecha ? tarea.fecha.slice(0, 10) : ''}
-                onChange={(e) => actualizar.mutate({ fecha: e.target.value || null })}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-              />
-            </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Estado</label>
+            <Select value={tarea.estado} onChange={(e) => actualizar.mutate({ estado: e.target.value as TareaPersonal['estado'] })}>
+              {ESTADOS_TAREA_PERSONAL.map((es) => (
+                <option key={es} value={es}>
+                  {ETIQUETA_ESTADO_TAREA_PERSONAL[es]}
+                </option>
+              ))}
+            </Select>
           </div>
-
-          {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Prioridad</label>
+            <Select value={tarea.prioridad} onChange={(e) => actualizar.mutate({ prioridad: e.target.value as TareaPersonal['prioridad'] })}>
+              {PRIORIDADES_TAREA_PERSONAL.map((p) => (
+                <option key={p} value={p}>
+                  {ETIQUETA_PRIORIDAD_TAREA_PERSONAL[p]}
+                </option>
+              ))}
+            </Select>
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Fecha (opcional)</label>
+            <input
+              type="date"
+              defaultValue={tarea.fecha ? tarea.fecha.slice(0, 10) : ''}
+              onChange={(e) => actualizar.mutate({ fecha: e.target.value || null })}
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+            />
+          </div>
         </div>
 
-        <div className="flex flex-col border-t border-slate-100 pt-5 dark:border-slate-800 md:border-l md:border-t-0 md:pl-5 md:pt-0">
+        {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+
+        <div className="border-t border-slate-100 pt-4 dark:border-slate-800">
           <h3 className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
             Notas{tarea.comentarios.length > 0 && <span className="ml-1 font-normal text-slate-400">({tarea.comentarios.length})</span>}
           </h3>
 
-          <div className="max-h-56 overflow-y-auto pr-1 md:max-h-none md:flex-1">
+          <div className="max-h-[26rem] overflow-y-auto pr-1">
             {tarea.comentarios.length === 0 && <p className="py-2 text-xs text-slate-400">Sin notas todavía — escribí algo abajo.</p>}
             {tarea.comentarios.map((c) => (
               <ComentarioItem
