@@ -38,6 +38,7 @@ import { Bancos } from './pages/Bancos';
 import { GastosMenores } from './pages/GastosMenores';
 import { Proyectos } from './pages/Proyectos';
 import { Propiedades } from './pages/Propiedades';
+import { MisTareas } from './pages/MisTareas';
 import { Contratos } from './pages/Contratos';
 import { CobrosAlquiler } from './pages/CobrosAlquiler';
 import { InmobiliariaPublicaLayout } from './pages/inmobiliaria/InmobiliariaPublicaLayout';
@@ -198,6 +199,7 @@ const RUTAS_ADMIN = [
           { path: '/productos', element: <Productos /> },
           { path: '/productos/etiquetas', element: <EtiquetasCodigoBarras /> },
           { path: '/reportes', element: <Reportes /> },
+          { path: '/mis-tareas', element: <MisTareas /> },
           { path: '/contabilidad', element: <Contabilidad /> },
           { path: '/bancos', element: <Bancos /> },
           { path: '/gastos-menores', element: <GastosMenores /> },
