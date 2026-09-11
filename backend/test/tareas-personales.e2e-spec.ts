@@ -66,22 +66,36 @@ describe('Mis Tareas (e2e)', () => {
     await prisma.$disconnect();
   });
 
-  it('el usuario A crea una tarea y la ve en su propia lista', async () => {
+  it('el usuario A crea una tarea con etiquetas y la ve en su propia lista', async () => {
     const token = await login('a@e2e-mis-tareas.com');
 
     const respuesta = await request(app.getHttpServer())
       .post('/api/admin/mis-tareas')
       .set('Authorization', `Bearer ${token}`)
-      .send({ titulo: 'Llamar al proveedor de insumos' })
+      .send({ titulo: 'Llamar al proveedor de insumos', etiquetas: ['Proveedores', 'Urgente'] })
       .expect(201);
 
     tareaAId = respuesta.body.id;
+    expect(respuesta.body.etiquetas).toEqual(['Proveedores', 'Urgente']);
 
     const lista = await request(app.getHttpServer())
       .get('/api/admin/mis-tareas')
       .set('Authorization', `Bearer ${token}`)
       .expect(200);
     expect(lista.body.map((t: { id: string }) => t.id)).toContain(tareaAId);
+  });
+
+  it('se puede pasar la tarea a EN_ESPERA sin que se marque como completada', async () => {
+    const token = await login('a@e2e-mis-tareas.com');
+
+    const respuesta = await request(app.getHttpServer())
+      .patch(`/api/admin/mis-tareas/${tareaAId}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ estado: 'EN_ESPERA' })
+      .expect(200);
+
+    expect(respuesta.body.estado).toBe('EN_ESPERA');
+    expect(respuesta.body.completadaEn).toBeNull();
   });
 
   it('el usuario B (mismo tenant) NO ve la tarea de A en su lista', async () => {
@@ -160,6 +174,31 @@ describe('Mis Tareas (e2e)', () => {
       .delete(`/api/admin/mis-tareas/comentarios/${comentarioAId}`)
       .set('Authorization', `Bearer ${token}`)
       .expect(404);
+  });
+
+  it('el usuario B no puede editar el comentario de A (y el texto no cambia)', async () => {
+    const token = await login('b@e2e-mis-tareas.com');
+
+    await request(app.getHttpServer())
+      .patch(`/api/admin/mis-tareas/comentarios/${comentarioAId}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ contenido: 'Secuestrado por B' })
+      .expect(404);
+
+    const comentario = await prisma.comentarioTareaPersonal.findUniqueOrThrow({ where: { id: comentarioAId } });
+    expect(comentario.contenido).toContain('Ya llamé');
+  });
+
+  it('el usuario A edita su propio comentario', async () => {
+    const token = await login('a@e2e-mis-tareas.com');
+
+    const respuesta = await request(app.getHttpServer())
+      .patch(`/api/admin/mis-tareas/comentarios/${comentarioAId}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ contenido: 'Texto corregido — llegan el viernes.' })
+      .expect(200);
+
+    expect(respuesta.body.contenido).toBe('Texto corregido — llegan el viernes.');
   });
 
   it('marcar la tarea como HECHA completa completadaEn; reabrirla lo limpia', async () => {

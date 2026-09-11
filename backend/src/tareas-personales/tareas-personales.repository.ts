@@ -56,6 +56,7 @@ export class TareasPersonalesRepository {
       estado?: EstadoTareaPersonal;
       fecha?: Date | null;
       completadaEn?: Date | null;
+      etiquetas?: string[];
     },
   ) {
     return this.db.tareaPersonal.update({ where: { id, usuarioId }, data: datos, include: INCLUDE_TAREA });
@@ -74,6 +75,14 @@ export class TareasPersonalesRepository {
 
   buscarComentarioPorId(id: string) {
     return this.db.comentarioTareaPersonal.findUniqueOrThrow({ where: { id } });
+  }
+
+  editarComentario(id: string, contenido: string) {
+    return this.db.comentarioTareaPersonal.update({
+      where: { id },
+      data: { contenido },
+      include: { autor: { select: { id: true, nombre: true } } },
+    });
   }
 
   eliminarComentario(id: string) {

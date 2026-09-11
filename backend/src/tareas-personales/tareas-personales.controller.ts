@@ -3,6 +3,7 @@ import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { TareasPersonalesService } from './tareas-personales.service';
 import { CrearTareaPersonalDto } from './dto/crear-tarea-personal.dto';
 import { CrearComentarioTareaPersonalDto } from './dto/crear-comentario-tarea-personal.dto';
+import { EditarComentarioTareaPersonalDto } from './dto/editar-comentario-tarea-personal.dto';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtPayloadUser } from '../common/types/authenticated-request';
 
@@ -47,6 +48,11 @@ export class TareasPersonalesController {
   @Post(':id/comentarios')
   agregarComentario(@Param('id') id: string, @Body() dto: CrearComentarioTareaPersonalDto, @CurrentUser() user: JwtPayloadUser) {
     return this.service.agregarComentario(id, user.userId, dto);
+  }
+
+  @Patch('comentarios/:id')
+  editarComentario(@Param('id') id: string, @Body() dto: EditarComentarioTareaPersonalDto, @CurrentUser() user: JwtPayloadUser) {
+    return this.service.editarComentario(id, user.userId, dto);
   }
 
   @Delete('comentarios/:id')

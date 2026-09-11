@@ -4393,6 +4393,10 @@ enum PrioridadTareaPersonal {
 enum EstadoTareaPersonal {
   PENDIENTE
   EN_CURSO
+  // Esperando algo externo (una aprobación, una respuesta) — distinto de
+  // EN_CURSO porque no hay nada que hacer del lado propio hasta que eso
+  // llegue; separarlo evita que el tablero mienta sobre "estoy trabajando en esto ahora".
+  EN_ESPERA
   HECHA
 }
 
@@ -4418,6 +4422,9 @@ model TareaPersonal {
   // (agrupa por este campo).
   fecha        DateTime?
   completadaEn DateTime?
+  // Lista libre (chips sugeridos en el frontend, sin catálogo aparte a
+  // propósito) — mismo criterio que Propiedad.amenidades/Webhook.eventos.
+  etiquetas    String[]
   createdAt    DateTime               @default(now())
   updatedAt    DateTime               @updatedAt
 
@@ -4444,6 +4451,10 @@ model ComentarioTareaPersonal {
   // tabla aparte, mismo YAGNI que Propiedad.amenidades.
   imagenes  String[]
   createdAt DateTime      @default(now())
+  // Se puede editar el texto (no se guarda historial de versiones, a
+  // diferencia de ComentarioTareaProyecto que nunca se edita) — este
+  // timestamp es lo único que delata que cambió.
+  updatedAt DateTime      @updatedAt
 
   @@map("comentarios_tarea_personal")
 }

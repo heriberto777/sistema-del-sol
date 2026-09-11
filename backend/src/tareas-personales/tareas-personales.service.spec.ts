@@ -15,6 +15,7 @@ describe('TareasPersonalesService', () => {
       eliminar: jest.fn(),
       crearComentario: jest.fn(),
       buscarComentarioPorId: jest.fn(),
+      editarComentario: jest.fn(),
       eliminarComentario: jest.fn(),
     } as unknown as jest.Mocked<TareasPersonalesRepository>;
     service = new TareasPersonalesService(repository);
@@ -101,6 +102,41 @@ describe('TareasPersonalesService', () => {
       repository.buscarPorId.mockResolvedValue({ id: 'tarea1' } as never);
       await service.eliminarComentario('c1', 'u1');
       expect(repository.eliminarComentario).toHaveBeenCalledWith('c1');
+    });
+  });
+
+  describe('editarComentario', () => {
+    it('rechaza si la tarea padre del comentario no es del usuario actual', async () => {
+      repository.buscarComentarioPorId.mockResolvedValue({ id: 'c1', tareaId: 'tarea1', autorId: 'u1' } as never);
+      repository.buscarPorId.mockRejectedValue(new Error('no encontrada'));
+      await expect(service.editarComentario('c1', 'u1', { contenido: 'editado' })).rejects.toThrow('no encontrada');
+      expect(repository.editarComentario).not.toHaveBeenCalled();
+    });
+
+    it('rechaza si el comentario no es del usuario actual', async () => {
+      repository.buscarComentarioPorId.mockResolvedValue({ id: 'c1', tareaId: 'tarea1', autorId: 'otro-usuario' } as never);
+      repository.buscarPorId.mockResolvedValue({ id: 'tarea1' } as never);
+      await expect(service.editarComentario('c1', 'u1', { contenido: 'editado' })).rejects.toThrow(ForbiddenException);
+      expect(repository.editarComentario).not.toHaveBeenCalled();
+    });
+
+    it('edita el contenido del comentario propio', async () => {
+      repository.buscarComentarioPorId.mockResolvedValue({ id: 'c1', tareaId: 'tarea1', autorId: 'u1' } as never);
+      repository.buscarPorId.mockResolvedValue({ id: 'tarea1' } as never);
+      await service.editarComentario('c1', 'u1', { contenido: 'texto corregido' });
+      expect(repository.editarComentario).toHaveBeenCalledWith('c1', 'texto corregido');
+    });
+  });
+
+  describe('etiquetas', () => {
+    it('crear pasa las etiquetas tal cual al repositorio', async () => {
+      await service.crear({ titulo: 'Investigar bug', etiquetas: ['Bug', 'Urgente'] }, 'u1', 't1');
+      expect(repository.crear).toHaveBeenCalledWith({ titulo: 'Investigar bug', etiquetas: ['Bug', 'Urgente'] }, 'u1', 't1');
+    });
+
+    it('actualizar pasa las etiquetas tal cual al repositorio', async () => {
+      await service.actualizar('tarea1', 'u1', { etiquetas: ['Ventas'] });
+      expect(repository.actualizar).toHaveBeenCalledWith('tarea1', 'u1', expect.objectContaining({ etiquetas: ['Ventas'] }));
     });
   });
 });

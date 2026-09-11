@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { EstadoTareaPersonal, PrioridadTareaPersonal } from '@prisma/client';
-import { IsDateString, IsEnum, IsOptional, IsString, MaxLength } from 'class-validator';
+import { ArrayMaxSize, IsArray, IsDateString, IsEnum, IsOptional, IsString, MaxLength } from 'class-validator';
 
 export class CrearTareaPersonalDto {
   @ApiProperty()
@@ -22,4 +22,12 @@ export class CrearTareaPersonalDto {
   @IsOptional()
   @IsDateString()
   fecha?: string | null;
+
+  @ApiProperty({ required: false, type: [String], description: 'Texto libre — el frontend sugiere algunas, pero acepta cualquiera' })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(8)
+  @IsString({ each: true })
+  @MaxLength(40, { each: true })
+  etiquetas?: string[];
 }
