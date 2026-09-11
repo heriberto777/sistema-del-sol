@@ -45,8 +45,21 @@ function esMismoDia(a: Date, b: Date) {
 function formatoDiaCorto(d: Date) {
   return d.toLocaleDateString('es-DO', { weekday: 'short', day: 'numeric' });
 }
+
+/**
+ * `tarea.fecha` es un día calendario, no un instante — llega como
+ * "YYYY-MM-DDT00:00:00.000Z" (medianoche UTC). Construirla con
+ * `new Date(iso)` y mostrarla en huso horario local retrocede un día
+ * en cualquier zona detrás de UTC (ej. RD, UTC-4): medianoche UTC del
+ * 11 cae en 10 a las 20:00 hora local. Se arma la fecha a partir de los
+ * componentes del string directamente para que el día nunca cambie.
+ */
+function soloFecha(fechaIso: string): Date {
+  const [anio, mes, dia] = fechaIso.slice(0, 10).split('-').map(Number);
+  return new Date(anio, mes - 1, dia);
+}
 function formatoFechaBadge(fecha: string) {
-  return new Date(fecha).toLocaleDateString('es-DO', { day: 'numeric', month: 'short' });
+  return soloFecha(fecha).toLocaleDateString('es-DO', { day: 'numeric', month: 'short' });
 }
 
 function FilaTarea({
@@ -246,7 +259,7 @@ function VistaAgenda({ tareas, onAbrir }: { tareas: TareaPersonal[]; onAbrir: (t
       <div className="grid min-w-[900px] grid-cols-8 gap-2">
         {dias.map((d) => {
           const hoy = esMismoDia(d, new Date());
-          const items = tareas.filter((t) => t.fecha && esMismoDia(new Date(t.fecha), d)).sort(compararPrioridad);
+          const items = tareas.filter((t) => t.fecha && esMismoDia(soloFecha(t.fecha), d)).sort(compararPrioridad);
           return (
             <div key={d.toISOString()} className={clsx('flex flex-col gap-2 rounded-xl border p-2.5', hoy ? 'border-sol-300 bg-sol-50/60 dark:bg-sol-500/5' : 'border-slate-200 dark:border-slate-800')}>
               <p className={clsx('text-center text-xs font-semibold', hoy ? 'text-sol-700 dark:text-sol-400' : 'text-slate-400')}>{formatoDiaCorto(d)}</p>
@@ -331,7 +344,7 @@ function VistaEstadisticas({ tareas }: { tareas: TareaPersonal[] }) {
 
   const hoy = new Date();
   hoy.setHours(0, 0, 0, 0);
-  const vencidas = tareas.filter((t) => t.estado !== 'HECHA' && t.fecha && new Date(t.fecha) < hoy).length;
+  const vencidas = tareas.filter((t) => t.estado !== 'HECHA' && t.fecha && soloFecha(t.fecha) < hoy).length;
 
   const porEstado = ESTADOS_TAREA_PERSONAL.map((estado) => ({ estado, cantidad: tareas.filter((t) => t.estado === estado).length }));
   const porPrioridad = [...PRIORIDADES_TAREA_PERSONAL]
