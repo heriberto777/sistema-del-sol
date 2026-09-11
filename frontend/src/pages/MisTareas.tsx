@@ -1,20 +1,29 @@
 import { DragEvent, FormEvent, useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { MessageSquare, Plus, Trash2 } from 'lucide-react';
+import { AlertTriangle, CalendarCheck, CheckCircle2, ListTodo, MessageSquare, Plus, Trash2 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { apiClient } from '../lib/api-client';
 import { mensajeErrorApi } from '../lib/mensaje-error-api';
 import { Button } from '../components/atoms/Button/Button';
 import { Card } from '../components/atoms/Card/Card';
 import { TareaPersonalModal } from '../components/organisms/TareaPersonalModal/TareaPersonalModal';
-import { ESTADOS_TAREA_PERSONAL, ETIQUETA_ESTADO_TAREA_PERSONAL, PUNTO_PRIORIDAD_TAREA_PERSONAL, TareaPersonal } from '../types/tareas-personales';
+import {
+  ESTADOS_TAREA_PERSONAL,
+  ETIQUETA_ESTADO_TAREA_PERSONAL,
+  ETIQUETA_PRIORIDAD_TAREA_PERSONAL,
+  PRIORIDADES_TAREA_PERSONAL,
+  PUNTO_PRIORIDAD_TAREA_PERSONAL,
+  TareaPersonal,
+} from '../types/tareas-personales';
 
 const CLAVE_VISTA = 'mis-tareas-vista';
-type Vista = 'lista' | 'kanban' | 'agenda';
+type Vista = 'lista' | 'kanban' | 'agenda' | 'estadisticas';
 const VISTAS: { id: Vista; etiqueta: string }[] = [
   { id: 'lista', etiqueta: 'Lista' },
   { id: 'kanban', etiqueta: 'Tablero' },
   { id: 'agenda', etiqueta: 'Agenda semanal' },
+  { id: 'estadisticas', etiqueta: 'Estadísticas' },
 ];
 
 const ORDEN_PRIORIDAD: Record<string, number> = { ALTA: 0, MEDIA: 1, BAJA: 2 };
@@ -258,11 +267,132 @@ function VistaAgenda({ tareas, onAbrir }: { tareas: TareaPersonal[]; onAbrir: (t
   );
 }
 
+const TONOS_TARJETA: Record<'neutral' | 'success' | 'danger', string> = {
+  neutral: 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400',
+  success: 'bg-emerald-100 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400',
+  danger: 'bg-red-100 text-red-600 dark:bg-red-500/10 dark:text-red-400',
+};
+
+function TarjetaEstadistica({
+  etiqueta,
+  valor,
+  detalle,
+  icon: Icon,
+  tono = 'neutral',
+}: {
+  etiqueta: string;
+  valor: string | number;
+  detalle?: string;
+  icon: LucideIcon;
+  tono?: 'neutral' | 'success' | 'danger';
+}) {
+  return (
+    <div className="flex items-start gap-3 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+      <div className={clsx('flex h-9 w-9 shrink-0 items-center justify-center rounded-lg', TONOS_TARJETA[tono])}>
+        <Icon size={16} />
+      </div>
+      <div className="min-w-0">
+        <p className="text-2xl font-semibold leading-tight text-slate-900 dark:text-slate-100">{valor}</p>
+        <p className="truncate text-xs font-medium text-slate-500 dark:text-slate-400">{etiqueta}</p>
+        {detalle && <p className="text-[11px] text-slate-400">{detalle}</p>}
+      </div>
+    </div>
+  );
+}
+
+function FilaBarra({ etiqueta, cantidad, total, color }: { etiqueta: string; cantidad: number; total: number; color: string }) {
+  const pct = total > 0 ? Math.round((cantidad / total) * 100) : 0;
+  return (
+    <div className="flex items-center gap-3">
+      <span className="w-28 shrink-0 truncate text-xs text-slate-500 dark:text-slate-400">{etiqueta}</span>
+      <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+        <div className={clsx('h-full rounded-full transition-all', color)} style={{ width: `${pct}%` }} />
+      </div>
+      <span className="w-6 shrink-0 text-right text-xs font-medium text-slate-500 dark:text-slate-400">{cantidad}</span>
+    </div>
+  );
+}
+
+const COLOR_ESTADO_TAREA_PERSONAL: Record<string, string> = {
+  PENDIENTE: 'bg-slate-400',
+  EN_CURSO: 'bg-blue-500',
+  EN_ESPERA: 'bg-amber-500',
+  HECHA: 'bg-emerald-500',
+};
+
+function VistaEstadisticas({ tareas }: { tareas: TareaPersonal[] }) {
+  const total = tareas.length;
+  const completadas = tareas.filter((t) => t.estado === 'HECHA').length;
+  const activas = total - completadas;
+  const pctCompletado = total > 0 ? Math.round((completadas / total) * 100) : 0;
+
+  const inicioSemana = inicioDeSemana(new Date());
+  const completadasEstaSemana = tareas.filter((t) => t.completadaEn && new Date(t.completadaEn) >= inicioSemana).length;
+
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+  const vencidas = tareas.filter((t) => t.estado !== 'HECHA' && t.fecha && new Date(t.fecha) < hoy).length;
+
+  const porEstado = ESTADOS_TAREA_PERSONAL.map((estado) => ({ estado, cantidad: tareas.filter((t) => t.estado === estado).length }));
+  const porPrioridad = [...PRIORIDADES_TAREA_PERSONAL]
+    .sort((a, b) => ORDEN_PRIORIDAD[a] - ORDEN_PRIORIDAD[b])
+    .map((prioridad) => ({ prioridad, cantidad: tareas.filter((t) => t.prioridad === prioridad).length }));
+
+  const conteoEtiquetas = new Map<string, number>();
+  tareas.forEach((t) => t.etiquetas.forEach((et) => conteoEtiquetas.set(et, (conteoEtiquetas.get(et) ?? 0) + 1)));
+  const topEtiquetas = [...conteoEtiquetas.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6);
+  const maxEtiqueta = topEtiquetas[0]?.[1] ?? 0;
+
+  if (total === 0) {
+    return <p className="py-8 text-center text-sm text-slate-400">Agregá tareas para ver tus estadísticas acá.</p>;
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <TarjetaEstadistica etiqueta="Tareas activas" valor={activas} icon={ListTodo} />
+        <TarjetaEstadistica etiqueta="Completadas" valor={`${pctCompletado}%`} detalle={`${completadas} de ${total}`} icon={CheckCircle2} tono="success" />
+        <TarjetaEstadistica etiqueta="Completadas esta semana" valor={completadasEstaSemana} icon={CalendarCheck} />
+        <TarjetaEstadistica etiqueta="Vencidas" valor={vencidas} icon={AlertTriangle} tono={vencidas > 0 ? 'danger' : 'neutral'} />
+      </div>
+
+      <div className="grid gap-3 lg:grid-cols-2">
+        <Card titulo="Por estado">
+          <div className="space-y-2.5">
+            {porEstado.map(({ estado, cantidad }) => (
+              <FilaBarra key={estado} etiqueta={ETIQUETA_ESTADO_TAREA_PERSONAL[estado]} cantidad={cantidad} total={total} color={COLOR_ESTADO_TAREA_PERSONAL[estado]} />
+            ))}
+          </div>
+        </Card>
+        <Card titulo="Por prioridad">
+          <div className="space-y-2.5">
+            {porPrioridad.map(({ prioridad, cantidad }) => (
+              <FilaBarra key={prioridad} etiqueta={ETIQUETA_PRIORIDAD_TAREA_PERSONAL[prioridad]} cantidad={cantidad} total={total} color={PUNTO_PRIORIDAD_TAREA_PERSONAL[prioridad]} />
+            ))}
+          </div>
+        </Card>
+      </div>
+
+      <Card titulo="Etiquetas más usadas">
+        {topEtiquetas.length === 0 ? (
+          <p className="text-sm text-slate-400">Todavía no usaste etiquetas.</p>
+        ) : (
+          <div className="space-y-2.5">
+            {topEtiquetas.map(([etiqueta, cantidad]) => (
+              <FilaBarra key={etiqueta} etiqueta={etiqueta} cantidad={cantidad} total={maxEtiqueta} color="bg-sol-500" />
+            ))}
+          </div>
+        )}
+      </Card>
+    </div>
+  );
+}
+
 export function MisTareas() {
   const queryClient = useQueryClient();
   const [vista, setVista] = useState<Vista>(() => {
     const guardada = localStorage.getItem(CLAVE_VISTA);
-    return guardada === 'kanban' || guardada === 'agenda' ? (guardada as Vista) : 'lista';
+    return guardada === 'kanban' || guardada === 'agenda' || guardada === 'estadisticas' ? (guardada as Vista) : 'lista';
   });
   const [tituloNuevo, setTituloNuevo] = useState('');
   const [tareaAbiertaId, setTareaAbiertaId] = useState<string | null>(null);
@@ -355,6 +485,7 @@ export function MisTareas() {
         <VistaKanban tareas={lista} onAbrir={(t) => setTareaAbiertaId(t.id)} onCambiarEstado={(id, estado) => cambiarEstado.mutate({ id, estado })} />
       )}
       {!isLoading && vista === 'agenda' && <VistaAgenda tareas={lista} onAbrir={(t) => setTareaAbiertaId(t.id)} />}
+      {!isLoading && vista === 'estadisticas' && <VistaEstadisticas tareas={lista} />}
 
       {tareaActual && <TareaPersonalModal tarea={tareaActual} onClose={() => setTareaAbiertaId(null)} />}
     </div>
