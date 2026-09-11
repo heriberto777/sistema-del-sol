@@ -69,6 +69,21 @@ function FilaTarea({
       <button type="button" onClick={onAbrir} className="min-w-0 flex-1 text-left">
         <span className={clsx('truncate text-sm', hecha ? 'text-slate-400 line-through' : 'text-slate-800 dark:text-slate-100')}>{tarea.titulo}</span>
       </button>
+      {(tarea.estado === 'EN_CURSO' || tarea.estado === 'EN_ESPERA') && (
+        <span
+          className={clsx(
+            'shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold',
+            tarea.estado === 'EN_ESPERA' ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400' : 'bg-blue-100 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400',
+          )}
+        >
+          {ETIQUETA_ESTADO_TAREA_PERSONAL[tarea.estado]}
+        </span>
+      )}
+      {tarea.etiquetas.slice(0, 2).map((et) => (
+        <span key={et} className="hidden shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-500 dark:bg-slate-800 dark:text-slate-400 sm:inline-block">
+          {et}
+        </span>
+      ))}
       {tarea.fecha && <span className="shrink-0 text-xs text-slate-400">{formatoFechaBadge(tarea.fecha)}</span>}
       {tarea.comentarios.length > 0 && (
         <span className="flex shrink-0 items-center gap-0.5 text-xs text-slate-400">
@@ -144,6 +159,15 @@ function TarjetaKanban({ tarea, onAbrir }: { tarea: TareaPersonal; onAbrir: () =
         )}
       </div>
       <p className="text-sm text-slate-800 dark:text-slate-100">{tarea.titulo}</p>
+      {tarea.etiquetas.length > 0 && (
+        <div className="mt-1.5 flex flex-wrap gap-1">
+          {tarea.etiquetas.map((et) => (
+            <span key={et} className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+              {et}
+            </span>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -168,7 +192,7 @@ function VistaKanban({
   }
 
   return (
-    <div className="grid gap-3 sm:grid-cols-3">
+    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
       {ESTADOS_TAREA_PERSONAL.map((estado) => {
         const items = tareas.filter((t) => t.estado === estado).sort(compararPrioridad);
         return (
