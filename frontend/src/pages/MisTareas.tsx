@@ -169,10 +169,10 @@ function TarjetaKanban({ tarea, onAbrir }: { tarea: TareaPersonal; onAbrir: () =
       draggable
       onDragStart={onDragStart}
       onClick={onAbrir}
-      className="cursor-pointer rounded-lg border border-slate-200 bg-white p-3 shadow-sm hover:shadow dark:border-slate-700 dark:bg-slate-900"
+      className="cursor-pointer rounded-lg border border-slate-200 bg-white p-2 shadow-sm hover:shadow dark:border-slate-700 dark:bg-slate-900"
     >
-      <div className="mb-1.5 flex items-center gap-2">
-        <span className={clsx('h-2 w-2 shrink-0 rounded-full', PUNTO_PRIORIDAD_TAREA_PERSONAL[tarea.prioridad])} />
+      <div className="mb-1 flex items-center gap-1.5">
+        <span className={clsx('h-1.5 w-1.5 shrink-0 rounded-full', PUNTO_PRIORIDAD_TAREA_PERSONAL[tarea.prioridad])} />
         {tarea.fecha && <span className="text-[10px] text-slate-400">{formatoFechaBadge(tarea.fecha)}</span>}
         {tarea.comentarios.length > 0 && (
           <span className="ml-auto flex items-center gap-0.5 text-[10px] text-slate-400">
@@ -180,11 +180,11 @@ function TarjetaKanban({ tarea, onAbrir }: { tarea: TareaPersonal; onAbrir: () =
           </span>
         )}
       </div>
-      <p className="line-clamp-2 text-sm text-slate-800 dark:text-slate-100">{tarea.titulo}</p>
+      <p className="line-clamp-2 text-[12.5px] leading-snug text-slate-800 dark:text-slate-100">{tarea.titulo}</p>
       {tarea.etiquetas.length > 0 && (
-        <div className="mt-1.5 flex flex-wrap gap-1">
+        <div className="mt-1 flex flex-wrap gap-1">
           {tarea.etiquetas.map((et) => (
-            <span key={et} className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+            <span key={et} className="rounded-full bg-slate-100 px-1.5 py-px text-[9.5px] font-medium text-slate-500 dark:bg-slate-800 dark:text-slate-400">
               {et}
             </span>
           ))}
@@ -268,7 +268,7 @@ function VistaAgenda({ tareas, onAbrir }: { tareas: TareaPersonal[]; onAbrir: (t
               <p className={clsx('shrink-0 px-2.5 pb-1.5 pt-2.5 text-center text-xs font-semibold', hoy ? 'text-sol-700 dark:text-sol-400' : 'text-slate-400')}>
                 {formatoDiaCorto(d)}
               </p>
-              <div className="space-y-2 overflow-y-auto px-2.5 pb-2.5">
+              <div className="space-y-1.5 overflow-y-auto px-2 pb-2">
                 {items.map((t) => (
                   <TarjetaKanban key={t.id} tarea={t} onAbrir={() => onAbrir(t)} />
                 ))}
@@ -278,7 +278,7 @@ function VistaAgenda({ tareas, onAbrir }: { tareas: TareaPersonal[]; onAbrir: (t
         })}
         <div className="flex max-h-[28rem] flex-col rounded-xl border border-slate-200 dark:border-slate-800">
           <p className="shrink-0 px-2.5 pb-1.5 pt-2.5 text-center text-xs font-semibold text-slate-400">Sin fecha</p>
-          <div className="space-y-2 overflow-y-auto px-2.5 pb-2.5">
+          <div className="space-y-1.5 overflow-y-auto px-2 pb-2">
             {sinFecha.map((t) => (
               <TarjetaKanban key={t.id} tarea={t} onAbrir={() => onAbrir(t)} />
             ))}
