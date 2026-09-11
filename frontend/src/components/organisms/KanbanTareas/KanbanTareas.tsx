@@ -1,7 +1,7 @@
 import { DragEvent, MouseEvent, useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown, MessageSquare, Pause, Play, Sparkles, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, ChevronsDownUp, ChevronsLeft, ChevronsRight, ChevronsUpDown, MessageSquare, Pause, Play, Sparkles, Trash2 } from 'lucide-react';
 import { apiClient } from '../../../lib/api-client';
 import { mensajeErrorApi } from '../../../lib/mensaje-error-api';
 import { useAuth } from '../../../hooks/useAuth';
@@ -81,6 +81,12 @@ export function KanbanTareas({ proyectoId, proyectoNombre, proyectoDescripcion, 
   });
   const [columnaDestacada, setColumnaDestacada] = useState<string | null>(null);
   const [tareaAbierta, setTareaAbierta] = useState<Tarea | null>(null);
+  // Panel lateral de comentarios (dentro del modal de detalle) — abierto por
+  // defecto, con un botón para ocultarlo y ganar ancho para Responsables/
+  // Horas. Se resetea a abierto cada vez que se abre una tarea a propósito
+  // (no persiste): es una preferencia de "estoy leyendo esto ahora", no una
+  // configuración de largo plazo como el colapso del Sidebar.
+  const [panelComentariosAbierto, setPanelComentariosAbierto] = useState(true);
   const [modalCrearAbierto, setModalCrearAbierto] = useState(false);
   const [tareaEditando, setTareaEditando] = useState<Tarea | null>(null);
   const [tareaAEliminar, setTareaAEliminar] = useState<Tarea | null>(null);
@@ -674,98 +680,117 @@ export function KanbanTareas({ proyectoId, proyectoNombre, proyectoDescripcion, 
       )}
 
       {tareaActual && (
-        <Modal titulo={tareaActual.titulo} onClose={() => setTareaAbierta(null)}>
-          <div className="space-y-5">
-            <div>
-              <h3 className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-300">Responsables</h3>
-              <div className="flex flex-wrap gap-2">
-                {tareaActual.responsables.map((r) => (
-                  <span
-                    key={r.empleado.id}
-                    className="flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-700 dark:bg-slate-800 dark:text-slate-300"
-                  >
-                    {r.empleado.nombre}
-                    <button
-                      type="button"
-                      onClick={() => quitarResponsable.mutate({ tareaId: tareaActual.id, empleadoId: r.empleado.id })}
-                      className="text-slate-400 hover:text-red-600"
+        <Modal titulo={tareaActual.titulo} onClose={() => setTareaAbierta(null)} ancho="xl">
+          <div className="mb-3 flex justify-end">
+            <button
+              type="button"
+              onClick={() => setPanelComentariosAbierto((v) => !v)}
+              className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+            >
+              <MessageSquare size={13} />
+              Comentarios
+              {tareaActual.comentarios.length > 0 && (
+                <span className="rounded-full bg-sol-500 px-1.5 text-[10px] font-bold text-white">{tareaActual.comentarios.length}</span>
+              )}
+              {panelComentariosAbierto ? <ChevronsRight size={13} /> : <ChevronsLeft size={13} />}
+            </button>
+          </div>
+
+          <div className={clsx('grid gap-5', panelComentariosAbierto && 'md:grid-cols-[minmax(0,1fr)_280px]')}>
+            <div className="space-y-5">
+              <div>
+                <h3 className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-300">Responsables</h3>
+                <div className="flex flex-wrap gap-2">
+                  {tareaActual.responsables.map((r) => (
+                    <span
+                      key={r.empleado.id}
+                      className="flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-700 dark:bg-slate-800 dark:text-slate-300"
                     >
-                      ×
-                    </button>
-                  </span>
-                ))}
-              </div>
-              <Select
-                className="mt-2"
-                value=""
-                onChange={(e) => {
-                  if (e.target.value) asignarResponsable.mutate({ tareaId: tareaActual.id, empleadoId: e.target.value });
-                }}
-              >
-                <option value="">Agregar responsable…</option>
-                {empleados
-                  ?.filter((emp) => !tareaActual.responsables.some((r) => r.empleado.id === emp.id))
-                  .map((emp) => (
-                    <option key={emp.id} value={emp.id}>
-                      {emp.nombre}
-                    </option>
-                  ))}
-              </Select>
-            </div>
-
-            <div>
-              <h3 className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-300">Horas registradas</h3>
-              <div className="space-y-1">
-                {tareaActual.registrosHoras.length === 0 && <p className="text-xs text-slate-400">Sin horas cargadas todavía.</p>}
-                {tareaActual.registrosHoras.map((r) => (
-                  <div key={r.id} className="flex justify-between text-xs text-slate-600 dark:text-slate-300">
-                    <span>
-                      {r.empleado.nombre} — {new Date(r.fecha).toLocaleDateString('es-DO')}
+                      {r.empleado.nombre}
+                      <button
+                        type="button"
+                        onClick={() => quitarResponsable.mutate({ tareaId: tareaActual.id, empleadoId: r.empleado.id })}
+                        className="text-slate-400 hover:text-red-600"
+                      >
+                        ×
+                      </button>
                     </span>
-                    <span className="font-medium">{r.horas}h</span>
-                  </div>
-                ))}
+                  ))}
+                </div>
+                <Select
+                  className="mt-2"
+                  value=""
+                  onChange={(e) => {
+                    if (e.target.value) asignarResponsable.mutate({ tareaId: tareaActual.id, empleadoId: e.target.value });
+                  }}
+                >
+                  <option value="">Agregar responsable…</option>
+                  {empleados
+                    ?.filter((emp) => !tareaActual.responsables.some((r) => r.empleado.id === emp.id))
+                    .map((emp) => (
+                      <option key={emp.id} value={emp.id}>
+                        {emp.nombre}
+                      </option>
+                    ))}
+                </Select>
               </div>
-              <FormularioHora
-                empleados={empleados ?? []}
-                onRegistrar={(empleadoId, fecha, horas) => registrarHora.mutate({ tareaId: tareaActual.id, empleadoId, fecha, horas })}
-                guardando={registrarHora.isPending}
-              />
+
+              <div>
+                <h3 className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-300">Horas registradas</h3>
+                <div className="space-y-1">
+                  {tareaActual.registrosHoras.length === 0 && <p className="text-xs text-slate-400">Sin horas cargadas todavía.</p>}
+                  {tareaActual.registrosHoras.map((r) => (
+                    <div key={r.id} className="flex justify-between text-xs text-slate-600 dark:text-slate-300">
+                      <span>
+                        {r.empleado.nombre} — {new Date(r.fecha).toLocaleDateString('es-DO')}
+                      </span>
+                      <span className="font-medium">{r.horas}h</span>
+                    </div>
+                  ))}
+                </div>
+                <FormularioHora
+                  empleados={empleados ?? []}
+                  onRegistrar={(empleadoId, fecha, horas) => registrarHora.mutate({ tareaId: tareaActual.id, empleadoId, fecha, horas })}
+                  guardando={registrarHora.isPending}
+                />
+              </div>
             </div>
 
-            <div>
-              <h3 className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-300">Comentarios</h3>
-              <div className="max-h-56 space-y-2 overflow-y-auto pr-1">
-                {tareaActual.comentarios.length === 0 && <p className="text-xs text-slate-400">Sin comentarios todavía.</p>}
-                {tareaActual.comentarios.map((c) => (
-                  <div key={c.id} className="rounded-lg bg-slate-50 px-3 py-2 dark:bg-slate-800/60">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="text-xs">
-                        <span className="font-semibold text-slate-700 dark:text-slate-200">{c.autor.nombre}</span>{' '}
-                        <span className="text-slate-400">
-                          {new Date(c.createdAt).toLocaleDateString('es-DO')} {new Date(c.createdAt).toLocaleTimeString('es-DO', { hour: '2-digit', minute: '2-digit' })}
-                        </span>
+            {panelComentariosAbierto && (
+              <div className="flex flex-col border-t border-slate-100 pt-5 dark:border-slate-800 md:border-l md:border-t-0 md:pl-5 md:pt-0">
+                <h3 className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-300">Comentarios</h3>
+                <div className="max-h-56 space-y-2 overflow-y-auto pr-1 md:max-h-none md:flex-1">
+                  {tareaActual.comentarios.length === 0 && <p className="text-xs text-slate-400">Sin comentarios todavía.</p>}
+                  {tareaActual.comentarios.map((c) => (
+                    <div key={c.id} className="rounded-lg bg-slate-50 px-3 py-2 dark:bg-slate-800/60">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="text-xs">
+                          <span className="font-semibold text-slate-700 dark:text-slate-200">{c.autor.nombre}</span>{' '}
+                          <span className="text-slate-400">
+                            {new Date(c.createdAt).toLocaleDateString('es-DO')} {new Date(c.createdAt).toLocaleTimeString('es-DO', { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+                        {(c.autor.id === usuario?.id || puedeModerarComentarios) && (
+                          <button
+                            type="button"
+                            onClick={() => eliminarComentario.mutate(c.id)}
+                            className="text-slate-400 hover:text-red-600"
+                            aria-label="Eliminar comentario"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        )}
                       </div>
-                      {(c.autor.id === usuario?.id || puedeModerarComentarios) && (
-                        <button
-                          type="button"
-                          onClick={() => eliminarComentario.mutate(c.id)}
-                          className="text-slate-400 hover:text-red-600"
-                          aria-label="Eliminar comentario"
-                        >
-                          <Trash2 size={13} />
-                        </button>
-                      )}
+                      <p className="mt-1 whitespace-pre-wrap text-sm text-slate-700 dark:text-slate-300">{c.contenido}</p>
                     </div>
-                    <p className="mt-1 whitespace-pre-wrap text-sm text-slate-700 dark:text-slate-300">{c.contenido}</p>
-                  </div>
-                ))}
+                  ))}
+                </div>
+                <FormularioComentario
+                  onComentar={(contenido) => agregarComentario.mutate({ tareaId: tareaActual.id, contenido })}
+                  guardando={agregarComentario.isPending}
+                />
               </div>
-              <FormularioComentario
-                onComentar={(contenido) => agregarComentario.mutate({ tareaId: tareaActual.id, contenido })}
-                guardando={agregarComentario.isPending}
-              />
-            </div>
+            )}
           </div>
         </Modal>
       )}

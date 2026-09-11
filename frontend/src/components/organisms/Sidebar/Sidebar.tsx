@@ -103,6 +103,15 @@ interface Grupo {
 const SUELTOS_ARRIBA: Enlace[] = [
   { ruta: '/', etiqueta: 'Dashboard', icono: LayoutDashboard, permisos: ['reportes.ver'] },
   { ruta: '/reportes', etiqueta: 'Reportes', icono: BarChart3, permisos: ['reportes.ver'] },
+  // Auditoría de organización del Sidebar: "Ventas" tenía 12 ítems mezclando
+  // documentos de venta reales con plugins enteros. Tienda Online/Proyectos/
+  // Publicaciones Sociales son una sola pantalla cada uno — meterlos en un
+  // acordeón de un solo ítem es fricción sin beneficio, así que quedan
+  // sueltos igual que Dashboard/Reportes. Inmobiliaria SÍ tiene 3 pantallas
+  // y se queda como su propio grupo (ver GRUPOS más abajo).
+  { ruta: '/tienda-online', etiqueta: 'Tienda Online', icono: Globe, permisos: ['admin.configuracion'], modulo: 'ecommerce' },
+  { ruta: '/proyectos', etiqueta: 'Proyectos', icono: FolderKanban, permisos: ['proyectos.ver'], modulo: 'proyectos' },
+  { ruta: '/publicaciones-sociales', etiqueta: 'Publicaciones Sociales', icono: Megaphone, permisos: ['publicacionessociales.ver'], modulo: 'publicacionessociales' },
 ];
 
 const GRUPOS: Grupo[] = [
@@ -115,15 +124,20 @@ const GRUPOS: Grupo[] = [
       { ruta: '/remisiones', etiqueta: 'Remisiones', icono: Truck, permisos: ['remisiones.ver'], modulo: 'remisiones' },
       { ruta: '/notas-credito', etiqueta: 'Notas de crédito/débito', icono: RotateCcw, permisos: ['facturacion.ver'], modulo: 'facturacion' },
       { ruta: '/pos', etiqueta: 'Punto de venta', icono: Store, permisos: ['pos.ver'], modulo: 'pos' },
-      { ruta: '/tienda-online', etiqueta: 'Tienda Online', icono: Globe, permisos: ['admin.configuracion'], modulo: 'ecommerce' },
-      { ruta: '/proyectos', etiqueta: 'Proyectos', icono: FolderKanban, permisos: ['proyectos.ver'], modulo: 'proyectos' },
-      { ruta: '/propiedades', etiqueta: 'Propiedades', icono: Home, permisos: ['inmobiliaria.propiedades.ver'], modulo: 'inmobiliaria' },
-      { ruta: '/contratos-propiedad', etiqueta: 'Contratos (Inmobiliaria)', icono: Handshake, permisos: ['inmobiliaria.contratos.ver'], modulo: 'inmobiliaria' },
-      { ruta: '/alquileres', etiqueta: 'Alquileres administrados', icono: KeyRound, permisos: ['inmobiliaria.alquileres.ver'], modulo: 'inmobiliaria' },
-      { ruta: '/publicaciones-sociales', etiqueta: 'Publicaciones Sociales', icono: Megaphone, permisos: ['publicacionessociales.ver'], modulo: 'publicacionessociales' },
       // Sirve tanto a Ventas (clientes) como a Compras (proveedores) —
       // se prioriza acá por ser el uso más frecuente.
       { ruta: '/contactos', etiqueta: 'Contactos', icono: Contact, permisos: ['clientes.ver', 'compras.ver'] },
+    ],
+  },
+  {
+    // Plugin Inmobiliaria — grupo propio (3 pantallas) en vez de vivir
+    // mezclado dentro de "Ventas" (auditoría de organización del Sidebar).
+    id: 'inmobiliaria',
+    etiqueta: 'Inmobiliaria',
+    items: [
+      { ruta: '/propiedades', etiqueta: 'Propiedades', icono: Home, permisos: ['inmobiliaria.propiedades.ver'], modulo: 'inmobiliaria' },
+      { ruta: '/contratos-propiedad', etiqueta: 'Contratos', icono: Handshake, permisos: ['inmobiliaria.contratos.ver'], modulo: 'inmobiliaria' },
+      { ruta: '/alquileres', etiqueta: 'Alquileres administrados', icono: KeyRound, permisos: ['inmobiliaria.alquileres.ver'], modulo: 'inmobiliaria' },
     ],
   },
   {
@@ -292,6 +306,34 @@ export function Sidebar({ forzarExpandido, onNavegar }: SidebarProps = {}) {
         : 'text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-900',
     );
 
+  /** Compartido entre "sueltos arriba" y los ítems de cada grupo — antes duplicado, ver el caso especial de Tienda Online (atajo a la tienda pública). */
+  function renderEnlace(enlace: Enlace) {
+    if (enlace.ruta === '/tienda-online' && !colapsado) {
+      return (
+        <div key={enlace.ruta} className="flex items-center gap-0.5">
+          <NavLink to={enlace.ruta} className={(p) => clsx(enlaceClase(p), 'flex-1')} onClick={onNavegar}>
+            <enlace.icono size={17} className="shrink-0" />
+            {enlace.etiqueta}
+          </NavLink>
+          <EnlaceTiendaExterno />
+        </div>
+      );
+    }
+    return (
+      <NavLink
+        key={enlace.ruta}
+        to={enlace.ruta}
+        end={enlace.ruta === '/'}
+        className={enlaceClase}
+        title={colapsado ? enlace.etiqueta : undefined}
+        onClick={onNavegar}
+      >
+        <enlace.icono size={17} className="shrink-0" />
+        {!colapsado && enlace.etiqueta}
+      </NavLink>
+    );
+  }
+
   const gruposVisibles = GRUPOS.map((g) => ({
     ...g,
     items: g.items.filter((item) => esVisible(item, tienePermiso, tieneModulo)),
@@ -324,19 +366,7 @@ export function Sidebar({ forzarExpandido, onNavegar }: SidebarProps = {}) {
         )}
       </div>
 
-      {SUELTOS_ARRIBA.filter((enlace) => esVisible(enlace, tienePermiso, tieneModulo)).map((enlace) => (
-        <NavLink
-          key={enlace.ruta}
-          to={enlace.ruta}
-          end={enlace.ruta === '/'}
-          className={enlaceClase}
-          title={colapsado ? enlace.etiqueta : undefined}
-          onClick={onNavegar}
-        >
-          <enlace.icono size={17} className="shrink-0" />
-          {!colapsado && enlace.etiqueta}
-        </NavLink>
-      ))}
+      {SUELTOS_ARRIBA.filter((enlace) => esVisible(enlace, tienePermiso, tieneModulo)).map(renderEnlace)}
 
       {gruposVisibles.map((grupo) => {
         const abierto = colapsado || gruposAbiertos.has(grupo.id);
@@ -352,32 +382,7 @@ export function Sidebar({ forzarExpandido, onNavegar }: SidebarProps = {}) {
                 {grupo.etiqueta}
               </button>
             )}
-            {abierto && (
-              <div className="flex flex-col gap-0.5">
-                {grupo.items.map((enlace) =>
-                  enlace.ruta === '/tienda-online' && !colapsado ? (
-                    <div key={enlace.ruta} className="flex items-center gap-0.5">
-                      <NavLink to={enlace.ruta} className={(p) => clsx(enlaceClase(p), 'flex-1')} onClick={onNavegar}>
-                        <enlace.icono size={17} className="shrink-0" />
-                        {enlace.etiqueta}
-                      </NavLink>
-                      <EnlaceTiendaExterno />
-                    </div>
-                  ) : (
-                    <NavLink
-                      key={enlace.ruta}
-                      to={enlace.ruta}
-                      className={enlaceClase}
-                      title={colapsado ? enlace.etiqueta : undefined}
-                      onClick={onNavegar}
-                    >
-                      <enlace.icono size={17} className="shrink-0" />
-                      {!colapsado && enlace.etiqueta}
-                    </NavLink>
-                  ),
-                )}
-              </div>
-            )}
+            {abierto && <div className="flex flex-col gap-0.5">{grupo.items.map(renderEnlace)}</div>}
           </div>
         );
       })}
