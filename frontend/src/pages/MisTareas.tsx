@@ -180,7 +180,7 @@ function TarjetaKanban({ tarea, onAbrir }: { tarea: TareaPersonal; onAbrir: () =
           </span>
         )}
       </div>
-      <p className="text-sm text-slate-800 dark:text-slate-100">{tarea.titulo}</p>
+      <p className="line-clamp-2 text-sm text-slate-800 dark:text-slate-100">{tarea.titulo}</p>
       {tarea.etiquetas.length > 0 && (
         <div className="mt-1.5 flex flex-wrap gap-1">
           {tarea.etiquetas.map((et) => (
@@ -261,19 +261,28 @@ function VistaAgenda({ tareas, onAbrir }: { tareas: TareaPersonal[]; onAbrir: (t
           const hoy = esMismoDia(d, new Date());
           const items = tareas.filter((t) => t.fecha && esMismoDia(soloFecha(t.fecha), d)).sort(compararPrioridad);
           return (
-            <div key={d.toISOString()} className={clsx('flex flex-col gap-2 rounded-xl border p-2.5', hoy ? 'border-sol-300 bg-sol-50/60 dark:bg-sol-500/5' : 'border-slate-200 dark:border-slate-800')}>
-              <p className={clsx('text-center text-xs font-semibold', hoy ? 'text-sol-700 dark:text-sol-400' : 'text-slate-400')}>{formatoDiaCorto(d)}</p>
-              {items.map((t) => (
-                <TarjetaKanban key={t.id} tarea={t} onAbrir={() => onAbrir(t)} />
-              ))}
+            <div
+              key={d.toISOString()}
+              className={clsx('flex max-h-[28rem] flex-col rounded-xl border', hoy ? 'border-sol-300 bg-sol-50/60 dark:bg-sol-500/5' : 'border-slate-200 dark:border-slate-800')}
+            >
+              <p className={clsx('shrink-0 px-2.5 pb-1.5 pt-2.5 text-center text-xs font-semibold', hoy ? 'text-sol-700 dark:text-sol-400' : 'text-slate-400')}>
+                {formatoDiaCorto(d)}
+              </p>
+              <div className="space-y-2 overflow-y-auto px-2.5 pb-2.5">
+                {items.map((t) => (
+                  <TarjetaKanban key={t.id} tarea={t} onAbrir={() => onAbrir(t)} />
+                ))}
+              </div>
             </div>
           );
         })}
-        <div className="flex flex-col gap-2 rounded-xl border border-slate-200 p-2.5 dark:border-slate-800">
-          <p className="text-center text-xs font-semibold text-slate-400">Sin fecha</p>
-          {sinFecha.map((t) => (
-            <TarjetaKanban key={t.id} tarea={t} onAbrir={() => onAbrir(t)} />
-          ))}
+        <div className="flex max-h-[28rem] flex-col rounded-xl border border-slate-200 dark:border-slate-800">
+          <p className="shrink-0 px-2.5 pb-1.5 pt-2.5 text-center text-xs font-semibold text-slate-400">Sin fecha</p>
+          <div className="space-y-2 overflow-y-auto px-2.5 pb-2.5">
+            {sinFecha.map((t) => (
+              <TarjetaKanban key={t.id} tarea={t} onAbrir={() => onAbrir(t)} />
+            ))}
+          </div>
         </div>
       </div>
     </div>
