@@ -77,6 +77,7 @@ export function Conteos() {
             </div>
           )}
           {conteos.length > 0 && (
+            <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead className="bg-slate-50 text-slate-500 dark:bg-slate-900/60 dark:text-slate-400">
                 <tr>
@@ -111,6 +112,7 @@ export function Conteos() {
                 })}
               </tbody>
             </table>
+            </div>
           )}
         </Card>
       </div>

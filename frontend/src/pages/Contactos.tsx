@@ -98,13 +98,13 @@ export function Contactos() {
         <Button onClick={abrirNuevo}>{pestana === 'clientes' ? 'Nuevo cliente' : 'Nuevo proveedor'}</Button>
       </div>
 
-      <div className="flex gap-2 border-b border-slate-200 dark:border-slate-800">
+      <div className="flex gap-2 overflow-x-auto border-b border-slate-200 dark:border-slate-800">
         {(['clientes', 'proveedores'] as const).map((p) => (
           <button
             key={p}
             onClick={() => cambiarPestana(p)}
             className={
-              'px-3 py-2 text-sm font-medium border-b-2 -mb-px ' +
+              'shrink-0 whitespace-nowrap px-3 py-2 text-sm font-medium border-b-2 -mb-px ' +
               (pestana === p
                 ? 'border-sol-500 text-sol-700 dark:text-sol-300'
                 : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400')

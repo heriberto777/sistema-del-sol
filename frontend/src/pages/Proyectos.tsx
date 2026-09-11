@@ -145,6 +145,7 @@ export function Proyectos() {
             </div>
           )}
           {proyectos.length > 0 && (
+            <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead>
                 <tr className="border-b border-slate-100 text-xs uppercase text-slate-400 dark:border-slate-800">
@@ -171,6 +172,7 @@ export function Proyectos() {
                 ))}
               </tbody>
             </table>
+            </div>
           )}
 
           {data && (

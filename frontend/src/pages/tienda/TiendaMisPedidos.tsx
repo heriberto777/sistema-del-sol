@@ -76,14 +76,14 @@ export function TiendaMisPedidos() {
           </div>
         </div>
 
-        <div className="mb-6 flex gap-1 border-b border-slate-200 dark:border-slate-800">
+        <div className="mb-6 flex gap-1 overflow-x-auto border-b border-slate-200 dark:border-slate-800">
           {TABS.map((t) => (
             <button
               key={t}
               type="button"
               onClick={() => setTab(t)}
               className={clsx(
-                'border-b-2 px-4 py-2 text-sm font-medium transition-colors',
+                'shrink-0 whitespace-nowrap border-b-2 px-4 py-2 text-sm font-medium transition-colors',
                 tab === t
                   ? 'border-sol-500 text-sol-600 dark:text-sol-400'
                   : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200',

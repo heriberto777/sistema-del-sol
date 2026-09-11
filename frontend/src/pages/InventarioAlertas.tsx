@@ -64,13 +64,13 @@ export function InventarioAlertas() {
           <p className="text-sm text-slate-500 dark:text-slate-400">Sin stock, stock bajo, por vencer y vencidos — con detalle por producto.</p>
         </div>
 
-        <div className="flex gap-1 border-b border-slate-200 dark:border-slate-800">
+        <div className="flex gap-1 overflow-x-auto border-b border-slate-200 dark:border-slate-800">
           {PESTANAS.map((p) => (
             <button
               key={p.id}
               onClick={() => setPestana(p.id)}
               className={clsx(
-                'border-b-2 px-3 py-2 text-sm font-medium',
+                'shrink-0 whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium',
                 pestana === p.id
                   ? 'border-sol-500 text-sol-600 dark:text-sol-400'
                   : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400',

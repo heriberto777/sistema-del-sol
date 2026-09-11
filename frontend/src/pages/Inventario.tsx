@@ -226,7 +226,7 @@ export function Inventario() {
         </div>
       </div>
 
-      <div className="flex gap-2 border-b border-slate-200 dark:border-slate-800">
+      <div className="flex gap-2 overflow-x-auto border-b border-slate-200 dark:border-slate-800">
         {([
           { clave: 'stock', etiqueta: 'Stock' },
           { clave: 'ajustes', etiqueta: 'Ajustes' },
@@ -236,7 +236,7 @@ export function Inventario() {
             key={t.clave}
             onClick={() => setPestana(t.clave)}
             className={
-              'px-3 py-2 text-sm font-medium border-b-2 -mb-px ' +
+              'shrink-0 whitespace-nowrap px-3 py-2 text-sm font-medium border-b-2 -mb-px ' +
               (pestana === t.clave
                 ? 'border-sol-500 text-sol-700 dark:text-sol-300'
                 : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400')

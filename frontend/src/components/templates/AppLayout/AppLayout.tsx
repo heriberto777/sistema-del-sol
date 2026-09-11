@@ -53,7 +53,12 @@ export function AppLayout() {
               <GlobalCrearMenu />
             </div>
           </header>
-          <main className="flex-1 overflow-y-auto p-4 sm:p-6">
+          {/* `overflow-x-hidden` es una red de seguridad, no el fix en sí (mismo
+              criterio que Modal.tsx) — si una página se olvida de envolver una
+              tabla/barra de tabs ancha en su propio `overflow-x-auto`, el
+              desborde queda contenido acá en vez de arrastrar horizontalmente
+              todo el layout (header, sidebar) en móvil. */}
+          <main className="min-w-0 flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-6">
             <Outlet />
           </main>
         </div>
