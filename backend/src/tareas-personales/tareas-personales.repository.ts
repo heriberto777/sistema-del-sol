@@ -28,9 +28,13 @@ export class TareasPersonalesRepository {
   }
 
   crear(dto: CrearTareaPersonalDto, usuarioId: string, tenantId: string) {
-    const { fecha, ...datos } = dto;
+    const { fecha, etiquetas, ...datos } = dto;
     return this.db.tareaPersonal.create({
-      data: { ...datos, usuarioId, tenantId, fecha: fecha ? new Date(fecha) : undefined },
+      // La columna es NOT NULL sin default — si el DTO no trae etiquetas
+      // (ej. el alta rápida "Agregar tarea", que solo manda el título),
+      // Prisma omite la clave del INSERT y Postgres rechaza el NULL
+      // implícito (bug real, P2011). Se fuerza el default acá.
+      data: { ...datos, etiquetas: etiquetas ?? [], usuarioId, tenantId, fecha: fecha ? new Date(fecha) : undefined },
       include: INCLUDE_TAREA,
     });
   }

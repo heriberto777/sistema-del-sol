@@ -85,6 +85,23 @@ describe('Mis Tareas (e2e)', () => {
     expect(lista.body.map((t: { id: string }) => t.id)).toContain(tareaAId);
   });
 
+  it('crear una tarea sin etiquetas (alta rápida) no revienta — queda con []', async () => {
+    const token = await login('a@e2e-mis-tareas.com');
+
+    const respuesta = await request(app.getHttpServer())
+      .post('/api/admin/mis-tareas')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ titulo: 'Tarea sin etiquetas' })
+      .expect(201);
+
+    expect(respuesta.body.etiquetas).toEqual([]);
+
+    await request(app.getHttpServer())
+      .delete(`/api/admin/mis-tareas/${respuesta.body.id}`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+  });
+
   it('se puede pasar la tarea a EN_ESPERA sin que se marque como completada', async () => {
     const token = await login('a@e2e-mis-tareas.com');
 
