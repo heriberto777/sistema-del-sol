@@ -28,6 +28,11 @@ function useAhora(intervaloMs: number): number {
   return ahora;
 }
 
+function formatoFechaHoraComentario(fecha: string): string {
+  const d = new Date(fecha);
+  return `${d.toLocaleDateString('es-DO', { day: 'numeric', month: 'short' })} · ${d.toLocaleTimeString('es-DO', { hour: 'numeric', minute: '2-digit' })}`;
+}
+
 function formatearDuracion(ms: number): string {
   const minutos = Math.max(0, Math.floor(ms / 60_000));
   const horas = Math.floor(minutos / 60);
@@ -758,30 +763,40 @@ export function KanbanTareas({ proyectoId, proyectoNombre, proyectoDescripcion, 
 
             {panelComentariosAbierto && (
               <div className="flex flex-col border-t border-slate-100 pt-5 dark:border-slate-800 md:border-l md:border-t-0 md:pl-5 md:pt-0">
-                <h3 className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-300">Comentarios</h3>
-                <div className="max-h-56 space-y-2 overflow-y-auto pr-1 md:max-h-none md:flex-1">
-                  {tareaActual.comentarios.length === 0 && <p className="text-xs text-slate-400">Sin comentarios todavía.</p>}
-                  {tareaActual.comentarios.map((c) => (
-                    <div key={c.id} className="rounded-lg bg-slate-50 px-3 py-2 dark:bg-slate-800/60">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="text-xs">
-                          <span className="font-semibold text-slate-700 dark:text-slate-200">{c.autor.nombre}</span>{' '}
-                          <span className="text-slate-400">
-                            {new Date(c.createdAt).toLocaleDateString('es-DO')} {new Date(c.createdAt).toLocaleTimeString('es-DO', { hour: '2-digit', minute: '2-digit' })}
-                          </span>
-                        </div>
-                        {(c.autor.id === usuario?.id || puedeModerarComentarios) && (
-                          <button
-                            type="button"
-                            onClick={() => eliminarComentario.mutate(c.id)}
-                            className="text-slate-400 hover:text-red-600"
-                            aria-label="Eliminar comentario"
-                          >
-                            <Trash2 size={13} />
-                          </button>
+                <h3 className="mb-1 text-sm font-semibold text-slate-700 dark:text-slate-300">
+                  Comentarios{tareaActual.comentarios.length > 0 && <span className="ml-1 font-normal text-slate-400">({tareaActual.comentarios.length})</span>}
+                </h3>
+                <div className="max-h-56 overflow-y-auto pr-1 md:max-h-none md:flex-1">
+                  {tareaActual.comentarios.length === 0 && <p className="py-2 text-xs text-slate-400">Sin comentarios todavía.</p>}
+                  {tareaActual.comentarios.map((c, i) => (
+                    <div key={c.id} className="group flex gap-2.5 border-b border-slate-100 py-2.5 first:pt-0 last:border-0 dark:border-slate-800">
+                      <div
+                        className={clsx(
+                          'flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white',
+                          PALETA_AVATAR[i % PALETA_AVATAR.length],
                         )}
+                      >
+                        {inicialesDe(c.autor.nombre)}
                       </div>
-                      <p className="mt-1 whitespace-pre-wrap text-sm text-slate-700 dark:text-slate-300">{c.contenido}</p>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="min-w-0 truncate text-xs">
+                            <span className="font-semibold text-slate-700 dark:text-slate-200">{c.autor.nombre}</span>{' '}
+                            <span className="text-slate-400">{formatoFechaHoraComentario(c.createdAt)}</span>
+                          </p>
+                          {(c.autor.id === usuario?.id || puedeModerarComentarios) && (
+                            <button
+                              type="button"
+                              onClick={() => eliminarComentario.mutate(c.id)}
+                              className="shrink-0 text-slate-300 opacity-0 transition-opacity hover:text-red-600 group-hover:opacity-100"
+                              aria-label="Eliminar comentario"
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          )}
+                        </div>
+                        <p className="mt-0.5 whitespace-pre-wrap text-[13px] leading-relaxed text-slate-600 dark:text-slate-300">{c.contenido}</p>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -844,7 +859,7 @@ function FormularioComentario({ onComentar, guardando }: { onComentar: (contenid
 
   return (
     <form
-      className="mt-3 flex items-end gap-2"
+      className="mt-3 border-t border-slate-100 pt-3 dark:border-slate-800"
       onSubmit={(e) => {
         e.preventDefault();
         if (contenido.trim()) {
@@ -858,11 +873,13 @@ function FormularioComentario({ onComentar, guardando }: { onComentar: (contenid
         placeholder="Escribí un comentario para el equipo…"
         value={contenido}
         onChange={(e) => setContenido(e.target.value)}
-        className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none transition-colors placeholder:text-slate-400 focus:border-sol-500 focus:ring-2 focus:ring-sol-500/30 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500"
+        className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none transition-colors placeholder:text-slate-400 focus:border-sol-500 focus:ring-2 focus:ring-sol-500/30 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500"
       />
-      <Button type="submit" variante="secundario" disabled={!contenido.trim() || guardando}>
-        {guardando ? 'Enviando…' : 'Comentar'}
-      </Button>
+      <div className="mt-2 flex justify-end">
+        <Button type="submit" variante="secundario" disabled={!contenido.trim() || guardando}>
+          {guardando ? 'Enviando…' : 'Comentar'}
+        </Button>
+      </div>
     </form>
   );
 }
