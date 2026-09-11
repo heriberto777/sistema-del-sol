@@ -1,7 +1,7 @@
-import { DragEvent, FormEvent, useEffect, useState } from 'react';
+import { DragEvent, FormEvent, useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { AlertTriangle, CalendarCheck, CheckCircle2, ListTodo, MessageSquare, Plus, Trash2 } from 'lucide-react';
+import { AlertTriangle, CalendarCheck, CheckCircle2, ListTodo, MessageSquare, Search, Trash2, Plus } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { apiClient } from '../lib/api-client';
 import { mensajeErrorApi } from '../lib/mensaje-error-api';
@@ -62,6 +62,39 @@ function formatoFechaBadge(fecha: string) {
   return soloFecha(fecha).toLocaleDateString('es-DO', { day: 'numeric', month: 'short' });
 }
 
+function coincideTexto(tarea: TareaPersonal, busqueda: string): boolean {
+  const q = busqueda.trim().toLowerCase();
+  if (!q) return true;
+  return tarea.titulo.toLowerCase().includes(q) || tarea.etiquetas.some((et) => et.toLowerCase().includes(q));
+}
+
+function BuscadorTareas({ valor, onChange, placeholder }: { valor: string; onChange: (v: string) => void; placeholder?: string }) {
+  return (
+    <div className="relative w-full sm:max-w-xs">
+      <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+      <input
+        value={valor}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder ?? 'Buscar por título o etiqueta…'}
+        className="w-full rounded-lg border border-slate-300 py-2 pl-8 pr-3 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+      />
+    </div>
+  );
+}
+
+function BotonVerMas({ restante, pagina, onClick }: { restante: number; pagina: number; onClick: () => void }) {
+  if (restante <= 0) return null;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="w-full rounded-lg border border-dashed border-slate-300 py-2 text-xs font-semibold text-slate-500 hover:border-sol-400 hover:text-sol-600 dark:border-slate-700 dark:text-slate-400 dark:hover:text-sol-400"
+    >
+      Ver {Math.min(pagina, restante)} más
+    </button>
+  );
+}
+
 function FilaTarea({
   tarea,
   onAbrir,
@@ -119,6 +152,8 @@ function FilaTarea({
   );
 }
 
+const PAGINA_LISTA = 20;
+
 function VistaLista({
   tareas,
   onAbrir,
@@ -130,40 +165,85 @@ function VistaLista({
   onCambiarEstado: (id: string, estado: string) => void;
   onEliminar: (id: string) => void;
 }) {
-  const pendientes = tareas.filter((t) => t.estado !== 'HECHA').sort(compararPrioridad);
-  const hechas = tareas.filter((t) => t.estado === 'HECHA');
+  const [busqueda, setBusqueda] = useState('');
+  const [visiblesPendientes, setVisiblesPendientes] = useState(PAGINA_LISTA);
+  const [visiblesHechas, setVisiblesHechas] = useState(PAGINA_LISTA);
+
+  useEffect(() => {
+    setVisiblesPendientes(PAGINA_LISTA);
+    setVisiblesHechas(PAGINA_LISTA);
+  }, [busqueda]);
+
+  const filtradas = useMemo(() => tareas.filter((t) => coincideTexto(t, busqueda)), [tareas, busqueda]);
+  const pendientes = filtradas.filter((t) => t.estado !== 'HECHA').sort(compararPrioridad);
+  const hechas = filtradas.filter((t) => t.estado === 'HECHA');
+  const pendientesVisibles = pendientes.slice(0, visiblesPendientes);
+  const hechasVisibles = hechas.slice(0, visiblesHechas);
 
   return (
-    <Card sinPadding>
-      {pendientes.length === 0 && hechas.length === 0 && (
-        <p className="p-8 text-center text-sm text-slate-400">Sin tareas todavía — agregá la primera arriba.</p>
-      )}
-      <div className="divide-y divide-slate-100 dark:divide-slate-800">
-        {pendientes.map((t) => (
-          <FilaTarea key={t.id} tarea={t} onAbrir={() => onAbrir(t)} onToggle={() => onCambiarEstado(t.id, 'HECHA')} onEliminar={() => onEliminar(t.id)} />
-        ))}
-      </div>
-      {hechas.length > 0 && (
-        <details className="border-t border-slate-100 dark:border-slate-800">
-          <summary className="cursor-pointer select-none px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-400 hover:text-slate-600 dark:hover:text-slate-300">
-            Completadas ({hechas.length})
-          </summary>
-          <div className="divide-y divide-slate-100 dark:divide-slate-800">
-            {hechas.map((t) => (
-              <FilaTarea key={t.id} tarea={t} onAbrir={() => onAbrir(t)} onToggle={() => onCambiarEstado(t.id, 'PENDIENTE')} onEliminar={() => onEliminar(t.id)} />
-            ))}
+    <div className="space-y-3">
+      {tareas.length > 0 && <BuscadorTareas valor={busqueda} onChange={setBusqueda} />}
+      <Card sinPadding>
+        {pendientes.length === 0 && hechas.length === 0 && (
+          <p className="p-8 text-center text-sm text-slate-400">
+            {busqueda ? 'Ninguna tarea coincide con la búsqueda.' : 'Sin tareas todavía — agregá la primera arriba.'}
+          </p>
+        )}
+        <div className="divide-y divide-slate-100 dark:divide-slate-800">
+          {pendientesVisibles.map((t) => (
+            <FilaTarea key={t.id} tarea={t} onAbrir={() => onAbrir(t)} onToggle={() => onCambiarEstado(t.id, 'HECHA')} onEliminar={() => onEliminar(t.id)} />
+          ))}
+        </div>
+        {pendientes.length > visiblesPendientes && (
+          <div className="px-5 py-3">
+            <BotonVerMas restante={pendientes.length - visiblesPendientes} pagina={PAGINA_LISTA} onClick={() => setVisiblesPendientes((v) => v + PAGINA_LISTA)} />
           </div>
-        </details>
-      )}
-    </Card>
+        )}
+        {hechas.length > 0 && (
+          <details className="border-t border-slate-100 dark:border-slate-800">
+            <summary className="cursor-pointer select-none px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-400 hover:text-slate-600 dark:hover:text-slate-300">
+              Completadas ({hechas.length})
+            </summary>
+            <div className="divide-y divide-slate-100 dark:divide-slate-800">
+              {hechasVisibles.map((t) => (
+                <FilaTarea key={t.id} tarea={t} onAbrir={() => onAbrir(t)} onToggle={() => onCambiarEstado(t.id, 'PENDIENTE')} onEliminar={() => onEliminar(t.id)} />
+              ))}
+            </div>
+            {hechas.length > visiblesHechas && (
+              <div className="px-5 py-3">
+                <BotonVerMas restante={hechas.length - visiblesHechas} pagina={PAGINA_LISTA} onClick={() => setVisiblesHechas((v) => v + PAGINA_LISTA)} />
+              </div>
+            )}
+          </details>
+        )}
+      </Card>
+    </div>
   );
 }
 
-function TarjetaKanban({ tarea, onAbrir }: { tarea: TareaPersonal; onAbrir: () => void }) {
+type Densidad = 'clasica' | 'compacta';
+
+function TarjetaKanban({ tarea, onAbrir, densidad = 'clasica' }: { tarea: TareaPersonal; onAbrir: () => void; densidad?: Densidad }) {
   function onDragStart(e: DragEvent<HTMLDivElement>) {
     e.dataTransfer.setData('text/plain', tarea.id);
     e.dataTransfer.effectAllowed = 'move';
   }
+
+  if (densidad === 'compacta') {
+    return (
+      <div
+        draggable
+        onDragStart={onDragStart}
+        onClick={onAbrir}
+        className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2 py-1.5 shadow-sm hover:shadow dark:border-slate-700 dark:bg-slate-900"
+      >
+        <span className={clsx('h-1.5 w-1.5 shrink-0 rounded-full', PUNTO_PRIORIDAD_TAREA_PERSONAL[tarea.prioridad])} />
+        <span className="min-w-0 flex-1 truncate text-[12px] text-slate-800 dark:text-slate-100">{tarea.titulo}</span>
+        {tarea.fecha && <span className="shrink-0 text-[10px] text-slate-400">{formatoFechaBadge(tarea.fecha)}</span>}
+      </div>
+    );
+  }
+
   return (
     <div
       draggable
@@ -194,6 +274,33 @@ function TarjetaKanban({ tarea, onAbrir }: { tarea: TareaPersonal; onAbrir: () =
   );
 }
 
+const CLAVE_DENSIDAD_TABLERO = 'mis-tareas-densidad-tablero';
+const PAGINA_KANBAN = 8;
+
+function SegmentadoDensidad({ valor, onChange }: { valor: Densidad; onChange: (v: Densidad) => void }) {
+  const OPCIONES: { id: Densidad; etiqueta: string }[] = [
+    { id: 'clasica', etiqueta: 'Clásica' },
+    { id: 'compacta', etiqueta: 'Compacta' },
+  ];
+  return (
+    <div className="inline-flex gap-0.5 rounded-full border border-slate-200 bg-slate-50 p-0.5 dark:border-slate-700 dark:bg-slate-800/60">
+      {OPCIONES.map((op) => (
+        <button
+          key={op.id}
+          type="button"
+          onClick={() => onChange(op.id)}
+          className={clsx(
+            'rounded-full px-3 py-1 text-xs font-semibold transition-colors',
+            valor === op.id ? 'bg-white text-slate-800 shadow-sm dark:bg-slate-900 dark:text-slate-100' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400',
+          )}
+        >
+          {op.etiqueta}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function VistaKanban({
   tareas,
   onAbrir,
@@ -204,6 +311,14 @@ function VistaKanban({
   onCambiarEstado: (id: string, estado: string) => void;
 }) {
   const [columnaDestacada, setColumnaDestacada] = useState<string | null>(null);
+  const [busqueda, setBusqueda] = useState('');
+  const [visiblesPorColumna, setVisiblesPorColumna] = useState<Record<string, number>>({});
+  const [densidad, setDensidad] = useState<Densidad>(() => (localStorage.getItem(CLAVE_DENSIDAD_TABLERO) === 'compacta' ? 'compacta' : 'clasica'));
+
+  useEffect(() => localStorage.setItem(CLAVE_DENSIDAD_TABLERO, densidad), [densidad]);
+  useEffect(() => setVisiblesPorColumna({}), [busqueda]);
+
+  const filtradas = useMemo(() => tareas.filter((t) => coincideTexto(t, busqueda)), [tareas, busqueda]);
 
   function onDrop(e: DragEvent<HTMLDivElement>, estado: string) {
     e.preventDefault();
@@ -214,33 +329,91 @@ function VistaKanban({
   }
 
   return (
-    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-      {ESTADOS_TAREA_PERSONAL.map((estado) => {
-        const items = tareas.filter((t) => t.estado === estado).sort(compararPrioridad);
-        return (
-          <div
-            key={estado}
-            onDragOver={(e) => {
-              e.preventDefault();
-              setColumnaDestacada(estado);
-            }}
-            onDragLeave={() => setColumnaDestacada((c) => (c === estado ? null : c))}
-            onDrop={(e) => onDrop(e, estado)}
-            className={clsx(
-              'flex flex-col gap-2 rounded-xl border border-dashed p-3 transition-colors',
-              columnaDestacada === estado ? 'border-sol-400 bg-sol-50/60 dark:bg-sol-500/5' : 'border-slate-200 dark:border-slate-800',
-            )}
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <BuscadorTareas valor={busqueda} onChange={setBusqueda} placeholder="Buscar en el tablero…" />
+        <SegmentadoDensidad valor={densidad} onChange={setDensidad} />
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {ESTADOS_TAREA_PERSONAL.map((estado) => {
+          const items = filtradas.filter((t) => t.estado === estado).sort(compararPrioridad);
+          const visibles = visiblesPorColumna[estado] ?? PAGINA_KANBAN;
+          const slice = items.slice(0, visibles);
+          return (
+            <div
+              key={estado}
+              onDragOver={(e) => {
+                e.preventDefault();
+                setColumnaDestacada(estado);
+              }}
+              onDragLeave={() => setColumnaDestacada((c) => (c === estado ? null : c))}
+              onDrop={(e) => onDrop(e, estado)}
+              className={clsx(
+                'flex flex-col gap-2 rounded-xl border border-dashed p-3 transition-colors',
+                columnaDestacada === estado ? 'border-sol-400 bg-sol-50/60 dark:bg-sol-500/5' : 'border-slate-200 dark:border-slate-800',
+              )}
+            >
+              <p className="px-1 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                {ETIQUETA_ESTADO_TAREA_PERSONAL[estado]} <span className="text-slate-300 dark:text-slate-600">({items.length})</span>
+              </p>
+              {slice.map((t) => (
+                <TarjetaKanban key={t.id} tarea={t} onAbrir={() => onAbrir(t)} densidad={densidad} />
+              ))}
+              {items.length === 0 && (
+                <p className="px-1 text-xs text-slate-300 dark:text-slate-600">{busqueda ? 'Nada por acá.' : 'Arrastrá una tarea acá'}</p>
+              )}
+              <BotonVerMas
+                restante={items.length - slice.length}
+                pagina={PAGINA_KANBAN}
+                onClick={() => setVisiblesPorColumna((v) => ({ ...v, [estado]: visibles + PAGINA_KANBAN }))}
+              />
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+const PAGINA_AGENDA = 6;
+const CLAVE_SIN_FECHA = 'sin-fecha';
+
+function ColumnaAgenda({
+  claveColumna,
+  etiqueta,
+  destacada,
+  items,
+  visibles,
+  onVerMas,
+  onAbrir,
+}: {
+  claveColumna: string;
+  etiqueta: string;
+  destacada: boolean;
+  items: TareaPersonal[];
+  visibles: number;
+  onVerMas: (clave: string) => void;
+  onAbrir: (t: TareaPersonal) => void;
+}) {
+  const slice = items.slice(0, visibles);
+  return (
+    <div className={clsx('flex flex-col rounded-xl border', destacada ? 'border-sol-300 bg-sol-50/60 dark:bg-sol-500/5' : 'border-slate-200 dark:border-slate-800')}>
+      <p className={clsx('shrink-0 px-2 pb-1.5 pt-2.5 text-center text-xs font-semibold', destacada ? 'text-sol-700 dark:text-sol-400' : 'text-slate-400')}>{etiqueta}</p>
+      <div className="space-y-1 px-2 pb-2">
+        {slice.map((t) => (
+          <TarjetaKanban key={t.id} tarea={t} onAbrir={() => onAbrir(t)} densidad="compacta" />
+        ))}
+        {items.length - slice.length > 0 && (
+          <button
+            type="button"
+            onClick={() => onVerMas(claveColumna)}
+            className="w-full rounded-md py-1 text-center text-[10px] font-semibold text-sol-600 hover:bg-sol-50 dark:text-sol-400 dark:hover:bg-sol-500/10"
           >
-            <p className="px-1 text-xs font-semibold uppercase tracking-wide text-slate-400">
-              {ETIQUETA_ESTADO_TAREA_PERSONAL[estado]} <span className="text-slate-300 dark:text-slate-600">({items.length})</span>
-            </p>
-            {items.map((t) => (
-              <TarjetaKanban key={t.id} tarea={t} onAbrir={() => onAbrir(t)} />
-            ))}
-            {items.length === 0 && <p className="px-1 text-xs text-slate-300 dark:text-slate-600">Arrastrá una tarea acá</p>}
-          </div>
-        );
-      })}
+            +{Math.min(PAGINA_AGENDA, items.length - slice.length)} más
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -253,37 +426,41 @@ function VistaAgenda({ tareas, onAbrir }: { tareas: TareaPersonal[]; onAbrir: (t
     return d;
   });
   const sinFecha = tareas.filter((t) => !t.fecha && t.estado !== 'HECHA');
+  const [visiblesPorDia, setVisiblesPorDia] = useState<Record<string, number>>({});
+
+  function onVerMas(clave: string) {
+    setVisiblesPorDia((v) => ({ ...v, [clave]: (v[clave] ?? PAGINA_AGENDA) + PAGINA_AGENDA }));
+  }
 
   return (
     <div className="overflow-x-auto">
       <div className="grid min-w-[900px] grid-cols-8 gap-2">
         {dias.map((d) => {
+          const clave = d.toISOString();
           const hoy = esMismoDia(d, new Date());
           const items = tareas.filter((t) => t.fecha && esMismoDia(soloFecha(t.fecha), d)).sort(compararPrioridad);
           return (
-            <div
-              key={d.toISOString()}
-              className={clsx('flex max-h-[28rem] flex-col rounded-xl border', hoy ? 'border-sol-300 bg-sol-50/60 dark:bg-sol-500/5' : 'border-slate-200 dark:border-slate-800')}
-            >
-              <p className={clsx('shrink-0 px-2.5 pb-1.5 pt-2.5 text-center text-xs font-semibold', hoy ? 'text-sol-700 dark:text-sol-400' : 'text-slate-400')}>
-                {formatoDiaCorto(d)}
-              </p>
-              <div className="space-y-1.5 overflow-y-auto px-2 pb-2">
-                {items.map((t) => (
-                  <TarjetaKanban key={t.id} tarea={t} onAbrir={() => onAbrir(t)} />
-                ))}
-              </div>
-            </div>
+            <ColumnaAgenda
+              key={clave}
+              claveColumna={clave}
+              etiqueta={formatoDiaCorto(d)}
+              destacada={hoy}
+              items={items}
+              visibles={visiblesPorDia[clave] ?? PAGINA_AGENDA}
+              onVerMas={onVerMas}
+              onAbrir={onAbrir}
+            />
           );
         })}
-        <div className="flex max-h-[28rem] flex-col rounded-xl border border-slate-200 dark:border-slate-800">
-          <p className="shrink-0 px-2.5 pb-1.5 pt-2.5 text-center text-xs font-semibold text-slate-400">Sin fecha</p>
-          <div className="space-y-1.5 overflow-y-auto px-2 pb-2">
-            {sinFecha.map((t) => (
-              <TarjetaKanban key={t.id} tarea={t} onAbrir={() => onAbrir(t)} />
-            ))}
-          </div>
-        </div>
+        <ColumnaAgenda
+          claveColumna={CLAVE_SIN_FECHA}
+          etiqueta="Sin fecha"
+          destacada={false}
+          items={sinFecha}
+          visibles={visiblesPorDia[CLAVE_SIN_FECHA] ?? PAGINA_AGENDA}
+          onVerMas={onVerMas}
+          onAbrir={onAbrir}
+        />
       </div>
     </div>
   );
