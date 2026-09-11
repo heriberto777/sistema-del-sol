@@ -62,6 +62,7 @@ import { BancosModule } from './bancos/bancos.module';
 import { GastosMenoresModule } from './gastos-menores/gastos-menores.module';
 import { ProyectosModule } from './proyectos/proyectos.module';
 import { InmobiliariaModule } from './inmobiliaria/inmobiliaria.module';
+import { TareasPersonalesModule } from './tareas-personales/tareas-personales.module';
 import { PublicacionesSocialesModule } from './publicaciones-sociales/publicaciones-sociales.module';
 import { FormasPagoModule } from './formas-pago/formas-pago.module';
 import { CategoriasModule } from './categorias/categorias.module';
@@ -165,6 +166,7 @@ import { TenantMiddleware } from './common/middleware/tenant.middleware';
     GastosMenoresModule,
     ProyectosModule,
     InmobiliariaModule,
+    TareasPersonalesModule,
     PublicacionesSocialesModule,
     OfertasModule,
     ComisionesModule,

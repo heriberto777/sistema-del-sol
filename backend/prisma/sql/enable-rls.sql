@@ -46,7 +46,8 @@ BEGIN
       'proyectos', 'hitos_proyecto', 'tareas_proyecto', 'registros_hora_proyecto',
       'sesiones_trabajo_tarea',
       'publicaciones_sociales',
-      'propiedades', 'contratos_propiedad', 'alertas_busqueda_propiedad', 'cobros_alquiler'
+      'propiedades', 'contratos_propiedad', 'alertas_busqueda_propiedad', 'cobros_alquiler',
+      'tareas_personales'
     ])
   LOOP
     EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY;', tabla);

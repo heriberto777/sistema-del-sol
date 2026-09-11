@@ -127,6 +127,7 @@ model Tenant {
   contratosPropiedad        ContratoPropiedad[]
   alertasBusquedaPropiedad  AlertaBusquedaPropiedad[]
   cobrosAlquiler            CobroAlquiler[]
+  tareasPersonales          TareaPersonal[]
 
   @@map("tenants")
 }
@@ -741,6 +742,8 @@ model User {
   sucursales                            UsuarioSucursal[]
   codigosAutorizacionSolicitados        CodigoAutorizacion[]
   comentariosTareaProyecto              ComentarioTareaProyecto[]
+  tareasPersonales                      TareaPersonal[]
+  comentariosTareaPersonal              ComentarioTareaPersonal[]
 
   @@unique([tenantId, email])
   @@map("users")
@@ -4379,4 +4382,68 @@ model AlertaBusquedaPropiedad {
   createdAt            DateTime            @default(now())
 
   @@map("alertas_busqueda_propiedad")
+}
+
+enum PrioridadTareaPersonal {
+  BAJA
+  MEDIA
+  ALTA
+}
+
+enum EstadoTareaPersonal {
+  PENDIENTE
+  EN_CURSO
+  HECHA
+}
+
+/// Plugin "Mis Tareas" — lista de tareas personal, no de equipo (a
+/// diferencia de TareaProyecto, que es visible para todo el proyecto).
+/// Siempre activo (no pasa por MODULOS_BASE/@RequiereModulo): es
+/// productividad individual, sin complejidad fiscal/de negocio que
+/// justifique gatearlo por plan, mismo criterio que Contabilidad/
+/// Contactos. El aislamiento por usuario (nadie ve las tareas de otro
+/// dentro del mismo tenant) se hace a mano en el repositorio — SIEMPRE
+/// filtrando también por `usuarioId`, no solo por `tenantId`.
+model TareaPersonal {
+  id           String                 @id @default(uuid())
+  tenantId     String
+  tenant       Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  usuarioId    String
+  usuario      User                   @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  titulo       String
+  prioridad    PrioridadTareaPersonal @default(MEDIA)
+  estado       EstadoTareaPersonal    @default(PENDIENTE)
+  // Día asignado — null significa "sin fecha" (bandeja general en la
+  // Lista diaria); lo usan tanto la Lista (hoy) como la Agenda semanal
+  // (agrupa por este campo).
+  fecha        DateTime?
+  completadaEn DateTime?
+  createdAt    DateTime               @default(now())
+  updatedAt    DateTime               @updatedAt
+
+  comentarios ComentarioTareaPersonal[]
+
+  @@map("tareas_personales")
+}
+
+/// Hija sin tenantId propio (mismo patrón que ComentarioTareaProyecto) —
+/// su aislamiento depende de resolver siempre primero la TareaPersonal
+/// padre (tenant+usuario) antes de confiar en nada del comentario.
+model ComentarioTareaPersonal {
+  id        String        @id @default(uuid())
+  tareaId   String
+  tarea     TareaPersonal @relation(fields: [tareaId], references: [id], onDelete: Cascade)
+  autorId   String
+  autor     User          @relation(fields: [autorId], references: [id], onDelete: Cascade)
+  // Texto plano con fences ``` opcionales — el resaltado de bloques de
+  // código es 100% responsabilidad del frontend al renderizar, acá no
+  // se interpreta ni se valida sintaxis.
+  contenido String        @db.Text
+  // Data URIs (comprimidas en el navegador antes de subir, mismo
+  // criterio que el logo del tenant/fotos de producto) — plano, sin
+  // tabla aparte, mismo YAGNI que Propiedad.amenidades.
+  imagenes  String[]
+  createdAt DateTime      @default(now())
+
+  @@map("comentarios_tarea_personal")
 }

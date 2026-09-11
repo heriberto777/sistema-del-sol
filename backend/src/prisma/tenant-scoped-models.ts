@@ -102,4 +102,9 @@ export const TENANT_SCOPED_MODELS = new Set([
   'ContratoPropiedad',
   'AlertaBusquedaPropiedad',
   'CobroAlquiler',
+  // "Mis Tareas" — ComentarioTareaPersonal queda AFUERA a propósito,
+  // mismo criterio que ComentarioTareaProyecto: sin tenantId propio, su
+  // aislamiento depende de resolver siempre primero la TareaPersonal
+  // padre (tenant + usuario dueño) antes de confiar en nada del comentario.
+  'TareaPersonal',
 ]);
