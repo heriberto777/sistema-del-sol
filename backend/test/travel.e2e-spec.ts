@@ -229,6 +229,51 @@ describe('Travel Management (e2e)', () => {
     expect(respuesta.body.message).toContain('bodega activa');
   });
 
+  it('el tenant A factura una reserva en USD convirtiendo a DOP con la tasa configurada del tenant', async () => {
+    const token = await login('admin@e2e-travel-a.com', SUBDOMINIO_A);
+
+    const sucursal = await prisma.sucursal.create({ data: { tenantId: tenantAId, nombre: 'Principal' } });
+    await prisma.bodega.create({ data: { tenantId: tenantAId, sucursalId: sucursal.id, nombre: 'Principal', activa: true } });
+    await prisma.tasaCambio.create({ data: { tenantId: tenantAId, moneda: 'USD', tasa: 58.5 } });
+    // CONTADO + comprobante CONSUMO (default) + modalidad NCF (default del tenant) → TipoNcf 'B02' (ver TIPO_NCF_COMPLETO en facturacion.service.ts).
+    await prisma.ncfAsignado.create({
+      data: { tenantId: tenantAId, tipoNcf: 'B02', secuenciaActual: 1, secuenciaFinal: 9999, vigenciaHasta: new Date('2030-01-01') },
+    });
+
+    const creada = await request(app.getHttpServer())
+      .post('/api/admin/travel/reservas')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ clienteId: clienteAId, tipo: 'VUELO', moneda: 'USD', montoCosto: 250, montoVenta: 320 })
+      .expect(201);
+
+    const respuesta = await request(app.getHttpServer())
+      .post(`/api/admin/travel/reservas/${creada.body.id}/facturar`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(201);
+
+    const factura = await prisma.factura.findUniqueOrThrow({ where: { id: respuesta.body.facturaId } });
+    expect(factura.moneda).toBe('USD');
+    // 320 USD * 58.5 = 18720 DOP — el subtotal en DOP siempre es la fuente de verdad (ver CLAUDE.md, ítem C-2).
+    expect(Number(factura.subtotal)).toBe(18720);
+  });
+
+  it('el tenant A no puede facturar en una moneda sin tasa de cambio configurada', async () => {
+    const token = await login('admin@e2e-travel-a.com', SUBDOMINIO_A);
+
+    const creada = await request(app.getHttpServer())
+      .post('/api/admin/travel/reservas')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ clienteId: clienteAId, tipo: 'VUELO', moneda: 'EUR', montoCosto: 100, montoVenta: 120 })
+      .expect(201);
+
+    const respuesta = await request(app.getHttpServer())
+      .post(`/api/admin/travel/reservas/${creada.body.id}/facturar`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(400);
+
+    expect(respuesta.body.message).toContain('EUR');
+  });
+
   it('el tenant A elimina su propia reserva', async () => {
     const token = await login('admin@e2e-travel-a.com', SUBDOMINIO_A);
 

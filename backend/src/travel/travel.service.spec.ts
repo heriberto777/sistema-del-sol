@@ -4,6 +4,7 @@ import { TravelRepository } from './travel.repository';
 import { ClientesService } from '../clientes/clientes.service';
 import { CorrelativosRepository } from '../correlativos/correlativos.repository';
 import { FacturacionService } from '../facturacion/facturacion.service';
+import { TasasCambioService } from '../tasas-cambio/tasas-cambio.service';
 import { TravelProviderService } from './providers/travel-provider.service';
 import { TravelProvider } from './providers/travel-provider.interface';
 
@@ -15,6 +16,7 @@ describe('TravelService', () => {
   let facturacionService: jest.Mocked<FacturacionService>;
   let proveedor: jest.Mocked<TravelProvider>;
   let travelProviderService: jest.Mocked<TravelProviderService>;
+  let tasasCambioService: jest.Mocked<TasasCambioService>;
 
   beforeEach(() => {
     repository = {
@@ -44,7 +46,8 @@ describe('TravelService', () => {
       confirmarCancelacion: jest.fn(),
     } as unknown as jest.Mocked<TravelProvider>;
     travelProviderService = { activo: proveedor } as unknown as jest.Mocked<TravelProviderService>;
-    service = new TravelService(repository, clientesService, correlativosRepository, facturacionService, travelProviderService);
+    tasasCambioService = { buscarPorMoneda: jest.fn() } as unknown as jest.Mocked<TasasCambioService>;
+    service = new TravelService(repository, clientesService, correlativosRepository, facturacionService, travelProviderService, tasasCambioService);
   });
 
   describe('crear', () => {
@@ -132,8 +135,9 @@ describe('TravelService', () => {
       await expect(service.facturar('r1', 't1', 'u1')).rejects.toThrow('cancelada');
     });
 
-    it('rechaza si la moneda no es DOP (conversión todavía no existe)', async () => {
+    it('rechaza con un mensaje claro si la moneda no es DOP y no hay tasa de cambio configurada', async () => {
       repository.buscarPorId.mockResolvedValue({ ...reservaBase, moneda: 'USD' } as never);
+      tasasCambioService.buscarPorMoneda.mockResolvedValue(null);
       await expect(service.facturar('r1', 't1', 'u1')).rejects.toThrow('USD');
       expect(facturacionService.crear).not.toHaveBeenCalled();
     });
@@ -156,6 +160,7 @@ describe('TravelService', () => {
           clienteId: 'c1',
           bodegaId: 'b1',
           tipoFactura: 'CONTADO',
+          moneda: undefined,
           lineas: [{ descripcionManual: 'Boleto aéreo — TRV-2026-000001', cantidad: 1, precioUnitario: 5000, aplicaItbis: true }],
         },
         't1',
@@ -164,6 +169,26 @@ describe('TravelService', () => {
       );
       expect(repository.marcarFacturada).toHaveBeenCalledWith('r1', 'f1');
       expect(resultado).toEqual({ facturaId: 'f1', numero: '000010', total: 5000 });
+    });
+
+    it('convierte a DOP con la tasa configurada del tenant y pasa la moneda original a Facturación (multi-moneda)', async () => {
+      repository.buscarPorId.mockResolvedValue({ ...reservaBase, moneda: 'USD', montoVenta: 320 } as never);
+      tasasCambioService.buscarPorMoneda.mockResolvedValue({ tasa: 58.5 } as never);
+      repository.buscarBodegaActivaPorDefecto.mockResolvedValue({ id: 'b1' } as never);
+      facturacionService.crear.mockResolvedValue({ id: 'f1', numero: '000011', total: 18720 } as never);
+
+      await service.facturar('r1', 't1', 'u1');
+
+      expect(tasasCambioService.buscarPorMoneda).toHaveBeenCalledWith('USD');
+      expect(facturacionService.crear).toHaveBeenCalledWith(
+        expect.objectContaining({
+          moneda: 'USD',
+          lineas: [expect.objectContaining({ precioUnitario: 18720 })],
+        }),
+        't1',
+        'u1',
+        { sinMovimientoInventario: true },
+      );
     });
   });
 

@@ -7,6 +7,7 @@ import { TravelRepository } from './travel.repository';
 import { ClientesModule } from '../clientes/clientes.module';
 import { CorrelativosModule } from '../correlativos/correlativos.module';
 import { FacturacionModule } from '../facturacion/facturacion.module';
+import { TasasCambioModule } from '../tasas-cambio/tasas-cambio.module';
 import { DuffelAdapter } from './providers/duffel.adapter';
 import { TravelProviderService } from './providers/travel-provider.service';
 
@@ -20,7 +21,7 @@ import { TravelProviderService } from './providers/travel-provider.service';
  * su Plan o un `TenantModuloOverride` puntual desde /plataforma/tenants.
  */
 @Module({
-  imports: [ClientesModule, CorrelativosModule, FacturacionModule],
+  imports: [ClientesModule, CorrelativosModule, FacturacionModule, TasasCambioModule],
   controllers: [TravelController, TravelVuelosController, TravelLedgerController],
   providers: [TravelService, TravelRepository, DuffelAdapter, TravelProviderService],
   exports: [TravelProviderService],

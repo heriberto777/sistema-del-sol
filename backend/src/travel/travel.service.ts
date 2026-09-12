@@ -7,6 +7,7 @@ import { ReservarOfertaVueloDto } from './dto/reservar-oferta-vuelo.dto';
 import { ClientesService } from '../clientes/clientes.service';
 import { CorrelativosRepository } from '../correlativos/correlativos.repository';
 import { FacturacionService } from '../facturacion/facturacion.service';
+import { TasasCambioService } from '../tasas-cambio/tasas-cambio.service';
 import { TravelProviderService } from './providers/travel-provider.service';
 
 const ETIQUETA_TIPO: Record<string, string> = { VUELO: 'Boleto aéreo', HOTEL: 'Reserva de hotel' };
@@ -28,6 +29,7 @@ export class TravelService {
     private readonly correlativosRepository: CorrelativosRepository,
     private readonly facturacionService: FacturacionService,
     private readonly travelProviderService: TravelProviderService,
+    private readonly tasasCambioService: TasasCambioService,
   ) {}
 
   async crear(dto: CrearReservaTravelDto, tenantId: string) {
@@ -66,16 +68,30 @@ export class TravelService {
    * Reserva confirmada → Factura, mismo patrón que
    * ProyectosService.facturarHito (línea con descripcionManual,
    * sinMovimientoInventario: true — un viaje es un SERVICIO, no mueve
-   * stock). La conversión de moneda (Pieza Nueva 3 del análisis de Fase
-   * 1) todavía no existe — factura solo lo que ya está en DOP, a
-   * propósito, para no facturar mal por asumir una tasa de cambio.
+   * stock). Conversión de moneda: reusa la tasa que el tenant ya
+   * configura en Configuración → Tasas de cambio (mismo catálogo que usa
+   * el ítem C-2 de Facturación) — `tasa` es "cuántos DOP vale 1 unidad de
+   * esa moneda" (ver TasasCambioService), así que `montoVenta * tasa` da
+   * el monto DOP real a facturar. Se pasa además `moneda` a
+   * FacturacionService.crear() para que el documento impreso muestre
+   * también el monto original vía el mecanismo de multi-moneda que ya
+   * existe (subtotalMoneda/totalMoneda) — no se inventa nada nuevo.
    */
   async facturar(id: string, tenantId: string, vendedorId: string) {
     const reserva = await this.repository.buscarPorId(id);
     if (reserva.facturaId) throw new BadRequestException('Esta reserva ya fue facturada');
     if (reserva.estado === 'CANCELADA') throw new BadRequestException('No se puede facturar una reserva cancelada');
+
+    let precioUnitarioDop = Number(reserva.montoVenta);
     if (reserva.moneda !== 'DOP') {
-      throw new BadRequestException(`Facturar en ${reserva.moneda} todavía no está soportado — la conversión de moneda es una pieza pendiente. Facturá en DOP por ahora.`);
+      const tasaCambio = await this.tasasCambioService.buscarPorMoneda(reserva.moneda);
+      if (!tasaCambio) {
+        throw new BadRequestException(
+          `No hay una tasa de cambio configurada para ${reserva.moneda} — configurala en Configuración → Tasas de cambio antes de facturar esta reserva.`,
+        );
+      }
+      // Redondeo a 2 decimales — mismo criterio que costo-hora.util (evitar ruido de punto flotante en el monto final).
+      precioUnitarioDop = Math.round(Number(reserva.montoVenta) * Number(tasaCambio.tasa) * 100) / 100;
     }
 
     const bodega = await this.repository.buscarBodegaActivaPorDefecto();
@@ -86,11 +102,12 @@ export class TravelService {
         clienteId: reserva.clienteId,
         bodegaId: bodega.id,
         tipoFactura: 'CONTADO',
+        moneda: reserva.moneda !== 'DOP' ? reserva.moneda : undefined,
         lineas: [
           {
             descripcionManual: `${ETIQUETA_TIPO[reserva.tipo]} — ${reserva.codigoInterno}`,
             cantidad: 1,
-            precioUnitario: Number(reserva.montoVenta),
+            precioUnitario: precioUnitarioDop,
             aplicaItbis: true,
           },
         ],
