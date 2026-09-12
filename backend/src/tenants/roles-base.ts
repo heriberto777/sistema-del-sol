@@ -98,6 +98,11 @@ export const PERMISOS_BASE = [
   // propiedad; ver/gestionar los hitos en sí queda del lado de Proyectos
   // (`proyectos.ver`/`.crear`/`.facturar`), sin permiso duplicado acá.
   'inmobiliaria.preventas.crear',
+  // Plugin Travel Management (Fase 0 — CRUD manual de reservas, sin
+  // proveedor todavía). `.facturar` separado de `.editar`, mismo criterio
+  // que `proyectos.facturar`: generar una Factura real es una acción más
+  // sensible que editar los datos de una reserva.
+  'travel.ver', 'travel.crear', 'travel.editar', 'travel.eliminar', 'travel.facturar',
 ];
 
 export const ROLES_BASE: Record<string, string[]> = {

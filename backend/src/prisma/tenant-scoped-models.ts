@@ -107,4 +107,9 @@ export const TENANT_SCOPED_MODELS = new Set([
   // aislamiento depende de resolver siempre primero la TareaPersonal
   // padre (tenant + usuario dueño) antes de confiar en nada del comentario.
   'TareaPersonal',
+  // Plugin Travel Management (Fase 0) — TravelReservaPasajero queda
+  // AFUERA a propósito, mismo criterio que ComentarioTareaPersonal: sin
+  // tenantId propio, su aislamiento depende de resolver siempre primero
+  // la TravelReserva padre.
+  'TravelReserva',
 ]);

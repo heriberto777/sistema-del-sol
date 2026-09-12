@@ -19,4 +19,5 @@ export const CORRELATIVOS_BASE: TipoCorrelativo[] = [
   'TRANSFERENCIA',
   'CONTEO_FISICO',
   'CODIGO_BARRAS',
+  'TRAVEL_RESERVA',
 ];

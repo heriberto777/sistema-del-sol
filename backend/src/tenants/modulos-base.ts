@@ -24,6 +24,7 @@ export const MODULOS_BASE: { clave: string; nombre: string }[] = [
   { clave: 'ecommerce', nombre: 'Tienda Online (plugin)' },
   { clave: 'proyectos', nombre: 'Proyectos (plugin)' },
   { clave: 'publicacionessociales', nombre: 'Publicaciones Sociales (plugin)' },
+  { clave: 'travel', nombre: 'Travel Management (plugin)' },
 ];
 
 export const PLANES_BASE: Record<string, { descripcion: string; modulos: string[] }> = {
