@@ -138,7 +138,10 @@ export class DuffelAdapter implements TravelProvider {
           email: p.email,
           phone_number: p.telefono,
         })),
-        payments: { type: 'balance', currency: request.monedaBalance, amount: request.montoBalance.toFixed(2) },
+        // Confirmado contra el sandbox real: `payments` es un ARRAY, no un
+        // objeto suelto (la documentación que consulté antes de escribir
+        // esto decía lo contrario — corregido al probar en vivo).
+        payments: [{ type: 'balance', currency: request.monedaBalance, amount: request.montoBalance.toFixed(2) }],
       },
     });
 

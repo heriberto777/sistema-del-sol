@@ -55,7 +55,8 @@ export interface PasajeroOrdenVuelo {
   /** YYYY-MM-DD */
   fechaNacimiento: string;
   genero: 'm' | 'f';
-  titulo?: string;
+  /** Duffel lo exige siempre (confirmado contra el sandbox real, la doc oficial no lo dejaba claro): 'mr' | 'mrs' | 'ms' | 'miss' | 'dr'. */
+  titulo: string;
   email: string;
   telefono: string;
 }

@@ -79,7 +79,7 @@ describe('DuffelAdapter', () => {
 
     const resultado = await adapter.crearOrdenVuelo({
       ofertaId: 'off_1',
-      pasajeros: [{ id: 'pas_1', nombre: 'Juan', apellido: 'Pérez', fechaNacimiento: '1990-01-01', genero: 'm', email: 'j@x.com', telefono: '+18095551234' }],
+      pasajeros: [{ id: 'pas_1', nombre: 'Juan', apellido: 'Pérez', fechaNacimiento: '1990-01-01', genero: 'm', titulo: 'mr', email: 'j@x.com', telefono: '+18095551234' }],
       montoBalance: 450,
       monedaBalance: 'USD',
     });
@@ -87,7 +87,7 @@ describe('DuffelAdapter', () => {
     expect(resultado).toEqual({ id: 'ord_1', localizador: 'ABC123', montoTotal: '450.00', moneda: 'USD' });
     const [, opciones] = fetchMock.mock.calls[0];
     const cuerpo = JSON.parse(opciones.body as string);
-    expect(cuerpo.data.payments).toEqual({ type: 'balance', currency: 'USD', amount: '450.00' });
+    expect(cuerpo.data.payments).toEqual([{ type: 'balance', currency: 'USD', amount: '450.00' }]);
     expect(cuerpo.data.selected_offers).toEqual(['off_1']);
   });
 

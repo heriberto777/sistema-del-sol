@@ -180,7 +180,7 @@ describe('TravelService', () => {
     const dto = {
       clienteId: 'c1',
       ofertaId: 'off_1',
-      pasajeros: [{ id: 'pas_1', nombre: 'Juan', apellido: 'Pérez', fechaNacimiento: '1990-01-01', genero: 'm' as const, email: 'j@x.com', telefono: '+1809' }],
+      pasajeros: [{ id: 'pas_1', nombre: 'Juan', apellido: 'Pérez', fechaNacimiento: '1990-01-01', genero: 'm' as const, titulo: 'mr', email: 'j@x.com', telefono: '+1809' }],
       montoVenta: 500,
     };
 

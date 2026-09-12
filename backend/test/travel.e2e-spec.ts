@@ -264,7 +264,7 @@ describe('Travel Management (e2e)', () => {
           clienteId: clienteAId,
           ofertaId: 'off_fake',
           montoVenta: 500,
-          pasajeros: [{ id: 'pas_1', nombre: 'Juan', apellido: 'Pérez', fechaNacimiento: '1990-01-01', genero: 'm', email: 'j@x.com', telefono: '+18095551234' }],
+          pasajeros: [{ id: 'pas_1', nombre: 'Juan', apellido: 'Pérez', fechaNacimiento: '1990-01-01', genero: 'm', titulo: 'mr', email: 'j@x.com', telefono: '+18095551234' }],
         })
         .expect(404);
     });
@@ -279,7 +279,7 @@ describe('Travel Management (e2e)', () => {
           clienteId: clienteAId,
           ofertaId: 'off_fake',
           montoVenta: 500,
-          pasajeros: [{ id: 'pas_1', nombre: 'Juan', apellido: 'Pérez', fechaNacimiento: '1990-01-01', genero: 'm', email: 'j@x.com', telefono: '+18095551234' }],
+          pasajeros: [{ id: 'pas_1', nombre: 'Juan', apellido: 'Pérez', fechaNacimiento: '1990-01-01', genero: 'm', titulo: 'mr', email: 'j@x.com', telefono: '+18095551234' }],
         })
         .expect(201);
 

@@ -25,10 +25,9 @@ export class PasajeroReservaVueloDto {
   @IsEnum(['m', 'f'])
   genero: 'm' | 'f';
 
-  @ApiProperty({ required: false })
-  @IsOptional()
-  @IsString()
-  titulo?: string;
+  @ApiProperty({ enum: ['mr', 'mrs', 'ms', 'miss', 'dr'], description: 'Duffel lo exige siempre — confirmado contra el sandbox real' })
+  @IsEnum(['mr', 'mrs', 'ms', 'miss', 'dr'])
+  titulo: string;
 
   @ApiProperty()
   @IsEmail()
