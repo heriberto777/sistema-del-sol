@@ -21,9 +21,52 @@ export interface TravelReserva {
   montoVenta: string;
   notas: string | null;
   facturaId: string | null;
+  // Fase 1b — null en la carga manual (Fase 0), pobladas solo si se
+  // reservó de verdad contra un proveedor (ver reservarOfertaVuelo).
+  proveedor: string | null;
+  proveedorOrdenId: string | null;
+  localizadorAerolinea: string | null;
+  proveedorCancelacionId: string | null;
   pasajeros: PasajeroTravel[];
   createdAt: string;
   updatedAt: string;
+}
+
+/// Segmento real de un tramo de vuelo — forma confirmada contra el
+/// sandbox real de Duffel (no inventada). `passenger_id` es el mismo id
+/// que hay que mandar en `pasajeros[].id` al reservar.
+export interface SegmentoVueloCrudo {
+  id: string;
+  departing_at: string;
+  arriving_at: string;
+  marketing_carrier_flight_number: string;
+  marketing_carrier: { name: string; iata_code: string; logo_symbol_url: string | null };
+  origin: { iata_code: string; city_name: string | null };
+  destination: { iata_code: string; city_name: string | null };
+  passengers: { passenger_id: string }[];
+}
+
+export interface TramoVueloCrudo {
+  id: string;
+  /** Duración ISO 8601 (ej. "PT9H30M") — ver formatoDuracionIso en TravelBuscarVuelo. */
+  duration: string;
+  origin: { iata_code: string; city_name: string | null };
+  destination: { iata_code: string; city_name: string | null };
+  segments: SegmentoVueloCrudo[];
+}
+
+export interface OfertaVuelo {
+  id: string;
+  aerolinea: string;
+  montoTotal: string;
+  moneda: string;
+  expiraEn: string;
+  tramosCrudo: TramoVueloCrudo[];
+}
+
+export interface ResultadoBusquedaVuelos {
+  solicitudId: string;
+  ofertas: OfertaVuelo[];
 }
 
 export const TIPOS_TRAVEL_RESERVA = ['VUELO', 'HOTEL'] as const;
