@@ -28,6 +28,7 @@ import {
   type LucideIcon,
   Megaphone,
   MessageCircle,
+  Plane,
   Receipt,
   RotateCcw,
   Settings,
@@ -124,6 +125,7 @@ const MODULOS_SUELTOS: Enlace[] = [
   { ruta: '/tienda-online', etiqueta: 'Tienda Online', icono: Globe, permisos: ['admin.configuracion'], modulo: 'ecommerce' },
   { ruta: '/proyectos', etiqueta: 'Proyectos', icono: FolderKanban, permisos: ['proyectos.ver'], modulo: 'proyectos' },
   { ruta: '/publicaciones-sociales', etiqueta: 'Publicaciones Sociales', icono: Megaphone, permisos: ['publicacionessociales.ver'], modulo: 'publicacionessociales' },
+  { ruta: '/travel/reservas', etiqueta: 'Reservas de viaje', icono: Plane, permisos: ['travel.ver'], modulo: 'travel' },
 ];
 
 const GRUPOS: Grupo[] = [
