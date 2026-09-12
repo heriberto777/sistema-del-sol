@@ -233,4 +233,10 @@ export class ActualizarPlataformaConfigDto {
   @IsInt()
   @Min(0)
   iaFondoLimiteMensual?: number;
+
+  // Travel Management (plugin) — cuenta Duffel única y compartida de la plataforma (decisión B2B)
+  @ApiProperty({ required: false, description: '"duffel_test_..." en sandbox / "duffel_live_..." en producción — "" borra el override guardado' })
+  @IsOptional()
+  @IsString()
+  duffelApiToken?: string;
 }

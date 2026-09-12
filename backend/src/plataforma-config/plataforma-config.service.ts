@@ -79,6 +79,7 @@ export class PlataformaConfigService implements OnModuleInit {
     this.aplicarCampoSecreto(data, 'iaClaudeApiKeyCifrado', dto.iaClaudeApiKey);
     this.aplicarCampoSecreto(data, 'iaOpenaiApiKeyCifrado', dto.iaOpenaiApiKey);
     this.aplicarCampoSecreto(data, 'iaGeminiApiKeyCifrado', dto.iaGeminiApiKey);
+    this.aplicarCampoSecreto(data, 'duffelApiTokenCifrado', dto.duffelApiToken);
 
     const actualizado = await this.repository.actualizar(config.id, data);
     this.sincronizarEnv(actualizado);
@@ -132,6 +133,10 @@ export class PlataformaConfigService implements OnModuleInit {
     if (config.iaFondoProveedorActivo) process.env.IA_FONDO_PROVEEDOR_ACTIVO = config.iaFondoProveedorActivo;
     if (config.iaOpenaiModeloFondo) process.env.OPENAI_IMAGEN_MODEL = config.iaOpenaiModeloFondo;
     if (config.iaGeminiModeloFondo) process.env.GEMINI_IMAGEN_MODEL = config.iaGeminiModeloFondo;
+
+    // Travel Management — cuenta Duffel compartida de la plataforma; es
+    // literalmente lo que DuffelAdapter.habilitado/llamar() leen.
+    if (config.duffelApiTokenCifrado) process.env.DUFFEL_API_TOKEN = descifrar(config.duffelApiTokenCifrado);
   }
 
   /** Nunca expone un secreto en texto plano — solo si hay uno guardado (*Configurado). */
@@ -198,6 +203,9 @@ export class PlataformaConfigService implements OnModuleInit {
         openaiModelo: config.iaOpenaiModeloFondo,
         geminiModelo: config.iaGeminiModeloFondo,
         limiteMensual: config.iaFondoLimiteMensual,
+      },
+      travel: {
+        duffelApiTokenConfigurado: Boolean(config.duffelApiTokenCifrado),
       },
     };
   }

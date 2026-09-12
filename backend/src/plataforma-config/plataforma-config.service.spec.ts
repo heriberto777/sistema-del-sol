@@ -24,6 +24,7 @@ const CONFIG_VACIA = {
   webhookUrl: null,
   webhookSecretCifrado: null,
   webhookActivo: false,
+  duffelApiTokenCifrado: null,
 };
 
 describe('PlataformaConfigService', () => {
@@ -58,6 +59,16 @@ describe('PlataformaConfigService', () => {
       const resultado = await service.obtener();
       expect(resultado.pasarela.stripeSecretKeyConfigurado).toBe(false);
       expect(resultado.notificaciones.email.passwordConfigurado).toBe(false);
+      expect(resultado.travel.duffelApiTokenConfigurado).toBe(false);
+    });
+
+    it('travel — reporta configurado:true sin exponer el token en texto plano', async () => {
+      repo.obtenerOCrear.mockResolvedValue({ ...CONFIG_VACIA, duffelApiTokenCifrado: cifrar('duffel_test_real') } as never);
+
+      const resultado = await service.obtener();
+
+      expect(resultado.travel.duffelApiTokenConfigurado).toBe(true);
+      expect(JSON.stringify(resultado)).not.toContain('duffel_test_real');
     });
   });
 
@@ -118,6 +129,15 @@ describe('PlataformaConfigService', () => {
       await service.onModuleInit();
 
       expect(process.env.PASARELA_PAGO_ACTIVA).toBe('stripe');
+    });
+
+    it('travel — sincroniza el token descifrado a DUFFEL_API_TOKEN (lo que lee DuffelAdapter)', async () => {
+      delete process.env.DUFFEL_API_TOKEN;
+      repo.actualizar.mockResolvedValue({ ...CONFIG_VACIA, duffelApiTokenCifrado: cifrar('duffel_test_real') } as never);
+
+      await service.actualizar({ duffelApiToken: 'duffel_test_real' } as never);
+
+      expect(process.env.DUFFEL_API_TOKEN).toBe('duffel_test_real');
     });
 
     it('el modelo elegido por proveedor se guarda y se sincroniza a su variable de entorno', async () => {

@@ -85,6 +85,9 @@ export interface ConfiguracionPlataforma {
     geminiModelo: string | null;
     limiteMensual: number;
   };
+  travel: {
+    duffelApiTokenConfigurado: boolean;
+  };
 }
 
 // Fase 4 — reglas de notificación de vencimiento configurables.
@@ -97,7 +100,17 @@ interface ReglaNotificacion {
 
 const PLACEHOLDER_CONFIGURADO = '•••••••• (configurado)';
 
-const TABS = ['General', 'NCF / e-CF', 'Notificaciones', 'Pasarela de pago', 'IA para productos', 'Webhook', 'Vencimientos', 'Dominio propio'] as const;
+const TABS = [
+  'General',
+  'NCF / e-CF',
+  'Notificaciones',
+  'Pasarela de pago',
+  'IA para productos',
+  'Webhook',
+  'Vencimientos',
+  'Dominio propio',
+  'Travel (Duffel)',
+] as const;
 type Tab = (typeof TABS)[number];
 
 export function PlatformConfiguracion() {
@@ -153,6 +166,7 @@ export function PlatformConfiguracion() {
           {tab === 'Webhook' && <SeccionWebhook config={config} guardar={guardar} />}
           {tab === 'Vencimientos' && <SeccionVencimientos config={config} guardar={guardar} />}
           {tab === 'Dominio propio' && <SeccionDominioPropio config={config} guardar={guardar} />}
+          {tab === 'Travel (Duffel)' && <SeccionTravel config={config} guardar={guardar} />}
         </>
       )}
     </div>
@@ -381,6 +395,42 @@ function SeccionPasarela({ config, guardar }: SeccionProps) {
           onChange={(e) => setStripeWebhookSecret(e.target.value)}
           placeholder={pasarela.stripeWebhookSecretConfigurado ? PLACEHOLDER_CONFIGURADO : 'whsec_...'}
         />
+        <Button type="submit" disabled={guardar.isPending}>
+          {guardar.isPending ? 'Guardando…' : 'Guardar'}
+        </Button>
+      </form>
+    </Card>
+  );
+}
+
+function SeccionTravel({ config, guardar }: SeccionProps) {
+  const travel = config.travel;
+  const [duffelApiToken, setDuffelApiToken] = useState('');
+
+  function onSubmit(e: FormEvent) {
+    e.preventDefault();
+    guardar.mutate({ ...(duffelApiToken !== '' ? { duffelApiToken } : {}) });
+    setDuffelApiToken('');
+  }
+
+  return (
+    <Card
+      titulo="Travel Management (Duffel)"
+      descripcion="Cuenta única y compartida de la plataforma para reservar vuelos — cada agencia (tenant) no trae la suya propia."
+    >
+      <form onSubmit={onSubmit} className="max-w-md space-y-3">
+        <FormField
+          id="duffelApiToken"
+          label="Duffel API Token"
+          type="password"
+          value={duffelApiToken}
+          onChange={(e) => setDuffelApiToken(e.target.value)}
+          placeholder={travel.duffelApiTokenConfigurado ? PLACEHOLDER_CONFIGURADO : 'duffel_test_...'}
+        />
+        <p className="text-xs text-slate-400">
+          "duffel_test_..." para probar en sandbox, "duffel_live_..." en producción — es el mismo endpoint de Duffel, solo cambia el
+          prefijo del token.
+        </p>
         <Button type="submit" disabled={guardar.isPending}>
           {guardar.isPending ? 'Guardando…' : 'Guardar'}
         </Button>

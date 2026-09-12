@@ -642,6 +642,17 @@ model PlataformaConfiguracion {
   // mes — el costo por imagen lo paga la plataforma, no el tenant.
   iaFondoLimiteMensual   Int     @default(20)
 
+  // Travel Management (plugin) — token de Duffel, cuenta ÚNICA y
+  // COMPARTIDA de la plataforma (decisión B2B confirmada: agencias
+  // usan Sistema del Sol, no traen su propia cuenta Duffel cada una —
+  // ver docs/Sistema_del_Sol_Travel_Management_Plugin.md y el análisis
+  // "Los Dos Pagos del Vuelo"). Mismo patrón que stripeSecretKeyCifrado:
+  // sincronizarEnv() la vuelca a DUFFEL_API_TOKEN, que es lo que
+  // DuffelAdapter.habilitado/llamar() leen. "duffel_test_..." en
+  // sandbox, "duffel_live_..." en producción — mismo host, cambia el
+  // prefijo del token (no hay URL de sandbox separada).
+  duffelApiTokenCifrado String?
+
   @@map("plataforma_configuracion")
 }
 
