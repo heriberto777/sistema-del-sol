@@ -98,11 +98,16 @@ export const PERMISOS_BASE = [
   // propiedad; ver/gestionar los hitos en sí queda del lado de Proyectos
   // (`proyectos.ver`/`.crear`/`.facturar`), sin permiso duplicado acá.
   'inmobiliaria.preventas.crear',
-  // Plugin Travel Management (Fase 0 — CRUD manual de reservas, sin
-  // proveedor todavía). `.facturar` separado de `.editar`, mismo criterio
-  // que `proyectos.facturar`: generar una Factura real es una acción más
-  // sensible que editar los datos de una reserva.
+  // Plugin Travel Management (Fase 0 — CRUD manual de reservas). `.facturar`
+  // separado de `.editar`, mismo criterio que `proyectos.facturar`: generar
+  // una Factura real es una acción más sensible que editar los datos de
+  // una reserva.
   'travel.ver', 'travel.crear', 'travel.editar', 'travel.eliminar', 'travel.facturar',
+  // Fase 1b — búsqueda/reserva/cancelación reales contra el proveedor
+  // (Duffel). Separados de crear/editar/eliminar (que siguen siendo el
+  // alta manual de Fase 0): reservar de verdad gasta el Balance
+  // compartido de la plataforma, amerita su propio permiso.
+  'travel.buscar', 'travel.reservar', 'travel.cancelar',
 ];
 
 export const ROLES_BASE: Record<string, string[]> = {

@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common';
-import { EstadoTravelReserva, TipoTravelReserva } from '@prisma/client';
+import { EstadoTravelReserva, TipoMovimientoLedgerTravel, TipoTravelReserva } from '@prisma/client';
 import { TenantPrismaService } from '../prisma/tenant-prisma.service';
 import { CrearPasajeroTravelDto } from './dto/crear-pasajero-travel.dto';
+import { PasajeroOrdenVuelo } from './providers/travel-provider.interface';
 
 const INCLUDE_RESERVA = {
   cliente: { select: { id: true, nombre: true } },
@@ -69,5 +70,69 @@ export class TravelRepository {
   /** Mismo criterio que ProyectosRepository.buscarBodegaActivaPorDefecto — una reserva es un SERVICIO, no mueve stock, pero FacturacionService.crear() igual exige una bodega. */
   buscarBodegaActivaPorDefecto() {
     return this.db.bodega.findFirst({ where: { activa: true }, orderBy: { nombre: 'asc' } });
+  }
+
+  /**
+   * Fase 1b — reserva creada de verdad contra un proveedor (Duffel), a
+   * diferencia de `crear()` que es la carga manual de Fase 0. Separado a
+   * propósito: los campos de proveedor (montoCosto/moneda ya re-priced,
+   * ids de Duffel) nunca deberían poder colarse en el alta manual.
+   */
+  crearDesdeProveedor(
+    datos: {
+      tenantId: string;
+      codigoInterno: string;
+      clienteId: string;
+      tipo: TipoTravelReserva;
+      estado: EstadoTravelReserva;
+      moneda: string;
+      montoCosto: number;
+      montoVenta: number;
+      notas?: string;
+      proveedor: string;
+      proveedorOfertaId: string;
+      proveedorOrdenId: string;
+      localizadorAerolinea: string;
+    },
+    pasajeros: PasajeroOrdenVuelo[],
+  ) {
+    return this.db.travelReserva.create({
+      data: {
+        ...datos,
+        pasajeros: {
+          create: pasajeros.map((p) => ({
+            nombre: p.nombre,
+            apellido: p.apellido,
+            fechaNacimiento: new Date(p.fechaNacimiento),
+            email: p.email,
+            telefono: p.telefono,
+          })),
+        },
+      },
+      include: INCLUDE_RESERVA,
+    });
+  }
+
+  marcarCancelacionCotizada(id: string, proveedorCancelacionId: string) {
+    return this.db.travelReserva.update({ where: { id }, data: { proveedorCancelacionId } });
+  }
+
+  marcarCanceladaPorProveedor(id: string) {
+    return this.db.travelReserva.update({ where: { id }, data: { estado: 'CANCELADA' } });
+  }
+
+  registrarMovimientoLedger(datos: {
+    tenantId: string;
+    reservaId?: string;
+    tipo: TipoMovimientoLedgerTravel;
+    monto: number;
+    moneda: string;
+    descripcion: string;
+  }) {
+    return this.db.travelLedgerMovimiento.create({ data: datos });
+  }
+
+  listarLedger() {
+    return this.db.travelLedgerMovimiento.findMany({ orderBy: { createdAt: 'desc' } });
   }
 }

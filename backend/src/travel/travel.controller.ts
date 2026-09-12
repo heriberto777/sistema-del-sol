@@ -2,6 +2,7 @@ import { Body, Controller, Delete, Get, Param, Patch, Post } from '@nestjs/commo
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { TravelService } from './travel.service';
 import { CrearReservaTravelDto } from './dto/crear-reserva-travel.dto';
+import { ReservarOfertaVueloDto } from './dto/reservar-oferta-vuelo.dto';
 import { Permissions } from '../common/decorators/permissions.decorator';
 import { RequiereModulo } from '../common/decorators/requiere-modulo.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -18,6 +19,13 @@ export class TravelController {
   @Permissions('travel.crear')
   crear(@Body() dto: CrearReservaTravelDto, @CurrentUser() user: JwtPayloadUser) {
     return this.travelService.crear(dto, user.tenantId);
+  }
+
+  // Ruta literal antes de ':id' a propósito (mismo cuidado de orden que InmobiliariaController).
+  @Post('duffel')
+  @Permissions('travel.reservar')
+  reservarOfertaVuelo(@Body() dto: ReservarOfertaVueloDto, @CurrentUser() user: JwtPayloadUser) {
+    return this.travelService.reservarOfertaVuelo(dto, user.tenantId);
   }
 
   @Get()
@@ -48,5 +56,17 @@ export class TravelController {
   @Permissions('travel.facturar')
   facturar(@Param('id') id: string, @CurrentUser() user: JwtPayloadUser) {
     return this.travelService.facturar(id, user.tenantId, user.userId);
+  }
+
+  @Post(':id/cancelacion/cotizar')
+  @Permissions('travel.cancelar')
+  cotizarCancelacion(@Param('id') id: string) {
+    return this.travelService.cotizarCancelacionProveedor(id);
+  }
+
+  @Post(':id/cancelacion/confirmar')
+  @Permissions('travel.cancelar')
+  confirmarCancelacion(@Param('id') id: string, @CurrentUser() user: JwtPayloadUser) {
+    return this.travelService.confirmarCancelacionProveedor(id, user.tenantId);
   }
 }

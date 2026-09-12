@@ -112,4 +112,5 @@ export const TENANT_SCOPED_MODELS = new Set([
   // tenantId propio, su aislamiento depende de resolver siempre primero
   // la TravelReserva padre.
   'TravelReserva',
+  'TravelLedgerMovimiento',
 ]);

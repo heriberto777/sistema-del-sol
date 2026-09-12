@@ -5,6 +5,31 @@ import * as bcrypt from 'bcryptjs';
 import { PrismaClient } from '@prisma/client';
 import { AppModule } from '../src/app.module';
 import { HttpExceptionFilter } from '../src/common/filters/http-exception.filter';
+import { DuffelAdapter } from '../src/travel/providers/duffel.adapter';
+
+/**
+ * Doble de prueba de DuffelAdapter — los e2e no pueden depender de la
+ * API real de Duffel (necesitaría un token real, sería lento/frágil y
+ * gastaría el sandbox). Devuelve siempre lo mismo, determinístico,
+ * respetando la forma normalizada de TravelProvider.
+ */
+const OFERTA_FAKE = {
+  id: 'off_fake',
+  aerolinea: 'Fake Air',
+  montoTotal: '450.00',
+  moneda: 'USD',
+  expiraEn: new Date(Date.now() + 3600_000).toISOString(),
+  tramosCrudo: [],
+};
+const duffelAdapterFake = {
+  clave: 'duffel',
+  habilitado: true,
+  buscarVuelos: jest.fn().mockResolvedValue({ solicitudId: 'orq_fake', ofertas: [OFERTA_FAKE] }),
+  obtenerOferta: jest.fn().mockResolvedValue(OFERTA_FAKE),
+  crearOrdenVuelo: jest.fn().mockResolvedValue({ id: 'ord_fake', localizador: 'FAKE123', montoTotal: '450.00', moneda: 'USD' }),
+  cotizarCancelacion: jest.fn().mockResolvedValue({ id: 'orc_fake', montoReembolso: '300.00', moneda: 'USD' }),
+  confirmarCancelacion: jest.fn().mockResolvedValue({ reembolsado: true, montoReembolso: '300.00', moneda: 'USD' }),
+};
 
 /**
  * Aislamiento entre tenants para el plugin Travel Management (Fase 0 —
@@ -26,7 +51,16 @@ describe('Travel Management (e2e)', () => {
   let clienteAId: string;
   let reservaAId: string;
 
-  const PERMISOS = ['travel.ver', 'travel.crear', 'travel.editar', 'travel.eliminar', 'travel.facturar'];
+  const PERMISOS = [
+    'travel.ver',
+    'travel.crear',
+    'travel.editar',
+    'travel.eliminar',
+    'travel.facturar',
+    'travel.buscar',
+    'travel.reservar',
+    'travel.cancelar',
+  ];
 
   async function crearPermisos(claves: string[]) {
     for (const clave of claves) {
@@ -83,7 +117,10 @@ describe('Travel Management (e2e)', () => {
     clienteAId = clienteA.id;
     await prisma.cliente.create({ data: { tenantId: tenantBId, nombre: 'Cliente Travel B' } });
 
-    const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
+    const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
+      .overrideProvider(DuffelAdapter)
+      .useValue(duffelAdapterFake)
+      .compile();
     app = moduleRef.createNestApplication();
     app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true, forbidNonWhitelisted: true }));
     app.useGlobalFilters(new HttpExceptionFilter());
@@ -199,5 +236,98 @@ describe('Travel Management (e2e)', () => {
       .delete(`/api/admin/travel/reservas/${reservaAId}`)
       .set('Authorization', `Bearer ${token}`)
       .expect(200);
+  });
+
+  describe('Fase 1b — búsqueda/reserva/cancelación reales (con DuffelAdapter de prueba)', () => {
+    let reservaDuffelAId: string;
+
+    it('buscarVuelos delega en el proveedor (activo)', async () => {
+      const token = await login('admin@e2e-travel-a.com', SUBDOMINIO_A);
+
+      const respuesta = await request(app.getHttpServer())
+        .post('/api/admin/travel/vuelos/buscar')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ tramos: [{ origen: 'SDQ', destino: 'MAD', fecha: '2026-12-10' }], pasajeros: [{ tipo: 'adult' }] })
+        .expect(201);
+
+      expect(respuesta.body.ofertas).toHaveLength(1);
+      expect(respuesta.body.ofertas[0].id).toBe('off_fake');
+    });
+
+    it('el tenant B no puede reservar contra Duffel usando un cliente de A (IDOR)', async () => {
+      const token = await login('admin@e2e-travel-b.com', SUBDOMINIO_B);
+
+      await request(app.getHttpServer())
+        .post('/api/admin/travel/reservas/duffel')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          clienteId: clienteAId,
+          ofertaId: 'off_fake',
+          montoVenta: 500,
+          pasajeros: [{ id: 'pas_1', nombre: 'Juan', apellido: 'Pérez', fechaNacimiento: '1990-01-01', genero: 'm', email: 'j@x.com', telefono: '+18095551234' }],
+        })
+        .expect(404);
+    });
+
+    it('el tenant A reserva de verdad contra Duffel (re-price + Balance) y queda CONFIRMADA con el débito en el ledger', async () => {
+      const token = await login('admin@e2e-travel-a.com', SUBDOMINIO_A);
+
+      const respuesta = await request(app.getHttpServer())
+        .post('/api/admin/travel/reservas/duffel')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          clienteId: clienteAId,
+          ofertaId: 'off_fake',
+          montoVenta: 500,
+          pasajeros: [{ id: 'pas_1', nombre: 'Juan', apellido: 'Pérez', fechaNacimiento: '1990-01-01', genero: 'm', email: 'j@x.com', telefono: '+18095551234' }],
+        })
+        .expect(201);
+
+      reservaDuffelAId = respuesta.body.id;
+      expect(respuesta.body.estado).toBe('CONFIRMADA');
+      expect(respuesta.body.proveedor).toBe('duffel');
+      expect(respuesta.body.proveedorOrdenId).toBe('ord_fake');
+      expect(respuesta.body.localizadorAerolinea).toBe('FAKE123');
+      expect(Number(respuesta.body.montoCosto)).toBe(450);
+
+      const ledger = await request(app.getHttpServer()).get('/api/admin/travel/ledger').set('Authorization', `Bearer ${token}`).expect(200);
+      expect(ledger.body).toEqual(expect.arrayContaining([{ moneda: 'USD', saldo: -450 }]));
+    });
+
+    it('el tenant B no ve el ledger de A (aislamiento)', async () => {
+      const token = await login('admin@e2e-travel-b.com', SUBDOMINIO_B);
+      const ledger = await request(app.getHttpServer()).get('/api/admin/travel/ledger').set('Authorization', `Bearer ${token}`).expect(200);
+      expect(ledger.body).toEqual([]);
+    });
+
+    it('el tenant B no puede cotizar/confirmar la cancelación de la reserva Duffel de A', async () => {
+      const token = await login('admin@e2e-travel-b.com', SUBDOMINIO_B);
+
+      await request(app.getHttpServer())
+        .post(`/api/admin/travel/reservas/${reservaDuffelAId}/cancelacion/cotizar`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(404);
+    });
+
+    it('el tenant A cotiza y confirma la cancelación — pasa a CANCELADA y el ledger acredita el reembolso', async () => {
+      const token = await login('admin@e2e-travel-a.com', SUBDOMINIO_A);
+
+      await request(app.getHttpServer())
+        .post(`/api/admin/travel/reservas/${reservaDuffelAId}/cancelacion/cotizar`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(201);
+
+      await request(app.getHttpServer())
+        .post(`/api/admin/travel/reservas/${reservaDuffelAId}/cancelacion/confirmar`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(201);
+
+      const reserva = await prisma.travelReserva.findUniqueOrThrow({ where: { id: reservaDuffelAId } });
+      expect(reserva.estado).toBe('CANCELADA');
+
+      // Débito de 450 al reservar + crédito de 300 al confirmar el reembolso = -150 neto.
+      const ledger = await request(app.getHttpServer()).get('/api/admin/travel/ledger').set('Authorization', `Bearer ${token}`).expect(200);
+      expect(ledger.body).toEqual(expect.arrayContaining([{ moneda: 'USD', saldo: -150 }]));
+    });
   });
 });
