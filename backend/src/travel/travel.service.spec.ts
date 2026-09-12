@@ -32,6 +32,7 @@ describe('TravelService', () => {
       marcarCanceladaPorProveedor: jest.fn(),
       registrarMovimientoLedger: jest.fn(),
       listarLedger: jest.fn(),
+      descartarAlertaProveedor: jest.fn(),
     } as unknown as jest.Mocked<TravelRepository>;
     clientesService = { buscarPorId: jest.fn() } as unknown as jest.Mocked<ClientesService>;
     correlativosRepository = { siguiente: jest.fn() } as unknown as jest.Mocked<CorrelativosRepository>;
@@ -314,6 +315,13 @@ describe('TravelService', () => {
       const saldos = await service.saldoLedger();
 
       expect(saldos).toEqual(expect.arrayContaining([{ moneda: 'USD', saldo: -350 }, { moneda: 'DOP', saldo: -200 }]));
+    });
+  });
+
+  describe('descartarAlertaProveedor', () => {
+    it('delega al repositorio', async () => {
+      await service.descartarAlertaProveedor('r1');
+      expect(repository.descartarAlertaProveedor).toHaveBeenCalledWith('r1');
     });
   });
 });

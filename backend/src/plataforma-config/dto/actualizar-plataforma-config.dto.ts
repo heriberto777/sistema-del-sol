@@ -239,4 +239,9 @@ export class ActualizarPlataformaConfigDto {
   @IsOptional()
   @IsString()
   duffelApiToken?: string;
+
+  @ApiProperty({ required: false, description: 'Secreto para verificar la firma del webhook de Duffel (X-Duffel-Signature) — "" borra el override guardado' })
+  @IsOptional()
+  @IsString()
+  duffelWebhookSecret?: string;
 }

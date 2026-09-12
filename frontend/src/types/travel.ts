@@ -27,6 +27,10 @@ export interface TravelReserva {
   proveedorOrdenId: string | null;
   localizadorAerolinea: string | null;
   proveedorCancelacionId: string | null;
+  // Alerta del webhook de Duffel (cambio de itinerario/cancelación externa) — null = sin alerta pendiente.
+  alertaProveedorTipo: string | null;
+  alertaProveedorDetalle: string | null;
+  alertaProveedorEn: string | null;
   pasajeros: PasajeroTravel[];
   createdAt: string;
   updatedAt: string;

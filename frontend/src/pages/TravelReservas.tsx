@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { Plane, Plus, Receipt, Trash2, X } from 'lucide-react';
+import { AlertTriangle, Plane, Plus, Receipt, Trash2, X } from 'lucide-react';
 import { apiClient } from '../lib/api-client';
 import { useAuth } from '../hooks/useAuth';
 import { mensajeErrorApi } from '../lib/mensaje-error-api';
@@ -698,6 +698,12 @@ export function TravelReservas() {
     onError: (err) => setError(mensajeErrorApi(err, 'No se pudo eliminar la reserva.')),
   });
 
+  const descartarAlerta = useMutation({
+    mutationFn: async (id: string) => apiClient.post(`/admin/travel/reservas/${id}/alerta/descartar`),
+    onSuccess: invalidar,
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo descartar la alerta.')),
+  });
+
   const lista = reservas ?? [];
 
   return (
@@ -763,6 +769,22 @@ export function TravelReservas() {
                         <td className="px-5 py-3">
                           <p className="font-mono text-xs text-slate-600 dark:text-slate-300">{r.codigoInterno}</p>
                           {r.localizadorAerolinea && <p className="text-[10px] text-slate-400">Loc: {r.localizadorAerolinea}</p>}
+                          {r.alertaProveedorTipo && (
+                            <div className="mt-1 flex items-start gap-1 rounded bg-amber-50 px-1.5 py-1 text-[10px] text-amber-700 dark:bg-amber-500/10 dark:text-amber-400">
+                              <AlertTriangle size={12} className="mt-0.5 shrink-0" />
+                              <span className="flex-1">{r.alertaProveedorDetalle}</span>
+                              {tienePermiso('travel.editar') && (
+                                <button
+                                  type="button"
+                                  onClick={() => descartarAlerta.mutate(r.id)}
+                                  disabled={descartarAlerta.isPending}
+                                  className="shrink-0 underline hover:no-underline"
+                                >
+                                  Descartar
+                                </button>
+                              )}
+                            </div>
+                          )}
                         </td>
                         <td className="px-5 py-3 text-slate-800 dark:text-slate-100">{r.cliente.nombre}</td>
                         <td className="px-5 py-3 text-slate-500 dark:text-slate-400">

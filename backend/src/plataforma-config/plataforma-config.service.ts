@@ -80,6 +80,7 @@ export class PlataformaConfigService implements OnModuleInit {
     this.aplicarCampoSecreto(data, 'iaOpenaiApiKeyCifrado', dto.iaOpenaiApiKey);
     this.aplicarCampoSecreto(data, 'iaGeminiApiKeyCifrado', dto.iaGeminiApiKey);
     this.aplicarCampoSecreto(data, 'duffelApiTokenCifrado', dto.duffelApiToken);
+    this.aplicarCampoSecreto(data, 'duffelWebhookSecretCifrado', dto.duffelWebhookSecret);
 
     const actualizado = await this.repository.actualizar(config.id, data);
     this.sincronizarEnv(actualizado);
@@ -137,6 +138,7 @@ export class PlataformaConfigService implements OnModuleInit {
     // Travel Management — cuenta Duffel compartida de la plataforma; es
     // literalmente lo que DuffelAdapter.habilitado/llamar() leen.
     if (config.duffelApiTokenCifrado) process.env.DUFFEL_API_TOKEN = descifrar(config.duffelApiTokenCifrado);
+    if (config.duffelWebhookSecretCifrado) process.env.DUFFEL_WEBHOOK_SECRET = descifrar(config.duffelWebhookSecretCifrado);
   }
 
   /** Nunca expone un secreto en texto plano — solo si hay uno guardado (*Configurado). */
@@ -206,6 +208,7 @@ export class PlataformaConfigService implements OnModuleInit {
       },
       travel: {
         duffelApiTokenConfigurado: Boolean(config.duffelApiTokenCifrado),
+        duffelWebhookSecretConfigurado: Boolean(config.duffelWebhookSecretCifrado),
       },
     };
   }

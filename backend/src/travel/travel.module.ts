@@ -3,7 +3,9 @@ import { TravelService } from './travel.service';
 import { TravelController } from './travel.controller';
 import { TravelVuelosController } from './travel-vuelos.controller';
 import { TravelLedgerController } from './travel-ledger.controller';
+import { TravelWebhookController } from './travel-webhook.controller';
 import { TravelRepository } from './travel.repository';
+import { DuffelWebhookService } from './duffel-webhook.service';
 import { ClientesModule } from '../clientes/clientes.module';
 import { CorrelativosModule } from '../correlativos/correlativos.module';
 import { FacturacionModule } from '../facturacion/facturacion.module';
@@ -22,8 +24,8 @@ import { TravelProviderService } from './providers/travel-provider.service';
  */
 @Module({
   imports: [ClientesModule, CorrelativosModule, FacturacionModule, TasasCambioModule],
-  controllers: [TravelController, TravelVuelosController, TravelLedgerController],
-  providers: [TravelService, TravelRepository, DuffelAdapter, TravelProviderService],
+  controllers: [TravelController, TravelVuelosController, TravelLedgerController, TravelWebhookController],
+  providers: [TravelService, TravelRepository, DuffelAdapter, TravelProviderService, DuffelWebhookService],
   exports: [TravelProviderService],
 })
 export class TravelModule {}

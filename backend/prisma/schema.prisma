@@ -653,6 +653,12 @@ model PlataformaConfiguracion {
   // sandbox, "duffel_live_..." en producción — mismo host, cambia el
   // prefijo del token (no hay URL de sandbox separada).
   duffelApiTokenCifrado String?
+  // Webhook entrante de Duffel (order.airline_initiated_change_detected,
+  // order_cancellation.created) — mismo esquema de firma que Stripe
+  // (header `X-Duffel-Signature`, formato `t=...,v1=...`, HMAC-SHA256
+  // sobre `${timestamp}.${body}`), confirmado contra la doc pública de
+  // Duffel. sincronizarEnv() la vuelca a DUFFEL_WEBHOOK_SECRET.
+  duffelWebhookSecretCifrado String?
 
   @@map("plataforma_configuracion")
 }
@@ -4539,6 +4545,15 @@ model TravelReserva {
   // confirmar — ver TravelService.cotizarCancelacionProveedor/
   // confirmarCancelacionProveedor.
   proveedorCancelacionId String?
+  // Webhook de Duffel (DuffelWebhookService) — alerta visible para que el
+  // agente revise manualmente; nunca dispara un cambio automático de
+  // `estado` ni del ledger (eso queda para la reconciliación de Balance,
+  // todavía sin implementar). `alertaProveedorTipo`: 'CAMBIO_ITINERARIO'
+  // (la aerolínea cambió el vuelo) | 'CANCELACION_EXTERNA' (se detectó una
+  // cancelación en Duffel que no se originó en esta plataforma).
+  alertaProveedorTipo    String?
+  alertaProveedorDetalle String?             @db.Text
+  alertaProveedorEn      DateTime?
   createdAt     DateTime            @default(now())
   updatedAt     DateTime            @updatedAt
 

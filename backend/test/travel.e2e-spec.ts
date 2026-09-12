@@ -2,6 +2,7 @@ import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import * as bcrypt from 'bcryptjs';
+import { createHmac } from 'crypto';
 import { PrismaClient } from '@prisma/client';
 import { AppModule } from '../src/app.module';
 import { HttpExceptionFilter } from '../src/common/filters/http-exception.filter';
@@ -121,7 +122,7 @@ describe('Travel Management (e2e)', () => {
       .overrideProvider(DuffelAdapter)
       .useValue(duffelAdapterFake)
       .compile();
-    app = moduleRef.createNestApplication();
+    app = moduleRef.createNestApplication({ rawBody: true });
     app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true, forbidNonWhitelisted: true }));
     app.useGlobalFilters(new HttpExceptionFilter());
     app.setGlobalPrefix('api');
@@ -407,6 +408,58 @@ describe('Travel Management (e2e)', () => {
       // + crédito de 300 al confirmar este reembolso = -600 neto.
       const ledger = await request(app.getHttpServer()).get('/api/admin/travel/ledger').set('Authorization', `Bearer ${token}`).expect(200);
       expect(ledger.body).toEqual(expect.arrayContaining([{ moneda: 'USD', saldo: -600 }]));
+    });
+  });
+
+  describe('POST /webhooks/duffel', () => {
+    const SECRET = 'whsec_test_duffel';
+    const ENV_ORIGINAL = process.env.DUFFEL_WEBHOOK_SECRET;
+
+    function firmar(payload: string, secret: string): string {
+      const timestamp = Math.floor(Date.now() / 1000);
+      const firmaHex = createHmac('sha256', secret).update(`${timestamp}.${payload}`).digest('hex');
+      return `t=${timestamp},v1=${firmaHex}`;
+    }
+
+    beforeAll(() => {
+      process.env.DUFFEL_WEBHOOK_SECRET = SECRET;
+    });
+
+    afterAll(() => {
+      process.env.DUFFEL_WEBHOOK_SECRET = ENV_ORIGINAL;
+    });
+
+    it('rechaza sin DUFFEL_WEBHOOK_SECRET configurado', async () => {
+      delete process.env.DUFFEL_WEBHOOK_SECRET;
+      await request(app.getHttpServer())
+        .post('/api/webhooks/duffel')
+        .set('x-duffel-signature', 't=123,v1=firma-invalida')
+        .send({ type: 'order.airline_initiated_change_detected' })
+        .expect(400);
+      process.env.DUFFEL_WEBHOOK_SECRET = SECRET;
+    });
+
+    it('rechaza sin header de firma', async () => {
+      await request(app.getHttpServer()).post('/api/webhooks/duffel').send({ type: 'order.airline_initiated_change_detected' }).expect(400);
+    });
+
+    it('rechaza una firma inválida', async () => {
+      await request(app.getHttpServer())
+        .post('/api/webhooks/duffel')
+        .set('x-duffel-signature', 't=123,v1=firma-invalida')
+        .send({ type: 'order.airline_initiated_change_detected' })
+        .expect(400);
+    });
+
+    it('con firma válida, marca la alerta CAMBIO_ITINERARIO en la reserva con esa orden de Duffel', async () => {
+      const payload = JSON.stringify({ type: 'order.airline_initiated_change_detected', data: { order_id: 'ord_fake' } });
+      const firma = firmar(payload, SECRET);
+
+      await request(app.getHttpServer()).post('/api/webhooks/duffel').set('x-duffel-signature', firma).set('Content-Type', 'application/json').send(payload).expect(200);
+
+      const reserva = await prisma.travelReserva.findFirstOrThrow({ where: { proveedorOrdenId: 'ord_fake' } });
+      expect(reserva.alertaProveedorTipo).toBe('CAMBIO_ITINERARIO');
+      expect(reserva.alertaProveedorDetalle).toContain('itinerario');
     });
   });
 });

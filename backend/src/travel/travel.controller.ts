@@ -69,4 +69,10 @@ export class TravelController {
   confirmarCancelacion(@Param('id') id: string, @CurrentUser() user: JwtPayloadUser) {
     return this.travelService.confirmarCancelacionProveedor(id, user.tenantId);
   }
+
+  @Post(':id/alerta/descartar')
+  @Permissions('travel.editar')
+  descartarAlerta(@Param('id') id: string) {
+    return this.travelService.descartarAlertaProveedor(id);
+  }
 }

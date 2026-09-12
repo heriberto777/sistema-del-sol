@@ -218,6 +218,11 @@ export class TravelService {
     return resultado;
   }
 
+  /** El agente ya revisó la alerta que dejó el webhook de Duffel (cambio de itinerario/cancelación externa) — la limpia sin tocar estado/ledger. */
+  descartarAlertaProveedor(id: string) {
+    return this.repository.descartarAlertaProveedor(id);
+  }
+
   /** Saldo (CREDITO - DEBITO) del tenant contra el Balance compartido de la plataforma, agrupado por moneda — sin cachear, bajo volumen esperado en esta fase. */
   async saldoLedger() {
     const movimientos = await this.repository.listarLedger();

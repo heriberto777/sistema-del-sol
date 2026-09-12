@@ -130,6 +130,13 @@ export class TravelRepository {
     return this.db.travelReserva.update({ where: { id }, data: { estado: 'CANCELADA' } });
   }
 
+  descartarAlertaProveedor(id: string) {
+    return this.db.travelReserva.update({
+      where: { id },
+      data: { alertaProveedorTipo: null, alertaProveedorDetalle: null, alertaProveedorEn: null },
+    });
+  }
+
   registrarMovimientoLedger(datos: {
     tenantId: string;
     reservaId?: string;
