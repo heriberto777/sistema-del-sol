@@ -339,6 +339,39 @@ describe('Travel Management (e2e)', () => {
       expect(ledger.body).toEqual(expect.arrayContaining([{ moneda: 'USD', saldo: -450 }]));
     });
 
+    it('el tenant A reserva contra Duffel con pasaporte y queda persistido en el pasajero', async () => {
+      const token = await login('admin@e2e-travel-a.com', SUBDOMINIO_A);
+
+      const respuesta = await request(app.getHttpServer())
+        .post('/api/admin/travel/reservas/duffel')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          clienteId: clienteAId,
+          ofertaId: 'off_fake',
+          montoVenta: 500,
+          pasajeros: [
+            {
+              id: 'pas_1',
+              nombre: 'María',
+              apellido: 'García',
+              fechaNacimiento: '1985-05-20',
+              genero: 'f',
+              titulo: 'mrs',
+              email: 'm@x.com',
+              telefono: '+18095551234',
+              numeroPasaporte: 'AB123456',
+              paisEmisionPasaporte: 'DO',
+              fechaVencimientoPasaporte: '2030-01-01',
+            },
+          ],
+        })
+        .expect(201);
+
+      expect(respuesta.body.pasajeros[0].numeroDocumento).toBe('AB123456');
+      expect(respuesta.body.pasajeros[0].paisEmisionDocumento).toBe('DO');
+      expect(respuesta.body.pasajeros[0].fechaVencimientoDocumento).toContain('2030-01-01');
+    });
+
     it('el tenant B no ve el ledger de A (aislamiento)', async () => {
       const token = await login('admin@e2e-travel-b.com', SUBDOMINIO_B);
       const ledger = await request(app.getHttpServer()).get('/api/admin/travel/ledger').set('Authorization', `Bearer ${token}`).expect(200);
@@ -370,9 +403,10 @@ describe('Travel Management (e2e)', () => {
       const reserva = await prisma.travelReserva.findUniqueOrThrow({ where: { id: reservaDuffelAId } });
       expect(reserva.estado).toBe('CANCELADA');
 
-      // Débito de 450 al reservar + crédito de 300 al confirmar el reembolso = -150 neto.
+      // Débito de 450 (esta reserva) + débito de 450 (la reserva con pasaporte del test anterior, nunca cancelada)
+      // + crédito de 300 al confirmar este reembolso = -600 neto.
       const ledger = await request(app.getHttpServer()).get('/api/admin/travel/ledger').set('Authorization', `Bearer ${token}`).expect(200);
-      expect(ledger.body).toEqual(expect.arrayContaining([{ moneda: 'USD', saldo: -150 }]));
+      expect(ledger.body).toEqual(expect.arrayContaining([{ moneda: 'USD', saldo: -600 }]));
     });
   });
 });

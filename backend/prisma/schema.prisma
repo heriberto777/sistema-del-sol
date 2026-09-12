@@ -4562,6 +4562,13 @@ model TravelReservaPasajero {
   fechaNacimiento DateTime?
   tipoDocumento   String?
   numeroDocumento String?
+  // Vuelos internacionales (APIS) — Duffel acepta `identity_documents` en
+  // la orden y lo confirmé contra el sandbox real (sin error, aunque no
+  // lo exige para toda ruta/aerolínea). Opcionales a propósito: solo se
+  // completan cuando el pasajero los aporta, la reserva funciona igual
+  // sin ellos si la aerolínea no los pide.
+  paisEmisionDocumento      String?
+  fechaVencimientoDocumento DateTime?
   email           String?
   telefono        String?
   createdAt       DateTime      @default(now())

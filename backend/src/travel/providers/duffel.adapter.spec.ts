@@ -89,6 +89,42 @@ describe('DuffelAdapter', () => {
     const cuerpo = JSON.parse(opciones.body as string);
     expect(cuerpo.data.payments).toEqual([{ type: 'balance', currency: 'USD', amount: '450.00' }]);
     expect(cuerpo.data.selected_offers).toEqual(['off_1']);
+    expect(cuerpo.data.passengers[0].identity_documents).toBeUndefined();
+  });
+
+  it('crearOrdenVuelo incluye identity_documents solo si el pasajero aportó pasaporte completo (confirmado que Duffel lo acepta en vivo)', async () => {
+    process.env.DUFFEL_API_TOKEN = 'duffel_test_123';
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: { id: 'ord_1', booking_reference: 'ABC123', total_amount: '450.00', total_currency: 'USD' } }),
+    });
+
+    await adapter.crearOrdenVuelo({
+      ofertaId: 'off_1',
+      pasajeros: [
+        {
+          id: 'pas_1',
+          nombre: 'Juan',
+          apellido: 'Pérez',
+          fechaNacimiento: '1990-01-01',
+          genero: 'm',
+          titulo: 'mr',
+          email: 'j@x.com',
+          telefono: '+18095551234',
+          numeroPasaporte: 'AB123456',
+          paisEmisionPasaporte: 'DO',
+          fechaVencimientoPasaporte: '2030-01-01',
+        },
+      ],
+      montoBalance: 450,
+      monedaBalance: 'USD',
+    });
+
+    const [, opciones] = fetchMock.mock.calls[0];
+    const cuerpo = JSON.parse(opciones.body as string);
+    expect(cuerpo.data.passengers[0].identity_documents).toEqual([
+      { type: 'passport', unique_identifier: 'AB123456', issuing_country_code: 'DO', expires_on: '2030-01-01' },
+    ]);
   });
 
   it('traduce offer_no_longer_available a un mensaje de negocio claro', async () => {

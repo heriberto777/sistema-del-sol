@@ -137,6 +137,16 @@ export class DuffelAdapter implements TravelProvider {
           title: p.titulo,
           email: p.email,
           phone_number: p.telefono,
+          // Confirmado contra el sandbox real: Duffel acepta este shape sin
+          // error aunque la ruta no lo exija — se manda solo si el
+          // pasajero aportó los 3 datos (ver comentario en la interfaz).
+          ...(p.numeroPasaporte && p.paisEmisionPasaporte && p.fechaVencimientoPasaporte
+            ? {
+                identity_documents: [
+                  { type: 'passport', unique_identifier: p.numeroPasaporte, issuing_country_code: p.paisEmisionPasaporte, expires_on: p.fechaVencimientoPasaporte },
+                ],
+              }
+            : {}),
         })),
         // Confirmado contra el sandbox real: `payments` es un ARRAY, no un
         // objeto suelto (la documentación que consulté antes de escribir

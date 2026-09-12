@@ -106,6 +106,15 @@ export class TravelRepository {
             fechaNacimiento: new Date(p.fechaNacimiento),
             email: p.email,
             telefono: p.telefono,
+            // Pasaporte (APIS) — se guarda para trazabilidad aunque Duffel no lo devuelva en la respuesta de la orden.
+            ...(p.numeroPasaporte
+              ? {
+                  tipoDocumento: 'passport',
+                  numeroDocumento: p.numeroPasaporte,
+                  paisEmisionDocumento: p.paisEmisionPasaporte,
+                  fechaVencimientoDocumento: p.fechaVencimientoPasaporte ? new Date(p.fechaVencimientoPasaporte) : undefined,
+                }
+              : {}),
           })),
         },
       },

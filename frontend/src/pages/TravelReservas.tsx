@@ -311,8 +311,23 @@ interface FormPasajero {
   titulo: string;
   email: string;
   telefono: string;
+  // Pasaporte (APIS) — opcional, recomendado para vuelos internacionales. Si se completa uno de los 3, hay que completar los 3 (ver DTO backend).
+  numeroPasaporte: string;
+  paisEmisionPasaporte: string;
+  fechaVencimientoPasaporte: string;
 }
-const PASAJERO_VACIO: FormPasajero = { nombre: '', apellido: '', fechaNacimiento: '', genero: 'm', titulo: 'mr', email: '', telefono: '' };
+const PASAJERO_VACIO: FormPasajero = {
+  nombre: '',
+  apellido: '',
+  fechaNacimiento: '',
+  genero: 'm',
+  titulo: 'mr',
+  email: '',
+  telefono: '',
+  numeroPasaporte: '',
+  paisEmisionPasaporte: '',
+  fechaVencimientoPasaporte: '',
+};
 const TITULOS_PASAJERO: { valor: string; etiqueta: string }[] = [
   { valor: 'mr', etiqueta: 'Sr.' },
   { valor: 'mrs', etiqueta: 'Sra.' },
@@ -334,7 +349,13 @@ function ReservarOfertaModal({
   guardando: boolean;
   error: string | null;
   onClose: () => void;
-  onGuardar: (dto: { clienteId: string; montoVenta: number; notas?: string; pasajeros: ({ id: string } & FormPasajero)[] }) => void;
+  onGuardar: (dto: {
+    clienteId: string;
+    montoVenta: number;
+    notas?: string;
+    pasajeros: ({ id: string } & Omit<FormPasajero, 'numeroPasaporte' | 'paisEmisionPasaporte' | 'fechaVencimientoPasaporte'> &
+      Partial<Pick<FormPasajero, 'numeroPasaporte' | 'paisEmisionPasaporte' | 'fechaVencimientoPasaporte'>>)[];
+  }) => void;
 }) {
   const pasajeroIds = extraerPasajeroIds(oferta);
   const [clienteId, setClienteId] = useState('');
@@ -357,7 +378,13 @@ function ReservarOfertaModal({
       clienteId,
       montoVenta: Number(montoVenta),
       notas: notas || undefined,
-      pasajeros: pasajeroIds.map((id) => ({ id, ...pasajeros[id] })),
+      pasajeros: pasajeroIds.map((id) => {
+        // Nunca mandar strings vacíos en campos opcionales con validación de formato (ej. @Length(2,2))
+        // — "" no es lo mismo que "no lo mandes" para class-validator, hay que omitir la clave entera.
+        const { numeroPasaporte, paisEmisionPasaporte, fechaVencimientoPasaporte, ...resto } = pasajeros[id];
+        const tienePasaporte = numeroPasaporte && paisEmisionPasaporte && fechaVencimientoPasaporte;
+        return { id, ...resto, ...(tienePasaporte ? { numeroPasaporte, paisEmisionPasaporte, fechaVencimientoPasaporte } : {}) };
+      }),
     });
   }
 
@@ -428,6 +455,26 @@ function ReservarOfertaModal({
                 />
                 <FormField label="Email" type="email" value={pasajeros[id].email} onChange={(e) => actualizarPasajero(id, 'email', e.target.value)} required />
                 <FormField label="Teléfono" value={pasajeros[id].telefono} onChange={(e) => actualizarPasajero(id, 'telefono', e.target.value)} required />
+              </div>
+              <p className="mb-2 mt-3 text-xs font-semibold uppercase tracking-wide text-slate-400">Pasaporte (opcional — recomendado para vuelos internacionales)</p>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <FormField
+                  label="Número de pasaporte"
+                  value={pasajeros[id].numeroPasaporte}
+                  onChange={(e) => actualizarPasajero(id, 'numeroPasaporte', e.target.value)}
+                />
+                <FormField
+                  label="País emisor (ej. DO)"
+                  maxLength={2}
+                  value={pasajeros[id].paisEmisionPasaporte}
+                  onChange={(e) => actualizarPasajero(id, 'paisEmisionPasaporte', e.target.value.toUpperCase())}
+                />
+                <FormField
+                  label="Vencimiento"
+                  type="date"
+                  value={pasajeros[id].fechaVencimientoPasaporte}
+                  onChange={(e) => actualizarPasajero(id, 'fechaVencimientoPasaporte', e.target.value)}
+                />
               </div>
             </div>
           ))}

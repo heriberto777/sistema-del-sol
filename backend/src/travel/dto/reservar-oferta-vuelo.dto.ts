@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { ArrayMaxSize, ArrayMinSize, IsDateString, IsEmail, IsEnum, IsNumber, IsOptional, IsString, IsUUID, MaxLength, Min, ValidateNested } from 'class-validator';
+import { ArrayMaxSize, ArrayMinSize, IsDateString, IsEmail, IsEnum, IsNumber, IsOptional, IsString, IsUUID, Length, MaxLength, Min, ValidateNested } from 'class-validator';
 
 export class PasajeroReservaVueloDto {
   @ApiProperty({ description: 'Debe coincidir con un id de pasajero devuelto por la oferta del proveedor' })
@@ -37,6 +37,24 @@ export class PasajeroReservaVueloDto {
   @IsString()
   @MaxLength(30)
   telefono: string;
+
+  // Pasaporte (APIS) — opcional: no toda ruta/aerolínea lo exige, pero Duffel lo acepta sin error si se manda (confirmado contra el sandbox real).
+  @ApiProperty({ required: false, description: 'Recomendado para vuelos internacionales — si se completa uno de los 3 campos, hay que completar los 3' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  numeroPasaporte?: string;
+
+  @ApiProperty({ required: false, description: 'ISO 3166-1 alpha-2 (ej. "DO")' })
+  @IsOptional()
+  @IsString()
+  @Length(2, 2)
+  paisEmisionPasaporte?: string;
+
+  @ApiProperty({ required: false, description: 'YYYY-MM-DD' })
+  @IsOptional()
+  @IsDateString()
+  fechaVencimientoPasaporte?: string;
 }
 
 export class ReservarOfertaVueloDto {

@@ -59,6 +59,16 @@ export interface PasajeroOrdenVuelo {
   titulo: string;
   email: string;
   telefono: string;
+  /**
+   * Pasaporte (APIS) — opcional a propósito: no toda ruta/aerolínea lo
+   * exige, pero Duffel lo acepta sin error cuando se manda (confirmado
+   * contra el sandbox real). Si se completa uno, hay que completar los 3.
+   */
+  numeroPasaporte?: string;
+  /** ISO 3166-1 alpha-2 (ej. "DO"). */
+  paisEmisionPasaporte?: string;
+  /** YYYY-MM-DD */
+  fechaVencimientoPasaporte?: string;
 }
 
 export interface CrearOrdenVueloRequest {
