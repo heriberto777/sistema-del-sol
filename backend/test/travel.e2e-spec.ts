@@ -528,4 +528,18 @@ describe('Travel Management (e2e)', () => {
       await request(app.getHttpServer()).delete(`/api/admin/travel/markup/${reglaId}`).set('Authorization', `Bearer ${token}`).expect(200);
     });
   });
+
+  describe('GET /admin/travel/reservas/resumen', () => {
+    it('el tenant B ve sus propios agregados, no los del tenant A (aislamiento)', async () => {
+      const tokenB = await login('admin@e2e-travel-b.com', SUBDOMINIO_B);
+
+      const respuesta = await request(app.getHttpServer()).get('/api/admin/travel/reservas/resumen').set('Authorization', `Bearer ${tokenB}`).expect(200);
+
+      expect(respuesta.body).toEqual(
+        expect.objectContaining({ reservasPorEstado: expect.any(Object), ingresosMes: expect.any(Number), pendientesDeFacturar: expect.any(Number), saldoLedger: [] }),
+      );
+      // El tenant A ya tiene reservas CONFIRMADA/FACTURADA/CANCELADA de tests anteriores — B no debería verlas.
+      expect(Object.values(respuesta.body.reservasPorEstado as Record<string, number>).reduce((a, b) => a + b, 0)).toBe(0);
+    });
+  });
 });

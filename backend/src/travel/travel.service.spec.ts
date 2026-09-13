@@ -33,6 +33,7 @@ describe('TravelService', () => {
       registrarMovimientoLedger: jest.fn(),
       listarLedger: jest.fn(),
       descartarAlertaProveedor: jest.fn(),
+      resumen: jest.fn(),
     } as unknown as jest.Mocked<TravelRepository>;
     clientesService = { buscarPorId: jest.fn() } as unknown as jest.Mocked<ClientesService>;
     correlativosRepository = { siguiente: jest.fn() } as unknown as jest.Mocked<CorrelativosRepository>;
@@ -322,6 +323,22 @@ describe('TravelService', () => {
     it('delega al repositorio', async () => {
       await service.descartarAlertaProveedor('r1');
       expect(repository.descartarAlertaProveedor).toHaveBeenCalledWith('r1');
+    });
+  });
+
+  describe('resumen', () => {
+    it('combina el resumen del repositorio con el saldo del ledger', async () => {
+      repository.resumen.mockResolvedValue({ reservasPorEstado: { CONFIRMADA: 2 }, ingresosMes: 500, pendientesDeFacturar: 2 } as never);
+      repository.listarLedger.mockResolvedValue([{ tipo: 'DEBITO', monto: 450, moneda: 'USD' }] as never);
+
+      const resultado = await service.resumen();
+
+      expect(resultado).toEqual({
+        reservasPorEstado: { CONFIRMADA: 2 },
+        ingresosMes: 500,
+        pendientesDeFacturar: 2,
+        saldoLedger: [{ moneda: 'USD', saldo: -450 }],
+      });
     });
   });
 });

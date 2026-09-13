@@ -223,6 +223,12 @@ export class TravelService {
     return this.repository.descartarAlertaProveedor(id);
   }
 
+  /** Dashboard del plugin — sin cachear (mismo criterio que saldoLedger), bajo volumen esperado en esta fase. */
+  async resumen() {
+    const [resumen, saldoLedger] = await Promise.all([this.repository.resumen(), this.saldoLedger()]);
+    return { ...resumen, saldoLedger };
+  }
+
   /** Saldo (CREDITO - DEBITO) del tenant contra el Balance compartido de la plataforma, agrupado por moneda — sin cachear, bajo volumen esperado en esta fase. */
   async saldoLedger() {
     const movimientos = await this.repository.listarLedger();

@@ -28,6 +28,13 @@ export class TravelController {
     return this.travelService.reservarOfertaVuelo(dto, user.tenantId);
   }
 
+  // Ruta literal antes de ':id' a propósito (mismo cuidado de orden que 'duffel').
+  @Get('resumen')
+  @Permissions('travel.ver')
+  resumen() {
+    return this.travelService.resumen();
+  }
+
   @Get()
   @Permissions('travel.ver')
   listar() {

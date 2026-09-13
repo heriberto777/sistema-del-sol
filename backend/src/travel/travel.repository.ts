@@ -151,4 +151,22 @@ export class TravelRepository {
   listarLedger() {
     return this.db.travelLedgerMovimiento.findMany({ orderBy: { createdAt: 'desc' } });
   }
+
+  async resumen() {
+    const inicioMes = new Date();
+    inicioMes.setDate(1);
+    inicioMes.setHours(0, 0, 0, 0);
+
+    const [porEstadoRaw, ingresosMes, pendientesDeFacturar] = await Promise.all([
+      this.db.travelReserva.groupBy({ by: ['estado'], _count: { _all: true } }),
+      this.db.travelReserva.aggregate({ _sum: { montoVenta: true }, where: { estado: 'FACTURADA', updatedAt: { gte: inicioMes } } }),
+      this.db.travelReserva.count({ where: { estado: 'CONFIRMADA' } }),
+    ]);
+
+    return {
+      reservasPorEstado: Object.fromEntries(porEstadoRaw.map((r) => [r.estado, r._count._all])),
+      ingresosMes: Number(ingresosMes._sum.montoVenta ?? 0),
+      pendientesDeFacturar,
+    };
+  }
 }
