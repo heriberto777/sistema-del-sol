@@ -113,4 +113,5 @@ export const TENANT_SCOPED_MODELS = new Set([
   // la TravelReserva padre.
   'TravelReserva',
   'TravelLedgerMovimiento',
+  'TravelReglaMarkup',
 ]);

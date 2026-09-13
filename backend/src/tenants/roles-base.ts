@@ -108,6 +108,9 @@ export const PERMISOS_BASE = [
   // alta manual de Fase 0): reservar de verdad gasta el Balance
   // compartido de la plataforma, amerita su propio permiso.
   'travel.buscar', 'travel.reservar', 'travel.cancelar',
+  // Reglas de markup automático (sugerencia de montoVenta) — acción de
+  // configuración, separada de crear/editar/reservar.
+  'travel.markup',
 ];
 
 export const ROLES_BASE: Record<string, string[]> = {

@@ -8,6 +8,7 @@ import { mensajeErrorApi } from '../lib/mensaje-error-api';
 import { Button } from '../components/atoms/Button/Button';
 import { Card } from '../components/atoms/Card/Card';
 import { Select } from '../components/atoms/Select/Select';
+import { Input } from '../components/atoms/Input/Input';
 import { FormField } from '../components/molecules/FormField/FormField';
 import { Modal } from '../components/molecules/Modal/Modal';
 import { ConfirmModal } from '../components/molecules/ConfirmModal/ConfirmModal';
@@ -22,6 +23,7 @@ import {
   OfertaVuelo,
   ResultadoBusquedaVuelos,
   TIPOS_TRAVEL_RESERVA,
+  TravelReglaMarkup,
   TravelReserva,
 } from '../types/travel';
 
@@ -64,6 +66,7 @@ function ReservaFormModal({
   onGuardar: (form: FormReserva) => void;
 }) {
   const [form, setForm] = useState<FormReserva>(FORM_VACIO);
+  const [sugiriendo, setSugiriendo] = useState(false);
 
   function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -114,15 +117,39 @@ function ReservaFormModal({
             onChange={(e) => setForm({ ...form, montoCosto: e.target.value })}
             required
           />
-          <FormField
-            label="Venta (al cliente)"
-            type="number"
-            min="0"
-            step="0.01"
-            value={form.montoVenta}
-            onChange={(e) => setForm({ ...form, montoVenta: e.target.value })}
-            required
-          />
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Venta (al cliente)</label>
+              <button
+                type="button"
+                disabled={!form.montoCosto || sugiriendo}
+                onClick={async () => {
+                  setSugiriendo(true);
+                  try {
+                    const r = await apiClient.get<{ montoVentaSugerido: number }>('/admin/travel/markup/sugerir', {
+                      params: { tipo: form.tipo, montoCosto: form.montoCosto },
+                    });
+                    setForm((f) => ({ ...f, montoVenta: String(r.data.montoVentaSugerido) }));
+                  } catch {
+                    /* silencioso — el campo sigue editable a mano */
+                  } finally {
+                    setSugiriendo(false);
+                  }
+                }}
+                className="text-xs font-medium text-sol-600 hover:underline disabled:opacity-50 dark:text-sol-400"
+              >
+                {sugiriendo ? 'Calculando…' : 'Sugerir'}
+              </button>
+            </div>
+            <Input
+              type="number"
+              min="0"
+              step="0.01"
+              value={form.montoVenta}
+              onChange={(e) => setForm({ ...form, montoVenta: e.target.value })}
+              required
+            />
+          </div>
         </div>
 
         <div className="flex flex-col gap-1">
@@ -216,6 +243,146 @@ function CancelarReservaModal({ reserva, onClose, onCancelada }: { reserva: Trav
 /* ---------------------------------------------------------------- */
 /* Saldo del ledger — Balance compartido de la plataforma             */
 /* ---------------------------------------------------------------- */
+
+const FORM_REGLA_VACIA = { tipo: '', porcentaje: '', montoFijo: '' };
+
+function MarkupTab() {
+  const queryClient = useQueryClient();
+  const { tienePermiso } = useAuth();
+  const [form, setForm] = useState(FORM_REGLA_VACIA);
+  const [error, setError] = useState<string | null>(null);
+
+  const { data: reglas, isLoading } = useQuery({
+    queryKey: ['travel-markup'],
+    queryFn: async () => (await apiClient.get<TravelReglaMarkup[]>('/admin/travel/markup')).data,
+  });
+
+  const crear = useMutation({
+    mutationFn: async () =>
+      apiClient.post('/admin/travel/markup', {
+        tipo: form.tipo || undefined,
+        ...(form.porcentaje !== '' ? { porcentaje: Number(form.porcentaje) } : {}),
+        ...(form.montoFijo !== '' ? { montoFijo: Number(form.montoFijo) } : {}),
+      }),
+    onSuccess: () => {
+      setForm(FORM_REGLA_VACIA);
+      setError(null);
+      queryClient.invalidateQueries({ queryKey: ['travel-markup'] });
+    },
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo crear la regla.')),
+  });
+
+  const toggleActiva = useMutation({
+    mutationFn: async ({ id, activa }: { id: string; activa: boolean }) => apiClient.patch(`/admin/travel/markup/${id}`, { activa }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['travel-markup'] }),
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo cambiar la regla.')),
+  });
+
+  const eliminar = useMutation({
+    mutationFn: async (id: string) => apiClient.delete(`/admin/travel/markup/${id}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['travel-markup'] }),
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo eliminar la regla.')),
+  });
+
+  const lista = reglas ?? [];
+  const puedeGestionar = tienePermiso('travel.markup');
+
+  return (
+    <div className="space-y-4">
+      {puedeGestionar && (
+        <Card titulo="Nueva regla de markup" descripcion="Sugiere el precio de venta al reservar — nunca lo aplica solo, siempre editable.">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              crear.mutate();
+            }}
+            className="grid grid-cols-1 gap-3 sm:grid-cols-4 sm:items-end"
+          >
+            <div className="flex flex-col gap-1">
+              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Tipo</label>
+              <Select value={form.tipo} onChange={(e) => setForm({ ...form, tipo: e.target.value })}>
+                <option value="">Global (VUELO + HOTEL)</option>
+                {TIPOS_TRAVEL_RESERVA.map((t) => (
+                  <option key={t} value={t}>
+                    {ETIQUETA_TIPO_TRAVEL_RESERVA[t]}
+                  </option>
+                ))}
+              </Select>
+            </div>
+            <FormField
+              label="Porcentaje (%)"
+              type="number"
+              step="0.01"
+              value={form.porcentaje}
+              onChange={(e) => setForm({ ...form, porcentaje: e.target.value, montoFijo: '' })}
+              placeholder="ej. 15"
+            />
+            <FormField
+              label="Monto fijo"
+              type="number"
+              step="0.01"
+              value={form.montoFijo}
+              onChange={(e) => setForm({ ...form, montoFijo: e.target.value, porcentaje: '' })}
+              placeholder="ej. 30"
+            />
+            <Button type="submit" disabled={crear.isPending || (!form.porcentaje && !form.montoFijo)}>
+              {crear.isPending ? 'Creando…' : 'Crear regla'}
+            </Button>
+          </form>
+          <p className="mt-2 text-xs text-slate-400">Exactamente uno de los dos campos — porcentaje o monto fijo, nunca ambos.</p>
+          {error && <p className="mt-2 text-sm text-red-600 dark:text-red-400">{error}</p>}
+        </Card>
+      )}
+
+      <Card sinPadding>
+        {isLoading && <p className="p-6 text-sm text-slate-500 dark:text-slate-400">Cargando…</p>}
+        {!isLoading && lista.length === 0 && (
+          <EstadoVacio titulo="Sin reglas de markup" descripcion="Sin ninguna regla activa, el precio de venta sugerido es igual al costo (0% de markup)." />
+        )}
+        {!isLoading && lista.length > 0 && (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-slate-100 text-left text-xs font-semibold uppercase tracking-wide text-slate-400 dark:border-slate-800">
+                <th className="px-5 py-3">Tipo</th>
+                <th className="px-5 py-3">Markup</th>
+                <th className="px-5 py-3">Estado</th>
+                <th className="px-5 py-3" />
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+              {lista.map((r) => (
+                <tr key={r.id}>
+                  <td className="px-5 py-3 text-slate-800 dark:text-slate-100">{r.tipo ? ETIQUETA_TIPO_TRAVEL_RESERVA[r.tipo] : 'Global'}</td>
+                  <td className="px-5 py-3 text-slate-600 dark:text-slate-300">{r.porcentaje ? `+${r.porcentaje}%` : `+${r.montoFijo} (fijo)`}</td>
+                  <td className="px-5 py-3">
+                    {puedeGestionar ? (
+                      <button
+                        type="button"
+                        onClick={() => toggleActiva.mutate({ id: r.id, activa: !r.activa })}
+                        className={clsx('rounded-full px-2 py-0.5 text-xs font-semibold', r.activa ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400' : 'bg-slate-100 text-slate-500 dark:bg-slate-800')}
+                      >
+                        {r.activa ? 'Activa' : 'Inactiva'}
+                      </button>
+                    ) : (
+                      <span>{r.activa ? 'Activa' : 'Inactiva'}</span>
+                    )}
+                  </td>
+                  <td className="px-5 py-3 text-right">
+                    {puedeGestionar && (
+                      <button type="button" onClick={() => eliminar.mutate(r.id)} className="text-slate-400 hover:text-red-600" aria-label="Eliminar">
+                        <Trash2 size={16} />
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </Card>
+    </div>
+  );
+}
 
 function SaldoLedger() {
   const { data } = useQuery({
@@ -362,6 +529,15 @@ function ReservarOfertaModal({
   const [montoVenta, setMontoVenta] = useState(oferta.montoTotal);
   const [notas, setNotas] = useState('');
   const [pasajeros, setPasajeros] = useState<Record<string, FormPasajero>>(Object.fromEntries(pasajeroIds.map((id) => [id, { ...PASAJERO_VACIO }])));
+
+  // Markup automático — solo sugiere el punto de partida, el campo sigue 100% editable.
+  useEffect(() => {
+    apiClient
+      .get<{ montoVentaSugerido: number }>('/admin/travel/markup/sugerir', { params: { tipo: 'VUELO', montoCosto: oferta.montoTotal } })
+      .then((r) => setMontoVenta(String(r.data.montoVentaSugerido)))
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function actualizarPasajero(id: string, campo: keyof FormPasajero, valor: string) {
     setPasajeros((prev) => ({ ...prev, [id]: { ...prev[id], [campo]: valor } }));
@@ -628,6 +804,7 @@ function BuscarVueloTab({ clientes }: { clientes: ClienteOpcion[] | undefined })
 const VISTAS = [
   { id: 'reservas', etiqueta: 'Reservas' },
   { id: 'buscar', etiqueta: 'Buscar vuelo' },
+  { id: 'markup', etiqueta: 'Markup' },
 ] as const;
 type Vista = (typeof VISTAS)[number]['id'];
 
@@ -743,6 +920,7 @@ export function TravelReservas() {
         {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
 
         {vista === 'buscar' && <BuscarVueloTab clientes={clientes} />}
+        {vista === 'markup' && <MarkupTab />}
 
         {vista === 'reservas' && (
           <Card sinPadding>

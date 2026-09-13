@@ -130,6 +130,7 @@ model Tenant {
   tareasPersonales          TareaPersonal[]
   reservasTravel            TravelReserva[]
   movimientosLedgerTravel   TravelLedgerMovimiento[]
+  reglasMarkupTravel        TravelReglaMarkup[]
 
   @@map("tenants")
 }
@@ -4619,4 +4620,24 @@ model TravelLedgerMovimiento {
   createdAt   DateTime                   @default(now())
 
   @@map("travel_ledger_movimientos")
+}
+
+/// Markup automático (antes YAGNI — ver comentario en TravelReserva) —
+/// una regla por tipo (VUELO/HOTEL) o una regla global (tipo null,
+/// aplica a ambos si no hay una más específica activa). Nunca se aplica
+/// solo, solo SUGIERE un montoVenta editable — TravelReservaMarkupService
+/// .sugerir() nunca escribe nada. Exactamente uno de porcentaje/montoFijo
+/// (validado en el servicio, no en BD).
+model TravelReglaMarkup {
+  id         String             @id @default(uuid())
+  tenantId   String
+  tenant     Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tipo       TipoTravelReserva?
+  porcentaje Decimal?           @db.Decimal(5, 2)
+  montoFijo  Decimal?           @db.Decimal(12, 2)
+  activa     Boolean            @default(true)
+  createdAt  DateTime           @default(now())
+  updatedAt  DateTime           @updatedAt
+
+  @@map("travel_reglas_markup")
 }

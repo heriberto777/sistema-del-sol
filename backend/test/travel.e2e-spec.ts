@@ -61,6 +61,7 @@ describe('Travel Management (e2e)', () => {
     'travel.buscar',
     'travel.reservar',
     'travel.cancelar',
+    'travel.markup',
   ];
 
   async function crearPermisos(claves: string[]) {
@@ -460,6 +461,71 @@ describe('Travel Management (e2e)', () => {
       const reserva = await prisma.travelReserva.findFirstOrThrow({ where: { proveedorOrdenId: 'ord_fake' } });
       expect(reserva.alertaProveedorTipo).toBe('CAMBIO_ITINERARIO');
       expect(reserva.alertaProveedorDetalle).toContain('itinerario');
+    });
+  });
+
+  describe('Markup automático', () => {
+    let reglaId: string;
+
+    it('el tenant A crea una regla de markup por porcentaje', async () => {
+      const token = await login('admin@e2e-travel-a.com', SUBDOMINIO_A);
+
+      const respuesta = await request(app.getHttpServer())
+        .post('/api/admin/travel/markup')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ tipo: 'VUELO', porcentaje: 15 })
+        .expect(201);
+
+      reglaId = respuesta.body.id;
+      expect(Number(respuesta.body.porcentaje)).toBe(15);
+    });
+
+    it('rechaza crear una regla con porcentaje y montoFijo a la vez', async () => {
+      const token = await login('admin@e2e-travel-a.com', SUBDOMINIO_A);
+
+      await request(app.getHttpServer())
+        .post('/api/admin/travel/markup')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ porcentaje: 10, montoFijo: 20 })
+        .expect(400);
+    });
+
+    it('sugiere el monto de venta aplicando la regla activa del tenant', async () => {
+      const token = await login('admin@e2e-travel-a.com', SUBDOMINIO_A);
+
+      const respuesta = await request(app.getHttpServer())
+        .get('/api/admin/travel/markup/sugerir')
+        .query({ tipo: 'VUELO', montoCosto: '200' })
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(respuesta.body.montoVentaSugerido).toBe(230);
+    });
+
+    it('el tenant B no ve la regla de A (aislamiento) y su sugerencia no aplica ningún markup', async () => {
+      const tokenB = await login('admin@e2e-travel-b.com', SUBDOMINIO_B);
+
+      const listado = await request(app.getHttpServer()).get('/api/admin/travel/markup').set('Authorization', `Bearer ${tokenB}`).expect(200);
+      expect(listado.body).toEqual([]);
+
+      const sugerencia = await request(app.getHttpServer())
+        .get('/api/admin/travel/markup/sugerir')
+        .query({ tipo: 'VUELO', montoCosto: '200' })
+        .set('Authorization', `Bearer ${tokenB}`)
+        .expect(200);
+      expect(sugerencia.body).toEqual({ montoVentaSugerido: 200, reglaAplicada: null });
+    });
+
+    it('el tenant B no puede editar/eliminar la regla de A por id directo', async () => {
+      const tokenB = await login('admin@e2e-travel-b.com', SUBDOMINIO_B);
+
+      await request(app.getHttpServer()).patch(`/api/admin/travel/markup/${reglaId}`).set('Authorization', `Bearer ${tokenB}`).send({ activa: false }).expect(404);
+      await request(app.getHttpServer()).delete(`/api/admin/travel/markup/${reglaId}`).set('Authorization', `Bearer ${tokenB}`).expect(404);
+    });
+
+    it('el tenant A elimina su propia regla', async () => {
+      const token = await login('admin@e2e-travel-a.com', SUBDOMINIO_A);
+      await request(app.getHttpServer()).delete(`/api/admin/travel/markup/${reglaId}`).set('Authorization', `Bearer ${token}`).expect(200);
     });
   });
 });

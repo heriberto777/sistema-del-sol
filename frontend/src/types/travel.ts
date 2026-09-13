@@ -73,6 +73,15 @@ export interface ResultadoBusquedaVuelos {
   ofertas: OfertaVuelo[];
 }
 
+export interface TravelReglaMarkup {
+  id: string;
+  tipo: 'VUELO' | 'HOTEL' | null;
+  porcentaje: string | null;
+  montoFijo: string | null;
+  activa: boolean;
+  createdAt: string;
+}
+
 export const TIPOS_TRAVEL_RESERVA = ['VUELO', 'HOTEL'] as const;
 export const ETIQUETA_TIPO_TRAVEL_RESERVA: Record<string, string> = { VUELO: 'Vuelo', HOTEL: 'Hotel' };
 
