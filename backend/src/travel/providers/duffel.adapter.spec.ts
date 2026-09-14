@@ -245,11 +245,18 @@ describe('DuffelAdapter', () => {
     await expect(adapter.obtenerOferta('off_expirada')).rejects.toThrow(/expiró o fue reservada/);
   });
 
-  it('traduce rate_limit_error a un mensaje de negocio claro', async () => {
+  it('traduce rate_limit_error a un mensaje de negocio claro tras agotar los reintentos', async () => {
     process.env.DUFFEL_API_TOKEN = 'duffel_test_123';
-    fetchMock.mockResolvedValue({ ok: false, status: 429, json: async () => ({ errors: [{ type: 'rate_limit_error', title: 'Too many requests' }] }) });
+    // ratelimit-reset ya vencido -> espera calculada 0ms, no ralentiza el test real.
+    fetchMock.mockResolvedValue({
+      ok: false,
+      status: 429,
+      headers: { get: (nombre: string) => (nombre === 'ratelimit-reset' ? new Date(0).toUTCString() : null) },
+      json: async () => ({ errors: [{ type: 'rate_limit_error', title: 'Too many requests' }] }),
+    });
 
     await expect(adapter.obtenerOferta('off_1')).rejects.toThrow(/limitando las solicitudes/);
+    expect(fetchMock).toHaveBeenCalledTimes(3); // intento inicial + 2 reintentos (MAX_REINTENTOS_RATE_LIMIT)
   });
 
   it('cotizarCancelacion y confirmarCancelacion siguen el flujo de 2 pasos', async () => {
@@ -268,10 +275,49 @@ describe('DuffelAdapter', () => {
     expect(fetchMock.mock.calls[1][0]).toBe('https://api.duffel.com/air/order_cancellations/orc_1/actions/confirm');
   });
 
-  it('lanza ServiceUnavailableException si la petición de red falla', async () => {
+  it('lanza ServiceUnavailableException si la petición de red falla incluso tras reintentar (operación de lectura)', async () => {
     process.env.DUFFEL_API_TOKEN = 'duffel_test_123';
     fetchMock.mockRejectedValue(new Error('ECONNRESET'));
 
     await expect(adapter.obtenerOferta('off_1')).rejects.toThrow(ServiceUnavailableException);
+    expect(fetchMock).toHaveBeenCalledTimes(3); // intento inicial + 2 reintentos, obtenerOferta es de lectura
+  });
+
+  it('un fallo de red transitorio se recupera solo (obtenerOferta reintenta y el segundo intento funciona)', async () => {
+    process.env.DUFFEL_API_TOKEN = 'duffel_test_123';
+    fetchMock
+      .mockRejectedValueOnce(new Error('ECONNRESET'))
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ data: { id: 'off_1', total_amount: '450.00', total_currency: 'USD', expires_at: '2026-11-01T00:00:00Z', owner: { name: 'Iberia' }, slices: [], passengers: [] } }),
+      });
+
+    const resultado = await adapter.obtenerOferta('off_1');
+
+    expect(resultado.id).toBe('off_1');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('crearOrdenVuelo NUNCA reintenta ante un fallo de red — podría duplicar una orden real ya cobrada', async () => {
+    process.env.DUFFEL_API_TOKEN = 'duffel_test_123';
+    fetchMock.mockRejectedValue(new Error('ECONNRESET'));
+
+    await expect(
+      adapter.crearOrdenVuelo({
+        ofertaId: 'off_1',
+        pasajeros: [{ id: 'pas_1', nombre: 'Juan', apellido: 'Pérez', fechaNacimiento: '1990-01-01', genero: 'm', titulo: 'mr', email: 'j@x.com', telefono: '+18095551234' }],
+        montoBalance: 450,
+        monedaBalance: 'USD',
+      }),
+    ).rejects.toThrow(ServiceUnavailableException);
+    expect(fetchMock).toHaveBeenCalledTimes(1); // sin reintentos
+  });
+
+  it('confirmarCancelacion NUNCA reintenta ante un fallo de red — podría duplicar un reembolso real', async () => {
+    process.env.DUFFEL_API_TOKEN = 'duffel_test_123';
+    fetchMock.mockRejectedValue(new Error('ECONNRESET'));
+
+    await expect(adapter.confirmarCancelacion('orc_1')).rejects.toThrow(ServiceUnavailableException);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });
