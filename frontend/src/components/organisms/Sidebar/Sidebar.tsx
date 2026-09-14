@@ -112,24 +112,22 @@ const SUELTOS_ARRIBA: Enlace[] = [
   { ruta: '/mis-tareas', etiqueta: 'Mis tareas', icono: ListChecks, modulo: 'mistareas' },
 ];
 
-// Auditoría de organización del Sidebar: "Ventas" tenía 12 ítems mezclando
-// documentos de venta reales con plugins enteros. Tienda Online/Proyectos/
-// Publicaciones Sociales son una sola pantalla cada uno — meterlos en un
-// acordeón de un solo ítem es fricción sin beneficio, pero dejarlos
-// sueltos sin ninguna etiqueta (mezclados visualmente con Dashboard/
-// Reportes, que sí son chrome universal) hacía parecer que "faltaba"
-// organizarlos. Llevan su propia etiqueta estática "Módulos" — sin
-// caret, no son colapsables, es solo la separación visual — mientras que
-// Inmobiliaria (3 pantallas) sí amerita ser un acordeón real (ver GRUPOS).
-const ETIQUETA_MODULOS_SUELTOS = 'Módulos';
-const MODULOS_SUELTOS: Enlace[] = [
-  { ruta: '/tienda-online', etiqueta: 'Tienda Online', icono: Globe, permisos: ['admin.configuracion'], modulo: 'ecommerce' },
-  { ruta: '/proyectos', etiqueta: 'Proyectos', icono: FolderKanban, permisos: ['proyectos.ver'], modulo: 'proyectos' },
-  { ruta: '/publicaciones-sociales', etiqueta: 'Publicaciones Sociales', icono: Megaphone, permisos: ['publicacionessociales.ver'], modulo: 'publicacionessociales' },
-  { ruta: '/travel/reservas', etiqueta: 'Reservas de viaje', icono: Plane, permisos: ['travel.ver'], modulo: 'travel' },
-];
-
 const GRUPOS: Grupo[] = [
+  {
+    // Plugins opcionales (Tienda Online/Proyectos/Publicaciones Sociales/
+    // Travel) agrupados bajo un acordeón real igual que el resto — antes
+    // vivían con una etiqueta estática sin caret ("solo separación
+    // visual"), pero eso los dejaba siempre expandidos y sin la misma
+    // consistencia visual que Ventas/Finanzas/Sistema.
+    id: 'modulos',
+    etiqueta: 'Módulos',
+    items: [
+      { ruta: '/tienda-online', etiqueta: 'Tienda Online', icono: Globe, permisos: ['admin.configuracion'], modulo: 'ecommerce' },
+      { ruta: '/proyectos', etiqueta: 'Proyectos', icono: FolderKanban, permisos: ['proyectos.ver'], modulo: 'proyectos' },
+      { ruta: '/publicaciones-sociales', etiqueta: 'Publicaciones Sociales', icono: Megaphone, permisos: ['publicacionessociales.ver'], modulo: 'publicacionessociales' },
+      { ruta: '/travel/reservas', etiqueta: 'Reservas de viaje', icono: Plane, permisos: ['travel.ver'], modulo: 'travel' },
+    ],
+  },
   {
     id: 'ventas',
     etiqueta: 'Ventas',
@@ -354,8 +352,6 @@ export function Sidebar({ forzarExpandido, onNavegar }: SidebarProps = {}) {
     items: g.items.filter((item) => esVisible(item, tienePermiso, tieneModulo)),
   })).filter((g) => g.items.length > 0);
 
-  const modulosSueltosVisibles = MODULOS_SUELTOS.filter((enlace) => esVisible(enlace, tienePermiso, tieneModulo));
-
   return (
     <nav
       className={clsx(
@@ -384,15 +380,6 @@ export function Sidebar({ forzarExpandido, onNavegar }: SidebarProps = {}) {
       </div>
 
       {SUELTOS_ARRIBA.filter((enlace) => esVisible(enlace, tienePermiso, tieneModulo)).map(renderEnlace)}
-
-      {modulosSueltosVisibles.length > 0 && (
-        <div className="mt-1">
-          {!colapsado && (
-            <p className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">{ETIQUETA_MODULOS_SUELTOS}</p>
-          )}
-          <div className="flex flex-col gap-0.5">{modulosSueltosVisibles.map(renderEnlace)}</div>
-        </div>
-      )}
 
       {gruposVisibles.map((grupo) => {
         const abierto = colapsado || gruposAbiertos.has(grupo.id);
