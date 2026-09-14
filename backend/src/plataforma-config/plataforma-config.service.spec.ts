@@ -26,6 +26,8 @@ const CONFIG_VACIA = {
   webhookActivo: false,
   duffelApiTokenCifrado: null,
   duffelWebhookSecretCifrado: null,
+  hotelbedsApiKeyCifrado: null,
+  hotelbedsSecretCifrado: null,
 };
 
 describe('PlataformaConfigService', () => {
@@ -79,6 +81,17 @@ describe('PlataformaConfigService', () => {
 
       expect(resultado.travel.duffelWebhookSecretConfigurado).toBe(true);
       expect(JSON.stringify(resultado)).not.toContain('whsec_duffel_real');
+    });
+
+    it('travel — reporta hotelbedsApiKeyConfigurado/hotelbedsSecretConfigurado:true sin exponerlos en texto plano', async () => {
+      repo.obtenerOCrear.mockResolvedValue({ ...CONFIG_VACIA, hotelbedsApiKeyCifrado: cifrar('hb_key_real'), hotelbedsSecretCifrado: cifrar('hb_secret_real') } as never);
+
+      const resultado = await service.obtener();
+
+      expect(resultado.travel.hotelbedsApiKeyConfigurado).toBe(true);
+      expect(resultado.travel.hotelbedsSecretConfigurado).toBe(true);
+      expect(JSON.stringify(resultado)).not.toContain('hb_key_real');
+      expect(JSON.stringify(resultado)).not.toContain('hb_secret_real');
     });
   });
 
@@ -157,6 +170,17 @@ describe('PlataformaConfigService', () => {
       await service.actualizar({ duffelWebhookSecret: 'whsec_duffel_real' } as never);
 
       expect(process.env.DUFFEL_WEBHOOK_SECRET).toBe('whsec_duffel_real');
+    });
+
+    it('travel — sincroniza las credenciales de Hotelbeds descifradas a HOTELBEDS_API_KEY/HOTELBEDS_SECRET (lo que lee HotelbedsAdapter)', async () => {
+      delete process.env.HOTELBEDS_API_KEY;
+      delete process.env.HOTELBEDS_SECRET;
+      repo.actualizar.mockResolvedValue({ ...CONFIG_VACIA, hotelbedsApiKeyCifrado: cifrar('hb_key_real'), hotelbedsSecretCifrado: cifrar('hb_secret_real') } as never);
+
+      await service.actualizar({ hotelbedsApiKey: 'hb_key_real', hotelbedsSecret: 'hb_secret_real' } as never);
+
+      expect(process.env.HOTELBEDS_API_KEY).toBe('hb_key_real');
+      expect(process.env.HOTELBEDS_SECRET).toBe('hb_secret_real');
     });
 
     it('el modelo elegido por proveedor se guarda y se sincroniza a su variable de entorno', async () => {

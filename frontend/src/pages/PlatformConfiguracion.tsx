@@ -88,6 +88,8 @@ export interface ConfiguracionPlataforma {
   travel: {
     duffelApiTokenConfigurado: boolean;
     duffelWebhookSecretConfigurado: boolean;
+    hotelbedsApiKeyConfigurado: boolean;
+    hotelbedsSecretConfigurado: boolean;
   };
 }
 
@@ -110,7 +112,7 @@ const TABS = [
   'Webhook',
   'Vencimientos',
   'Dominio propio',
-  'Travel (Duffel)',
+  'Travel',
 ] as const;
 type Tab = (typeof TABS)[number];
 
@@ -167,9 +169,10 @@ export function PlatformConfiguracion() {
           {tab === 'Webhook' && <SeccionWebhook config={config} guardar={guardar} />}
           {tab === 'Vencimientos' && <SeccionVencimientos config={config} guardar={guardar} />}
           {tab === 'Dominio propio' && <SeccionDominioPropio config={config} guardar={guardar} />}
-          {tab === 'Travel (Duffel)' && (
+          {tab === 'Travel' && (
             <div className="space-y-4">
               <SeccionTravel config={config} guardar={guardar} />
+              <SeccionTravelHotelbeds config={config} guardar={guardar} />
               <SeccionTravelReconciliacion />
             </div>
           )}
@@ -462,6 +465,52 @@ function SeccionTravel({ config, guardar }: SeccionProps) {
           />
         </div>
 
+        <Button type="submit" disabled={guardar.isPending}>
+          {guardar.isPending ? 'Guardando…' : 'Guardar'}
+        </Button>
+      </form>
+    </Card>
+  );
+}
+
+function SeccionTravelHotelbeds({ config, guardar }: SeccionProps) {
+  const travel = config.travel;
+  const [hotelbedsApiKey, setHotelbedsApiKey] = useState('');
+  const [hotelbedsSecret, setHotelbedsSecret] = useState('');
+
+  function onSubmit(e: FormEvent) {
+    e.preventDefault();
+    guardar.mutate({
+      ...(hotelbedsApiKey !== '' ? { hotelbedsApiKey } : {}),
+      ...(hotelbedsSecret !== '' ? { hotelbedsSecret } : {}),
+    });
+    setHotelbedsApiKey('');
+    setHotelbedsSecret('');
+  }
+
+  return (
+    <Card
+      titulo="Travel Management (Hotelbeds)"
+      descripcion="Cuenta única y compartida de la plataforma para reservar hoteles — factura neto con liquidación periódica, nunca pide tarjeta al reservar."
+    >
+      <form onSubmit={onSubmit} className="max-w-md space-y-3">
+        <FormField
+          id="hotelbedsApiKey"
+          label="Api Key"
+          type="password"
+          value={hotelbedsApiKey}
+          onChange={(e) => setHotelbedsApiKey(e.target.value)}
+          placeholder={travel.hotelbedsApiKeyConfigurado ? PLACEHOLDER_CONFIGURADO : 'Api key de developer.hotelbeds.com'}
+        />
+        <FormField
+          id="hotelbedsSecret"
+          label="Secret"
+          type="password"
+          value={hotelbedsSecret}
+          onChange={(e) => setHotelbedsSecret(e.target.value)}
+          placeholder={travel.hotelbedsSecretConfigurado ? PLACEHOLDER_CONFIGURADO : 'Secret compartido'}
+        />
+        <p className="text-xs text-slate-400">Las dos firman cada request (X-Signature) — sandbox de test, mismo host que producción.</p>
         <Button type="submit" disabled={guardar.isPending}>
           {guardar.isPending ? 'Guardando…' : 'Guardar'}
         </Button>

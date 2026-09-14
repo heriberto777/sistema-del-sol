@@ -3,6 +3,7 @@ import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { TravelService } from './travel.service';
 import { CrearReservaTravelDto } from './dto/crear-reserva-travel.dto';
 import { ReservarOfertaVueloDto } from './dto/reservar-oferta-vuelo.dto';
+import { ReservarHotelDto } from './dto/reservar-hotel.dto';
 import { Permissions } from '../common/decorators/permissions.decorator';
 import { RequiereModulo } from '../common/decorators/requiere-modulo.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -26,6 +27,13 @@ export class TravelController {
   @Permissions('travel.reservar')
   reservarOfertaVuelo(@Body() dto: ReservarOfertaVueloDto, @CurrentUser() user: JwtPayloadUser) {
     return this.travelService.reservarOfertaVuelo(dto, user.tenantId);
+  }
+
+  // Ruta literal antes de ':id' a propósito (mismo cuidado de orden que 'duffel').
+  @Post('hotelbeds')
+  @Permissions('travel.reservar')
+  reservarHotel(@Body() dto: ReservarHotelDto, @CurrentUser() user: JwtPayloadUser) {
+    return this.travelService.reservarHotel(dto, user.tenantId);
   }
 
   // Ruta literal antes de ':id' a propósito (mismo cuidado de orden que 'duffel').

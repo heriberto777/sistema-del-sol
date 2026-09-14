@@ -660,6 +660,12 @@ model PlataformaConfiguracion {
   // sobre `${timestamp}.${body}`), confirmado contra la doc pública de
   // Duffel. sincronizarEnv() la vuelca a DUFFEL_WEBHOOK_SECRET.
   duffelWebhookSecretCifrado String?
+  // Hotelbeds (hoteles) — cuenta única y compartida de la plataforma,
+  // mismo criterio que Duffel. Autenticación por firma (Api-key +
+  // X-Signature = SHA256(apiKey+secret+timestamp)), confirmado contra el
+  // sandbox real — no hay Bearer token, hace falta guardar las dos partes.
+  hotelbedsApiKeyCifrado String?
+  hotelbedsSecretCifrado String?
 
   @@map("plataforma_configuracion")
 }

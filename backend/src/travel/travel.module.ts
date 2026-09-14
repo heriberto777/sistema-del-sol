@@ -6,6 +6,7 @@ import { TravelLedgerController } from './travel-ledger.controller';
 import { TravelWebhookController } from './travel-webhook.controller';
 import { TravelReglaMarkupController } from './travel-regla-markup.controller';
 import { TravelReconciliacionController } from './travel-reconciliacion.controller';
+import { TravelHotelesController } from './travel-hoteles.controller';
 import { TravelRepository } from './travel.repository';
 import { TravelReglaMarkupRepository } from './travel-regla-markup.repository';
 import { TravelReglaMarkupService } from './travel-regla-markup.service';
@@ -17,6 +18,8 @@ import { FacturacionModule } from '../facturacion/facturacion.module';
 import { TasasCambioModule } from '../tasas-cambio/tasas-cambio.module';
 import { DuffelAdapter } from './providers/duffel.adapter';
 import { TravelProviderService } from './providers/travel-provider.service';
+import { HotelbedsAdapter } from './providers/hotelbeds.adapter';
+import { HotelProviderService } from './providers/hotel-provider.service';
 
 /**
  * Plugin Travel Management — Fase 0 (esqueleto sin proveedor) + Fase 1a
@@ -29,8 +32,27 @@ import { TravelProviderService } from './providers/travel-provider.service';
  */
 @Module({
   imports: [ClientesModule, CorrelativosModule, FacturacionModule, TasasCambioModule],
-  controllers: [TravelController, TravelVuelosController, TravelLedgerController, TravelWebhookController, TravelReglaMarkupController, TravelReconciliacionController],
-  providers: [TravelService, TravelRepository, DuffelAdapter, TravelProviderService, DuffelWebhookService, TravelReglaMarkupRepository, TravelReglaMarkupService, TravelReconciliacionService],
-  exports: [TravelProviderService],
+  controllers: [
+    TravelController,
+    TravelVuelosController,
+    TravelHotelesController,
+    TravelLedgerController,
+    TravelWebhookController,
+    TravelReglaMarkupController,
+    TravelReconciliacionController,
+  ],
+  providers: [
+    TravelService,
+    TravelRepository,
+    DuffelAdapter,
+    TravelProviderService,
+    HotelbedsAdapter,
+    HotelProviderService,
+    DuffelWebhookService,
+    TravelReglaMarkupRepository,
+    TravelReglaMarkupService,
+    TravelReconciliacionService,
+  ],
+  exports: [TravelProviderService, HotelProviderService],
 })
 export class TravelModule {}

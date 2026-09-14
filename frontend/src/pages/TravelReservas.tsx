@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { AlertTriangle, Clock, DollarSign, Plane, Plus, Receipt, Trash2, Wallet, X } from 'lucide-react';
+import { AlertTriangle, BedDouble, Clock, DollarSign, Plane, Plus, Receipt, Trash2, Wallet, X } from 'lucide-react';
 import { apiClient } from '../lib/api-client';
 import { useAuth } from '../hooks/useAuth';
 import { mensajeErrorApi } from '../lib/mensaje-error-api';
@@ -21,8 +21,11 @@ import {
   ESTADOS_TRAVEL_RESERVA,
   ETIQUETA_ESTADO_TRAVEL_RESERVA,
   ETIQUETA_TIPO_TRAVEL_RESERVA,
+  HotelListado,
   OfertaVuelo,
+  ResultadoBusquedaHoteles,
   ResultadoBusquedaVuelos,
+  TarifaHotel,
   TIPOS_TRAVEL_RESERVA,
   TravelReglaMarkup,
   TravelReserva,
@@ -936,6 +939,258 @@ function BuscarVueloTab({ clientes }: { clientes: ClienteOpcion[] | undefined })
 }
 
 /* ---------------------------------------------------------------- */
+/* Buscar hotel (Hotelbeds) — búsqueda + reserva real                 */
+/* ---------------------------------------------------------------- */
+
+const FORM_BUSQUEDA_HOTEL_VACIO = { destino: '', checkIn: '', checkOut: '', adultos: 2, ninos: 0 };
+
+interface FormHuespedHotel {
+  nombre: string;
+  apellido: string;
+  tipo: 'AD' | 'CH';
+}
+
+function TarjetaHotel({ hotel, onReservar }: { hotel: HotelListado; onReservar: (tarifa: TarifaHotel, habitacionNombre: string) => void }) {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
+      <div className="mb-3 flex items-start justify-between gap-3">
+        <div>
+          <p className="font-semibold text-slate-800 dark:text-slate-100">{hotel.nombre}</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            {hotel.categoria} · {hotel.destino}
+          </p>
+        </div>
+      </div>
+      <div className="space-y-2">
+        {hotel.habitaciones.map((habitacion) => (
+          <div key={habitacion.codigo} className="rounded-lg bg-slate-50 p-3 dark:bg-slate-800/60">
+            <p className="mb-1.5 text-sm font-medium text-slate-700 dark:text-slate-300">{habitacion.nombre}</p>
+            <div className="space-y-1.5">
+              {habitacion.tarifas.map((tarifa) => (
+                <div key={tarifa.rateKey} className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                  <span className="text-slate-600 dark:text-slate-300">
+                    {tarifa.regimen}
+                    {tarifa.reembolsable && <span className="ml-1.5 text-[10px] font-semibold uppercase text-emerald-600 dark:text-emerald-400">Reembolsable</span>}
+                  </span>
+                  <div className="flex items-center gap-3">
+                    <span className="font-semibold text-slate-800 dark:text-slate-100">
+                      {tarifa.moneda} {Number(tarifa.montoNeto).toLocaleString('es-DO', { minimumFractionDigits: 2 })}
+                    </span>
+                    <Button type="button" onClick={() => onReservar(tarifa, habitacion.nombre)} className="!px-3 !py-1 text-xs">
+                      Reservar
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ReservarHotelModal({
+  hotel,
+  tarifa,
+  huespedesIniciales,
+  clientes,
+  guardando,
+  error,
+  onClose,
+  onGuardar,
+}: {
+  hotel: HotelListado;
+  tarifa: TarifaHotel;
+  huespedesIniciales: FormHuespedHotel[];
+  clientes: ClienteOpcion[] | undefined;
+  guardando: boolean;
+  error: string | null;
+  onClose: () => void;
+  onGuardar: (dto: { clienteId: string; rateKey: string; huespedes: FormHuespedHotel[]; montoVenta: number; notas?: string }) => void;
+}) {
+  const [clienteId, setClienteId] = useState('');
+  const [montoVenta, setMontoVenta] = useState(tarifa.montoNeto);
+  const [notas, setNotas] = useState('');
+  const [huespedes, setHuespedes] = useState<FormHuespedHotel[]>(huespedesIniciales);
+
+  useEffect(() => {
+    apiClient
+      .get<{ montoVentaSugerido: number }>('/admin/travel/markup/sugerir', { params: { tipo: 'HOTEL', montoCosto: tarifa.montoNeto } })
+      .then((r) => setMontoVenta(String(r.data.montoVentaSugerido)))
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function actualizarHuesped(i: number, campo: keyof FormHuespedHotel, valor: string) {
+    setHuespedes((prev) => prev.map((h, j) => (j === i ? { ...h, [campo]: valor } : h)));
+  }
+
+  const completo = clienteId && montoVenta && huespedes.every((h) => h.nombre && h.apellido);
+
+  function onSubmit(e: FormEvent) {
+    e.preventDefault();
+    onGuardar({ clienteId, rateKey: tarifa.rateKey, huespedes, montoVenta: Number(montoVenta), notas: notas || undefined });
+  }
+
+  return (
+    <Modal titulo="Reservar hotel" onClose={onClose} ancho="xl">
+      <form onSubmit={onSubmit} className="space-y-4">
+        <div className="rounded-lg bg-slate-50 p-3 text-sm dark:bg-slate-800/60">
+          <p className="font-medium text-slate-800 dark:text-slate-100">{hotel.nombre}</p>
+          <p className="text-slate-600 dark:text-slate-300">{tarifa.regimen}</p>
+        </div>
+
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Cliente</label>
+            <Select value={clienteId} onChange={(e) => setClienteId(e.target.value)} required>
+              <option value="">Seleccioná un cliente…</option>
+              {clientes?.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.nombre}
+                </option>
+              ))}
+            </Select>
+          </div>
+          <FormField
+            label={`Venta al cliente (costo: ${tarifa.moneda} ${tarifa.montoNeto})`}
+            type="number"
+            min="0"
+            step="0.01"
+            value={montoVenta}
+            onChange={(e) => setMontoVenta(e.target.value)}
+            required
+          />
+        </div>
+
+        <div className="space-y-3">
+          {huespedes.map((h, i) => (
+            <div key={i} className="rounded-lg border border-slate-200 p-3 dark:border-slate-700">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Huésped {i + 1} — {h.tipo === 'AD' ? 'Adulto' : 'Niño'}</p>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <FormField label="Nombre" value={h.nombre} onChange={(e) => actualizarHuesped(i, 'nombre', e.target.value)} required />
+                <FormField label="Apellido" value={h.apellido} onChange={(e) => actualizarHuesped(i, 'apellido', e.target.value)} required />
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Notas (opcional)</label>
+          <textarea
+            value={notas}
+            onChange={(e) => setNotas(e.target.value)}
+            rows={2}
+            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+          />
+        </div>
+
+        {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+
+        <div className="flex justify-end gap-2">
+          <Button type="button" variante="secundario" onClick={onClose}>
+            Cancelar
+          </Button>
+          <Button type="submit" disabled={!completo || guardando}>
+            {guardando ? 'Reservando…' : 'Confirmar reserva'}
+          </Button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+function BuscarHotelTab({ clientes }: { clientes: ClienteOpcion[] | undefined }) {
+  const queryClient = useQueryClient();
+  const [form, setForm] = useState(FORM_BUSQUEDA_HOTEL_VACIO);
+  const [seleccion, setSeleccion] = useState<{ hotel: HotelListado; tarifa: TarifaHotel } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const buscar = useMutation({
+    mutationFn: async () =>
+      (
+        await apiClient.post<ResultadoBusquedaHoteles>('/admin/travel/hoteles/buscar', {
+          destino: form.destino.toUpperCase(),
+          checkIn: form.checkIn,
+          checkOut: form.checkOut,
+          habitaciones: 1,
+          adultos: form.adultos,
+          ninos: form.ninos,
+        })
+      ).data,
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo buscar hoteles.')),
+  });
+
+  const reservar = useMutation({
+    mutationFn: async (dto: Parameters<Parameters<typeof ReservarHotelModal>[0]['onGuardar']>[0]) => apiClient.post('/admin/travel/reservas/hotelbeds', dto),
+    onSuccess: () => {
+      setSeleccion(null);
+      setError(null);
+      queryClient.invalidateQueries({ queryKey: ['travel-reservas'] });
+      queryClient.invalidateQueries({ queryKey: ['travel-ledger'] });
+    },
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo reservar el hotel.')),
+  });
+
+  function onSubmit(e: FormEvent) {
+    e.preventDefault();
+    buscar.mutate();
+  }
+
+  const huespedesIniciales: FormHuespedHotel[] = [
+    ...Array.from({ length: form.adultos }, () => ({ nombre: '', apellido: '', tipo: 'AD' as const })),
+    ...Array.from({ length: form.ninos }, () => ({ nombre: '', apellido: '', tipo: 'CH' as const })),
+  ];
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <form onSubmit={onSubmit} className="space-y-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+            <FormField label="Destino (código Hotelbeds)" value={form.destino} onChange={(e) => setForm({ ...form, destino: e.target.value })} maxLength={3} placeholder="PMI" required />
+            <FormField label="Check-in" type="date" value={form.checkIn} onChange={(e) => setForm({ ...form, checkIn: e.target.value })} required />
+            <FormField label="Check-out" type="date" value={form.checkOut} onChange={(e) => setForm({ ...form, checkOut: e.target.value })} required />
+            <FormField label="Adultos" type="number" min="1" max="9" value={form.adultos} onChange={(e) => setForm({ ...form, adultos: Number(e.target.value) })} />
+            <FormField label="Niños" type="number" min="0" max="6" value={form.ninos} onChange={(e) => setForm({ ...form, ninos: Number(e.target.value) })} />
+          </div>
+          <p className="text-xs text-slate-400">Fase 1 — una habitación por reserva.</p>
+
+          <Button type="submit" disabled={buscar.isPending || !form.destino || !form.checkIn || !form.checkOut} className="flex items-center gap-1.5">
+            <BedDouble size={16} />
+            {buscar.isPending ? 'Buscando…' : 'Buscar hoteles'}
+          </Button>
+        </form>
+      </Card>
+
+      {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+
+      {buscar.data && (
+        <div className="space-y-3">
+          <p className="text-sm text-slate-500 dark:text-slate-400">{buscar.data.hoteles.length} hotel(es) encontrado(s).</p>
+          {buscar.data.hoteles.map((hotel) => (
+            <TarjetaHotel key={hotel.codigo} hotel={hotel} onReservar={(tarifa) => setSeleccion({ hotel, tarifa })} />
+          ))}
+        </div>
+      )}
+
+      {seleccion && (
+        <ReservarHotelModal
+          hotel={seleccion.hotel}
+          tarifa={seleccion.tarifa}
+          huespedesIniciales={huespedesIniciales}
+          clientes={clientes}
+          guardando={reservar.isPending}
+          error={error}
+          onClose={() => setSeleccion(null)}
+          onGuardar={(dto) => reservar.mutate(dto)}
+        />
+      )}
+    </div>
+  );
+}
+
+/* ---------------------------------------------------------------- */
 /* Página principal — pestañas Reservas / Buscar vuelo               */
 /* ---------------------------------------------------------------- */
 
@@ -943,6 +1198,7 @@ const VISTAS = [
   { id: 'resumen', etiqueta: 'Resumen' },
   { id: 'reservas', etiqueta: 'Reservas' },
   { id: 'buscar', etiqueta: 'Buscar vuelo' },
+  { id: 'buscarHotel', etiqueta: 'Buscar hotel' },
   { id: 'markup', etiqueta: 'Markup' },
 ] as const;
 type Vista = (typeof VISTAS)[number]['id'];
@@ -1060,6 +1316,7 @@ export function TravelReservas() {
 
         {vista === 'resumen' && <ResumenTab />}
         {vista === 'buscar' && <BuscarVueloTab clientes={clientes} />}
+        {vista === 'buscarHotel' && <BuscarHotelTab clientes={clientes} />}
         {vista === 'markup' && <MarkupTab />}
 
         {vista === 'reservas' && (

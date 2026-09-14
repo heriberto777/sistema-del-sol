@@ -81,6 +81,8 @@ export class PlataformaConfigService implements OnModuleInit {
     this.aplicarCampoSecreto(data, 'iaGeminiApiKeyCifrado', dto.iaGeminiApiKey);
     this.aplicarCampoSecreto(data, 'duffelApiTokenCifrado', dto.duffelApiToken);
     this.aplicarCampoSecreto(data, 'duffelWebhookSecretCifrado', dto.duffelWebhookSecret);
+    this.aplicarCampoSecreto(data, 'hotelbedsApiKeyCifrado', dto.hotelbedsApiKey);
+    this.aplicarCampoSecreto(data, 'hotelbedsSecretCifrado', dto.hotelbedsSecret);
 
     const actualizado = await this.repository.actualizar(config.id, data);
     this.sincronizarEnv(actualizado);
@@ -139,6 +141,9 @@ export class PlataformaConfigService implements OnModuleInit {
     // literalmente lo que DuffelAdapter.habilitado/llamar() leen.
     if (config.duffelApiTokenCifrado) process.env.DUFFEL_API_TOKEN = descifrar(config.duffelApiTokenCifrado);
     if (config.duffelWebhookSecretCifrado) process.env.DUFFEL_WEBHOOK_SECRET = descifrar(config.duffelWebhookSecretCifrado);
+    // Hotelbeds (hoteles) — cuenta compartida, mismo criterio que Duffel. HotelbedsAdapter lee estas dos variables directamente.
+    if (config.hotelbedsApiKeyCifrado) process.env.HOTELBEDS_API_KEY = descifrar(config.hotelbedsApiKeyCifrado);
+    if (config.hotelbedsSecretCifrado) process.env.HOTELBEDS_SECRET = descifrar(config.hotelbedsSecretCifrado);
   }
 
   /** Nunca expone un secreto en texto plano — solo si hay uno guardado (*Configurado). */
@@ -209,6 +214,8 @@ export class PlataformaConfigService implements OnModuleInit {
       travel: {
         duffelApiTokenConfigurado: Boolean(config.duffelApiTokenCifrado),
         duffelWebhookSecretConfigurado: Boolean(config.duffelWebhookSecretCifrado),
+        hotelbedsApiKeyConfigurado: Boolean(config.hotelbedsApiKeyCifrado),
+        hotelbedsSecretConfigurado: Boolean(config.hotelbedsSecretCifrado),
       },
     };
   }

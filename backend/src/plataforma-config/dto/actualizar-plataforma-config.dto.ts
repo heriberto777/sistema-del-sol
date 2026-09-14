@@ -244,4 +244,15 @@ export class ActualizarPlataformaConfigDto {
   @IsOptional()
   @IsString()
   duffelWebhookSecret?: string;
+
+  // Hotelbeds (plugin, hoteles) — cuenta única y compartida de la plataforma, mismo criterio B2B que Duffel.
+  @ApiProperty({ required: false, description: '"" borra el override guardado' })
+  @IsOptional()
+  @IsString()
+  hotelbedsApiKey?: string;
+
+  @ApiProperty({ required: false, description: 'Usado junto al Api-key para firmar cada request (X-Signature) — "" borra el override guardado' })
+  @IsOptional()
+  @IsString()
+  hotelbedsSecret?: string;
 }

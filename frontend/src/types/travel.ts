@@ -83,6 +83,32 @@ export interface ResultadoBusquedaVuelos {
   ofertas: OfertaVuelo[];
 }
 
+export interface TarifaHotel {
+  rateKey: string;
+  montoNeto: string;
+  moneda: string;
+  regimen: string;
+  reembolsable: boolean;
+}
+
+export interface HabitacionHotel {
+  codigo: string;
+  nombre: string;
+  tarifas: TarifaHotel[];
+}
+
+export interface HotelListado {
+  codigo: number;
+  nombre: string;
+  categoria: string;
+  destino: string;
+  habitaciones: HabitacionHotel[];
+}
+
+export interface ResultadoBusquedaHoteles {
+  hoteles: HotelListado[];
+}
+
 export interface TravelReglaMarkup {
   id: string;
   tipo: 'VUELO' | 'HOTEL' | null;

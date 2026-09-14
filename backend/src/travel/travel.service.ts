@@ -4,11 +4,14 @@ import { TravelRepository } from './travel.repository';
 import { CrearReservaTravelDto } from './dto/crear-reserva-travel.dto';
 import { BuscarVuelosDto } from './dto/buscar-vuelos.dto';
 import { ReservarOfertaVueloDto } from './dto/reservar-oferta-vuelo.dto';
+import { BuscarHotelesDto } from './dto/buscar-hoteles.dto';
+import { ReservarHotelDto } from './dto/reservar-hotel.dto';
 import { ClientesService } from '../clientes/clientes.service';
 import { CorrelativosRepository } from '../correlativos/correlativos.repository';
 import { FacturacionService } from '../facturacion/facturacion.service';
 import { TasasCambioService } from '../tasas-cambio/tasas-cambio.service';
 import { TravelProviderService } from './providers/travel-provider.service';
+import { HotelProviderService } from './providers/hotel-provider.service';
 
 const ETIQUETA_TIPO: Record<string, string> = { VUELO: 'Boleto aéreo', HOTEL: 'Reserva de hotel' };
 
@@ -29,6 +32,7 @@ export class TravelService {
     private readonly correlativosRepository: CorrelativosRepository,
     private readonly facturacionService: FacturacionService,
     private readonly travelProviderService: TravelProviderService,
+    private readonly hotelProviderService: HotelProviderService,
     private readonly tasasCambioService: TasasCambioService,
   ) {}
 
@@ -183,25 +187,105 @@ export class TravelService {
     return reserva;
   }
 
-  /** Paso 1 de 2 — cotiza el reembolso sin cancelar todavía. */
+  buscarHoteles(dto: BuscarHotelesDto) {
+    return this.hotelProviderService.activo.buscarHoteles({
+      destino: dto.destino,
+      checkIn: dto.checkIn,
+      checkOut: dto.checkOut,
+      ocupacion: { habitaciones: dto.habitaciones, adultos: dto.adultos, ninos: dto.ninos },
+    });
+  }
+
+  /**
+   * Reserva de hotel de verdad contra el proveedor activo (Hotelbeds) —
+   * re-cotización obligatoria (checkrates), mismo criterio que vuelos:
+   * nunca confiar en el precio que vio el usuario al buscar. A diferencia
+   * de Duffel, Hotelbeds no pide ningún dato de pago al reservar
+   * (confirmado contra el sandbox real) — es facturación neta con
+   * liquidación periódica, no un Balance prefondeado; el DEBITO al ledger
+   * interno igual aplica: es cuánto le va a facturar Hotelbeds a la
+   * plataforma por esta reserva, y de ahí cuánto le corresponde a este
+   * tenant. Fase 1 — una sola habitación por reserva (ver
+   * ReservarHotelDto/BuscarHotelesDto).
+   */
+  async reservarHotel(dto: ReservarHotelDto, tenantId: string) {
+    await this.clientesService.buscarPorId(dto.clienteId);
+
+    const proveedor = this.hotelProviderService.activo;
+    const tarifa = await proveedor.confirmarTarifa(dto.rateKey);
+
+    const titular = dto.huespedes[0];
+    const orden = await proveedor.crearReserva({
+      rateKey: tarifa.rateKey,
+      titular: { nombre: titular.nombre, apellido: titular.apellido },
+      huespedes: dto.huespedes,
+      referenciaCliente: `SDS-${tenantId.slice(0, 8)}`,
+    });
+
+    const numero = await this.correlativosRepository.siguiente(tenantId, 'TRAVEL_RESERVA');
+    const codigoInterno = `TRV-${new Date().getFullYear()}-${numero}`;
+
+    const reserva = await this.repository.crearDesdeProveedorHotel(
+      {
+        tenantId,
+        codigoInterno,
+        clienteId: dto.clienteId,
+        estado: 'CONFIRMADA',
+        moneda: tarifa.moneda,
+        montoCosto: Number(tarifa.montoNeto),
+        montoVenta: dto.montoVenta,
+        notas: dto.notas,
+        proveedor: proveedor.clave,
+        proveedorOfertaId: tarifa.rateKey,
+        proveedorOrdenId: orden.referencia,
+        localizadorAerolinea: orden.referencia,
+      },
+      dto.huespedes,
+    );
+
+    await this.repository.registrarMovimientoLedger({
+      tenantId,
+      reservaId: reserva.id,
+      tipo: 'DEBITO',
+      monto: Number(tarifa.montoNeto),
+      moneda: tarifa.moneda,
+      descripcion: `Reserva ${proveedor.clave} ${orden.referencia} — ${reserva.codigoInterno}`,
+    });
+
+    return reserva;
+  }
+
+  /**
+   * Paso 1 de 2 — cotiza el reembolso sin cancelar todavía. Despacha por
+   * `reserva.proveedor`: Duffel cotiza contra `proveedorOrdenId` y guarda
+   * el id de la cancelación cotizada; Hotelbeds no tiene un objeto de
+   * cancelación separado — `SIMULATION` es una re-consulta efímera contra
+   * la misma reserva, así que acá se guarda igual el `id` que devuelve
+   * (para trazabilidad) pero confirmarCancelacionProveedor() nunca lo usa.
+   */
   async cotizarCancelacionProveedor(id: string) {
     const reserva = await this.repository.buscarPorId(id);
     if (!reserva.proveedorOrdenId) {
       throw new BadRequestException('Esta reserva no fue hecha contra un proveedor — no hay una orden que cancelar (usá eliminar si es carga manual).');
     }
-    const cotizacion = await this.travelProviderService.activo.cotizarCancelacion(reserva.proveedorOrdenId);
+    const proveedorActivo = reserva.proveedor === 'hotelbeds' ? this.hotelProviderService.activo : this.travelProviderService.activo;
+    const cotizacion = await proveedorActivo.cotizarCancelacion(reserva.proveedorOrdenId);
     await this.repository.marcarCancelacionCotizada(id, cotizacion.id);
     return cotizacion;
   }
 
-  /** Paso 2 de 2 — confirma la cancelación cotizada y acredita el reembolso al ledger del tenant. */
+  /** Paso 2 de 2 — confirma la cancelación cotizada y acredita el reembolso (o lo liberado de la deuda, en Hotelbeds) al ledger del tenant. */
   async confirmarCancelacionProveedor(id: string, tenantId: string) {
     const reserva = await this.repository.buscarPorId(id);
     if (!reserva.proveedorCancelacionId) {
       throw new BadRequestException('Primero hay que cotizar la cancelación (cotizarCancelacionProveedor).');
     }
 
-    const resultado = await this.travelProviderService.activo.confirmarCancelacion(reserva.proveedorCancelacionId);
+    // Hotelbeds confirma contra la MISMA referencia de la reserva (no tiene un id de cancelación separado como Duffel) y necesita el monto original para calcular qué se libera de la deuda.
+    const resultado =
+      reserva.proveedor === 'hotelbeds'
+        ? await this.hotelProviderService.activo.confirmarCancelacion(reserva.proveedorOrdenId!, Number(reserva.montoCosto))
+        : await this.travelProviderService.activo.confirmarCancelacion(reserva.proveedorCancelacionId);
     await this.repository.marcarCanceladaPorProveedor(id);
 
     if (resultado.reembolsado && resultado.montoReembolso) {

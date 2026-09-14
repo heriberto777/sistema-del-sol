@@ -3,6 +3,7 @@ import { EstadoTravelReserva, TipoMovimientoLedgerTravel, TipoTravelReserva } fr
 import { TenantPrismaService } from '../prisma/tenant-prisma.service';
 import { CrearPasajeroTravelDto } from './dto/crear-pasajero-travel.dto';
 import { PasajeroOrdenVuelo } from './providers/travel-provider.interface';
+import { HuespedReservaHotel } from './providers/hotel-provider.interface';
 
 const INCLUDE_RESERVA = {
   cliente: { select: { id: true, nombre: true } },
@@ -117,6 +118,42 @@ export class TravelRepository {
               : {}),
           })),
         },
+      },
+      include: INCLUDE_RESERVA,
+    });
+  }
+
+  /**
+   * Hoteles (Hotelbeds) — hermano de crearDesdeProveedor (vuelos). No lo
+   * reusa: los huéspedes solo tienen nombre/apellido/tipo (AD/CH), a
+   * diferencia de un pasajero de vuelo (pasaporte, título, etc.) — forzar
+   * el mismo tipo hubiera sido más confuso que un método aparte.
+   */
+  crearDesdeProveedorHotel(
+    datos: {
+      tenantId: string;
+      codigoInterno: string;
+      clienteId: string;
+      estado: EstadoTravelReserva;
+      moneda: string;
+      montoCosto: number;
+      montoVenta: number;
+      notas?: string;
+      proveedor: string;
+      proveedorOfertaId: string;
+      proveedorOrdenId: string;
+      localizadorAerolinea: string;
+    },
+    huespedes: HuespedReservaHotel[],
+  ) {
+    return this.db.travelReserva.create({
+      data: {
+        ...datos,
+        tipo: 'HOTEL',
+        // Nunca en tipoDocumento (es "passport", etc. — otro concepto). El
+        // tipo AD/CH del huésped solo hace falta para la request a
+        // Hotelbeds, no se persiste todavía.
+        pasajeros: { create: huespedes.map((h) => ({ nombre: h.nombre, apellido: h.apellido })) },
       },
       include: INCLUDE_RESERVA,
     });
