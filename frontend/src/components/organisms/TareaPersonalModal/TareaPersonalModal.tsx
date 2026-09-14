@@ -4,6 +4,7 @@ import { Maximize2, Pencil, Sparkles, Trash2, X } from 'lucide-react';
 import { apiClient } from '../../../lib/api-client';
 import { mensajeErrorApi } from '../../../lib/mensaje-error-api';
 import { comprimirImagen } from '../../../lib/comprimir-imagen';
+import { useAuth } from '../../../hooks/useAuth';
 import { Button } from '../../atoms/Button/Button';
 import { Select } from '../../atoms/Select/Select';
 import { Modal } from '../../molecules/Modal/Modal';
@@ -148,6 +149,11 @@ const ETIQUETAS_SUGERIDAS = [...ETIQUETAS_SUGERIDAS_NEGOCIO, ...ETIQUETAS_SUGERI
 
 export function TareaPersonalModal({ tarea, onClose }: { tarea: TareaPersonal; onClose: () => void }) {
   const queryClient = useQueryClient();
+  // 'mistareas' está en los 3 planes pero 'ia' solo en Premium — sin este
+  // chequeo, un tenant Básico/Profesional vería el botón y le fallaría con
+  // 403 al primer clic (el guard real sigue siendo 100% del backend).
+  const { tieneModulo, tienePermiso } = useAuth();
+  const puedeGenerarConIa = tieneModulo('ia') && tienePermiso('ia.usar');
   const [contenido, setContenido] = useState('');
   const [imagenesPendientes, setImagenesPendientes] = useState<string[]>([]);
   const [etiquetaNueva, setEtiquetaNueva] = useState('');
@@ -301,15 +307,17 @@ export function TareaPersonalModal({ tarea, onClose }: { tarea: TareaPersonal; o
         <div className="flex flex-col gap-1.5">
           <div className="flex items-center justify-between">
             <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Descripción (opcional)</label>
-            <button
-              type="button"
-              onClick={() => generarDescripcionIa.mutate()}
-              disabled={generarDescripcionIa.isPending}
-              className="flex items-center gap-1 rounded-lg border border-sol-200 bg-sol-50 px-2.5 py-1 text-xs font-semibold text-sol-700 hover:bg-sol-100 disabled:opacity-50 dark:border-sol-500/30 dark:bg-sol-500/10 dark:text-sol-400"
-            >
-              <Sparkles size={12} />
-              {generarDescripcionIa.isPending ? 'Generando…' : 'Generar con IA'}
-            </button>
+            {puedeGenerarConIa && (
+              <button
+                type="button"
+                onClick={() => generarDescripcionIa.mutate()}
+                disabled={generarDescripcionIa.isPending}
+                className="flex items-center gap-1 rounded-lg border border-sol-200 bg-sol-50 px-2.5 py-1 text-xs font-semibold text-sol-700 hover:bg-sol-100 disabled:opacity-50 dark:border-sol-500/30 dark:bg-sol-500/10 dark:text-sol-400"
+              >
+                <Sparkles size={12} />
+                {generarDescripcionIa.isPending ? 'Generando…' : 'Generar con IA'}
+              </button>
+            )}
           </div>
           <textarea
             value={descripcion}
