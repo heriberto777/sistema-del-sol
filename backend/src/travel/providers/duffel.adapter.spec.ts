@@ -199,6 +199,41 @@ describe('DuffelAdapter', () => {
     expect(cuerpo.data.passengers[1].infant_passenger_id).toBeUndefined();
   });
 
+  it('listarOrdenes normaliza las órdenes y devuelve el cursor de paginación (confirmado en vivo: meta.after)', async () => {
+    process.env.DUFFEL_API_TOKEN = 'duffel_test_123';
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        data: [
+          { id: 'ord_1', booking_reference: 'ABC123', total_amount: '450.00', total_currency: 'USD', created_at: '2026-01-01T00:00:00Z', cancelled_at: null },
+          { id: 'ord_2', booking_reference: 'DEF456', total_amount: '200.00', total_currency: 'USD', created_at: '2026-01-02T00:00:00Z', cancelled_at: '2026-01-03T00:00:00Z' },
+        ],
+        meta: { after: 'cursor_pagina_2' },
+      }),
+    });
+
+    const resultado = await adapter.listarOrdenes();
+
+    expect(resultado.cursorSiguiente).toBe('cursor_pagina_2');
+    expect(resultado.ordenes).toEqual([
+      { id: 'ord_1', localizador: 'ABC123', montoTotal: '450.00', moneda: 'USD', creadaEn: '2026-01-01T00:00:00Z', canceladaEn: null },
+      { id: 'ord_2', localizador: 'DEF456', montoTotal: '200.00', moneda: 'USD', creadaEn: '2026-01-02T00:00:00Z', canceladaEn: '2026-01-03T00:00:00Z' },
+    ]);
+
+    const [url] = fetchMock.mock.calls[0];
+    expect(url).toBe('https://api.duffel.com/air/orders?limit=50');
+  });
+
+  it('listarOrdenes manda el cursor recibido como "after"', async () => {
+    process.env.DUFFEL_API_TOKEN = 'duffel_test_123';
+    fetchMock.mockResolvedValue({ ok: true, json: async () => ({ data: [], meta: { after: null } }) });
+
+    await adapter.listarOrdenes('cursor_previo');
+
+    const [url] = fetchMock.mock.calls[0];
+    expect(url).toBe('https://api.duffel.com/air/orders?limit=50&after=cursor_previo');
+  });
+
   it('traduce offer_no_longer_available a un mensaje de negocio claro', async () => {
     process.env.DUFFEL_API_TOKEN = 'duffel_test_123';
     fetchMock.mockResolvedValue({

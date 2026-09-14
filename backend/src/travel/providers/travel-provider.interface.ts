@@ -126,6 +126,22 @@ export interface ResultadoCancelacionVuelo {
   moneda: string | null;
 }
 
+/** Orden real en el proveedor, para reconciliación — `canceladaEn` viene directo del recurso (Duffel expone `cancelled_at` en la propia orden, no hace falta cruzar con order_cancellations). */
+export interface OrdenVueloListado {
+  id: string;
+  localizador: string;
+  montoTotal: string;
+  moneda: string;
+  creadaEn: string;
+  canceladaEn: string | null;
+}
+
+export interface ResultadoListadoOrdenes {
+  ordenes: OrdenVueloListado[];
+  /** null = no hay más páginas. */
+  cursorSiguiente: string | null;
+}
+
 export interface TravelProvider {
   readonly clave: string;
   readonly habilitado: boolean;
@@ -142,4 +158,7 @@ export interface TravelProvider {
 
   /** Paso 2 de 2 — confirma la cancelación cotizada por cotizarCancelacion(). */
   confirmarCancelacion(cancelacionId: string): Promise<ResultadoCancelacionVuelo>;
+
+  /** Solo para reconciliación (Plataforma) — lista las órdenes reales de la cuenta compartida, paginado con cursor. */
+  listarOrdenes(cursor?: string): Promise<ResultadoListadoOrdenes>;
 }

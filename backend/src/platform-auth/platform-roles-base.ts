@@ -20,6 +20,9 @@ export const PERMISOS_PLATAFORMA_BASE = [
   'platform.pagos.registrar',
   'platform.configuracion.ver',
   'platform.configuracion.gestionar',
+  // Travel Management — reconciliación de la cuenta Duffel compartida
+  // (huérfanas/cancelaciones no reflejadas) contra las órdenes reales.
+  'platform.travel.reconciliar',
 ];
 
 export const ROLES_PLATAFORMA_BASE: Record<string, string[]> = {

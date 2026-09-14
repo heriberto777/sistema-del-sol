@@ -5,9 +5,11 @@ import { TravelVuelosController } from './travel-vuelos.controller';
 import { TravelLedgerController } from './travel-ledger.controller';
 import { TravelWebhookController } from './travel-webhook.controller';
 import { TravelReglaMarkupController } from './travel-regla-markup.controller';
+import { TravelReconciliacionController } from './travel-reconciliacion.controller';
 import { TravelRepository } from './travel.repository';
 import { TravelReglaMarkupRepository } from './travel-regla-markup.repository';
 import { TravelReglaMarkupService } from './travel-regla-markup.service';
+import { TravelReconciliacionService } from './travel-reconciliacion.service';
 import { DuffelWebhookService } from './duffel-webhook.service';
 import { ClientesModule } from '../clientes/clientes.module';
 import { CorrelativosModule } from '../correlativos/correlativos.module';
@@ -27,8 +29,8 @@ import { TravelProviderService } from './providers/travel-provider.service';
  */
 @Module({
   imports: [ClientesModule, CorrelativosModule, FacturacionModule, TasasCambioModule],
-  controllers: [TravelController, TravelVuelosController, TravelLedgerController, TravelWebhookController, TravelReglaMarkupController],
-  providers: [TravelService, TravelRepository, DuffelAdapter, TravelProviderService, DuffelWebhookService, TravelReglaMarkupRepository, TravelReglaMarkupService],
+  controllers: [TravelController, TravelVuelosController, TravelLedgerController, TravelWebhookController, TravelReglaMarkupController, TravelReconciliacionController],
+  providers: [TravelService, TravelRepository, DuffelAdapter, TravelProviderService, DuffelWebhookService, TravelReglaMarkupRepository, TravelReglaMarkupService, TravelReconciliacionService],
   exports: [TravelProviderService],
 })
 export class TravelModule {}

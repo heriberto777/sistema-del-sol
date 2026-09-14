@@ -7,6 +7,7 @@ import {
   OrdenVuelo,
   ResultadoBusquedaVuelos,
   ResultadoCancelacionVuelo,
+  ResultadoListadoOrdenes,
   TravelProvider,
 } from './travel-provider.interface';
 
@@ -32,6 +33,16 @@ interface DuffelOferta {
   // la `age` mandada en la búsqueda (age 8 -> "child", age 1 ->
   // "infant_without_seat") — nunca hay que adivinarlo por tramosCrudo.
   passengers: { id: string; type: string | null; age: number | null }[];
+}
+
+interface DuffelOrdenListado {
+  id: string;
+  booking_reference: string;
+  total_amount: string;
+  total_currency: string;
+  created_at: string;
+  // Confirmado contra el sandbox real: viene directo en la orden, no hace falta cruzar con /air/order_cancellations.
+  cancelled_at: string | null;
 }
 
 function normalizarOferta(o: DuffelOferta): OfertaVuelo {
@@ -73,6 +84,12 @@ export class DuffelAdapter implements TravelProvider {
   }
 
   private async llamar<T>(path: string, init: { method: 'GET' | 'POST'; body?: unknown }): Promise<T> {
+    const cuerpo = await this.llamarCrudo(path, init);
+    return (cuerpo as { data: T }).data;
+  }
+
+  /** Igual que llamar(), pero sin descartar `meta` — lo necesita listarOrdenes() para el cursor de paginación. */
+  private async llamarCrudo(path: string, init: { method: 'GET' | 'POST'; body?: unknown }): Promise<{ data: unknown; meta?: { after: string | null } }> {
     const token = this.requerirToken();
 
     let respuesta: Response;
@@ -111,7 +128,7 @@ export class DuffelAdapter implements TravelProvider {
       throw new ServiceUnavailableException(primerError?.message ?? primerError?.title ?? 'El proveedor de vuelos rechazó la solicitud');
     }
 
-    return (cuerpo as { data: T }).data;
+    return cuerpo as { data: unknown; meta?: { after: string | null } };
   }
 
   async buscarVuelos(request: BuscarVuelosRequest): Promise<ResultadoBusquedaVuelos> {
@@ -192,5 +209,25 @@ export class DuffelAdapter implements TravelProvider {
       { method: 'POST' },
     );
     return { reembolsado: Boolean(confirmada.refund_amount), montoReembolso: confirmada.refund_amount, moneda: confirmada.refund_currency };
+  }
+
+  async listarOrdenes(cursor?: string): Promise<ResultadoListadoOrdenes> {
+    const params = new URLSearchParams({ limit: '50' });
+    if (cursor) params.set('after', cursor);
+
+    const cuerpo = await this.llamarCrudo(`/air/orders?${params.toString()}`, { method: 'GET' });
+    const ordenes = cuerpo.data as DuffelOrdenListado[];
+
+    return {
+      ordenes: ordenes.map((o) => ({
+        id: o.id,
+        localizador: o.booking_reference,
+        montoTotal: o.total_amount,
+        moneda: o.total_currency,
+        creadaEn: o.created_at,
+        canceladaEn: o.cancelled_at,
+      })),
+      cursorSiguiente: cuerpo.meta?.after ?? null,
+    };
   }
 }

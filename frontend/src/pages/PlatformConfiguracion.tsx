@@ -167,7 +167,12 @@ export function PlatformConfiguracion() {
           {tab === 'Webhook' && <SeccionWebhook config={config} guardar={guardar} />}
           {tab === 'Vencimientos' && <SeccionVencimientos config={config} guardar={guardar} />}
           {tab === 'Dominio propio' && <SeccionDominioPropio config={config} guardar={guardar} />}
-          {tab === 'Travel (Duffel)' && <SeccionTravel config={config} guardar={guardar} />}
+          {tab === 'Travel (Duffel)' && (
+            <div className="space-y-4">
+              <SeccionTravel config={config} guardar={guardar} />
+              <SeccionTravelReconciliacion />
+            </div>
+          )}
         </>
       )}
     </div>
@@ -461,6 +466,85 @@ function SeccionTravel({ config, guardar }: SeccionProps) {
           {guardar.isPending ? 'Guardando…' : 'Guardar'}
         </Button>
       </form>
+    </Card>
+  );
+}
+
+interface ResumenReconciliacionTravel {
+  totalOrdenesRevisadas: number;
+  ordenesHuerfanas: { id: string; localizador: string; montoTotal: string; moneda: string; creadaEn: string; canceladaEn: string | null }[];
+  cancelacionesNoReflejadas: { ordenId: string; reservaId: string; tenantId: string; codigoInterno: string; canceladaEn: string }[];
+}
+
+/**
+ * Duffel no expone el saldo real del Balance por API (confirmado contra
+ * el sandbox real: /air/balances, /balances y /air/balance dan 404) —
+ * esto NO compara números, cruza las órdenes reales de la cuenta contra
+ * las TravelReserva internas para detectar huérfanas o cancelaciones que
+ * el webhook no capturó. Nunca corrige nada solo, es un reporte.
+ */
+function SeccionTravelReconciliacion() {
+  const [resultado, setResultado] = useState<ResumenReconciliacionTravel | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const revisar = useMutation({
+    mutationFn: async () => (await platformApiClient.get<ResumenReconciliacionTravel>('/platform/travel/reconciliacion')).data,
+    onSuccess: (data) => {
+      setResultado(data);
+      setError(null);
+    },
+    onError: () => setError('No se pudo revisar la cuenta de Duffel — intentá de nuevo en unos minutos.'),
+  });
+
+  return (
+    <Card
+      titulo="Reconciliación de la cuenta Duffel"
+      descripcion="Cruza las órdenes reales de la cuenta compartida contra las reservas internas — no corrige nada solo, solo reporta."
+    >
+      <Button onClick={() => revisar.mutate()} disabled={revisar.isPending}>
+        {revisar.isPending ? 'Revisando…' : 'Revisar ahora'}
+      </Button>
+      {error && <p className="mt-3 text-sm text-red-600 dark:text-red-400">{error}</p>}
+
+      {resultado && (
+        <div className="mt-4 space-y-4">
+          <p className="text-xs text-slate-400">{resultado.totalOrdenesRevisadas} orden(es) revisada(s) en Duffel.</p>
+
+          <div>
+            <p className="mb-2 text-sm font-medium text-slate-700 dark:text-slate-300">
+              Órdenes huérfanas (existen en Duffel, sin reserva interna) — {resultado.ordenesHuerfanas.length}
+            </p>
+            {resultado.ordenesHuerfanas.length === 0 ? (
+              <p className="text-xs text-slate-400">Ninguna.</p>
+            ) : (
+              <ul className="space-y-1 text-xs text-slate-600 dark:text-slate-300">
+                {resultado.ordenesHuerfanas.map((o) => (
+                  <li key={o.id} className="rounded bg-amber-50 px-2 py-1 dark:bg-amber-500/10">
+                    {o.localizador} — {o.moneda} {o.montoTotal} — {new Date(o.creadaEn).toLocaleDateString('es-DO')}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          <div>
+            <p className="mb-2 text-sm font-medium text-slate-700 dark:text-slate-300">
+              Cancelaciones no reflejadas internamente — {resultado.cancelacionesNoReflejadas.length}
+            </p>
+            {resultado.cancelacionesNoReflejadas.length === 0 ? (
+              <p className="text-xs text-slate-400">Ninguna.</p>
+            ) : (
+              <ul className="space-y-1 text-xs text-slate-600 dark:text-slate-300">
+                {resultado.cancelacionesNoReflejadas.map((c) => (
+                  <li key={c.ordenId} className="rounded bg-red-50 px-2 py-1 dark:bg-red-500/10">
+                    {c.codigoInterno} — cancelada en Duffel el {new Date(c.canceladaEn).toLocaleDateString('es-DO')}, sigue sin marcar CANCELADA internamente
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+      )}
     </Card>
   );
 }
