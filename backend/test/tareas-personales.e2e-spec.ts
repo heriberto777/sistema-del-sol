@@ -35,10 +35,20 @@ describe('Mis Tareas (e2e)', () => {
   beforeAll(async () => {
     prisma = new PrismaClient();
 
+    const modulo = await prisma.modulo.upsert({
+      where: { clave: 'mistareas' },
+      update: {},
+      create: { clave: 'mistareas', nombre: 'Mis Tareas' },
+    });
     const plan = await prisma.plan.upsert({
       where: { nombre: 'E2E Mis Tareas' },
       update: {},
       create: { nombre: 'E2E Mis Tareas' },
+    });
+    await prisma.planModulo.upsert({
+      where: { planId_moduloId: { planId: plan.id, moduloId: modulo.id } },
+      update: {},
+      create: { planId: plan.id, moduloId: modulo.id },
     });
     const tenant = await prisma.tenant.create({ data: { nombre: 'E2E Mis Tareas', subdominio: SUBDOMINIO, planId: plan.id } });
     tenantId = tenant.id;
