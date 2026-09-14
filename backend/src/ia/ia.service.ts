@@ -86,6 +86,17 @@ export class IaService {
 
     return respuesta ? { descripcion: respuesta.trim(), generadaConIa: true } : { descripcion: nombre, generadaConIa: false };
   }
+
+  async generarDescripcionTarea(titulo: string, categoria?: string) {
+    if (!this.iaClient.habilitado) {
+      return { descripcion: '', generadaConIa: false };
+    }
+
+    const prompt = `Eres un asistente de un equipo de TI en República Dominicana. Escribe una descripción breve (2-4 oraciones, en español) que amplíe esta tarea para que quien la ejecute entienda el contexto y qué se espera: "${titulo}"${categoria ? ` (renglón: ${categoria})` : ''}. Respondé solo con la descripción, sin encabezados ni comillas.`;
+    const respuesta = await this.iaClient.completar(prompt, 250);
+
+    return respuesta ? { descripcion: respuesta.trim(), generadaConIa: true } : { descripcion: '', generadaConIa: false };
+  }
 }
 
 const DIACRITICOS = new RegExp('[\\u0300-\\u036f]', 'g');

@@ -105,10 +105,11 @@ interface Grupo {
 const SUELTOS_ARRIBA: Enlace[] = [
   { ruta: '/', etiqueta: 'Dashboard', icono: LayoutDashboard, permisos: ['reportes.ver'] },
   { ruta: '/reportes', etiqueta: 'Reportes', icono: BarChart3, permisos: ['reportes.ver'] },
-  // Sin `permisos` ni `modulo` a propósito — es personal (tu propia
-  // lista, nadie más la ve) y siempre disponible, mismo criterio que
-  // cambiar tu propia contraseña.
-  { ruta: '/mis-tareas', etiqueta: 'Mis tareas', icono: ListChecks },
+  // Sin `permisos` a propósito — es personal (tu propia lista, nadie
+  // más la ve), mismo criterio que cambiar tu propia contraseña. SÍ
+  // lleva `modulo` desde que sumó categorías de incentivo: dejó de ser
+  // siempre-on (ver MODULOS_BASE).
+  { ruta: '/mis-tareas', etiqueta: 'Mis tareas', icono: ListChecks, modulo: 'mistareas' },
 ];
 
 // Auditoría de organización del Sidebar: "Ventas" tenía 12 ítems mezclando

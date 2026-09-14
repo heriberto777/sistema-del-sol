@@ -6,16 +6,19 @@ import { CrearComentarioTareaPersonalDto } from './dto/crear-comentario-tarea-pe
 import { EditarComentarioTareaPersonalDto } from './dto/editar-comentario-tarea-personal.dto';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtPayloadUser } from '../common/types/authenticated-request';
+import { RequiereModulo } from '../common/decorators/requiere-modulo.decorator';
 
 /**
- * "Mis Tareas" — sin `@Permissions`/`@RequiereModulo` a propósito: es
- * personal y siempre disponible para cualquier usuario autenticado
- * (mismo criterio que cambiar tu propia contraseña). La única
- * autorización real es de dueño — ver TareasPersonalesRepository, que
- * filtra por `usuarioId` en cada query.
+ * "Mis Tareas" — activable por tenant (`@RequiereModulo('mistareas')`,
+ * ver MODULOS_BASE) desde que sumó categorías de incentivo con envío de
+ * reportes. Sin `@Permissions` a propósito: dentro de un tenant con el
+ * módulo activo, sigue siendo personal y disponible para cualquier
+ * usuario autenticado. La única autorización real es de dueño — ver
+ * TareasPersonalesRepository, que filtra por `usuarioId` en cada query.
  */
 @ApiBearerAuth()
 @ApiTags('tareas-personales')
+@RequiereModulo('mistareas')
 @Controller('admin/mis-tareas')
 export class TareasPersonalesController {
   constructor(private readonly service: TareasPersonalesService) {}

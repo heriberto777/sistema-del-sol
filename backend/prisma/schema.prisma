@@ -128,6 +128,7 @@ model Tenant {
   alertasBusquedaPropiedad  AlertaBusquedaPropiedad[]
   cobrosAlquiler            CobroAlquiler[]
   tareasPersonales          TareaPersonal[]
+  categoriasIncentivo       CategoriaIncentivo[]
   reservasTravel            TravelReserva[]
   movimientosLedgerTravel   TravelLedgerMovimiento[]
   reglasMarkupTravel        TravelReglaMarkup[]
@@ -4442,12 +4443,13 @@ enum EstadoTareaPersonal {
 
 /// Plugin "Mis Tareas" — lista de tareas personal, no de equipo (a
 /// diferencia de TareaProyecto, que es visible para todo el proyecto).
-/// Siempre activo (no pasa por MODULOS_BASE/@RequiereModulo): es
-/// productividad individual, sin complejidad fiscal/de negocio que
-/// justifique gatearlo por plan, mismo criterio que Contabilidad/
-/// Contactos. El aislamiento por usuario (nadie ve las tareas de otro
-/// dentro del mismo tenant) se hace a mano en el repositorio — SIEMPRE
-/// filtrando también por `usuarioId`, no solo por `tenantId`.
+/// Activable por Plan/TenantModuloOverride (clave 'mistareas' en
+/// MODULOS_BASE) — antes era siempre-on; el backfill
+/// (scripts/backfill-mistareas-modulo.ts) le dio el override activo a
+/// todo tenant existente para no cortarle el acceso al pasar a gateado.
+/// El aislamiento por usuario (nadie ve las tareas de otro dentro del
+/// mismo tenant) se hace a mano en el repositorio — SIEMPRE filtrando
+/// también por `usuarioId`, no solo por `tenantId`.
 model TareaPersonal {
   id           String                 @id @default(uuid())
   tenantId     String
@@ -4455,6 +4457,11 @@ model TareaPersonal {
   usuarioId    String
   usuario      User                   @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
   titulo       String
+  // Detalle ampliado, opcional — soporta los mismos fences ``` que
+  // ComentarioTareaPersonal.contenido, mismo criterio de renderizado
+  // 100% en el frontend. "Generar con IA" solo sugiere un punto de
+  // partida acá, nunca escribe sola sin que se confirme.
+  descripcion  String?                @db.Text
   prioridad    PrioridadTareaPersonal @default(MEDIA)
   estado       EstadoTareaPersonal    @default(PENDIENTE)
   // Día asignado — null significa "sin fecha" (bandeja general en la
@@ -4465,12 +4472,42 @@ model TareaPersonal {
   // Lista libre (chips sugeridos en el frontend, sin catálogo aparte a
   // propósito) — mismo criterio que Propiedad.amenidades/Webhook.eventos.
   etiquetas    String[]
+  // null = "Sin incentivo" (no suma ni resta al % de cumplimiento de
+  // ningún renglón) — es el valor por defecto, así que ninguna tarea ya
+  // creada queda afectada por este campo nuevo. onDelete: SetNull porque
+  // borrar un renglón no debería borrar el historial de tareas que ya
+  // sumaron a él.
+  categoriaIncentivoId String?
+  categoriaIncentivo   CategoriaIncentivo? @relation(fields: [categoriaIncentivoId], references: [id], onDelete: SetNull)
   createdAt    DateTime               @default(now())
   updatedAt    DateTime               @updatedAt
 
   comentarios ComentarioTareaPersonal[]
 
   @@map("tareas_personales")
+}
+
+/// Renglón de incentivo IT (CIGUAS APPS, Backups, ITT, Staff, Reporte,
+/// Minuta, ...) — catálogo por tenant, no global: cada tenant define los
+/// suyos y su peso en $. "Sin incentivo" no es una fila acá, es
+/// simplemente `TareaPersonal.categoriaIncentivoId = null`.
+model CategoriaIncentivo {
+  id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  nombre    String
+  // Valor monetario del renglón (ej. 2500.00) — la suma de todos los
+  // renglones activos de un tenant es el bono total del período; no se
+  // valida contra ningún total fijo, cada tenant decide el suyo.
+  peso      Decimal  @db.Decimal(12, 2)
+  activa    Boolean  @default(true)
+  orden     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tareas TareaPersonal[]
+
+  @@map("categorias_incentivo")
 }
 
 /// Hija sin tenantId propio (mismo patrón que ComentarioTareaProyecto) —

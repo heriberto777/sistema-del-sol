@@ -4,11 +4,11 @@ import { TareasPersonalesService } from './tareas-personales.service';
 import { TareasPersonalesRepository } from './tareas-personales.repository';
 
 /**
- * "Mis Tareas" — sin manifiesto en plugins/ y sin `@RequiereModulo`:
- * a diferencia de Inmobiliaria/Proyectos/Ecommerce (verticales de
- * negocio vendibles por plan), esto es productividad personal, siempre
- * disponible para cualquier usuario — mismo criterio que Contabilidad/
- * Contactos (ver MODULOS_BASE en roles-base.ts).
+ * "Mis Tareas" — sin manifiesto en plugins/ (vive en src/ como un módulo
+ * más), pero SÍ activable por Plan/TenantModuloOverride (clave
+ * 'mistareas' en MODULOS_BASE, tenants/modulos-base.ts) desde que sumó
+ * categorías de incentivo con envío de reportes — dejó de ser
+ * "siempre-on" como Contabilidad/Contactos.
  */
 @Module({
   controllers: [TareasPersonalesController],

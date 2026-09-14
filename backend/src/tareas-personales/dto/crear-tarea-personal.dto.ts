@@ -8,6 +8,17 @@ export class CrearTareaPersonalDto {
   @MaxLength(200)
   titulo: string;
 
+  @ApiProperty({ required: false, description: 'Soporta fences ``` — mismo criterio de renderizado que los comentarios' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(5000)
+  descripcion?: string | null;
+
+  @ApiProperty({ required: false, description: 'id de CategoriaIncentivo — null/omitido = "Sin incentivo"' })
+  @IsOptional()
+  @IsString()
+  categoriaIncentivoId?: string | null;
+
   @ApiProperty({ enum: PrioridadTareaPersonal, required: false, default: PrioridadTareaPersonal.MEDIA })
   @IsOptional()
   @IsEnum(PrioridadTareaPersonal)

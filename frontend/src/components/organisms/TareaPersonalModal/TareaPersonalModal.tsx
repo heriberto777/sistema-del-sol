@@ -1,13 +1,15 @@
-import { FormEvent, ReactNode, useRef, useState } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Bold, Code2, Italic, Maximize2, Paperclip, Pencil, Smile, Trash2, Underline, X } from 'lucide-react';
+import { FormEvent, useRef, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Maximize2, Pencil, Sparkles, Trash2, X } from 'lucide-react';
 import { apiClient } from '../../../lib/api-client';
 import { mensajeErrorApi } from '../../../lib/mensaje-error-api';
 import { comprimirImagen } from '../../../lib/comprimir-imagen';
 import { Button } from '../../atoms/Button/Button';
 import { Select } from '../../atoms/Select/Select';
 import { Modal } from '../../molecules/Modal/Modal';
+import { BarraFormato, ContenidoComentario } from '../../molecules/ComentarioFormato/ComentarioFormato';
 import {
+  CategoriaIncentivo,
   ComentarioTareaPersonal,
   ESTADOS_TAREA_PERSONAL,
   ETIQUETAS_SUGERIDAS_NEGOCIO,
@@ -18,157 +20,9 @@ import {
   TareaPersonal,
 } from '../../../types/tareas-personales';
 
-const EMOJIS_SUGERIDOS = ['✅', '👍', '🎉', '🐛', '⚠️', '🔥', '💡', '📌', '⏰', '❌', '🙌', '👀', '🤔', '🚀', '💬', '🙏', '😀', '😅', '😞', '🎯', '📅', '🔧', '✔️', '📎'];
-
-/** Envuelve la selección actual del textarea con marcas ```así``` (o inserta un placeholder si no hay nada seleccionado) — mismo patrón que cualquier editor tipo Word/Discord. */
-function envolverSeleccion(
-  ref: React.RefObject<HTMLTextAreaElement>,
-  valor: string,
-  onChange: (v: string) => void,
-  marcaInicio: string,
-  marcaFin: string,
-  placeholder: string,
-) {
-  const el = ref.current;
-  const inicio = el?.selectionStart ?? valor.length;
-  const fin = el?.selectionEnd ?? valor.length;
-  const seleccionado = valor.slice(inicio, fin) || placeholder;
-  const nuevo = valor.slice(0, inicio) + marcaInicio + seleccionado + marcaFin + valor.slice(fin);
-  onChange(nuevo);
-  requestAnimationFrame(() => {
-    el?.focus();
-    const pos = inicio + marcaInicio.length + seleccionado.length + marcaFin.length;
-    el?.setSelectionRange(pos, pos);
-  });
-}
-
-function insertarEnCursor(ref: React.RefObject<HTMLTextAreaElement>, valor: string, onChange: (v: string) => void, texto: string) {
-  const el = ref.current;
-  const pos = el?.selectionStart ?? valor.length;
-  onChange(valor.slice(0, pos) + texto + valor.slice(pos));
-  requestAnimationFrame(() => {
-    el?.focus();
-    el?.setSelectionRange(pos + texto.length, pos + texto.length);
-  });
-}
-
-/** Separa texto plano de bloques ```código``` — el resaltado (acá y el de negrita/cursiva/subrayado) es puramente de presentación, nunca se interpreta más allá de esto. */
-function segmentarContenido(texto: string): { tipo: 'texto' | 'codigo'; valor: string }[] {
-  const partes: { tipo: 'texto' | 'codigo'; valor: string }[] = [];
-  const regex = /```[\w-]*\n?([\s\S]*?)```/g;
-  let ultimo = 0;
-  let match: RegExpExecArray | null;
-  while ((match = regex.exec(texto))) {
-    if (match.index > ultimo) partes.push({ tipo: 'texto', valor: texto.slice(ultimo, match.index) });
-    partes.push({ tipo: 'codigo', valor: match[1].trimEnd() });
-    ultimo = regex.lastIndex;
-  }
-  if (ultimo < texto.length) partes.push({ tipo: 'texto', valor: texto.slice(ultimo) });
-  return partes.filter((p) => p.valor.trim().length > 0 || p.tipo === 'codigo');
-}
-
-/** `**negrita**` / `*cursiva*` / `__subrayado__` — mismo criterio que Discord, sin librería de markdown. */
-function renderizarTextoConFormato(texto: string, keyPrefix: string): ReactNode[] {
-  const nodos: ReactNode[] = [];
-  const regex = /(\*\*[^*\n]+\*\*|__[^_\n]+__|\*[^*\n]+\*)/g;
-  let ultimo = 0;
-  let match: RegExpExecArray | null;
-  let i = 0;
-  while ((match = regex.exec(texto))) {
-    if (match.index > ultimo) nodos.push(texto.slice(ultimo, match.index));
-    const token = match[0];
-    if (token.startsWith('**')) nodos.push(<strong key={`${keyPrefix}-${i++}`}>{token.slice(2, -2)}</strong>);
-    else if (token.startsWith('__')) nodos.push(<u key={`${keyPrefix}-${i++}`}>{token.slice(2, -2)}</u>);
-    else nodos.push(<em key={`${keyPrefix}-${i++}`}>{token.slice(1, -1)}</em>);
-    ultimo = regex.lastIndex;
-  }
-  if (ultimo < texto.length) nodos.push(texto.slice(ultimo));
-  return nodos;
-}
-
 function formatoFechaHora(fecha: string): string {
   const d = new Date(fecha);
   return `${d.toLocaleDateString('es-DO', { day: 'numeric', month: 'short' })} · ${d.toLocaleTimeString('es-DO', { hour: 'numeric', minute: '2-digit' })}`;
-}
-
-/** Fila de íconos compartida entre "agregar nota" y "editar nota" — solo el textarea/imagen quedan a cargo de quien lo usa. */
-function BarraFormato({
-  textareaRef,
-  valor,
-  onChange,
-  mostrarImagen,
-  onSeleccionarImagen,
-}: {
-  textareaRef: React.RefObject<HTMLTextAreaElement>;
-  valor: string;
-  onChange: (v: string) => void;
-  mostrarImagen?: boolean;
-  onSeleccionarImagen?: (archivo: File | undefined) => void;
-}) {
-  const [emojiAbierto, setEmojiAbierto] = useState(false);
-  const boton = 'flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200';
-
-  return (
-    <div className="relative flex items-center gap-0.5">
-      <button type="button" title="Negrita" className={boton} onClick={() => envolverSeleccion(textareaRef, valor, onChange, '**', '**', 'negrita')}>
-        <Bold size={15} />
-      </button>
-      <button type="button" title="Cursiva" className={boton} onClick={() => envolverSeleccion(textareaRef, valor, onChange, '*', '*', 'cursiva')}>
-        <Italic size={15} />
-      </button>
-      <button type="button" title="Subrayado" className={boton} onClick={() => envolverSeleccion(textareaRef, valor, onChange, '__', '__', 'subrayado')}>
-        <Underline size={15} />
-      </button>
-      <button type="button" title="Bloque de código" className={boton} onClick={() => envolverSeleccion(textareaRef, valor, onChange, '```\n', '\n```', 'código')}>
-        <Code2 size={15} />
-      </button>
-      <button type="button" title="Emoji" className={boton} onClick={() => setEmojiAbierto((v) => !v)}>
-        <Smile size={15} />
-      </button>
-      {emojiAbierto && (
-        <div className="absolute bottom-9 left-0 z-10 grid w-52 grid-cols-6 gap-1 rounded-lg border border-slate-200 bg-white p-2 shadow-lg dark:border-slate-700 dark:bg-slate-900">
-          {EMOJIS_SUGERIDOS.map((emoji) => (
-            <button
-              key={emoji}
-              type="button"
-              onClick={() => {
-                insertarEnCursor(textareaRef, valor, onChange, emoji);
-                setEmojiAbierto(false);
-              }}
-              className="rounded p-1 text-base hover:bg-slate-100 dark:hover:bg-slate-800"
-            >
-              {emoji}
-            </button>
-          ))}
-        </div>
-      )}
-      {mostrarImagen && (
-        <label title="Adjuntar imagen" className={`${boton} cursor-pointer`}>
-          <Paperclip size={15} />
-          <input type="file" accept="image/*" className="hidden" onChange={(e) => onSeleccionarImagen?.(e.target.files?.[0])} />
-        </label>
-      )}
-    </div>
-  );
-}
-
-function ContenidoComentario({ contenido }: { contenido: string }) {
-  const partes = segmentarContenido(contenido);
-  return (
-    <div className="space-y-2">
-      {partes.map((p, i) =>
-        p.tipo === 'codigo' ? (
-          <pre key={i} className="overflow-x-auto rounded-lg bg-slate-900 px-3 py-2 text-[11.5px] leading-relaxed text-slate-100">
-            <code>{p.valor}</code>
-          </pre>
-        ) : (
-          <p key={i} className="whitespace-pre-wrap text-[13px] leading-relaxed text-slate-600 dark:text-slate-300">
-            {renderizarTextoConFormato(p.valor.trim(), `p${i}`)}
-          </p>
-        ),
-      )}
-    </div>
-  );
 }
 
 /** Overlay simple para ver una imagen adjunta a tamaño completo — las miniaturas de 20x20 no alcanzan para leer texto/detalle dentro de una captura de pantalla. */
@@ -299,17 +153,38 @@ export function TareaPersonalModal({ tarea, onClose }: { tarea: TareaPersonal; o
   const [etiquetaNueva, setEtiquetaNueva] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [imagenAmpliada, setImagenAmpliada] = useState<string | null>(null);
+  const [descripcion, setDescripcion] = useState(tarea.descripcion ?? '');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const { data: categorias } = useQuery({
+    queryKey: ['categorias-incentivo'],
+    queryFn: async () => (await apiClient.get<CategoriaIncentivo[]>('/admin/categorias-incentivo')).data,
+  });
 
   function invalidar() {
     queryClient.invalidateQueries({ queryKey: ['mis-tareas'] });
   }
 
   const actualizar = useMutation({
-    mutationFn: async (dto: Partial<Pick<TareaPersonal, 'titulo' | 'prioridad' | 'estado' | 'fecha' | 'etiquetas'>>) =>
+    mutationFn: async (dto: Partial<Pick<TareaPersonal, 'titulo' | 'descripcion' | 'prioridad' | 'estado' | 'fecha' | 'etiquetas' | 'categoriaIncentivoId'>>) =>
       apiClient.patch(`/admin/mis-tareas/${tarea.id}`, dto),
     onSuccess: invalidar,
     onError: (err) => setError(mensajeErrorApi(err, 'No se pudo guardar el cambio.')),
+  });
+
+  const generarDescripcionIa = useMutation({
+    mutationFn: async () =>
+      (
+        await apiClient.post<{ descripcion: string; generadaConIa: boolean }>('/ia/generar-descripcion-tarea', {
+          titulo: tarea.titulo,
+          categoria: tarea.categoriaIncentivo?.nombre,
+        })
+      ).data,
+    onSuccess: (data) => {
+      if (data.descripcion) setDescripcion(data.descripcion);
+      else setError('La IA no está configurada todavía (falta la API key en Plataforma) — escribí la descripción a mano.');
+    },
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo generar la descripción con IA.')),
   });
 
   const agregarComentario = useMutation({
@@ -403,6 +278,47 @@ export function TareaPersonalModal({ tarea, onClose }: { tarea: TareaPersonal; o
               className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
             />
           </div>
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Categoría de incentivo</label>
+          <Select
+            value={tarea.categoriaIncentivoId ?? ''}
+            onChange={(e) => actualizar.mutate({ categoriaIncentivoId: e.target.value || null })}
+            className="max-w-sm"
+          >
+            <option value="">Sin incentivo (no aplica)</option>
+            {categorias
+              ?.filter((c) => c.activa || c.id === tarea.categoriaIncentivoId)
+              .map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.nombre} · ${Number(c.peso).toLocaleString('es-DO')}
+                </option>
+              ))}
+          </Select>
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <div className="flex items-center justify-between">
+            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Descripción (opcional)</label>
+            <button
+              type="button"
+              onClick={() => generarDescripcionIa.mutate()}
+              disabled={generarDescripcionIa.isPending}
+              className="flex items-center gap-1 rounded-lg border border-sol-200 bg-sol-50 px-2.5 py-1 text-xs font-semibold text-sol-700 hover:bg-sol-100 disabled:opacity-50 dark:border-sol-500/30 dark:bg-sol-500/10 dark:text-sol-400"
+            >
+              <Sparkles size={12} />
+              {generarDescripcionIa.isPending ? 'Generando…' : 'Generar con IA'}
+            </button>
+          </div>
+          <textarea
+            value={descripcion}
+            onChange={(e) => setDescripcion(e.target.value)}
+            onBlur={() => descripcion !== (tarea.descripcion ?? '') && actualizar.mutate({ descripcion: descripcion || null })}
+            rows={3}
+            placeholder="Detalle ampliado del problema o la tarea…"
+            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none focus:border-sol-500 focus:ring-2 focus:ring-sol-500/30 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+          />
         </div>
 
         <div className="flex flex-col gap-1.5">

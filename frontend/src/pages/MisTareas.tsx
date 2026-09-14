@@ -1,29 +1,33 @@
 import { DragEvent, FormEvent, useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { AlertTriangle, CalendarCheck, CheckCircle2, ListTodo, MessageSquare, Search, Trash2, Plus } from 'lucide-react';
+import { AlertTriangle, CalendarCheck, CheckCircle2, ListTodo, MessageSquare, Search, Send, Settings, Trash2, Plus } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { apiClient } from '../lib/api-client';
 import { mensajeErrorApi } from '../lib/mensaje-error-api';
 import { Button } from '../components/atoms/Button/Button';
 import { Card } from '../components/atoms/Card/Card';
 import { TareaPersonalModal } from '../components/organisms/TareaPersonalModal/TareaPersonalModal';
+import { CategoriasIncentivoModal } from '../components/organisms/CategoriasIncentivoModal/CategoriasIncentivoModal';
 import {
+  COLOR_BORDE_ESTADO_TAREA_PERSONAL,
   ESTADOS_TAREA_PERSONAL,
   ETIQUETA_ESTADO_TAREA_PERSONAL,
   ETIQUETA_PRIORIDAD_TAREA_PERSONAL,
   PRIORIDADES_TAREA_PERSONAL,
   PUNTO_PRIORIDAD_TAREA_PERSONAL,
+  ResumenIncentivo,
   TareaPersonal,
 } from '../types/tareas-personales';
 
 const CLAVE_VISTA = 'mis-tareas-vista';
-type Vista = 'lista' | 'kanban' | 'agenda' | 'estadisticas';
+type Vista = 'lista' | 'kanban' | 'agenda' | 'estadisticas' | 'incentivos';
 const VISTAS: { id: Vista; etiqueta: string }[] = [
   { id: 'lista', etiqueta: 'Lista' },
   { id: 'kanban', etiqueta: 'Tablero' },
   { id: 'agenda', etiqueta: 'Agenda semanal' },
   { id: 'estadisticas', etiqueta: 'Estadísticas' },
+  { id: 'incentivos', etiqueta: 'Incentivos' },
 ];
 
 const ORDEN_PRIORIDAD: Record<string, number> = { ALTA: 0, MEDIA: 1, BAJA: 2 };
@@ -235,7 +239,11 @@ function TarjetaKanban({ tarea, onAbrir, densidad = 'clasica' }: { tarea: TareaP
         draggable
         onDragStart={onDragStart}
         onClick={onAbrir}
-        className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2 py-1.5 shadow-sm hover:shadow dark:border-slate-700 dark:bg-slate-900"
+        className={clsx(
+          'flex cursor-pointer items-center gap-1.5 rounded-lg border-y border-r border-l-4 bg-white px-2 py-1.5 shadow-sm hover:shadow dark:border-slate-700 dark:bg-slate-900',
+          'border-slate-200',
+          COLOR_BORDE_ESTADO_TAREA_PERSONAL[tarea.estado],
+        )}
       >
         <span className={clsx('h-1.5 w-1.5 shrink-0 rounded-full', PUNTO_PRIORIDAD_TAREA_PERSONAL[tarea.prioridad])} />
         <span className="min-w-0 flex-1 truncate text-[12px] text-slate-800 dark:text-slate-100">{tarea.titulo}</span>
@@ -249,7 +257,11 @@ function TarjetaKanban({ tarea, onAbrir, densidad = 'clasica' }: { tarea: TareaP
       draggable
       onDragStart={onDragStart}
       onClick={onAbrir}
-      className="cursor-pointer rounded-lg border border-slate-200 bg-white p-2 shadow-sm hover:shadow dark:border-slate-700 dark:bg-slate-900"
+      className={clsx(
+        'cursor-pointer rounded-lg border-y border-r border-l-4 bg-white p-2 shadow-sm hover:shadow dark:border-slate-700 dark:bg-slate-900',
+        'border-slate-200',
+        COLOR_BORDE_ESTADO_TAREA_PERSONAL[tarea.estado],
+      )}
     >
       <div className="mb-1 flex items-center gap-1.5">
         <span className={clsx('h-1.5 w-1.5 shrink-0 rounded-full', PUNTO_PRIORIDAD_TAREA_PERSONAL[tarea.prioridad])} />
@@ -587,14 +599,199 @@ function VistaEstadisticas({ tareas }: { tareas: TareaPersonal[] }) {
   );
 }
 
+function formatoMonto(n: number): string {
+  return n.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+/** Réplica exacta del formato que arma CategoriasIncentivoService.construirMensaje — solo para la vista previa; el mensaje que de verdad se envía lo recalcula el backend al confirmar. */
+function construirMensajeIncentivo(resumen: ResumenIncentivo): string {
+  const lineas = resumen.renglones
+    .map((r) => `🔹 *${r.nombre}:* ${r.porcentaje.toFixed(2)}% ($${formatoMonto(r.montoGanado)} de $${formatoMonto(r.peso)})`)
+    .join('\n');
+
+  return [
+    '📊 *REPORTE DE CUMPLIMIENTO DE INCENTIVO IT*',
+    `🗓 *Período:* ${resumen.periodo}`,
+    '',
+    '*Resumen de Renglones:*',
+    lineas,
+    '',
+    '-----------------------------------',
+    `🎯 *Cumplimiento General:* ${resumen.porcentajeGeneral.toFixed(2)}%`,
+    `💰 *Total Incentivo Ganado:* $${formatoMonto(resumen.montoGanadoTotal)} / $${formatoMonto(resumen.pesoTotal)}`,
+    '-----------------------------------',
+    '_Enviado automáticamente desde el Sistema de Gestión IT_',
+  ].join('\n');
+}
+
+function VistaIncentivos() {
+  const [mes, setMes] = useState(() => {
+    const hoy = new Date();
+    return `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}`;
+  });
+  const [envioAbierto, setEnvioAbierto] = useState(false);
+  const [canal, setCanal] = useState<'WHATSAPP' | 'EMAIL'>('WHATSAPP');
+  const [destino, setDestino] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [exito, setExito] = useState<string | null>(null);
+
+  const { data: resumen, isLoading } = useQuery({
+    queryKey: ['categorias-incentivo-resumen', mes],
+    queryFn: async () => (await apiClient.get<ResumenIncentivo>('/admin/categorias-incentivo/resumen', { params: { mes } })).data,
+  });
+
+  const enviar = useMutation({
+    mutationFn: async () => apiClient.post('/admin/categorias-incentivo/resumen/enviar', { mes, canal, destino: destino.trim() }),
+    onSuccess: () => {
+      setError(null);
+      setExito(canal === 'EMAIL' ? 'Reporte enviado por email.' : 'Reporte enviado por WhatsApp.');
+    },
+    onError: (err) => {
+      setExito(null);
+      setError(mensajeErrorApi(err, 'No se pudo enviar el reporte.'));
+    },
+  });
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div className="flex flex-col gap-1">
+          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Período</label>
+          <input
+            type="month"
+            value={mes}
+            onChange={(e) => setMes(e.target.value)}
+            className="rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+          />
+        </div>
+        <Button
+          type="button"
+          onClick={() => {
+            setEnvioAbierto((v) => !v);
+            setExito(null);
+          }}
+          className="flex items-center gap-1.5"
+        >
+          <Send size={15} />
+          Enviar reporte
+        </Button>
+      </div>
+
+      {isLoading && <p className="text-sm text-slate-500 dark:text-slate-400">Cargando…</p>}
+
+      {resumen && (
+        <>
+          <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl bg-slate-900 px-6 py-4 text-white dark:bg-slate-950">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Cumplimiento general — {resumen.periodo}</p>
+              <p className="text-2xl font-bold">{resumen.porcentajeGeneral.toFixed(2)}%</p>
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Total incentivo ganado</p>
+              <p className="text-2xl font-bold">
+                ${formatoMonto(resumen.montoGanadoTotal)} <span className="text-sm font-normal text-slate-400">/ ${formatoMonto(resumen.pesoTotal)}</span>
+              </p>
+            </div>
+          </div>
+
+          {resumen.renglones.length === 0 ? (
+            <p className="py-6 text-center text-sm text-slate-400">Sin categorías de incentivo activas — creá alguna desde "Categorías de incentivo".</p>
+          ) : (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {resumen.renglones.map((r) => (
+                <Card key={r.id}>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">{r.nombre}</p>
+                  <p
+                    className={clsx(
+                      'text-xl font-bold',
+                      r.porcentaje >= 98 ? 'text-emerald-600 dark:text-emerald-400' : r.porcentaje >= 90 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400',
+                    )}
+                  >
+                    {r.porcentaje.toFixed(2)}%
+                  </p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    ${formatoMonto(r.montoGanado)} de ${formatoMonto(r.peso)}
+                  </p>
+                  <p className="mt-1 text-[11px] text-slate-400">
+                    {r.tareasCompletadas} de {r.tareasTotales} tarea(s)
+                  </p>
+                  <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                    <div
+                      className={clsx('h-full rounded-full', r.porcentaje >= 98 ? 'bg-emerald-500' : r.porcentaje >= 90 ? 'bg-amber-500' : 'bg-red-500')}
+                      style={{ width: `${Math.min(100, r.porcentaje)}%` }}
+                    />
+                  </div>
+                </Card>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+
+      {envioAbierto && resumen && (
+        <Card titulo="Enviar reporte de cumplimiento">
+          <div className="space-y-3">
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setCanal('WHATSAPP')}
+                className={clsx(
+                  'flex-1 rounded-lg border px-3 py-2 text-sm font-semibold',
+                  canal === 'WHATSAPP' ? 'border-sol-400 bg-sol-50 text-sol-700 dark:bg-sol-500/10 dark:text-sol-400' : 'border-slate-200 text-slate-500 dark:border-slate-700',
+                )}
+              >
+                📱 WhatsApp
+              </button>
+              <button
+                type="button"
+                onClick={() => setCanal('EMAIL')}
+                className={clsx(
+                  'flex-1 rounded-lg border px-3 py-2 text-sm font-semibold',
+                  canal === 'EMAIL' ? 'border-sol-400 bg-sol-50 text-sol-700 dark:bg-sol-500/10 dark:text-sol-400' : 'border-slate-200 text-slate-500 dark:border-slate-700',
+                )}
+              >
+                ✉️ Email
+              </button>
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">{canal === 'EMAIL' ? 'Enviar al email' : 'Enviar al número (con código de país)'}</label>
+              <input
+                value={destino}
+                onChange={(e) => setDestino(e.target.value)}
+                placeholder={canal === 'EMAIL' ? 'gerencia@ejemplo.com' : '+1 809 555 0123'}
+                className="rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Vista previa</label>
+              <pre className="whitespace-pre-wrap rounded-lg bg-slate-900 p-3 text-[11.5px] leading-relaxed text-emerald-100">{construirMensajeIncentivo(resumen)}</pre>
+            </div>
+            {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+            {exito && <p className="text-sm text-emerald-600 dark:text-emerald-400">{exito}</p>}
+            <div className="flex justify-end gap-2">
+              <Button type="button" variante="secundario" onClick={() => setEnvioAbierto(false)}>
+                Cerrar
+              </Button>
+              <Button type="button" onClick={() => enviar.mutate()} disabled={!destino.trim() || enviar.isPending}>
+                {enviar.isPending ? 'Enviando…' : 'Enviar ahora'}
+              </Button>
+            </div>
+          </div>
+        </Card>
+      )}
+    </div>
+  );
+}
+
 export function MisTareas() {
   const queryClient = useQueryClient();
   const [vista, setVista] = useState<Vista>(() => {
     const guardada = localStorage.getItem(CLAVE_VISTA);
-    return guardada === 'kanban' || guardada === 'agenda' || guardada === 'estadisticas' ? (guardada as Vista) : 'lista';
+    return guardada === 'kanban' || guardada === 'agenda' || guardada === 'estadisticas' || guardada === 'incentivos' ? (guardada as Vista) : 'lista';
   });
   const [tituloNuevo, setTituloNuevo] = useState('');
   const [tareaAbiertaId, setTareaAbiertaId] = useState<string | null>(null);
+  const [categoriasAbierto, setCategoriasAbierto] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => localStorage.setItem(CLAVE_VISTA, vista), [vista]);
@@ -640,9 +837,19 @@ export function MisTareas() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Mis tareas</h1>
-        <p className="text-sm text-slate-500 dark:text-slate-400">Tu lista personal — nadie más la ve.</p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Mis tareas</h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400">Tu lista personal — nadie más la ve.</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setCategoriasAbierto(true)}
+          className="flex shrink-0 items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+        >
+          <Settings size={13} />
+          Categorías de incentivo
+        </button>
       </div>
 
       {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
@@ -685,8 +892,10 @@ export function MisTareas() {
       )}
       {!isLoading && vista === 'agenda' && <VistaAgenda tareas={lista} onAbrir={(t) => setTareaAbiertaId(t.id)} />}
       {!isLoading && vista === 'estadisticas' && <VistaEstadisticas tareas={lista} />}
+      {!isLoading && vista === 'incentivos' && <VistaIncentivos />}
 
       {tareaActual && <TareaPersonalModal tarea={tareaActual} onClose={() => setTareaAbiertaId(null)} />}
+      {categoriasAbierto && <CategoriasIncentivoModal onClose={() => setCategoriasAbierto(false)} />}
     </div>
   );
 }

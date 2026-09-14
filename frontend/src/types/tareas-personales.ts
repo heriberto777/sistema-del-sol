@@ -12,14 +12,44 @@ export interface ComentarioTareaPersonal {
   autor: AutorComentarioPersonal;
 }
 
+export interface RenglonResumenIncentivo {
+  id: string;
+  nombre: string;
+  peso: number;
+  tareasTotales: number;
+  tareasCompletadas: number;
+  porcentaje: number;
+  montoGanado: number;
+}
+
+export interface ResumenIncentivo {
+  periodo: string;
+  renglones: RenglonResumenIncentivo[];
+  pesoTotal: number;
+  montoGanadoTotal: number;
+  porcentajeGeneral: number;
+}
+
+export interface CategoriaIncentivo {
+  id: string;
+  nombre: string;
+  /** Decimal serializado como string por Prisma — mismo criterio que los montos de Travel. */
+  peso: string;
+  activa: boolean;
+  orden: number;
+}
+
 export interface TareaPersonal {
   id: string;
   titulo: string;
+  descripcion: string | null;
   prioridad: 'BAJA' | 'MEDIA' | 'ALTA';
   estado: 'PENDIENTE' | 'EN_CURSO' | 'EN_ESPERA' | 'HECHA';
   fecha: string | null;
   completadaEn: string | null;
   etiquetas: string[];
+  categoriaIncentivoId: string | null;
+  categoriaIncentivo: CategoriaIncentivo | null;
   createdAt: string;
   updatedAt: string;
   comentarios: ComentarioTareaPersonal[];
@@ -35,6 +65,13 @@ export const ETIQUETA_ESTADO_TAREA_PERSONAL: Record<string, string> = {
   EN_CURSO: 'Haciendo',
   EN_ESPERA: 'En espera',
   HECHA: 'Hecho',
+};
+/** Borde izquierdo de la tarjeta Kanban por columna — distinto del punto de prioridad, que es otro eje. */
+export const COLOR_BORDE_ESTADO_TAREA_PERSONAL: Record<string, string> = {
+  PENDIENTE: 'border-l-slate-400',
+  EN_CURSO: 'border-l-blue-500',
+  EN_ESPERA: 'border-l-amber-500',
+  HECHA: 'border-l-emerald-500',
 };
 
 export const DIAS_SEMANA = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];

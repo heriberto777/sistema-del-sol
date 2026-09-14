@@ -8,6 +8,7 @@ const INCLUDE_TAREA = {
     orderBy: { createdAt: 'asc' as const },
     include: { autor: { select: { id: true, nombre: true } } },
   },
+  categoriaIncentivo: true,
 };
 
 /**
@@ -56,6 +57,8 @@ export class TareasPersonalesRepository {
     usuarioId: string,
     datos: {
       titulo?: string;
+      descripcion?: string | null;
+      categoriaIncentivoId?: string | null;
       prioridad?: PrioridadTareaPersonal;
       estado?: EstadoTareaPersonal;
       fecha?: Date | null;

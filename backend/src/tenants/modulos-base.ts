@@ -20,6 +20,7 @@ export const MODULOS_BASE: { clave: string; nombre: string }[] = [
   { clave: 'bancos', nombre: 'Bancos' },
   { clave: 'gastosmenores', nombre: 'Gastos menores' },
   { clave: 'ia', nombre: 'IA' },
+  { clave: 'mistareas', nombre: 'Mis Tareas' },
   { clave: 'inmobiliaria', nombre: 'Inmobiliaria (plugin)' },
   { clave: 'ecommerce', nombre: 'Tienda Online (plugin)' },
   { clave: 'proyectos', nombre: 'Proyectos (plugin)' },
@@ -30,17 +31,17 @@ export const MODULOS_BASE: { clave: string; nombre: string }[] = [
 export const PLANES_BASE: Record<string, { descripcion: string; modulos: string[] }> = {
   Básico: {
     descripcion: 'Facturación, inventario y compras — lo esencial para empezar.',
-    modulos: ['facturacion', 'cotizaciones', 'remisiones', 'inventario', 'compras', 'productos'],
+    modulos: ['facturacion', 'cotizaciones', 'remisiones', 'inventario', 'compras', 'productos', 'mistareas'],
   },
   Profesional: {
     descripcion: 'Básico + punto de venta y control de caja/gastos menores.',
-    modulos: ['facturacion', 'cotizaciones', 'remisiones', 'inventario', 'compras', 'productos', 'pos', 'bancos', 'gastosmenores'],
+    modulos: ['facturacion', 'cotizaciones', 'remisiones', 'inventario', 'compras', 'productos', 'pos', 'bancos', 'gastosmenores', 'mistareas'],
   },
   Premium: {
     descripcion: 'Todo lo anterior + nómina, IA y plugins.',
     modulos: [
       'facturacion', 'cotizaciones', 'remisiones', 'inventario', 'compras', 'productos',
-      'pos', 'bancos', 'gastosmenores', 'nomina', 'ia', 'inmobiliaria', 'ecommerce', 'proyectos',
+      'pos', 'bancos', 'gastosmenores', 'nomina', 'ia', 'mistareas', 'inmobiliaria', 'ecommerce', 'proyectos',
       'publicacionessociales',
     ],
   },

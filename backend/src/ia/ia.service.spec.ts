@@ -107,4 +107,22 @@ describe('IaService', () => {
       expect(resultado).toEqual({ descripcion: 'Una silla cómoda para tu oficina.', generadaConIa: true });
     });
   });
+
+  describe('generarDescripcionTarea', () => {
+    it('sin IA habilitada, devuelve descripción vacía (el frontend deja el campo para completar a mano)', async () => {
+      const resultado = await service.generarDescripcionTarea('Revisar backup de PostgreSQL');
+
+      expect(resultado).toEqual({ descripcion: '', generadaConIa: false });
+    });
+
+    it('con IA habilitada, usa el texto generado y pasa la categoría como contexto', async () => {
+      Object.defineProperty(iaClient, 'habilitado', { value: true });
+      iaClient.completar.mockResolvedValue('Verificar que el backup nocturno de PostgreSQL corrió sin errores.');
+
+      const resultado = await service.generarDescripcionTarea('Revisar backup de PostgreSQL', 'Backups');
+
+      expect(resultado).toEqual({ descripcion: 'Verificar que el backup nocturno de PostgreSQL corrió sin errores.', generadaConIa: true });
+      expect(iaClient.completar.mock.calls[0][0]).toContain('Backups');
+    });
+  });
 });

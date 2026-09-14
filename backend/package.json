@@ -25,6 +25,7 @@
     "notificaciones:plantillas-comentarios-tarea:backfill": "dotenv -e ../.env -- ts-node scripts/backfill-plantillas-comentarios-tarea.ts",
     "secciones-home:backfill": "dotenv -e ../.env -- ts-node scripts/migrar-secciones-home.ts",
     "planes:seed": "dotenv -e ../.env -- ts-node scripts/seed-planes.ts",
+    "mistareas:backfill": "dotenv -e ../.env -- ts-node scripts/backfill-mistareas-modulo.ts",
     "tenant-plan:backfill": "dotenv -e ../.env -- ts-node scripts/backfill-tenant-plan.ts",
     "platform-roles:seed": "dotenv -e ../.env -- ts-node scripts/seed-platform-roles.ts",
     "suscripciones:backfill": "dotenv -e ../.env -- ts-node scripts/backfill-suscripciones.ts",

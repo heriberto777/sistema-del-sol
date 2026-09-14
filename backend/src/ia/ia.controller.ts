@@ -4,6 +4,7 @@ import { IaService } from './ia.service';
 import { PreguntarAsistenteDto } from './dto/preguntar-asistente.dto';
 import { SugerirCuentaContableDto } from './dto/sugerir-cuenta-contable.dto';
 import { GenerarDescripcionProductoDto } from './dto/generar-descripcion-producto.dto';
+import { GenerarDescripcionTareaDto } from './dto/generar-descripcion-tarea.dto';
 import { Permissions } from '../common/decorators/permissions.decorator';
 import { RequiereModulo } from '../common/decorators/requiere-modulo.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -32,5 +33,11 @@ export class IaController {
   @Permissions('ia.usar')
   generarDescripcionProducto(@Body() dto: GenerarDescripcionProductoDto) {
     return this.iaService.generarDescripcionProducto(dto.nombre, dto.categoria);
+  }
+
+  @Post('generar-descripcion-tarea')
+  @Permissions('ia.usar')
+  generarDescripcionTarea(@Body() dto: GenerarDescripcionTareaDto) {
+    return this.iaService.generarDescripcionTarea(dto.titulo, dto.categoria);
   }
 }
