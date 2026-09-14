@@ -219,7 +219,7 @@ describe('TravelService', () => {
 
     it('rechaza si la oferta ya expiró (re-price la detecta)', async () => {
       clientesService.buscarPorId.mockResolvedValue({ id: 'c1' } as never);
-      proveedor.obtenerOferta.mockResolvedValue({ id: 'off_1', aerolinea: 'X', montoTotal: '450.00', moneda: 'USD', expiraEn: '2000-01-01T00:00:00Z', tramosCrudo: null });
+      proveedor.obtenerOferta.mockResolvedValue({ id: 'off_1', aerolinea: 'X', montoTotal: '450.00', moneda: 'USD', expiraEn: '2000-01-01T00:00:00Z', tramosCrudo: null, pasajeros: [] });
 
       await expect(service.reservarOfertaVuelo(dto, 't1')).rejects.toThrow(BadRequestException);
       expect(proveedor.crearOrdenVuelo).not.toHaveBeenCalled();
@@ -228,7 +228,7 @@ describe('TravelService', () => {
     it('re-precia, crea la orden con Balance, guarda la reserva y debita el ledger', async () => {
       clientesService.buscarPorId.mockResolvedValue({ id: 'c1' } as never);
       const expiraEn = new Date(Date.now() + 3600_000).toISOString();
-      proveedor.obtenerOferta.mockResolvedValue({ id: 'off_1', aerolinea: 'Iberia', montoTotal: '450.00', moneda: 'USD', expiraEn, tramosCrudo: null });
+      proveedor.obtenerOferta.mockResolvedValue({ id: 'off_1', aerolinea: 'Iberia', montoTotal: '450.00', moneda: 'USD', expiraEn, tramosCrudo: null, pasajeros: [] });
       proveedor.crearOrdenVuelo.mockResolvedValue({ id: 'ord_1', localizador: 'ABC123', montoTotal: '450.00', moneda: 'USD' });
       correlativosRepository.siguiente.mockResolvedValue('000001');
       repository.crearDesdeProveedor.mockResolvedValue({ id: 'r1', codigoInterno: `TRV-${new Date().getFullYear()}-000001` } as never);

@@ -20,6 +20,32 @@ interface ErrorDuffel {
   errors?: { type: string; title: string; message?: string; code?: string }[];
 }
 
+interface DuffelOferta {
+  id: string;
+  total_amount: string;
+  total_currency: string;
+  expires_at: string;
+  owner: { name: string };
+  slices: unknown;
+  // Confirmado contra el sandbox real: cada oferta trae su propia lista
+  // de pasajeros con el `type` ya resuelto por la aerolínea a partir de
+  // la `age` mandada en la búsqueda (age 8 -> "child", age 1 ->
+  // "infant_without_seat") — nunca hay que adivinarlo por tramosCrudo.
+  passengers: { id: string; type: string | null; age: number | null }[];
+}
+
+function normalizarOferta(o: DuffelOferta): OfertaVuelo {
+  return {
+    id: o.id,
+    aerolinea: o.owner.name,
+    montoTotal: o.total_amount,
+    moneda: o.total_currency,
+    expiraEn: o.expires_at,
+    tramosCrudo: o.slices,
+    pasajeros: o.passengers.map((p) => ({ id: p.id, tipo: (p.type ?? 'adult') as 'adult' | 'child' | 'infant_without_seat', edad: p.age })),
+  };
+}
+
 /**
  * `fetch` nativo directo contra la REST API de Duffel — mismo criterio
  * que StripeAdapter/AlanubeAdapter: sin SDK oficial (existe `@duffel/api`
@@ -91,35 +117,26 @@ export class DuffelAdapter implements TravelProvider {
   async buscarVuelos(request: BuscarVuelosRequest): Promise<ResultadoBusquedaVuelos> {
     const data = await this.llamar<{
       id: string;
-      offers: { id: string; total_amount: string; total_currency: string; expires_at: string; owner: { name: string }; slices: unknown }[];
+      offers: DuffelOferta[];
     }>('/air/offer_requests?return_offers=true', {
       method: 'POST',
       body: {
         slices: request.tramos.map((t) => ({ origin: t.origen, destination: t.destino, departure_date: t.fecha })),
-        passengers: request.pasajeros.map((p) => ({ type: p.tipo })),
+        // Uno u otro por pasajero — nunca ambos (confirmado contra el sandbox real). La edad gana si por error vinieran los dos.
+        passengers: request.pasajeros.map((p) => (p.edad != null ? { age: p.edad } : { type: p.tipo })),
         cabin_class: request.cabina,
       },
     });
 
     return {
       solicitudId: data.id,
-      ofertas: data.offers.map((o) => ({
-        id: o.id,
-        aerolinea: o.owner.name,
-        montoTotal: o.total_amount,
-        moneda: o.total_currency,
-        expiraEn: o.expires_at,
-        tramosCrudo: o.slices,
-      })),
+      ofertas: data.offers.map(normalizarOferta),
     };
   }
 
   async obtenerOferta(ofertaId: string): Promise<OfertaVuelo> {
-    const o = await this.llamar<{ id: string; total_amount: string; total_currency: string; expires_at: string; owner: { name: string }; slices: unknown }>(
-      `/air/offers/${ofertaId}`,
-      { method: 'GET' },
-    );
-    return { id: o.id, aerolinea: o.owner.name, montoTotal: o.total_amount, moneda: o.total_currency, expiraEn: o.expires_at, tramosCrudo: o.slices };
+    const o = await this.llamar<DuffelOferta>(`/air/offers/${ofertaId}`, { method: 'GET' });
+    return normalizarOferta(o);
   }
 
   async crearOrdenVuelo(request: CrearOrdenVueloRequest): Promise<OrdenVuelo> {
@@ -147,6 +164,9 @@ export class DuffelAdapter implements TravelProvider {
                 ],
               }
             : {}),
+          // Confirmado contra el sandbox real: va en el pasajero ADULTO
+          // responsable, apuntando al id del pasajero infante.
+          ...(p.infantePasajeroId ? { infant_passenger_id: p.infantePasajeroId } : {}),
         })),
         // Confirmado contra el sandbox real: `payments` es un ARRAY, no un
         // objeto suelto (la documentación que consulté antes de escribir

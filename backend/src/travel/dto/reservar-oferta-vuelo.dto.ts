@@ -55,6 +55,14 @@ export class PasajeroReservaVueloDto {
   @IsOptional()
   @IsDateString()
   fechaVencimientoPasaporte?: string;
+
+  @ApiProperty({
+    required: false,
+    description: 'Solo en el pasajero ADULTO responsable: el id del pasajero infante (infant_without_seat) que viaja con él — Duffel lo exige si hay algún infante en la oferta',
+  })
+  @IsOptional()
+  @IsString()
+  infantePasajeroId?: string;
 }
 
 export class ReservarOfertaVueloDto {

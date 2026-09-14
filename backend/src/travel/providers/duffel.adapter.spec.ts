@@ -44,7 +44,15 @@ describe('DuffelAdapter', () => {
         data: {
           id: 'orq_1',
           offers: [
-            { id: 'off_1', total_amount: '450.00', total_currency: 'USD', expires_at: '2026-11-01T00:00:00Z', owner: { name: 'Iberia' }, slices: [{ x: 1 }] },
+            {
+              id: 'off_1',
+              total_amount: '450.00',
+              total_currency: 'USD',
+              expires_at: '2026-11-01T00:00:00Z',
+              owner: { name: 'Iberia' },
+              slices: [{ x: 1 }],
+              passengers: [{ id: 'pas_1', type: 'adult', age: null }],
+            },
           ],
         },
       }),
@@ -58,7 +66,15 @@ describe('DuffelAdapter', () => {
 
     expect(resultado.solicitudId).toBe('orq_1');
     expect(resultado.ofertas).toEqual([
-      { id: 'off_1', aerolinea: 'Iberia', montoTotal: '450.00', moneda: 'USD', expiraEn: '2026-11-01T00:00:00Z', tramosCrudo: [{ x: 1 }] },
+      {
+        id: 'off_1',
+        aerolinea: 'Iberia',
+        montoTotal: '450.00',
+        moneda: 'USD',
+        expiraEn: '2026-11-01T00:00:00Z',
+        tramosCrudo: [{ x: 1 }],
+        pasajeros: [{ id: 'pas_1', tipo: 'adult', edad: null }],
+      },
     ]);
 
     const [url, opciones] = fetchMock.mock.calls[0];
@@ -68,6 +84,20 @@ describe('DuffelAdapter', () => {
     const cuerpo = JSON.parse(opciones.body as string);
     expect(cuerpo.data.slices).toEqual([{ origin: 'SDQ', destination: 'MAD', departure_date: '2026-11-10' }]);
     expect(cuerpo.data.passengers).toEqual([{ type: 'adult' }]);
+  });
+
+  it('buscarVuelos manda "age" en vez de "type" cuando el pasajero trae edad (mutuamente excluyentes, confirmado en vivo)', async () => {
+    process.env.DUFFEL_API_TOKEN = 'duffel_test_123';
+    fetchMock.mockResolvedValue({ ok: true, json: async () => ({ data: { id: 'orq_1', offers: [] } }) });
+
+    await adapter.buscarVuelos({
+      tramos: [{ origen: 'SDQ', destino: 'MAD', fecha: '2026-11-10' }],
+      pasajeros: [{ tipo: 'adult' }, { edad: 8 }, { edad: 1 }],
+    });
+
+    const [, opciones] = fetchMock.mock.calls[0];
+    const cuerpo = JSON.parse(opciones.body as string);
+    expect(cuerpo.data.passengers).toEqual([{ type: 'adult' }, { age: 8 }, { age: 1 }]);
   });
 
   it('crearOrdenVuelo manda el pago como Balance (nunca tarjeta) y devuelve el localizador', async () => {
@@ -125,6 +155,48 @@ describe('DuffelAdapter', () => {
     expect(cuerpo.data.passengers[0].identity_documents).toEqual([
       { type: 'passport', unique_identifier: 'AB123456', issuing_country_code: 'DO', expires_on: '2030-01-01' },
     ]);
+  });
+
+  it('crearOrdenVuelo vincula al infante con su adulto responsable vía infant_passenger_id (confirmado en vivo)', async () => {
+    process.env.DUFFEL_API_TOKEN = 'duffel_test_123';
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: { id: 'ord_1', booking_reference: 'ABC123', total_amount: '506.58', total_currency: 'USD' } }),
+    });
+
+    await adapter.crearOrdenVuelo({
+      ofertaId: 'off_1',
+      pasajeros: [
+        {
+          id: 'pas_adulto',
+          nombre: 'Juan',
+          apellido: 'Pérez',
+          fechaNacimiento: '1985-01-01',
+          genero: 'm',
+          titulo: 'mr',
+          email: 'j@x.com',
+          telefono: '+18095551234',
+          infantePasajeroId: 'pas_infante',
+        },
+        {
+          id: 'pas_infante',
+          nombre: 'Luis',
+          apellido: 'Pérez',
+          fechaNacimiento: '2025-06-01',
+          genero: 'm',
+          titulo: 'mr',
+          email: 'j@x.com',
+          telefono: '+18095551234',
+        },
+      ],
+      montoBalance: 506.58,
+      monedaBalance: 'USD',
+    });
+
+    const [, opciones] = fetchMock.mock.calls[0];
+    const cuerpo = JSON.parse(opciones.body as string);
+    expect(cuerpo.data.passengers[0].infant_passenger_id).toBe('pas_infante');
+    expect(cuerpo.data.passengers[1].infant_passenger_id).toBeUndefined();
   });
 
   it('traduce offer_no_longer_available a un mensaje de negocio claro', async () => {

@@ -59,6 +59,15 @@ export interface TramoVueloCrudo {
   segments: SegmentoVueloCrudo[];
 }
 
+/// Pasajero de la oferta con el tipo ya resuelto por la aerolínea (edad 8
+/// -> "child", edad 1 -> "infant_without_seat") — confirmado contra el
+/// sandbox real, no hay que adivinarlo por los segmentos.
+export interface PasajeroOfertaVuelo {
+  id: string;
+  tipo: 'adult' | 'child' | 'infant_without_seat';
+  edad: number | null;
+}
+
 export interface OfertaVuelo {
   id: string;
   aerolinea: string;
@@ -66,6 +75,7 @@ export interface OfertaVuelo {
   moneda: string;
   expiraEn: string;
   tramosCrudo: TramoVueloCrudo[];
+  pasajeros: PasajeroOfertaVuelo[];
 }
 
 export interface ResultadoBusquedaVuelos {

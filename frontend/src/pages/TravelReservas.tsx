@@ -460,6 +460,9 @@ const FORM_BUSQUEDA_VACIO = {
   fechaSalida: '',
   fechaRegreso: '',
   adultos: 1,
+  // Edad exacta de cada niño/bebé — Duffel resuelve el tipo (child/infant_without_seat) según la edad, no hay que elegirlo a mano.
+  ninos: [] as number[],
+  infantes: [] as number[],
   cabina: 'economy' as 'economy' | 'premium_economy' | 'business' | 'first',
 };
 
@@ -475,11 +478,7 @@ function formatoHoraVuelo(iso: string): string {
   return iso.slice(11, 16);
 }
 
-function extraerPasajeroIds(oferta: OfertaVuelo): string[] {
-  const ids = new Set<string>();
-  oferta.tramosCrudo.forEach((t) => t.segments.forEach((s) => s.passengers.forEach((p) => ids.add(p.passenger_id))));
-  return [...ids];
-}
+const ETIQUETA_TIPO_PASAJERO: Record<string, string> = { adult: 'Adulto', child: 'Niño', infant_without_seat: 'Bebé' };
 
 function TarjetaOferta({ oferta, onReservar }: { oferta: OfertaVuelo; onReservar: () => void }) {
   const minutosParaExpirar = Math.max(0, Math.round((new Date(oferta.expiraEn).getTime() - Date.now()) / 60_000));
@@ -565,15 +564,19 @@ function ReservarOfertaModal({
     clienteId: string;
     montoVenta: number;
     notas?: string;
-    pasajeros: ({ id: string } & Omit<FormPasajero, 'numeroPasaporte' | 'paisEmisionPasaporte' | 'fechaVencimientoPasaporte'> &
+    pasajeros: ({ id: string; infantePasajeroId?: string } & Omit<FormPasajero, 'numeroPasaporte' | 'paisEmisionPasaporte' | 'fechaVencimientoPasaporte'> &
       Partial<Pick<FormPasajero, 'numeroPasaporte' | 'paisEmisionPasaporte' | 'fechaVencimientoPasaporte'>>)[];
   }) => void;
 }) {
-  const pasajeroIds = extraerPasajeroIds(oferta);
+  const pasajeroIds = oferta.pasajeros.map((p) => p.id);
+  const adultoIds = oferta.pasajeros.filter((p) => p.tipo === 'adult').map((p) => p.id);
+  const infanteIds = oferta.pasajeros.filter((p) => p.tipo === 'infant_without_seat').map((p) => p.id);
   const [clienteId, setClienteId] = useState('');
   const [montoVenta, setMontoVenta] = useState(oferta.montoTotal);
   const [notas, setNotas] = useState('');
   const [pasajeros, setPasajeros] = useState<Record<string, FormPasajero>>(Object.fromEntries(pasajeroIds.map((id) => [id, { ...PASAJERO_VACIO }])));
+  // Duffel exige vincular cada bebé (infant_without_seat) a un adulto responsable — clave: id del bebé, valor: id del adulto elegido.
+  const [infanteAdultoMap, setInfanteAdultoMap] = useState<Record<string, string>>({});
 
   // Markup automático — solo sugiere el punto de partida, el campo sigue 100% editable.
   useEffect(() => {
@@ -591,10 +594,14 @@ function ReservarOfertaModal({
   const completo =
     clienteId &&
     montoVenta &&
-    pasajeroIds.every((id) => pasajeros[id].nombre && pasajeros[id].apellido && pasajeros[id].fechaNacimiento && pasajeros[id].email && pasajeros[id].telefono);
+    pasajeroIds.every((id) => pasajeros[id].nombre && pasajeros[id].apellido && pasajeros[id].fechaNacimiento && pasajeros[id].email && pasajeros[id].telefono) &&
+    infanteIds.every((id) => infanteAdultoMap[id]);
 
   function onSubmit(e: FormEvent) {
     e.preventDefault();
+    // Invertido: por cada bebé, el vínculo va en el pasajero ADULTO (infantePasajeroId = id del bebé) — así lo exige Duffel.
+    const adultoAInfante = Object.fromEntries(Object.entries(infanteAdultoMap).map(([infanteId, adultoId]) => [adultoId, infanteId]));
+
     onGuardar({
       clienteId,
       montoVenta: Number(montoVenta),
@@ -604,7 +611,12 @@ function ReservarOfertaModal({
         // — "" no es lo mismo que "no lo mandes" para class-validator, hay que omitir la clave entera.
         const { numeroPasaporte, paisEmisionPasaporte, fechaVencimientoPasaporte, ...resto } = pasajeros[id];
         const tienePasaporte = numeroPasaporte && paisEmisionPasaporte && fechaVencimientoPasaporte;
-        return { id, ...resto, ...(tienePasaporte ? { numeroPasaporte, paisEmisionPasaporte, fechaVencimientoPasaporte } : {}) };
+        return {
+          id,
+          ...resto,
+          ...(tienePasaporte ? { numeroPasaporte, paisEmisionPasaporte, fechaVencimientoPasaporte } : {}),
+          ...(adultoAInfante[id] ? { infantePasajeroId: adultoAInfante[id] } : {}),
+        };
       }),
     });
   }
@@ -644,13 +656,29 @@ function ReservarOfertaModal({
         </div>
 
         <div className="space-y-3">
-          {pasajeroIds.map((id, i) => (
-            <div key={id} className="rounded-lg border border-slate-200 p-3 dark:border-slate-700">
-              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Pasajero {i + 1}</p>
+          {oferta.pasajeros.map((p, i) => (
+            <div key={p.id} className="rounded-lg border border-slate-200 p-3 dark:border-slate-700">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                Pasajero {i + 1} — {ETIQUETA_TIPO_PASAJERO[p.tipo]}
+                {p.edad != null && ` (${p.edad} ${p.edad === 1 ? 'año' : 'años'})`}
+              </p>
+              {p.tipo === 'infant_without_seat' && (
+                <div className="mb-3 flex flex-col gap-1">
+                  <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Viaja con (adulto responsable)</label>
+                  <Select value={infanteAdultoMap[p.id] ?? ''} onChange={(e) => setInfanteAdultoMap((prev) => ({ ...prev, [p.id]: e.target.value }))} required>
+                    <option value="">Seleccioná un adulto…</option>
+                    {adultoIds.map((adultoId, j) => (
+                      <option key={adultoId} value={adultoId}>
+                        Pasajero {oferta.pasajeros.findIndex((pp) => pp.id === adultoId) + 1} (Adulto {j + 1})
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+              )}
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="flex flex-col gap-1">
                   <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Título</label>
-                  <Select value={pasajeros[id].titulo} onChange={(e) => actualizarPasajero(id, 'titulo', e.target.value)}>
+                  <Select value={pasajeros[p.id].titulo} onChange={(e) => actualizarPasajero(p.id, 'titulo', e.target.value)}>
                     {TITULOS_PASAJERO.map((t) => (
                       <option key={t.valor} value={t.valor}>
                         {t.etiqueta}
@@ -660,41 +688,41 @@ function ReservarOfertaModal({
                 </div>
                 <div className="flex flex-col gap-1">
                   <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Género</label>
-                  <Select value={pasajeros[id].genero} onChange={(e) => actualizarPasajero(id, 'genero', e.target.value)}>
+                  <Select value={pasajeros[p.id].genero} onChange={(e) => actualizarPasajero(p.id, 'genero', e.target.value)}>
                     <option value="m">Masculino</option>
                     <option value="f">Femenino</option>
                   </Select>
                 </div>
-                <FormField label="Nombre" value={pasajeros[id].nombre} onChange={(e) => actualizarPasajero(id, 'nombre', e.target.value)} required />
-                <FormField label="Apellido" value={pasajeros[id].apellido} onChange={(e) => actualizarPasajero(id, 'apellido', e.target.value)} required />
+                <FormField label="Nombre" value={pasajeros[p.id].nombre} onChange={(e) => actualizarPasajero(p.id, 'nombre', e.target.value)} required />
+                <FormField label="Apellido" value={pasajeros[p.id].apellido} onChange={(e) => actualizarPasajero(p.id, 'apellido', e.target.value)} required />
                 <FormField
                   label="Fecha de nacimiento"
                   type="date"
-                  value={pasajeros[id].fechaNacimiento}
-                  onChange={(e) => actualizarPasajero(id, 'fechaNacimiento', e.target.value)}
+                  value={pasajeros[p.id].fechaNacimiento}
+                  onChange={(e) => actualizarPasajero(p.id, 'fechaNacimiento', e.target.value)}
                   required
                 />
-                <FormField label="Email" type="email" value={pasajeros[id].email} onChange={(e) => actualizarPasajero(id, 'email', e.target.value)} required />
-                <FormField label="Teléfono" value={pasajeros[id].telefono} onChange={(e) => actualizarPasajero(id, 'telefono', e.target.value)} required />
+                <FormField label="Email" type="email" value={pasajeros[p.id].email} onChange={(e) => actualizarPasajero(p.id, 'email', e.target.value)} required />
+                <FormField label="Teléfono" value={pasajeros[p.id].telefono} onChange={(e) => actualizarPasajero(p.id, 'telefono', e.target.value)} required />
               </div>
               <p className="mb-2 mt-3 text-xs font-semibold uppercase tracking-wide text-slate-400">Pasaporte (opcional — recomendado para vuelos internacionales)</p>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <FormField
                   label="Número de pasaporte"
-                  value={pasajeros[id].numeroPasaporte}
-                  onChange={(e) => actualizarPasajero(id, 'numeroPasaporte', e.target.value)}
+                  value={pasajeros[p.id].numeroPasaporte}
+                  onChange={(e) => actualizarPasajero(p.id, 'numeroPasaporte', e.target.value)}
                 />
                 <FormField
                   label="País emisor (ej. DO)"
                   maxLength={2}
-                  value={pasajeros[id].paisEmisionPasaporte}
-                  onChange={(e) => actualizarPasajero(id, 'paisEmisionPasaporte', e.target.value.toUpperCase())}
+                  value={pasajeros[p.id].paisEmisionPasaporte}
+                  onChange={(e) => actualizarPasajero(p.id, 'paisEmisionPasaporte', e.target.value.toUpperCase())}
                 />
                 <FormField
                   label="Vencimiento"
                   type="date"
-                  value={pasajeros[id].fechaVencimientoPasaporte}
-                  onChange={(e) => actualizarPasajero(id, 'fechaVencimientoPasaporte', e.target.value)}
+                  value={pasajeros[p.id].fechaVencimientoPasaporte}
+                  onChange={(e) => actualizarPasajero(p.id, 'fechaVencimientoPasaporte', e.target.value)}
                 />
               </div>
             </div>
@@ -744,7 +772,11 @@ function BuscarVueloTab({ clientes }: { clientes: ClienteOpcion[] | undefined })
       return (
         await apiClient.post<ResultadoBusquedaVuelos>('/admin/travel/vuelos/buscar', {
           tramos,
-          pasajeros: Array.from({ length: form.adultos }, () => ({ tipo: 'adult' })),
+          pasajeros: [
+            ...Array.from({ length: form.adultos }, () => ({ tipo: 'adult' })),
+            ...form.ninos.map((edad) => ({ edad })),
+            ...form.infantes.map((edad) => ({ edad })),
+          ],
           cabina: form.cabina,
         })
       ).data;
@@ -807,6 +839,67 @@ function BuscarVueloTab({ clientes }: { clientes: ClienteOpcion[] | undefined })
                 <option value="business">Business</option>
                 <option value="first">Primera</option>
               </Select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Niños (2-17 años)</label>
+                <button
+                  type="button"
+                  onClick={() => setForm({ ...form, ninos: [...form.ninos, 8] })}
+                  disabled={form.ninos.length >= 8}
+                  className="text-xs font-medium text-sol-600 hover:underline disabled:opacity-50 dark:text-sol-400"
+                >
+                  + Agregar niño
+                </button>
+              </div>
+              {form.ninos.map((edad, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <Input
+                    type="number"
+                    min={2}
+                    max={17}
+                    value={edad}
+                    onChange={(e) => setForm({ ...form, ninos: form.ninos.map((v, j) => (j === i ? Number(e.target.value) : v)) })}
+                  />
+                  <button type="button" onClick={() => setForm({ ...form, ninos: form.ninos.filter((_, j) => j !== i) })} aria-label="Quitar niño">
+                    <X size={16} className="text-slate-400 hover:text-red-600" />
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Bebés (0-1 años, en brazos)</label>
+                <button
+                  type="button"
+                  onClick={() => setForm({ ...form, infantes: [...form.infantes, 1] })}
+                  disabled={form.infantes.length >= form.adultos}
+                  className="text-xs font-medium text-sol-600 hover:underline disabled:opacity-50 dark:text-sol-400"
+                >
+                  + Agregar bebé
+                </button>
+              </div>
+              {form.infantes.length >= form.adultos && (
+                <p className="text-xs text-slate-400">Cada bebé necesita viajar con un adulto responsable — agregá otro adulto para sumar otro bebé.</p>
+              )}
+              {form.infantes.map((edad, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <Input
+                    type="number"
+                    min={0}
+                    max={1}
+                    value={edad}
+                    onChange={(e) => setForm({ ...form, infantes: form.infantes.map((v, j) => (j === i ? Number(e.target.value) : v)) })}
+                  />
+                  <button type="button" onClick={() => setForm({ ...form, infantes: form.infantes.filter((_, j) => j !== i) })} aria-label="Quitar bebé">
+                    <X size={16} className="text-slate-400 hover:text-red-600" />
+                  </button>
+                </div>
+              ))}
             </div>
           </div>
 

@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { ArrayMaxSize, ArrayMinSize, IsDateString, IsEnum, IsOptional, IsString, Length, ValidateNested } from 'class-validator';
+import { ArrayMaxSize, ArrayMinSize, IsDateString, IsEnum, IsInt, IsOptional, IsString, Length, Max, Min, ValidateNested } from 'class-validator';
 
 export class TramoBusquedaVueloDto {
   @ApiProperty({ description: 'Código IATA de 3 letras (ej. "SDQ")' })
@@ -19,9 +19,21 @@ export class TramoBusquedaVueloDto {
 }
 
 export class PasajeroBusquedaVueloDto {
-  @ApiProperty({ enum: ['adult', 'child', 'infant_without_seat'] })
+  @ApiProperty({
+    required: false,
+    enum: ['adult', 'child', 'infant_without_seat'],
+    description: 'Para niños/bebés es mejor mandar "edad" — Duffel exige uno u otro, nunca ambos (confirmado contra el sandbox real)',
+  })
+  @IsOptional()
   @IsEnum(['adult', 'child', 'infant_without_seat'])
-  tipo: 'adult' | 'child' | 'infant_without_seat';
+  tipo?: 'adult' | 'child' | 'infant_without_seat';
+
+  @ApiProperty({ required: false, description: 'Edad exacta (0-17) — cada aerolínea decide su propio corte adulto/niño/bebé según esto' })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(17)
+  edad?: number;
 }
 
 export class BuscarVuelosDto {

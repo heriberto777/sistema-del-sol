@@ -12,7 +12,22 @@
  */
 
 export interface PasajeroBusquedaVuelo {
+  /** Uno u otro, nunca ambos (Duffel los trata como mutuamente excluyentes) — si vienen los dos, la edad gana. */
+  tipo?: 'adult' | 'child' | 'infant_without_seat';
+  edad?: number;
+}
+
+/**
+ * Pasajero tal como lo devuelve la oferta/re-price de Duffel — `tipo` ya
+ * viene resuelto por la aerolínea a partir de la edad mandada en la
+ * búsqueda (confirmado contra el sandbox real: mandar `{age: 8}` en la
+ * búsqueda, la oferta responde `{type: 'child', age: 8}`). El frontend
+ * usa este `id` para armar el formulario de cada pasajero al reservar.
+ */
+export interface PasajeroOfertaVuelo {
+  id: string;
   tipo: 'adult' | 'child' | 'infant_without_seat';
+  edad: number | null;
 }
 
 export interface TramoBusquedaVuelo {
@@ -39,6 +54,8 @@ export interface OfertaVuelo {
   expiraEn: string;
   /** JSON crudo de los tramos/segmentos del proveedor — sin normalizar todavía (Fase 2, cuando exista una UI que los necesite en detalle). */
   tramosCrudo: unknown;
+  /** Ids reales de esta oferta (uno por pasajero buscado) con el tipo ya resuelto por la aerolínea — usar esto, no adivinar por tramosCrudo. */
+  pasajeros: PasajeroOfertaVuelo[];
 }
 
 export interface ResultadoBusquedaVuelos {
@@ -69,6 +86,13 @@ export interface PasajeroOrdenVuelo {
   paisEmisionPasaporte?: string;
   /** YYYY-MM-DD */
   fechaVencimientoPasaporte?: string;
+  /**
+   * Solo tiene sentido en el pasajero ADULTO responsable — su valor es el
+   * `id` del pasajero infante que viaja con él. Confirmado contra el
+   * sandbox real: Duffel exige este vínculo para crear la orden si hay
+   * algún pasajero `infant_without_seat`.
+   */
+  infantePasajeroId?: string;
 }
 
 export interface CrearOrdenVueloRequest {
