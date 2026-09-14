@@ -69,6 +69,8 @@ export class PlataformaConfigService implements OnModuleInit {
     if (dto.iaOpenaiModeloFondo !== undefined) data.iaOpenaiModeloFondo = dto.iaOpenaiModeloFondo;
     if (dto.iaGeminiModeloFondo !== undefined) data.iaGeminiModeloFondo = dto.iaGeminiModeloFondo;
     if (dto.iaFondoLimiteMensual !== undefined) data.iaFondoLimiteMensual = dto.iaFondoLimiteMensual;
+    if (dto.hotelbedsMoneda !== undefined) data.hotelbedsMoneda = dto.hotelbedsMoneda || null;
+    if (dto.hotelbedsTasaCambio !== undefined) data.hotelbedsTasaCambio = dto.hotelbedsTasaCambio;
 
     this.aplicarCampoSecreto(data, 'smtpPasswordCifrado', dto.smtpPassword);
     this.aplicarCampoSecreto(data, 'twilioAuthTokenCifrado', dto.twilioAuthToken);
@@ -144,6 +146,8 @@ export class PlataformaConfigService implements OnModuleInit {
     // Hotelbeds (hoteles) — cuenta compartida, mismo criterio que Duffel. HotelbedsAdapter lee estas dos variables directamente.
     if (config.hotelbedsApiKeyCifrado) process.env.HOTELBEDS_API_KEY = descifrar(config.hotelbedsApiKeyCifrado);
     if (config.hotelbedsSecretCifrado) process.env.HOTELBEDS_SECRET = descifrar(config.hotelbedsSecretCifrado);
+    if (config.hotelbedsMoneda) process.env.HOTELBEDS_MONEDA = config.hotelbedsMoneda;
+    if (config.hotelbedsTasaCambio !== null) process.env.HOTELBEDS_TASA_CAMBIO = String(config.hotelbedsTasaCambio);
   }
 
   /** Nunca expone un secreto en texto plano — solo si hay uno guardado (*Configurado). */
@@ -216,6 +220,8 @@ export class PlataformaConfigService implements OnModuleInit {
         duffelWebhookSecretConfigurado: Boolean(config.duffelWebhookSecretCifrado),
         hotelbedsApiKeyConfigurado: Boolean(config.hotelbedsApiKeyCifrado),
         hotelbedsSecretConfigurado: Boolean(config.hotelbedsSecretCifrado),
+        hotelbedsMoneda: config.hotelbedsMoneda ?? 'EUR',
+        hotelbedsTasaCambio: config.hotelbedsTasaCambio !== null ? Number(config.hotelbedsTasaCambio) : null,
       },
     };
   }

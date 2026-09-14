@@ -109,6 +109,13 @@ export interface ResultadoBusquedaHoteles {
   hoteles: HotelListado[];
 }
 
+export interface DestinoHotel {
+  codigo: string;
+  nombre: string;
+  pais: string;
+  bandera: string;
+}
+
 export interface TravelReglaMarkup {
   id: string;
   tipo: 'VUELO' | 'HOTEL' | null;

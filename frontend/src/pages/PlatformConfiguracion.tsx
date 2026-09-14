@@ -90,6 +90,8 @@ export interface ConfiguracionPlataforma {
     duffelWebhookSecretConfigurado: boolean;
     hotelbedsApiKeyConfigurado: boolean;
     hotelbedsSecretConfigurado: boolean;
+    hotelbedsMoneda: string;
+    hotelbedsTasaCambio: number | null;
   };
 }
 
@@ -477,12 +479,16 @@ function SeccionTravelHotelbeds({ config, guardar }: SeccionProps) {
   const travel = config.travel;
   const [hotelbedsApiKey, setHotelbedsApiKey] = useState('');
   const [hotelbedsSecret, setHotelbedsSecret] = useState('');
+  const [moneda, setMoneda] = useState(travel.hotelbedsMoneda);
+  const [tasaCambio, setTasaCambio] = useState(travel.hotelbedsTasaCambio !== null ? String(travel.hotelbedsTasaCambio) : '');
 
   function onSubmit(e: FormEvent) {
     e.preventDefault();
     guardar.mutate({
       ...(hotelbedsApiKey !== '' ? { hotelbedsApiKey } : {}),
       ...(hotelbedsSecret !== '' ? { hotelbedsSecret } : {}),
+      hotelbedsMoneda: moneda,
+      ...(moneda !== 'EUR' && tasaCambio !== '' ? { hotelbedsTasaCambio: Number(tasaCambio) } : {}),
     });
     setHotelbedsApiKey('');
     setHotelbedsSecret('');
@@ -511,7 +517,36 @@ function SeccionTravelHotelbeds({ config, guardar }: SeccionProps) {
           placeholder={travel.hotelbedsSecretConfigurado ? PLACEHOLDER_CONFIGURADO : 'Secret compartido'}
         />
         <p className="text-xs text-slate-400">Las dos firman cada request (X-Signature) — sandbox de test, mismo host que producción.</p>
-        <Button type="submit" disabled={guardar.isPending}>
+
+        <div className="border-t border-slate-100 pt-3 dark:border-slate-800">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="flex flex-col gap-1">
+              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Moneda de venta</label>
+              <Select value={moneda} onChange={(e) => setMoneda(e.target.value)}>
+                <option value="EUR">EUR (sin conversión — la nativa de Hotelbeds)</option>
+                <option value="USD">USD</option>
+                <option value="DOP">DOP</option>
+              </Select>
+            </div>
+            {moneda !== 'EUR' && (
+              <FormField
+                label={`Tasa: 1 EUR = ? ${moneda}`}
+                type="number"
+                min="0.000001"
+                step="0.000001"
+                value={tasaCambio}
+                onChange={(e) => setTasaCambio(e.target.value)}
+                placeholder="ej. 1.08"
+                required
+              />
+            )}
+          </div>
+          <p className="mt-2 text-xs text-slate-400">
+            Hotelbeds cotiza siempre en EUR — si vendés en otra moneda, la tasa es manual (actualizala vos, no se consulta ningún tipo de cambio en vivo).
+          </p>
+        </div>
+
+        <Button type="submit" disabled={guardar.isPending || (moneda !== 'EUR' && !tasaCambio)}>
           {guardar.isPending ? 'Guardando…' : 'Guardar'}
         </Button>
       </form>

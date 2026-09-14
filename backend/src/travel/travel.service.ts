@@ -187,6 +187,10 @@ export class TravelService {
     return reserva;
   }
 
+  buscarDestinosHotel(query: string) {
+    return this.hotelProviderService.activo.buscarDestinos(query);
+  }
+
   buscarHoteles(dto: BuscarHotelesDto) {
     return this.hotelProviderService.activo.buscarHoteles({
       destino: dto.destino,

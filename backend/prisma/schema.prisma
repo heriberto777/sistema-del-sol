@@ -666,6 +666,13 @@ model PlataformaConfiguracion {
   // sandbox real — no hay Bearer token, hace falta guardar las dos partes.
   hotelbedsApiKeyCifrado String?
   hotelbedsSecretCifrado String?
+  // Hotelbeds cotiza siempre en EUR (confirmado contra el sandbox real, sin
+  // parámetro de moneda en su API) — para vender en otra moneda hay que
+  // convertir nosotros mismos. null/"EUR" = sin conversión (passthrough).
+  // La tasa es manual (1 EUR = N de hotelbedsMoneda), igual criterio que las
+  // tasas de ISR/TSS de Nómina: no se verifica contra una fuente en vivo.
+  hotelbedsMoneda        String?
+  hotelbedsTasaCambio    Decimal? @db.Decimal(12, 6)
 
   @@map("plataforma_configuracion")
 }

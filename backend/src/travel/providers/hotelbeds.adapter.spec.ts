@@ -1,13 +1,16 @@
 import { ServiceUnavailableException } from '@nestjs/common';
 import { HotelbedsAdapter } from './hotelbeds.adapter';
+import { RedisService } from '../../redis/redis.service';
 
 describe('HotelbedsAdapter', () => {
   let adapter: HotelbedsAdapter;
   let fetchMock: jest.Mock;
+  let redisMock: jest.Mocked<Pick<RedisService, 'obtenerJson' | 'guardarJson'>>;
   const ENV_ORIGINAL = { ...process.env };
 
   beforeEach(() => {
-    adapter = new HotelbedsAdapter();
+    redisMock = { obtenerJson: jest.fn().mockResolvedValue(null), guardarJson: jest.fn().mockResolvedValue(undefined) };
+    adapter = new HotelbedsAdapter(redisMock as unknown as RedisService);
     fetchMock = jest.fn();
     (global as unknown as { fetch: typeof fetch }).fetch = fetchMock as never;
   });
@@ -138,7 +141,7 @@ describe('HotelbedsAdapter', () => {
 
     const resultado = await adapter.cotizarCancelacion('1-8322356');
 
-    expect(resultado).toEqual({ id: 'CANC-1', montoReembolso: '0', moneda: 'EUR' });
+    expect(resultado).toEqual({ id: 'CANC-1', montoReembolso: '0.00', moneda: 'EUR' });
     const [url] = fetchMock.mock.calls[0];
     expect(url).toBe('https://api.test.hotelbeds.com/hotel-api/1.0/bookings/1-8322356?cancellationFlag=SIMULATION');
   });
@@ -188,5 +191,116 @@ describe('HotelbedsAdapter', () => {
     fetchMock.mockRejectedValue(new Error('ECONNRESET'));
 
     await expect(adapter.confirmarTarifa('RK1')).rejects.toThrow(ServiceUnavailableException);
+  });
+
+  describe('conversión de moneda (Hotelbeds siempre cotiza en EUR)', () => {
+    beforeEach(() => {
+      process.env.HOTELBEDS_API_KEY = 'key123';
+      process.env.HOTELBEDS_SECRET = 'secret123';
+    });
+
+    it('sin HOTELBEDS_MONEDA configurada, pasa los montos de Hotelbeds tal cual en EUR', async () => {
+      fetchMock.mockResolvedValue({ ok: true, json: async () => ({ hotel: { totalNet: '198.36', rooms: [{ rates: [{ rateKey: 'RK1' }] }] } }) });
+      const resultado = await adapter.confirmarTarifa('RK1');
+      expect(resultado).toEqual({ rateKey: 'RK1', montoNeto: '198.36', moneda: 'EUR' });
+    });
+
+    it('con HOTELBEDS_MONEDA=USD y una tasa configurada, convierte el monto y cambia la moneda devuelta', async () => {
+      process.env.HOTELBEDS_MONEDA = 'USD';
+      process.env.HOTELBEDS_TASA_CAMBIO = '1.08';
+      fetchMock.mockResolvedValue({ ok: true, json: async () => ({ hotel: { totalNet: '100.00', rooms: [{ rates: [{ rateKey: 'RK1' }] }] } }) });
+
+      const resultado = await adapter.confirmarTarifa('RK1');
+
+      expect(resultado).toEqual({ rateKey: 'RK1', montoNeto: '108.00', moneda: 'USD' });
+    });
+
+    it('con moneda distinta de EUR pero sin tasa configurada, no rompe — usa tasa 1 como fallback seguro', async () => {
+      process.env.HOTELBEDS_MONEDA = 'USD';
+      delete process.env.HOTELBEDS_TASA_CAMBIO;
+      fetchMock.mockResolvedValue({ ok: true, json: async () => ({ hotel: { totalNet: '100.00', rooms: [{ rates: [{ rateKey: 'RK1' }] }] } }) });
+
+      const resultado = await adapter.confirmarTarifa('RK1');
+
+      expect(resultado).toEqual({ rateKey: 'RK1', montoNeto: '100.00', moneda: 'USD' });
+    });
+
+    it('confirmarCancelacion convierte la penalidad ANTES de restarla del monto original (ambos ya en la moneda configurada)', async () => {
+      process.env.HOTELBEDS_MONEDA = 'USD';
+      process.env.HOTELBEDS_TASA_CAMBIO = '1.10';
+      // Penalidad real de Hotelbeds: 50 EUR -> 55 USD. Original ya guardado en USD: 218.196 (198.36 EUR * 1.10).
+      fetchMock.mockResolvedValue({ ok: true, json: async () => ({ cancellationAmount: 50 }) });
+
+      const resultado = await adapter.confirmarCancelacion('1-8322356', 218.2);
+
+      expect(resultado).toEqual({ reembolsado: true, montoReembolso: '163.20', moneda: 'USD' });
+    });
+  });
+
+  describe('buscarDestinos', () => {
+    beforeEach(() => {
+      process.env.HOTELBEDS_API_KEY = 'key123';
+      process.env.HOTELBEDS_SECRET = 'secret123';
+    });
+
+    it('devuelve [] sin llamar a fetch si la consulta está vacía', async () => {
+      const resultado = await adapter.buscarDestinos('   ');
+      expect(resultado).toEqual([]);
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('pagina el catálogo completo (tope real de 1000 por página) y filtra sin distinguir acentos/mayúsculas', async () => {
+      fetchMock
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({
+            total: 3,
+            destinations: [
+              { code: 'DOM', name: { content: 'Santo Domingo' }, countryCode: 'DO' },
+              { code: 'PMI', name: { content: 'Palma de Mallorca' }, countryCode: 'ES' },
+              { code: 'S1E', countryCode: 'DO' }, // sin name — se descarta, no es buscable por texto
+            ],
+          }),
+        });
+
+      const resultado = await adapter.buscarDestinos('santo');
+
+      expect(resultado).toEqual([{ codigo: 'DOM', nombre: 'Santo Domingo', pais: 'República Dominicana', bandera: '🇩🇴' }]);
+      // Una sola página porque total(3) <= PAGE(1000)
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      const [url, opciones] = fetchMock.mock.calls[0];
+      expect(url).toBe('https://api.test.hotelbeds.com/hotel-content-api/1.0/locations/destinations?fields=code,name,countryCode&language=CAS&from=1&to=1000');
+      expect(opciones.method).toBe('GET');
+    });
+
+    it('cachea el catálogo en Redis — una segunda búsqueda no vuelve a pedir las páginas a Hotelbeds', async () => {
+      fetchMock.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ total: 1, destinations: [{ code: 'PUJ', name: { content: 'Punta Cana' }, countryCode: 'DO' }] }),
+      });
+
+      await adapter.buscarDestinos('punta');
+      expect(redisMock.guardarJson).toHaveBeenCalledWith(
+        'travel:hotelbeds:destinos',
+        [{ code: 'PUJ', nombre: 'Punta Cana', pais: 'República Dominicana', bandera: '🇩🇴' }],
+        24 * 60 * 60,
+      );
+
+      // Simula el hit de caché que guardarJson dejó guardado.
+      redisMock.obtenerJson.mockResolvedValue([{ code: 'PUJ', nombre: 'Punta Cana', pais: 'República Dominicana', bandera: '🇩🇴' }]);
+      const resultado2 = await adapter.buscarDestinos('cana');
+
+      expect(resultado2).toEqual([{ codigo: 'PUJ', nombre: 'Punta Cana', pais: 'República Dominicana', bandera: '🇩🇴' }]);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('un cache-hit en Redis no llama a fetch en absoluto', async () => {
+      redisMock.obtenerJson.mockResolvedValue([{ code: 'DOM', nombre: 'Santo Domingo', pais: 'República Dominicana', bandera: '🇩🇴' }]);
+
+      const resultado = await adapter.buscarDestinos('santo');
+
+      expect(resultado).toEqual([{ codigo: 'DOM', nombre: 'Santo Domingo', pais: 'República Dominicana', bandera: '🇩🇴' }]);
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
   });
 });

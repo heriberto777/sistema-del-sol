@@ -1,7 +1,7 @@
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { AlertTriangle, BedDouble, Clock, DollarSign, Plane, Plus, Receipt, Trash2, Wallet, X } from 'lucide-react';
+import { AlertTriangle, ArrowLeftRight, BedDouble, ChevronDown, Clock, DollarSign, Plane, Plus, Receipt, Trash2, Users, Wallet, X } from 'lucide-react';
 import { apiClient } from '../lib/api-client';
 import { useAuth } from '../hooks/useAuth';
 import { mensajeErrorApi } from '../lib/mensaje-error-api';
@@ -10,6 +10,8 @@ import { Card } from '../components/atoms/Card/Card';
 import { Select } from '../components/atoms/Select/Select';
 import { Input } from '../components/atoms/Input/Input';
 import { FormField } from '../components/molecules/FormField/FormField';
+import { AutocompleteAeropuerto } from '../components/molecules/AutocompleteAeropuerto/AutocompleteAeropuerto';
+import { AutocompleteDestinoHotel } from '../components/molecules/AutocompleteDestinoHotel/AutocompleteDestinoHotel';
 import { Modal } from '../components/molecules/Modal/Modal';
 import { ConfirmModal } from '../components/molecules/ConfirmModal/ConfirmModal';
 import { EstadoVacio } from '../components/molecules/EstadoVacio/EstadoVacio';
@@ -481,35 +483,71 @@ function formatoHoraVuelo(iso: string): string {
   return iso.slice(11, 16);
 }
 
+function minutosDesdeIso(iso: string): number {
+  const match = iso.match(/PT(?:(\d+)H)?(?:(\d+)M)?/);
+  return Number(match?.[1] ?? 0) * 60 + Number(match?.[2] ?? 0);
+}
+function duracionTotalMinutos(oferta: OfertaVuelo): number {
+  return oferta.tramosCrudo.reduce((acc, t) => acc + minutosDesdeIso(t.duration), 0);
+}
+function ofertaEsDirecta(oferta: OfertaVuelo): boolean {
+  return oferta.tramosCrudo.every((t) => t.segments.length === 1);
+}
+
 const ETIQUETA_TIPO_PASAJERO: Record<string, string> = { adult: 'Adulto', child: 'Niño', infant_without_seat: 'Bebé' };
 
-function TarjetaOferta({ oferta, onReservar }: { oferta: OfertaVuelo; onReservar: () => void }) {
+const ORDENES_VUELO = [
+  { id: 'recomendado', etiqueta: 'Recomendado' },
+  { id: 'precio', etiqueta: 'Más económico' },
+  { id: 'duracion', etiqueta: 'Más rápido' },
+] as const;
+
+/** Fila de resultado — estilo comparativo (aerolínea/badges + horarios + precio) inspirado en Trip.com. */
+function FilaOferta({ oferta, onReservar }: { oferta: OfertaVuelo; onReservar: () => void }) {
   const minutosParaExpirar = Math.max(0, Math.round((new Date(oferta.expiraEn).getTime() - Date.now()) / 60_000));
+  const directo = ofertaEsDirecta(oferta);
+  const aerolinea = oferta.tramosCrudo[0]?.segments[0]?.marketing_carrier.name ?? '—';
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
-      <div className="space-y-3">
+    <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900 sm:flex-row sm:items-center">
+      <div className="flex shrink-0 items-center gap-2.5 sm:w-40">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sol-100 text-xs font-bold text-sol-700 dark:bg-sol-500/10 dark:text-sol-400">
+          {aerolinea.slice(0, 2).toUpperCase()}
+        </span>
+        <div className="min-w-0">
+          <p className="truncate text-sm font-semibold text-slate-800 dark:text-slate-100">{aerolinea}</p>
+          <span
+            className={clsx(
+              'inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase',
+              directo ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400' : 'bg-slate-100 text-slate-500 dark:bg-slate-800',
+            )}
+          >
+            {directo ? 'Directo' : 'Con escala(s)'}
+          </span>
+        </div>
+      </div>
+
+      <div className="flex-1 space-y-1.5">
         {oferta.tramosCrudo.map((tramo) => (
-          <div key={tramo.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+          <div key={tramo.id} className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-sm">
             <span className="font-semibold text-slate-800 dark:text-slate-100">
               {tramo.origin.iata_code} {formatoHoraVuelo(tramo.segments[0]?.departing_at ?? '')} → {tramo.destination.iata_code}{' '}
               {formatoHoraVuelo(tramo.segments[tramo.segments.length - 1]?.arriving_at ?? '')}
             </span>
             <span className="text-slate-400">{formatoDuracionIso(tramo.duration)}</span>
             <span className="text-slate-400">{tramo.segments.length === 1 ? 'Directo' : `${tramo.segments.length - 1} escala(s)`}</span>
-            <span className="text-slate-500 dark:text-slate-400">{tramo.segments[0]?.marketing_carrier.name}</span>
           </div>
         ))}
       </div>
 
-      <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-3 dark:border-slate-800">
-        <span className="text-[11px] text-slate-400">Oferta válida por {minutosParaExpirar} min</span>
+      <div className="flex shrink-0 items-center justify-between gap-4 border-t border-slate-100 pt-3 dark:border-slate-800 sm:w-44 sm:flex-col sm:items-end sm:border-t-0 sm:pt-0">
+        <span className="text-[11px] text-slate-400">Válida {minutosParaExpirar} min</span>
         <div className="flex items-center gap-3">
           <span className="text-lg font-semibold text-slate-900 dark:text-slate-100">
             {oferta.moneda} {Number(oferta.montoTotal).toLocaleString('es-DO', { minimumFractionDigits: 2 })}
           </span>
           <Button type="button" onClick={onReservar}>
-            Reservar
+            Seleccionar
           </Button>
         </div>
       </div>
@@ -757,11 +795,159 @@ function ReservarOfertaModal({
   );
 }
 
+/** Popover "¿Quiénes vuelan?" — mismos datos de siempre (adultos + edad exacta de niños/bebés), agrupados como en Avianca. */
+function PasajerosPopover({ form, setForm }: { form: typeof FORM_BUSQUEDA_VACIO; setForm: (f: typeof FORM_BUSQUEDA_VACIO) => void }) {
+  const [abierto, setAbierto] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function onClickFuera(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setAbierto(false);
+    }
+    document.addEventListener('mousedown', onClickFuera);
+    return () => document.removeEventListener('mousedown', onClickFuera);
+  }, []);
+
+  const resumen = [
+    `${form.adultos} adulto${form.adultos === 1 ? '' : 's'}`,
+    form.ninos.length ? `${form.ninos.length} niño${form.ninos.length === 1 ? '' : 's'}` : null,
+    form.infantes.length ? `${form.infantes.length} bebé${form.infantes.length === 1 ? '' : 's'}` : null,
+  ]
+    .filter(Boolean)
+    .join(', ');
+
+  return (
+    <div ref={ref} className="relative flex flex-col gap-1">
+      <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Pasajeros</label>
+      <button
+        type="button"
+        onClick={() => setAbierto((v) => !v)}
+        className="flex items-center justify-between gap-2 rounded-lg border border-slate-300 px-3 py-2 text-left text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+      >
+        <span className="flex items-center gap-1.5 truncate">
+          <Users size={14} className="shrink-0 text-slate-400" />
+          {resumen}
+        </span>
+        <ChevronDown size={14} className="shrink-0 text-slate-400" />
+      </button>
+
+      {abierto && (
+        <div className="absolute top-full z-20 mt-1 w-80 space-y-4 rounded-xl border border-slate-200 bg-white p-4 shadow-lg dark:border-slate-700 dark:bg-slate-900">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-slate-800 dark:text-slate-100">Adultos</p>
+              <p className="text-xs text-slate-400">Desde 15 años</p>
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                disabled={form.adultos <= 1}
+                onClick={() => setForm({ ...form, adultos: form.adultos - 1 })}
+                className="flex h-7 w-7 items-center justify-center rounded-full border border-slate-300 disabled:opacity-30 dark:border-slate-700"
+              >
+                −
+              </button>
+              <span className="w-4 text-center font-mono text-sm font-semibold">{form.adultos}</span>
+              <button
+                type="button"
+                disabled={form.adultos >= 9}
+                onClick={() => setForm({ ...form, adultos: form.adultos + 1 })}
+                className="flex h-7 w-7 items-center justify-center rounded-full border border-slate-300 disabled:opacity-30 dark:border-slate-700"
+              >
+                +
+              </button>
+            </div>
+          </div>
+
+          <div className="space-y-2 border-t border-slate-100 pt-3 dark:border-slate-800">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-slate-800 dark:text-slate-100">Niños</p>
+                <p className="text-xs text-slate-400">2 a 17 años</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setForm({ ...form, ninos: [...form.ninos, 8] })}
+                disabled={form.ninos.length >= 8}
+                className="text-xs font-medium text-sol-600 hover:underline disabled:opacity-50 dark:text-sol-400"
+              >
+                + Agregar
+              </button>
+            </div>
+            {form.ninos.map((edad, i) => (
+              <div key={i} className="flex items-center gap-2 pl-1">
+                <span className="text-xs text-slate-400">Edad</span>
+                <Input
+                  type="number"
+                  min={2}
+                  max={17}
+                  value={edad}
+                  onChange={(e) => setForm({ ...form, ninos: form.ninos.map((v, j) => (j === i ? Number(e.target.value) : v)) })}
+                  className="!w-16 !py-1"
+                />
+                <button type="button" onClick={() => setForm({ ...form, ninos: form.ninos.filter((_, j) => j !== i) })} aria-label="Quitar niño">
+                  <X size={14} className="text-slate-400 hover:text-red-600" />
+                </button>
+              </div>
+            ))}
+          </div>
+
+          <div className="space-y-2 border-t border-slate-100 pt-3 dark:border-slate-800">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-slate-800 dark:text-slate-100">Bebés</p>
+                <p className="text-xs text-slate-400">Menores de 2 años, en brazos</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setForm({ ...form, infantes: [...form.infantes, 1] })}
+                disabled={form.infantes.length >= form.adultos}
+                className="text-xs font-medium text-sol-600 hover:underline disabled:opacity-50 dark:text-sol-400"
+              >
+                + Agregar
+              </button>
+            </div>
+            {form.infantes.length >= form.adultos && (
+              <p className="text-xs text-slate-400">Cada bebé necesita viajar con un adulto — agregá otro adulto para sumar otro bebé.</p>
+            )}
+            {form.infantes.map((edad, i) => (
+              <div key={i} className="flex items-center gap-2 pl-1">
+                <span className="text-xs text-slate-400">Edad</span>
+                <Input
+                  type="number"
+                  min={0}
+                  max={1}
+                  value={edad}
+                  onChange={(e) => setForm({ ...form, infantes: form.infantes.map((v, j) => (j === i ? Number(e.target.value) : v)) })}
+                  className="!w-16 !py-1"
+                />
+                <button type="button" onClick={() => setForm({ ...form, infantes: form.infantes.filter((_, j) => j !== i) })} aria-label="Quitar bebé">
+                  <X size={14} className="text-slate-400 hover:text-red-600" />
+                </button>
+              </div>
+            ))}
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setAbierto(false)}
+            className="w-full rounded-lg bg-slate-900 py-2 text-sm font-semibold text-white dark:bg-slate-100 dark:text-slate-900"
+          >
+            Confirmar
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function BuscarVueloTab({ clientes }: { clientes: ClienteOpcion[] | undefined }) {
   const queryClient = useQueryClient();
   const [form, setForm] = useState(FORM_BUSQUEDA_VACIO);
   const [ofertaAReservar, setOfertaAReservar] = useState<OfertaVuelo | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [orden, setOrden] = useState<(typeof ORDENES_VUELO)[number]['id']>('recomendado');
+  const [soloDirectos, setSoloDirectos] = useState(false);
 
   const buscar = useMutation({
     mutationFn: async () => {
@@ -808,101 +994,61 @@ function BuscarVueloTab({ clientes }: { clientes: ClienteOpcion[] | undefined })
     <div className="space-y-4">
       <Card>
         <form onSubmit={onSubmit} className="space-y-3">
-          <div className="flex gap-4 text-sm">
-            <label className="flex items-center gap-1.5">
-              <input type="radio" checked={form.tipoViaje === 'ida'} onChange={() => setForm({ ...form, tipoViaje: 'ida' })} />
+          <div className="inline-flex rounded-full bg-slate-100 p-1 dark:bg-slate-800">
+            <button
+              type="button"
+              onClick={() => setForm({ ...form, tipoViaje: 'ida' })}
+              className={clsx(
+                'rounded-full px-4 py-1.5 text-sm font-semibold transition-colors',
+                form.tipoViaje === 'ida' ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-slate-100' : 'text-slate-500 dark:text-slate-400',
+              )}
+            >
               Solo ida
-            </label>
-            <label className="flex items-center gap-1.5">
-              <input type="radio" checked={form.tipoViaje === 'ida_vuelta'} onChange={() => setForm({ ...form, tipoViaje: 'ida_vuelta' })} />
+            </button>
+            <button
+              type="button"
+              onClick={() => setForm({ ...form, tipoViaje: 'ida_vuelta' })}
+              className={clsx(
+                'rounded-full px-4 py-1.5 text-sm font-semibold transition-colors',
+                form.tipoViaje === 'ida_vuelta' ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-slate-100' : 'text-slate-500 dark:text-slate-400',
+              )}
+            >
               Ida y vuelta
-            </label>
+            </button>
           </div>
 
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-6">
-            <FormField label="Origen (IATA)" value={form.origen} onChange={(e) => setForm({ ...form, origen: e.target.value })} maxLength={3} placeholder="SDQ" required />
-            <FormField label="Destino (IATA)" value={form.destino} onChange={(e) => setForm({ ...form, destino: e.target.value })} maxLength={3} placeholder="MAD" required />
-            <FormField label="Salida" type="date" value={form.fechaSalida} onChange={(e) => setForm({ ...form, fechaSalida: e.target.value })} required />
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-12">
+            <div className="flex items-end gap-2 lg:col-span-5">
+              <AutocompleteAeropuerto label="Origen" value={form.origen} onChange={(codigo) => setForm({ ...form, origen: codigo })} required />
+              <button
+                type="button"
+                onClick={() => setForm({ ...form, origen: form.destino, destino: form.origen })}
+                aria-label="Intercambiar origen y destino"
+                className="mb-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-300 text-slate-400 hover:border-sol-500 hover:text-sol-600 dark:border-slate-700 dark:hover:border-sol-500"
+              >
+                <ArrowLeftRight size={16} />
+              </button>
+              <AutocompleteAeropuerto label="Destino" value={form.destino} onChange={(codigo) => setForm({ ...form, destino: codigo })} required />
+            </div>
+            <div className="lg:col-span-2">
+              <FormField label="Salida" type="date" value={form.fechaSalida} onChange={(e) => setForm({ ...form, fechaSalida: e.target.value })} required />
+            </div>
             {form.tipoViaje === 'ida_vuelta' && (
-              <FormField label="Regreso" type="date" value={form.fechaRegreso} onChange={(e) => setForm({ ...form, fechaRegreso: e.target.value })} required />
+              <div className="lg:col-span-2">
+                <FormField label="Regreso" type="date" value={form.fechaRegreso} onChange={(e) => setForm({ ...form, fechaRegreso: e.target.value })} required />
+              </div>
             )}
-            <FormField
-              label="Adultos"
-              type="number"
-              min="1"
-              max="9"
-              value={form.adultos}
-              onChange={(e) => setForm({ ...form, adultos: Number(e.target.value) })}
-            />
-            <div className="flex flex-col gap-1">
+            <div className="lg:col-span-2">
+              <PasajerosPopover form={form} setForm={setForm} />
+            </div>
+            <div className="flex flex-col gap-1 lg:col-span-1">
               <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Cabina</label>
               <Select value={form.cabina} onChange={(e) => setForm({ ...form, cabina: e.target.value as typeof form.cabina })}>
                 <option value="economy">Económica</option>
-                <option value="premium_economy">Premium economy</option>
+                <option value="premium_economy">Premium</option>
                 <option value="business">Business</option>
                 <option value="first">Primera</option>
               </Select>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Niños (2-17 años)</label>
-                <button
-                  type="button"
-                  onClick={() => setForm({ ...form, ninos: [...form.ninos, 8] })}
-                  disabled={form.ninos.length >= 8}
-                  className="text-xs font-medium text-sol-600 hover:underline disabled:opacity-50 dark:text-sol-400"
-                >
-                  + Agregar niño
-                </button>
-              </div>
-              {form.ninos.map((edad, i) => (
-                <div key={i} className="flex items-center gap-2">
-                  <Input
-                    type="number"
-                    min={2}
-                    max={17}
-                    value={edad}
-                    onChange={(e) => setForm({ ...form, ninos: form.ninos.map((v, j) => (j === i ? Number(e.target.value) : v)) })}
-                  />
-                  <button type="button" onClick={() => setForm({ ...form, ninos: form.ninos.filter((_, j) => j !== i) })} aria-label="Quitar niño">
-                    <X size={16} className="text-slate-400 hover:text-red-600" />
-                  </button>
-                </div>
-              ))}
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Bebés (0-1 años, en brazos)</label>
-                <button
-                  type="button"
-                  onClick={() => setForm({ ...form, infantes: [...form.infantes, 1] })}
-                  disabled={form.infantes.length >= form.adultos}
-                  className="text-xs font-medium text-sol-600 hover:underline disabled:opacity-50 dark:text-sol-400"
-                >
-                  + Agregar bebé
-                </button>
-              </div>
-              {form.infantes.length >= form.adultos && (
-                <p className="text-xs text-slate-400">Cada bebé necesita viajar con un adulto responsable — agregá otro adulto para sumar otro bebé.</p>
-              )}
-              {form.infantes.map((edad, i) => (
-                <div key={i} className="flex items-center gap-2">
-                  <Input
-                    type="number"
-                    min={0}
-                    max={1}
-                    value={edad}
-                    onChange={(e) => setForm({ ...form, infantes: form.infantes.map((v, j) => (j === i ? Number(e.target.value) : v)) })}
-                  />
-                  <button type="button" onClick={() => setForm({ ...form, infantes: form.infantes.filter((_, j) => j !== i) })} aria-label="Quitar bebé">
-                    <X size={16} className="text-slate-400 hover:text-red-600" />
-                  </button>
-                </div>
-              ))}
             </div>
           </div>
 
@@ -915,14 +1061,52 @@ function BuscarVueloTab({ clientes }: { clientes: ClienteOpcion[] | undefined })
 
       {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
 
-      {buscar.data && (
-        <div className="space-y-3">
-          <p className="text-sm text-slate-500 dark:text-slate-400">{buscar.data.ofertas.length} oferta(s) encontrada(s).</p>
-          {buscar.data.ofertas.map((oferta) => (
-            <TarjetaOferta key={oferta.id} oferta={oferta} onReservar={() => setOfertaAReservar(oferta)} />
-          ))}
-        </div>
-      )}
+      {buscar.data && (() => {
+        const ofertasFiltradas = buscar.data.ofertas
+          .filter((o) => !soloDirectos || ofertaEsDirecta(o))
+          .slice()
+          .sort((a, b) => {
+            if (orden === 'precio') return Number(a.montoTotal) - Number(b.montoTotal);
+            if (orden === 'duracion') return duracionTotalMinutos(a) - duracionTotalMinutos(b);
+            return 0;
+          });
+
+        return (
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
+              <div className="flex gap-1">
+                {ORDENES_VUELO.map((o) => (
+                  <button
+                    key={o.id}
+                    type="button"
+                    onClick={() => setOrden(o.id)}
+                    className={clsx(
+                      'rounded-lg px-3 py-1.5 text-xs font-semibold',
+                      orden === o.id ? 'bg-sol-100 text-sol-700 dark:bg-sol-500/10 dark:text-sol-400' : 'text-slate-500 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-800',
+                    )}
+                  >
+                    {o.etiqueta}
+                  </button>
+                ))}
+              </div>
+              <label className="flex items-center gap-1.5 text-xs font-medium text-slate-600 dark:text-slate-300">
+                <input type="checkbox" checked={soloDirectos} onChange={(e) => setSoloDirectos(e.target.checked)} />
+                Solo directos
+              </label>
+              <span className="text-xs text-slate-400">
+                {ofertasFiltradas.length} de {buscar.data.ofertas.length} oferta(s)
+              </span>
+            </div>
+
+            {ofertasFiltradas.map((oferta) => (
+              <FilaOferta key={oferta.id} oferta={oferta} onReservar={() => setOfertaAReservar(oferta)} />
+            ))}
+            {ofertasFiltradas.length === 0 && (
+              <p className="text-sm text-slate-500 dark:text-slate-400">Ninguna oferta directa — desmarcá el filtro para ver todas.</p>
+            )}
+          </div>
+        );
+      })()}
 
       {ofertaAReservar && (
         <ReservarOfertaModal
@@ -950,6 +1134,74 @@ interface FormHuespedHotel {
   tipo: 'AD' | 'CH';
 }
 
+/** El `regimen` viene tal cual de Hotelbeds (boardName) — mapeo best-effort a ícono + etiqueta en español, con fallback al texto original. */
+const REGIMENES_CONOCIDOS: { patron: RegExp; icono: string; etiqueta: string }[] = [
+  { patron: /ALL\s*INCLUSIVE/i, icono: '🍹', etiqueta: 'Todo incluido' },
+  { patron: /FULL\s*BOARD/i, icono: '🍽️', etiqueta: 'Pensión completa' },
+  { patron: /HALF\s*BOARD/i, icono: '🍽️', etiqueta: 'Media pensión' },
+  { patron: /BED\s*AND\s*BREAKFAST|BREAKFAST/i, icono: '🥐', etiqueta: 'Desayuno incluido' },
+  { patron: /SELF\s*CATERING/i, icono: '🧑‍🍳', etiqueta: 'Autoservicio' },
+  { patron: /ROOM\s*ONLY|SIN\s*R[ÉE]GIMEN/i, icono: '🛏️', etiqueta: 'Solo habitación' },
+];
+function iconoYEtiquetaRegimen(regimen: string): { icono: string; etiqueta: string } {
+  const match = REGIMENES_CONOCIDOS.find((r) => r.patron.test(regimen));
+  return match ?? { icono: '🏨', etiqueta: regimen };
+}
+
+function TablaTarifasHabitacion({ habitacion, onReservar }: { habitacion: HotelListado['habitaciones'][number]; onReservar: (tarifa: TarifaHotel) => void }) {
+  const montoMasBarato = Math.min(...habitacion.tarifas.map((t) => Number(t.montoNeto)));
+
+  return (
+    <div className="overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700">
+      <p className="bg-slate-50 px-4 py-2.5 text-sm font-semibold text-slate-800 dark:bg-slate-800/60 dark:text-slate-100">{habitacion.nombre}</p>
+      <table className="w-full text-sm">
+        <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+          {habitacion.tarifas.map((tarifa, i) => {
+            const { icono, etiqueta } = iconoYEtiquetaRegimen(tarifa.regimen);
+            const esMasBarata = Number(tarifa.montoNeto) === montoMasBarato;
+            return (
+              // Hotelbeds puede repetir el mismo rateKey dentro de una misma habitación (confirmado en vivo) — el índice evita que React descarte una tarifa por key duplicada.
+              <tr key={`${tarifa.rateKey}-${i}`} className={esMasBarata ? 'bg-sol-50/60 dark:bg-sol-500/5' : undefined}>
+                <td className="px-4 py-2.5 font-medium text-slate-700 dark:text-slate-200">
+                  <span className="mr-1.5">{icono}</span>
+                  {etiqueta}
+                </td>
+                <td className="px-4 py-2.5">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span
+                      className={clsx(
+                        'rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase',
+                        tarifa.reembolsable
+                          ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400'
+                          : 'bg-slate-100 text-slate-500 dark:bg-slate-800',
+                      )}
+                    >
+                      {tarifa.reembolsable ? 'Reembolsable' : 'No reembolsable'}
+                    </span>
+                    {esMasBarata && (
+                      <span className="rounded-full bg-sol-100 px-2 py-0.5 text-[10px] font-semibold uppercase text-sol-700 dark:bg-sol-500/10 dark:text-sol-400">
+                        Más barata
+                      </span>
+                    )}
+                  </div>
+                </td>
+                <td className="px-4 py-2.5 text-right font-semibold text-slate-900 dark:text-slate-100">
+                  {tarifa.moneda} {Number(tarifa.montoNeto).toLocaleString('es-DO', { minimumFractionDigits: 2 })}
+                </td>
+                <td className="px-4 py-2.5 text-right">
+                  <Button type="button" onClick={() => onReservar(tarifa)} className="!px-3 !py-1 text-xs">
+                    Reservar
+                  </Button>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function TarjetaHotel({ hotel, onReservar }: { hotel: HotelListado; onReservar: (tarifa: TarifaHotel, habitacionNombre: string) => void }) {
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
@@ -961,29 +1213,9 @@ function TarjetaHotel({ hotel, onReservar }: { hotel: HotelListado; onReservar: 
           </p>
         </div>
       </div>
-      <div className="space-y-2">
+      <div className="space-y-3">
         {hotel.habitaciones.map((habitacion) => (
-          <div key={habitacion.codigo} className="rounded-lg bg-slate-50 p-3 dark:bg-slate-800/60">
-            <p className="mb-1.5 text-sm font-medium text-slate-700 dark:text-slate-300">{habitacion.nombre}</p>
-            <div className="space-y-1.5">
-              {habitacion.tarifas.map((tarifa) => (
-                <div key={tarifa.rateKey} className="flex flex-wrap items-center justify-between gap-2 text-sm">
-                  <span className="text-slate-600 dark:text-slate-300">
-                    {tarifa.regimen}
-                    {tarifa.reembolsable && <span className="ml-1.5 text-[10px] font-semibold uppercase text-emerald-600 dark:text-emerald-400">Reembolsable</span>}
-                  </span>
-                  <div className="flex items-center gap-3">
-                    <span className="font-semibold text-slate-800 dark:text-slate-100">
-                      {tarifa.moneda} {Number(tarifa.montoNeto).toLocaleString('es-DO', { minimumFractionDigits: 2 })}
-                    </span>
-                    <Button type="button" onClick={() => onReservar(tarifa, habitacion.nombre)} className="!px-3 !py-1 text-xs">
-                      Reservar
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+          <TablaTarifasHabitacion key={habitacion.codigo} habitacion={habitacion} onReservar={(tarifa) => onReservar(tarifa, habitacion.nombre)} />
         ))}
       </div>
     </div>
@@ -1148,7 +1380,7 @@ function BuscarHotelTab({ clientes }: { clientes: ClienteOpcion[] | undefined })
       <Card>
         <form onSubmit={onSubmit} className="space-y-3">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
-            <FormField label="Destino (código Hotelbeds)" value={form.destino} onChange={(e) => setForm({ ...form, destino: e.target.value })} maxLength={3} placeholder="PMI" required />
+            <AutocompleteDestinoHotel label="Destino" value={form.destino} onChange={(codigo) => setForm({ ...form, destino: codigo })} required />
             <FormField label="Check-in" type="date" value={form.checkIn} onChange={(e) => setForm({ ...form, checkIn: e.target.value })} required />
             <FormField label="Check-out" type="date" value={form.checkOut} onChange={(e) => setForm({ ...form, checkOut: e.target.value })} required />
             <FormField label="Adultos" type="number" min="1" max="9" value={form.adultos} onChange={(e) => setForm({ ...form, adultos: Number(e.target.value) })} />

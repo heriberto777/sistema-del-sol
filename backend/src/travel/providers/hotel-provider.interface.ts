@@ -12,6 +12,13 @@ import { CotizacionCancelacionVuelo, ResultadoCancelacionVuelo } from './travel-
  * tratan la cancelación de un hotel igual que la de un vuelo.
  */
 
+export interface DestinoHotel {
+  codigo: string;
+  nombre: string;
+  pais: string;
+  bandera: string;
+}
+
 export interface OcupacionHotel {
   habitaciones: number;
   adultos: number;
@@ -88,6 +95,9 @@ export interface ReservaHotelCreada {
 export interface HotelProvider {
   readonly clave: string;
   readonly habilitado: boolean;
+
+  /** Autocompletar de destino — catálogo propio del proveedor, NO son códigos IATA (ver comentario en HotelbedsAdapter). */
+  buscarDestinos(query: string): Promise<DestinoHotel[]>;
 
   buscarHoteles(request: BuscarHotelesRequest): Promise<ResultadoBusquedaHoteles>;
 

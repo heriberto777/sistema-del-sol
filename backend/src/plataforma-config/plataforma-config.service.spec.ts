@@ -28,6 +28,8 @@ const CONFIG_VACIA = {
   duffelWebhookSecretCifrado: null,
   hotelbedsApiKeyCifrado: null,
   hotelbedsSecretCifrado: null,
+  hotelbedsMoneda: null,
+  hotelbedsTasaCambio: null,
 };
 
 describe('PlataformaConfigService', () => {
@@ -92,6 +94,21 @@ describe('PlataformaConfigService', () => {
       expect(resultado.travel.hotelbedsSecretConfigurado).toBe(true);
       expect(JSON.stringify(resultado)).not.toContain('hb_key_real');
       expect(JSON.stringify(resultado)).not.toContain('hb_secret_real');
+    });
+
+    it('travel — hotelbedsMoneda por defecto es EUR y hotelbedsTasaCambio null (sin conversión configurada)', async () => {
+      const resultado = await service.obtener();
+      expect(resultado.travel.hotelbedsMoneda).toBe('EUR');
+      expect(resultado.travel.hotelbedsTasaCambio).toBeNull();
+    });
+
+    it('travel — expone hotelbedsMoneda/hotelbedsTasaCambio guardados (no son secretos, van en claro)', async () => {
+      repo.obtenerOCrear.mockResolvedValue({ ...CONFIG_VACIA, hotelbedsMoneda: 'USD', hotelbedsTasaCambio: 1.08 } as never);
+
+      const resultado = await service.obtener();
+
+      expect(resultado.travel.hotelbedsMoneda).toBe('USD');
+      expect(resultado.travel.hotelbedsTasaCambio).toBe(1.08);
     });
   });
 
@@ -181,6 +198,17 @@ describe('PlataformaConfigService', () => {
 
       expect(process.env.HOTELBEDS_API_KEY).toBe('hb_key_real');
       expect(process.env.HOTELBEDS_SECRET).toBe('hb_secret_real');
+    });
+
+    it('travel — sincroniza hotelbedsMoneda/hotelbedsTasaCambio a HOTELBEDS_MONEDA/HOTELBEDS_TASA_CAMBIO (lo que lee HotelbedsAdapter)', async () => {
+      delete process.env.HOTELBEDS_MONEDA;
+      delete process.env.HOTELBEDS_TASA_CAMBIO;
+      repo.actualizar.mockResolvedValue({ ...CONFIG_VACIA, hotelbedsMoneda: 'USD', hotelbedsTasaCambio: 1.08 } as never);
+
+      await service.actualizar({ hotelbedsMoneda: 'USD', hotelbedsTasaCambio: 1.08 } as never);
+
+      expect(process.env.HOTELBEDS_MONEDA).toBe('USD');
+      expect(process.env.HOTELBEDS_TASA_CAMBIO).toBe('1.08');
     });
 
     it('el modelo elegido por proveedor se guarda y se sincroniza a su variable de entorno', async () => {

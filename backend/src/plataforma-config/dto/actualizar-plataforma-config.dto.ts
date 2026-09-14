@@ -255,4 +255,15 @@ export class ActualizarPlataformaConfigDto {
   @IsOptional()
   @IsString()
   hotelbedsSecret?: string;
+
+  @ApiProperty({ required: false, description: 'Moneda en la que se muestran/venden las tarifas de hotel — Hotelbeds siempre cotiza en EUR, esto convierte. Vacío o "EUR" = sin conversión.' })
+  @IsOptional()
+  @IsString()
+  hotelbedsMoneda?: string;
+
+  @ApiProperty({ required: false, description: 'Tasa manual 1 EUR = N de hotelbedsMoneda — obligatoria si hotelbedsMoneda no es EUR' })
+  @IsOptional()
+  @IsNumber()
+  @Min(0.000001)
+  hotelbedsTasaCambio?: number;
 }
