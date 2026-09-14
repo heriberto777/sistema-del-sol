@@ -1,15 +1,17 @@
 import { DragEvent, FormEvent, useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { AlertTriangle, CalendarCheck, CheckCircle2, ListTodo, MessageSquare, Search, Send, Settings, Trash2, Plus } from 'lucide-react';
+import { AlertTriangle, CalendarCheck, CheckCircle2, Copy, ListTodo, MessageSquare, Search, Send, Settings, Trash2, Plus } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { apiClient } from '../lib/api-client';
 import { mensajeErrorApi } from '../lib/mensaje-error-api';
 import { Button } from '../components/atoms/Button/Button';
 import { Card } from '../components/atoms/Card/Card';
+import { Select } from '../components/atoms/Select/Select';
 import { TareaPersonalModal } from '../components/organisms/TareaPersonalModal/TareaPersonalModal';
 import { CategoriasIncentivoModal } from '../components/organisms/CategoriasIncentivoModal/CategoriasIncentivoModal';
 import {
+  CategoriaIncentivo,
   COLOR_BORDE_ESTADO_TAREA_PERSONAL,
   ESTADOS_TAREA_PERSONAL,
   ETIQUETA_ESTADO_TAREA_PERSONAL,
@@ -104,15 +106,33 @@ function FilaTarea({
   onAbrir,
   onToggle,
   onEliminar,
+  onDuplicar,
+  seleccionable = false,
+  seleccionada = false,
+  onToggleSeleccion,
 }: {
   tarea: TareaPersonal;
   onAbrir: () => void;
   onToggle: () => void;
   onEliminar: () => void;
+  onDuplicar: () => void;
+  /** Solo se muestra el checkbox de selección cuando hay un filtro de categoría activo (ver VistaLista). */
+  seleccionable?: boolean;
+  seleccionada?: boolean;
+  onToggleSeleccion?: () => void;
 }) {
   const hecha = tarea.estado === 'HECHA';
   return (
     <div className="flex items-center gap-3 px-5 py-3 hover:bg-slate-50 dark:hover:bg-slate-800/40">
+      {seleccionable && (
+        <input
+          type="checkbox"
+          checked={seleccionada}
+          onChange={onToggleSeleccion}
+          className="h-4 w-4 shrink-0 rounded border-slate-300 text-sol-600 focus:ring-sol-500 dark:border-slate-600"
+          aria-label="Seleccionar tarea"
+        />
+      )}
       <button
         type="button"
         onClick={onToggle}
@@ -149,6 +169,9 @@ function FilaTarea({
           <MessageSquare size={12} /> {tarea.comentarios.length}
         </span>
       )}
+      <button type="button" onClick={onDuplicar} className="shrink-0 text-slate-300 hover:text-sol-600" aria-label="Duplicar tarea" title="Duplicar — crea una copia en Por hacer, sin fecha">
+        <Copy size={14} />
+      </button>
       <button type="button" onClick={onEliminar} className="shrink-0 text-slate-300 hover:text-red-600" aria-label="Eliminar tarea">
         <Trash2 size={14} />
       </button>
@@ -163,39 +186,128 @@ function VistaLista({
   onAbrir,
   onCambiarEstado,
   onEliminar,
+  onDuplicar,
+  onDuplicarVarias,
 }: {
   tareas: TareaPersonal[];
   onAbrir: (t: TareaPersonal) => void;
   onCambiarEstado: (id: string, estado: string) => void;
   onEliminar: (id: string) => void;
+  onDuplicar: (t: TareaPersonal) => void;
+  onDuplicarVarias: (ts: TareaPersonal[]) => void;
 }) {
   const [busqueda, setBusqueda] = useState('');
+  const [categoriaFiltro, setCategoriaFiltro] = useState('');
+  const [seleccionadas, setSeleccionadas] = useState<Set<string>>(new Set());
   const [visiblesPendientes, setVisiblesPendientes] = useState(PAGINA_LISTA);
   const [visiblesHechas, setVisiblesHechas] = useState(PAGINA_LISTA);
+
+  const { data: categorias } = useQuery({
+    queryKey: ['categorias-incentivo'],
+    queryFn: async () => (await apiClient.get<CategoriaIncentivo[]>('/admin/categorias-incentivo')).data,
+  });
 
   useEffect(() => {
     setVisiblesPendientes(PAGINA_LISTA);
     setVisiblesHechas(PAGINA_LISTA);
   }, [busqueda]);
 
-  const filtradas = useMemo(() => tareas.filter((t) => coincideTexto(t, busqueda)), [tareas, busqueda]);
+  useEffect(() => setSeleccionadas(new Set()), [categoriaFiltro]);
+
+  const filtradas = useMemo(
+    () => tareas.filter((t) => coincideTexto(t, busqueda) && (!categoriaFiltro || t.categoriaIncentivoId === categoriaFiltro)),
+    [tareas, busqueda, categoriaFiltro],
+  );
   const pendientes = filtradas.filter((t) => t.estado !== 'HECHA').sort(compararPrioridad);
   const hechas = filtradas.filter((t) => t.estado === 'HECHA');
   const pendientesVisibles = pendientes.slice(0, visiblesPendientes);
   const hechasVisibles = hechas.slice(0, visiblesHechas);
 
+  function alternarSeleccion(id: string) {
+    setSeleccionadas((actual) => {
+      const nuevo = new Set(actual);
+      if (nuevo.has(id)) nuevo.delete(id);
+      else nuevo.add(id);
+      return nuevo;
+    });
+  }
+
+  const todasSeleccionadas = filtradas.length > 0 && filtradas.every((t) => seleccionadas.has(t.id));
+
+  function alternarSeleccionarTodas() {
+    setSeleccionadas(todasSeleccionadas ? new Set() : new Set(filtradas.map((t) => t.id)));
+  }
+
+  function duplicarSeleccionadas() {
+    onDuplicarVarias(filtradas.filter((t) => seleccionadas.has(t.id)));
+    setSeleccionadas(new Set());
+  }
+
   return (
     <div className="space-y-3">
-      {tareas.length > 0 && <BuscadorTareas valor={busqueda} onChange={setBusqueda} />}
+      {tareas.length > 0 && (
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <BuscadorTareas valor={busqueda} onChange={setBusqueda} />
+          {categorias && categorias.length > 0 && (
+            <Select value={categoriaFiltro} onChange={(e) => setCategoriaFiltro(e.target.value)} className="sm:max-w-[16rem]">
+              <option value="">Todas las categorías</option>
+              {categorias.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.nombre}
+                </option>
+              ))}
+            </Select>
+          )}
+        </div>
+      )}
+
+      {/* Duplicar en lote — pensado para tareas mensuales fijas de un mismo
+          renglón de incentivo: filtrás por categoría, elegís cuáles se
+          repiten este mes y las duplicás todas de una vez, en "Por hacer"
+          y sin fecha (igual que el duplicado individual). */}
+      {categoriaFiltro && filtradas.length > 0 && (
+        <div className="flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-2 dark:border-slate-700 dark:bg-slate-800/60">
+          <label className="flex items-center gap-2 text-xs font-medium text-slate-600 dark:text-slate-300">
+            <input
+              type="checkbox"
+              checked={todasSeleccionadas}
+              onChange={alternarSeleccionarTodas}
+              className="h-4 w-4 rounded border-slate-300 text-sol-600 focus:ring-sol-500 dark:border-slate-600"
+            />
+            Seleccionar todas ({filtradas.length})
+          </label>
+          <Button
+            type="button"
+            variante="secundario"
+            disabled={seleccionadas.size === 0}
+            onClick={duplicarSeleccionadas}
+            className="ml-auto flex items-center gap-1.5 py-1.5 text-xs"
+          >
+            <Copy size={13} />
+            Duplicar seleccionadas ({seleccionadas.size})
+          </Button>
+        </div>
+      )}
+
       <Card sinPadding>
         {pendientes.length === 0 && hechas.length === 0 && (
           <p className="p-8 text-center text-sm text-slate-400">
-            {busqueda ? 'Ninguna tarea coincide con la búsqueda.' : 'Sin tareas todavía — agregá la primera arriba.'}
+            {busqueda || categoriaFiltro ? 'Ninguna tarea coincide con el filtro.' : 'Sin tareas todavía — agregá la primera arriba.'}
           </p>
         )}
         <div className="divide-y divide-slate-100 dark:divide-slate-800">
           {pendientesVisibles.map((t) => (
-            <FilaTarea key={t.id} tarea={t} onAbrir={() => onAbrir(t)} onToggle={() => onCambiarEstado(t.id, 'HECHA')} onEliminar={() => onEliminar(t.id)} />
+            <FilaTarea
+              key={t.id}
+              tarea={t}
+              onAbrir={() => onAbrir(t)}
+              onToggle={() => onCambiarEstado(t.id, 'HECHA')}
+              onEliminar={() => onEliminar(t.id)}
+              onDuplicar={() => onDuplicar(t)}
+              seleccionable={!!categoriaFiltro}
+              seleccionada={seleccionadas.has(t.id)}
+              onToggleSeleccion={() => alternarSeleccion(t.id)}
+            />
           ))}
         </div>
         {pendientes.length > visiblesPendientes && (
@@ -210,7 +322,17 @@ function VistaLista({
             </summary>
             <div className="divide-y divide-slate-100 dark:divide-slate-800">
               {hechasVisibles.map((t) => (
-                <FilaTarea key={t.id} tarea={t} onAbrir={() => onAbrir(t)} onToggle={() => onCambiarEstado(t.id, 'PENDIENTE')} onEliminar={() => onEliminar(t.id)} />
+                <FilaTarea
+                  key={t.id}
+                  tarea={t}
+                  onAbrir={() => onAbrir(t)}
+                  onToggle={() => onCambiarEstado(t.id, 'PENDIENTE')}
+                  onEliminar={() => onEliminar(t.id)}
+                  onDuplicar={() => onDuplicar(t)}
+                  seleccionable={!!categoriaFiltro}
+                  seleccionada={seleccionadas.has(t.id)}
+                  onToggleSeleccion={() => alternarSeleccion(t.id)}
+                />
               ))}
             </div>
             {hechas.length > visiblesHechas && (
@@ -227,7 +349,18 @@ function VistaLista({
 
 type Densidad = 'clasica' | 'compacta';
 
-function TarjetaKanban({ tarea, onAbrir, densidad = 'clasica' }: { tarea: TareaPersonal; onAbrir: () => void; densidad?: Densidad }) {
+function TarjetaKanban({
+  tarea,
+  onAbrir,
+  onDuplicar,
+  densidad = 'clasica',
+}: {
+  tarea: TareaPersonal;
+  onAbrir: () => void;
+  /** Omitido en la Agenda semanal (densidad compacta ahí) — no hace falta ese caso de uso. */
+  onDuplicar?: () => void;
+  densidad?: Densidad;
+}) {
   function onDragStart(e: DragEvent<HTMLDivElement>) {
     e.dataTransfer.setData('text/plain', tarea.id);
     e.dataTransfer.effectAllowed = 'move';
@@ -267,9 +400,23 @@ function TarjetaKanban({ tarea, onAbrir, densidad = 'clasica' }: { tarea: TareaP
         <span className={clsx('h-1.5 w-1.5 shrink-0 rounded-full', PUNTO_PRIORIDAD_TAREA_PERSONAL[tarea.prioridad])} />
         {tarea.fecha && <span className="text-[10px] text-slate-400">{formatoFechaBadge(tarea.fecha)}</span>}
         {tarea.comentarios.length > 0 && (
-          <span className="ml-auto flex items-center gap-0.5 text-[10px] text-slate-400">
+          <span className="flex items-center gap-0.5 text-[10px] text-slate-400">
             <MessageSquare size={10} /> {tarea.comentarios.length}
           </span>
+        )}
+        {onDuplicar && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDuplicar();
+            }}
+            className="ml-auto shrink-0 text-slate-300 hover:text-sol-600"
+            aria-label="Duplicar tarea"
+            title="Duplicar — crea una copia en Por hacer, sin fecha"
+          >
+            <Copy size={12} />
+          </button>
         )}
       </div>
       <p className="line-clamp-2 text-[12.5px] leading-snug text-slate-800 dark:text-slate-100">{tarea.titulo}</p>
@@ -317,10 +464,12 @@ function VistaKanban({
   tareas,
   onAbrir,
   onCambiarEstado,
+  onDuplicar,
 }: {
   tareas: TareaPersonal[];
   onAbrir: (t: TareaPersonal) => void;
   onCambiarEstado: (id: string, estado: string) => void;
+  onDuplicar: (t: TareaPersonal) => void;
 }) {
   const [columnaDestacada, setColumnaDestacada] = useState<string | null>(null);
   const [busqueda, setBusqueda] = useState('');
@@ -370,7 +519,7 @@ function VistaKanban({
                 {ETIQUETA_ESTADO_TAREA_PERSONAL[estado]} <span className="text-slate-300 dark:text-slate-600">({items.length})</span>
               </p>
               {slice.map((t) => (
-                <TarjetaKanban key={t.id} tarea={t} onAbrir={() => onAbrir(t)} densidad={densidad} />
+                <TarjetaKanban key={t.id} tarea={t} onAbrir={() => onAbrir(t)} onDuplicar={() => onDuplicar(t)} densidad={densidad} />
               ))}
               {items.length === 0 && (
                 <p className="px-1 text-xs text-slate-300 dark:text-slate-600">{busqueda ? 'Nada por acá.' : 'Arrastrá una tarea acá'}</p>
@@ -827,6 +976,29 @@ export function MisTareas() {
     onError: (err) => setError(mensajeErrorApi(err, 'No se pudo eliminar la tarea.')),
   });
 
+  // Duplicar = crear de nuevo con los mismos datos, en "Por hacer" y sin
+  // fecha (omitir estado/fecha alcanza — el backend ya los pone por
+  // default) — pensado para las tareas de incentivo que se repiten mes a
+  // mes (CIGUAS APPS, Backups, ITT, ...). Acepta un array para que
+  // "Duplicar seleccionadas" reuse la misma mutación que el duplicado
+  // individual.
+  const duplicar = useMutation({
+    mutationFn: async (tareasADuplicar: TareaPersonal[]) =>
+      Promise.all(
+        tareasADuplicar.map((t) =>
+          apiClient.post('/admin/mis-tareas', {
+            titulo: t.titulo,
+            descripcion: t.descripcion ?? undefined,
+            categoriaIncentivoId: t.categoriaIncentivoId ?? undefined,
+            prioridad: t.prioridad,
+            etiquetas: t.etiquetas,
+          }),
+        ),
+      ),
+    onSuccess: invalidar,
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo duplicar la(s) tarea(s).')),
+  });
+
   function onCrear(e: FormEvent) {
     e.preventDefault();
     if (tituloNuevo.trim()) crear.mutate(tituloNuevo.trim());
@@ -885,10 +1057,22 @@ export function MisTareas() {
       {isLoading && <p className="text-sm text-slate-500 dark:text-slate-400">Cargando…</p>}
 
       {!isLoading && vista === 'lista' && (
-        <VistaLista tareas={lista} onAbrir={(t) => setTareaAbiertaId(t.id)} onCambiarEstado={(id, estado) => cambiarEstado.mutate({ id, estado })} onEliminar={(id) => eliminar.mutate(id)} />
+        <VistaLista
+          tareas={lista}
+          onAbrir={(t) => setTareaAbiertaId(t.id)}
+          onCambiarEstado={(id, estado) => cambiarEstado.mutate({ id, estado })}
+          onEliminar={(id) => eliminar.mutate(id)}
+          onDuplicar={(t) => duplicar.mutate([t])}
+          onDuplicarVarias={(ts) => duplicar.mutate(ts)}
+        />
       )}
       {!isLoading && vista === 'kanban' && (
-        <VistaKanban tareas={lista} onAbrir={(t) => setTareaAbiertaId(t.id)} onCambiarEstado={(id, estado) => cambiarEstado.mutate({ id, estado })} />
+        <VistaKanban
+          tareas={lista}
+          onAbrir={(t) => setTareaAbiertaId(t.id)}
+          onCambiarEstado={(id, estado) => cambiarEstado.mutate({ id, estado })}
+          onDuplicar={(t) => duplicar.mutate([t])}
+        />
       )}
       {!isLoading && vista === 'agenda' && <VistaAgenda tareas={lista} onAbrir={(t) => setTareaAbiertaId(t.id)} />}
       {!isLoading && vista === 'estadisticas' && <VistaEstadisticas tareas={lista} />}
