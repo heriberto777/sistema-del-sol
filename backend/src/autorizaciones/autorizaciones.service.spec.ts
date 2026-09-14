@@ -84,8 +84,8 @@ describe('AutorizacionesService', () => {
         expect.objectContaining({ tenantId: 't1', tipo: 'ANULACION_FACTURA', referenciaId: 'f1', solicitadoPorId: 'u1' }),
       );
       expect(emailChannel.enviar).toHaveBeenCalledTimes(2);
-      expect(emailChannel.enviar).toHaveBeenCalledWith('supervisor@ejemplo.com', expect.any(String), expect.any(String));
-      expect(emailChannel.enviar).toHaveBeenCalledWith('admin@ejemplo.com', expect.any(String), expect.any(String));
+      expect(emailChannel.enviar).toHaveBeenCalledWith('supervisor@ejemplo.com', expect.any(String), expect.any(String), undefined, 't1');
+      expect(emailChannel.enviar).toHaveBeenCalledWith('admin@ejemplo.com', expect.any(String), expect.any(String), undefined, 't1');
       expect(resultado.enviadoA).toHaveLength(2);
       expect(resultado.enviadoA[0]).not.toContain('supervisor@ejemplo.com'); // ofuscado, no el email completo
       expect(resultado.expiraEn.getTime()).toBeGreaterThan(Date.now());

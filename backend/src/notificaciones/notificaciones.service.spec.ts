@@ -50,7 +50,7 @@ describe('NotificacionesService', () => {
 
       await service.enviar({ tenantId: 't1', canal: 'EMAIL', clave: 'x', destinatario: 'a@b.com', variables: {} });
 
-      expect(emailChannel.enviar).toHaveBeenCalledWith('a@b.com', 'Hola', 'Cuerpo', undefined);
+      expect(emailChannel.enviar).toHaveBeenCalledWith('a@b.com', 'Hola', 'Cuerpo', undefined, 't1');
       expect(whatsAppChannel.enviar).not.toHaveBeenCalled();
       expect(repository.marcarEstado).toHaveBeenCalledWith('n1', 'ENVIADA');
     });
@@ -63,7 +63,7 @@ describe('NotificacionesService', () => {
 
       await service.enviar({ tenantId: 't1', canal: 'EMAIL', clave: 'x', destinatario: 'a@b.com', variables: {}, adjuntoPdf });
 
-      expect(emailChannel.enviar).toHaveBeenCalledWith('a@b.com', 'Hola', 'Cuerpo', [adjuntoPdf]);
+      expect(emailChannel.enviar).toHaveBeenCalledWith('a@b.com', 'Hola', 'Cuerpo', [adjuntoPdf], 't1');
     });
 
     it('canal WHATSAPP despacha por WhatsAppChannel, no por Email', async () => {
@@ -105,7 +105,7 @@ describe('NotificacionesService', () => {
 
       await service.enviar({ tenantId: 't1', canal: 'EMAIL', clave: 'x', destinatario: 'a@b.com', variables: { nombre: 'Ana', total: '100' } });
 
-      expect(emailChannel.enviar).toHaveBeenCalledWith('a@b.com', 'Hola Ana', 'Total: 100', undefined);
+      expect(emailChannel.enviar).toHaveBeenCalledWith('a@b.com', 'Hola Ana', 'Total: 100', undefined, 't1');
     });
   });
 
@@ -238,7 +238,7 @@ describe('NotificacionesService', () => {
         where: { tenantId: 't1', roles: { some: { role: { nombre: 'Admin Total' } } } },
       });
       expect(repository.buscarPlantilla).toHaveBeenCalledWith('t1', 'EMAIL', 'whatsapp_requiere_atencion');
-      expect(emailChannel.enviar).toHaveBeenCalledWith('admin@x.com', '', 'Atender WhatsApp whatsapp:+18095551234', undefined);
+      expect(emailChannel.enviar).toHaveBeenCalledWith('admin@x.com', '', 'Atender WhatsApp whatsapp:+18095551234', undefined, 't1');
     });
   });
 
@@ -465,7 +465,7 @@ describe('NotificacionesService', () => {
         comentario: 'cambiale el color a azul',
       });
 
-      expect(emailChannel.enviar).toHaveBeenCalledWith('creador@x.com', '', 'Te pidieron: cambiale el color a azul', undefined);
+      expect(emailChannel.enviar).toHaveBeenCalledWith('creador@x.com', '', 'Te pidieron: cambiale el color a azul', undefined, 't1');
     });
 
     it('no falla si el creador ya no existe', async () => {
@@ -504,7 +504,7 @@ describe('NotificacionesService', () => {
         motivoRechazo: 'La foto sale borrosa',
       });
 
-      expect(emailChannel.enviar).toHaveBeenCalledWith('creador@x.com', '', 'Motivo: La foto sale borrosa', undefined);
+      expect(emailChannel.enviar).toHaveBeenCalledWith('creador@x.com', '', 'Motivo: La foto sale borrosa', undefined, 't1');
     });
   });
 });

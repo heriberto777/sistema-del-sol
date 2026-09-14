@@ -70,7 +70,7 @@ describe('AuthService — recuperación de contraseña', () => {
           resetPasswordExpiraEn: expect.any(Date),
         }),
       });
-      expect(emailChannel.enviar).toHaveBeenCalledWith(dto.email, expect.any(String), expect.stringContaining('http'));
+      expect(emailChannel.enviar).toHaveBeenCalledWith(dto.email, expect.any(String), expect.stringContaining('http'), undefined, 't1');
     });
   });
 

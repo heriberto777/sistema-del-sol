@@ -39,7 +39,7 @@ BEGIN
       'codigos_autorizacion', 'comisiones_venta',
       'configuraciones_lealtad', 'movimientos_lealtad',
       'cajas', 'tasas_cambio', 'correlativos',
-      'whatsapp_config_tenant', 'pasarela_config_tenant',
+      'whatsapp_config_tenant', 'pasarela_config_tenant', 'email_config_tenant',
       'sesiones_cobro_factura', 'whatsapp_mensajes',
       'carritos_borrador', 'pedidos_tienda', 'secciones_tienda',
       'tenant_dominios',

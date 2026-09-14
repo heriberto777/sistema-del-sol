@@ -72,7 +72,7 @@ export class NotificacionesService {
 
     let enviada = true;
     if (params.canal === 'EMAIL') {
-      enviada = await this.emailChannel.enviar(params.destinatario, asunto ?? '', cuerpo, params.adjuntoPdf ? [params.adjuntoPdf] : undefined);
+      enviada = await this.emailChannel.enviar(params.destinatario, asunto ?? '', cuerpo, params.adjuntoPdf ? [params.adjuntoPdf] : undefined, params.tenantId);
     } else if (params.canal === 'WHATSAPP') {
       enviada = await this.whatsAppChannel.enviar(params.destinatario, asunto ?? '', cuerpo);
     }

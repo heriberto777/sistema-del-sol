@@ -65,7 +65,7 @@ describe('CategoriasIncentivoService', () => {
     });
 
     it('canal WHATSAPP llama a whatsAppChannel con el texto formateado (asteriscos, sin HTML)', async () => {
-      await service.enviarResumen('2026-09', 'WHATSAPP', '+18095550123');
+      await service.enviarResumen('2026-09', 'WHATSAPP', '+18095550123', 't1');
 
       expect(whatsAppChannel.enviar).toHaveBeenCalledTimes(1);
       const [destino, asunto, cuerpo] = whatsAppChannel.enviar.mock.calls[0];
@@ -77,7 +77,7 @@ describe('CategoriasIncentivoService', () => {
     });
 
     it('canal EMAIL llama a emailChannel envolviendo el mensaje en <pre> (para que se vea igual que en WhatsApp)', async () => {
-      await service.enviarResumen('2026-09', 'EMAIL', 'gerencia@ejemplo.com');
+      await service.enviarResumen('2026-09', 'EMAIL', 'gerencia@ejemplo.com', 't1');
 
       expect(emailChannel.enviar).toHaveBeenCalledTimes(1);
       const [destino, , cuerpo] = emailChannel.enviar.mock.calls[0];
@@ -90,7 +90,7 @@ describe('CategoriasIncentivoService', () => {
     it('si el canal devuelve false (SMTP/Twilio no configurado), lanza ServiceUnavailableException', async () => {
       whatsAppChannel.enviar.mockResolvedValue(false);
 
-      await expect(service.enviarResumen('2026-09', 'WHATSAPP', '+18095550123')).rejects.toThrow(ServiceUnavailableException);
+      await expect(service.enviarResumen('2026-09', 'WHATSAPP', '+18095550123', 't1')).rejects.toThrow(ServiceUnavailableException);
     });
   });
 });

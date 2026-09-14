@@ -42,6 +42,7 @@ import { EmisionECfModule } from './emision-ecf/emision-ecf.module';
 import { NcfPlataformaModule } from './ncf-plataforma/ncf-plataforma.module';
 import { CorrelativosModule } from './correlativos/correlativos.module';
 import { WhatsappConfigModule } from './whatsapp-config/whatsapp-config.module';
+import { EmailConfigTenantModule } from './email-config-tenant/email-config-tenant.module';
 import { WhatsappBotModule } from './whatsapp-bot/whatsapp-bot.module';
 import { PasarelaCobroModule } from './pasarela-cobro/pasarela-cobro.module';
 import { DocumentosPublicosModule } from './documentos-publicos/documentos-publicos.module';
@@ -142,6 +143,7 @@ import { TenantMiddleware } from './common/middleware/tenant.middleware';
     EmisionECfModule,
     CorrelativosModule,
     WhatsappConfigModule,
+    EmailConfigTenantModule,
     WhatsappBotModule,
     PasarelaCobroModule,
     DocumentosPublicosModule,

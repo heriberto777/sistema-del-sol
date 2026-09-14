@@ -75,7 +75,7 @@ export class AutorizacionesService {
 
     const asunto = 'Código de autorización — El Sistema del Sol';
     const cuerpo = `<p>Se solicitó autorización para: <strong>${params.descripcion}</strong> (monto RD$ ${params.monto.toFixed(2)}).</p><p>Código: <strong style="font-size:1.5em">${codigo}</strong></p><p>Vence en 5 minutos. Si no reconocés esta solicitud, ignorá este correo.</p>`;
-    await Promise.all(destinatarios.map((d) => this.emailChannel.enviar(d.email, asunto, cuerpo)));
+    await Promise.all(destinatarios.map((d) => this.emailChannel.enviar(d.email, asunto, cuerpo, undefined, params.tenantId)));
 
     return { expiraEn, enviadoA: destinatarios.map((d) => ofuscarEmail(d.email)) };
   }

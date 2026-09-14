@@ -49,7 +49,7 @@ export class AlertasBusquedaPropiedadCronService {
       });
 
       if (propiedades.length > 0) {
-        await this.enviarAviso(alerta.email, alerta.tenant.nombre, alerta.tenant.subdominio, propiedades);
+        await this.enviarAviso(alerta.email, alerta.tenant.nombre, alerta.tenant.subdominio, propiedades, alerta.tenantId);
         enviados++;
       }
       await this.prisma.alertaBusquedaPropiedad.update({ where: { id: alerta.id }, data: { ultimaNotificacionEn: new Date() } });
@@ -63,6 +63,7 @@ export class AlertasBusquedaPropiedadCronService {
     tenantNombre: string,
     subdominio: string,
     propiedades: { id: string; titulo: string; precio: unknown; moneda: string }[],
+    tenantId: string,
   ) {
     const base = process.env.FRONTEND_URL ?? 'http://localhost:5173';
     const items = propiedades
@@ -73,6 +74,6 @@ export class AlertasBusquedaPropiedadCronService {
       })
       .join('');
     const cuerpo = `<p>Encontramos ${propiedades.length} propiedad(es) nueva(s) que coinciden con tu búsqueda en ${tenantNombre}:</p><ul>${items}</ul>`;
-    await this.emailChannel.enviar(email, `Nuevas propiedades en ${tenantNombre}`, cuerpo);
+    await this.emailChannel.enviar(email, `Nuevas propiedades en ${tenantNombre}`, cuerpo, undefined, tenantId);
   }
 }

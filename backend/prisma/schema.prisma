@@ -111,6 +111,7 @@ model Tenant {
   ventasAparcadas           VentaAparcada[]
   carritosBorrador          CarritoBorrador[]
   whatsappConfig            WhatsappConfigTenant?
+  emailConfig               EmailConfigTenant?
   whatsappMensajes          WhatsappMensaje[]
   pasarelaConfig            PasarelaConfigTenant?
   sesionesCobroFactura      SesionCobroFactura[]
@@ -1031,6 +1032,33 @@ model WhatsappConfigTenant {
   updatedAt                   DateTime @updatedAt
 
   @@map("whatsapp_config_tenant")
+}
+
+/// SMTP propio por tenant — mismo molde de 4 capas que WhatsappConfigTenant
+/// (obtenerOCrear/aplicarCampoSecreto/aFormaSegura). Cuando `habilitado` y
+/// `smtpHost` están cargados, `EmailChannel.enviar()` lo usa para TODO el
+/// correo de ese tenant (factura/cotización al cliente, alertas de
+/// propiedades, recuperación de contraseña, códigos de autorización,
+/// reporte de incentivos) en vez del SMTP compartido de
+/// PlataformaConfiguracion — decisión explícita: una vez que el tenant
+/// carga su propio SMTP, TODO su correo sale de ahí, para que las
+/// respuestas del cliente lleguen a su bandeja real. Sin reintento: si
+/// falla, el envío queda como no enviado (mismo comportamiento que hoy
+/// con el único SMTP que existe) — el tenant debe corregir su config.
+model EmailConfigTenant {
+  id                  String   @id @default(uuid())
+  tenantId            String   @unique
+  tenant              Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  habilitado          Boolean  @default(false)
+  smtpHost            String?
+  smtpPort            Int?
+  smtpUser            String?
+  smtpPasswordCifrado String?
+  smtpFrom            String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@map("email_config_tenant")
 }
 
 /// Historial de conversación del bot de WhatsApp (ítem H-2b) — usa

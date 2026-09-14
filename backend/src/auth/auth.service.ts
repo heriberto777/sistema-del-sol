@@ -144,6 +144,8 @@ export class AuthService {
       user.email,
       'Restablece tu contraseña — El Sistema del Sol',
       `<p>Solicitaste restablecer tu contraseña.</p><p><a href="${enlace}">Haz clic aquí para continuar</a></p><p>Este enlace vence en 1 hora. Si no fuiste tú, ignora este correo.</p>`,
+      undefined,
+      tenant.id,
     );
 
     return RESPUESTA_GENERICA_OLVIDE;

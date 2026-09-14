@@ -54,6 +54,8 @@ describe('AlertasBusquedaPropiedadCronService', () => {
       'visitante@example.com',
       expect.stringContaining('Empresa Demo'),
       expect.stringContaining('/inmobiliaria/demo/p1'),
+      undefined,
+      't1',
     );
   });
 

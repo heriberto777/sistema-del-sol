@@ -116,14 +116,14 @@ export class CategoriasIncentivoService {
     ].join('\n');
   }
 
-  async enviarResumen(mes: string, canal: 'EMAIL' | 'WHATSAPP', destino: string) {
+  async enviarResumen(mes: string, canal: 'EMAIL' | 'WHATSAPP', destino: string, tenantId: string) {
     const resumen = await this.resumen(mes);
     const mensaje = this.construirMensaje(resumen);
     const asunto = `Reporte de cumplimiento de incentivo IT — ${resumen.periodo}`;
 
     const enviado =
       canal === 'EMAIL'
-        ? await this.emailChannel.enviar(destino, asunto, `<pre style="font-family:monospace;white-space:pre-wrap">${mensaje}</pre>`)
+        ? await this.emailChannel.enviar(destino, asunto, `<pre style="font-family:monospace;white-space:pre-wrap">${mensaje}</pre>`, undefined, tenantId)
         : await this.whatsAppChannel.enviar(destino, asunto, mensaje);
 
     if (!enviado) {
