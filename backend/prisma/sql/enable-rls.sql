@@ -47,7 +47,8 @@ BEGIN
       'sesiones_trabajo_tarea',
       'publicaciones_sociales',
       'propiedades', 'contratos_propiedad', 'alertas_busqueda_propiedad', 'cobros_alquiler',
-      'tareas_personales', 'categorias_incentivo'
+      'tareas_personales', 'categorias_incentivo',
+      'travel_reservas', 'travel_ledger_movimientos', 'travel_reglas_markup'
     ])
   LOOP
     EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY;', tabla);
