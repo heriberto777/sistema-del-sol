@@ -1,4 +1,4 @@
-import { DragEvent, MouseEvent, useEffect, useState } from 'react';
+import { DragEvent, MouseEvent, useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
 import { ChevronDown, ChevronRight, ChevronsDownUp, ChevronsLeft, ChevronsRight, ChevronsUpDown, MessageSquare, Pause, Play, Sparkles, Trash2 } from 'lucide-react';
@@ -14,6 +14,7 @@ import { SearchInput } from '../../molecules/SearchInput/SearchInput';
 import { ConfirmModal } from '../../molecules/ConfirmModal/ConfirmModal';
 import { RowActionsMenu } from '../../molecules/RowActionsMenu/RowActionsMenu';
 import { RequierePermiso } from '../RequierePermiso/RequierePermiso';
+import { BarraFormato, ContenidoComentario } from '../../molecules/ComentarioFormato/ComentarioFormato';
 import { TareaFormModal, TareaFormValues } from '../TareaFormModal/TareaFormModal';
 import { GenerarTareasIaModal, PlanIaParaCrear } from '../GenerarTareasIaModal/GenerarTareasIaModal';
 import { EmpleadoOpcion, ESTILO_PRIORIDAD_TAREA, ETIQUETA_PRIORIDAD_TAREA, Hito, Tarea } from '../../../types/proyectos';
@@ -701,8 +702,8 @@ export function KanbanTareas({ proyectoId, proyectoNombre, proyectoDescripcion, 
             </button>
           </div>
 
-          <div className={clsx('grid gap-5', panelComentariosAbierto && 'md:grid-cols-[minmax(0,1fr)_280px]')}>
-            <div className="space-y-5">
+          <div className={clsx('flex flex-col gap-5 md:items-start', panelComentariosAbierto && 'md:flex-row')}>
+            <div className="min-w-0 flex-1 space-y-5">
               <div>
                 <h3 className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-300">Responsables</h3>
                 <div className="flex flex-wrap gap-2">
@@ -762,11 +763,12 @@ export function KanbanTareas({ proyectoId, proyectoNombre, proyectoDescripcion, 
             </div>
 
             {panelComentariosAbierto && (
-              <div className="flex flex-col border-t border-slate-100 pt-5 dark:border-slate-800 md:border-l md:border-t-0 md:pl-5 md:pt-0">
-                <h3 className="mb-1 text-sm font-semibold text-slate-700 dark:text-slate-300">
+              <div className="flex flex-col border-t border-slate-100 pt-5 dark:border-slate-800 md:h-[28rem] md:w-72 md:shrink-0 md:border-l md:border-t-0 md:pl-5 md:pt-0">
+                <h3 className="mb-1 shrink-0 text-sm font-semibold text-slate-700 dark:text-slate-300">
                   Comentarios{tareaActual.comentarios.length > 0 && <span className="ml-1 font-normal text-slate-400">({tareaActual.comentarios.length})</span>}
                 </h3>
-                <div className="max-h-56 overflow-y-auto pr-1 md:max-h-none md:flex-1">
+                {/* min-h-0 es lo que hace que un flex item pueda encogerse por debajo de su contenido — sin esto, overflow-y-auto no scrollea nunca dentro de un flex column (bug real, confirmado: antes esta columna vivía en un `grid`, donde `flex-1` no hacía nada). */}
+                <div className="min-h-0 flex-1 overflow-y-auto pr-1">
                   {tareaActual.comentarios.length === 0 && <p className="py-2 text-xs text-slate-400">Sin comentarios todavía.</p>}
                   {tareaActual.comentarios.map((c, i) => (
                     <div key={c.id} className="group flex gap-2.5 border-b border-slate-100 py-2.5 first:pt-0 last:border-0 dark:border-slate-800">
@@ -795,15 +797,19 @@ export function KanbanTareas({ proyectoId, proyectoNombre, proyectoDescripcion, 
                             </button>
                           )}
                         </div>
-                        <p className="mt-0.5 whitespace-pre-wrap text-[13px] leading-relaxed text-slate-600 dark:text-slate-300">{c.contenido}</p>
+                        <div className="mt-0.5">
+                          <ContenidoComentario contenido={c.contenido} />
+                        </div>
                       </div>
                     </div>
                   ))}
                 </div>
-                <FormularioComentario
-                  onComentar={(contenido) => agregarComentario.mutate({ tareaId: tareaActual.id, contenido })}
-                  guardando={agregarComentario.isPending}
-                />
+                <div className="shrink-0">
+                  <FormularioComentario
+                    onComentar={(contenido) => agregarComentario.mutate({ tareaId: tareaActual.id, contenido })}
+                    guardando={agregarComentario.isPending}
+                  />
+                </div>
               </div>
             )}
           </div>
@@ -856,10 +862,11 @@ function FormularioHora({
 
 function FormularioComentario({ onComentar, guardando }: { onComentar: (contenido: string) => void; guardando: boolean }) {
   const [contenido, setContenido] = useState('');
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   return (
     <form
-      className="mt-3 border-t border-slate-100 pt-3 dark:border-slate-800"
+      className="mt-3 rounded-xl border border-slate-200 p-2.5 dark:border-slate-700"
       onSubmit={(e) => {
         e.preventDefault();
         if (contenido.trim()) {
@@ -869,14 +876,16 @@ function FormularioComentario({ onComentar, guardando }: { onComentar: (contenid
       }}
     >
       <textarea
+        ref={textareaRef}
         rows={2}
-        placeholder="Escribí un comentario para el equipo…"
+        placeholder="Escribí un comentario para el equipo — usá ``` para un bloque de código…"
         value={contenido}
         onChange={(e) => setContenido(e.target.value)}
-        className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none transition-colors placeholder:text-slate-400 focus:border-sol-500 focus:ring-2 focus:ring-sol-500/30 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500"
+        className="w-full resize-none border-none bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400 dark:text-slate-100 dark:placeholder:text-slate-500"
       />
-      <div className="mt-2 flex justify-end">
-        <Button type="submit" variante="secundario" disabled={!contenido.trim() || guardando}>
+      <div className="flex items-center justify-between">
+        <BarraFormato textareaRef={textareaRef} valor={contenido} onChange={setContenido} />
+        <Button type="submit" disabled={!contenido.trim() || guardando}>
           {guardando ? 'Enviando…' : 'Comentar'}
         </Button>
       </div>

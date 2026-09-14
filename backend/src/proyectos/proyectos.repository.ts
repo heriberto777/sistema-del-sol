@@ -119,6 +119,11 @@ export class ProyectosRepository {
     return this.db.hitoProyecto.update({ where: { id }, data: { estado: 'FACTURADO', facturaId } });
   }
 
+  /** Factura consolidada — misma Factura para varios hitos a la vez (ver comentario de `facturaId` en schema.prisma). */
+  marcarHitosFacturados(hitoIds: string[], facturaId: string) {
+    return this.db.hitoProyecto.updateMany({ where: { id: { in: hitoIds } }, data: { estado: 'FACTURADO', facturaId } });
+  }
+
   /** Confirmado con el usuario — bloquea facturar un hito con tareas sin terminar. */
   contarTareasVigentesDelHito(hitoId: string): Promise<number> {
     return this.db.tareaProyecto.count({ where: { hitoId, estado: { not: 'TERMINADA' } } });
@@ -237,7 +242,9 @@ export class ProyectosRepository {
    */
   async sumarFacturadoDelProyecto(proyectoId: string): Promise<number> {
     const facturas = await this.db.factura.findMany({
-      where: { hitoProyectoOrigen: { proyectoId }, estado: { not: 'ANULADA' } },
+      // Relación a-muchos desde que existe la factura consolidada — `some`
+      // en vez de match directo (una Factura puede venir de varios hitos).
+      where: { hitosProyectoOrigen: { some: { proyectoId } }, estado: { not: 'ANULADA' } },
       select: { subtotal: true },
     });
     return facturas.reduce((acc, f) => acc + Number(f.subtotal), 0);

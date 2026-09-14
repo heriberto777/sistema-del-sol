@@ -4,6 +4,7 @@ import { ProyectosService } from './proyectos.service';
 import { ProyectosIaService } from './proyectos-ia.service';
 import { CrearProyectoDto } from './dto/crear-proyecto.dto';
 import { CrearHitoDto } from './dto/crear-hito.dto';
+import { FacturarConsolidadoDto } from './dto/facturar-consolidado.dto';
 import { GenerarTareasIaDto } from './dto/generar-tareas-ia.dto';
 import { Permissions } from '../common/decorators/permissions.decorator';
 import { RequiereModulo } from '../common/decorators/requiere-modulo.decorator';
@@ -126,5 +127,18 @@ export class ProyectosController {
   @Permissions('proyectos.facturar')
   previsualizarFacturaHito(@Param('id') id: string) {
     return this.proyectosService.previsualizarFacturaHito(id);
+  }
+
+  // "Facturar todo" — una sola Factura para varios hitos sin facturar del proyecto, mismo permiso fiscal que facturar uno solo.
+  @Get(':proyectoId/hitos/previsualizar-factura-consolidada')
+  @Permissions('proyectos.facturar')
+  previsualizarFacturaConsolidada(@Param('proyectoId') proyectoId: string) {
+    return this.proyectosService.previsualizarFacturaConsolidada(proyectoId);
+  }
+
+  @Post(':proyectoId/hitos/facturar-consolidado')
+  @Permissions('proyectos.facturar')
+  facturarConsolidado(@Param('proyectoId') proyectoId: string, @Body() dto: FacturarConsolidadoDto, @CurrentUser() user: JwtPayloadUser) {
+    return this.proyectosService.facturarConsolidado(proyectoId, dto.hitoIds, user.tenantId, user.userId);
   }
 }

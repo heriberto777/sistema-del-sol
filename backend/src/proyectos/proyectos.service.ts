@@ -186,6 +186,85 @@ export class ProyectosService {
   }
 
   /**
+   * "Facturar todo" — datos para el modal de confirmación de la factura
+   * consolidada: un renglón por cada hito SIN facturar todavía del
+   * proyecto, con su monto (si se puede calcular) y si está listo o no.
+   * Mismo criterio que `previsualizarFacturaHito`: nunca promete algo que
+   * `facturarConsolidado` vaya a rechazar después.
+   */
+  async previsualizarFacturaConsolidada(proyectoId: string) {
+    const proyecto = await this.proyectosRepository.buscarProyectoPorId(proyectoId);
+    const hitosSinFacturar = proyecto.hitos.filter((h) => !h.facturaId);
+
+    const detalle = await Promise.all(
+      hitosSinFacturar.map(async (hito) => {
+        const tareasPendientes = await this.proyectosRepository.contarTareasVigentesDelHito(hito.id);
+        if (tareasPendientes > 0) {
+          return { hitoId: hito.id, hitoNombre: hito.nombre, monto: 0, tareasPendientes, puedeFacturar: false, motivo: `${tareasPendientes} tarea(s) sin terminar` };
+        }
+        try {
+          const { monto } = await this.calcularMontoHito(hito, proyecto);
+          return { hitoId: hito.id, hitoNombre: hito.nombre, monto, tareasPendientes: 0, puedeFacturar: true, motivo: null };
+        } catch (error) {
+          return { hitoId: hito.id, hitoNombre: hito.nombre, monto: 0, tareasPendientes: 0, puedeFacturar: false, motivo: error instanceof Error ? error.message : 'No se pudo calcular el monto' };
+        }
+      }),
+    );
+
+    const listos = detalle.filter((d) => d.puedeFacturar);
+    return {
+      proyectoNombre: proyecto.nombre,
+      clienteNombre: proyecto.cliente.nombre,
+      hitos: detalle,
+      total: listos.reduce((acc, d) => acc + d.monto, 0),
+    };
+  }
+
+  /**
+   * Factura UNA sola vez, en una sola Factura con una línea por hito —
+   * revalida cada `hitoId` recibido (no facturado ya, sin tareas
+   * pendientes, monto calculable) en vez de confiar en lo que mandó el
+   * frontend: si algo cambió entre la previsualización y la confirmación,
+   * ese hito puntual queda afuera del lote en vez de abortar todo.
+   */
+  async facturarConsolidado(proyectoId: string, hitoIds: string[], tenantId: string, vendedorId: string) {
+    const proyecto = await this.proyectosRepository.buscarProyectoPorId(proyectoId);
+    const candidatos = proyecto.hitos.filter((h) => !h.facturaId && hitoIds.includes(h.id));
+
+    const lineas: { descripcionManual: string; cantidad: number; precioUnitario: number; aplicaItbis: boolean }[] = [];
+    const idsListos: string[] = [];
+
+    for (const hito of candidatos) {
+      const tareasPendientes = await this.proyectosRepository.contarTareasVigentesDelHito(hito.id);
+      if (tareasPendientes > 0) continue;
+      try {
+        const { monto } = await this.calcularMontoHito(hito, proyecto);
+        lineas.push({ descripcionManual: `${proyecto.nombre} — ${hito.nombre}`, cantidad: 1, precioUnitario: monto, aplicaItbis: true });
+        idsListos.push(hito.id);
+      } catch {
+        // No listo todavía (ej. sin monto fijo cargado) — se excluye del lote, no aborta el resto.
+      }
+    }
+
+    if (lineas.length === 0) {
+      throw new BadRequestException('Ningún hito de los seleccionados está listo para facturar todavía.');
+    }
+
+    const bodega = await this.proyectosRepository.buscarBodegaActivaPorDefecto();
+    if (!bodega) throw new BadRequestException('Este tenant no tiene ninguna bodega activa configurada — no se puede facturar');
+
+    const factura = await this.facturacionService.crear(
+      { clienteId: proyecto.clienteId, bodegaId: bodega.id, tipoFactura: 'CONTADO', lineas },
+      tenantId,
+      vendedorId,
+      { sinMovimientoInventario: true },
+    );
+
+    await this.proyectosRepository.marcarHitosFacturados(idsListos, factura.id);
+    return { facturaId: factura.id, numero: factura.numero, total: factura.total, hitosFacturados: idsListos.length };
+  }
+
+  /**
    * Costo interno estimado de una hora de ESTE empleado — base para el
    * dashboard de rentabilidad de la Fase 4, no expuesto en un endpoint
    * propio todavía. Nunca lo que se le cobra al cliente (ver

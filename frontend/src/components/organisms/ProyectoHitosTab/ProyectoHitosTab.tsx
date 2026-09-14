@@ -12,6 +12,8 @@ import { ConfirmModal } from '../../molecules/ConfirmModal/ConfirmModal';
 import { RequierePermiso } from '../RequierePermiso/RequierePermiso';
 import { HitoFormModal, HitoFormValues } from '../HitoFormModal/HitoFormModal';
 import { FacturarHitoModal } from '../FacturarHitoModal/FacturarHitoModal';
+import { FacturarConsolidadoModal } from '../FacturarConsolidadoModal/FacturarConsolidadoModal';
+import { HitoDetalleModal } from '../HitoDetalleModal/HitoDetalleModal';
 import { useAuth } from '../../../hooks/useAuth';
 import { ESTADOS_HITO, ETIQUETA_ESTADO_HITO, Hito, Tarea } from '../../../types/proyectos';
 
@@ -37,6 +39,8 @@ export function ProyectoHitosTab({ proyectoId, hitos, tareas, onInvalidar, onErr
   const [hitoEditando, setHitoEditando] = useState<Hito | null>(null);
   const [hitoAEliminar, setHitoAEliminar] = useState<Hito | null>(null);
   const [hitoAFacturar, setHitoAFacturar] = useState<Hito | null>(null);
+  const [hitoDetalle, setHitoDetalle] = useState<Hito | null>(null);
+  const [facturarTodoAbierto, setFacturarTodoAbierto] = useState(false);
   const [errorForm, setErrorForm] = useState<string | null>(null);
 
   // Fase 5 — costo interno (salario) de las horas ya cargadas en cada hito,
@@ -102,6 +106,23 @@ export function ProyectoHitosTab({ proyectoId, hitos, tareas, onInvalidar, onErr
     onError: (err) => onError(mensajeErrorApi(err, 'No se pudo facturar el hito.')),
   });
 
+  const facturarConsolidado = useMutation({
+    mutationFn: async (hitoIds: string[]) =>
+      (
+        await apiClient.post<{ facturaId: string; numero: string | null; total: string; hitosFacturados: number }>(
+          `/admin/proyectos/${proyectoId}/hitos/facturar-consolidado`,
+          { hitoIds },
+        )
+      ).data,
+    onSuccess: (factura) => {
+      onError(null);
+      onFacturado(`Factura ${factura.numero ?? factura.facturaId} generada por RD$ ${Number(factura.total).toLocaleString('es-DO')} — ${factura.hitosFacturados} hito(s) consolidado(s).`);
+      setFacturarTodoAbierto(false);
+      invalidar();
+    },
+    onError: (err) => onError(mensajeErrorApi(err, 'No se pudo generar la factura consolidada.')),
+  });
+
   // Puntos 1 y 2 del pedido del usuario (2026-09-10): cantidad de tareas
   // asignadas a cada hito y su % de progreso (Terminadas ÷ total).
   const tareasDelHito = (hitoId: string) => tareas.filter((t) => t.hitoId === hitoId);
@@ -111,14 +132,25 @@ export function ProyectoHitosTab({ proyectoId, hitos, tareas, onInvalidar, onErr
     return { total: delHito.length, terminadas, porcentaje: delHito.length === 0 ? 0 : Math.round((terminadas / delHito.length) * 100) };
   };
 
+  const hayHitosPorFacturar = hitos.some((h) => !h.facturaId);
+
   return (
     <Card
       titulo="Hitos"
       descripcion="Entregas o cortes de facturación del proyecto."
       acciones={
-        <RequierePermiso permiso="proyectos.crear">
-          <Button onClick={() => setModalAbierto(true)}>Nuevo hito</Button>
-        </RequierePermiso>
+        <div className="flex items-center gap-2">
+          {hayHitosPorFacturar && (
+            <RequierePermiso permiso="proyectos.facturar">
+              <Button type="button" variante="secundario" onClick={() => setFacturarTodoAbierto(true)}>
+                Facturar todo
+              </Button>
+            </RequierePermiso>
+          )}
+          <RequierePermiso permiso="proyectos.crear">
+            <Button onClick={() => setModalAbierto(true)}>Nuevo hito</Button>
+          </RequierePermiso>
+        </div>
       }
     >
       <div className="space-y-2">
@@ -128,7 +160,11 @@ export function ProyectoHitosTab({ proyectoId, hitos, tareas, onInvalidar, onErr
           const montoInsuficiente = costo && costo.horasTotales > 0 && h.montoFijo != null && Number(h.montoFijo) < costo.costoHoras;
           const progreso = progresoHito(h.id);
           return (
-          <div key={h.id} className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2 dark:border-slate-800">
+          <div
+            key={h.id}
+            onClick={() => setHitoDetalle(h)}
+            className="flex cursor-pointer items-center justify-between rounded-lg border border-slate-200 px-3 py-2 hover:border-sol-300 dark:border-slate-800 dark:hover:border-sol-500/50"
+          >
             <div>
               <p className="font-medium text-slate-900 dark:text-slate-100">{h.nombre}</p>
               <p className="text-xs text-slate-500 dark:text-slate-400">
@@ -151,7 +187,7 @@ export function ProyectoHitosTab({ proyectoId, hitos, tareas, onInvalidar, onErr
                 </p>
               )}
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
               {!h.facturaId && (
                 <RequierePermiso permiso="proyectos.facturar">
                   <Button type="button" variante="secundario" onClick={() => setHitoAFacturar(h)}>
@@ -216,6 +252,35 @@ export function ProyectoHitosTab({ proyectoId, hitos, tareas, onInvalidar, onErr
           confirmando={facturarHito.isPending}
           onConfirmar={() => facturarHito.mutate(hitoAFacturar.id)}
           onCancelar={() => setHitoAFacturar(null)}
+        />
+      )}
+
+      {hitoDetalle && (
+        <HitoDetalleModal
+          hito={hitoDetalle}
+          tareas={tareas}
+          onClose={() => setHitoDetalle(null)}
+          onEditar={() => {
+            setHitoDetalle(null);
+            setHitoEditando(hitoDetalle);
+          }}
+          onFacturar={() => {
+            setHitoDetalle(null);
+            setHitoAFacturar(hitoDetalle);
+          }}
+          onEliminar={() => {
+            setHitoDetalle(null);
+            setHitoAEliminar(hitoDetalle);
+          }}
+        />
+      )}
+
+      {facturarTodoAbierto && (
+        <FacturarConsolidadoModal
+          proyectoId={proyectoId}
+          confirmando={facturarConsolidado.isPending}
+          onConfirmar={(hitoIds) => facturarConsolidado.mutate(hitoIds)}
+          onCancelar={() => setFacturarTodoAbierto(false)}
         />
       )}
 

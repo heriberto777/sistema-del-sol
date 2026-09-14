@@ -25,6 +25,7 @@ describe('ProyectosService', () => {
       buscarHitoPorId: jest.fn(),
       sumarHorasDelHito: jest.fn(),
       marcarHitoFacturado: jest.fn(),
+      marcarHitosFacturados: jest.fn(),
       buscarBodegaActivaPorDefecto: jest.fn(),
       contarTareasVigentesDelHito: jest.fn(),
       sumarFacturadoDelProyecto: jest.fn(),
@@ -232,6 +233,104 @@ describe('ProyectosService', () => {
       expect(resultado).toEqual(
         expect.objectContaining({ monto: 12000, horas: 10, tarifaHora: 1200, tareasPendientes: 0, puedeFacturar: true }),
       );
+    });
+  });
+
+  describe('previsualizarFacturaConsolidada', () => {
+    it('un renglón por cada hito sin facturar, marcando cuáles están listos y por qué los que no', async () => {
+      repository.buscarProyectoPorId.mockResolvedValue({
+        id: 'p1',
+        nombre: 'Migración POS',
+        cliente: { nombre: 'ACME SRL' },
+        modoFacturacion: 'PRECIO_FIJO',
+        hitos: [
+          { id: 'h1', nombre: 'Levantamiento', facturaId: null, montoFijo: 1200 },
+          { id: 'h2', nombre: 'Configuración', facturaId: null, montoFijo: 2400 },
+          { id: 'h3', nombre: 'Ya facturado antes', facturaId: 'f-viejo', montoFijo: 800 },
+        ],
+      } as never);
+      repository.contarTareasVigentesDelHito.mockImplementation(async (hitoId: string) => (hitoId === 'h2' ? 2 : 0));
+
+      const resultado = await service.previsualizarFacturaConsolidada('p1');
+
+      expect(resultado.hitos).toEqual([
+        { hitoId: 'h1', hitoNombre: 'Levantamiento', monto: 1200, tareasPendientes: 0, puedeFacturar: true, motivo: null },
+        { hitoId: 'h2', hitoNombre: 'Configuración', monto: 0, tareasPendientes: 2, puedeFacturar: false, motivo: '2 tarea(s) sin terminar' },
+      ]);
+      // h3 (ya facturado) ni aparece — no es candidato.
+      expect(resultado.hitos).toHaveLength(2);
+      expect(resultado.total).toBe(1200);
+      expect(resultado.proyectoNombre).toBe('Migración POS');
+      expect(resultado.clienteNombre).toBe('ACME SRL');
+    });
+  });
+
+  describe('facturarConsolidado', () => {
+    const BODEGA = { id: 'b1', nombre: 'Principal' };
+    const FACTURA = { id: 'f-nueva', numero: '00099', total: 4248 };
+
+    beforeEach(() => {
+      repository.buscarBodegaActivaPorDefecto.mockResolvedValue(BODEGA as never);
+      facturacionService.crear.mockResolvedValue(FACTURA as never);
+    });
+
+    it('factura en un solo lote los hitos listos, excluye los bloqueados, y marca solo los facturados con la misma factura', async () => {
+      repository.buscarProyectoPorId.mockResolvedValue({
+        id: 'p1',
+        nombre: 'Migración POS',
+        clienteId: 'c1',
+        modoFacturacion: 'PRECIO_FIJO',
+        hitos: [
+          { id: 'h1', nombre: 'Levantamiento', facturaId: null, montoFijo: 1200 },
+          { id: 'h2', nombre: 'Configuración', facturaId: null, montoFijo: 2400 },
+          { id: 'h3', nombre: 'Capacitación', facturaId: null, montoFijo: 800 },
+        ],
+      } as never);
+      repository.contarTareasVigentesDelHito.mockImplementation(async (hitoId: string) => (hitoId === 'h2' ? 2 : 0));
+
+      const resultado = await service.facturarConsolidado('p1', ['h1', 'h2', 'h3'], 't1', 'u1');
+
+      expect(facturacionService.crear).toHaveBeenCalledWith(
+        expect.objectContaining({
+          clienteId: 'c1',
+          lineas: [
+            { descripcionManual: 'Migración POS — Levantamiento', cantidad: 1, precioUnitario: 1200, aplicaItbis: true },
+            { descripcionManual: 'Migración POS — Capacitación', cantidad: 1, precioUnitario: 800, aplicaItbis: true },
+          ],
+        }),
+        't1',
+        'u1',
+        { sinMovimientoInventario: true },
+      );
+      expect(repository.marcarHitosFacturados).toHaveBeenCalledWith(['h1', 'h3'], 'f-nueva');
+      expect(resultado).toEqual({ facturaId: 'f-nueva', numero: '00099', total: 4248, hitosFacturados: 2 });
+    });
+
+    it('ignora un hitoId que ya fue facturado (no confía ciegamente en la lista recibida)', async () => {
+      repository.buscarProyectoPorId.mockResolvedValue({
+        id: 'p1',
+        nombre: 'Migración POS',
+        clienteId: 'c1',
+        modoFacturacion: 'PRECIO_FIJO',
+        hitos: [{ id: 'h1', nombre: 'Levantamiento', facturaId: 'f-viejo', montoFijo: 1200 }],
+      } as never);
+
+      await expect(service.facturarConsolidado('p1', ['h1'], 't1', 'u1')).rejects.toThrow('Ningún hito de los seleccionados está listo para facturar todavía.');
+      expect(facturacionService.crear).not.toHaveBeenCalled();
+    });
+
+    it('rechaza si NINGÚN hito seleccionado está listo (todos bloqueados)', async () => {
+      repository.buscarProyectoPorId.mockResolvedValue({
+        id: 'p1',
+        nombre: 'Migración POS',
+        clienteId: 'c1',
+        modoFacturacion: 'PRECIO_FIJO',
+        hitos: [{ id: 'h1', nombre: 'Levantamiento', facturaId: null, montoFijo: 1200 }],
+      } as never);
+      repository.contarTareasVigentesDelHito.mockResolvedValue(1);
+
+      await expect(service.facturarConsolidado('p1', ['h1'], 't1', 'u1')).rejects.toThrow(BadRequestException);
+      expect(repository.marcarHitosFacturados).not.toHaveBeenCalled();
     });
   });
 

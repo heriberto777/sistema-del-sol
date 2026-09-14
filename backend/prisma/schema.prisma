@@ -1272,7 +1272,8 @@ model Factura {
   recargos            FacturaRecargo[]
   cotizacionOrigen    Cotizacion?
   remisionOrigen      Remision?
-  hitoProyectoOrigen  HitoProyecto?
+  // Lista, no un solo opcional — una factura consolidada agrupa varios hitos.
+  hitosProyectoOrigen HitoProyecto[]
   cobroAlquilerOrigen CobroAlquiler?
   travelReservaOrigen TravelReserva?
   pagos               Pago[]
@@ -3975,9 +3976,12 @@ model HitoProyecto {
   alertaVencimientoEnviada Boolean            @default(false)
   createdAt                DateTime           @default(now())
   // Fase 4 — la Factura real generada desde este hito (ver
-  // ProyectosService.facturarHito). @unique: un hito nunca se factura
-  // dos veces, es el mismo guard que ya usa Cotizacion/Remisión.
-  facturaId                String?            @unique
+  // ProyectosService.facturarHito/facturarConsolidado). Que un hito nunca
+  // se facture dos veces lo garantiza el chequeo `if (hito.facturaId)` en
+  // el service, NO una restricción de columna — a propósito YA NO es
+  // `@unique`: una factura consolidada vincula la MISMA Factura desde
+  // varios hitos a la vez.
+  facturaId                String?
   factura                  Factura?           @relation(fields: [facturaId], references: [id])
 
   tareas TareaProyecto[]
