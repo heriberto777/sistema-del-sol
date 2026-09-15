@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { Building2, Ban, AlertTriangle, CalendarClock, PauseCircle, Wallet } from 'lucide-react';
+import { Building2, Ban, AlertTriangle, CalendarClock, PauseCircle, Wallet, BadgeDollarSign } from 'lucide-react';
 import { platformApiClient } from '../lib/platform-api-client';
 import { Card } from '../components/atoms/Card/Card';
 import { StatCard } from '../components/molecules/StatCard/StatCard';
@@ -8,7 +8,14 @@ interface ResumenDashboard {
   tenants: { total: number; activos: number; suspendidos: number; cancelados: number };
   mrrAproximado: number;
   tenantsPorPlan: { planId: string; nombre: string; cantidadTenants: number }[];
-  cartera: { totalPendiente: number; totalVencido: number; cantidadVencidas: number };
+  cartera: {
+    totalPendiente: number;
+    totalVencido: number;
+    cantidadVencidas: number;
+    cantidadPendientes: number;
+    cobradoEsteMes: number;
+    cantidadPagadasEsteMes: number;
+  };
 }
 
 const fmtRD = (v: number) => `RD$ ${v.toLocaleString('es-DO', { minimumFractionDigits: 2 })}`;
@@ -33,6 +40,12 @@ export function PlatformDashboard() {
             <StatCard etiqueta="Tenants suspendidos" valor={String(data.tenants.suspendidos)} icono={PauseCircle} />
             <StatCard etiqueta="Tenants cancelados" valor={String(data.tenants.cancelados)} icono={Ban} />
             <StatCard etiqueta="Ingreso mensual aproximado (MRR)" valor={fmtRD(data.mrrAproximado)} icono={Wallet} />
+            <StatCard
+              etiqueta="Cobrado este mes"
+              valor={fmtRD(data.cartera.cobradoEsteMes)}
+              variacion={`${data.cartera.cantidadPagadasEsteMes} factura(s)`}
+              icono={BadgeDollarSign}
+            />
             <StatCard etiqueta="Cartera pendiente" valor={fmtRD(data.cartera.totalPendiente)} icono={CalendarClock} />
             <StatCard
               etiqueta="Cartera vencida"
