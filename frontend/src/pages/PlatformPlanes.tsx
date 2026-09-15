@@ -11,6 +11,7 @@ import { Select } from '../components/atoms/Select/Select';
 import { Modal } from '../components/molecules/Modal/Modal';
 import { RowActionsMenu } from '../components/molecules/RowActionsMenu/RowActionsMenu';
 import { usePlatformAuth } from '../hooks/usePlatformAuth';
+import { Check, X } from 'lucide-react';
 
 type CicloFacturacion = 'MENSUAL' | 'ANUAL';
 
@@ -44,6 +45,7 @@ export function PlatformPlanes() {
 
   const [modalAbierto, setModalAbierto] = useState(false);
   const [planEditando, setPlanEditando] = useState<Plan | null>(null);
+  const [planViendoModulos, setPlanViendoModulos] = useState<Plan | null>(null);
   const [mostrarInactivos, setMostrarInactivos] = useState(false);
 
   const { data: planes } = useQuery({
@@ -122,16 +124,17 @@ export function PlatformPlanes() {
                     <span className="text-xs text-slate-400">+ ITBIS</span>
                   </td>
                   <td className="px-5 py-3">
-                    <div className="flex flex-wrap gap-1">
-                      {plan.modulos.length === 0 ? (
-                        <span className="text-xs text-slate-400">Sin módulos</span>
-                      ) : (
-                        plan.modulos.map((pm) => (
-                          <Badge key={pm.modulo.clave} tono="neutro">
-                            {pm.modulo.nombre}
-                          </Badge>
-                        ))
-                      )}
+                    <div className="flex items-center gap-2">
+                      <Badge tono="neutro">
+                        {plan.modulos.length} módulo{plan.modulos.length === 1 ? '' : 's'}
+                      </Badge>
+                      <button
+                        type="button"
+                        onClick={() => setPlanViendoModulos(plan)}
+                        className="text-xs font-medium text-sol-600 hover:underline dark:text-sol-400"
+                      >
+                        Ver módulos
+                      </button>
                     </div>
                   </td>
                   <td className="px-5 py-3 font-medium text-slate-900 dark:text-slate-100">{cantidadPorPlan.get(plan.id) ?? 0}</td>
@@ -169,7 +172,63 @@ export function PlatformPlanes() {
       </Card>
 
       {modalAbierto && <ModalPlan plan={planEditando} onClose={() => setModalAbierto(false)} />}
+      {planViendoModulos && <ModalVerModulos plan={planViendoModulos} onClose={() => setPlanViendoModulos(null)} />}
     </div>
+  );
+}
+
+/**
+ * Solo lectura — a diferencia de ModalPlan (que edita la selección), esta
+ * muestra el catálogo completo con check/tachado contra ESTE plan. Evita
+ * que la fila de la tabla crezca sin límite a medida que un plan acumula
+ * módulos (antes se listaban todos los badges inline en la celda).
+ */
+function ModalVerModulos({ plan, onClose }: { plan: Plan; onClose: () => void }) {
+  const { data: catalogoModulos } = useQuery({
+    queryKey: ['platform-planes-modulos'],
+    queryFn: async () => (await platformApiClient.get<Modulo[]>('/platform/planes/modulos')).data,
+  });
+  const clavesIncluidas = new Set(plan.modulos.map((pm) => pm.modulo.clave));
+
+  return (
+    <Modal titulo={`Módulos de "${plan.nombre}"`} onClose={onClose}>
+      <div className="space-y-4">
+        <p className="text-sm text-slate-500 dark:text-slate-400">
+          {plan.modulos.length} de {catalogoModulos?.length ?? '…'} módulos del catálogo incluidos.
+        </p>
+
+        {!catalogoModulos && <p className="text-sm text-slate-400">Cargando catálogo de módulos…</p>}
+
+        {catalogoModulos && (
+          <div className="grid grid-cols-1 gap-x-4 gap-y-2 sm:grid-cols-2">
+            {catalogoModulos.map((modulo) => {
+              const activo = clavesIncluidas.has(modulo.clave);
+              return (
+                <div
+                  key={modulo.clave}
+                  className={clsx(
+                    'flex items-center gap-2 text-sm',
+                    activo ? 'text-slate-900 dark:text-slate-100' : 'text-slate-400 dark:text-slate-600',
+                  )}
+                >
+                  {activo ? (
+                    <Check className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                  ) : (
+                    <X className="h-4 w-4 shrink-0" />
+                  )}
+                  <span className={activo ? '' : 'line-through'}>{modulo.nombre}</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        <p className="border-t border-slate-100 pt-3 text-xs text-slate-400 dark:border-slate-800">
+          Contabilidad, Contactos, Reportes, Notificaciones y Admin quedan siempre activos, en todos los planes, sin
+          excepción posible.
+        </p>
+      </div>
+    </Modal>
   );
 }
 
