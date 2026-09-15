@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Building2, PauseCircle, Wallet, AlertTriangle } from 'lucide-react';
 import { platformApiClient } from '../lib/platform-api-client';
 import { mensajeErrorApi } from '../lib/mensaje-error-api';
 import { usePlatformAuth } from '../hooks/usePlatformAuth';
@@ -12,6 +13,7 @@ import { Switch } from '../components/atoms/Switch/Switch';
 import { Modal } from '../components/molecules/Modal/Modal';
 import { RowActionsMenu } from '../components/molecules/RowActionsMenu/RowActionsMenu';
 import { CampoImagen } from '../components/molecules/CampoImagen/CampoImagen';
+import { StatCard } from '../components/molecules/StatCard/StatCard';
 
 interface Tenant {
   id: string;
@@ -47,6 +49,16 @@ const TONO_POR_ESTADO: Record<Tenant['estado'], 'exito' | 'advertencia' | 'pelig
   SUSPENDIDO: 'advertencia',
   CANCELADO: 'peligro',
 };
+
+// Subconjunto de PlatformDashboardService.resumen() — el resto de esa
+// respuesta no aplica acá, activos/suspendidos ya salen de `tenants`
+// (misma fuente que la tabla, sin riesgo de que ambos números diverjan).
+interface ResumenPlataforma {
+  mrrAproximado: number;
+  cartera: { totalVencido: number; cantidadVencidas: number };
+}
+
+const fmtRD = (v: number) => `RD$ ${v.toLocaleString('es-DO', { minimumFractionDigits: 2 })}`;
 
 interface Suscripcion {
   id: string;
@@ -591,7 +603,15 @@ export function PlatformTenants() {
     queryFn: async () => (await platformApiClient.get<Plan[]>('/platform/planes')).data,
   });
 
+  // Mismo queryKey que PlatformDashboard.tsx — comparte caché, sin duplicar el fetch si ya se visitó esa pantalla.
+  const { data: resumen } = useQuery({
+    queryKey: ['platform-dashboard'],
+    queryFn: async () => (await platformApiClient.get<ResumenPlataforma>('/platform/dashboard')).data,
+  });
+
   const planesAsignables = (planes ?? []).filter((p) => p.activo);
+  const activos = (tenants ?? []).filter((t) => t.estado === 'ACTIVO').length;
+  const suspendidos = (tenants ?? []).filter((t) => t.estado === 'SUSPENDIDO').length;
 
   const cambiarEstado = useMutation({
     mutationFn: async ({ id, estado }: { id: string; estado: Tenant['estado'] }) =>
@@ -610,6 +630,18 @@ export function PlatformTenants() {
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Tenants</h1>
         <Button onClick={() => setModalNuevoAbierto(true)}>Nuevo tenant</Button>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <StatCard etiqueta="Tenants activos" valor={String(activos)} icono={Building2} />
+        <StatCard etiqueta="Tenants suspendidos" valor={String(suspendidos)} icono={PauseCircle} />
+        <StatCard etiqueta="Ingreso mensual aproximado (MRR)" valor={resumen ? fmtRD(resumen.mrrAproximado) : '—'} icono={Wallet} />
+        <StatCard
+          etiqueta="Cartera vencida"
+          valor={resumen ? fmtRD(resumen.cartera.totalVencido) : '—'}
+          variacion={resumen ? `${resumen.cartera.cantidadVencidas} factura(s)` : undefined}
+          icono={AlertTriangle}
+        />
       </div>
 
       <Card sinPadding titulo="Tenants" descripcion={tenants ? `${tenants.length} empresa(s) registradas` : undefined}>
