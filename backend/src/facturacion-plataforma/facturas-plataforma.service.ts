@@ -49,6 +49,10 @@ export class FacturasPlataformaService {
     return this.facturasPlataformaRepository.listarPendientesOVencidas();
   }
 
+  sumarPagadasEnRango(desde: Date, hasta: Date) {
+    return this.facturasPlataformaRepository.sumarPagadasEnRango(desde, hasta);
+  }
+
   /**
    * Reutilizado tanto por el cron diario (facturación recurrente) como
    * por "generar factura ahora" manual — una sola fuente de verdad para

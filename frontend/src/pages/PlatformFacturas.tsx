@@ -1,5 +1,7 @@
 import { FormEvent, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import clsx from 'clsx';
+import { Wallet, CalendarClock, AlertTriangle } from 'lucide-react';
 import { platformApiClient } from '../lib/platform-api-client';
 import { mensajeErrorApi } from '../lib/mensaje-error-api';
 import { FormField } from '../components/molecules/FormField/FormField';
@@ -9,6 +11,7 @@ import { Card } from '../components/atoms/Card/Card';
 import { Select } from '../components/atoms/Select/Select';
 import { Modal } from '../components/molecules/Modal/Modal';
 import { Paginacion } from '../components/molecules/Paginacion/Paginacion';
+import { StatCard } from '../components/molecules/StatCard/StatCard';
 import { PaginaResultado } from '../types/pagina-resultado';
 import { usePlatformAuth } from '../hooks/usePlatformAuth';
 import { abrirBlob } from '../lib/descargar-archivo';
@@ -50,6 +53,72 @@ const TONO_POR_ESTADO: Record<EstadoFactura, 'exito' | 'advertencia' | 'peligro'
   VENCIDA: 'peligro',
   ANULADA: 'advertencia',
 };
+
+// Subconjunto de PlatformDashboardService.resumen() — el resto de esa respuesta no aplica acá.
+interface ResumenPlataforma {
+  cartera: {
+    totalPendiente: number;
+    totalVencido: number;
+    cantidadVencidas: number;
+    cantidadPendientes: number;
+    cobradoEsteMes: number;
+    cantidadPagadasEsteMes: number;
+  };
+}
+
+const fmtRD = (v: number) => `RD$ ${v.toLocaleString('es-DO', { minimumFractionDigits: 2 })}`;
+
+const PESTANAS_ESTADO: { estado: EstadoFactura | ''; etiqueta: string }[] = [
+  { estado: 'VENCIDA', etiqueta: 'Vencidas' },
+  { estado: 'PENDIENTE', etiqueta: 'Pendientes' },
+  { estado: 'PAGADA', etiqueta: 'Pagadas' },
+  { estado: 'ANULADA', etiqueta: 'Anuladas' },
+  { estado: '', etiqueta: 'Todas' },
+];
+
+/** Mismo patrón que SegmentadoDensidad en MisTareas.tsx — acá con un contador opcional por pestaña (solo en las que importan para cobranza). */
+function PestanasEstado({
+  valor,
+  onChange,
+  contadores,
+}: {
+  valor: EstadoFactura | '';
+  onChange: (v: EstadoFactura | '') => void;
+  contadores: Partial<Record<EstadoFactura, number>>;
+}) {
+  return (
+    <div className="inline-flex flex-wrap gap-0.5 rounded-full border border-slate-200 bg-slate-50 p-0.5 dark:border-slate-700 dark:bg-slate-800/60">
+      {PESTANAS_ESTADO.map((p) => {
+        const contador = p.estado ? contadores[p.estado] : undefined;
+        return (
+          <button
+            key={p.estado || 'todas'}
+            type="button"
+            onClick={() => onChange(p.estado)}
+            className={clsx(
+              'flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition-colors',
+              valor === p.estado
+                ? 'bg-white text-slate-800 shadow-sm dark:bg-slate-900 dark:text-slate-100'
+                : 'text-slate-500 hover:text-slate-700 dark:text-slate-400',
+            )}
+          >
+            {p.etiqueta}
+            {contador !== undefined && contador > 0 && (
+              <span
+                className={clsx(
+                  'rounded-full px-1.5 py-px text-[10px] font-bold',
+                  p.estado === 'VENCIDA' ? 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300' : 'bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300',
+                )}
+              >
+                {contador}
+              </span>
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
 function PanelFactura({ factura, onClose }: { factura: FacturaPlataforma; onClose: () => void }) {
   const { tienePermiso } = usePlatformAuth();
@@ -207,7 +276,7 @@ function PanelFactura({ factura, onClose }: { factura: FacturaPlataforma; onClos
 export function PlatformFacturas() {
   const { tienePermiso } = usePlatformAuth();
   const [pagina, setPagina] = useState(1);
-  const [estado, setEstado] = useState('');
+  const [estado, setEstado] = useState<EstadoFactura | ''>('');
   const [tenantId, setTenantId] = useState('');
   const [facturaAbierta, setFacturaAbierta] = useState<FacturaPlataforma | null>(null);
   const [modalNuevaFactura, setModalNuevaFactura] = useState(false);
@@ -227,8 +296,14 @@ export function PlatformFacturas() {
       ).data,
   });
 
-  function onSubmitFiltro(e: FormEvent) {
-    e.preventDefault();
+  // Mismo queryKey que PlatformDashboard.tsx/PlatformTenants.tsx — comparte caché.
+  const { data: resumen } = useQuery({
+    queryKey: ['platform-dashboard'],
+    queryFn: async () => (await platformApiClient.get<ResumenPlataforma>('/platform/dashboard')).data,
+  });
+
+  function cambiarEstado(v: EstadoFactura | '') {
+    setEstado(v);
     setPagina(1);
   }
 
@@ -236,35 +311,54 @@ export function PlatformFacturas() {
     <div className="space-y-6">
       <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Facturas</h1>
 
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <StatCard
+          etiqueta="Cobrado este mes"
+          valor={resumen ? fmtRD(resumen.cartera.cobradoEsteMes) : '—'}
+          variacion={resumen ? `${resumen.cartera.cantidadPagadasEsteMes} factura(s)` : undefined}
+          icono={Wallet}
+        />
+        <StatCard
+          etiqueta="Pendiente"
+          valor={resumen ? fmtRD(resumen.cartera.totalPendiente) : '—'}
+          variacion={resumen ? `${resumen.cartera.cantidadPendientes} factura(s)` : undefined}
+          icono={CalendarClock}
+        />
+        <StatCard
+          etiqueta="Vencido"
+          valor={resumen ? fmtRD(resumen.cartera.totalVencido) : '—'}
+          variacion={resumen ? `${resumen.cartera.cantidadVencidas} factura(s)` : undefined}
+          icono={AlertTriangle}
+        />
+      </div>
+
       <Card
         sinPadding
         titulo="Facturación de plataforma"
         descripcion="Facturas generadas por la suscripción de cada tenant."
         acciones={
           <div className="flex items-center gap-2">
-            <form onSubmit={onSubmitFiltro} className="flex items-center gap-2">
-              <Select value={estado} onChange={(e) => { setEstado(e.target.value); setPagina(1); }} className="!w-auto py-1">
-                <option value="">Todos los estados</option>
-                <option value="PENDIENTE">Pendiente</option>
-                <option value="PAGADA">Pagada</option>
-                <option value="VENCIDA">Vencida</option>
-                <option value="ANULADA">Anulada</option>
-              </Select>
-              <Select value={tenantId} onChange={(e) => { setTenantId(e.target.value); setPagina(1); }} className="!w-auto py-1">
-                <option value="">Todos los tenants</option>
-                {tenants?.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.nombre}
-                  </option>
-                ))}
-              </Select>
-            </form>
+            <Select value={tenantId} onChange={(e) => { setTenantId(e.target.value); setPagina(1); }} className="!w-auto py-1">
+              <option value="">Todos los tenants</option>
+              {tenants?.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.nombre}
+                </option>
+              ))}
+            </Select>
             {tienePermiso('platform.facturacion.gestionar') && (
               <Button onClick={() => setModalNuevaFactura(true)}>Nueva factura</Button>
             )}
           </div>
         }
       >
+        <div className="border-b border-slate-100 px-5 py-3 dark:border-slate-800">
+          <PestanasEstado
+            valor={estado}
+            onChange={cambiarEstado}
+            contadores={{ VENCIDA: resumen?.cartera.cantidadVencidas, PENDIENTE: resumen?.cartera.cantidadPendientes }}
+          />
+        </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead className="bg-slate-50 text-slate-500 dark:bg-slate-900/60 dark:text-slate-400">

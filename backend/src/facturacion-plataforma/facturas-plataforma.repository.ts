@@ -95,6 +95,16 @@ export class FacturasPlataformaRepository {
     });
   }
 
+  /** KPI "cobrado este mes" del dashboard/libro de Facturas — por fecha de pago real, no de emisión. */
+  async sumarPagadasEnRango(desde: Date, hasta: Date) {
+    const resultado = await this.prisma.facturaPlataforma.aggregate({
+      where: { estado: 'PAGADA', fechaPago: { gte: desde, lt: hasta } },
+      _sum: { total: true },
+      _count: true,
+    });
+    return { total: Number(resultado._sum.total ?? 0), cantidad: resultado._count };
+  }
+
   /**
    * Fase 4 — auto-suspensión: una fila por tenant con alguna factura VENCIDA
    * hace más de `diasMora` días (la más antigua de esas, para notificar con

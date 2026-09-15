@@ -15,10 +15,15 @@ export class PlatformDashboardService {
   ) {}
 
   async resumen() {
-    const [tenants, planes, facturasCartera] = await Promise.all([
+    const ahora = new Date();
+    const inicioMes = new Date(ahora.getFullYear(), ahora.getMonth(), 1);
+    const inicioMesSiguiente = new Date(ahora.getFullYear(), ahora.getMonth() + 1, 1);
+
+    const [tenants, planes, facturasCartera, cobradoEsteMes] = await Promise.all([
       this.tenantsService.listar(),
       this.planesService.listar(),
       this.facturasPlataformaService.listarPendientesOVencidas(),
+      this.facturasPlataformaService.sumarPagadasEnRango(inicioMes, inicioMesSiguiente),
     ]);
 
     const activos = tenants.filter((t) => t.estado === 'ACTIVO');
@@ -41,6 +46,7 @@ export class PlatformDashboardService {
     let totalPendiente = 0;
     let totalVencido = 0;
     let cantidadVencidas = 0;
+    let cantidadPendientes = 0;
     for (const f of facturasCartera) {
       const total = Number(f.total);
       if (f.estado === 'VENCIDA') {
@@ -48,6 +54,7 @@ export class PlatformDashboardService {
         cantidadVencidas += 1;
       } else {
         totalPendiente += total;
+        cantidadPendientes += 1;
       }
     }
 
@@ -55,7 +62,14 @@ export class PlatformDashboardService {
       tenants: { total: tenants.length, activos: activos.length, suspendidos: suspendidos.length, cancelados: cancelados.length },
       mrrAproximado,
       tenantsPorPlan,
-      cartera: { totalPendiente, totalVencido, cantidadVencidas },
+      cartera: {
+        totalPendiente,
+        totalVencido,
+        cantidadVencidas,
+        cantidadPendientes,
+        cobradoEsteMes: cobradoEsteMes.total,
+        cantidadPagadasEsteMes: cobradoEsteMes.cantidad,
+      },
     };
   }
 }
