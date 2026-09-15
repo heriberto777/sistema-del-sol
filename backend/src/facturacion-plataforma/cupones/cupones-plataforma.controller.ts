@@ -23,6 +23,12 @@ export class CuponesPlataformaController {
     return this.cuponesPlataformaService.listar();
   }
 
+  @Get(':id/aplicaciones')
+  @PlatformPermissions('platform.facturacion.ver')
+  listarAplicaciones(@Param('id') id: string) {
+    return this.cuponesPlataformaService.listarAplicaciones(id);
+  }
+
   @Post()
   @PlatformPermissions('platform.facturacion.gestionar')
   crear(@Body() dto: CrearCuponDto) {

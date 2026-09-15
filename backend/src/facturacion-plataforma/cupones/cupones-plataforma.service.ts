@@ -23,6 +23,17 @@ export class CuponesPlataformaService {
     return this.cuponesRepository.listar();
   }
 
+  async listarAplicaciones(cuponId: string) {
+    const aplicaciones = await this.cuponesRepository.listarAplicacionesDeCupon(cuponId);
+    return aplicaciones.map((a) => ({
+      id: a.id,
+      ciclosRestantes: a.ciclosRestantes,
+      activo: a.activo,
+      fechaAplicado: a.fechaAplicado,
+      tenant: a.suscripcion.tenant,
+    }));
+  }
+
   crear(dto: CrearCuponDto) {
     return this.cuponesRepository.crear({
       codigo: dto.codigo.toUpperCase(),

@@ -25,11 +25,20 @@ interface Cupon {
   activo: boolean;
 }
 
+interface AplicacionCupon {
+  id: string;
+  ciclosRestantes: number | null;
+  activo: boolean;
+  fechaAplicado: string;
+  tenant: { id: string; nombre: string };
+}
+
 export function PlatformCupones() {
   const { tienePermiso } = usePlatformAuth();
   const puedeGestionar = tienePermiso('platform.facturacion.gestionar');
   const [modalAbierto, setModalAbierto] = useState(false);
   const [cuponEditando, setCuponEditando] = useState<Cupon | null>(null);
+  const [cuponViendoAplicaciones, setCuponViendoAplicaciones] = useState<Cupon | null>(null);
   const [mostrarInactivos, setMostrarInactivos] = useState(false);
   const queryClient = useQueryClient();
 
@@ -63,80 +72,158 @@ export function PlatformCupones() {
         {puedeGestionar && <Button onClick={abrirNuevo}>Nuevo cupón</Button>}
       </div>
 
-      <Card
-        sinPadding
-        titulo="Cupones existentes"
-        descripcion={cupones ? `${cupones.length} cupón(es) en el catálogo` : undefined}
-        acciones={
-          <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
-            <input type="checkbox" checked={mostrarInactivos} onChange={(e) => setMostrarInactivos(e.target.checked)} />
-            Mostrar inactivos
-          </label>
-        }
-      >
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-slate-50 text-slate-500 dark:bg-slate-900/60 dark:text-slate-400">
-              <tr>
-                <th className="px-5 py-3 font-medium">Código</th>
-                <th className="px-5 py-3 font-medium">Descuento</th>
-                <th className="px-5 py-3 font-medium">Duración</th>
-                <th className="px-5 py-3 font-medium">Usos</th>
-                <th className="px-5 py-3 font-medium">Expira</th>
-                <th className="px-5 py-3 font-medium">Estado</th>
-                <th className="px-5 py-3"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {cuponesVisibles.map((cupon) => (
-                <tr key={cupon.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                  <td className="px-5 py-3 font-mono font-medium text-slate-900 dark:text-slate-100">{cupon.codigo}</td>
-                  <td className="px-5 py-3">
-                    {cupon.tipo === 'PORCENTAJE' ? `${cupon.valor}%` : `RD$ ${Number(cupon.valor).toLocaleString('es-DO')}`}
-                  </td>
-                  <td className="px-5 py-3">{cupon.duracionCiclos === null ? 'Indefinida' : `${cupon.duracionCiclos} ciclo(s)`}</td>
-                  <td className="px-5 py-3">
-                    {cupon.usosActuales}
-                    {cupon.usosMaximos !== null && ` / ${cupon.usosMaximos}`}
-                  </td>
-                  <td className="px-5 py-3">
-                    {cupon.fechaExpiracion ? new Date(cupon.fechaExpiracion).toLocaleDateString('es-DO') : 'Sin expiración'}
-                  </td>
-                  <td className="px-5 py-3">
-                    <Badge tono={cupon.activo ? 'exito' : 'peligro'}>{cupon.activo ? 'Activo' : 'Inactivo'}</Badge>
-                  </td>
-                  <td className="px-5 py-3 text-right">
-                    {puedeGestionar && (
-                      <RowActionsMenu
-                        acciones={[
-                          { etiqueta: 'Editar', onClick: () => abrirEditar(cupon) },
-                          cupon.activo
-                            ? {
-                                etiqueta: 'Desactivar',
-                                tono: 'peligro' as const,
-                                onClick: () => cambiarActivo.mutate({ id: cupon.id, activo: false }),
-                              }
-                            : { etiqueta: 'Activar', onClick: () => cambiarActivo.mutate({ id: cupon.id, activo: true }) },
-                        ]}
-                      />
-                    )}
-                  </td>
-                </tr>
-              ))}
-              {cuponesVisibles.length === 0 && (
-                <tr>
-                  <td colSpan={7} className="px-5 py-6 text-center text-slate-400">
-                    {cupones?.length === 0 ? 'Todavía no hay cupones creados.' : 'No hay cupones activos — probá "Mostrar inactivos".'}
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-slate-500 dark:text-slate-400">
+          {cupones ? `${cupones.length} cupón(es) en el catálogo` : 'Cargando…'}
+        </p>
+        <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+          <input type="checkbox" checked={mostrarInactivos} onChange={(e) => setMostrarInactivos(e.target.checked)} />
+          Mostrar inactivos
+        </label>
+      </div>
+
+      {cuponesVisibles.length === 0 ? (
+        <Card>
+          <p className="py-6 text-center text-sm text-slate-400">
+            {cupones?.length === 0 ? 'Todavía no hay cupones creados.' : 'No hay cupones activos — probá "Mostrar inactivos".'}
+          </p>
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {cuponesVisibles.map((cupon) => (
+            <TarjetaCupon
+              key={cupon.id}
+              cupon={cupon}
+              puedeGestionar={puedeGestionar}
+              onEditar={() => abrirEditar(cupon)}
+              onCambiarActivo={(activo) => cambiarActivo.mutate({ id: cupon.id, activo })}
+              onVerAplicaciones={() => setCuponViendoAplicaciones(cupon)}
+            />
+          ))}
         </div>
-      </Card>
+      )}
 
       {modalAbierto && <ModalCupon cupon={cuponEditando} onClose={() => setModalAbierto(false)} />}
+      {cuponViendoAplicaciones && (
+        <ModalAplicacionesCupon cupon={cuponViendoAplicaciones} onClose={() => setCuponViendoAplicaciones(null)} />
+      )}
     </div>
+  );
+}
+
+function TarjetaCupon({
+  cupon,
+  puedeGestionar,
+  onEditar,
+  onCambiarActivo,
+  onVerAplicaciones,
+}: {
+  cupon: Cupon;
+  puedeGestionar: boolean;
+  onEditar: () => void;
+  onCambiarActivo: (activo: boolean) => void;
+  onVerAplicaciones: () => void;
+}) {
+  const expirado = Boolean(cupon.fechaExpiracion && new Date(cupon.fechaExpiracion) < new Date());
+  const porcentajeUso = cupon.usosMaximos ? Math.min(100, (cupon.usosActuales / cupon.usosMaximos) * 100) : null;
+
+  return (
+    <Card className="flex h-full flex-col">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="truncate font-mono text-base font-semibold text-slate-900 dark:text-slate-100">{cupon.codigo}</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            {cupon.duracionCiclos === null ? 'Duración indefinida' : `${cupon.duracionCiclos} ciclo(s)`}
+          </p>
+        </div>
+        <p className="shrink-0 font-mono text-xl font-bold text-sol-600 dark:text-sol-400">
+          {cupon.tipo === 'PORCENTAJE' ? `${cupon.valor}%` : `RD$ ${Number(cupon.valor).toLocaleString('es-DO')}`}
+        </p>
+      </div>
+
+      <div className="my-3 border-t border-dashed border-slate-200 dark:border-slate-700" />
+
+      <div className="flex-1 space-y-2 text-sm">
+        <div className="flex justify-between text-slate-500 dark:text-slate-400">
+          <span>Vigente hasta</span>
+          <span className={`font-mono ${expirado ? 'text-red-600 dark:text-red-400' : 'text-slate-900 dark:text-slate-100'}`}>
+            {cupon.fechaExpiracion ? new Date(cupon.fechaExpiracion).toLocaleDateString('es-DO') : 'Sin expiración'}
+          </span>
+        </div>
+        <div className="flex justify-between text-slate-500 dark:text-slate-400">
+          <span>Usos</span>
+          <span className="font-mono text-slate-900 dark:text-slate-100">
+            {cupon.usosActuales} / {cupon.usosMaximos ?? '∞'}
+          </span>
+        </div>
+        {porcentajeUso !== null && (
+          <div className="h-1.5 rounded-full bg-slate-100 dark:bg-slate-800">
+            <div
+              className={`h-full rounded-full ${porcentajeUso >= 90 ? 'bg-red-500' : 'bg-sol-500'}`}
+              style={{ width: `${porcentajeUso}%` }}
+            />
+          </div>
+        )}
+      </div>
+
+      <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-3 dark:border-slate-800">
+        <Badge tono={!cupon.activo ? 'peligro' : expirado ? 'advertencia' : 'exito'}>
+          {!cupon.activo ? 'Desactivado' : expirado ? 'Expirado' : 'Activo'}
+        </Badge>
+        <div className="flex items-center gap-3">
+          <button type="button" onClick={onVerAplicaciones} className="text-xs font-medium text-sol-600 hover:underline dark:text-sol-400">
+            Ver aplicaciones
+          </button>
+          {puedeGestionar && (
+            <RowActionsMenu
+              acciones={[
+                { etiqueta: 'Editar', onClick: onEditar },
+                cupon.activo
+                  ? { etiqueta: 'Desactivar', tono: 'peligro' as const, onClick: () => onCambiarActivo(false) }
+                  : { etiqueta: 'Activar', onClick: () => onCambiarActivo(true) },
+              ]}
+            />
+          )}
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+function ModalAplicacionesCupon({ cupon, onClose }: { cupon: Cupon; onClose: () => void }) {
+  const { data: aplicaciones } = useQuery({
+    queryKey: ['platform-cupon-aplicaciones', cupon.id],
+    queryFn: async () => (await platformApiClient.get<AplicacionCupon[]>(`/platform/cupones/${cupon.id}/aplicaciones`)).data,
+  });
+
+  return (
+    <Modal titulo={`Aplicaciones de "${cupon.codigo}"`} onClose={onClose}>
+      <div className="space-y-3">
+        <p className="text-sm text-slate-500 dark:text-slate-400">
+          {aplicaciones
+            ? `${aplicaciones.length} canje(s) — historial completo, incluye los que ya no están vigentes.`
+            : 'Cargando…'}
+        </p>
+        <div className="max-h-96 space-y-2 overflow-y-auto">
+          {aplicaciones?.map((a) => (
+            <div
+              key={a.id}
+              className="flex items-center justify-between rounded-md border border-slate-200 px-3 py-2 dark:border-slate-800"
+            >
+              <div>
+                <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{a.tenant.nombre}</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Aplicado el {new Date(a.fechaAplicado).toLocaleDateString('es-DO')} —{' '}
+                  {a.ciclosRestantes === null ? 'indefinido' : `${a.ciclosRestantes} ciclo(s) restante(s)`}
+                </p>
+              </div>
+              <Badge tono={a.activo ? 'exito' : 'neutro'}>{a.activo ? 'Vigente' : 'No vigente'}</Badge>
+            </div>
+          ))}
+          {aplicaciones?.length === 0 && <p className="text-sm text-slate-400">Todavía no lo canjeó ningún tenant.</p>}
+        </div>
+      </div>
+    </Modal>
   );
 }
 

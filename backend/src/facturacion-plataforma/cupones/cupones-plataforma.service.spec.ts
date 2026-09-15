@@ -18,6 +18,7 @@ describe('CuponesPlataformaService', () => {
       desactivarAplicacionesActivas: jest.fn().mockResolvedValue(undefined),
       crearAplicacion: jest.fn(),
       buscarAplicacionActiva: jest.fn(),
+      listarAplicacionesDeCupon: jest.fn(),
     } as unknown as jest.Mocked<CuponesPlataformaRepository>;
     suscripcionesRepository = {
       buscarPorTenant: jest.fn().mockResolvedValue({ id: 's1', tenantId: 't1' }),
@@ -76,6 +77,33 @@ describe('CuponesPlataformaService', () => {
       cuponesRepository.buscarPorCodigo.mockResolvedValue(null);
       await expect(service.aplicarATenant('t1', 'promo10')).rejects.toThrow(NotFoundException);
       expect(cuponesRepository.buscarPorCodigo).toHaveBeenCalledWith('PROMO10');
+    });
+  });
+
+  describe('listarAplicaciones', () => {
+    it('aplana el tenant de la suscripción anidada, sin el resto de la estructura de Prisma', async () => {
+      cuponesRepository.listarAplicacionesDeCupon.mockResolvedValue([
+        {
+          id: 'sc1',
+          ciclosRestantes: 2,
+          activo: true,
+          fechaAplicado: new Date('2026-09-01'),
+          suscripcion: { tenant: { id: 't1', nombre: 'Boutique Amantina' } },
+        },
+      ] as never);
+
+      const resultado = await service.listarAplicaciones('c1');
+
+      expect(resultado).toEqual([
+        {
+          id: 'sc1',
+          ciclosRestantes: 2,
+          activo: true,
+          fechaAplicado: new Date('2026-09-01'),
+          tenant: { id: 't1', nombre: 'Boutique Amantina' },
+        },
+      ]);
+      expect(cuponesRepository.listarAplicacionesDeCupon).toHaveBeenCalledWith('c1');
     });
   });
 

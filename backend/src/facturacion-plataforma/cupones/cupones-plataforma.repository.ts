@@ -12,6 +12,21 @@ export class CuponesPlataformaRepository {
     return this.prisma.cuponDescuento.findMany({ orderBy: { createdAt: 'desc' } });
   }
 
+  /** Historial completo de canjes de un código — nunca se borra, ver SuscripcionCupon en schema.prisma. */
+  listarAplicacionesDeCupon(cuponId: string) {
+    return this.prisma.suscripcionCupon.findMany({
+      where: { cuponId },
+      orderBy: { fechaAplicado: 'desc' },
+      select: {
+        id: true,
+        ciclosRestantes: true,
+        activo: true,
+        fechaAplicado: true,
+        suscripcion: { select: { tenant: { select: { id: true, nombre: true } } } },
+      },
+    });
+  }
+
   buscarPorCodigo(codigo: string) {
     return this.prisma.cuponDescuento.findUnique({ where: { codigo } });
   }
