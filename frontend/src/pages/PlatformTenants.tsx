@@ -601,6 +601,7 @@ export function PlatformTenants() {
   const [tenantSuscripcion, setTenantSuscripcion] = useState<Tenant | null>(null);
   const [tenantDominios, setTenantDominios] = useState<Tenant | null>(null);
   const [tenantAResetear, setTenantAResetear] = useState<Tenant | null>(null);
+  const [tenantCambiandoPlan, setTenantCambiandoPlan] = useState<Tenant | null>(null);
 
   const { data: tenants } = useQuery({
     queryKey: ['platform-tenants'],
@@ -625,12 +626,6 @@ export function PlatformTenants() {
   const cambiarEstado = useMutation({
     mutationFn: async ({ id, estado }: { id: string; estado: Tenant['estado'] }) =>
       platformApiClient.patch(`/platform/tenants/${id}`, { estado }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['platform-tenants'] }),
-  });
-
-  const cambiarPlan = useMutation({
-    mutationFn: async ({ id, planId: nuevoPlanId }: { id: string; planId: string }) =>
-      platformApiClient.patch(`/platform/tenants/${id}`, { planId: nuevoPlanId }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['platform-tenants'] }),
   });
 
@@ -687,24 +682,13 @@ export function PlatformTenants() {
                   </td>
                   <td className="px-5 py-3 font-mono text-xs text-slate-500 dark:text-slate-400">{tenant.rnc ?? '—'}</td>
                   <td className="px-5 py-3">
-                    <Select
-                      value={tenant.planId ?? ''}
-                      disabled={cambiarPlan.isPending}
-                      onChange={(e) => cambiarPlan.mutate({ id: tenant.id, planId: e.target.value })}
-                      className="!w-auto py-1"
+                    <button
+                      type="button"
+                      onClick={() => setTenantCambiandoPlan(tenant)}
+                      className="text-left hover:underline"
                     >
-                      <option value="" disabled>
-                        Sin plan
-                      </option>
-                      {planesAsignables.map((plan) => (
-                        <option key={plan.id} value={plan.id}>
-                          {plan.nombre}
-                        </option>
-                      ))}
-                      {tenant.plan && !planesAsignables.some((p) => p.id === tenant.plan!.id) && (
-                        <option value={tenant.plan.id}>{tenant.plan.nombre} (inactivo)</option>
-                      )}
-                    </Select>
+                      {tenant.plan ? tenant.plan.nombre : <span className="text-slate-400">Sin plan asignado</span>}
+                    </button>
                   </td>
                   <td className="px-5 py-3">
                     {tenant.modulosOverride.length === 0 ? (
@@ -773,7 +757,67 @@ export function PlatformTenants() {
       {tenantSuscripcion && <PanelSuscripcionTenant tenant={tenantSuscripcion} onClose={() => setTenantSuscripcion(null)} />}
       {tenantDominios && <PanelDominiosTenant tenant={tenantDominios} onClose={() => setTenantDominios(null)} />}
       {tenantAResetear && <ModalResetearTenant tenant={tenantAResetear} onClose={() => setTenantAResetear(null)} />}
+      {tenantCambiandoPlan && (
+        <ModalCambiarPlan tenant={tenantCambiandoPlan} planes={planesAsignables} onClose={() => setTenantCambiandoPlan(null)} />
+      )}
     </div>
+  );
+}
+
+/**
+ * Reemplaza el <select> que vivía siempre visible en la fila — asignar un
+ * plan es una acción con consecuencias reales (cambia qué módulos ve el
+ * tenant) y ahora requiere abrir este modal y confirmar, en vez de bastar
+ * un click accidental sobre un dropdown suelto en la tabla.
+ */
+function ModalCambiarPlan({ tenant, planes, onClose }: { tenant: Tenant; planes: Plan[]; onClose: () => void }) {
+  const queryClient = useQueryClient();
+  const [planId, setPlanId] = useState(tenant.planId ?? '');
+  const [error, setError] = useState<string | null>(null);
+
+  const cambiarPlan = useMutation({
+    mutationFn: async () => platformApiClient.patch(`/platform/tenants/${tenant.id}`, { planId }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['platform-tenants'] });
+      onClose();
+    },
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo cambiar el plan.')),
+  });
+
+  return (
+    <Modal titulo={`Cambiar plan — ${tenant.nombre}`} onClose={onClose}>
+      <div className="space-y-4">
+        <p className="text-sm text-slate-500 dark:text-slate-400">
+          Plan actual: <span className="font-medium text-slate-700 dark:text-slate-300">{tenant.plan?.nombre ?? 'Sin plan'}</span>
+        </p>
+        <div>
+          <label htmlFor="cambiar-plan-select" className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+            Nuevo plan
+          </label>
+          <Select id="cambiar-plan-select" value={planId} onChange={(e) => setPlanId(e.target.value)}>
+            <option value="" disabled>
+              Selecciona un plan
+            </option>
+            {planes.map((plan) => (
+              <option key={plan.id} value={plan.id}>
+                {plan.nombre}
+              </option>
+            ))}
+            {tenant.plan && !planes.some((p) => p.id === tenant.plan!.id) && (
+              <option value={tenant.plan.id}>{tenant.plan.nombre} (inactivo)</option>
+            )}
+          </Select>
+        </div>
+        {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+        <Button
+          className="w-full"
+          disabled={!planId || planId === tenant.planId || cambiarPlan.isPending}
+          onClick={() => cambiarPlan.mutate()}
+        >
+          {cambiarPlan.isPending ? 'Guardando…' : 'Confirmar cambio de plan'}
+        </Button>
+      </div>
+    </Modal>
   );
 }
 
