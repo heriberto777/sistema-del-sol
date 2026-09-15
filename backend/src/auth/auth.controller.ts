@@ -53,6 +53,16 @@ export class AuthController {
 
   // Autoservicio (Fase 9) — sin @Permissions, cualquier usuario autenticado
   // administra su propio PIN, igual criterio que cambiar su contraseña.
+  // Silenciosa (sin contraseña) — reemite accessToken/usuario con
+  // permisos/modulosActivos al día, para que un cambio de Plan/módulos o
+  // de permisos de un rol se refleje sin forzar logout+login manual (ver
+  // AuthContext.tsx, que la llama al montar el layout).
+  @ApiBearerAuth()
+  @Post('refrescar')
+  refrescar(@CurrentUser() user: JwtPayloadUser) {
+    return this.authService.refrescarSesion(user.userId, user.tenantId);
+  }
+
   @ApiBearerAuth()
   @Put('mi-pin')
   establecerPin(@Body() dto: EstablecerPinDto, @CurrentUser() user: JwtPayloadUser) {

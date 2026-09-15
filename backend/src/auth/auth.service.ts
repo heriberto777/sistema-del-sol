@@ -61,6 +61,44 @@ export class AuthService {
       throw new UnauthorizedException('Credenciales inválidas');
     }
 
+    return this.construirSesion(user, tenant);
+  }
+
+  /**
+   * "Silenciosa" — sin pedir contraseña de nuevo, para refrescar
+   * `permisos`/`modulosActivos` sin forzar un logout+login manual cuando
+   * cambia el Plan/módulos del tenant o los permisos de un rol. Requiere
+   * un JWT YA válido (mismo guard que cualquier ruta de tenant) — nunca
+   * expone esto sin autenticación previa. Reemite un `accessToken` nuevo
+   * (con `permisos` frescos, ya que ésos viajan DENTRO del JWT firmado y
+   * un usuario logueado no los vuelve a leer de la BD hasta tener un
+   * token nuevo) además del objeto `usuario` con `modulosActivos` al día.
+   */
+  async refrescarSesion(userId: string, tenantId: string) {
+    const [user, tenant] = await Promise.all([
+      this.prisma.user.findUnique({
+        where: { id: userId },
+        include: { roles: { include: { role: { include: { rolePermissions: { include: { permission: true } } } } } } },
+      }),
+      this.prisma.tenant.findUnique({ where: { id: tenantId } }),
+    ]);
+    if (!user || !user.activo || !tenant || tenant.estado !== 'ACTIVO') {
+      throw new UnauthorizedException('Sesión inválida');
+    }
+
+    return this.construirSesion(user, tenant);
+  }
+
+  private async construirSesion(
+    user: {
+      id: string;
+      nombre: string;
+      email: string;
+      pinHash: string | null;
+      roles: { role: { nombre: string; rolePermissions: { permission: { clave: string } }[] } }[];
+    },
+    tenant: { id: string; subdominio: string; nombre: string },
+  ) {
     const roles = user.roles.map((userRole) => userRole.role.nombre);
     const permisos = Array.from(
       new Set(

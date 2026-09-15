@@ -1,5 +1,8 @@
-import { createContext, ReactNode, useCallback, useMemo, useState } from 'react';
+import { createContext, ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 import { apiClient } from '../lib/api-client';
+
+/** Cada cuánto se refresca sola la sesión (permisos/módulos) mientras la pestaña sigue abierta — ver `refrescarSesion`. */
+const INTERVALO_REFRESCO_MS = 5 * 60 * 1000;
 
 export interface UsuarioAutenticado {
   id: string;
@@ -36,6 +39,8 @@ interface AuthContextValue {
   tieneModulo: (modulo: string) => boolean;
   /** Fase 9 — actualiza `tienePin` localmente tras configurar/eliminar el PIN, sin esperar al próximo login. */
   actualizarTienePin: (tienePin: boolean) => void;
+  /** Reemite el token/usuario con permisos y módulos al día, sin pedir contraseña — se llama sola (ver AuthProvider), pero queda expuesta por si hace falta un botón manual "Actualizar sesión". */
+  refrescarSesion: () => Promise<void>;
 }
 
 export const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -64,6 +69,12 @@ export function esCajeroPuro(usuario: Pick<UsuarioAutenticado, 'permisos'> | nul
 
 const STORAGE_KEY = 'sol_access_token';
 const STORAGE_USER_KEY = 'sol_usuario';
+// Debe coincidir con SucursalActivaContext.tsx (`STORAGE_KEY` ahí) — no se
+// importa directo para evitar un ciclo (SucursalActivaContext ya importa
+// useAuth, que depende de este archivo). Sin este cleanup, en una compu
+// compartida el siguiente usuario que loguea heredaba la sucursal elegida
+// por el anterior.
+const STORAGE_SUCURSAL_ACTIVA_KEY = 'sol_sucursal_activa';
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [usuario, setUsuario] = useState<UsuarioAutenticado | null>(() => {
@@ -88,8 +99,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(() => {
     localStorage.removeItem(STORAGE_KEY);
     localStorage.removeItem(STORAGE_USER_KEY);
+    localStorage.removeItem(STORAGE_SUCURSAL_ACTIVA_KEY);
     setUsuario(null);
   }, []);
+
+  /**
+   * Silenciosa (sin pedir contraseña de nuevo) — reemite accessToken/usuario
+   * con permisos/modulosActivos al día. Sin esto, un cambio de Plan/módulos
+   * en Plataforma o de permisos de un rol no se reflejaba en el Sidebar
+   * hasta el próximo logout+login manual (usuario.modulosActivos/permisos
+   * quedaban congelados en la foto del último login) — la aplicación REAL
+   * de ambos ya era 100% en vivo del lado del backend (PermissionsGuard/
+   * ModuloActivoGuard), esto solo pone al día lo que el frontend MUESTRA.
+   * Falla en silencio a propósito: si la red falla, la sesión sigue
+   * funcionando con los datos que ya tenía, y el siguiente intento
+   * programado lo reintenta — un 401 real ya lo maneja el interceptor
+   * global de `apiClient` (logout + redirect a /login).
+   */
+  const refrescarSesion = useCallback(async () => {
+    try {
+      const { data } = await apiClient.post('/auth/refrescar');
+      localStorage.setItem(STORAGE_KEY, data.accessToken);
+      localStorage.setItem(STORAGE_USER_KEY, JSON.stringify(data.usuario));
+      setUsuario(data.usuario);
+    } catch {
+      // silencioso — ver comentario de arriba.
+    }
+  }, []);
+
+  // Al montar (o cuando cambia DE usuario, es decir login/logout — nunca
+  // por el propio refresco, que reutiliza el mismo id) y cada
+  // INTERVALO_REFRESCO_MS mientras la pestaña siga abierta con sesión activa.
+  const usuarioId = usuario?.id;
+  useEffect(() => {
+    if (!usuarioId) return;
+    refrescarSesion();
+    const id = setInterval(refrescarSesion, INTERVALO_REFRESCO_MS);
+    return () => clearInterval(id);
+  }, [usuarioId, refrescarSesion]);
 
   // `?.permisos?.` (no solo `?.permisos.`) a propósito: una sesión que
   // inició antes de que este campo existiera tiene `usuario` guardado en
@@ -108,8 +155,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ usuario, cargando, login, logout, tienePermiso, tieneModulo, actualizarTienePin }),
-    [usuario, cargando, login, logout, tienePermiso, tieneModulo, actualizarTienePin],
+    () => ({ usuario, cargando, login, logout, tienePermiso, tieneModulo, actualizarTienePin, refrescarSesion }),
+    [usuario, cargando, login, logout, tienePermiso, tieneModulo, actualizarTienePin, refrescarSesion],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -32,6 +32,10 @@ apiClient.interceptors.response.use(
       // recargando sin parar).
       localStorage.removeItem('sol_access_token');
       localStorage.removeItem('sol_usuario');
+      // Mismo criterio que AuthContext.logout() — en una compu compartida,
+      // dejar la sucursal elegida hace que el siguiente usuario que loguee
+      // la herede.
+      localStorage.removeItem('sol_sucursal_activa');
       window.location.href = '/login';
     }
     return Promise.reject(error);

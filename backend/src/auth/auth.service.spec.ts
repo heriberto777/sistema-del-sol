@@ -1,9 +1,14 @@
-import { BadRequestException, ForbiddenException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import * as bcrypt from 'bcryptjs';
 import { AuthService } from './auth.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { EmailChannel } from '../notificaciones/canales/email.channel';
 import { hashearTokenReset } from '../common/utils/password-reset-token';
+import { resolverModulosActivos } from '../planes/resolver-modulos-activos';
+import { resolverPersonalizacionDocumento } from '../common/impresion/resolver-personalizacion-documento';
+
+jest.mock('../planes/resolver-modulos-activos');
+jest.mock('../common/impresion/resolver-personalizacion-documento');
 
 describe('AuthService — recuperación de contraseña', () => {
   let service: AuthService;
@@ -271,6 +276,93 @@ describe('AuthService — recuperación de contraseña', () => {
         await expect(service.verificarPin('u1', '1234')).rejects.toThrow(ForbiddenException);
         expect(prisma.user.update).not.toHaveBeenCalled();
       });
+    });
+  });
+});
+
+describe('AuthService — login / refrescarSesion', () => {
+  let service: AuthService;
+  let prisma: { tenant: { findUnique: jest.Mock }; user: { findUnique: jest.Mock } };
+  let jwtService: { sign: jest.Mock };
+  const resolverModulosActivosMock = resolverModulosActivos as jest.Mock;
+  const resolverPersonalizacionDocumentoMock = resolverPersonalizacionDocumento as jest.Mock;
+
+  const TENANT = { id: 't1', subdominio: 'demo', nombre: 'Empresa Demo', estado: 'ACTIVO' };
+  const PASSWORD_HASH = bcrypt.hashSync('Admin123!', 10);
+  const USER_CON_ROLES = {
+    id: 'u1',
+    nombre: 'Admin Demo',
+    email: 'admin@demo.com',
+    activo: true,
+    passwordHash: PASSWORD_HASH,
+    pinHash: null,
+    roles: [
+      {
+        role: {
+          nombre: 'Admin Total',
+          rolePermissions: [{ permission: { clave: 'facturacion.ver' } }, { permission: { clave: 'admin.usuarios' } }],
+        },
+      },
+    ],
+  };
+
+  beforeEach(() => {
+    prisma = { tenant: { findUnique: jest.fn() }, user: { findUnique: jest.fn() } };
+    jwtService = { sign: jest.fn().mockReturnValue('jwt-firmado') };
+    resolverModulosActivosMock.mockResolvedValue(['facturacion', 'inventario']);
+    resolverPersonalizacionDocumentoMock.mockResolvedValue({ logo: undefined });
+    (prisma as unknown as { configuracion: { findMany: jest.Mock } }).configuracion = { findMany: jest.fn().mockResolvedValue([]) };
+    service = new AuthService(prisma as unknown as PrismaService, jwtService as never, {} as never);
+  });
+
+  describe('login', () => {
+    it('arma el JWT y el objeto usuario con permisos deduplicados y modulosActivos resuelto en vivo', async () => {
+      prisma.tenant.findUnique.mockResolvedValue(TENANT);
+      prisma.user.findUnique.mockResolvedValue(USER_CON_ROLES);
+
+      const resultado = await service.login({ email: 'admin@demo.com', password: 'Admin123!', tenantSubdominio: 'demo' });
+
+      expect(jwtService.sign).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: 'u1', tenantId: 't1', permisos: ['facturacion.ver', 'admin.usuarios'] }),
+      );
+      expect(resultado.accessToken).toBe('jwt-firmado');
+      expect(resultado.usuario.modulosActivos).toEqual(['facturacion', 'inventario']);
+      expect(resolverModulosActivosMock).toHaveBeenCalledWith(prisma, 't1');
+    });
+
+    it('rechaza con credenciales inválidas si la contraseña no coincide', async () => {
+      prisma.tenant.findUnique.mockResolvedValue(TENANT);
+      prisma.user.findUnique.mockResolvedValue(USER_CON_ROLES);
+
+      await expect(service.login({ email: 'admin@demo.com', password: 'mala', tenantSubdominio: 'demo' })).rejects.toThrow(UnauthorizedException);
+    });
+  });
+
+  describe('refrescarSesion', () => {
+    it('reemite accessToken/usuario con datos frescos, sin pedir contraseña', async () => {
+      prisma.user.findUnique.mockResolvedValue(USER_CON_ROLES);
+      prisma.tenant.findUnique.mockResolvedValue(TENANT);
+      resolverModulosActivosMock.mockResolvedValue(['facturacion', 'nomina']); // ej. le agregaron un módulo nuevo al plan
+
+      const resultado = await service.refrescarSesion('u1', 't1');
+
+      expect(prisma.user.findUnique).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 'u1' } }));
+      expect(resultado.usuario.modulosActivos).toEqual(['facturacion', 'nomina']);
+      expect(resultado.accessToken).toBe('jwt-firmado');
+    });
+
+    it('rechaza si el usuario ya no existe o está inactivo', async () => {
+      prisma.user.findUnique.mockResolvedValue(null);
+      prisma.tenant.findUnique.mockResolvedValue(TENANT);
+
+      await expect(service.refrescarSesion('u1', 't1')).rejects.toThrow(UnauthorizedException);
+    });
+
+    it('rechaza si el tenant ya no existe o quedó suspendido', async () => {
+      prisma.user.findUnique.mockResolvedValue(USER_CON_ROLES);
+      prisma.tenant.findUnique.mockResolvedValue({ ...TENANT, estado: 'SUSPENDIDO' });
+
+      await expect(service.refrescarSesion('u1', 't1')).rejects.toThrow(UnauthorizedException);
     });
   });
 });
