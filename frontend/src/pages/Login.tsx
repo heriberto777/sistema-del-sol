@@ -89,7 +89,10 @@ export function Login() {
       // Cajero y Supervisor de Caja van directo al POS, no al Dashboard
       // (ninguno tiene reportes.ver) — ver docs/ARCHITECTURE.md, "Roles
       // de POS: Cajero, Vendedor, Supervisor de Caja".
-      navigate(usaPosComoInicio(usuarioLogueado) ? '/pos' : '/');
+      // replace: true — si no, "/login" queda en el historial y dar "atrás"
+      // tras loguearse vuelve a montar este formulario desde cero (bug real
+      // reportado: el usuario sigue logeado pero ve el login otra vez).
+      navigate(usaPosComoInicio(usuarioLogueado) ? '/pos' : '/', { replace: true });
     } catch (err) {
       setError(mensajeErrorApi(err, 'Credenciales inválidas'));
     }

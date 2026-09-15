@@ -36,7 +36,8 @@ export function TiendaLogin() {
     setEnviando(true);
     try {
       await login({ email, password });
-      navigate(destino);
+      // replace: true — mismo criterio que Login.tsx (tenant), ver ese comentario.
+      navigate(destino, { replace: true });
     } catch (err) {
       setError(mensajeErrorApi(err, 'No se pudo iniciar sesión.'));
     } finally {

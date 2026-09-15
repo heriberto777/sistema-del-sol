@@ -30,7 +30,8 @@ export function PlatformLogin() {
     setError(null);
     try {
       await login(email, password);
-      navigate('/plataforma/dashboard');
+      // replace: true — mismo criterio que Login.tsx (tenant), ver ese comentario.
+      navigate('/plataforma/dashboard', { replace: true });
     } catch (err) {
       setError(mensajeErrorApi(err, 'Credenciales inválidas'));
     }
