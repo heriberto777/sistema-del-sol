@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TareasPersonalesController } from './tareas-personales.controller';
 import { TareasPersonalesService } from './tareas-personales.service';
 import { TareasPersonalesRepository } from './tareas-personales.repository';
+import { TareasPersonalesCronService } from './tareas-personales-cron.service';
 
 /**
  * "Mis Tareas" — sin manifiesto en plugins/ (vive en src/ como un módulo
@@ -12,6 +13,6 @@ import { TareasPersonalesRepository } from './tareas-personales.repository';
  */
 @Module({
   controllers: [TareasPersonalesController],
-  providers: [TareasPersonalesService, TareasPersonalesRepository],
+  providers: [TareasPersonalesService, TareasPersonalesRepository, TareasPersonalesCronService],
 })
 export class TareasPersonalesModule {}

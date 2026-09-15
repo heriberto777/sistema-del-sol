@@ -34,6 +34,35 @@ function formatoFechaHoraComentario(fecha: string): string {
   return `${d.toLocaleDateString('es-DO', { day: 'numeric', month: 'short' })} · ${d.toLocaleTimeString('es-DO', { hour: 'numeric', minute: '2-digit' })}`;
 }
 
+/**
+ * `fechaVencimiento` es un día calendario, no un instante — llega como
+ * medianoche UTC. Armarla a partir de los componentes del string evita
+ * que retroceda un día en cualquier huso detrás de UTC (mismo bug/fix
+ * que `MisTareas.tsx: soloFecha`).
+ */
+function soloFecha(fechaIso: string): Date {
+  const [anio, mes, dia] = fechaIso.slice(0, 10).split('-').map(Number);
+  return new Date(anio, mes - 1, dia);
+}
+function formatoFechaVencimiento(fecha: string): string {
+  return soloFecha(fecha).toLocaleDateString('es-DO', { day: 'numeric', month: 'short' });
+}
+/** Solo visual (el aviso real por email/WhatsApp lo dispara TareasProyectoCronService en el backend) — una tarea TERMINADA nunca se resalta. */
+function estadoVencimiento(fecha: string, estado: string): 'vencida' | 'hoy' | null {
+  if (estado === 'TERMINADA') return null;
+  const dia = soloFecha(fecha);
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+  if (dia.getTime() === hoy.getTime()) return 'hoy';
+  if (dia.getTime() < hoy.getTime()) return 'vencida';
+  return null;
+}
+const CLASE_BADGE_VENCIMIENTO: Record<'vencida' | 'hoy', string> = {
+  vencida: 'bg-red-100 text-red-700 dark:bg-red-500/10 dark:text-red-400',
+  hoy: 'bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400',
+};
+const ETIQUETA_BADGE_VENCIMIENTO: Record<'vencida' | 'hoy', string> = { vencida: 'Vencida', hoy: 'Vence hoy' };
+
 function formatearDuracion(ms: number): string {
   const minutos = Math.max(0, Math.floor(ms / 60_000));
   const horas = Math.floor(minutos / 60);
@@ -592,9 +621,17 @@ export function KanbanTareas({ proyectoId, proyectoNombre, proyectoDescripcion, 
                                     </div>
                                   )}
                                 </div>
-                                {t.fechaVencimiento && (
-                                  <p className="text-xs text-slate-400">Vence {new Date(t.fechaVencimiento).toLocaleDateString('es-DO')}</p>
-                                )}
+                                {t.fechaVencimiento &&
+                                  (() => {
+                                    const vencimiento = estadoVencimiento(t.fechaVencimiento, t.estado);
+                                    return vencimiento ? (
+                                      <span className={clsx('inline-block rounded-full px-2 py-0.5 text-[10px] font-medium', CLASE_BADGE_VENCIMIENTO[vencimiento])}>
+                                        {ETIQUETA_BADGE_VENCIMIENTO[vencimiento]}
+                                      </span>
+                                    ) : (
+                                      <p className="text-xs text-slate-400">Vence {formatoFechaVencimiento(t.fechaVencimiento)}</p>
+                                    );
+                                  })()}
                               </div>
                             )}
                           </div>

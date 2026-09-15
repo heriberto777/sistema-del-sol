@@ -167,7 +167,13 @@ export class ProyectosRepository {
   actualizarTarea(id: string, dto: Partial<CrearTareaProyectoDto>) {
     return this.db.tareaProyecto.update({
       where: { id },
-      data: { ...dto, fechaVencimiento: aFecha(dto.fechaVencimiento) },
+      data: {
+        ...dto,
+        fechaVencimiento: aFecha(dto.fechaVencimiento),
+        // Editar la fecha de vencimiento reabre la posibilidad de un nuevo
+        // aviso de "vence hoy" (ver TareasProyectoCronService).
+        ...(dto.fechaVencimiento !== undefined ? { recordatorioEnviado: false } : {}),
+      },
       include: INCLUDE_TAREA,
     });
   }

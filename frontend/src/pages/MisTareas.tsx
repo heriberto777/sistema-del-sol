@@ -68,6 +68,23 @@ function formatoFechaBadge(fecha: string) {
   return soloFecha(fecha).toLocaleDateString('es-DO', { day: 'numeric', month: 'short' });
 }
 
+/** Solo visual (el aviso real por email/WhatsApp lo dispara TareasPersonalesCronService en el backend, mismo criterio de "hoy") — una tarea ya HECHA nunca se resalta, sin importar la fecha. */
+function estadoVencimiento(fecha: string, estado: string): 'vencida' | 'hoy' | null {
+  if (estado === 'HECHA') return null;
+  const dia = soloFecha(fecha);
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+  if (dia.getTime() === hoy.getTime()) return 'hoy';
+  if (dia.getTime() < hoy.getTime()) return 'vencida';
+  return null;
+}
+
+const CLASE_BADGE_FECHA: Record<'vencida' | 'hoy', string> = {
+  vencida: 'bg-red-100 text-red-700 dark:bg-red-500/10 dark:text-red-400',
+  hoy: 'bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400',
+};
+const ETIQUETA_BADGE_FECHA: Record<'vencida' | 'hoy', string> = { vencida: 'Vencida', hoy: 'Vence hoy' };
+
 function coincideTexto(tarea: TareaPersonal, busqueda: string): boolean {
   const q = busqueda.trim().toLowerCase();
   if (!q) return true;
@@ -122,6 +139,7 @@ function FilaTarea({
   onToggleSeleccion?: () => void;
 }) {
   const hecha = tarea.estado === 'HECHA';
+  const vencimiento = tarea.fecha ? estadoVencimiento(tarea.fecha, tarea.estado) : null;
   return (
     <div className="flex items-center gap-3 px-5 py-3 hover:bg-slate-50 dark:hover:bg-slate-800/40">
       {seleccionable && (
@@ -163,7 +181,11 @@ function FilaTarea({
           {et}
         </span>
       ))}
-      {tarea.fecha && <span className="shrink-0 text-xs text-slate-400">{formatoFechaBadge(tarea.fecha)}</span>}
+      {tarea.fecha && (
+        <span className={clsx('shrink-0 rounded-full px-2 py-0.5 text-xs font-medium', vencimiento ? CLASE_BADGE_FECHA[vencimiento] : 'text-slate-400')}>
+          {vencimiento ? ETIQUETA_BADGE_FECHA[vencimiento] : formatoFechaBadge(tarea.fecha)}
+        </span>
+      )}
       {tarea.comentarios.length > 0 && (
         <span className="flex shrink-0 items-center gap-0.5 text-xs text-slate-400">
           <MessageSquare size={12} /> {tarea.comentarios.length}
@@ -400,6 +422,8 @@ function TarjetaKanban({
     e.dataTransfer.effectAllowed = 'move';
   }
 
+  const vencimiento = tarea.fecha ? estadoVencimiento(tarea.fecha, tarea.estado) : null;
+
   if (densidad === 'compacta') {
     return (
       <div
@@ -414,7 +438,11 @@ function TarjetaKanban({
       >
         <span className={clsx('h-1.5 w-1.5 shrink-0 rounded-full', PUNTO_PRIORIDAD_TAREA_PERSONAL[tarea.prioridad])} />
         <span className="min-w-0 flex-1 truncate text-[12px] text-slate-800 dark:text-slate-100">{tarea.titulo}</span>
-        {tarea.fecha && <span className="shrink-0 text-[10px] text-slate-400">{formatoFechaBadge(tarea.fecha)}</span>}
+        {tarea.fecha && (
+          <span className={clsx('shrink-0 rounded-full px-1.5 py-px text-[10px] font-medium', vencimiento ? CLASE_BADGE_FECHA[vencimiento] : 'text-slate-400')}>
+            {vencimiento ? ETIQUETA_BADGE_FECHA[vencimiento] : formatoFechaBadge(tarea.fecha)}
+          </span>
+        )}
       </div>
     );
   }
@@ -432,7 +460,11 @@ function TarjetaKanban({
     >
       <div className="mb-1 flex items-center gap-1.5">
         <span className={clsx('h-1.5 w-1.5 shrink-0 rounded-full', PUNTO_PRIORIDAD_TAREA_PERSONAL[tarea.prioridad])} />
-        {tarea.fecha && <span className="text-[10px] text-slate-400">{formatoFechaBadge(tarea.fecha)}</span>}
+        {tarea.fecha && (
+          <span className={clsx('rounded-full px-1.5 py-px text-[10px] font-medium', vencimiento ? CLASE_BADGE_FECHA[vencimiento] : 'text-slate-400')}>
+            {vencimiento ? ETIQUETA_BADGE_FECHA[vencimiento] : formatoFechaBadge(tarea.fecha)}
+          </span>
+        )}
         {tarea.comentarios.length > 0 && (
           <span className="flex items-center gap-0.5 text-[10px] text-slate-400">
             <MessageSquare size={10} /> {tarea.comentarios.length}

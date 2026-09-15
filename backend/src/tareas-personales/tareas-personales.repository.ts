@@ -66,7 +66,14 @@ export class TareasPersonalesRepository {
       etiquetas?: string[];
     },
   ) {
-    return this.db.tareaPersonal.update({ where: { id, usuarioId }, data: datos, include: INCLUDE_TAREA });
+    return this.db.tareaPersonal.update({
+      where: { id, usuarioId },
+      // Editar la fecha reabre la posibilidad de un nuevo aviso de "vence
+      // hoy" (ver TareasPersonalesCronService) — mismo criterio que
+      // ProyectosRepository.actualizarHito/actualizarTarea.
+      data: { ...datos, ...(datos.fecha !== undefined ? { recordatorioEnviado: false } : {}) },
+      include: INCLUDE_TAREA,
+    });
   }
 
   eliminar(id: string, usuarioId: string) {

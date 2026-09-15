@@ -4030,6 +4030,11 @@ model TareaProyecto {
   estado           EstadoTareaProyecto    @default(PENDIENTE)
   prioridad        PrioridadTareaProyecto @default(MEDIA)
   fechaVencimiento DateTime?
+  // Aviso único (email + WhatsApp) a los responsables el día que llega
+  // `fechaVencimiento` — ver TareasProyectoCronService. Se resetea a false
+  // si se edita `fechaVencimiento` (mismo criterio que
+  // HitoProyecto.alertaVencimientoEnviada/TareaPersonal.recordatorioEnviado).
+  recordatorioEnviado Boolean              @default(false)
   createdAt        DateTime               @default(now())
   updatedAt        DateTime               @updatedAt
 
@@ -4511,6 +4516,10 @@ model TareaPersonal {
   // sumaron a él.
   categoriaIncentivoId String?
   categoriaIncentivo   CategoriaIncentivo? @relation(fields: [categoriaIncentivoId], references: [id], onDelete: SetNull)
+  // Aviso único (email + WhatsApp si el usuario tiene teléfono) el día que
+  // llega `fecha` — ver TareasPersonalesCronService. Se resetea a false si
+  // se edita `fecha` (mismo criterio que HitoProyecto.alertaVencimientoEnviada).
+  recordatorioEnviado Boolean                @default(false)
   createdAt    DateTime               @default(now())
   updatedAt    DateTime               @updatedAt
 

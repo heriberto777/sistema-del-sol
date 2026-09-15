@@ -23,6 +23,8 @@ export const EVENTOS = {
   PUBLICACION_SOCIAL_APROBADA: 'publicaciones_sociales.aprobada',
   PUBLICACION_SOCIAL_RECHAZADA: 'publicaciones_sociales.rechazada',
   TAREA_PROYECTO_COMENTADA: 'proyectos.tarea_comentada',
+  TAREA_PROYECTO_VENCE_HOY: 'proyectos.tarea_vence_hoy',
+  TAREA_PERSONAL_VENCE_HOY: 'tareas_personales.vence_hoy',
 } as const;
 
 export type NombreEvento = (typeof EVENTOS)[keyof typeof EVENTOS];
@@ -217,4 +219,21 @@ export interface TareaProyectoComentadaPayload {
   autorNombre: string;
   contenido: string;
   destinatariosUserId: string[];
+}
+
+/** Emitido por TareasProyectoCronService el día que llega `fechaVencimiento` — avisa a TODOS los responsables con `Empleado.userId` vinculado, sin fallback a Admin Total (mismo criterio que TareaProyectoComentadaPayload). */
+export interface TareaProyectoVenceHoyPayload {
+  tenantId: string;
+  tareaId: string;
+  tareaTitulo: string;
+  proyectoNombre: string;
+  destinatariosUserId: string[];
+}
+
+/** Emitido por TareasPersonalesCronService el día que llega `fecha` — la tarea es personal, el único destinatario posible es su dueño. */
+export interface TareaPersonalVenceHoyPayload {
+  tenantId: string;
+  tareaId: string;
+  tareaTitulo: string;
+  usuarioId: string;
 }

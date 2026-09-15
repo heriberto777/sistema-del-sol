@@ -12,6 +12,7 @@ import { FacturacionModule } from '../facturacion/facturacion.module';
 import { IaModule } from '../ia/ia.module';
 import { WhatsappConfigModule } from '../whatsapp-config/whatsapp-config.module';
 import { HitosProyectoCronService } from './hitos-proyecto-cron.service';
+import { TareasProyectoCronService } from './tareas-proyecto-cron.service';
 import { PresupuestoProyectoListener } from './presupuesto-proyecto.listener';
 import { HitoFacturaAnuladaListener } from './hito-factura-anulada.listener';
 
@@ -35,6 +36,7 @@ import { HitoFacturaAnuladaListener } from './hito-factura-anulada.listener';
     ProyectosIaService,
     TareasProyectoService,
     HitosProyectoCronService,
+    TareasProyectoCronService,
     PresupuestoProyectoListener,
     HitoFacturaAnuladaListener,
   ],

@@ -372,6 +372,70 @@ describe('NotificacionesService', () => {
     });
   });
 
+  describe('alVencerTareaProyectoHoy', () => {
+    beforeEach(() => {
+      repository.buscarPlantilla.mockResolvedValue({ activa: true, asunto: 'x', cuerpo: 'x' } as never);
+      repository.crearNotificacion.mockResolvedValue({ id: 'n1' } as never);
+      emailChannel.enviar.mockResolvedValue(true);
+      whatsAppChannel.enviar.mockResolvedValue(true);
+    });
+
+    it('no hace nada si no hay destinatarios', async () => {
+      await service.alVencerTareaProyectoHoy({ tenantId: 't1', tareaId: 'tp1', tareaTitulo: 'Entregar diseño', proyectoNombre: 'Proyecto X', destinatariosUserId: [] });
+      expect(prisma.user.findMany).not.toHaveBeenCalled();
+      expect(emailChannel.enviar).not.toHaveBeenCalled();
+    });
+
+    it('envía EMAIL siempre y WHATSAPP solo a quien tiene teléfono', async () => {
+      prisma.user.findMany.mockResolvedValue([
+        { id: 'u1', email: 'u1@x.com', telefono: '18095551234' },
+        { id: 'u2', email: 'u2@x.com', telefono: null },
+      ]);
+
+      await service.alVencerTareaProyectoHoy({ tenantId: 't1', tareaId: 'tp1', tareaTitulo: 'Entregar diseño', proyectoNombre: 'Proyecto X', destinatariosUserId: ['u1', 'u2'] });
+
+      expect(repository.buscarPlantilla).toHaveBeenCalledWith('t1', 'EMAIL', 'tarea_proyecto_vence_hoy');
+      expect(emailChannel.enviar).toHaveBeenCalledTimes(2);
+      expect(whatsAppChannel.enviar).toHaveBeenCalledTimes(1);
+      expect(repository.buscarPlantilla).toHaveBeenCalledWith('t1', 'WHATSAPP', 'tarea_proyecto_vence_hoy');
+    });
+  });
+
+  describe('alVencerTareaPersonalHoy', () => {
+    beforeEach(() => {
+      repository.buscarPlantilla.mockResolvedValue({ activa: true, asunto: 'x', cuerpo: 'x' } as never);
+      repository.crearNotificacion.mockResolvedValue({ id: 'n1' } as never);
+      emailChannel.enviar.mockResolvedValue(true);
+      whatsAppChannel.enviar.mockResolvedValue(true);
+    });
+
+    it('no hace nada si el usuario ya no existe', async () => {
+      prisma.user.findUnique.mockResolvedValue(null);
+      await service.alVencerTareaPersonalHoy({ tenantId: 't1', tareaId: 'ta1', tareaTitulo: 'Backup mensual', usuarioId: 'u1' });
+      expect(emailChannel.enviar).not.toHaveBeenCalled();
+    });
+
+    it('envía EMAIL siempre, y WHATSAPP solo si tiene teléfono guardado', async () => {
+      prisma.user.findUnique.mockResolvedValue({ id: 'u1', email: 'u1@x.com', telefono: '18095551234' });
+
+      await service.alVencerTareaPersonalHoy({ tenantId: 't1', tareaId: 'ta1', tareaTitulo: 'Backup mensual', usuarioId: 'u1' });
+
+      expect(repository.buscarPlantilla).toHaveBeenCalledWith('t1', 'EMAIL', 'tarea_personal_vence_hoy');
+      expect(emailChannel.enviar).toHaveBeenCalledTimes(1);
+      expect(whatsAppChannel.enviar).toHaveBeenCalledTimes(1);
+      expect(repository.buscarPlantilla).toHaveBeenCalledWith('t1', 'WHATSAPP', 'tarea_personal_vence_hoy');
+    });
+
+    it('sin teléfono guardado, solo manda EMAIL', async () => {
+      prisma.user.findUnique.mockResolvedValue({ id: 'u1', email: 'u1@x.com', telefono: null });
+
+      await service.alVencerTareaPersonalHoy({ tenantId: 't1', tareaId: 'ta1', tareaTitulo: 'Backup mensual', usuarioId: 'u1' });
+
+      expect(emailChannel.enviar).toHaveBeenCalledTimes(1);
+      expect(whatsAppChannel.enviar).not.toHaveBeenCalled();
+    });
+  });
+
   describe('alQuedarPendienteAprobacionPublicacionSocial (Fase 5)', () => {
     it('resuelve destinatarios por el PERMISO publicacionessociales.aprobar, no por nombre de rol', async () => {
       prisma.user.findMany.mockResolvedValue([{ id: 'u1', email: 'gerente@x.com', telefono: null }]);

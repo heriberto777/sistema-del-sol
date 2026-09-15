@@ -19,6 +19,8 @@ import {
   PublicacionSocialRechazadaPayload,
   StockBajoPayload,
   TareaProyectoComentadaPayload,
+  TareaProyectoVenceHoyPayload,
+  TareaPersonalVenceHoyPayload,
   WhatsappRequiereAtencionPayload,
 } from '../event-bus/events';
 import { PrismaService } from '../prisma/prisma.service';
@@ -334,6 +336,32 @@ export class NotificacionesService {
       if (usuario.telefono) {
         await this.enviar({ tenantId: payload.tenantId, canal: 'WHATSAPP', clave: 'tarea_proyecto_comentario_nuevo', destinatario: usuario.telefono, variables });
       }
+    }
+  }
+
+  /** Emitido por TareasProyectoCronService el día que llega `fechaVencimiento` — igual patrón que `alComentarTareaProyecto`: EMAIL siempre + WHATSAPP si el usuario tiene teléfono, sin fallback a Admin Total. */
+  @OnEvent(EVENTOS.TAREA_PROYECTO_VENCE_HOY)
+  async alVencerTareaProyectoHoy(payload: TareaProyectoVenceHoyPayload) {
+    if (payload.destinatariosUserId.length === 0) return;
+    const usuarios = await this.prisma.user.findMany({ where: { id: { in: payload.destinatariosUserId } } });
+    const variables = { tarea_titulo: payload.tareaTitulo, proyecto_nombre: payload.proyectoNombre };
+    for (const usuario of usuarios) {
+      await this.enviar({ tenantId: payload.tenantId, canal: 'EMAIL', clave: 'tarea_proyecto_vence_hoy', destinatario: usuario.email, variables });
+      if (usuario.telefono) {
+        await this.enviar({ tenantId: payload.tenantId, canal: 'WHATSAPP', clave: 'tarea_proyecto_vence_hoy', destinatario: usuario.telefono, variables });
+      }
+    }
+  }
+
+  /** Emitido por TareasPersonalesCronService el día que llega `fecha` — el único destinatario posible es el dueño de la tarea. */
+  @OnEvent(EVENTOS.TAREA_PERSONAL_VENCE_HOY)
+  async alVencerTareaPersonalHoy(payload: TareaPersonalVenceHoyPayload) {
+    const usuario = await this.prisma.user.findUnique({ where: { id: payload.usuarioId } });
+    if (!usuario) return;
+    const variables = { tarea_titulo: payload.tareaTitulo };
+    await this.enviar({ tenantId: payload.tenantId, canal: 'EMAIL', clave: 'tarea_personal_vence_hoy', destinatario: usuario.email, variables });
+    if (usuario.telefono) {
+      await this.enviar({ tenantId: payload.tenantId, canal: 'WHATSAPP', clave: 'tarea_personal_vence_hoy', destinatario: usuario.telefono, variables });
     }
   }
 
