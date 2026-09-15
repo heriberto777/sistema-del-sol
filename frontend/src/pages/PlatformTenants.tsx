@@ -27,6 +27,8 @@ interface Tenant {
   estado: 'ACTIVO' | 'SUSPENDIDO' | 'CANCELADO';
   planId: string | null;
   plan: { id: string; nombre: string } | null;
+  modulosOverride: { activo: boolean; modulo: { clave: string; nombre: string } }[];
+  suscripcion: { fechaProximoCorte: string } | null;
   createdAt: string;
 }
 
@@ -49,6 +51,13 @@ const TONO_POR_ESTADO: Record<Tenant['estado'], 'exito' | 'advertencia' | 'pelig
   SUSPENDIDO: 'advertencia',
   CANCELADO: 'peligro',
 };
+
+// Mismo patrón que AccountMenu.tsx (avatar con iniciales) — acá en cuadrado
+// para diferenciarlo del avatar circular de "persona" del header.
+function iniciales(nombre: string) {
+  const partes = nombre.trim().split(/\s+/);
+  return ((partes[0]?.[0] ?? '') + (partes[1]?.[0] ?? '')).toUpperCase();
+}
 
 // Subconjunto de PlatformDashboardService.resumen() — el resto de esa
 // respuesta no aplica acá, activos/suspendidos ya salen de `tenants`
@@ -649,10 +658,12 @@ export function PlatformTenants() {
           <table className="w-full text-left text-sm">
             <thead className="bg-slate-50 text-slate-500 dark:bg-slate-900/60 dark:text-slate-400">
               <tr>
-                <th className="px-5 py-3 font-medium">Nombre</th>
-                <th className="px-5 py-3 font-medium">Subdominio</th>
+                <th className="px-5 py-3 font-medium">Tenant</th>
+                <th className="px-5 py-3 font-medium">RNC</th>
                 <th className="px-5 py-3 font-medium">Plan</th>
+                <th className="px-5 py-3 font-medium">Excepciones de módulo</th>
                 <th className="px-5 py-3 font-medium">Estado</th>
+                <th className="px-5 py-3 font-medium">Próx. corte</th>
                 <th className="px-5 py-3"></th>
               </tr>
             </thead>
@@ -662,16 +673,19 @@ export function PlatformTenants() {
                   <td className="px-5 py-3">
                     <div className="flex items-center gap-2">
                       {tenant.logo ? (
-                        <img src={tenant.logo} alt="" className="h-7 w-7 shrink-0 rounded object-contain" />
+                        <img src={tenant.logo} alt="" className="h-8 w-8 shrink-0 rounded-lg object-contain" />
                       ) : (
-                        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-slate-100 text-xs text-slate-400 dark:bg-slate-800">
-                          —
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-sol-100 text-xs font-semibold text-sol-700 dark:bg-sol-900/40 dark:text-sol-300">
+                          {iniciales(tenant.nombre)}
                         </div>
                       )}
-                      {tenant.nombre}
+                      <div className="min-w-0">
+                        <p className="font-medium text-slate-900 dark:text-slate-100">{tenant.nombre}</p>
+                        <p className="font-mono text-xs text-slate-400">{tenant.subdominio}</p>
+                      </div>
                     </div>
                   </td>
-                  <td className="px-5 py-3 font-mono text-xs">{tenant.subdominio}</td>
+                  <td className="px-5 py-3 font-mono text-xs text-slate-500 dark:text-slate-400">{tenant.rnc ?? '—'}</td>
                   <td className="px-5 py-3">
                     <Select
                       value={tenant.planId ?? ''}
@@ -693,7 +707,31 @@ export function PlatformTenants() {
                     </Select>
                   </td>
                   <td className="px-5 py-3">
+                    {tenant.modulosOverride.length === 0 ? (
+                      <span className="text-xs text-slate-400">—</span>
+                    ) : (
+                      <div className="flex flex-wrap gap-1">
+                        {tenant.modulosOverride.map((ov) => (
+                          <span
+                            key={ov.modulo.clave}
+                            className={
+                              ov.activo
+                                ? 'rounded-md bg-emerald-50 px-1.5 py-0.5 text-[11px] font-medium text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
+                                : 'rounded-md bg-red-50 px-1.5 py-0.5 text-[11px] font-medium text-red-700 line-through dark:bg-red-900/30 dark:text-red-400'
+                            }
+                          >
+                            {ov.activo ? '+ ' : ''}
+                            {ov.modulo.nombre}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </td>
+                  <td className="px-5 py-3">
                     <Badge tono={TONO_POR_ESTADO[tenant.estado]}>{tenant.estado}</Badge>
+                  </td>
+                  <td className="px-5 py-3 font-mono text-xs text-slate-500 dark:text-slate-400">
+                    {tenant.suscripcion ? new Date(tenant.suscripcion.fechaProximoCorte).toLocaleDateString('es-DO') : '—'}
                   </td>
                   <td className="px-5 py-3 text-right">
                     <RowActionsMenu
@@ -719,7 +757,7 @@ export function PlatformTenants() {
               ))}
               {tenants?.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-5 py-6 text-center text-slate-400">
+                  <td colSpan={7} className="px-5 py-6 text-center text-slate-400">
                     Todavía no hay tenants creados.
                   </td>
                 </tr>

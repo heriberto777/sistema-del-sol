@@ -16,8 +16,16 @@ import { ModoReseteoTenant } from './dto/resetear-tenant.dto';
 export class TenantsRepository {
   constructor(private readonly prisma: PrismaService) {}
 
+  /** Ítem "Tabla operativa + KPIs" — incluye lo necesario para la vista de PlatformTenants.tsx (excepciones de módulo, próximo corte) sin que la propia tabla tenga que pegarle a otro endpoint por fila. */
   listar() {
-    return this.prisma.tenant.findMany({ orderBy: { createdAt: 'desc' }, include: { plan: true } });
+    return this.prisma.tenant.findMany({
+      orderBy: { createdAt: 'desc' },
+      include: {
+        plan: true,
+        modulosOverride: { include: { modulo: true } },
+        suscripcion: { select: { fechaProximoCorte: true } },
+      },
+    });
   }
 
   buscarPorId(id: string) {
