@@ -48,6 +48,6 @@ export class CategoriasIncentivoController {
 
   @Post('resumen/enviar')
   enviarResumen(@Body() dto: EnviarResumenIncentivoDto, @CurrentUser() user: JwtPayloadUser) {
-    return this.service.enviarResumen(dto.mes, dto.canal, dto.destino, user.tenantId);
+    return this.service.enviarResumen(dto.mes, dto.canal, dto.destino, user.tenantId, dto.comentario);
   }
 }

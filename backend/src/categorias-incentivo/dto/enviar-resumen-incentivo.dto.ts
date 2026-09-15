@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsIn, IsString, Matches } from 'class-validator';
+import { IsIn, IsOptional, IsString, Matches, MaxLength } from 'class-validator';
 
 export class EnviarResumenIncentivoDto {
   @ApiProperty({ description: 'YYYY-MM' })
@@ -14,4 +14,10 @@ export class EnviarResumenIncentivoDto {
   @ApiProperty({ description: 'Email o número de teléfono según el canal elegido' })
   @IsString()
   destino: string;
+
+  @ApiProperty({ required: false, description: 'Opcional — nota libre que se agrega al final del reporte' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  comentario?: string;
 }

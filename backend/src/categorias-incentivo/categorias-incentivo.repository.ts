@@ -53,4 +53,13 @@ export class CategoriasIncentivoRepository {
       }),
     );
   }
+
+  /** Detalle de "Tareas pendientes del período" para el reporte enviado — cualquier tarea con categoría de incentivo, del período, que no llegó a HECHA. */
+  listarPendientesPeriodo(desde: Date, hasta: Date) {
+    return this.db.tareaPersonal.findMany({
+      where: { categoriaIncentivoId: { not: null }, fecha: { gte: desde, lte: hasta }, estado: { not: 'HECHA' } },
+      select: { id: true, titulo: true, estado: true, categoriaIncentivo: { select: { nombre: true } } },
+      orderBy: [{ fecha: 'asc' }, { createdAt: 'asc' }],
+    });
+  }
 }

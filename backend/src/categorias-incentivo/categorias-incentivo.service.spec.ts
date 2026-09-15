@@ -6,12 +6,12 @@ import { WhatsAppChannel } from '../notificaciones/canales/whatsapp.channel';
 
 describe('CategoriasIncentivoService', () => {
   let service: CategoriasIncentivoService;
-  let repository: jest.Mocked<Pick<CategoriasIncentivoRepository, 'resumenPeriodo' | 'listarDestinatarios'>>;
+  let repository: jest.Mocked<Pick<CategoriasIncentivoRepository, 'resumenPeriodo' | 'listarDestinatarios' | 'listarPendientesPeriodo'>>;
   let emailChannel: jest.Mocked<Pick<EmailChannel, 'enviar'>>;
   let whatsAppChannel: jest.Mocked<Pick<WhatsAppChannel, 'enviar'>>;
 
   beforeEach(() => {
-    repository = { resumenPeriodo: jest.fn(), listarDestinatarios: jest.fn() };
+    repository = { resumenPeriodo: jest.fn(), listarDestinatarios: jest.fn(), listarPendientesPeriodo: jest.fn().mockResolvedValue([]) };
     emailChannel = { enviar: jest.fn().mockResolvedValue(true) };
     whatsAppChannel = { enviar: jest.fn().mockResolvedValue(true) };
     service = new CategoriasIncentivoService(repository as unknown as CategoriasIncentivoRepository, emailChannel as unknown as EmailChannel, whatsAppChannel as unknown as WhatsAppChannel);
@@ -67,6 +67,21 @@ describe('CategoriasIncentivoService', () => {
       expect(desde.toISOString()).toBe('2026-02-01T00:00:00.000Z');
       expect(hasta.toISOString()).toBe('2026-02-28T23:59:59.999Z');
     });
+
+    it('incluye las tareas pendientes del período, con el nombre de su categoría', async () => {
+      repository.resumenPeriodo.mockResolvedValue([]);
+      repository.listarPendientesPeriodo.mockResolvedValue([
+        { id: 'ta1', titulo: 'Backup mensual', estado: 'PENDIENTE', categoriaIncentivo: { nombre: 'Backups' } } as never,
+        { id: 'ta2', titulo: 'Reporte semanal', estado: 'EN_CURSO', categoriaIncentivo: null } as never,
+      ]);
+
+      const resultado = await service.resumen('2026-09');
+
+      expect(resultado.tareasPendientes).toEqual([
+        { id: 'ta1', titulo: 'Backup mensual', categoriaNombre: 'Backups' },
+        { id: 'ta2', titulo: 'Reporte semanal', categoriaNombre: null },
+      ]);
+    });
   });
 
   describe('enviarResumen', () => {
@@ -101,6 +116,48 @@ describe('CategoriasIncentivoService', () => {
       whatsAppChannel.enviar.mockResolvedValue(false);
 
       await expect(service.enviarResumen('2026-09', 'WHATSAPP', '+18095550123', 't1')).rejects.toThrow(ServiceUnavailableException);
+    });
+
+    it('sin tareas pendientes en el período, el mensaje dice que no hay ninguna', async () => {
+      repository.listarPendientesPeriodo.mockResolvedValue([]);
+
+      await service.enviarResumen('2026-09', 'WHATSAPP', '+18095550123', 't1');
+
+      const [, , cuerpo] = whatsAppChannel.enviar.mock.calls[0];
+      expect(cuerpo).toContain('Tareas pendientes del período');
+      expect(cuerpo).toContain('Ninguna');
+    });
+
+    it('lista las tareas pendientes del período con su categoría', async () => {
+      repository.listarPendientesPeriodo.mockResolvedValue([
+        { id: 'ta1', titulo: 'Backup mensual', estado: 'PENDIENTE', categoriaIncentivo: { nombre: 'Backups' } } as never,
+      ]);
+
+      await service.enviarResumen('2026-09', 'WHATSAPP', '+18095550123', 't1');
+
+      const [, , cuerpo] = whatsAppChannel.enviar.mock.calls[0];
+      expect(cuerpo).toContain('Backup mensual (Backups)');
+    });
+
+    it('el comentario es opcional — sin él, no agrega la sección de comentario', async () => {
+      await service.enviarResumen('2026-09', 'WHATSAPP', '+18095550123', 't1');
+
+      const [, , cuerpo] = whatsAppChannel.enviar.mock.calls[0];
+      expect(cuerpo).not.toContain('Comentario');
+    });
+
+    it('con comentario, lo agrega al final del mensaje', async () => {
+      await service.enviarResumen('2026-09', 'WHATSAPP', '+18095550123', 't1', 'Excelente mes, sigan así.');
+
+      const [, , cuerpo] = whatsAppChannel.enviar.mock.calls[0];
+      expect(cuerpo).toContain('💬 *Comentario:* Excelente mes, sigan así.');
+    });
+
+    it('un comentario en blanco (solo espacios) se trata como si no hubiera comentario', async () => {
+      await service.enviarResumen('2026-09', 'WHATSAPP', '+18095550123', 't1', '   ');
+
+      const [, , cuerpo] = whatsAppChannel.enviar.mock.calls[0];
+      expect(cuerpo).not.toContain('Comentario');
     });
   });
 });

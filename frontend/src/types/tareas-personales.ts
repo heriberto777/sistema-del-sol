@@ -22,12 +22,19 @@ export interface RenglonResumenIncentivo {
   montoGanado: number;
 }
 
+export interface TareaPendienteIncentivo {
+  id: string;
+  titulo: string;
+  categoriaNombre: string | null;
+}
+
 export interface ResumenIncentivo {
   periodo: string;
   renglones: RenglonResumenIncentivo[];
   pesoTotal: number;
   montoGanadoTotal: number;
   porcentajeGeneral: number;
+  tareasPendientes: TareaPendienteIncentivo[];
 }
 
 export interface CategoriaIncentivo {

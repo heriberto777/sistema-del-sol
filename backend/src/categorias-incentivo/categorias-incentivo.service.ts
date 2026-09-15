@@ -15,12 +15,19 @@ export interface RenglonResumenIncentivo {
   montoGanado: number;
 }
 
+export interface TareaPendienteIncentivo {
+  id: string;
+  titulo: string;
+  categoriaNombre: string | null;
+}
+
 export interface ResumenIncentivo {
   periodo: string;
   renglones: RenglonResumenIncentivo[];
   pesoTotal: number;
   montoGanadoTotal: number;
   porcentajeGeneral: number;
+  tareasPendientes: TareaPendienteIncentivo[];
 }
 
 function formatoMonto(n: number): string {
@@ -85,7 +92,10 @@ export class CategoriasIncentivoService {
    */
   async resumen(mes: string): Promise<ResumenIncentivo> {
     const { desde, hasta, etiqueta } = this.rangoDelMes(mes);
-    const datos = await this.repository.resumenPeriodo(desde, hasta);
+    const [datos, pendientesRaw] = await Promise.all([
+      this.repository.resumenPeriodo(desde, hasta),
+      this.repository.listarPendientesPeriodo(desde, hasta),
+    ]);
 
     const renglones: RenglonResumenIncentivo[] = datos.map(({ categoria, tareasTotales, tareasCompletadas }) => {
       const porcentaje = tareasTotales > 0 ? (tareasCompletadas / tareasTotales) * 100 : 0;
@@ -96,33 +106,49 @@ export class CategoriasIncentivoService {
     const pesoTotal = renglones.reduce((acc, r) => acc + r.peso, 0);
     const montoGanadoTotal = renglones.reduce((acc, r) => acc + r.montoGanado, 0);
     const porcentajeGeneral = pesoTotal > 0 ? (montoGanadoTotal / pesoTotal) * 100 : 0;
+    const tareasPendientes: TareaPendienteIncentivo[] = pendientesRaw.map((t) => ({
+      id: t.id,
+      titulo: t.titulo,
+      categoriaNombre: t.categoriaIncentivo?.nombre ?? null,
+    }));
 
-    return { periodo: etiqueta, renglones, pesoTotal, montoGanadoTotal, porcentajeGeneral };
+    return { periodo: etiqueta, renglones, pesoTotal, montoGanadoTotal, porcentajeGeneral, tareasPendientes };
   }
 
-  private construirMensaje(resumen: ResumenIncentivo): string {
+  private construirMensaje(resumen: ResumenIncentivo, comentario?: string): string {
     const lineas = resumen.renglones
       .map((r) => `🔹 *${r.nombre}:* ${r.porcentaje.toFixed(2)}% ($${formatoMonto(r.montoGanado)} de $${formatoMonto(r.peso)})`)
       .join('\n');
+    const pendientes =
+      resumen.tareasPendientes.length > 0
+        ? resumen.tareasPendientes.map((t) => `• ${t.titulo}${t.categoriaNombre ? ` (${t.categoriaNombre})` : ''}`).join('\n')
+        : 'Ninguna — todas las tareas del período están completadas. 🎉';
 
-    return [
+    const partes = [
       '📊 *REPORTE DE CUMPLIMIENTO DE INCENTIVO IT*',
       `🗓 *Período:* ${resumen.periodo}`,
       '',
       '*Resumen de Renglones:*',
       lineas,
       '',
+      '*Tareas pendientes del período:*',
+      pendientes,
+      '',
       '-----------------------------------',
       `🎯 *Cumplimiento General:* ${resumen.porcentajeGeneral.toFixed(2)}%`,
       `💰 *Total Incentivo Ganado:* $${formatoMonto(resumen.montoGanadoTotal)} / $${formatoMonto(resumen.pesoTotal)}`,
       '-----------------------------------',
-      '_Enviado automáticamente desde el Sistema de Gestión IT_',
-    ].join('\n');
+    ];
+    if (comentario?.trim()) {
+      partes.push('', `💬 *Comentario:* ${comentario.trim()}`);
+    }
+    partes.push('_Enviado automáticamente desde el Sistema de Gestión IT_');
+    return partes.join('\n');
   }
 
-  async enviarResumen(mes: string, canal: 'EMAIL' | 'WHATSAPP', destino: string, tenantId: string) {
+  async enviarResumen(mes: string, canal: 'EMAIL' | 'WHATSAPP', destino: string, tenantId: string, comentario?: string) {
     const resumen = await this.resumen(mes);
-    const mensaje = this.construirMensaje(resumen);
+    const mensaje = this.construirMensaje(resumen, comentario);
     const asunto = `Reporte de cumplimiento de incentivo IT — ${resumen.periodo}`;
 
     const enviado =

@@ -819,24 +819,35 @@ function formatoMonto(n: number): string {
 }
 
 /** Réplica exacta del formato que arma CategoriasIncentivoService.construirMensaje — solo para la vista previa; el mensaje que de verdad se envía lo recalcula el backend al confirmar. */
-function construirMensajeIncentivo(resumen: ResumenIncentivo): string {
+function construirMensajeIncentivo(resumen: ResumenIncentivo, comentario?: string): string {
   const lineas = resumen.renglones
     .map((r) => `🔹 *${r.nombre}:* ${r.porcentaje.toFixed(2)}% ($${formatoMonto(r.montoGanado)} de $${formatoMonto(r.peso)})`)
     .join('\n');
+  const pendientes =
+    resumen.tareasPendientes.length > 0
+      ? resumen.tareasPendientes.map((t) => `• ${t.titulo}${t.categoriaNombre ? ` (${t.categoriaNombre})` : ''}`).join('\n')
+      : 'Ninguna — todas las tareas del período están completadas. 🎉';
 
-  return [
+  const partes = [
     '📊 *REPORTE DE CUMPLIMIENTO DE INCENTIVO IT*',
     `🗓 *Período:* ${resumen.periodo}`,
     '',
     '*Resumen de Renglones:*',
     lineas,
     '',
+    '*Tareas pendientes del período:*',
+    pendientes,
+    '',
     '-----------------------------------',
     `🎯 *Cumplimiento General:* ${resumen.porcentajeGeneral.toFixed(2)}%`,
     `💰 *Total Incentivo Ganado:* $${formatoMonto(resumen.montoGanadoTotal)} / $${formatoMonto(resumen.pesoTotal)}`,
     '-----------------------------------',
-    '_Enviado automáticamente desde el Sistema de Gestión IT_',
-  ].join('\n');
+  ];
+  if (comentario?.trim()) {
+    partes.push('', `💬 *Comentario:* ${comentario.trim()}`);
+  }
+  partes.push('_Enviado automáticamente desde el Sistema de Gestión IT_');
+  return partes.join('\n');
 }
 
 function VistaIncentivos() {
@@ -847,6 +858,7 @@ function VistaIncentivos() {
   const [envioAbierto, setEnvioAbierto] = useState(false);
   const [canal, setCanal] = useState<'WHATSAPP' | 'EMAIL'>('WHATSAPP');
   const [destino, setDestino] = useState('');
+  const [comentario, setComentario] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [exito, setExito] = useState<string | null>(null);
 
@@ -864,9 +876,16 @@ function VistaIncentivos() {
   });
 
   const enviar = useMutation({
-    mutationFn: async () => apiClient.post('/admin/categorias-incentivo/resumen/enviar', { mes, canal, destino: destino.trim() }),
+    mutationFn: async () =>
+      apiClient.post('/admin/categorias-incentivo/resumen/enviar', {
+        mes,
+        canal,
+        destino: destino.trim(),
+        ...(comentario.trim() ? { comentario: comentario.trim() } : {}),
+      }),
     onSuccess: () => {
       setError(null);
+      setComentario('');
       setExito(canal === 'EMAIL' ? 'Reporte enviado por email.' : 'Reporte enviado por WhatsApp.');
     },
     onError: (err) => {
@@ -1000,8 +1019,20 @@ function VistaIncentivos() {
               />
             </div>
             <div className="flex flex-col gap-1">
+              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Comentario (opcional)</label>
+              <textarea
+                value={comentario}
+                onChange={(e) => setComentario(e.target.value)}
+                rows={2}
+                maxLength={500}
+                placeholder="Una nota para quien recibe el reporte — ej. felicitación, contexto de algo pendiente…"
+                className="rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+              />
+              {!comentario.trim() && <p className="text-xs text-amber-600 dark:text-amber-400">Se enviará sin ningún comentario adicional.</p>}
+            </div>
+            <div className="flex flex-col gap-1">
               <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Vista previa</label>
-              <pre className="whitespace-pre-wrap rounded-lg bg-slate-900 p-3 text-[11.5px] leading-relaxed text-emerald-100">{construirMensajeIncentivo(resumen)}</pre>
+              <pre className="whitespace-pre-wrap rounded-lg bg-slate-900 p-3 text-[11.5px] leading-relaxed text-emerald-100">{construirMensajeIncentivo(resumen, comentario)}</pre>
             </div>
             {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
             {exito && <p className="text-sm text-emerald-600 dark:text-emerald-400">{exito}</p>}
