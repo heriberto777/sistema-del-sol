@@ -27,6 +27,11 @@ export class CategoriasIncentivoRepository {
     return this.db.categoriaIncentivo.delete({ where: { id } });
   }
 
+  /** Para el selector de "Enviar reporte" — cualquier usuario activo del tenant, no solo Admin Total (el reporte de incentivo lo puede recibir cualquier encargado). */
+  listarDestinatarios() {
+    return this.db.user.findMany({ where: { activo: true }, select: { id: true, nombre: true, email: true }, orderBy: { nombre: 'asc' } });
+  }
+
   /**
    * Cuenta totales/completadas por renglón activo dentro de [desde, hasta]
    * — filtra por `TareaPersonal.fecha` (día asignado), no por

@@ -197,7 +197,7 @@ function VistaLista({
   onDuplicarVarias: (ts: TareaPersonal[]) => void;
 }) {
   const [busqueda, setBusqueda] = useState('');
-  const [categoriaFiltro, setCategoriaFiltro] = useState('');
+  const [categoriasFiltro, setCategoriasFiltro] = useState<Set<string>>(new Set());
   const [seleccionadas, setSeleccionadas] = useState<Set<string>>(new Set());
   const [visiblesPendientes, setVisiblesPendientes] = useState(PAGINA_LISTA);
   const [visiblesHechas, setVisiblesHechas] = useState(PAGINA_LISTA);
@@ -212,16 +212,31 @@ function VistaLista({
     setVisiblesHechas(PAGINA_LISTA);
   }, [busqueda]);
 
-  useEffect(() => setSeleccionadas(new Set()), [categoriaFiltro]);
+  useEffect(() => setSeleccionadas(new Set()), [categoriasFiltro]);
 
+  // Sin categorías marcadas = todas. Con una o más marcadas, una tarea
+  // entra si su categoría es CUALQUIERA de las marcadas — así se puede
+  // duplicar de una vez, por ejemplo, "Backups" + "Reporte" juntas.
   const filtradas = useMemo(
-    () => tareas.filter((t) => coincideTexto(t, busqueda) && (!categoriaFiltro || t.categoriaIncentivoId === categoriaFiltro)),
-    [tareas, busqueda, categoriaFiltro],
+    () =>
+      tareas.filter(
+        (t) => coincideTexto(t, busqueda) && (categoriasFiltro.size === 0 || (!!t.categoriaIncentivoId && categoriasFiltro.has(t.categoriaIncentivoId))),
+      ),
+    [tareas, busqueda, categoriasFiltro],
   );
   const pendientes = filtradas.filter((t) => t.estado !== 'HECHA').sort(compararPrioridad);
   const hechas = filtradas.filter((t) => t.estado === 'HECHA');
   const pendientesVisibles = pendientes.slice(0, visiblesPendientes);
   const hechasVisibles = hechas.slice(0, visiblesHechas);
+
+  function alternarCategoriaFiltro(id: string) {
+    setCategoriasFiltro((actual) => {
+      const nuevo = new Set(actual);
+      if (nuevo.has(id)) nuevo.delete(id);
+      else nuevo.add(id);
+      return nuevo;
+    });
+  }
 
   function alternarSeleccion(id: string) {
     setSeleccionadas((actual) => {
@@ -246,26 +261,45 @@ function VistaLista({
   return (
     <div className="space-y-3">
       {tareas.length > 0 && (
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <div className="space-y-2">
           <BuscadorTareas valor={busqueda} onChange={setBusqueda} />
           {categorias && categorias.length > 0 && (
-            <Select value={categoriaFiltro} onChange={(e) => setCategoriaFiltro(e.target.value)} className="sm:max-w-[16rem]">
-              <option value="">Todas las categorías</option>
-              {categorias.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.nombre}
-                </option>
-              ))}
-            </Select>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-xs text-slate-400">Categoría:</span>
+              {categorias.map((c) => {
+                const activa = categoriasFiltro.has(c.id);
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => alternarCategoriaFiltro(c.id)}
+                    className={clsx(
+                      'rounded-full border px-2.5 py-1 text-xs font-medium',
+                      activa
+                        ? 'border-sol-400 bg-sol-50 text-sol-700 dark:border-sol-500/40 dark:bg-sol-500/10 dark:text-sol-400'
+                        : 'border-slate-200 text-slate-500 hover:border-slate-300 dark:border-slate-700 dark:text-slate-400',
+                    )}
+                  >
+                    {c.nombre}
+                  </button>
+                );
+              })}
+              {categoriasFiltro.size > 0 && (
+                <button type="button" onClick={() => setCategoriasFiltro(new Set())} className="text-xs text-slate-400 underline hover:text-slate-600 dark:hover:text-slate-300">
+                  Limpiar
+                </button>
+              )}
+            </div>
           )}
         </div>
       )}
 
-      {/* Duplicar en lote — pensado para tareas mensuales fijas de un mismo
-          renglón de incentivo: filtrás por categoría, elegís cuáles se
-          repiten este mes y las duplicás todas de una vez, en "Por hacer"
-          y sin fecha (igual que el duplicado individual). */}
-      {categoriaFiltro && filtradas.length > 0 && (
+      {/* Duplicar en lote — pensado para tareas mensuales fijas de uno o
+          más renglones de incentivo: marcás la(s) categoría(s), elegís
+          cuáles tareas se repiten este mes y las duplicás todas de una
+          vez, en "Por hacer" y sin fecha (igual que el duplicado
+          individual). */}
+      {categoriasFiltro.size > 0 && filtradas.length > 0 && (
         <div className="flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-2 dark:border-slate-700 dark:bg-slate-800/60">
           <label className="flex items-center gap-2 text-xs font-medium text-slate-600 dark:text-slate-300">
             <input
@@ -292,7 +326,7 @@ function VistaLista({
       <Card sinPadding>
         {pendientes.length === 0 && hechas.length === 0 && (
           <p className="p-8 text-center text-sm text-slate-400">
-            {busqueda || categoriaFiltro ? 'Ninguna tarea coincide con el filtro.' : 'Sin tareas todavía — agregá la primera arriba.'}
+            {busqueda || categoriasFiltro.size > 0 ? 'Ninguna tarea coincide con el filtro.' : 'Sin tareas todavía — agregá la primera arriba.'}
           </p>
         )}
         <div className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -304,7 +338,7 @@ function VistaLista({
               onToggle={() => onCambiarEstado(t.id, 'HECHA')}
               onEliminar={() => onEliminar(t.id)}
               onDuplicar={() => onDuplicar(t)}
-              seleccionable={!!categoriaFiltro}
+              seleccionable={categoriasFiltro.size > 0}
               seleccionada={seleccionadas.has(t.id)}
               onToggleSeleccion={() => alternarSeleccion(t.id)}
             />
@@ -329,7 +363,7 @@ function VistaLista({
                   onToggle={() => onCambiarEstado(t.id, 'PENDIENTE')}
                   onEliminar={() => onEliminar(t.id)}
                   onDuplicar={() => onDuplicar(t)}
-                  seleccionable={!!categoriaFiltro}
+                  seleccionable={categoriasFiltro.size > 0}
                   seleccionada={seleccionadas.has(t.id)}
                   onToggleSeleccion={() => alternarSeleccion(t.id)}
                 />
@@ -789,6 +823,14 @@ function VistaIncentivos() {
     queryFn: async () => (await apiClient.get<ResumenIncentivo>('/admin/categorias-incentivo/resumen', { params: { mes } })).data,
   });
 
+  // Solo se pide cuando el panel de envío está abierto — evita una query
+  // de más en cada carga de la vista Incentivos.
+  const { data: destinatarios } = useQuery({
+    queryKey: ['categorias-incentivo-destinatarios'],
+    queryFn: async () => (await apiClient.get<{ id: string; nombre: string; email: string }[]>('/admin/categorias-incentivo/destinatarios')).data,
+    enabled: envioAbierto,
+  });
+
   const enviar = useMutation({
     mutationFn: async () => apiClient.post('/admin/categorias-incentivo/resumen/enviar', { mes, canal, destino: destino.trim() }),
     onSuccess: () => {
@@ -904,10 +946,24 @@ function VistaIncentivos() {
             </div>
             <div className="flex flex-col gap-1">
               <label className="text-sm font-medium text-slate-700 dark:text-slate-300">{canal === 'EMAIL' ? 'Enviar al email' : 'Enviar al número (con código de país)'}</label>
+              {canal === 'EMAIL' && destinatarios && destinatarios.length > 0 && (
+                <Select
+                  value=""
+                  onChange={(e) => e.target.value && setDestino(e.target.value)}
+                  className="mb-1"
+                >
+                  <option value="">Elegir de tu equipo…</option>
+                  {destinatarios.map((d) => (
+                    <option key={d.id} value={d.email}>
+                      {d.nombre} · {d.email}
+                    </option>
+                  ))}
+                </Select>
+              )}
               <input
                 value={destino}
                 onChange={(e) => setDestino(e.target.value)}
-                placeholder={canal === 'EMAIL' ? 'gerencia@ejemplo.com' : '+1 809 555 0123'}
+                placeholder={canal === 'EMAIL' ? 'o escribí cualquier email — gerencia@ejemplo.com' : '+1 809 555 0123'}
                 className="rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
               />
             </div>

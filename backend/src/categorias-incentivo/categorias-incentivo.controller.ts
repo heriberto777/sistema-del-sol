@@ -36,6 +36,11 @@ export class CategoriasIncentivoController {
     return this.service.eliminar(id);
   }
 
+  @Get('destinatarios')
+  listarDestinatarios() {
+    return this.service.listarDestinatarios();
+  }
+
   @Get('resumen')
   resumen(@Query('mes') mes: string) {
     return this.service.resumen(mes);

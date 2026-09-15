@@ -6,15 +6,25 @@ import { WhatsAppChannel } from '../notificaciones/canales/whatsapp.channel';
 
 describe('CategoriasIncentivoService', () => {
   let service: CategoriasIncentivoService;
-  let repository: jest.Mocked<Pick<CategoriasIncentivoRepository, 'resumenPeriodo'>>;
+  let repository: jest.Mocked<Pick<CategoriasIncentivoRepository, 'resumenPeriodo' | 'listarDestinatarios'>>;
   let emailChannel: jest.Mocked<Pick<EmailChannel, 'enviar'>>;
   let whatsAppChannel: jest.Mocked<Pick<WhatsAppChannel, 'enviar'>>;
 
   beforeEach(() => {
-    repository = { resumenPeriodo: jest.fn() };
+    repository = { resumenPeriodo: jest.fn(), listarDestinatarios: jest.fn() };
     emailChannel = { enviar: jest.fn().mockResolvedValue(true) };
     whatsAppChannel = { enviar: jest.fn().mockResolvedValue(true) };
     service = new CategoriasIncentivoService(repository as unknown as CategoriasIncentivoRepository, emailChannel as unknown as EmailChannel, whatsAppChannel as unknown as WhatsAppChannel);
+  });
+
+  describe('listarDestinatarios', () => {
+    it('delega en el repositorio', async () => {
+      repository.listarDestinatarios.mockResolvedValue([{ id: 'u1', nombre: 'Gerente', email: 'gerente@ejemplo.com' }] as never);
+
+      const resultado = await service.listarDestinatarios();
+
+      expect(resultado).toEqual([{ id: 'u1', nombre: 'Gerente', email: 'gerente@ejemplo.com' }]);
+    });
   });
 
   describe('resumen', () => {

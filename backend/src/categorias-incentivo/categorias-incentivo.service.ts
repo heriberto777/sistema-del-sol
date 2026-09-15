@@ -49,6 +49,10 @@ export class CategoriasIncentivoService {
     return this.repository.listar();
   }
 
+  listarDestinatarios() {
+    return this.repository.listarDestinatarios();
+  }
+
   actualizar(id: string, dto: ActualizarCategoriaIncentivoDto) {
     return this.repository.actualizar(id, dto);
   }
