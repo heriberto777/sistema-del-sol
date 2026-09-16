@@ -11,10 +11,22 @@ export class WhatsappConfigRepository {
     return this.tenantPrisma.client;
   }
 
+  /**
+   * `upsert` (no "buscar y si no existe, crear") a propósito — ese patrón
+   * tiene una ventana de carrera real: dos requests casi simultáneos para
+   * un tenant que todavía no tiene fila (dos pestañas, un reintento de
+   * red, StrictMode en dev) pueden ver "no existe" los dos y disparar dos
+   * `create()` — el índice único de `tenantId` evita el duplicado real,
+   * pero el segundo `create()` revienta con un 500 sin manejar en vez de
+   * devolver la fila que el primero ya creó. `upsert` es atómico del lado
+   * de Postgres, sin esa ventana.
+   */
   async obtenerOCrear(tenantId: string) {
-    const existente = await this.db.whatsappConfigTenant.findUnique({ where: { tenantId } });
-    if (existente) return existente;
-    return this.db.whatsappConfigTenant.create({ data: { tenantId } });
+    return this.db.whatsappConfigTenant.upsert({
+      where: { tenantId },
+      update: {},
+      create: { tenantId },
+    });
   }
 
   async actualizar(id: string, data: Prisma.WhatsappConfigTenantUpdateInput) {

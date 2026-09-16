@@ -10,10 +10,13 @@ export class PasarelaCobroConfigRepository {
     return this.tenantPrisma.client;
   }
 
+  /** `upsert` (no "buscar y si no existe, crear") — ver el comentario en WhatsappConfigRepository.obtenerOCrear, mismo motivo exacto. */
   async obtenerOCrear(tenantId: string) {
-    const existente = await this.db.pasarelaConfigTenant.findUnique({ where: { tenantId } });
-    if (existente) return existente;
-    return this.db.pasarelaConfigTenant.create({ data: { tenantId } });
+    return this.db.pasarelaConfigTenant.upsert({
+      where: { tenantId },
+      update: {},
+      create: { tenantId },
+    });
   }
 
   async actualizar(id: string, data: Prisma.PasarelaConfigTenantUpdateInput) {

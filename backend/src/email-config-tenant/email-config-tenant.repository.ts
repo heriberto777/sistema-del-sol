@@ -10,10 +10,13 @@ export class EmailConfigTenantRepository {
     return this.tenantPrisma.client;
   }
 
+  /** `upsert` (no "buscar y si no existe, crear") — ver el comentario en WhatsappConfigRepository.obtenerOCrear, mismo motivo exacto. */
   async obtenerOCrear(tenantId: string) {
-    const existente = await this.db.emailConfigTenant.findUnique({ where: { tenantId } });
-    if (existente) return existente;
-    return this.db.emailConfigTenant.create({ data: { tenantId } });
+    return this.db.emailConfigTenant.upsert({
+      where: { tenantId },
+      update: {},
+      create: { tenantId },
+    });
   }
 
   async actualizar(id: string, data: Prisma.EmailConfigTenantUpdateInput) {
