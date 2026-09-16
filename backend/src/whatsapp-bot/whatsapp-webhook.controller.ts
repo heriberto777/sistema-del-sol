@@ -47,6 +47,13 @@ export class WhatsappWebhookController {
       if (manejado) return {};
     }
 
+    // Asistente interno de tareas (Fase 1) — si el número es de un
+    // empleado del tenant, responde sobre sus propias tareas y corta acá;
+    // cualquier cliente cualquiera nunca entra a esta rama (ver el
+    // comentario largo en WhatsappBotService.intentarResponderComoEmpleado).
+    const manejadoComoEmpleado = await this.whatsappBotService.intentarResponderComoEmpleado(config, from, mensaje);
+    if (manejadoComoEmpleado) return {};
+
     await this.whatsappBotService.procesarMensajeEntrante(config, from, mensaje, resolverPerfilNombre(body));
     return {};
   }

@@ -31,6 +31,8 @@ describe('WhatsappBotService', () => {
     whatsappMensaje: { update: jest.Mock };
     producto: { findMany: jest.Mock };
     categoria: { findMany: jest.Mock };
+    user: { findFirst: jest.Mock };
+    tareaPersonal: { findMany: jest.Mock };
   };
   let whatsappMensajesRepository: jest.Mocked<WhatsappMensajesRepository>;
   let conversacionIaService: jest.Mocked<ConversacionIaService>;
@@ -43,6 +45,8 @@ describe('WhatsappBotService', () => {
       whatsappMensaje: { update: jest.fn() },
       producto: { findMany: jest.fn().mockResolvedValue([]) },
       categoria: { findMany: jest.fn().mockResolvedValue([]) },
+      user: { findFirst: jest.fn().mockResolvedValue(null) },
+      tareaPersonal: { findMany: jest.fn().mockResolvedValue([]) },
     };
     whatsappMensajesRepository = {
       crear: jest.fn().mockResolvedValue(MENSAJE_ENTRANTE),
@@ -332,6 +336,91 @@ describe('WhatsappBotService', () => {
       await service.resolverConfigPorNumero('whatsapp:+14155238886');
 
       expect(prisma.whatsappConfigTenant.findUnique).toHaveBeenCalledWith({ where: { twilioWhatsappFrom: '+14155238886' } });
+    });
+  });
+
+  describe('intentarResponderComoEmpleado', () => {
+    it('devuelve false sin ningún efecto secundario si el número no es de un empleado (sigue el flujo de cliente)', async () => {
+      prisma.user.findFirst.mockResolvedValue(null);
+
+      const manejado = await service.intentarResponderComoEmpleado(CONFIG_BASE, 'whatsapp:+18095551234', 'qué tengo hoy');
+
+      expect(manejado).toBe(false);
+      expect(prisma.tareaPersonal.findMany).not.toHaveBeenCalled();
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('filtra al empleado por tenantId + teléfono + activo', async () => {
+      prisma.user.findFirst.mockResolvedValue(null);
+
+      await service.intentarResponderComoEmpleado(CONFIG_BASE, 'whatsapp:+18095551234', 'hola');
+
+      expect(prisma.user.findFirst).toHaveBeenCalledWith({
+        where: { tenantId: 't1', telefono: '+18095551234', activo: true },
+        select: { id: true, nombre: true },
+      });
+    });
+
+    it('empleado reconocido: clasifica con la IA propia del bot y responde con sus tareas reales (nunca inventadas)', async () => {
+      prisma.user.findFirst.mockResolvedValue({ id: 'u1', nombre: 'Cristopher Reyes' });
+      conversacionIaService.completar.mockResolvedValue('PENDIENTES');
+      prisma.tareaPersonal.findMany.mockResolvedValue([
+        { titulo: 'Sacar nota de crédito', prioridad: 'ALTA', fecha: null },
+        { titulo: 'Reunión con Asistente Comercial', prioridad: 'MEDIA', fecha: null },
+      ]);
+
+      const manejado = await service.intentarResponderComoEmpleado(CONFIG_BASE, 'whatsapp:+18095551234', '¿cuáles son mis pendientes?');
+
+      expect(manejado).toBe(true);
+      expect(prisma.tareaPersonal.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: expect.objectContaining({ tenantId: 't1', usuarioId: 'u1', estado: { not: 'HECHA' } }) }),
+      );
+      const cuerpoEnviado = fetchMock.mock.calls[0][1].body as URLSearchParams;
+      expect(cuerpoEnviado.get('Body')).toContain('Sacar nota de crédito');
+      expect(cuerpoEnviado.get('Body')).toContain('Reunión con Asistente Comercial');
+    });
+
+    it('sin tareas para "hoy", responde que no tiene ninguna en vez de una lista vacía', async () => {
+      prisma.user.findFirst.mockResolvedValue({ id: 'u1', nombre: 'Cristopher Reyes' });
+      conversacionIaService.completar.mockResolvedValue('HOY');
+      prisma.tareaPersonal.findMany.mockResolvedValue([]);
+
+      await service.intentarResponderComoEmpleado(CONFIG_BASE, 'whatsapp:+18095551234', 'qué tengo hoy');
+
+      const cuerpoEnviado = fetchMock.mock.calls[0][1].body as URLSearchParams;
+      expect(cuerpoEnviado.get('Body')).toContain('No tenés tareas para hoy, Cristopher');
+    });
+
+    it('intención DESCONOCIDA responde con el mensaje de ayuda, sin consultar la base de tareas', async () => {
+      prisma.user.findFirst.mockResolvedValue({ id: 'u1', nombre: 'Cristopher Reyes' });
+      conversacionIaService.completar.mockResolvedValue('DESCONOCIDA');
+
+      await service.intentarResponderComoEmpleado(CONFIG_BASE, 'whatsapp:+18095551234', 'buenas tardes');
+
+      expect(prisma.tareaPersonal.findMany).not.toHaveBeenCalled();
+      const cuerpoEnviado = fetchMock.mock.calls[0][1].body as URLSearchParams;
+      expect(cuerpoEnviado.get('Body')).toContain('Puedo contarte tus tareas');
+    });
+
+    it('sin IA configurada, clasifica por palabra clave en vez de fallar', async () => {
+      prisma.user.findFirst.mockResolvedValue({ id: 'u1', nombre: 'Cristopher Reyes' });
+      prisma.tareaPersonal.findMany.mockResolvedValue([{ titulo: 'Backup mensual', prioridad: 'ALTA', fecha: null }]);
+
+      await service.intentarResponderComoEmpleado({ ...CONFIG_BASE, iaApiKeyCifrado: null }, 'whatsapp:+18095551234', 'tengo alguna tarea pendiente?');
+
+      expect(conversacionIaService.completar).not.toHaveBeenCalled();
+      const cuerpoEnviado = fetchMock.mock.calls[0][1].body as URLSearchParams;
+      expect(cuerpoEnviado.get('Body')).toContain('Backup mensual');
+    });
+
+    it('no toca WhatsappMensajesRepository — no cuenta contra el límite diario de respuestas a clientes', async () => {
+      prisma.user.findFirst.mockResolvedValue({ id: 'u1', nombre: 'Cristopher Reyes' });
+      conversacionIaService.completar.mockResolvedValue('PENDIENTES');
+
+      await service.intentarResponderComoEmpleado(CONFIG_BASE, 'whatsapp:+18095551234', 'pendientes');
+
+      expect(whatsappMensajesRepository.crear).not.toHaveBeenCalled();
+      expect(whatsappMensajesRepository.contarRespuestasHoy).not.toHaveBeenCalled();
     });
   });
 });

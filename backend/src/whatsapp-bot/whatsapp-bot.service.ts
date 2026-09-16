@@ -27,6 +27,20 @@ Si el cliente pregunta por una CATEGORÍA o tipo de productos en general (no uno
 Si el cliente pide ver "el catálogo" o "qué tienen" en general, SIN mencionar un producto puntual ni una categoría, dejá los dos campos en null y tu "respuesta" debe preguntarle qué categoría o qué producto le interesa, en vez de asumir uno.
 "buscarProducto" y "buscarCategoria" nunca van los dos con valor a la vez.`;
 
+/**
+ * Fase 1 del asistente interno (control de acceso por RBAC real, ver
+ * `verificarPermisoConsultaInterna`) — hoy solo un dominio de datos
+ * (tareas personales propias), pensado para sumar ventas/inventario/
+ * balance de cliente más adelante sin rehacer la clasificación.
+ */
+const PROMPT_CLASIFICADOR_TAREAS = `Sos un clasificador de intención. Quien escribe es un EMPLEADO interno preguntando por sus propias tareas personales (no un cliente).
+Respondé ÚNICAMENTE con una palabra en mayúsculas, sin comillas ni texto adicional:
+HOY — si pregunta qué tiene que hacer hoy, o qué vence hoy.
+PENDIENTES — si pregunta en general por sus tareas pendientes/atrasadas, sin especificar "hoy".
+DESCONOCIDA — cualquier otra cosa (saludo, pregunta que no es sobre tareas, etc.).`;
+
+const EMOJI_PRIORIDAD_TAREA: Record<string, string> = { ALTA: '🔴', MEDIA: '🟡', BAJA: '🟢' };
+
 interface ConfigBot {
   tenantId: string;
   twilioAccountSid: string | null;
@@ -65,6 +79,106 @@ export class WhatsappBotService {
   verificarFirma(config: { twilioAuthTokenCifrado: string | null }, urlCompleta: string, params: Record<string, string>, firma: string | undefined): boolean {
     if (!config.twilioAuthTokenCifrado) return false;
     return verificarFirmaTwilio(urlCompleta, params, firma, descifrar(config.twilioAuthTokenCifrado));
+  }
+
+  /**
+   * Asistente interno (distinto del bot de atención al cliente de abajo)
+   * — intercepta ANTES del flujo de cliente, mismo patrón que
+   * `intentarAprobarPorWhatsapp` en el webhook. Si el número que escribe
+   * coincide con un `User` activo de este tenant, responde sobre SUS
+   * PROPIAS tareas en vez de correr el guion de atención al cliente; si
+   * no, devuelve `false` sin ningún efecto secundario y el webhook sigue
+   * el camino normal — un cliente cualquiera nunca llega a esta rama.
+   *
+   * A propósito NO pasa por `WhatsappMensajesRepository`/
+   * `limiteRespuestasDiarias`: es tráfico interno de bajo volumen que no
+   * debería gastarle cupo de respuestas automáticas al servicio al
+   * cliente (decisión explícita del usuario), así que no se persiste en
+   * `WhatsappMensaje` ni cuenta contra ningún tope — si en el futuro hace
+   * falta auditoría de estas consultas, ese es el lugar para sumarla.
+   *
+   * Clasifica la intención con la MISMA IA que el tenant ya configuró
+   * para su bot (nunca con la del Asistente general de Plataforma — este
+   * código corre desde un webhook `@Public()`, sin `request.user`, y
+   * `UsoIaService`/`TareasPersonalesRepository` dependen de
+   * `TenantPrismaService`, que revienta sin ese contexto). Sin IA
+   * configurada, cae a un matching simple por palabra clave — sigue
+   * siendo útil, solo menos flexible con la redacción de la pregunta.
+   */
+  async intentarResponderComoEmpleado(config: ConfigBot, from: string, body: string): Promise<boolean> {
+    const numero = from.replace(/^whatsapp:/, '');
+    const empleado = await this.prisma.user.findFirst({
+      where: { tenantId: config.tenantId, telefono: numero, activo: true },
+      select: { id: true, nombre: true },
+    });
+    if (!empleado) return false;
+
+    const intencion = await this.clasificarIntencionTareas(config, body);
+    const respuesta = await this.responderIntencionTareas(config.tenantId, empleado, intencion);
+    await this.enviarRespuesta(config, from, respuesta);
+    return true;
+  }
+
+  private async clasificarIntencionTareas(config: ConfigBot, body: string): Promise<'HOY' | 'PENDIENTES' | 'DESCONOCIDA'> {
+    if (config.iaApiKeyCifrado) {
+      const texto = await this.conversacionIaService.completar(config.iaProveedor, [{ role: 'user', content: body }], {
+        apiKey: descifrar(config.iaApiKeyCifrado),
+        modelo: config.iaModelo ?? undefined,
+        system: PROMPT_CLASIFICADOR_TAREAS,
+        maxTokens: 20,
+      });
+      const limpio = texto?.trim().toUpperCase();
+      if (limpio === 'HOY' || limpio === 'PENDIENTES' || limpio === 'DESCONOCIDA') return limpio;
+      // Respuesta inesperada de la IA (texto de más, otro idioma) — no se
+      // pierde el intento, cae al matching por palabra clave de abajo.
+    }
+    const texto = body.toLowerCase();
+    if (texto.includes('hoy')) return 'HOY';
+    if (texto.includes('pendiente') || texto.includes('tarea')) return 'PENDIENTES';
+    return 'DESCONOCIDA';
+  }
+
+  /**
+   * Nunca deja que la IA redacte un título o una fecha de la nada — acá
+   * solo clasifica la intención (arriba), la lista real de tareas sale
+   * SIEMPRE de una consulta directa a la base de datos, mismo criterio
+   * que `buscarProducto`/`buscarCategoria` con el catálogo de clientes.
+   */
+  private async responderIntencionTareas(tenantId: string, empleado: { id: string; nombre: string }, intencion: 'HOY' | 'PENDIENTES' | 'DESCONOCIDA'): Promise<string> {
+    if (intencion === 'DESCONOCIDA') {
+      return 'Hola 👋 Puedo contarte tus tareas — probá preguntando "¿qué tengo hoy?" o "¿cuáles son mis pendientes?".';
+    }
+
+    const inicioHoy = new Date();
+    inicioHoy.setHours(0, 0, 0, 0);
+    const inicioManana = new Date(inicioHoy);
+    inicioManana.setDate(inicioManana.getDate() + 1);
+
+    const tareas = await this.prisma.tareaPersonal.findMany({
+      where: {
+        tenantId,
+        usuarioId: empleado.id,
+        estado: { not: 'HECHA' },
+        ...(intencion === 'HOY' ? { fecha: { gte: inicioHoy, lt: inicioManana } } : {}),
+      },
+      orderBy: [{ fecha: 'asc' }, { createdAt: 'asc' }],
+      take: 10,
+    });
+
+    const primerNombre = empleado.nombre.split(' ')[0];
+    if (tareas.length === 0) {
+      return intencion === 'HOY' ? `No tenés tareas para hoy, ${primerNombre} 🎉` : `No tenés tareas pendientes, ${primerNombre} 🎉`;
+    }
+
+    const lineas = tareas
+      .map((t) => {
+        const fecha = t.fecha ? ` — ${new Intl.DateTimeFormat('es-DO', { day: '2-digit', month: '2-digit' }).format(t.fecha)}` : '';
+        return `${EMOJI_PRIORIDAD_TAREA[t.prioridad] ?? '•'} ${t.titulo}${fecha}`;
+      })
+      .join('\n');
+
+    const titulo = intencion === 'HOY' ? '📋 *Tus tareas de hoy:*' : `📋 *Tus tareas pendientes (${tareas.length}):*`;
+    return `${titulo}\n${lineas}`;
   }
 
   /** `from` tal cual lo manda Twilio (prefijo `whatsapp:` incluido) — es el remitente, el cliente. */
