@@ -101,6 +101,13 @@ describe('CategoriasIncentivoService', () => {
       expect(emailChannel.enviar).not.toHaveBeenCalled();
     });
 
+    it('pasa el tenantId a whatsAppChannel — para que use el Twilio propio del tenant si lo tiene, no siempre el de Plataforma', async () => {
+      await service.enviarResumen('2026-09', 'WHATSAPP', '+18095550123', 't1');
+
+      const [, , , tenantId] = whatsAppChannel.enviar.mock.calls[0];
+      expect(tenantId).toBe('t1');
+    });
+
     it('canal EMAIL llama a emailChannel envolviendo el mensaje en <pre> (para que se vea igual que en WhatsApp)', async () => {
       await service.enviarResumen('2026-09', 'EMAIL', 'gerencia@ejemplo.com', 't1');
 

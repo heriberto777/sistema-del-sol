@@ -73,7 +73,7 @@ describe('NotificacionesService', () => {
 
       await service.enviar({ tenantId: 't1', canal: 'WHATSAPP', clave: 'factura_creada', destinatario: '+18095551234', variables: {} });
 
-      expect(whatsAppChannel.enviar).toHaveBeenCalledWith('+18095551234', '', 'Tu factura fue emitida');
+      expect(whatsAppChannel.enviar).toHaveBeenCalledWith('+18095551234', '', 'Tu factura fue emitida', 't1');
       expect(emailChannel.enviar).not.toHaveBeenCalled();
     });
 

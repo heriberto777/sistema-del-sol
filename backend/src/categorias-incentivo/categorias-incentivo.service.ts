@@ -154,7 +154,7 @@ export class CategoriasIncentivoService {
     const enviado =
       canal === 'EMAIL'
         ? await this.emailChannel.enviar(destino, asunto, `<pre style="font-family:monospace;white-space:pre-wrap">${mensaje}</pre>`, undefined, tenantId)
-        : await this.whatsAppChannel.enviar(destino, asunto, mensaje);
+        : await this.whatsAppChannel.enviar(destino, asunto, mensaje, tenantId);
 
     if (!enviado) {
       throw new ServiceUnavailableException(

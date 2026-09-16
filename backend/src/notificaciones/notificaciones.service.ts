@@ -76,7 +76,7 @@ export class NotificacionesService {
     if (params.canal === 'EMAIL') {
       enviada = await this.emailChannel.enviar(params.destinatario, asunto ?? '', cuerpo, params.adjuntoPdf ? [params.adjuntoPdf] : undefined, params.tenantId);
     } else if (params.canal === 'WHATSAPP') {
-      enviada = await this.whatsAppChannel.enviar(params.destinatario, asunto ?? '', cuerpo);
+      enviada = await this.whatsAppChannel.enviar(params.destinatario, asunto ?? '', cuerpo, params.tenantId);
     }
 
     await this.notificacionesRepository.marcarEstado(notificacion.id, enviada ? 'ENVIADA' : 'FALLIDA');

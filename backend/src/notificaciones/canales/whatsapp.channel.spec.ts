@@ -1,12 +1,17 @@
 import { WhatsAppChannel } from './whatsapp.channel';
+import { PrismaService } from '../../prisma/prisma.service';
+import { cifrar } from '../../common/utils/encriptado.util';
 
 describe('WhatsAppChannel', () => {
   let channel: WhatsAppChannel;
+  let prisma: { whatsappConfigTenant: { findUnique: jest.Mock } };
   let fetchMock: jest.Mock;
   const ENV_ORIGINAL = { ...process.env };
 
   beforeEach(() => {
-    channel = new WhatsAppChannel();
+    process.env.ENCRYPTION_KEY = 'clave-de-prueba';
+    prisma = { whatsappConfigTenant: { findUnique: jest.fn().mockResolvedValue(null) } };
+    channel = new WhatsAppChannel(prisma as unknown as PrismaService);
     fetchMock = jest.fn();
     (global as unknown as { fetch: typeof fetch }).fetch = fetchMock as never;
   });
@@ -72,5 +77,71 @@ describe('WhatsAppChannel', () => {
     const resultado = await channel.enviar('+18095551234', 'asunto', 'cuerpo');
 
     expect(resultado).toBe(false);
+  });
+
+  describe('Twilio propio del tenant', () => {
+    it('usa el Twilio del tenant cuando está habilitado y completo, en vez del de Plataforma', async () => {
+      process.env.TWILIO_ACCOUNT_SID = 'AC-plataforma';
+      process.env.TWILIO_AUTH_TOKEN = 'token-plataforma';
+      process.env.TWILIO_WHATSAPP_FROM = '+14155238886';
+      fetchMock.mockResolvedValue({ ok: true, status: 201 });
+      prisma.whatsappConfigTenant.findUnique.mockResolvedValue({
+        habilitado: true,
+        twilioAccountSid: 'AC-tenant',
+        twilioAuthTokenCifrado: cifrar('token-tenant'),
+        twilioWhatsappFrom: '+18095550000',
+      });
+
+      const resultado = await channel.enviar('+18095551234', 'asunto', 'cuerpo', 't1');
+
+      expect(resultado).toBe(true);
+      expect(prisma.whatsappConfigTenant.findUnique).toHaveBeenCalledWith({ where: { tenantId: 't1' } });
+      expect(fetchMock).toHaveBeenCalledWith(
+        'https://api.twilio.com/2010-04-01/Accounts/AC-tenant/Messages.json',
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            Authorization: `Basic ${Buffer.from('AC-tenant:token-tenant').toString('base64')}`,
+          }),
+        }),
+      );
+      const [, opciones] = fetchMock.mock.calls[0];
+      expect((opciones.body as URLSearchParams).get('From')).toBe('whatsapp:+18095550000');
+    });
+
+    it('cae al Twilio de Plataforma si el tenant no tiene uno propio configurado', async () => {
+      process.env.TWILIO_ACCOUNT_SID = 'AC-plataforma';
+      process.env.TWILIO_AUTH_TOKEN = 'token-plataforma';
+      process.env.TWILIO_WHATSAPP_FROM = '+14155238886';
+      fetchMock.mockResolvedValue({ ok: true, status: 201 });
+      prisma.whatsappConfigTenant.findUnique.mockResolvedValue(null);
+
+      await channel.enviar('+18095551234', 'asunto', 'cuerpo', 't1');
+
+      expect(fetchMock).toHaveBeenCalledWith('https://api.twilio.com/2010-04-01/Accounts/AC-plataforma/Messages.json', expect.anything());
+    });
+
+    it('cae al Twilio de Plataforma si el tenant lo tiene deshabilitado', async () => {
+      process.env.TWILIO_ACCOUNT_SID = 'AC-plataforma';
+      process.env.TWILIO_AUTH_TOKEN = 'token-plataforma';
+      process.env.TWILIO_WHATSAPP_FROM = '+14155238886';
+      fetchMock.mockResolvedValue({ ok: true, status: 201 });
+      prisma.whatsappConfigTenant.findUnique.mockResolvedValue({ habilitado: false, twilioAccountSid: 'AC-tenant' });
+
+      await channel.enviar('+18095551234', 'asunto', 'cuerpo', 't1');
+
+      expect(fetchMock).toHaveBeenCalledWith('https://api.twilio.com/2010-04-01/Accounts/AC-plataforma/Messages.json', expect.anything());
+    });
+
+    it('no falla ni consulta la config del tenant si no se pasa tenantId (envíos de Plataforma)', async () => {
+      process.env.TWILIO_ACCOUNT_SID = 'AC-plataforma';
+      process.env.TWILIO_AUTH_TOKEN = 'token-plataforma';
+      process.env.TWILIO_WHATSAPP_FROM = '+14155238886';
+      fetchMock.mockResolvedValue({ ok: true, status: 201 });
+
+      await channel.enviar('+18095551234', 'asunto', 'cuerpo');
+
+      expect(prisma.whatsappConfigTenant.findUnique).not.toHaveBeenCalled();
+      expect(fetchMock).toHaveBeenCalledWith('https://api.twilio.com/2010-04-01/Accounts/AC-plataforma/Messages.json', expect.anything());
+    });
   });
 });
