@@ -1,4 +1,5 @@
 import { createContext, ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../lib/api-client';
 
 /** Cada cuánto se refresca sola la sesión (permisos/módulos) mientras la pestaña sigue abierta — ver `refrescarSesion`. */
@@ -77,31 +78,43 @@ const STORAGE_USER_KEY = 'sol_usuario';
 const STORAGE_SUCURSAL_ACTIVA_KEY = 'sol_sucursal_activa';
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const queryClient = useQueryClient();
   const [usuario, setUsuario] = useState<UsuarioAutenticado | null>(() => {
     const guardado = localStorage.getItem(STORAGE_USER_KEY);
     return guardado ? (JSON.parse(guardado) as UsuarioAutenticado) : null;
   });
   const [cargando, setCargando] = useState(false);
 
-  const login = useCallback(async (email: string, password: string, tenantSubdominio: string) => {
-    setCargando(true);
-    try {
-      const { data } = await apiClient.post('/auth/login', { email, password, tenantSubdominio });
-      localStorage.setItem(STORAGE_KEY, data.accessToken);
-      localStorage.setItem(STORAGE_USER_KEY, JSON.stringify(data.usuario));
-      setUsuario(data.usuario);
-      return data.usuario as UsuarioAutenticado;
-    } finally {
-      setCargando(false);
-    }
-  }, []);
+  const login = useCallback(
+    async (email: string, password: string, tenantSubdominio: string) => {
+      setCargando(true);
+      try {
+        const { data } = await apiClient.post('/auth/login', { email, password, tenantSubdominio });
+        // Sin esto, cualquier query cacheada de una sesión anterior en esta
+        // misma pestaña (otro tenant, u otro usuario del mismo tenant)
+        // seguía sirviéndose bajo la misma queryKey (ninguna lleva el
+        // tenantId adentro) hasta que se revalidara sola — bug real
+        // reportado: la config de WhatsApp de un tenant aparecía en otro
+        // tras loguearse de nuevo sin recargar la página.
+        queryClient.clear();
+        localStorage.setItem(STORAGE_KEY, data.accessToken);
+        localStorage.setItem(STORAGE_USER_KEY, JSON.stringify(data.usuario));
+        setUsuario(data.usuario);
+        return data.usuario as UsuarioAutenticado;
+      } finally {
+        setCargando(false);
+      }
+    },
+    [queryClient],
+  );
 
   const logout = useCallback(() => {
     localStorage.removeItem(STORAGE_KEY);
     localStorage.removeItem(STORAGE_USER_KEY);
     localStorage.removeItem(STORAGE_SUCURSAL_ACTIVA_KEY);
+    queryClient.clear();
     setUsuario(null);
-  }, []);
+  }, [queryClient]);
 
   /**
    * Silenciosa (sin pedir contraseña de nuevo) — reemite accessToken/usuario
