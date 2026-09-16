@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../../lib/api-client';
 import { Button } from '../../atoms/Button/Button';
+import { useAuth } from '../../../hooks/useAuth';
 
 interface RegistroAsistencia {
   horaEntrada: string | null;
@@ -18,14 +19,24 @@ interface MiEstadoHoy {
  * registro de entrada/salida para RRHH). Se oculta por completo si el
  * usuario no tiene un Empleado vinculado (Empleado.userId) — no todo
  * usuario de sistema está en la planilla.
+ *
+ * `enabled: tieneModulo('nomina')` — este widget vive en el header global
+ * (AppLayout), visible para cualquier usuario sin importar el módulo. Sin
+ * este guard, un tenant sin Nómina activa igual disparaba la consulta y
+ * se llevaba un 403 de `ModuloActivoGuard` en la consola (bug real
+ * reportado: 403 en `/nomina/asistencia/mi-estado-hoy`) — mismo criterio
+ * que `BandejaWhatsappWidget` con su propio permiso.
  */
 export function MarcarAsistenciaWidget() {
   const queryClient = useQueryClient();
+  const { tieneModulo } = useAuth();
+  const moduloActivo = tieneModulo('nomina');
 
   const { data } = useQuery({
     queryKey: ['rrhh-mi-estado-hoy'],
     queryFn: async () => (await apiClient.get<MiEstadoHoy>('/nomina/asistencia/mi-estado-hoy')).data,
     refetchInterval: 60_000,
+    enabled: moduloActivo,
   });
 
   const marcar = useMutation({
@@ -33,7 +44,7 @@ export function MarcarAsistenciaWidget() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['rrhh-mi-estado-hoy'] }),
   });
 
-  if (!data?.tieneEmpleado) return null;
+  if (!moduloActivo || !data?.tieneEmpleado) return null;
 
   const { registro } = data;
 
