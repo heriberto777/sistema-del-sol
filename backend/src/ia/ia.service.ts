@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { IaClientService } from './ia-client.service';
+import { UsoIaService } from './uso-ia.service';
 import { ReportesService } from '../reportes/reportes.service';
 import { CuentasContablesService } from '../contabilidad/cuentas-contables.service';
 
@@ -13,6 +14,7 @@ interface CuentaSugerida {
 export class IaService {
   constructor(
     private readonly iaClient: IaClientService,
+    private readonly usoIaService: UsoIaService,
     private readonly reportesService: ReportesService,
     private readonly cuentasContablesService: CuentasContablesService,
   ) {}
@@ -33,6 +35,12 @@ export class IaService {
         generadaConIa: false,
       };
     }
+    if (!(await this.usoIaService.intentarRegistrar(tenantId, 'ASISTENTE'))) {
+      return {
+        respuesta: `Modo básico (alcanzaste el límite de IA de este mes) — datos actuales del negocio: ${contexto}`,
+        generadaConIa: false,
+      };
+    }
 
     const prompt = `Eres el asistente de negocio de un sistema de facturación dominicano. Con estos datos reales del tenant: ${contexto}\n\nResponde en español, en 2-3 oraciones, esta pregunta del usuario: "${pregunta}"`;
     const respuesta = await this.iaClient.completar(prompt, 300);
@@ -43,11 +51,11 @@ export class IaService {
   }
 
   /** Sugiere una cuenta del catálogo del tenant para un gasto sin categorizar — vía IA si está disponible, si no por coincidencia de palabras. */
-  async sugerirCuentaContable(concepto: string): Promise<CuentaSugerida | null> {
+  async sugerirCuentaContable(concepto: string, tenantId: string): Promise<CuentaSugerida | null> {
     const cuentas = await this.cuentasContablesService.listar();
     const cuentasGasto = cuentas.filter((c) => c.tipo === 'GASTO' || c.tipo === 'ACTIVO');
 
-    if (this.iaClient.habilitado) {
+    if (this.iaClient.habilitado && (await this.usoIaService.intentarRegistrar(tenantId, 'ASISTENTE'))) {
       const opciones = cuentasGasto.map((c) => `${c.codigo}: ${c.nombre}`).join('\n');
       const prompt = `Catálogo de cuentas contables disponibles:\n${opciones}\n\nPara este gasto: "${concepto}", responde ÚNICAMENTE con el código de la cuenta más apropiada (solo el código, nada más).`;
       const respuesta = await this.iaClient.completar(prompt, 20);
@@ -76,9 +84,9 @@ export class IaService {
     return mejor ? { codigo: mejor.cuenta.codigo, nombre: mejor.cuenta.nombre, fuente: 'HEURISTICA' } : null;
   }
 
-  async generarDescripcionProducto(nombre: string, categoria?: string) {
-    if (!this.iaClient.habilitado) {
-      return { descripcion: `${nombre}${categoria ? ` — ${categoria}` : ''}. Descripción generada automáticamente sin IA (configure ANTHROPIC_API_KEY para una versión redactada).`, generadaConIa: false };
+  async generarDescripcionProducto(nombre: string, tenantId: string, categoria?: string) {
+    if (!this.iaClient.habilitado || !(await this.usoIaService.intentarRegistrar(tenantId, 'ASISTENTE'))) {
+      return { descripcion: `${nombre}${categoria ? ` — ${categoria}` : ''}. Descripción generada automáticamente sin IA (configure ANTHROPIC_API_KEY o esperá al próximo mes — alcanzaste el límite de generaciones).`, generadaConIa: false };
     }
 
     const prompt = `Escribe una descripción de venta corta (máximo 2 oraciones, en español, para República Dominicana) para este producto: "${nombre}"${categoria ? ` (categoría: ${categoria})` : ''}.`;
@@ -87,8 +95,8 @@ export class IaService {
     return respuesta ? { descripcion: respuesta.trim(), generadaConIa: true } : { descripcion: nombre, generadaConIa: false };
   }
 
-  async generarDescripcionTarea(titulo: string, categoria?: string) {
-    if (!this.iaClient.habilitado) {
+  async generarDescripcionTarea(titulo: string, tenantId: string, categoria?: string) {
+    if (!this.iaClient.habilitado || !(await this.usoIaService.intentarRegistrar(tenantId, 'ASISTENTE'))) {
       return { descripcion: '', generadaConIa: false };
     }
 

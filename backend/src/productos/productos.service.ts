@@ -12,6 +12,7 @@ import { PreciosRepository } from '../precios/precios.repository';
 import { generarExcel } from '../reportes/exportadores/excel-exportador';
 import type { ArchivoGenerado } from '../reportes/reportes.service';
 import { AnalizadorImagenService } from '../ia/analizador-imagen/analizador-imagen.service';
+import { UsoIaService } from '../ia/uso-ia.service';
 
 export interface ResumenImportacion {
   creados: number;
@@ -28,6 +29,7 @@ export class ProductosService {
     private readonly variantesService: VariantesService,
     private readonly preciosRepository: PreciosRepository,
     private readonly analizadorImagenService: AnalizadorImagenService,
+    private readonly usoIaService: UsoIaService,
   ) {}
 
   /**
@@ -36,8 +38,15 @@ export class ProductosService {
    * elige cuál candidato usar; nunca se aplica sola. `detalle` es un texto
    * corto opcional (marca, material, talla, uso, etc.) que el admin ya
    * conoce y la foto sola no puede confirmar.
+   *
+   * Auditoría de integraciones (2026-09) — a diferencia del asistente de
+   * texto, esta función no tiene ningún modo sin IA (no hay forma de
+   * "adivinar" una foto sin un modelo de visión), así que el límite
+   * mensual corta con un error claro en vez de degradar en silencio —
+   * mismo criterio que el fondo de banner de Publicaciones Sociales.
    */
-  async analizarImagen(imagen: string, detalle?: string) {
+  async analizarImagen(imagen: string, tenantId: string, detalle?: string) {
+    await this.usoIaService.verificarYRegistrar(tenantId, 'IMAGEN_PRODUCTO');
     const opciones = await this.analizadorImagenService.analizarDesdeDataUri(imagen, detalle);
     return { opciones };
   }

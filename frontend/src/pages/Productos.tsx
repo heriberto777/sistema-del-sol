@@ -455,8 +455,20 @@ function FormularioProducto({ producto, onGuardado }: { producto: Producto | nul
           detalle: detalleIa.trim() || undefined,
         })
       ).data,
-    onSuccess: (data) => setCandidatosIa(data.opciones),
+    onSuccess: (data) => {
+      setCandidatosIa(data.opciones);
+      queryClient.invalidateQueries({ queryKey: ['ia-uso-mensual'] });
+    },
     onError: (err) => setErrorIa(mensajeErrorApi(err, 'No se pudo generar con IA — probá de nuevo.')),
+  });
+
+  // Auditoría de integraciones (2026-09), H-4 — "te quedan N de M" antes de
+  // gastar el intento, en vez de enterarse recién al chocar el límite.
+  const { data: usoIa } = useQuery({
+    queryKey: ['ia-uso-mensual'],
+    queryFn: async () => (await apiClient.get<{ imagenProducto: { usados: number; limite: number } }>('/ia/uso-mensual')).data,
+    enabled: tienePermiso('productos.ia_generar'),
+    staleTime: 60 * 1000,
   });
 
   function onSubmit(e: FormEvent) {
@@ -492,19 +504,26 @@ function FormularioProducto({ producto, onGuardado }: { producto: Producto | nul
             placeholder="Detalle breve del producto (opcional) — marca, material, talla, uso… ayuda a la IA a acertar mejor"
             className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
           />
-          <Button
-            type="button"
-            variante="secundario"
-            onClick={() => {
-              setErrorIa(null);
-              analizarConIa.mutate();
-            }}
-            disabled={analizarConIa.isPending}
-            className="flex items-center gap-1.5 self-start"
-          >
-            <Sparkles size={14} />
-            {analizarConIa.isPending ? 'Analizando imagen…' : 'Generar con IA'}
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variante="secundario"
+              onClick={() => {
+                setErrorIa(null);
+                analizarConIa.mutate();
+              }}
+              disabled={analizarConIa.isPending || (usoIa ? usoIa.imagenProducto.usados >= usoIa.imagenProducto.limite : false)}
+              className="flex items-center gap-1.5 self-start"
+            >
+              <Sparkles size={14} />
+              {analizarConIa.isPending ? 'Analizando imagen…' : 'Generar con IA'}
+            </Button>
+            {usoIa && (
+              <span className="text-xs text-slate-400">
+                Te quedan {Math.max(0, usoIa.imagenProducto.limite - usoIa.imagenProducto.usados)} de {usoIa.imagenProducto.limite} este mes
+              </span>
+            )}
+          </div>
           {errorIa && <p className="text-xs text-red-600 dark:text-red-400">{errorIa}</p>}
         </div>
       )}

@@ -234,6 +234,19 @@ export class ActualizarPlataformaConfigDto {
   @Min(0)
   iaFondoLimiteMensual?: number;
 
+  // Auditoría de integraciones (2026-09) — mismo criterio que iaFondoLimiteMensual, para las otras dos funciones de IA que también paga Plataforma.
+  @ApiProperty({ required: false, description: 'Tope de "Generar con IA" (analizar foto de producto) por tenant por mes' })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  iaImagenLimiteMensual?: number;
+
+  @ApiProperty({ required: false, description: 'Tope del asistente de IA (sugerir cuenta contable, generar descripción) por tenant por mes' })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  iaAsistenteLimiteMensual?: number;
+
   // Travel Management (plugin) — cuenta Duffel única y compartida de la plataforma (decisión B2B)
   @ApiProperty({ required: false, description: '"duffel_test_..." en sandbox / "duffel_live_..." en producción — "" borra el override guardado' })
   @IsOptional()

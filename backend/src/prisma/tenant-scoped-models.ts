@@ -118,4 +118,6 @@ export const TENANT_SCOPED_MODELS = new Set([
   'TravelReserva',
   'TravelLedgerMovimiento',
   'TravelReglaMarkup',
+  // Auditoría de integraciones (2026-09) — tope mensual de IA por tenant.
+  'UsoIaTenant',
 ]);

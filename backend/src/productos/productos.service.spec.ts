@@ -6,6 +6,7 @@ import { LeyesFiscalesRepository } from '../leyes-fiscales/leyes-fiscales.reposi
 import { VariantesService } from '../variantes/variantes.service';
 import { PreciosRepository } from '../precios/precios.repository';
 import { AnalizadorImagenService } from '../ia/analizador-imagen/analizador-imagen.service';
+import { UsoIaService } from '../ia/uso-ia.service';
 
 describe('ProductosService', () => {
   let service: ProductosService;
@@ -15,6 +16,7 @@ describe('ProductosService', () => {
   let variantesService: jest.Mocked<VariantesService>;
   let preciosRepository: jest.Mocked<PreciosRepository>;
   let analizadorImagenService: jest.Mocked<AnalizadorImagenService>;
+  let usoIaService: jest.Mocked<UsoIaService>;
 
   beforeEach(() => {
     repository = {
@@ -43,23 +45,32 @@ describe('ProductosService', () => {
     } as unknown as jest.Mocked<PreciosRepository>;
     leyesFiscalesRepository = { buscarPorId: jest.fn() } as unknown as jest.Mocked<LeyesFiscalesRepository>;
     analizadorImagenService = { analizarDesdeDataUri: jest.fn() } as unknown as jest.Mocked<AnalizadorImagenService>;
-    service = new ProductosService(repository, categoriasRepository, leyesFiscalesRepository, variantesService, preciosRepository, analizadorImagenService);
+    usoIaService = { verificarYRegistrar: jest.fn().mockResolvedValue(undefined) } as unknown as jest.Mocked<UsoIaService>;
+    service = new ProductosService(repository, categoriasRepository, leyesFiscalesRepository, variantesService, preciosRepository, analizadorImagenService, usoIaService);
   });
 
   describe('analizarImagen', () => {
     it('delega en AnalizadorImagenService y envuelve el resultado en { opciones }', async () => {
       analizadorImagenService.analizarDesdeDataUri.mockResolvedValue([{ nombre: 'Camisa azul', descripcion: 'Camisa de algodón, manga larga.' }]);
 
-      const resultado = await service.analizarImagen('data:image/jpeg;base64,abc123');
+      const resultado = await service.analizarImagen('data:image/jpeg;base64,abc123', 'tenant-1');
 
+      expect(usoIaService.verificarYRegistrar).toHaveBeenCalledWith('tenant-1', 'IMAGEN_PRODUCTO');
       expect(analizadorImagenService.analizarDesdeDataUri).toHaveBeenCalledWith('data:image/jpeg;base64,abc123', undefined);
       expect(resultado).toEqual({ opciones: [{ nombre: 'Camisa azul', descripcion: 'Camisa de algodón, manga larga.' }] });
     });
 
     it('pasa el detalle opcional a AnalizadorImagenService', async () => {
       analizadorImagenService.analizarDesdeDataUri.mockResolvedValue([]);
-      await service.analizarImagen('data:image/jpeg;base64,abc123', 'Es de cuero genuino, talla 42');
+      await service.analizarImagen('data:image/jpeg;base64,abc123', 'tenant-1', 'Es de cuero genuino, talla 42');
       expect(analizadorImagenService.analizarDesdeDataUri).toHaveBeenCalledWith('data:image/jpeg;base64,abc123', 'Es de cuero genuino, talla 42');
+    });
+
+    it('si se alcanzó el límite mensual de IA, no llega a llamar a AnalizadorImagenService', async () => {
+      usoIaService.verificarYRegistrar.mockRejectedValue(new BadRequestException('Alcanzaste el límite de 20 uso(s) de análisis de imagen este mes'));
+
+      await expect(service.analizarImagen('data:image/jpeg;base64,abc123', 'tenant-1')).rejects.toThrow(BadRequestException);
+      expect(analizadorImagenService.analizarDesdeDataUri).not.toHaveBeenCalled();
     });
   });
 

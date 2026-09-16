@@ -38,6 +38,12 @@ export class PublicacionesSocialesController {
     return this.publicacionesSocialesService.listarPlantillas();
   }
 
+  @Get('uso-ia-mensual')
+  @Permissions('publicacionessociales.ver')
+  consultarUsoIaMensual(@CurrentUser() user: JwtPayloadUser) {
+    return this.publicacionesSocialesService.consultarUsoIaMensual(user.tenantId);
+  }
+
   @Get(':id')
   @Permissions('publicacionessociales.ver')
   buscarPorId(@Param('id') id: string) {

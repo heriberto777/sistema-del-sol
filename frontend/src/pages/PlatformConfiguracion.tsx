@@ -78,11 +78,15 @@ export interface ConfiguracionPlataforma {
     claudeModelo: string | null;
     openaiModelo: string | null;
     geminiModelo: string | null;
+    limiteMensual: number;
   };
   iaFondo: {
     proveedorActivo: string | null;
     openaiModelo: string | null;
     geminiModelo: string | null;
+    limiteMensual: number;
+  };
+  iaAsistente: {
     limiteMensual: number;
   };
   travel: {
@@ -642,14 +646,20 @@ function SeccionIaImagen({ config, guardar }: SeccionProps) {
   const [claudeModelo, setClaudeModelo] = useState(iaImagen.claudeModelo ?? '');
   const [openaiModelo, setOpenaiModelo] = useState(iaImagen.openaiModelo ?? '');
   const [geminiModelo, setGeminiModelo] = useState(iaImagen.geminiModelo ?? '');
+  // Auditoría de integraciones (2026-09) — antes sin ningún tope, a
+  // diferencia del fondo de banner de abajo que sí lo tiene desde el día uno.
+  const [limiteMensual, setLimiteMensual] = useState(String(iaImagen.limiteMensual));
+  const [limiteAsistente, setLimiteAsistente] = useState(String(config.iaAsistente.limiteMensual));
 
   useEffect(() => {
     setProveedorActivo(iaImagen.proveedorActivo ?? 'claude');
     setClaudeModelo(iaImagen.claudeModelo ?? '');
     setOpenaiModelo(iaImagen.openaiModelo ?? '');
     setGeminiModelo(iaImagen.geminiModelo ?? '');
+    setLimiteMensual(String(iaImagen.limiteMensual));
+    setLimiteAsistente(String(config.iaAsistente.limiteMensual));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [iaImagen.proveedorActivo, iaImagen.claudeModelo, iaImagen.openaiModelo, iaImagen.geminiModelo]);
+  }, [iaImagen.proveedorActivo, iaImagen.claudeModelo, iaImagen.openaiModelo, iaImagen.geminiModelo, iaImagen.limiteMensual, config.iaAsistente.limiteMensual]);
 
   function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -658,6 +668,8 @@ function SeccionIaImagen({ config, guardar }: SeccionProps) {
       iaClaudeModelo: claudeModelo,
       iaOpenaiModelo: openaiModelo,
       iaGeminiModelo: geminiModelo,
+      iaImagenLimiteMensual: limiteMensual ? Number(limiteMensual) : undefined,
+      iaAsistenteLimiteMensual: limiteAsistente ? Number(limiteAsistente) : undefined,
       ...(claudeApiKey !== '' ? { iaClaudeApiKey: claudeApiKey } : {}),
       ...(openaiApiKey !== '' ? { iaOpenaiApiKey: openaiApiKey } : {}),
       ...(geminiApiKey !== '' ? { iaGeminiApiKey: geminiApiKey } : {}),
@@ -730,6 +742,24 @@ function SeccionIaImagen({ config, guardar }: SeccionProps) {
           />
           <SelectorModeloIa proveedor="gemini" label="Modelo de Gemini" value={geminiModelo} onChange={setGeminiModelo} cargarModelos={cargarModelosPlataforma} />
         </div>
+
+        <FormField
+          id="iaImagenLimiteMensual"
+          label='Límite de "Generar con IA" (fotos de producto) por tenant por mes'
+          type="number"
+          min={0}
+          value={limiteMensual}
+          onChange={(e) => setLimiteMensual(e.target.value)}
+        />
+        <FormField
+          id="iaAsistenteLimiteMensual"
+          label="Límite del asistente de IA (sugerir cuenta contable, descripciones) por tenant por mes"
+          type="number"
+          min={0}
+          value={limiteAsistente}
+          onChange={(e) => setLimiteAsistente(e.target.value)}
+        />
+
         <Button type="submit" disabled={guardar.isPending}>
           {guardar.isPending ? 'Guardando…' : 'Guardar'}
         </Button>

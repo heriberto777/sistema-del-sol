@@ -62,8 +62,8 @@ export class ProductosController {
   // roles-base.ts. Antes de ':id' por el mismo motivo que 'catalogo'/'exportar'.
   @Post('analizar-imagen')
   @Permissions('productos.ia_generar')
-  analizarImagen(@Body() dto: AnalizarImagenProductoDto) {
-    return this.productosService.analizarImagen(dto.imagen, dto.detalle);
+  analizarImagen(@Body() dto: AnalizarImagenProductoDto, @CurrentUser() user: JwtPayloadUser) {
+    return this.productosService.analizarImagen(dto.imagen, user.tenantId, dto.detalle);
   }
 
   @Get(':id')

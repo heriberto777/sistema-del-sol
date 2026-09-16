@@ -127,6 +127,15 @@ export function PublicacionesSociales() {
     enabled: modalCrearAbierto,
   });
 
+  // Auditoría de integraciones (2026-09), H-4 — "te quedan N de M" antes de
+  // gastar el intento, en vez de enterarse recién al chocar el límite.
+  const { data: usoIaFondo } = useQuery({
+    queryKey: ['publicaciones-sociales-uso-ia-mensual'],
+    queryFn: async () => (await apiClient.get<{ usados: number; limite: number }>('/admin/publicaciones-sociales/uso-ia-mensual')).data,
+    enabled: modalCrearAbierto,
+    staleTime: 60 * 1000,
+  });
+
   const crear = useMutation({
     mutationFn: async () =>
       (
@@ -139,6 +148,7 @@ export function PublicacionesSociales() {
       ).data as PublicacionSocialResumen,
     onSuccess: (creada) => {
       queryClient.invalidateQueries({ queryKey: ['publicaciones-sociales'] });
+      queryClient.invalidateQueries({ queryKey: ['publicaciones-sociales-uso-ia-mensual'] });
       setModalCrearAbierto(false);
       setProductoSeleccionado(null);
       setPlantillaId('');
@@ -309,6 +319,11 @@ export function PublicacionesSociales() {
                   uno) — solo describí el estilo o la ambientación que querés, no hace falta escribir el precio. Puede tardar unos segundos.
                   Dejalo vacío para usar la plantilla fija con la foto tal cual.
                 </p>
+                {usoIaFondo && (
+                  <p className="text-xs text-slate-400">
+                    Te quedan {Math.max(0, usoIaFondo.limite - usoIaFondo.usados)} de {usoIaFondo.limite} generaciones con IA este mes
+                  </p>
+                )}
               </div>
 
               {errorCrear && <p className="text-sm text-red-600 dark:text-red-400">{errorCrear}</p>}

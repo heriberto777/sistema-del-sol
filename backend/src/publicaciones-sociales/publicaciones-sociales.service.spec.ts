@@ -142,6 +142,18 @@ describe('PublicacionesSocialesService', () => {
     });
   });
 
+  describe('consultarUsoIaMensual', () => {
+    it('devuelve usados y límite del tenant, sin registrar nada nuevo', async () => {
+      repo.contarGeneracionesIaDelMes.mockResolvedValue(3);
+      repo.buscarLimiteIaFondo.mockResolvedValue(20);
+
+      const resultado = await service.consultarUsoIaMensual('t1');
+
+      expect(resultado).toEqual({ usados: 3, limite: 20 });
+      expect(repo.contarGeneracionesIaDelMes).toHaveBeenCalledWith('t1');
+    });
+  });
+
   describe('buscarPorId', () => {
     it('enriquece con precio formateado y sin oferta', async () => {
       repo.buscarPorId.mockResolvedValue({

@@ -162,6 +162,15 @@ export class PublicacionesSocialesService {
     return this.publicacionesSocialesRepository.listarPlantillasActivas();
   }
 
+  /** Auditoría de integraciones (2026-09), H-4 — para mostrar "te quedan N de M" junto al botón "Generar fondo con IA", en vez de que el tenant se entere recién al chocar el límite. */
+  async consultarUsoIaMensual(tenantId: string) {
+    const [usados, limite] = await Promise.all([
+      this.publicacionesSocialesRepository.contarGeneracionesIaDelMes(tenantId),
+      this.publicacionesSocialesRepository.buscarLimiteIaFondo(),
+    ]);
+    return { usados, limite };
+  }
+
   /** Fase 5 — dispara el aviso a todos los aprobadores del tenant (Email siempre, WhatsApp del negocio si está configurado). */
   async enviarAAprobacion(id: string, tenantId: string) {
     const publicacion = await this.publicacionesSocialesRepository.buscarPorId(id);

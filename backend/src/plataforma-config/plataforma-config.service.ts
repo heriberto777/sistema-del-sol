@@ -69,6 +69,8 @@ export class PlataformaConfigService implements OnModuleInit {
     if (dto.iaOpenaiModeloFondo !== undefined) data.iaOpenaiModeloFondo = dto.iaOpenaiModeloFondo;
     if (dto.iaGeminiModeloFondo !== undefined) data.iaGeminiModeloFondo = dto.iaGeminiModeloFondo;
     if (dto.iaFondoLimiteMensual !== undefined) data.iaFondoLimiteMensual = dto.iaFondoLimiteMensual;
+    if (dto.iaImagenLimiteMensual !== undefined) data.iaImagenLimiteMensual = dto.iaImagenLimiteMensual;
+    if (dto.iaAsistenteLimiteMensual !== undefined) data.iaAsistenteLimiteMensual = dto.iaAsistenteLimiteMensual;
     if (dto.hotelbedsMoneda !== undefined) data.hotelbedsMoneda = dto.hotelbedsMoneda || null;
     if (dto.hotelbedsTasaCambio !== undefined) data.hotelbedsTasaCambio = dto.hotelbedsTasaCambio;
 
@@ -208,12 +210,16 @@ export class PlataformaConfigService implements OnModuleInit {
         claudeModelo: config.iaClaudeModelo,
         openaiModelo: config.iaOpenaiModelo,
         geminiModelo: config.iaGeminiModelo,
+        limiteMensual: config.iaImagenLimiteMensual,
       },
       iaFondo: {
         proveedorActivo: config.iaFondoProveedorActivo,
         openaiModelo: config.iaOpenaiModeloFondo,
         geminiModelo: config.iaGeminiModeloFondo,
         limiteMensual: config.iaFondoLimiteMensual,
+      },
+      iaAsistente: {
+        limiteMensual: config.iaAsistenteLimiteMensual,
       },
       travel: {
         duffelApiTokenConfigurado: Boolean(config.duffelApiTokenCifrado),

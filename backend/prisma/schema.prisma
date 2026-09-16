@@ -133,6 +133,7 @@ model Tenant {
   reservasTravel            TravelReserva[]
   movimientosLedgerTravel   TravelLedgerMovimiento[]
   reglasMarkupTravel        TravelReglaMarkup[]
+  usosIa                    UsoIaTenant[]
 
   @@map("tenants")
 }
@@ -645,6 +646,15 @@ model PlataformaConfiguracion {
   // Tope global (no por tenant/plan) de generaciones IA por tenant por
   // mes — el costo por imagen lo paga la plataforma, no el tenant.
   iaFondoLimiteMensual   Int     @default(20)
+
+  // Auditoría de integraciones (2026-09) — "Generar con IA" (analizar foto
+  // de producto) y el asistente de texto (sugerir cuenta contable, generar
+  // descripción de producto/tarea) usaban la misma cuenta compartida de
+  // arriba SIN ningún tope, a diferencia del fondo de banner que sí lo
+  // tiene desde el día uno — gasto de Plataforma sin techo. Ver UsoIaTenant
+  // (cuenta el uso real) y UsoIaService (compara contra estos límites).
+  iaImagenLimiteMensual    Int @default(20)
+  iaAsistenteLimiteMensual Int @default(50)
 
   // Travel Management (plugin) — token de Duffel, cuenta ÚNICA y
   // COMPARTIDA de la plataforma (decisión B2B confirmada: agencias
@@ -4549,6 +4559,29 @@ model CategoriaIncentivo {
   tareas TareaPersonal[]
 
   @@map("categorias_incentivo")
+}
+
+enum TipoUsoIa {
+  IMAGEN_PRODUCTO
+  ASISTENTE
+}
+
+/// Auditoría de integraciones (2026-09) — registra cada llamada real (pagada)
+/// a un proveedor de IA fuera de Publicaciones Sociales (que ya cuenta
+/// PublicacionSocial.origen='IA' directo, no necesita esta tabla) para poder
+/// aplicarle un tope mensual — ver UsoIaService y
+/// PlataformaConfiguracion.iaImagenLimiteMensual/iaAsistenteLimiteMensual.
+/// Solo se registra la llamada que SÍ le pega al proveedor pagado — el modo
+/// heurístico (sin API key configurada) no cuenta contra el tope.
+model UsoIaTenant {
+  id        String    @id @default(uuid())
+  tenantId  String
+  tenant    Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tipo      TipoUsoIa
+  createdAt DateTime  @default(now())
+
+  @@index([tenantId, tipo, createdAt])
+  @@map("usos_ia_tenant")
 }
 
 /// Hija sin tenantId propio (mismo patrón que ComentarioTareaProyecto) —
