@@ -20,4 +20,10 @@ export class EnviarResumenIncentivoDto {
   @IsString()
   @MaxLength(500)
   comentario?: string;
+
+  @ApiProperty({ required: false, description: 'Opcional — texto ya generado por /resumen/analizar-ia. Solo tiene efecto con canal EMAIL (ver CategoriasIncentivoService.enviarResumen).' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(4000)
+  analisisIa?: string;
 }

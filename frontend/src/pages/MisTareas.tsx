@@ -1,7 +1,7 @@
 import { DragEvent, FormEvent, useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { AlertTriangle, CalendarCheck, CheckCircle2, Copy, ListTodo, MessageSquare, Search, Send, Settings, Trash2, Plus } from 'lucide-react';
+import { AlertTriangle, CalendarCheck, CheckCircle2, Copy, ListTodo, MessageSquare, Search, Send, Settings, Sparkles, Trash2, Plus } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { apiClient } from '../lib/api-client';
 import { mensajeErrorApi } from '../lib/mensaje-error-api';
@@ -10,6 +10,7 @@ import { Card } from '../components/atoms/Card/Card';
 import { Select } from '../components/atoms/Select/Select';
 import { TareaPersonalModal } from '../components/organisms/TareaPersonalModal/TareaPersonalModal';
 import { CategoriasIncentivoModal } from '../components/organisms/CategoriasIncentivoModal/CategoriasIncentivoModal';
+import { Modal } from '../components/molecules/Modal/Modal';
 import {
   CategoriaIncentivo,
   COLOR_BORDE_ESTADO_TAREA_PERSONAL,
@@ -859,6 +860,7 @@ function VistaIncentivos() {
   const [canal, setCanal] = useState<'WHATSAPP' | 'EMAIL'>('WHATSAPP');
   const [destino, setDestino] = useState('');
   const [comentario, setComentario] = useState('');
+  const [analisisIa, setAnalisisIa] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [exito, setExito] = useState<string | null>(null);
 
@@ -882,16 +884,29 @@ function VistaIncentivos() {
         canal,
         destino: destino.trim(),
         ...(comentario.trim() ? { comentario: comentario.trim() } : {}),
+        // Solo tiene efecto con canal EMAIL (ver CategoriasIncentivoService.enviarResumen) —
+        // igual se manda siempre que haya texto, más simple que condicionarlo acá también.
+        ...(canal === 'EMAIL' && analisisIa.trim() ? { analisisIa: analisisIa.trim() } : {}),
       }),
     onSuccess: () => {
       setError(null);
       setComentario('');
+      setAnalisisIa('');
       setExito(canal === 'EMAIL' ? 'Reporte enviado por email.' : 'Reporte enviado por WhatsApp.');
     },
     onError: (err) => {
       setExito(null);
       setError(mensajeErrorApi(err, 'No se pudo enviar el reporte.'));
     },
+  });
+
+  const analizarConIa = useMutation({
+    mutationFn: async () => (await apiClient.post<{ analisis: string }>('/admin/categorias-incentivo/resumen/analizar-ia', { mes })).data,
+    onSuccess: (data) => {
+      setError(null);
+      setAnalisisIa(data.analisis);
+    },
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo generar el análisis de IA.')),
   });
 
   return (
@@ -971,7 +986,7 @@ function VistaIncentivos() {
       )}
 
       {envioAbierto && resumen && (
-        <Card titulo="Enviar reporte de cumplimiento">
+        <Modal titulo="Enviar reporte de cumplimiento" onClose={() => setEnvioAbierto(false)}>
           <div className="space-y-3">
             <div className="flex gap-2">
               <button
@@ -1030,6 +1045,25 @@ function VistaIncentivos() {
               />
               {!comentario.trim() && <p className="text-xs text-amber-600 dark:text-amber-400">Se enviará sin ningún comentario adicional.</p>}
             </div>
+            {canal === 'EMAIL' && (
+              <div className="flex flex-col gap-1">
+                <div className="flex items-center justify-between gap-2">
+                  <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Análisis de IA (opcional — solo se manda por email)</label>
+                  <Button type="button" variante="secundario" onClick={() => analizarConIa.mutate()} disabled={analizarConIa.isPending} className="flex shrink-0 items-center gap-1.5 text-xs">
+                    <Sparkles size={13} />
+                    {analizarConIa.isPending ? 'Analizando…' : analisisIa.trim() ? 'Analizar de nuevo' : 'Analizar con IA'}
+                  </Button>
+                </div>
+                <textarea
+                  value={analisisIa}
+                  onChange={(e) => setAnalisisIa(e.target.value)}
+                  rows={3}
+                  maxLength={4000}
+                  placeholder="Generá un análisis con IA o escribilo a mano — se agrega como un bloque aparte en el correo."
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                />
+              </div>
+            )}
             <div className="flex flex-col gap-1">
               <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Vista previa</label>
               <pre className="whitespace-pre-wrap rounded-lg bg-slate-900 p-3 text-[11.5px] leading-relaxed text-emerald-100">{construirMensajeIncentivo(resumen, comentario)}</pre>
@@ -1045,7 +1079,7 @@ function VistaIncentivos() {
               </Button>
             </div>
           </div>
-        </Card>
+        </Modal>
       )}
     </div>
   );

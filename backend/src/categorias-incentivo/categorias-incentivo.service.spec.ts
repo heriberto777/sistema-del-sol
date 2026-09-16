@@ -1,20 +1,43 @@
-import { ServiceUnavailableException } from '@nestjs/common';
+process.env.ENCRYPTION_KEY = 'clave-de-prueba';
+
+import { BadRequestException, ServiceUnavailableException } from '@nestjs/common';
+import { cifrar } from '../common/utils/encriptado.util';
 import { CategoriasIncentivoService } from './categorias-incentivo.service';
 import { CategoriasIncentivoRepository } from './categorias-incentivo.repository';
 import { EmailChannel } from '../notificaciones/canales/email.channel';
 import { WhatsAppChannel } from '../notificaciones/canales/whatsapp.channel';
+import { PrismaService } from '../prisma/prisma.service';
+import { ConversacionIaService } from '../ia/conversacion/conversacion-ia.service';
+import { IaClientService } from '../ia/ia-client.service';
+import { UsoIaService } from '../ia/uso-ia.service';
 
 describe('CategoriasIncentivoService', () => {
   let service: CategoriasIncentivoService;
   let repository: jest.Mocked<Pick<CategoriasIncentivoRepository, 'resumenPeriodo' | 'listarDestinatarios' | 'listarPendientesPeriodo'>>;
   let emailChannel: jest.Mocked<Pick<EmailChannel, 'enviar'>>;
   let whatsAppChannel: jest.Mocked<Pick<WhatsAppChannel, 'enviar'>>;
+  let prisma: { whatsappConfigTenant: { findUnique: jest.Mock } };
+  let conversacionIaService: jest.Mocked<Pick<ConversacionIaService, 'completar'>>;
+  let iaClientService: jest.Mocked<Pick<IaClientService, 'completar'>>;
+  let usoIaService: jest.Mocked<Pick<UsoIaService, 'intentarRegistrar'>>;
 
   beforeEach(() => {
     repository = { resumenPeriodo: jest.fn(), listarDestinatarios: jest.fn(), listarPendientesPeriodo: jest.fn().mockResolvedValue([]) };
     emailChannel = { enviar: jest.fn().mockResolvedValue(true) };
     whatsAppChannel = { enviar: jest.fn().mockResolvedValue(true) };
-    service = new CategoriasIncentivoService(repository as unknown as CategoriasIncentivoRepository, emailChannel as unknown as EmailChannel, whatsAppChannel as unknown as WhatsAppChannel);
+    prisma = { whatsappConfigTenant: { findUnique: jest.fn().mockResolvedValue(null) } };
+    conversacionIaService = { completar: jest.fn() };
+    iaClientService = { completar: jest.fn() };
+    usoIaService = { intentarRegistrar: jest.fn().mockResolvedValue(true) };
+    service = new CategoriasIncentivoService(
+      repository as unknown as CategoriasIncentivoRepository,
+      emailChannel as unknown as EmailChannel,
+      whatsAppChannel as unknown as WhatsAppChannel,
+      prisma as unknown as PrismaService,
+      conversacionIaService as unknown as ConversacionIaService,
+      iaClientService as unknown as IaClientService,
+      usoIaService as unknown as UsoIaService,
+    );
   });
 
   describe('listarDestinatarios', () => {
@@ -108,15 +131,31 @@ describe('CategoriasIncentivoService', () => {
       expect(tenantId).toBe('t1');
     });
 
-    it('canal EMAIL llama a emailChannel envolviendo el mensaje en <pre> (para que se vea igual que en WhatsApp)', async () => {
+    it('canal EMAIL llama a emailChannel con la plantilla HTML (tablas, no <pre> de texto plano)', async () => {
       await service.enviarResumen('2026-09', 'EMAIL', 'gerencia@ejemplo.com', 't1');
 
       expect(emailChannel.enviar).toHaveBeenCalledTimes(1);
       const [destino, , cuerpo] = emailChannel.enviar.mock.calls[0];
       expect(destino).toBe('gerencia@ejemplo.com');
-      expect(cuerpo).toContain('<pre');
+      expect(cuerpo).not.toContain('<pre');
+      expect(cuerpo).toContain('<table');
       expect(cuerpo).toContain('CIGUAS APPS');
       expect(whatsAppChannel.enviar).not.toHaveBeenCalled();
+    });
+
+    it('canal EMAIL con analisisIa incluye el bloque de análisis en el HTML', async () => {
+      await service.enviarResumen('2026-09', 'EMAIL', 'gerencia@ejemplo.com', 't1', undefined, 'Buen desempeño en Apps este mes.');
+
+      const [, , cuerpo] = emailChannel.enviar.mock.calls[0];
+      expect(cuerpo).toContain('Análisis de IA');
+      expect(cuerpo).toContain('Buen desempeño en Apps este mes.');
+    });
+
+    it('canal WHATSAPP ignora analisisIa — el análisis de IA solo se manda por correo', async () => {
+      await service.enviarResumen('2026-09', 'WHATSAPP', '+18095550123', 't1', undefined, 'Este análisis no debería aparecer.');
+
+      const [, , cuerpo] = whatsAppChannel.enviar.mock.calls[0];
+      expect(cuerpo).not.toContain('Este análisis no debería aparecer.');
     });
 
     it('si el canal devuelve false (SMTP/Twilio no configurado), lanza ServiceUnavailableException', async () => {
@@ -165,6 +204,56 @@ describe('CategoriasIncentivoService', () => {
 
       const [, , cuerpo] = whatsAppChannel.enviar.mock.calls[0];
       expect(cuerpo).not.toContain('Comentario');
+    });
+  });
+
+  describe('analizarConIa', () => {
+    beforeEach(() => {
+      repository.resumenPeriodo.mockResolvedValue([{ categoria: { id: 'c1', nombre: 'CIGUAS APPS', peso: '2500' } as never, tareasTotales: 10, tareasCompletadas: 9 }]);
+    });
+
+    it('rechaza si no hay renglones de incentivo en el período', async () => {
+      repository.resumenPeriodo.mockResolvedValue([]);
+
+      await expect(service.analizarConIa('2026-09', 't1')).rejects.toThrow(BadRequestException);
+    });
+
+    it('usa primero la IA propia del bot de WhatsApp del tenant si está configurada, sin tocar el Asistente general', async () => {
+      prisma.whatsappConfigTenant.findUnique.mockResolvedValue({ iaApiKeyCifrado: cifrar('sk-ant-tenant'), iaProveedor: 'ANTHROPIC', iaModelo: 'claude-x' });
+      conversacionIaService.completar.mockResolvedValue('Análisis del bot del tenant.');
+
+      const resultado = await service.analizarConIa('2026-09', 't1');
+
+      expect(resultado).toEqual({ analisis: 'Análisis del bot del tenant.' });
+      expect(conversacionIaService.completar).toHaveBeenCalledWith('ANTHROPIC', expect.any(Array), expect.objectContaining({ apiKey: expect.any(String), modelo: 'claude-x' }));
+      expect(usoIaService.intentarRegistrar).not.toHaveBeenCalled();
+      expect(iaClientService.completar).not.toHaveBeenCalled();
+    });
+
+    it('sin IA propia del tenant, cae al Asistente general y consume su cupo mensual', async () => {
+      prisma.whatsappConfigTenant.findUnique.mockResolvedValue(null);
+      iaClientService.completar.mockResolvedValue('Análisis del asistente general.');
+
+      const resultado = await service.analizarConIa('2026-09', 't1');
+
+      expect(resultado).toEqual({ analisis: 'Análisis del asistente general.' });
+      expect(usoIaService.intentarRegistrar).toHaveBeenCalledWith('t1', 'ASISTENTE');
+      expect(iaClientService.completar).toHaveBeenCalledWith(expect.any(String), 400);
+    });
+
+    it('si se alcanzó el límite mensual del Asistente general, lanza ServiceUnavailableException', async () => {
+      prisma.whatsappConfigTenant.findUnique.mockResolvedValue(null);
+      usoIaService.intentarRegistrar.mockResolvedValue(false);
+
+      await expect(service.analizarConIa('2026-09', 't1')).rejects.toThrow(ServiceUnavailableException);
+      expect(iaClientService.completar).not.toHaveBeenCalled();
+    });
+
+    it('si ninguna IA está configurada, lanza ServiceUnavailableException', async () => {
+      prisma.whatsappConfigTenant.findUnique.mockResolvedValue(null);
+      iaClientService.completar.mockResolvedValue(null);
+
+      await expect(service.analizarConIa('2026-09', 't1')).rejects.toThrow(ServiceUnavailableException);
     });
   });
 });

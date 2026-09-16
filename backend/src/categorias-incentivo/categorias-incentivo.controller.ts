@@ -48,6 +48,11 @@ export class CategoriasIncentivoController {
 
   @Post('resumen/enviar')
   enviarResumen(@Body() dto: EnviarResumenIncentivoDto, @CurrentUser() user: JwtPayloadUser) {
-    return this.service.enviarResumen(dto.mes, dto.canal, dto.destino, user.tenantId, dto.comentario);
+    return this.service.enviarResumen(dto.mes, dto.canal, dto.destino, user.tenantId, dto.comentario, dto.analisisIa);
+  }
+
+  @Post('resumen/analizar-ia')
+  analizarConIa(@Body('mes') mes: string, @CurrentUser() user: JwtPayloadUser) {
+    return this.service.analizarConIa(mes, user.tenantId);
   }
 }
