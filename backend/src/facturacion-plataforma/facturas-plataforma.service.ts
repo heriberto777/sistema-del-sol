@@ -15,6 +15,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { SuscripcionesRepository } from './suscripciones.repository';
 import { CuponesPlataformaRepository } from './cupones/cupones-plataforma.repository';
 import { sumarCiclos } from './sumar-ciclo.util';
+import { resolverModulosConOrigen } from '../planes/resolver-modulos-activos';
 
 const CICLO_ES: Record<string, string> = { MENSUAL: 'mensual', ANUAL: 'anual' };
 const CICLO_ES_PLURAL: Record<string, string> = { MENSUAL: 'meses', ANUAL: 'años' };
@@ -69,7 +70,7 @@ export class FacturasPlataformaService {
     const factura = await this.facturasPlataformaRepository.crear({
       tenantId: suscripcion.tenantId,
       suscripcionId: suscripcion.id,
-      concepto: `Suscripción ${suscripcion.plan.nombre} (${CICLO_ES[suscripcion.plan.cicloFacturacion] ?? suscripcion.plan.cicloFacturacion}) — ${periodo}`,
+      concepto: await this.construirConceptoSuscripcion(suscripcion, periodo),
       monto,
       descuento,
       itbis,
@@ -85,6 +86,28 @@ export class FacturasPlataformaService {
     await this.emisionECfService.emitirParaFacturaPlataforma(factura.id);
     await this.notificarFactura(suscripcion.tenantId, factura.id, 'generada');
     return factura;
+  }
+
+  /**
+   * Suma al concepto los módulos activos del tenant (plan + excepciones)
+   * — para que la factura diga QUÉ está pagando, no solo el nombre del
+   * plan. Reusa `resolverModulosConOrigen` (misma fuente que el
+   * checklist de plataforma), así que nunca puede divergir de lo que el
+   * tenant realmente tiene activo. Contabilidad/Contactos/Reportes/
+   * Notificaciones/Admin nunca aparecen acá — no están en el catálogo de
+   * `Modulo` (son plomería siempre activa, ver modulos-base.ts), así que
+   * no hace falta filtrarlos a mano.
+   */
+  private async construirConceptoSuscripcion(suscripcion: Suscripcion & { plan: Plan }, periodo: string): Promise<string> {
+    const base = `Suscripción ${suscripcion.plan.nombre} (${CICLO_ES[suscripcion.plan.cicloFacturacion] ?? suscripcion.plan.cicloFacturacion}) — ${periodo}`;
+
+    const modulos = await resolverModulosConOrigen(this.prisma, suscripcion.tenantId);
+    const nombresModulos = modulos
+      .filter((m) => m.activo)
+      .map((m) => m.nombre)
+      .sort((a, b) => a.localeCompare(b, 'es'));
+
+    return nombresModulos.length > 0 ? `${base} — Módulos: ${nombresModulos.join(', ')}` : base;
   }
 
   /**

@@ -20,7 +20,13 @@ describe('FacturasPlataformaService', () => {
   let plataformaConfigRepository: jest.Mocked<PlataformaConfigRepository>;
   let ncfPlataformaService: jest.Mocked<NcfPlataformaService>;
   let emisionECfService: jest.Mocked<EmisionECfService>;
-  let prisma: { user: { findFirst: jest.Mock }; suscripcion: { findUnique: jest.Mock }; tenant: { findUnique: jest.Mock } };
+  let prisma: {
+    user: { findFirst: jest.Mock };
+    suscripcion: { findUnique: jest.Mock };
+    tenant: { findUnique: jest.Mock };
+    modulo: { findMany: jest.Mock };
+    tenantModuloOverride: { findMany: jest.Mock };
+  };
   let suscripcionesRepository: jest.Mocked<SuscripcionesRepository>;
   let cuponesPlataformaRepository: jest.Mocked<CuponesPlataformaRepository>;
 
@@ -47,6 +53,10 @@ describe('FacturasPlataformaService', () => {
       user: { findFirst: jest.fn().mockResolvedValue({ email: 'admin@tenant.com' }) },
       suscripcion: { findUnique: jest.fn().mockResolvedValue({ id: 's1', tenantId: 't1' }) },
       tenant: { findUnique: jest.fn().mockResolvedValue({ telefono: '+18095551234' }) },
+      // Catálogo vacío por defecto — resolverModulosConOrigen devuelve []
+      // y el concepto no suma "— Módulos: …" salvo que un test lo cargue.
+      modulo: { findMany: jest.fn().mockResolvedValue([]) },
+      tenantModuloOverride: { findMany: jest.fn().mockResolvedValue([]) },
     };
     suscripcionesRepository = {
       desactivarPrimerPeriodoGratis: jest.fn().mockResolvedValue(undefined),
@@ -72,6 +82,38 @@ describe('FacturasPlataformaService', () => {
   });
 
   describe('generarDesdeSuscripcion', () => {
+    it('el concepto incluye los módulos activos del tenant (plan + excepciones), ordenados alfabéticamente', async () => {
+      const suscripcion = { id: 's1', tenantId: 't1', plan: { nombre: 'Premium', precio: 1500, cicloFacturacion: 'MENSUAL' } } as never;
+      prisma.modulo.findMany.mockResolvedValue([
+        { clave: 'facturacion', nombre: 'Facturación' },
+        { clave: 'inventario', nombre: 'Inventario' },
+        { clave: 'pos', nombre: 'Punto de venta' },
+      ]);
+      prisma.tenant.findUnique.mockResolvedValue({
+        telefono: '+18095551234',
+        plan: { modulos: [{ modulo: { clave: 'facturacion' } }, { modulo: { clave: 'inventario' } }] },
+      });
+      prisma.tenantModuloOverride.findMany.mockResolvedValue([{ activo: true, modulo: { clave: 'pos' } }]);
+      repo.crear.mockResolvedValue({ id: 'f1' } as never);
+      repo.buscarPorId.mockResolvedValue({ id: 'f1', concepto: 'x', total: 1500, fechaVencimiento: new Date() } as never);
+
+      await service.generarDesdeSuscripcion(suscripcion);
+
+      const [args] = repo.crear.mock.calls[0];
+      expect(args.concepto).toContain('Módulos: Facturación, Inventario, Punto de venta');
+    });
+
+    it('sin ningún módulo del catálogo activo, el concepto no agrega "— Módulos:"', async () => {
+      const suscripcion = { id: 's1', tenantId: 't1', plan: { nombre: 'Premium', precio: 1500, cicloFacturacion: 'MENSUAL' } } as never;
+      repo.crear.mockResolvedValue({ id: 'f1' } as never);
+      repo.buscarPorId.mockResolvedValue({ id: 'f1', concepto: 'x', total: 1500, fechaVencimiento: new Date() } as never);
+
+      await service.generarDesdeSuscripcion(suscripcion);
+
+      const [args] = repo.crear.mock.calls[0];
+      expect(args.concepto).not.toContain('Módulos:');
+    });
+
     it('crea la factura con monto/total igual al precio del plan y notifica al admin del tenant', async () => {
       const suscripcion = {
         id: 's1',
