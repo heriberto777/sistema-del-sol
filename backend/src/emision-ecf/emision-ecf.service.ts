@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { PlataformaConfigRepository } from '../plataforma-config/plataforma-config.repository';
 import { AlanubeAdapter } from './alanube.adapter';
 import { TipoDocumentoECf, EmisorECfLinea } from './emisor-ecf-adapter.interface';
+import { CLIENTE_SELECT_BASICO } from '../common/prisma/cliente-select-basico';
 
 const TIPOS_ECF: readonly string[] = ['E31', 'E32', 'E33', 'E34'];
 
@@ -39,7 +40,7 @@ export class EmisionECfService {
   async emitirParaFactura(tenantId: string, facturaId: string): Promise<void> {
     const factura = await this.prisma.factura.findUnique({
       where: { id: facturaId },
-      include: { cliente: true, tenant: true, lineas: { include: { producto: true } } },
+      include: { cliente: { select: CLIENTE_SELECT_BASICO }, tenant: true, lineas: { include: { producto: true } } },
     });
     if (!factura || factura.tenantId !== tenantId) return;
     if (!esTipoDocumentoECf(factura.tipoNcf) || !factura.ncf) return;

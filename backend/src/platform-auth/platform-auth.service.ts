@@ -55,7 +55,9 @@ export class PlatformAuthService {
     });
 
     const enlace = `${process.env.FRONTEND_URL ?? 'http://localhost:5173'}/plataforma/restablecer-password?token=${token}`;
-    this.logger.debug(`Enlace de restablecimiento para ${admin.email}: ${enlace}`);
+    // No loguear `enlace`/`token` (hallazgo de auditoría): quien lea este
+    // log podría restablecer la contraseña de cualquier super admin sin su email.
+    this.logger.debug(`Enlace de restablecimiento generado para ${admin.email}`);
     await this.emailChannel.enviar(
       admin.email,
       'Restablece tu contraseña — Plataforma El Sistema del Sol',

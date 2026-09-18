@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { TenantPrismaService } from '../prisma/tenant-prisma.service';
 import { EstadoCotizacion, Prisma } from '@prisma/client';
+import { CLIENTE_SELECT_BASICO } from '../common/prisma/cliente-select-basico';
 
 interface LineaCalculada {
   // Nullable (ítem B-9) — ver el comentario equivalente en
@@ -16,7 +17,7 @@ interface LineaCalculada {
   montoTotal: number;
 }
 
-const INCLUDE_COTIZACION = { lineas: { include: { producto: true } }, cliente: true } as const;
+const INCLUDE_COTIZACION = { lineas: { include: { producto: true } }, cliente: { select: CLIENTE_SELECT_BASICO } } as const;
 
 @Injectable()
 export class CotizacionesRepository {
@@ -122,7 +123,7 @@ export class CotizacionesRepository {
       this.db.cotizacion.findMany({
         where,
         orderBy: { createdAt: 'desc' },
-        include: { cliente: true },
+        include: { cliente: { select: CLIENTE_SELECT_BASICO } },
         skip: params.skip,
         take: params.take,
       }),

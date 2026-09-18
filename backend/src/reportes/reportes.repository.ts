@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { TenantPrismaService } from '../prisma/tenant-prisma.service';
+import { CLIENTE_SELECT_BASICO } from '../common/prisma/cliente-select-basico';
 
 function inicioDelDia(fecha = new Date()): Date {
   const d = new Date(fecha);
@@ -94,7 +95,7 @@ export class ReportesRepository {
     return this.db.factura.findMany({
       where: { estado: 'EMITIDA', fecha: { gte: desde, lte: finDelDia(hasta) }, ...(bodegaIds ? { bodegaId: { in: bodegaIds } } : {}) },
       orderBy: { fecha: 'asc' },
-      include: { cliente: true },
+      include: { cliente: { select: CLIENTE_SELECT_BASICO } },
     });
   }
 

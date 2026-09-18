@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificacionesService } from '../notificaciones/notificaciones.service';
+import { CLIENTE_SELECT_BASICO } from '../common/prisma/cliente-select-basico';
 
 const MS_POR_DIA = 24 * 60 * 60 * 1000;
 
@@ -23,7 +24,7 @@ export class RecordatoriosService {
   async enviarRecordatoriosDeCobro() {
     const facturasCredito = await this.prisma.factura.findMany({
       where: { estado: 'EMITIDA', tipoFactura: 'CREDITO', pagada: false },
-      include: { cliente: true },
+      include: { cliente: { select: CLIENTE_SELECT_BASICO } },
     });
 
     const ahora = Date.now();

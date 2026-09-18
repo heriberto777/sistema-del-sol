@@ -177,7 +177,9 @@ export class AuthService {
     });
 
     const enlace = `${process.env.FRONTEND_URL ?? 'http://localhost:5173'}/restablecer-password?token=${token}&tenant=${tenant.subdominio}`;
-    this.logger.debug(`Enlace de restablecimiento para ${user.email}: ${enlace}`);
+    // No loguear `enlace`/`token` (hallazgo de auditoría): quien lea este
+    // log podría restablecer la contraseña de cualquier usuario sin su email.
+    this.logger.debug(`Enlace de restablecimiento generado para ${user.email}`);
     await this.emailChannel.enviar(
       user.email,
       'Restablece tu contraseña — El Sistema del Sol',

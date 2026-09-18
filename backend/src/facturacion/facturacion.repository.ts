@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { TenantPrismaService } from '../prisma/tenant-prisma.service';
 import { ModalidadFacturacion, Prisma, TipoFactura, TipoNcf } from '@prisma/client';
+import { CLIENTE_SELECT_BASICO } from '../common/prisma/cliente-select-basico';
 
 interface LineaCalculada {
   // Nullable (ítem B-9) — exactamente uno de productoId/descripcionManual,
@@ -254,7 +255,7 @@ export class FacturacionRepository {
       include: {
         lineas: { include: { producto: { include: { componentes: { include: { componente: true } } } } } },
         recargos: { orderBy: { orden: 'asc' } },
-        cliente: true,
+        cliente: { select: CLIENTE_SELECT_BASICO },
         // Necesario para anular(): si ya se emitieron notas de crédito
         // parciales contra esta factura, solo hay que reintegrar lo que
         // aún no se había devuelto (ver FacturacionService.anular).
@@ -287,7 +288,10 @@ export class FacturacionRepository {
         orderBy: { createdAt: 'desc' },
         // _count filtrado — para que el frontend marque "nota aplicada"
         // (ítem "marcar factura devuelta") sin traer las notas completas.
-        include: { cliente: true, _count: { select: { notasRelacionadas: { where: { tipoFactura: 'NOTA_CREDITO', estado: 'EMITIDA' } } } } },
+        include: {
+          cliente: { select: CLIENTE_SELECT_BASICO },
+          _count: { select: { notasRelacionadas: { where: { tipoFactura: 'NOTA_CREDITO', estado: 'EMITIDA' } } } },
+        },
       }),
       this.db.factura.count({ where }),
     ]);
@@ -319,7 +323,7 @@ export class FacturacionRepository {
         skip: params.skip,
         take: params.take,
         orderBy: { createdAt: 'desc' },
-        include: { cliente: true },
+        include: { cliente: { select: CLIENTE_SELECT_BASICO } },
       }),
       this.db.factura.count({ where }),
     ]);

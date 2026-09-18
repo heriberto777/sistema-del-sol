@@ -5,6 +5,7 @@ import { NotificacionesRepository } from './notificaciones.repository';
 import { EmailChannel } from './canales/email.channel';
 import { WhatsAppChannel } from './canales/whatsapp.channel';
 import { renderizarPlantilla } from './plantilla-renderer';
+import { CLIENTE_SELECT_BASICO } from '../common/prisma/cliente-select-basico';
 import {
   CotizacionEnviadaPayload,
   EVENTOS,
@@ -121,7 +122,7 @@ export class NotificacionesService {
     try {
       const factura = await this.prisma.factura.findUnique({
         where: { id: facturaId },
-        include: { cliente: true, lineas: { include: { producto: true } }, recargos: { orderBy: { orden: 'asc' } } },
+        include: { cliente: { select: CLIENTE_SELECT_BASICO }, lineas: { include: { producto: true } }, recargos: { orderBy: { orden: 'asc' } } },
       });
       if (!factura) return undefined;
       return { filename: 'factura.pdf', content: await generarDocumentoPdf(mapearFacturaAParams(factura)) };
@@ -135,7 +136,7 @@ export class NotificacionesService {
     try {
       const cotizacion = await this.prisma.cotizacion.findUnique({
         where: { id: cotizacionId },
-        include: { cliente: true, lineas: { include: { producto: true } } },
+        include: { cliente: { select: CLIENTE_SELECT_BASICO }, lineas: { include: { producto: true } } },
       });
       if (!cotizacion) return undefined;
       return { filename: 'cotizacion.pdf', content: await generarDocumentoPdf(mapearCotizacionAParams(cotizacion)) };

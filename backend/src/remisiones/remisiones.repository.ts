@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { TenantPrismaService } from '../prisma/tenant-prisma.service';
 import { EstadoRemision, Prisma } from '@prisma/client';
+import { CLIENTE_SELECT_BASICO } from '../common/prisma/cliente-select-basico';
 
 // "Remisión + stock" — `producto` necesita el include profundo (mismo que
 // `FacturacionRepository.buscarPorId`) para que `expandirParaInventario`
@@ -8,7 +9,7 @@ import { EstadoRemision, Prisma } from '@prisma/client';
 // "Marcar entregada"/anular desde ENTREGADA.
 const INCLUDE_REMISION = {
   lineas: { include: { producto: { include: { componentes: { include: { componente: true } } } } } },
-  cliente: true,
+  cliente: { select: CLIENTE_SELECT_BASICO },
   bodega: true,
 } as const;
 
@@ -85,7 +86,7 @@ export class RemisionesRepository {
       this.db.remision.findMany({
         where,
         orderBy: { createdAt: 'desc' },
-        include: { cliente: true },
+        include: { cliente: { select: CLIENTE_SELECT_BASICO } },
         skip: params.skip,
         take: params.take,
       }),

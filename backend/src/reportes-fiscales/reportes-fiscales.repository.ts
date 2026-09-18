@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { TenantPrismaService } from '../prisma/tenant-prisma.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { CLIENTE_SELECT_BASICO } from '../common/prisma/cliente-select-basico';
 
 function finDelDia(fecha: Date): Date {
   const d = new Date(fecha);
@@ -23,7 +24,7 @@ export class ReportesFiscalesRepository {
     return this.db.factura.findMany({
       where: { estado: 'EMITIDA', fecha: { gte: desde, lte: finDelDia(hasta) } },
       orderBy: { fecha: 'asc' },
-      include: { cliente: true },
+      include: { cliente: { select: CLIENTE_SELECT_BASICO } },
     });
   }
 
