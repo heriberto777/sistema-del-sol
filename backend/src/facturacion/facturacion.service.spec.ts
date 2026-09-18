@@ -359,6 +359,39 @@ describe('FacturacionService', () => {
       expect(repository.crearFacturaEnTx).toHaveBeenCalledWith(TX, expect.objectContaining({ subtotal: 180, itbis: 32.4 }));
     });
 
+    it('cuando el descuento no divide exacto entre 3 líneas, la suma de líneas cuadra exacto contra el total (hallazgo de auditoría — Decimal, no float)', async () => {
+      repository.obtenerProductoConPrecioVigente.mockResolvedValue(producto(0, 100) as never); // 0% ITBIS para aislar el redondeo del descuento
+      repository.crearFacturaEnTx.mockResolvedValue(facturaCreada() as never);
+
+      // 3 líneas de RD$100 (subtotal 300), descuento fijo de RD$10 — no
+      // divide exacto (3.33... por línea). Antes del fix, esto podía dejar
+      // sum(líneas) = 299.99 o 290.01 en vez de 290 exacto.
+      await service.crear(
+        dto({
+          descuentoGeneralMonto: 10,
+          lineas: [
+            { productoId: 'prod-1', cantidad: 1 },
+            { productoId: 'prod-2', cantidad: 1 },
+            { productoId: 'prod-3', cantidad: 1 },
+          ],
+        }),
+        'tenant-1',
+        'vendedor-1',
+      );
+
+      const llamada = repository.crearFacturaEnTx.mock.calls[0][1] as {
+        lineas: { descuento: number; montoTotal: number }[];
+        subtotal: number;
+        total: number;
+      };
+      const sumaDescuentos = llamada.lineas.reduce((acc, l) => acc + l.descuento, 0);
+      const sumaMontoTotal = llamada.lineas.reduce((acc, l) => acc + l.montoTotal, 0);
+      expect(sumaDescuentos).toBe(10);
+      expect(sumaMontoTotal).toBe(290);
+      expect(llamada.subtotal).toBe(290);
+      expect(llamada.total).toBe(290);
+    });
+
     it('se acumula con un descuento por línea existente, no lo reemplaza', async () => {
       repository.obtenerProductoConPrecioVigente.mockResolvedValue(producto(18, 100) as never);
       repository.crearFacturaEnTx.mockResolvedValue(facturaCreada() as never);

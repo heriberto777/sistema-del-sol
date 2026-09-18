@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto';
 import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
-import { FormatoImpresion, PlantillaDocumento, TipoFactura, TipoNcf } from '@prisma/client';
+import { FormatoImpresion, PlantillaDocumento, Prisma, TipoFactura, TipoNcf } from '@prisma/client';
 import { FacturacionRepository } from './facturacion.repository';
 import { InventarioService } from '../inventario/inventario.service';
 import { expandirParaInventario } from '../inventario/expandir-para-inventario';
@@ -151,9 +151,15 @@ export class FacturacionService {
         if (!linea.productoId) {
           const porcentajeItbis = linea.aplicaItbis === false ? 0 : tasaItbisGeneralManual;
           const precioUnitario = linea.precioUnitario as number;
-          const descuento = linea.descuento ?? 0;
-          const totalLinea = linea.cantidad * precioUnitario - descuento;
-          const montoItbis = totalLinea * (porcentajeItbis / 100);
+          // Auditoría de redondeo: toda esta cadena (precio→descuento→ITBIS→total)
+          // corre en Prisma.Decimal, no en `number` — evita el error de punto
+          // flotante de IEEE 754 acumulándose entre pasos. Se redondea a
+          // centavos en cada valor monetario apenas se calcula (no solo al
+          // final), para que lo que queda en memoria ya sea exactamente lo
+          // que Postgres va a persistir por columna.
+          const descuentoD = new Prisma.Decimal(linea.descuento ?? 0).toDecimalPlaces(2);
+          const totalLineaD = new Prisma.Decimal(precioUnitario).times(linea.cantidad).minus(descuentoD).toDecimalPlaces(2);
+          const montoItbisD = totalLineaD.times(porcentajeItbis).dividedBy(100).toDecimalPlaces(2);
 
           return {
             productoId: null,
@@ -161,10 +167,10 @@ export class FacturacionService {
             descripcionManual: linea.descripcionManual,
             cantidad: linea.cantidad,
             precioUnitario,
-            descuento,
+            descuento: descuentoD.toNumber(),
             porcentajeItbis,
-            montoItbis,
-            montoTotal: totalLinea + montoItbis,
+            montoItbis: montoItbisD.toNumber(),
+            montoTotal: totalLineaD.plus(montoItbisD).toNumber(),
             pagaComision: true,
             tipoProducto: undefined,
             componentesCombo: [],
@@ -183,49 +189,66 @@ export class FacturacionService {
         if (dto.tipoFactura === 'NOTA_CREDITO' && !producto.permiteDevolucion) {
           throw new BadRequestException(`El producto "${producto.nombre}" no permite devoluciones`);
         }
-        const precioUnitario = linea.precioUnitario ?? Number(producto.precios[0]?.precioVenta ?? 0);
+        // `producto.precios[0]?.precioVenta`/`producto.porcentajeItbis`/
+        // `leyFiscal.porcentajeItbisAPagar` ya son Prisma.Decimal — se usan
+        // tal cual, sin pasar por `Number()` antes de calcular (eso es
+        // justamente lo que reintroducía el error de redondeo).
+        const precioUnitarioD =
+          linea.precioUnitario !== undefined ? new Prisma.Decimal(linea.precioUnitario) : new Prisma.Decimal(producto.precios[0]?.precioVenta ?? 0);
         // Toggle de ITBIS por línea (plan de integración Cuadre, ítem B-7) —
         // `aplicaItbis: false` fuerza 0% sin importar producto.porcentajeItbis,
         // para una venta exenta puntual (ej. cliente exonerado en esa factura).
         // Ley fiscal (ítem B-3, atada al Producto): reduce el ITBIS efectivo
         // — ej. `porcentajeItbisAPagar: 10` sobre un 18% normal da 1.8%
         // efectivo. Se aplica DESPUÉS del toggle (0% sigue siendo 0%).
-        const porcentajeItbis =
+        const porcentajeItbisD =
           linea.aplicaItbis === false
-            ? 0
-            : Number(producto.porcentajeItbis) * (producto.leyFiscal ? Number(producto.leyFiscal.porcentajeItbisAPagar) / 100 : 1);
+            ? new Prisma.Decimal(0)
+            : producto.leyFiscal
+              ? new Prisma.Decimal(producto.porcentajeItbis).times(producto.leyFiscal.porcentajeItbisAPagar).dividedBy(100)
+              : new Prisma.Decimal(producto.porcentajeItbis);
         // Un descuento manual explícito (aunque sea 0) siempre gana sobre
         // el automático — ver OfertasService, "no acumulable". Sin
         // descuento manual, además de resolver el monto se resuelve si
         // la oferta automática que lo generó paga comisión (ítem A-1,
         // "todo o nada" — ver OfertasService.combinarDescuentosConComision).
         // Con descuento manual (o sin oferta), la línea paga comisión
-        // normalmente.
+        // normalmente. `OfertasService` sigue devolviendo `number` (su
+        // propia matemática interna queda fuera de este cambio) — se
+        // redondea a centavos apenas entra a este cálculo, sea manual o
+        // automático.
         let pagaComision = true;
-        let descuento = linea.descuento;
-        if (descuento === undefined) {
+        let descuentoD: Prisma.Decimal;
+        if (linea.descuento === undefined) {
           if (esVentaNormal) {
-            const resuelto = await this.ofertasService.resolverDescuentoLineaConComision(linea.productoId, producto.categoriaId, linea.cantidad, precioUnitario);
-            descuento = resuelto.monto;
+            const resuelto = await this.ofertasService.resolverDescuentoLineaConComision(
+              linea.productoId,
+              producto.categoriaId,
+              linea.cantidad,
+              precioUnitarioD.toNumber(),
+            );
+            descuentoD = new Prisma.Decimal(resuelto.monto).toDecimalPlaces(2);
             pagaComision = resuelto.pagaComision;
           } else {
-            descuento = 0;
+            descuentoD = new Prisma.Decimal(0);
           }
+        } else {
+          descuentoD = new Prisma.Decimal(linea.descuento).toDecimalPlaces(2);
         }
 
-        const totalLinea = linea.cantidad * precioUnitario - descuento;
-        const montoItbis = totalLinea * (porcentajeItbis / 100);
+        const totalLineaD = precioUnitarioD.times(linea.cantidad).minus(descuentoD).toDecimalPlaces(2);
+        const montoItbisD = totalLineaD.times(porcentajeItbisD).dividedBy(100).toDecimalPlaces(2);
 
         return {
           productoId: linea.productoId as string | null,
           varianteId: varianteId as string | null,
           descripcionManual: undefined as string | undefined,
           cantidad: linea.cantidad,
-          precioUnitario,
-          descuento,
-          porcentajeItbis,
-          montoItbis,
-          montoTotal: totalLinea + montoItbis,
+          precioUnitario: precioUnitarioD.toNumber(),
+          descuento: descuentoD.toNumber(),
+          porcentajeItbis: porcentajeItbisD.toNumber(),
+          montoItbis: montoItbisD.toNumber(),
+          montoTotal: totalLineaD.plus(montoItbisD).toNumber(),
           // Ítem A-1 — persistido en LineaFactura; ComisionesEventosService
           // relee la factura ya creada (join a Producto) y no necesita
           // ningún otro dato transiente de este cálculo.
@@ -242,20 +265,30 @@ export class FacturacionService {
       }),
     );
 
+    // Re-deriva `cantidad×precioUnitario − descuento` de una línea ya
+    // calculada (todos `number` a esta altura) en Decimal — usado por los
+    // dos bloques de prorrateo de abajo y por el agregado final, para que
+    // ninguna suma intermedia vuelva a pasar por aritmética de punto
+    // flotante nativa.
+    const totalLineaDecimal = (l: { cantidad: number; precioUnitario: number; descuento: number }) =>
+      new Prisma.Decimal(l.cantidad).times(l.precioUnitario).minus(l.descuento);
+
     if (esVentaNormal) {
-      const subtotalPreCarrito = lineasCalculadas.reduce((acc, l) => acc + (l.cantidad * l.precioUnitario - l.descuento), 0);
-      const descuentoCarritoTotal = await this.ofertasService.resolverDescuentoCarritoTotal(subtotalPreCarrito);
+      const subtotalPreCarritoD = lineasCalculadas.reduce((acc, l) => acc.plus(totalLineaDecimal(l)), new Prisma.Decimal(0));
+      const descuentoCarritoTotal = await this.ofertasService.resolverDescuentoCarritoTotal(subtotalPreCarritoD.toNumber());
       if (descuentoCarritoTotal > 0) {
         const extras = prorratearDescuentoCarrito(
-          subtotalPreCarrito,
-          lineasCalculadas.map((l) => l.cantidad * l.precioUnitario - l.descuento),
+          subtotalPreCarritoD.toNumber(),
+          lineasCalculadas.map((l) => totalLineaDecimal(l).toNumber()),
           descuentoCarritoTotal,
         );
         lineasCalculadas.forEach((l, i) => {
-          l.descuento += extras[i];
-          const totalLinea = l.cantidad * l.precioUnitario - l.descuento;
-          l.montoItbis = totalLinea * (l.porcentajeItbis / 100);
-          l.montoTotal = totalLinea + l.montoItbis;
+          const descuentoD = new Prisma.Decimal(l.descuento).plus(extras[i]).toDecimalPlaces(2);
+          const totalLineaD = new Prisma.Decimal(l.cantidad).times(l.precioUnitario).minus(descuentoD).toDecimalPlaces(2);
+          const montoItbisD = totalLineaD.times(l.porcentajeItbis).dividedBy(100).toDecimalPlaces(2);
+          l.descuento = descuentoD.toNumber();
+          l.montoItbis = montoItbisD.toNumber();
+          l.montoTotal = totalLineaD.plus(montoItbisD).toNumber();
         });
       }
 
@@ -264,34 +297,36 @@ export class FacturacionService {
       // se prorratea igual (mismo util) SOBRE lo que quedó después de
       // ofertas, así que ambos se acumulan en vez de pisarse.
       if (dto.descuentoGeneralPct || dto.descuentoGeneralMonto) {
-        const subtotalPreGeneral = lineasCalculadas.reduce((acc, l) => acc + (l.cantidad * l.precioUnitario - l.descuento), 0);
+        const subtotalPreGeneralD = lineasCalculadas.reduce((acc, l) => acc.plus(totalLineaDecimal(l)), new Prisma.Decimal(0));
         const descuentoGeneralTotal = dto.descuentoGeneralPct
-          ? subtotalPreGeneral * (dto.descuentoGeneralPct / 100)
+          ? subtotalPreGeneralD.times(dto.descuentoGeneralPct).dividedBy(100).toDecimalPlaces(2).toNumber()
           : (dto.descuentoGeneralMonto ?? 0);
         const extras = prorratearDescuentoCarrito(
-          subtotalPreGeneral,
-          lineasCalculadas.map((l) => l.cantidad * l.precioUnitario - l.descuento),
+          subtotalPreGeneralD.toNumber(),
+          lineasCalculadas.map((l) => totalLineaDecimal(l).toNumber()),
           descuentoGeneralTotal,
         );
         lineasCalculadas.forEach((l, i) => {
-          l.descuento += extras[i];
-          const totalLinea = l.cantidad * l.precioUnitario - l.descuento;
-          l.montoItbis = totalLinea * (l.porcentajeItbis / 100);
-          l.montoTotal = totalLinea + l.montoItbis;
+          const descuentoD = new Prisma.Decimal(l.descuento).plus(extras[i]).toDecimalPlaces(2);
+          const totalLineaD = new Prisma.Decimal(l.cantidad).times(l.precioUnitario).minus(descuentoD).toDecimalPlaces(2);
+          const montoItbisD = totalLineaD.times(l.porcentajeItbis).dividedBy(100).toDecimalPlaces(2);
+          l.descuento = descuentoD.toNumber();
+          l.montoItbis = montoItbisD.toNumber();
+          l.montoTotal = totalLineaD.plus(montoItbisD).toNumber();
         });
       }
     }
 
-    const subtotalLineas = lineasCalculadas.reduce((acc, l) => acc + (l.cantidad * l.precioUnitario - l.descuento), 0);
-    const itbisLineas = lineasCalculadas.reduce((acc, l) => acc + l.montoItbis, 0);
-    const descuentoTotal = lineasCalculadas.reduce((acc, l) => acc + l.descuento, 0);
+    const subtotalLineasD = lineasCalculadas.reduce((acc, l) => acc.plus(totalLineaDecimal(l)), new Prisma.Decimal(0));
+    const itbisLineasD = lineasCalculadas.reduce((acc, l) => acc.plus(l.montoItbis), new Prisma.Decimal(0));
+    const descuentoTotalD = lineasCalculadas.reduce((acc, l) => acc.plus(l.descuento), new Prisma.Decimal(0));
     // Se almacenan en negativo para que sumar directamente todas las
     // facturas de un rango (reportes, dashboard) dé el neto correcto sin
     // tener que conocer el tipoFactura en cada consulta.
     const signo = dto.tipoFactura === 'NOTA_CREDITO' ? -1 : 1;
-    const subtotal = subtotalLineas * signo;
-    const itbis = itbisLineas * signo;
-    const total = (subtotalLineas + itbisLineas) * signo;
+    const subtotal = subtotalLineasD.times(signo).toNumber();
+    const itbis = itbisLineasD.times(signo).toNumber();
+    const total = subtotalLineasD.plus(itbisLineasD).times(signo).toNumber();
 
     // Red de seguridad — mismo criterio que AsientosContablesService.validarBalance:
     // la suma de los montoTotal de línea (siempre en positivo, ver
@@ -306,7 +341,7 @@ export class FacturacionService {
       );
     }
 
-    return { lineasCalculadas, subtotal, itbis, total, descuentoTotal };
+    return { lineasCalculadas, subtotal, itbis, total, descuentoTotal: descuentoTotalD.toNumber() };
   }
 
   /**
