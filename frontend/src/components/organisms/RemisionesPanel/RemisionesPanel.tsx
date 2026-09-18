@@ -22,10 +22,10 @@ import { useDebouncedValue } from '../../../hooks/useDebouncedValue';
 import { useAuth } from '../../../hooks/useAuth';
 import { PaginaResultado } from '../../../types/pagina-resultado';
 
-interface Cliente {
-  id: string;
-  nombre: string;
-}
+// Solo id/nombre — es lo único que este panel lee de Cliente (combobox de
+// búsqueda + preselección al editar). `ClienteBasico` sigue siendo la
+// fuente real; acotarlo acá con Pick evita forzar campos que nunca se usan.
+type Cliente = Pick<ClienteBasico, 'id' | 'nombre'>;
 
 interface Producto {
   id: string;

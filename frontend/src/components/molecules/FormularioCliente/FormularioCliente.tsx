@@ -7,6 +7,7 @@ import { FormField } from '../FormField/FormField';
 import { SelectField } from '../FormField/SelectField';
 import { SelectListaPrecio } from '../SelectListaPrecio/SelectListaPrecio';
 import { SelectCategoriaCliente } from '../SelectCategoriaCliente/SelectCategoriaCliente';
+import type { ClienteCompleto } from '@backend-src/common/prisma/cliente-select-basico';
 
 export type TipoCliente = 'PERSONA_FISICA' | 'PERSONA_JURIDICA';
 // Ítem "separar Comprobante Fiscal de Opción de Pago" — antes un solo
@@ -15,22 +16,7 @@ export type TipoCliente = 'PERSONA_FISICA' | 'PERSONA_JURIDICA';
 export type TipoComprobanteFiscal = 'CONSUMO' | 'CREDITO_FISCAL' | 'REGIMEN_ESPECIAL' | 'GUBERNAMENTAL';
 export type CondicionPago = 'CONTADO' | 'CREDITO';
 
-export interface Cliente {
-  id: string;
-  nombre: string;
-  tipo: TipoCliente;
-  rncCedula: string | null;
-  email: string | null;
-  telefono: string | null;
-  limiteCredito: string | null;
-  listaPrecioId: string | null;
-  listaPrecio: { id: string; nombre: string } | null;
-  categoriaId: string | null;
-  comprobanteFiscalPorDefecto: TipoComprobanteFiscal | null;
-  condicionPagoPorDefecto: CondicionPago | null;
-  plazoPagoDias: number;
-  puntosLealtad: number;
-}
+export type Cliente = ClienteCompleto;
 
 export interface ClienteFormValues {
   nombre: string;

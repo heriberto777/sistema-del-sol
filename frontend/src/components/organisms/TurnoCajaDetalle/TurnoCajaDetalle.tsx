@@ -21,6 +21,7 @@ import { useAtajosTeclado } from '../../../hooks/useAtajosTeclado';
 import { useListasPrecio } from '../../../hooks/useListasPrecio';
 import { useDebouncedValue } from '../../../hooks/useDebouncedValue';
 import { PaginaResultado } from '../../../types/pagina-resultado';
+import type { ClienteCompleto } from '@backend-src/common/prisma/cliente-select-basico';
 import {
   abrirCajaAgenteLocal,
   abrirCajaWebSerial,
@@ -42,17 +43,8 @@ const TONO_ESTADO_TURNO: Record<EstadoTurno, 'exito' | 'advertencia' | 'neutro'>
 };
 
 type TipoComprobanteFiscal = 'CONSUMO' | 'CREDITO_FISCAL' | 'REGIMEN_ESPECIAL' | 'GUBERNAMENTAL';
-type CondicionPago = 'CONTADO' | 'CREDITO';
 
-interface Cliente {
-  id: string;
-  nombre: string;
-  listaPrecio: { id: string; nombre: string } | null;
-  comprobanteFiscalPorDefecto?: TipoComprobanteFiscal | null;
-  condicionPagoPorDefecto?: CondicionPago | null;
-  plazoPagoDias?: number;
-  puntosLealtad?: number;
-}
+type Cliente = ClienteCompleto;
 
 interface Vendedor {
   id: string;

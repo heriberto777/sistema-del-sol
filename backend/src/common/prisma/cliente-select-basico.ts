@@ -25,3 +25,36 @@ export const CLIENTE_SELECT_BASICO = {
 } satisfies Prisma.ClienteSelect;
 
 export type ClienteBasico = SerializadoHttp<Prisma.ClienteGetPayload<{ select: typeof CLIENTE_SELECT_BASICO }>>;
+
+/**
+ * `select` completo de `Cliente` — TODOS los campos escalares excepto
+ * `passwordHash` — para `ClientesRepository.listar/buscarPorId/crear/
+ * actualizar` (hallazgo Alto: esos métodos hacían `findMany`/`update`
+ * sin ningún `select`, exponiendo `passwordHash` en el endpoint
+ * `/clientes` — el más consultado de todo el sistema, no solo un join
+ * puntual). Ningún otro campo de `Cliente` es sensible, así que acá sí
+ * tiene sentido "todo menos uno" en vez de una lista mínima como
+ * `CLIENTE_SELECT_BASICO`.
+ */
+export const CLIENTE_SELECT_COMPLETO = {
+  id: true,
+  nombre: true,
+  tipo: true,
+  rncCedula: true,
+  email: true,
+  telefono: true,
+  limiteCredito: true,
+  activo: true,
+  esConsumidorFinal: true,
+  listaPrecioId: true,
+  categoriaId: true,
+  comprobanteFiscalPorDefecto: true,
+  condicionPagoPorDefecto: true,
+  plazoPagoDias: true,
+  createdAt: true,
+  puntosLealtad: true,
+  listaPrecio: { select: { id: true, nombre: true } },
+  categoria: { select: { id: true, nombre: true } },
+} satisfies Prisma.ClienteSelect;
+
+export type ClienteCompleto = SerializadoHttp<Prisma.ClienteGetPayload<{ select: typeof CLIENTE_SELECT_COMPLETO }>>;

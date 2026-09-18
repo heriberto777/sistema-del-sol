@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { TenantPrismaService } from '../prisma/tenant-prisma.service';
 import { CrearClienteDto } from './dto/crear-cliente.dto';
+import { CLIENTE_SELECT_COMPLETO } from '../common/prisma/cliente-select-basico';
 
 @Injectable()
 export class ClientesRepository {
@@ -11,7 +12,7 @@ export class ClientesRepository {
   }
 
   crear(dto: CrearClienteDto, tenantId: string) {
-    return this.db.cliente.create({ data: { ...dto, tenantId } });
+    return this.db.cliente.create({ data: { ...dto, tenantId }, select: CLIENTE_SELECT_COMPLETO });
   }
 
   listar(params: { skip: number; take: number; busqueda?: string }) {
@@ -33,10 +34,7 @@ export class ClientesRepository {
         orderBy: { nombre: 'asc' },
         skip: params.skip,
         take: params.take,
-        include: {
-          listaPrecio: { select: { id: true, nombre: true } },
-          categoria: { select: { id: true, nombre: true } },
-        },
+        select: CLIENTE_SELECT_COMPLETO,
       }),
       this.db.cliente.count({ where }),
     ]);
@@ -45,11 +43,7 @@ export class ClientesRepository {
   buscarPorId(id: string) {
     return this.db.cliente.findUniqueOrThrow({
       where: { id },
-      include: {
-        direcciones: true,
-        listaPrecio: { select: { id: true, nombre: true } },
-        categoria: { select: { id: true, nombre: true } },
-      },
+      select: { ...CLIENTE_SELECT_COMPLETO, direcciones: true },
     });
   }
 
@@ -57,12 +51,12 @@ export class ClientesRepository {
   buscarConsumidorFinal() {
     return this.db.cliente.findFirst({
       where: { esConsumidorFinal: true },
-      include: { listaPrecio: { select: { id: true, nombre: true } } },
+      select: CLIENTE_SELECT_COMPLETO,
     });
   }
 
   actualizar(id: string, dto: Partial<CrearClienteDto>) {
-    return this.db.cliente.update({ where: { id }, data: dto });
+    return this.db.cliente.update({ where: { id }, data: dto, select: CLIENTE_SELECT_COMPLETO });
   }
 
   /**

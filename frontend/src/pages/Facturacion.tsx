@@ -19,15 +19,9 @@ import { TablaLineasEditable, LineaEditable } from '../components/molecules/Tabl
 import { SelectorBodega } from '../components/molecules/SelectorBodega/SelectorBodega';
 import { SelectFormaPago } from '../components/molecules/SelectFormaPago/SelectFormaPago';
 import { PaginaResultado } from '../types/pagina-resultado';
+import type { ClienteCompleto } from '@backend-src/common/prisma/cliente-select-basico';
 
-interface Cliente {
-  id: string;
-  nombre: string;
-  listaPrecio: { id: string; nombre: string } | null;
-  comprobanteFiscalPorDefecto: 'CONSUMO' | 'CREDITO_FISCAL' | 'REGIMEN_ESPECIAL' | 'GUBERNAMENTAL' | null;
-  condicionPagoPorDefecto: 'CONTADO' | 'CREDITO' | null;
-  plazoPagoDias: number;
-}
+type Cliente = ClienteCompleto;
 
 interface Producto {
   id: string;

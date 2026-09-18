@@ -25,10 +25,10 @@ import { mensajeErrorApi } from '../../../lib/mensaje-error-api';
 import type { ClienteBasico } from '@backend-src/common/prisma/cliente-select-basico';
 import type { BodegaBasica } from '@backend-src/common/prisma/bodega-select-basico';
 
-interface Cliente {
-  id: string;
-  nombre: string;
-}
+// Solo id/nombre — es lo único que este panel lee de Cliente (combobox de
+// búsqueda + preselección al editar). `ClienteBasico` sigue siendo la
+// fuente real; acotarlo acá con Pick evita forzar campos que nunca se usan.
+type Cliente = Pick<ClienteBasico, 'id' | 'nombre'>;
 
 interface Producto {
   id: string;
