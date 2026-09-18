@@ -2265,6 +2265,19 @@ enum FormatoImpresion {
   TERMICA_58MM
 }
 
+/// Diseño visual del PDF de Facturación/Cotizaciones/Remisiones — independiente
+/// de FormatoImpresion (que solo controla el tamaño de papel). CLASICO es el
+/// único que existía antes de esto (forward-only: ningún tenant existente
+/// cambia de aspecto solo por este agregado). No aplica a TERMICA_80MM/58MM
+/// — ahí sigue un único layout angosto, sin variantes (ver documento-ticket.ts).
+enum PlantillaDocumento {
+  CLASICO
+  ECF_OFICIAL
+  MINIMALISTA
+  COMPACTO
+  EDITORIAL
+}
+
 /// Cómo se abre la gaveta de dinero física al cobrar en POS (ítem F-9,
 /// ver ARCHITECTURE.md) — AGENTE_LOCAL habla con una impresora térmica
 /// USB o un puerto serial/COM directo (mismo comando ESC/POS de kick en
@@ -2837,6 +2850,11 @@ model Bodega {
   // null = hereda el default de Configuracion[FORMATO_IMPRESION_DEFAULT]
   // del tenant (ver resolver-formato-impresion.ts).
   formatoImpresion   FormatoImpresion?
+  // null = hereda el default de Configuracion[PLANTILLA_DOCUMENTO_DEFAULT]
+  // del tenant (ver resolver-plantilla-documento.ts) — mismo criterio que
+  // formatoImpresion, campo aparte porque son dos ejes independientes
+  // (tamaño de papel vs. diseño visual).
+  plantillaDocumento PlantillaDocumento?
   // null = hereda el default de Configuracion[CAJA_METODO_APERTURA_DEFAULT]
   // del tenant (ver resolver-metodo-apertura-caja.ts).
   metodoAperturaCaja MetodoAperturaCaja?

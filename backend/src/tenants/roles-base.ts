@@ -171,6 +171,12 @@ export const CONFIGURACIONES_BASE: Record<string, string> = {
   // Remisiones/POS (ver resolver-formato-impresion.ts) — un valor del
   // enum FormatoImpresion. Una Bodega puede anularlo puntualmente.
   FORMATO_IMPRESION_DEFAULT: 'CARTA',
+  // Diseño visual del PDF por defecto para Facturación/Cotizaciones/
+  // Remisiones (ver resolver-plantilla-documento.ts) — un valor del enum
+  // PlantillaDocumento. Eje independiente de FORMATO_IMPRESION_DEFAULT
+  // (ese es tamaño de papel, este es diseño). Una Bodega puede anularlo
+  // puntualmente. No aplica a los formatos TERMICA_80MM/58MM.
+  PLANTILLA_DOCUMENTO_DEFAULT: 'CLASICO',
   // Cómo se abre la gaveta de dinero al cobrar en POS por defecto (ítem
   // F-9, ver resolver-metodo-apertura-caja.ts) — un valor del enum
   // MetodoAperturaCaja. Una Bodega puede anularlo puntualmente.
