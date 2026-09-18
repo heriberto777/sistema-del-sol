@@ -12,8 +12,7 @@ import { ModalRegistrarPagoOrdenCompra } from '../components/molecules/ModalRegi
 import { RequierePermiso } from '../components/organisms/RequierePermiso/RequierePermiso';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { PaginaResultado } from '../types/pagina-resultado';
-
-type Bucket = 'CORRIENTE' | 'D1_30' | 'D31_60' | 'D61_90' | 'D90_MAS';
+import { Bucket, ETIQUETA_BUCKET, TONO_BUCKET, fmtRD } from '../lib/cuentas-aging';
 
 interface FilaCxP {
   id: string;
@@ -34,24 +33,6 @@ interface Resumen {
   totalPorVencer: number;
   buckets: Record<Bucket, number>;
 }
-
-const ETIQUETA_BUCKET: Record<Bucket, string> = {
-  CORRIENTE: 'Corriente',
-  D1_30: '1-30 días',
-  D31_60: '31-60 días',
-  D61_90: '61-90 días',
-  D90_MAS: '+90 días',
-};
-
-const TONO_BUCKET: Record<Bucket, 'exito' | 'advertencia' | 'peligro'> = {
-  CORRIENTE: 'exito',
-  D1_30: 'advertencia',
-  D31_60: 'advertencia',
-  D61_90: 'peligro',
-  D90_MAS: 'peligro',
-};
-
-const fmtRD = (v: number) => `RD$ ${v.toLocaleString('es-DO', { minimumFractionDigits: 2 })}`;
 
 /**
  * Ítem Cuentas por Pagar — órdenes de compra pendientes de pago (BORRADOR

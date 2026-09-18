@@ -9,7 +9,11 @@ import { ThemeToggle } from '../components/molecules/ThemeToggle/ThemeToggle';
 
 type EstadoFactura = 'PENDIENTE' | 'PAGADA' | 'VENCIDA' | 'ANULADA';
 
-interface FacturaPublica {
+// No confundir con la `FacturaPublica` de CobroFactura.tsx — ahí es la
+// factura de un TENANT a su cliente; acá es la factura de LA PLATAFORMA
+// al tenant (auditoría de estructura: mismo nombre, dos entidades
+// distintas, hallazgo de colisión).
+interface FacturaPlataformaPublica {
   tenant: { nombre: string };
   concepto: string;
   total: string;
@@ -31,7 +35,7 @@ export function PagarFactura() {
 
   const { data: factura, isLoading, isError } = useQuery({
     queryKey: ['factura-publica', facturaId],
-    queryFn: async () => (await pagosPublicosApiClient.get<FacturaPublica>(`/pagos-publicos/facturas/${facturaId}`)).data,
+    queryFn: async () => (await pagosPublicosApiClient.get<FacturaPlataformaPublica>(`/pagos-publicos/facturas/${facturaId}`)).data,
   });
 
   const pagar = useMutation({

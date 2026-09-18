@@ -25,6 +25,9 @@ interface EntregaFacturaPublica {
   direccion: string;
 }
 
+// No confundir con `FacturaPlataformaPublica` de PagarFactura.tsx — ahí
+// es la factura de LA PLATAFORMA al tenant; acá es la factura de un
+// TENANT a su propio cliente (la que se paga desde este link público).
 interface FacturaPublica {
   tenantNombre: string;
   numero: string;

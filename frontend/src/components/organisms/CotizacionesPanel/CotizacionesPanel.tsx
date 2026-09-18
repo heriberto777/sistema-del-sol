@@ -23,6 +23,7 @@ import { useAuth } from '../../../hooks/useAuth';
 import { PaginaResultado } from '../../../types/pagina-resultado';
 import { mensajeErrorApi } from '../../../lib/mensaje-error-api';
 import type { ClienteBasico } from '@backend-src/common/prisma/cliente-select-basico';
+import type { BodegaBasica } from '@backend-src/common/prisma/bodega-select-basico';
 
 interface Cliente {
   id: string;
@@ -35,10 +36,7 @@ interface Producto {
   codigo: string;
 }
 
-interface Bodega {
-  id: string;
-  nombre: string;
-}
+type Bodega = BodegaBasica;
 
 type EstadoCotizacion = 'BORRADOR' | 'ENVIADA' | 'ACEPTADA' | 'RECHAZADA' | 'VENCIDA';
 

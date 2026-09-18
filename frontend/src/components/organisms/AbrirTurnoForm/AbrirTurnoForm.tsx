@@ -5,12 +5,9 @@ import { Button } from '../../atoms/Button/Button';
 import { FormField } from '../../molecules/FormField/FormField';
 import { useSucursalActiva } from '../../../hooks/useSucursalActiva';
 import { mensajeErrorApi } from '../../../lib/mensaje-error-api';
+import type { BodegaBasica } from '@backend-src/common/prisma/bodega-select-basico';
 
-interface Bodega {
-  id: string;
-  nombre: string;
-  sucursalId: string;
-}
+type Bodega = BodegaBasica;
 
 interface Caja {
   id: string;

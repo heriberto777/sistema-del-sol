@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../../lib/api-client';
 import { mensajeErrorApi } from '../../../lib/mensaje-error-api';
 import type { ClienteBasico } from '@backend-src/common/prisma/cliente-select-basico';
+import type { BodegaBasica } from '@backend-src/common/prisma/bodega-select-basico';
 import { ModalImprimir } from '../../molecules/ModalImprimir/ModalImprimir';
 import { Modal } from '../../molecules/Modal/Modal';
 import { RowActionsMenu } from '../../molecules/RowActionsMenu/RowActionsMenu';
@@ -32,10 +33,7 @@ interface Producto {
   codigo: string;
 }
 
-interface Bodega {
-  id: string;
-  nombre: string;
-}
+type Bodega = BodegaBasica;
 
 type EstadoRemision = 'BORRADOR' | 'ENTREGADA' | 'FACTURADA' | 'ANULADA';
 

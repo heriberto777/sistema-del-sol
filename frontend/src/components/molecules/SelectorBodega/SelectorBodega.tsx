@@ -3,12 +3,9 @@ import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '../../../lib/api-client';
 import { Select } from '../../atoms/Select/Select';
 import { useSucursalActiva } from '../../../hooks/useSucursalActiva';
+import type { BodegaBasica } from '@backend-src/common/prisma/bodega-select-basico';
 
-interface Bodega {
-  id: string;
-  nombre: string;
-  sucursalId: string;
-}
+type Bodega = BodegaBasica;
 
 interface SelectorBodegaProps {
   id?: string;

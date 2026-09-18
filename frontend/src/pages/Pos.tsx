@@ -10,12 +10,9 @@ import { RequierePermiso } from '../components/organisms/RequierePermiso/Requier
 import { useAuth } from '../hooks/useAuth';
 import { esCajeroPuro } from '../contexts/AuthContext';
 import { PaginaResultado } from '../types/pagina-resultado';
+import type { BodegaBasica } from '@backend-src/common/prisma/bodega-select-basico';
 
-interface Bodega {
-  id: string;
-  nombre: string;
-  sucursalId: string;
-}
+type Bodega = BodegaBasica;
 
 interface TurnoCajaResumen {
   id: string;

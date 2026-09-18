@@ -23,21 +23,12 @@ import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { useVariantesProducto } from '../hooks/useVariantesProducto';
 import { SelectorLineaProducto } from '../components/molecules/SelectorLineaProducto/SelectorLineaProducto';
 import { PaginaResultado } from '../types/pagina-resultado';
-import { FORMATOS_IMPRESION, FormatoImpresion } from '../constants/formato-impresion';
-import { PLANTILLAS_DOCUMENTO, PlantillaDocumento } from '../constants/plantilla-documento';
-import { METODOS_APERTURA_CAJA, MetodoAperturaCaja } from '../constants/metodo-apertura-caja';
+import { FORMATOS_IMPRESION } from '../constants/formato-impresion';
+import { PLANTILLAS_DOCUMENTO } from '../constants/plantilla-documento';
+import { METODOS_APERTURA_CAJA } from '../constants/metodo-apertura-caja';
+import type { BodegaConSucursal } from '@backend-src/common/prisma/bodega-select-basico';
 
-interface Bodega {
-  id: string;
-  nombre: string;
-  direccion: string | null;
-  formatoImpresion: FormatoImpresion | null;
-  plantillaDocumento: PlantillaDocumento | null;
-  metodoAperturaCaja: MetodoAperturaCaja | null;
-  sucursalId: string;
-  activa: boolean;
-  sucursal?: { nombre: string };
-}
+type Bodega = BodegaConSucursal;
 
 interface Producto {
   id: string;

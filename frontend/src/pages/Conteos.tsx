@@ -15,11 +15,9 @@ import { RequierePermiso } from '../components/organisms/RequierePermiso/Requier
 import { useAuth } from '../hooks/useAuth';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { PaginaResultado } from '../types/pagina-resultado';
+import type { BodegaBasica } from '@backend-src/common/prisma/bodega-select-basico';
 
-interface Bodega {
-  id: string;
-  nombre: string;
-}
+type Bodega = BodegaBasica;
 
 interface ConteoResumen {
   id: string;

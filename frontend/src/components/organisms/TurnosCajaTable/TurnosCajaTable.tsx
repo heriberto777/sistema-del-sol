@@ -13,12 +13,9 @@ import { SearchInput } from '../../molecules/SearchInput/SearchInput';
 import { useAuth } from '../../../hooks/useAuth';
 import { useDebouncedValue } from '../../../hooks/useDebouncedValue';
 import { PaginaResultado } from '../../../types/pagina-resultado';
+import type { BodegaBasica } from '@backend-src/common/prisma/bodega-select-basico';
 
-interface Bodega {
-  id: string;
-  nombre: string;
-  sucursalId: string;
-}
+type Bodega = BodegaBasica;
 
 type EstadoTurno = 'ABIERTO' | 'PENDIENTE_REVISION' | 'CERRADO';
 
