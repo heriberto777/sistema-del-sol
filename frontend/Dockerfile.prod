@@ -18,7 +18,17 @@ COPY package.json ./
 RUN pnpm install
 
 COPY . .
-RUN pnpm build
+# `vite build` directo, no `pnpm build` (que es `tsc -b && vite build`):
+# el contexto de este build es SOLO ./frontend, sin acceso a ../backend —
+# `tsc -b` fallaría intentando resolver el alias de tipos `@backend-src/*`
+# (contrato de tipos compartido con el backend, ver frontend/tsconfig.json),
+# que apunta fuera de este contexto. Seguro de todos modos: el workflow de
+# CI (job "frontend") ya corre `pnpm --filter ./frontend build` completo
+# —con `tsc -b` y el repo entero disponible— antes de que deploy-prod.yml
+# pueda dispararse, así que el tipo-chequeo real ya ocurrió en ese paso;
+# acá solo hace falta el bundling. `vite build` no tipa-chequea per se,
+# solo transpila con esbuild.
+RUN pnpm exec vite build
 
 FROM nginx:1.27-alpine AS runtime
 
