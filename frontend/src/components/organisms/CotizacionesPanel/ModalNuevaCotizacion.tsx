@@ -2,7 +2,7 @@ import { FormEvent, useState } from 'react';
 import { User } from 'lucide-react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../../lib/api-client';
-import { Modal } from '../../molecules/Modal/Modal';
+import { ModalDocumento } from '../../molecules/ModalDocumento/ModalDocumento';
 import { Card } from '../../atoms/Card/Card';
 import { FormField } from '../../molecules/FormField/FormField';
 import { ComboboxBusqueda } from '../../molecules/ComboboxBusqueda/ComboboxBusqueda';
@@ -57,9 +57,36 @@ export function ModalNuevaCotizacion({ productos, onClose }: { productos: Produc
     crear.mutate();
   }
 
+  const cantidadLineas = lineas.filter((l) => l.productoId || (l.esManual && l.descripcionManual.trim())).length;
+
   return (
-    <Modal titulo="Nueva cotización" onClose={onClose} ancho="2xl">
-      <form onSubmit={onSubmit} className="space-y-4">
+    <ModalDocumento
+      titulo="Nueva cotización"
+      onClose={onClose}
+      resumen={
+        <>
+          <div className="flex flex-col gap-1">
+            <span className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Cliente</span>
+            <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">{cliente?.nombre ?? 'Sin seleccionar'}</span>
+          </div>
+          <div className="flex flex-col gap-1">
+            <span className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Líneas</span>
+            <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+              {cantidadLineas} {cantidadLineas === 1 ? 'artículo' : 'artículos'}
+            </span>
+          </div>
+        </>
+      }
+      acciones={
+        <>
+          {error && <p className="text-sm text-red-600">{error}</p>}
+          <Button type="submit" form="form-nueva-cotizacion" disabled={crear.isPending} className="w-full">
+            {crear.isPending ? 'Creando…' : 'Crear cotización'}
+          </Button>
+        </>
+      }
+    >
+      <form id="form-nueva-cotizacion" onSubmit={onSubmit} className="space-y-4">
         <Card titulo="Información de la cotización" contentClassName="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div className="sm:col-span-2">
             <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Cliente</label>
@@ -96,12 +123,7 @@ export function ModalNuevaCotizacion({ productos, onClose }: { productos: Produc
             precioSoloManual
           />
         </Card>
-
-        {error && <p className="text-sm text-red-600">{error}</p>}
-        <Button type="submit" disabled={crear.isPending} className="w-full">
-          {crear.isPending ? 'Creando…' : 'Crear cotización'}
-        </Button>
       </form>
-    </Modal>
+    </ModalDocumento>
   );
 }

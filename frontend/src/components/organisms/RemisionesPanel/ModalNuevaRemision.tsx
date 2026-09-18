@@ -3,7 +3,7 @@ import { Plus, User, X } from 'lucide-react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../../lib/api-client';
 import { mensajeErrorApi } from '../../../lib/mensaje-error-api';
-import { Modal } from '../../molecules/Modal/Modal';
+import { ModalDocumento } from '../../molecules/ModalDocumento/ModalDocumento';
 import { Card } from '../../atoms/Card/Card';
 import { Select } from '../../atoms/Select/Select';
 import { ComboboxBusqueda } from '../../molecules/ComboboxBusqueda/ComboboxBusqueda';
@@ -57,9 +57,41 @@ export function ModalNuevaRemision({
     crear.mutate();
   }
 
+  const cantidadLineas = lineas.filter((l) => l.productoId).length;
+  const bodegaSeleccionada = bodegas.find((b) => b.id === bodegaId);
+
   return (
-    <Modal titulo="Nueva remisión" onClose={onClose} ancho="2xl">
-      <form onSubmit={onSubmit} className="space-y-4">
+    <ModalDocumento
+      titulo="Nueva remisión"
+      onClose={onClose}
+      resumen={
+        <>
+          <div className="flex flex-col gap-1">
+            <span className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Cliente</span>
+            <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">{cliente?.nombre ?? 'Sin seleccionar'}</span>
+          </div>
+          <div className="flex flex-col gap-1">
+            <span className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Bodega</span>
+            <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">{bodegaSeleccionada?.nombre ?? 'Sin seleccionar'}</span>
+          </div>
+          <div className="flex flex-col gap-1">
+            <span className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Líneas</span>
+            <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+              {cantidadLineas} {cantidadLineas === 1 ? 'artículo' : 'artículos'}
+            </span>
+          </div>
+        </>
+      }
+      acciones={
+        <>
+          {error && <p className="text-sm text-red-600">{error}</p>}
+          <Button type="submit" form="form-nueva-remision" disabled={crear.isPending} className="w-full">
+            {crear.isPending ? 'Creando…' : 'Crear remisión'}
+          </Button>
+        </>
+      }
+    >
+      <form id="form-nueva-remision" onSubmit={onSubmit} className="space-y-4">
         <Card
           titulo="Información de la remisión"
           descripcion={'Se crea en borrador (sin tocar inventario) — el descuento real ocurre al marcar "Entregada".'}
@@ -150,12 +182,7 @@ export function ModalNuevaRemision({
             </button>
           </div>
         </Card>
-
-        {error && <p className="text-sm text-red-600">{error}</p>}
-        <Button type="submit" disabled={crear.isPending} className="w-full">
-          {crear.isPending ? 'Creando…' : 'Crear remisión'}
-        </Button>
       </form>
-    </Modal>
+    </ModalDocumento>
   );
 }

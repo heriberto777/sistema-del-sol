@@ -9,7 +9,7 @@ import { Card } from '../components/atoms/Card/Card';
 import { Select } from '../components/atoms/Select/Select';
 import { ComboboxBusqueda } from '../components/molecules/ComboboxBusqueda/ComboboxBusqueda';
 import { FormField } from '../components/molecules/FormField/FormField';
-import { Modal } from '../components/molecules/Modal/Modal';
+import { ModalDocumento } from '../components/molecules/ModalDocumento/ModalDocumento';
 import { FacturasTable } from '../components/organisms/FacturasTable/FacturasTable';
 import { EmitirNotaForm } from '../components/organisms/EmitirNotaForm/EmitirNotaForm';
 import { RequierePermiso } from '../components/organisms/RequierePermiso/RequierePermiso';
@@ -184,9 +184,39 @@ function ModalNuevaFactura({ onClose }: { onClose: () => void }) {
     crear.mutate();
   }
 
+  const cantidadLineas = lineas.filter((l) => l.productoId || (l.esManual && l.descripcionManual.trim())).length;
+
   return (
-    <Modal titulo="Nueva factura" onClose={onClose} ancho="2xl">
-      <form onSubmit={onSubmit} className="space-y-4">
+    <ModalDocumento
+      titulo="Nueva factura"
+      onClose={onClose}
+      resumen={
+        <>
+          <div className="flex flex-col gap-1">
+            <span className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Cliente</span>
+            <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">{cliente?.nombre ?? 'Sin seleccionar'}</span>
+          </div>
+          <div className="flex flex-col gap-1">
+            <span className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Líneas</span>
+            <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+              {cantidadLineas} {cantidadLineas === 1 ? 'artículo' : 'artículos'}
+            </span>
+          </div>
+          <p className="text-xs text-slate-400 dark:text-slate-500">
+            El subtotal, ITBIS y total exactos se calculan al guardar (dependen de precios de catálogo, ofertas vigentes y descuentos).
+          </p>
+        </>
+      }
+      acciones={
+        <>
+          {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+          <Button type="submit" form="form-nueva-factura" disabled={crear.isPending} className="w-full">
+            {crear.isPending ? 'Creando…' : 'Crear factura'}
+          </Button>
+        </>
+      }
+    >
+      <form id="form-nueva-factura" onSubmit={onSubmit} className="space-y-4">
         <Card titulo="Información de la factura" contentClassName="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div className="flex flex-col gap-1 sm:col-span-2">
             <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Cliente</label>
@@ -399,13 +429,8 @@ function ModalNuevaFactura({ onClose }: { onClose: () => void }) {
             </div>
           </div>
         </Card>
-
-        {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
-        <Button type="submit" disabled={crear.isPending} className="w-full">
-          {crear.isPending ? 'Creando…' : 'Crear factura'}
-        </Button>
       </form>
-    </Modal>
+    </ModalDocumento>
   );
 }
 

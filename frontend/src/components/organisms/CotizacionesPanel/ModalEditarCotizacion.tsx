@@ -3,6 +3,7 @@ import { User } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../../lib/api-client';
 import { Modal } from '../../molecules/Modal/Modal';
+import { ModalDocumento } from '../../molecules/ModalDocumento/ModalDocumento';
 import { FormField } from '../../molecules/FormField/FormField';
 import { ComboboxBusqueda } from '../../molecules/ComboboxBusqueda/ComboboxBusqueda';
 import { SelectorLineaProducto } from '../../molecules/SelectorLineaProducto/SelectorLineaProducto';
@@ -90,9 +91,36 @@ export function ModalEditarCotizacion({
     );
   }
 
+  const cantidadLineas = valores.lineas.filter((l) => l.productoId || (l.esManual && l.descripcionManual.trim())).length;
+
   return (
-    <Modal titulo={`Editar cotización ${numeroActual}`} onClose={onClose}>
-      <form onSubmit={onSubmit} className="space-y-3">
+    <ModalDocumento
+      titulo={`Editar cotización ${numeroActual}`}
+      onClose={onClose}
+      resumen={
+        <>
+          <div className="flex flex-col gap-1">
+            <span className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Cliente</span>
+            <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">{cliente?.nombre ?? 'Sin seleccionar'}</span>
+          </div>
+          <div className="flex flex-col gap-1">
+            <span className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Líneas</span>
+            <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+              {cantidadLineas} {cantidadLineas === 1 ? 'artículo' : 'artículos'}
+            </span>
+          </div>
+        </>
+      }
+      acciones={
+        <>
+          {error && <p className="text-sm text-red-600">{error}</p>}
+          <Button type="submit" form="form-editar-cotizacion" disabled={guardar.isPending} className="w-full">
+            {guardar.isPending ? 'Guardando…' : 'Guardar'}
+          </Button>
+        </>
+      }
+    >
+      <form id="form-editar-cotizacion" onSubmit={onSubmit} className="space-y-3">
         <p className="text-sm text-slate-500 dark:text-slate-400">
           Número <span className="font-medium text-slate-700 dark:text-slate-300">{numeroActual}</span> (asignado automáticamente, no editable)
         </p>
@@ -200,12 +228,7 @@ export function ModalEditarCotizacion({
             + Línea
           </Button>
         </div>
-
-        {error && <p className="text-sm text-red-600">{error}</p>}
-        <Button type="submit" disabled={guardar.isPending} className="w-full">
-          {guardar.isPending ? 'Guardando…' : 'Guardar'}
-        </Button>
       </form>
-    </Modal>
+    </ModalDocumento>
   );
 }
