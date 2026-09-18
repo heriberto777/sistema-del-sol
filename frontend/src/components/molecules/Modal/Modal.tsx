@@ -1,4 +1,4 @@
-import { ReactNode } from 'react';
+import { ReactNode, useEffect } from 'react';
 import { X } from 'lucide-react';
 
 interface ModalProps {
@@ -12,10 +12,12 @@ interface ModalProps {
 const ANCHOS = { lg: 'max-w-lg', xl: 'max-w-4xl', '2xl': 'max-w-5xl' } as const;
 
 /**
- * Overlay simple sin dependencias externas. Cierra al hacer click fuera del
- * panel o en la "×" — no atrapa el foco ni el scroll del body porque hoy
- * ningún formulario del proyecto lo necesita; si eso cambia, es el lugar
- * natural para agregarlo.
+ * Overlay simple sin dependencias externas. NO cierra al hacer click en el
+ * fondo — cerraba por error al arrastrar el mouse fuera de un textarea/select
+ * y soltar el click ahí, perdiendo lo que llevaba escrito un formulario largo
+ * (bug real reportado). Cierra con la "×" o con Escape; no atrapa el foco ni
+ * el scroll del body porque hoy ningún formulario del proyecto lo necesita —
+ * si eso cambia, es el lugar natural para agregarlo.
  *
  * El panel nunca puede ser más alto que la ventana (`max-h-[85vh]`) — con
  * un formulario largo, el contenido hace scroll DENTRO del modal
@@ -36,14 +38,18 @@ const ANCHOS = { lg: 'max-w-lg', xl: 'max-w-4xl', '2xl': 'max-w-5xl' } as const;
  * peor caso, recortado.
  */
 export function Modal({ titulo, onClose, children, ancho = 'lg' }: ModalProps) {
+  useEffect(() => {
+    const alPresionarTecla = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', alPresionarTecla);
+    return () => window.removeEventListener('keydown', alPresionarTecla);
+  }, [onClose]);
+
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-[1px]"
-      onClick={onClose}
-    >
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-[1px]">
       <div
         className={`flex max-h-[85vh] w-full ${ANCHOS[ancho]} flex-col rounded-xl border border-slate-200 bg-white shadow-xl dark:border-slate-800 dark:bg-slate-900`}
-        onClick={(e) => e.stopPropagation()}
       >
         <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-6 py-4 dark:border-slate-800">
           <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">{titulo}</h2>
