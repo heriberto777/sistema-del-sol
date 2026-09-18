@@ -835,33 +835,80 @@ function ModalNuevoTenant({ planes, onClose }: { planes: Plan[]; onClose: () => 
   const [adminNombre, setAdminNombre] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
+  // La suscripción nueva queda con `fechaProximoCorte: hoy` (ver
+  // TenantsRepository.crearConProvisioning) — recién factura sola en el
+  // próximo tick del cron (mañana 8am), sin período de gracia. Sin este
+  // paso, el admin de plataforma no veía NINGUNA factura hasta el día
+  // siguiente y asumía que algo estaba roto (reporte real del usuario).
+  const [tenantCreado, setTenantCreado] = useState<{ id: string; nombre: string } | null>(null);
+  const [facturaGenerada, setFacturaGenerada] = useState(false);
 
   const crearTenant = useMutation({
     mutationFn: async () =>
-      platformApiClient.post('/platform/tenants', {
-        nombre,
-        subdominio,
-        rnc: rnc || undefined,
-        direccion: direccion || undefined,
-        telefono: telefono || undefined,
-        email: email || undefined,
-        logo: logo || undefined,
-        planId,
-        adminEmail,
-        adminNombre,
-        adminPassword,
-      }),
-    onSuccess: () => {
+      (
+        await platformApiClient.post<{ id: string; nombre: string }>('/platform/tenants', {
+          nombre,
+          subdominio,
+          rnc: rnc || undefined,
+          direccion: direccion || undefined,
+          telefono: telefono || undefined,
+          email: email || undefined,
+          logo: logo || undefined,
+          planId,
+          adminEmail,
+          adminNombre,
+          adminPassword,
+        })
+      ).data,
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['platform-tenants'] });
-      onClose();
+      setTenantCreado(data);
     },
     onError: (err) => setError(mensajeErrorApi(err, 'No se pudo crear el tenant. Revisa que el subdominio no esté repetido y que el plan sea válido.')),
+  });
+
+  const generarPrimeraFactura = useMutation({
+    mutationFn: async () => platformApiClient.post(`/platform/tenants/${tenantCreado?.id}/suscripcion/generar-factura`),
+    onSuccess: () => {
+      setError(null);
+      setFacturaGenerada(true);
+      queryClient.invalidateQueries({ queryKey: ['platform-facturas'] });
+    },
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo generar la factura.')),
   });
 
   function onSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
     crearTenant.mutate();
+  }
+
+  if (tenantCreado) {
+    return (
+      <Modal titulo="Tenant creado" onClose={onClose}>
+        <div className="space-y-4">
+          <p className="text-sm text-slate-600 dark:text-slate-400">
+            <span className="font-medium text-slate-900 dark:text-slate-100">{tenantCreado.nombre}</span> se creó correctamente. La suscripción todavía no
+            generó ninguna factura — eso pasa recién en el próximo corte automático. ¿Generamos la primera factura ahora?
+          </p>
+          {facturaGenerada ? (
+            <p className="text-sm font-medium text-emerald-600 dark:text-emerald-400">Factura generada ✓</p>
+          ) : (
+            error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+          )}
+          <div className="flex justify-end gap-2">
+            <Button type="button" variante="secundario" onClick={onClose}>
+              {facturaGenerada ? 'Cerrar' : 'Ahora no'}
+            </Button>
+            {!facturaGenerada && (
+              <Button type="button" onClick={() => generarPrimeraFactura.mutate()} disabled={generarPrimeraFactura.isPending}>
+                {generarPrimeraFactura.isPending ? 'Generando…' : 'Generar la primera factura'}
+              </Button>
+            )}
+          </div>
+        </div>
+      </Modal>
+    );
   }
 
   return (
