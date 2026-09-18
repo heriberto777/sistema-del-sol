@@ -55,9 +55,16 @@ export function ModalDocumento({ titulo, onClose, children, resumen, acciones }:
         </div>
         <div className="flex min-h-0 flex-1 flex-col overflow-y-auto lg:flex-row lg:overflow-y-hidden">
           <div className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-6">{children}</div>
-          <div className="flex shrink-0 flex-col justify-between gap-4 border-t border-slate-100 bg-slate-50 p-5 dark:border-slate-800 dark:bg-slate-950/40 lg:w-64 lg:border-l lg:border-t-0 lg:overflow-y-auto">
-            <div className="flex flex-col gap-4">{resumen}</div>
-            <div className="flex flex-col gap-2">{acciones}</div>
+          {/* Panel lateral: `resumen` y `acciones` scrollean por separado — si
+              `resumen` crece (ej. varios recargos cargados), el botón de
+              abajo sigue fijo, nunca se va con el scroll. */}
+          <div className="flex shrink-0 flex-col border-t border-slate-100 bg-slate-50 dark:border-slate-800 dark:bg-slate-950/40 lg:w-72 lg:border-l lg:border-t-0">
+            <div className="flex-1 overflow-y-auto p-5">
+              <div className="flex flex-col gap-4">{resumen}</div>
+            </div>
+            <div className="shrink-0 border-t border-slate-200 p-5 dark:border-slate-800">
+              <div className="flex flex-col gap-2">{acciones}</div>
+            </div>
           </div>
         </div>
       </div>

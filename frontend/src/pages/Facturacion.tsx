@@ -202,6 +202,85 @@ function ModalNuevaFactura({ onClose }: { onClose: () => void }) {
               {cantidadLineas} {cantidadLineas === 1 ? 'artículo' : 'artículos'}
             </span>
           </div>
+
+          <div className="flex flex-col gap-1.5 border-t border-slate-200 pt-3 dark:border-slate-800">
+            <span className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Descuento general</span>
+            <Select
+              value={descuentoGeneralTipo}
+              onChange={(e) => setDescuentoGeneralTipo(e.target.value as '' | 'PCT' | 'MONTO')}
+              className="text-sm"
+            >
+              <option value="">Sin descuento</option>
+              <option value="PCT">% sobre el subtotal</option>
+              <option value="MONTO">Monto fijo (RD$)</option>
+            </Select>
+            {descuentoGeneralTipo && (
+              <input
+                type="number"
+                min={0}
+                step="0.01"
+                placeholder={descuentoGeneralTipo === 'PCT' ? '% ej. 10' : 'RD$'}
+                value={descuentoGeneralValor}
+                onChange={(e) => setDescuentoGeneralValor(e.target.value)}
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+              />
+            )}
+          </div>
+
+          <div className="flex flex-col gap-1.5 border-t border-slate-200 pt-3 dark:border-slate-800">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Recargos</span>
+              <button
+                type="button"
+                onClick={() => setRecargos((prev) => [...prev, { concepto: '', monto: '', gravado: false }])}
+                className="text-xs font-medium text-sol-600 hover:text-sol-700 dark:text-sol-400"
+              >
+                + Agregar
+              </button>
+            </div>
+            {recargos.length === 0 && <p className="text-xs text-slate-400 dark:text-slate-500">Ninguno</p>}
+            {recargos.map((recargo, i) => (
+              <div key={i} className="flex flex-col gap-1.5 rounded-lg border border-slate-200 p-2 dark:border-slate-700">
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="text"
+                    placeholder="Concepto"
+                    value={recargo.concepto}
+                    onChange={(e) => setRecargos((prev) => prev.map((r, idx) => (idx === i ? { ...r, concepto: e.target.value } : r)))}
+                    className="flex-1 rounded-md border border-slate-300 px-2 py-1 text-xs dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setRecargos((prev) => prev.filter((_, idx) => idx !== i))}
+                    className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+                    aria-label="Quitar recargo"
+                  >
+                    ×
+                  </button>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    placeholder="RD$"
+                    value={recargo.monto}
+                    onChange={(e) => setRecargos((prev) => prev.map((r, idx) => (idx === i ? { ...r, monto: e.target.value } : r)))}
+                    className="w-20 rounded-md border border-slate-300 px-2 py-1 text-xs dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                  />
+                  <label className="flex items-center gap-1 text-xs text-slate-600 dark:text-slate-400">
+                    <input
+                      type="checkbox"
+                      checked={recargo.gravado}
+                      onChange={(e) => setRecargos((prev) => prev.map((r, idx) => (idx === i ? { ...r, gravado: e.target.checked } : r)))}
+                    />
+                    Gravado
+                  </label>
+                </div>
+              </div>
+            ))}
+          </div>
+
           <p className="text-xs text-slate-400 dark:text-slate-500">
             El subtotal, ITBIS y total exactos se calculan al guardar (dependen de precios de catálogo, ofertas vigentes y descuentos).
           </p>
@@ -345,89 +424,6 @@ function ModalNuevaFactura({ onClose }: { onClose: () => void }) {
             onAgregar={(vacia) => setLineas((prev) => [...prev, vacia])}
             mostrarItbis
           />
-        </Card>
-
-        <Card titulo="Descuento general y recargos">
-          <div className="space-y-4">
-            <div className="flex flex-col gap-1">
-              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                Descuento general de la factura (opcional, plan de integración Cuadre, ítem B-8)
-              </label>
-              <div className="flex gap-2">
-                <Select value={descuentoGeneralTipo} onChange={(e) => setDescuentoGeneralTipo(e.target.value as '' | 'PCT' | 'MONTO')}>
-                  <option value="">Sin descuento general</option>
-                  <option value="PCT">% sobre el subtotal</option>
-                  <option value="MONTO">Monto fijo (RD$)</option>
-                </Select>
-                {descuentoGeneralTipo && (
-                  <input
-                    type="number"
-                    min={0}
-                    step="0.01"
-                    placeholder={descuentoGeneralTipo === 'PCT' ? '% ej. 10' : 'RD$'}
-                    value={descuentoGeneralValor}
-                    onChange={(e) => setDescuentoGeneralValor(e.target.value)}
-                    className="w-32 rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-                  />
-                )}
-              </div>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                Se reparte proporcionalmente entre todas las líneas (recalcula el ITBIS), además de cualquier descuento por línea u oferta automática.
-              </p>
-            </div>
-
-            <div className="flex flex-col gap-1 border-t border-slate-100 pt-4 dark:border-slate-800">
-              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                Recargos (opcional, plan de integración Cuadre, ítem B-4)
-              </label>
-              {recargos.map((recargo, i) => (
-                <div key={i} className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    placeholder="Concepto — ej. Imprevistos"
-                    value={recargo.concepto}
-                    onChange={(e) => setRecargos((prev) => prev.map((r, idx) => (idx === i ? { ...r, concepto: e.target.value } : r)))}
-                    className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-                  />
-                  <input
-                    type="number"
-                    min={0}
-                    step="0.01"
-                    placeholder="RD$"
-                    value={recargo.monto}
-                    onChange={(e) => setRecargos((prev) => prev.map((r, idx) => (idx === i ? { ...r, monto: e.target.value } : r)))}
-                    className="w-28 rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-                  />
-                  <label className="flex items-center gap-1 text-xs text-slate-600 dark:text-slate-400">
-                    <input
-                      type="checkbox"
-                      checked={recargo.gravado}
-                      onChange={(e) => setRecargos((prev) => prev.map((r, idx) => (idx === i ? { ...r, gravado: e.target.checked } : r)))}
-                    />
-                    Gravado
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => setRecargos((prev) => prev.filter((_, idx) => idx !== i))}
-                    className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
-                    aria-label="Quitar recargo"
-                  >
-                    ×
-                  </button>
-                </div>
-              ))}
-              <button
-                type="button"
-                onClick={() => setRecargos((prev) => [...prev, { concepto: '', monto: '', gravado: false }])}
-                className="self-start text-sm font-medium text-sol-600 hover:text-sol-700 dark:text-sol-400"
-              >
-                + Agregar recargo
-              </button>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                Cargo aparte, después del subtotal y el descuento — "Gravado" le suma ITBIS a la tasa general del tenant.
-              </p>
-            </div>
-          </div>
         </Card>
       </form>
     </ModalDocumento>
