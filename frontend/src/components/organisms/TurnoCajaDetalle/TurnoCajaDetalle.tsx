@@ -170,22 +170,18 @@ interface TurnoCajaDetalleData {
   facturas: FacturaTurno[];
   /** Ítem F-9 — resuelto server-side (override de la Bodega, o el default de la empresa). 'NINGUNO' si no hay gaveta configurada. */
   metodoAperturaCajaResuelto: 'NINGUNO' | 'AGENTE_LOCAL' | 'WEB_SERIAL';
+  /**
+   * Resuelto server-side (auditoría de estructura del frontend) — antes
+   * este archivo reimplementaba la fórmula de `pos.service.ts`
+   * (`calcularMovimientoEfectivo`) a mano para previsualizar el efectivo
+   * esperado ANTES de cerrar; ahora viaja ya calculado en esta misma
+   * respuesta, con la fórmula real, sin round-trip aparte.
+   */
+  efectivoEsperado: number;
 }
 
 function formatoRD(valor: string | number) {
   return `RD$ ${Number(valor).toLocaleString('es-DO', { minimumFractionDigits: 2 })}`;
-}
-
-/** Réplica del cálculo de pos.service.ts (calcularMovimientoEfectivo) — solo para mostrar el esperado ANTES de cerrar; el backend sigue siendo la fuente de verdad final. */
-function calcularMontoEsperado(data: TurnoCajaDetalleData): number {
-  const ventasEfectivo = data.facturas
-    .filter((f) => f.estado === 'EMITIDA')
-    .flatMap((f) => f.pagosVenta)
-    .filter((p) => p.formaPago.esEfectivo)
-    .reduce((acc, p) => acc + Number(p.monto), 0);
-  const entradas = data.movimientos.filter((m) => m.tipo === 'ENTRADA').reduce((acc, m) => acc + Number(m.monto), 0);
-  const salidas = data.movimientos.filter((m) => m.tipo === 'SALIDA').reduce((acc, m) => acc + Number(m.monto), 0);
-  return Number(data.montoInicial) + ventasEfectivo + entradas - salidas;
 }
 
 /** Desglose por TODAS las formas de pago (plan de integración Cuadre, ítem E-6) — antes el resumen del cierre solo distinguía efectivo. */
@@ -1686,7 +1682,7 @@ function ModalCerrarTurno({
   const algoContado = Object.values(conteo).some((v) => v.trim() !== '');
   const montoFinalContado = DENOMINACIONES.reduce((acc, d) => acc + d * (Number(conteo[d]) || 0), 0);
 
-  const montoEsperado = calcularMontoEsperado(data);
+  const montoEsperado = data.efectivoEsperado;
   const TOLERANCIA_REFERENCIA = 50; // RD$ — default documentado de Configuracion.POS_TOLERANCIA_ARQUEO; el backend valida el real
   const diferencia = algoContado ? montoFinalContado - montoEsperado : null;
   const dentroDeTolerancia = diferencia === null || Math.abs(diferencia) <= TOLERANCIA_REFERENCIA;

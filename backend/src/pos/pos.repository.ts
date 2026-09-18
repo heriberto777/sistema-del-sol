@@ -12,11 +12,11 @@ const INCLUDE_TURNO = {
       estado: true,
       formaPago: { select: { nombre: true, esEfectivo: true } },
       vendedorEmpleado: { select: { nombre: true } },
-      // Ledger real de pago dividido — para que el frontend pueda previsualizar
-      // el efectivo esperado exacto (una venta con pago mixto solo cuenta su
-      // porción efectivo, no todo el total) y armar el desglose por TODAS
-      // las formas de pago (ítem E-6, antes solo se distinguía efectivo).
-      // Ver calcularMovimientoEfectivo.
+      // Ledger real de pago dividido — para que el frontend arme el desglose
+      // por TODAS las formas de pago (ítem E-6, antes solo se distinguía
+      // efectivo). El efectivo esperado en sí ya no se recalcula acá: viaja
+      // resuelto en `PosService.buscarPorId` (campo `efectivoEsperado`,
+      // misma fórmula que `calcularMovimientoEfectivo`/`cerrarTurno`).
       pagosVenta: { select: { monto: true, formaPago: { select: { id: true, nombre: true, esEfectivo: true } } } },
       // Ítem "marcar factura devuelta" — mismo criterio que
       // FacturacionRepository.listar(), para que "Ventas del turno"

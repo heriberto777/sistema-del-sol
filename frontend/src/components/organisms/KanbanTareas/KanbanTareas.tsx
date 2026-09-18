@@ -18,6 +18,8 @@ import { BarraFormato, ContenidoComentario } from '../../molecules/ComentarioFor
 import { TareaFormModal, TareaFormValues } from '../TareaFormModal/TareaFormModal';
 import { GenerarTareasIaModal, PlanIaParaCrear } from '../GenerarTareasIaModal/GenerarTareasIaModal';
 import { EmpleadoOpcion, ESTILO_PRIORIDAD_TAREA, ETIQUETA_PRIORIDAD_TAREA, Hito, Tarea } from '../../../types/proyectos';
+import { soloFecha, formatoFechaHoraComentario, formatearDuracion } from '../../../lib/fecha';
+import { inicialesDe } from '../../../lib/iniciales';
 
 /** Re-renderiza el Kanban cada `intervaloMs` para que el tiempo del cronómetro corriendo se vea en vivo, sin pedirle nada nuevo al backend hasta que se pause. */
 function useAhora(intervaloMs: number): number {
@@ -29,21 +31,6 @@ function useAhora(intervaloMs: number): number {
   return ahora;
 }
 
-function formatoFechaHoraComentario(fecha: string): string {
-  const d = new Date(fecha);
-  return `${d.toLocaleDateString('es-DO', { day: 'numeric', month: 'short' })} · ${d.toLocaleTimeString('es-DO', { hour: 'numeric', minute: '2-digit' })}`;
-}
-
-/**
- * `fechaVencimiento` es un día calendario, no un instante — llega como
- * medianoche UTC. Armarla a partir de los componentes del string evita
- * que retroceda un día en cualquier huso detrás de UTC (mismo bug/fix
- * que `MisTareas.tsx: soloFecha`).
- */
-function soloFecha(fechaIso: string): Date {
-  const [anio, mes, dia] = fechaIso.slice(0, 10).split('-').map(Number);
-  return new Date(anio, mes - 1, dia);
-}
 function formatoFechaVencimiento(fecha: string): string {
   return soloFecha(fecha).toLocaleDateString('es-DO', { day: 'numeric', month: 'short' });
 }
@@ -62,13 +49,6 @@ const CLASE_BADGE_VENCIMIENTO: Record<'vencida' | 'hoy', string> = {
   hoy: 'bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400',
 };
 const ETIQUETA_BADGE_VENCIMIENTO: Record<'vencida' | 'hoy', string> = { vencida: 'Vencida', hoy: 'Vence hoy' };
-
-function formatearDuracion(ms: number): string {
-  const minutos = Math.max(0, Math.floor(ms / 60_000));
-  const horas = Math.floor(minutos / 60);
-  const minutosRestantes = minutos % 60;
-  return horas > 0 ? `${horas}h ${minutosRestantes}m` : `${minutosRestantes}m`;
-}
 
 const CLAVE_VISTA = 'proyectos-kanban-vista';
 const CLAVE_COLUMNAS_COLAPSADAS = 'proyectos-kanban-columnas-colapsadas';
@@ -90,11 +70,6 @@ const PUNTO_PRIORIDAD: Record<string, string> = {
 };
 
 const PALETA_AVATAR = ['bg-sol-500', 'bg-blue-500', 'bg-emerald-500', 'bg-purple-500', 'bg-pink-500'];
-
-function inicialesDe(nombre: string): string {
-  const partes = nombre.trim().split(/\s+/);
-  return ((partes[0]?.[0] ?? '') + (partes[1]?.[0] ?? '')).toUpperCase();
-}
 
 interface KanbanTareasProps {
   proyectoId: string;

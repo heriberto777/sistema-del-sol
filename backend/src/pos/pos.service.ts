@@ -127,7 +127,16 @@ export class PosService {
     // pegarle al agente local o a Web Serial al cobrar; se resuelve acá
     // para no pedir un round-trip aparte.
     const metodoAperturaCajaResuelto = await resolverMetodoAperturaCaja(this.prisma, tenantId, turno.bodegaId);
-    return { ...turno, facturas: turno.facturas.map(mapearFacturaTurno), metodoAperturaCajaResuelto };
+    // Auditoría de estructura del frontend: antes el frontend reimplementaba
+    // esta misma fórmula (TurnoCajaDetalle.tsx, calcularMontoEsperado) para
+    // previsualizar el efectivo esperado ANTES de cerrar — duplicación real
+    // con riesgo de divergencia si esta fórmula cambia acá. Se resuelve una
+    // sola vez, con la MISMA función que usa cerrarTurno(), y viaja gratis
+    // en esta misma respuesta (el frontend ya la consulta para pintar la
+    // pantalla, no hace falta un round-trip aparte).
+    const { ventasEfectivo, entradas, salidas } = await this.posRepository.calcularMovimientoEfectivo(id);
+    const efectivoEsperado = Number(turno.montoInicial) + ventasEfectivo + entradas - salidas;
+    return { ...turno, facturas: turno.facturas.map(mapearFacturaTurno), metodoAperturaCajaResuelto, efectivoEsperado };
   }
 
   /** Ítem "buscador de Devolución" — ver PosRepository.buscarParaDevolver. */

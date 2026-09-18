@@ -36,7 +36,7 @@ describe('PosService', () => {
       listar: jest.fn(),
       listarCajeros: jest.fn(),
       crearMovimiento: jest.fn(),
-      calcularMovimientoEfectivo: jest.fn(),
+      calcularMovimientoEfectivo: jest.fn().mockResolvedValue({ ventasEfectivo: 0, entradas: 0, salidas: 0 }),
       cerrarTurno: jest.fn(),
       marcarRevisado: jest.fn(),
       reporteCierres: jest.fn(),

@@ -5,6 +5,7 @@ import { AlertTriangle, CalendarCheck, CheckCircle2, Copy, ListTodo, MessageSqua
 import type { LucideIcon } from 'lucide-react';
 import { apiClient } from '../lib/api-client';
 import { mensajeErrorApi } from '../lib/mensaje-error-api';
+import { soloFecha } from '../lib/fecha';
 import { Button } from '../components/atoms/Button/Button';
 import { Card } from '../components/atoms/Card/Card';
 import { Select } from '../components/atoms/Select/Select';
@@ -61,10 +62,6 @@ function formatoDiaCorto(d: Date) {
  * 11 cae en 10 a las 20:00 hora local. Se arma la fecha a partir de los
  * componentes del string directamente para que el día nunca cambie.
  */
-function soloFecha(fechaIso: string): Date {
-  const [anio, mes, dia] = fechaIso.slice(0, 10).split('-').map(Number);
-  return new Date(anio, mes - 1, dia);
-}
 function formatoFechaBadge(fecha: string) {
   return soloFecha(fecha).toLocaleDateString('es-DO', { day: 'numeric', month: 'short' });
 }
