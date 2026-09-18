@@ -280,6 +280,40 @@ describe('FacturasPlataformaService', () => {
       expect(args.descuento).toBe(0);
       expect(suscripcionesRepository.desactivarPrimerPeriodoGratis).not.toHaveBeenCalled();
     });
+
+    it('avanza fechaProximoCorte un ciclo según el plan — bug real corregido: antes solo lo hacía el cron, no "generar factura ahora"', async () => {
+      const suscripcion = {
+        id: 's1',
+        tenantId: 't1',
+        fechaProximoCorte: new Date('2026-01-15T00:00:00Z'),
+        plan: { nombre: 'Premium', precio: 1500, cicloFacturacion: 'MENSUAL' },
+      } as never;
+      repo.crear.mockResolvedValue({ id: 'f1' } as never);
+      repo.buscarPorId.mockResolvedValue({ id: 'f1', concepto: 'x', total: 1500, fechaVencimiento: new Date() } as never);
+
+      await service.generarDesdeSuscripcion(suscripcion);
+
+      expect(suscripcionesRepository.avanzarProximoCorte).toHaveBeenCalledTimes(1);
+      const [id, fecha] = suscripcionesRepository.avanzarProximoCorte.mock.calls[0];
+      expect(id).toBe('s1');
+      expect(fecha.toISOString()).toContain('2026-02-15');
+    });
+
+    it('con ciclo ANUAL, avanza fechaProximoCorte un año', async () => {
+      const suscripcion = {
+        id: 's1',
+        tenantId: 't1',
+        fechaProximoCorte: new Date('2026-01-15T00:00:00Z'),
+        plan: { nombre: 'Premium', precio: 1500, cicloFacturacion: 'ANUAL' },
+      } as never;
+      repo.crear.mockResolvedValue({ id: 'f1' } as never);
+      repo.buscarPorId.mockResolvedValue({ id: 'f1', concepto: 'x', total: 1500, fechaVencimiento: new Date() } as never);
+
+      await service.generarDesdeSuscripcion(suscripcion);
+
+      const [, fecha] = suscripcionesRepository.avanzarProximoCorte.mock.calls[0];
+      expect(fecha.toISOString()).toContain('2027-01-15');
+    });
   });
 
   describe('generarFacturaAdelantada', () => {

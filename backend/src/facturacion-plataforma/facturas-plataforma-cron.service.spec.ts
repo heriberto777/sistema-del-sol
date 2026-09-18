@@ -51,20 +51,23 @@ describe('FacturasPlataformaCronService', () => {
   });
 
   describe('generarFacturasDelDia', () => {
-    it('genera una factura por cada suscripción activa vencida y avanza su próximo corte según el ciclo del plan', async () => {
-      suscripcionesRepo.listarActivasParaFacturar.mockResolvedValue([
+    it('genera una factura por cada suscripción activa vencida, delegando en generarDesdeSuscripcion (que ya avanza el próximo corte internamente)', async () => {
+      const suscripciones = [
         { id: 's1', fechaProximoCorte: new Date('2026-01-15T00:00:00Z'), plan: { cicloFacturacion: 'MENSUAL' } },
         { id: 's2', fechaProximoCorte: new Date('2026-01-15T00:00:00Z'), plan: { cicloFacturacion: 'ANUAL' } },
-      ] as never);
+      ];
+      suscripcionesRepo.listarActivasParaFacturar.mockResolvedValue(suscripciones as never);
 
       const total = await cron.generarFacturasDelDia();
 
       expect(total).toBe(2);
       expect(facturasService.generarDesdeSuscripcion).toHaveBeenCalledTimes(2);
-      const [, fechaMensual] = suscripcionesRepo.avanzarProximoCorte.mock.calls[0];
-      expect(fechaMensual.toISOString()).toContain('2026-02-15');
-      const [, fechaAnual] = suscripcionesRepo.avanzarProximoCorte.mock.calls[1];
-      expect(fechaAnual.toISOString()).toContain('2027-01-15');
+      expect(facturasService.generarDesdeSuscripcion).toHaveBeenNthCalledWith(1, suscripciones[0]);
+      expect(facturasService.generarDesdeSuscripcion).toHaveBeenNthCalledWith(2, suscripciones[1]);
+      // El cron mismo NO llama a avanzarProximoCorte — hacerlo acá Y en
+      // generarDesdeSuscripcion saltearía dos ciclos en vez de uno (bug
+      // real corregido, ver el comentario en generarDesdeSuscripcion).
+      expect(suscripcionesRepo.avanzarProximoCorte).not.toHaveBeenCalled();
     });
 
     it('no hace nada si no hay suscripciones vencidas', async () => {

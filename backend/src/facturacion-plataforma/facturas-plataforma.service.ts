@@ -14,7 +14,7 @@ import { mapearFacturaPlataformaAParams } from './mapear-factura-plataforma-pdf'
 import { PrismaService } from '../prisma/prisma.service';
 import { SuscripcionesRepository } from './suscripciones.repository';
 import { CuponesPlataformaRepository } from './cupones/cupones-plataforma.repository';
-import { sumarCiclos } from './sumar-ciclo.util';
+import { sumarCiclo, sumarCiclos } from './sumar-ciclo.util';
 import { resolverModulosConOrigen } from '../planes/resolver-modulos-activos';
 
 const CICLO_ES: Record<string, string> = { MENSUAL: 'mensual', ANUAL: 'anual' };
@@ -58,6 +58,14 @@ export class FacturasPlataformaService {
    * Reutilizado tanto por el cron diario (facturación recurrente) como
    * por "generar factura ahora" manual — una sola fuente de verdad para
    * cómo se arma una factura de plataforma a partir de una suscripción.
+   *
+   * Avanza `fechaProximoCorte` acá mismo (no en cada caller) — bug real
+   * encontrado: el cron sí lo hacía después de llamar a este método,
+   * pero `SuscripcionesService.generarFacturaAhora` no, así que una
+   * suscripción nueva (fechaProximoCorte = hoy) facturada a mano con
+   * "generar factura ahora" seguía viéndose "vencida" al día siguiente
+   * y el cron le generaba una SEGUNDA factura del mismo período.
+   * Centralizarlo acá hace imposible que un futuro caller se olvide.
    */
   async generarDesdeSuscripcion(suscripcion: Suscripcion & { plan: Plan }) {
     const ahora = new Date();
@@ -83,6 +91,7 @@ export class FacturasPlataformaService {
     });
 
     await aplicarEfectos();
+    await this.suscripcionesRepository.avanzarProximoCorte(suscripcion.id, sumarCiclo(suscripcion.fechaProximoCorte, suscripcion.plan.cicloFacturacion));
     await this.emisionECfService.emitirParaFacturaPlataforma(factura.id);
     await this.notificarFactura(suscripcion.tenantId, factura.id, 'generada');
     return factura;

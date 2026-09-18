@@ -6,7 +6,6 @@ import { FacturasPlataformaService } from './facturas-plataforma.service';
 import { ReglasNotificacionRepository } from './reglas-notificacion/reglas-notificacion.repository';
 import { PlataformaConfigRepository } from '../plataforma-config/plataforma-config.repository';
 import { TenantsService } from '../tenants/tenants.service';
-import { sumarCiclo } from './sumar-ciclo.util';
 
 const MS_POR_DIA = 24 * 60 * 60 * 1000;
 /** Compara solo año/mes/día (UTC) — `fechaVencimiento` conserva la hora de creación, el cron corre siempre a las 8am. */
@@ -37,12 +36,11 @@ export class FacturasPlataformaCronService {
     const hoy = new Date();
     const suscripciones = await this.suscripcionesRepository.listarActivasParaFacturar(hoy);
 
+    // generarDesdeSuscripcion ya avanza fechaProximoCorte internamente
+    // (ver el comentario ahí) — hacerlo también acá duplicaría el avance
+    // y saltearía un ciclo entero de facturación.
     for (const suscripcion of suscripciones) {
       await this.facturasPlataformaService.generarDesdeSuscripcion(suscripcion);
-      await this.suscripcionesRepository.avanzarProximoCorte(
-        suscripcion.id,
-        sumarCiclo(suscripcion.fechaProximoCorte, suscripcion.plan.cicloFacturacion),
-      );
     }
 
     this.logger.log(`Facturación de plataforma: ${suscripciones.length} factura(s) generada(s)`);
