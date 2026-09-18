@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ServiceUnavailableException } from '@nestjs/common';
 import { FacturasPlataformaService } from './facturas-plataforma.service';
 import { FacturasPlataformaRepository } from './facturas-plataforma.repository';
 import { EmailChannel } from '../notificaciones/canales/email.channel';
@@ -386,6 +386,87 @@ describe('FacturasPlataformaService', () => {
       plataformaConfigRepository.obtenerOCrear.mockResolvedValue({ nombreNegocio: null } as never);
 
       await expect(service.generarPdf('f1')).resolves.toBeInstanceOf(Buffer);
+    });
+
+    it('usa el default de PlataformaConfiguracion.plantillaDocumento cuando no se pide una plantilla puntual', async () => {
+      repo.buscarPorId.mockResolvedValue(factura as never);
+      plataformaConfigRepository.obtenerOCrear.mockResolvedValue({ nombreNegocio: null, plantillaDocumento: 'EDITORIAL' } as never);
+
+      await expect(service.generarPdf('f1')).resolves.toBeInstanceOf(Buffer);
+    });
+
+    it('una plantilla puntual pasada como parámetro gana sobre el default de PlataformaConfiguracion', async () => {
+      repo.buscarPorId.mockResolvedValue(factura as never);
+      plataformaConfigRepository.obtenerOCrear.mockResolvedValue({ nombreNegocio: null, plantillaDocumento: 'EDITORIAL' } as never);
+
+      await expect(service.generarPdf('f1', 'MINIMALISTA')).resolves.toBeInstanceOf(Buffer);
+    });
+  });
+
+  describe('reenviarFactura', () => {
+    const factura = {
+      id: 'f1',
+      tenantId: 't1',
+      ncf: 'B0100000005',
+      concepto: 'Suscripción X',
+      monto: 1000,
+      descuento: 0,
+      montoMora: 0,
+      itbis: 180,
+      total: 1000,
+      fechaEmision: new Date('2026-03-01T00:00:00Z'),
+      fechaVencimiento: new Date('2026-03-01T00:00:00Z'),
+      tenant: { nombre: 'Tenant Demo', rnc: '131234567' },
+      lineas: [],
+    };
+
+    beforeEach(() => {
+      repo.buscarPorId.mockResolvedValue(factura as never);
+      plataformaConfigRepository.obtenerOCrear.mockResolvedValue({ nombreNegocio: null, plantillaDocumento: 'CLASICO' } as never);
+    });
+
+    it('canal EMAIL busca el Admin Total del tenant y adjunta el PDF', async () => {
+      const resultado = await service.reenviarFactura('f1', 'EMAIL');
+
+      expect(prisma.user.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({ where: expect.objectContaining({ tenantId: 't1' }), orderBy: { createdAt: 'asc' } }),
+      );
+      expect(emailChannel.enviar).toHaveBeenCalledTimes(1);
+      const [destino, , cuerpo, adjuntos] = emailChannel.enviar.mock.calls[0];
+      expect(destino).toBe('admin@tenant.com');
+      expect(cuerpo).toContain('Suscripción X');
+      expect(adjuntos?.[0].filename).toBe('factura.pdf');
+      expect(adjuntos?.[0].content.subarray(0, 5).toString('latin1')).toBe('%PDF-');
+      expect(resultado).toEqual({ enviado: true });
+    });
+
+    it('canal EMAIL sin ningún Admin Total en el tenant lanza BadRequestException', async () => {
+      prisma.user.findFirst.mockResolvedValue(null);
+
+      await expect(service.reenviarFactura('f1', 'EMAIL')).rejects.toThrow(BadRequestException);
+      expect(emailChannel.enviar).not.toHaveBeenCalled();
+    });
+
+    it('canal WHATSAPP envía al teléfono del tenant, en texto, sin adjunto', async () => {
+      const resultado = await service.reenviarFactura('f1', 'WHATSAPP');
+
+      expect(prisma.tenant.findUnique).toHaveBeenCalledWith({ where: { id: 't1' }, select: { telefono: true } });
+      expect(whatsAppChannel.enviar).toHaveBeenCalledWith('+18095551234', '', expect.stringContaining('Suscripción X'));
+      expect(emailChannel.enviar).not.toHaveBeenCalled();
+      expect(resultado).toEqual({ enviado: true });
+    });
+
+    it('canal WHATSAPP sin teléfono en el tenant lanza BadRequestException', async () => {
+      prisma.tenant.findUnique.mockResolvedValue({ telefono: null });
+
+      await expect(service.reenviarFactura('f1', 'WHATSAPP')).rejects.toThrow(BadRequestException);
+      expect(whatsAppChannel.enviar).not.toHaveBeenCalled();
+    });
+
+    it('si el canal devuelve false, lanza ServiceUnavailableException', async () => {
+      whatsAppChannel.enviar.mockResolvedValue(false);
+
+      await expect(service.reenviarFactura('f1', 'WHATSAPP')).rejects.toThrow(ServiceUnavailableException);
     });
   });
 

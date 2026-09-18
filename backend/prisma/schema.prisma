@@ -554,6 +554,13 @@ model PlataformaConfiguracion {
   telefono  String?
   email     String?
 
+  // Diseño visual del PDF de FacturaPlataforma — mismo enum que usa
+  // Facturación/Cotizaciones/Remisiones del lado tenant (ver
+  // PlantillaDocumento más abajo), pero acá sin jerarquía de Bodega (no
+  // aplica: Plataforma es una sola entidad). Override puntual al imprimir
+  // vía query param, igual criterio que el lado tenant.
+  plantillaDocumento PlantillaDocumento @default(CLASICO)
+
   // NCF tradicional o e-CF para las FacturaPlataforma que la propia
   // plataforma emite a cada tenant — mismo enum que el lado tenant
   // (ModalidadFacturacion), la firma/envío real a la DGII para e-CF

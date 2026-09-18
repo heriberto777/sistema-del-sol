@@ -15,6 +15,7 @@ import { StatCard } from '../components/molecules/StatCard/StatCard';
 import { PaginaResultado } from '../types/pagina-resultado';
 import { usePlatformAuth } from '../hooks/usePlatformAuth';
 import { abrirBlob } from '../lib/descargar-archivo';
+import { PLANTILLAS_DOCUMENTO, PlantillaDocumento } from '../constants/plantilla-documento';
 
 type EstadoFactura = 'PENDIENTE' | 'PAGADA' | 'VENCIDA' | 'ANULADA';
 
@@ -132,6 +133,8 @@ function PanelFactura({ factura, onClose }: { factura: FacturaPlataforma; onClos
   const [metodoPago, setMetodoPago] = useState<Pago['metodoPago']>('TRANSFERENCIA');
   const [referencia, setReferencia] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [plantilla, setPlantilla] = useState<PlantillaDocumento | ''>('');
+  const [mensajeReenvio, setMensajeReenvio] = useState<string | null>(null);
 
   const { data: pagos } = useQuery({
     queryKey: ['platform-factura-pagos', factura.id],
@@ -157,6 +160,13 @@ function PanelFactura({ factura, onClose }: { factura: FacturaPlataforma; onClos
     onError: (err) => setError(mensajeErrorApi(err, 'No se pudo anular — puede que ya tenga pagos registrados.')),
   });
 
+  const reenviar = useMutation({
+    mutationFn: async (canal: 'EMAIL' | 'WHATSAPP') =>
+      platformApiClient.post(`/platform/facturas/${factura.id}/reenviar`, { canal, ...(plantilla ? { plantilla } : {}) }),
+    onSuccess: () => setMensajeReenvio('Factura reenviada.'),
+    onError: (err) => setMensajeReenvio(mensajeErrorApi(err, 'No se pudo reenviar la factura.')),
+  });
+
   const registrarPago = useMutation({
     mutationFn: async () =>
       platformApiClient.post(`/platform/facturas/${factura.id}/pagos`, {
@@ -178,7 +188,10 @@ function PanelFactura({ factura, onClose }: { factura: FacturaPlataforma; onClos
   const editable = factura.estado === 'PENDIENTE' || factura.estado === 'VENCIDA';
 
   async function descargarPdf() {
-    const respuesta = await platformApiClient.get(`/platform/facturas/${factura.id}/pdf`, { responseType: 'blob' });
+    const respuesta = await platformApiClient.get(`/platform/facturas/${factura.id}/pdf`, {
+      params: plantilla ? { plantilla } : undefined,
+      responseType: 'blob',
+    });
     abrirBlob(new Blob([respuesta.data], { type: 'application/pdf' }));
   }
 
@@ -207,9 +220,38 @@ function PanelFactura({ factura, onClose }: { factura: FacturaPlataforma; onClos
           </p>
         </div>
 
+        <div className="flex flex-col gap-1">
+          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Diseño</label>
+          <Select value={plantilla} onChange={(e) => setPlantilla(e.target.value as PlantillaDocumento | '')}>
+            <option value="">Diseño por defecto de Plataforma</option>
+            {PLANTILLAS_DOCUMENTO.map((p) => (
+              <option key={p.value} value={p.value}>
+                {p.label}
+              </option>
+            ))}
+          </Select>
+        </div>
         <Button variante="secundario" onClick={descargarPdf} className="w-full">
           Descargar PDF
         </Button>
+
+        {puedeGestionar && (
+          <div className="space-y-2 rounded-lg bg-slate-50 p-3 dark:bg-slate-800/60">
+            <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Reenviar factura al tenant</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Se envía al Admin Total del tenant (email, con el PDF adjunto) o al teléfono de la empresa (WhatsApp, solo resumen).
+            </p>
+            <div className="flex gap-2">
+              <Button variante="secundario" disabled={reenviar.isPending} onClick={() => reenviar.mutate('EMAIL')} className="flex-1">
+                {reenviar.isPending ? 'Enviando…' : 'Por email'}
+              </Button>
+              <Button variante="secundario" disabled={reenviar.isPending} onClick={() => reenviar.mutate('WHATSAPP')} className="flex-1">
+                {reenviar.isPending ? 'Enviando…' : 'Por WhatsApp'}
+              </Button>
+            </div>
+            {mensajeReenvio && <p className="text-sm text-slate-600 dark:text-slate-400">{mensajeReenvio}</p>}
+          </div>
+        )}
 
         {editable && puedeGestionar && (
           <div className="space-y-3">

@@ -7,6 +7,8 @@ import { ListarFacturasPlataformaQueryDto } from './dto/listar-facturas-platafor
 import { ActualizarFacturaPlataformaDto } from './dto/actualizar-factura-plataforma.dto';
 import { CrearFacturaPlataformaManualDto } from './dto/crear-factura-plataforma-manual.dto';
 import { CrearPagoPlataformaDto } from './dto/crear-pago-plataforma.dto';
+import { ImprimirFacturaPlataformaQueryDto } from './dto/imprimir-factura-plataforma-query.dto';
+import { ReenviarFacturaPlataformaDto } from './dto/reenviar-factura-plataforma.dto';
 import { Public } from '../common/decorators/public.decorator';
 import { PlatformPermissions } from '../common/decorators/platform-permissions.decorator';
 import { PlatformAuthGuard } from '../platform-auth/guards/platform-auth.guard';
@@ -60,10 +62,16 @@ export class FacturasPlataformaController {
 
   @Get(':id/pdf')
   @PlatformPermissions('platform.facturacion.ver')
-  async pdf(@Param('id') id: string, @Res() res: Response) {
-    const buffer = await this.facturasPlataformaService.generarPdf(id);
+  async pdf(@Param('id') id: string, @Query() query: ImprimirFacturaPlataformaQueryDto, @Res() res: Response) {
+    const buffer = await this.facturasPlataformaService.generarPdf(id, query.plantilla);
     res.set({ 'Content-Type': 'application/pdf', 'Content-Disposition': 'inline; filename="factura.pdf"' });
     res.send(buffer);
+  }
+
+  @Post(':id/reenviar')
+  @PlatformPermissions('platform.facturacion.gestionar')
+  reenviar(@Param('id') id: string, @Body() dto: ReenviarFacturaPlataformaDto) {
+    return this.facturasPlataformaService.reenviarFactura(id, dto.canal, dto.plantilla);
   }
 
   @Post(':id/anular')

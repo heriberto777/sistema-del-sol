@@ -1,5 +1,5 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
-import { Suscripcion, Plan, CanalNotificacionVencimiento } from '@prisma/client';
+import { BadRequestException, Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
+import { Suscripcion, Plan, CanalNotificacionVencimiento, PlantillaDocumento } from '@prisma/client';
 import { FacturasPlataformaRepository } from './facturas-plataforma.repository';
 import { ActualizarFacturaPlataformaDto } from './dto/actualizar-factura-plataforma.dto';
 import { CrearFacturaPlataformaManualDto } from './dto/crear-factura-plataforma-manual.dto';
@@ -275,12 +275,12 @@ export class FacturasPlataformaService {
     return this.facturasPlataformaRepository.marcarEstado(id, 'ANULADA');
   }
 
-  async generarPdf(id: string) {
+  async generarPdf(id: string, plantillaSolicitada?: PlantillaDocumento) {
     const [factura, config] = await Promise.all([this.facturasPlataformaRepository.buscarPorId(id), this.plataformaConfigRepository.obtenerOCrear()]);
     const emisor = config.nombreNegocio
       ? { nombre: config.nombreNegocio, rnc: config.rnc ?? undefined, direccion: config.direccion ?? undefined, telefono: config.telefono ?? undefined }
       : undefined;
-    return generarDocumentoPdf(mapearFacturaPlataformaAParams(factura, emisor));
+    return generarDocumentoPdf(mapearFacturaPlataformaAParams(factura, emisor), { plantilla: plantillaSolicitada ?? config.plantillaDocumento });
   }
 
   async marcarPagada(id: string, fechaPago: Date) {
@@ -381,5 +381,44 @@ export class FacturasPlataformaService {
 
     this.logger.debug(`Notificación de factura ${motivo} para ${admin.email}: ${factura.id}`);
     await this.emailChannel.enviar(admin.email, asunto, cuerpo);
+  }
+
+  /**
+   * Botón "Reenviar factura" del admin de plataforma — a diferencia de
+   * `notificarFactura`/`notificarPorRegla` (avisos automáticos con link
+   * de pago, sin el documento en sí), esto adjunta el PDF real. Nunca
+   * pasa `tenantId` a los canales — mismo criterio ya establecido en
+   * este archivo: una FacturaPlataforma es Plataforma cobrándole al
+   * tenant, así que siempre sale con el SMTP/Twilio de Plataforma, nunca
+   * con la integración propia del tenant.
+   */
+  async reenviarFactura(id: string, canal: 'EMAIL' | 'WHATSAPP', plantillaSolicitada?: PlantillaDocumento) {
+    const factura = await this.facturasPlataformaRepository.buscarPorId(id);
+
+    if (canal === 'EMAIL') {
+      const admin = await this.prisma.user.findFirst({
+        where: { tenantId: factura.tenantId, roles: { some: { role: { nombre: 'Admin Total' } } } },
+        orderBy: { createdAt: 'asc' },
+      });
+      if (!admin) {
+        throw new BadRequestException('Este tenant no tiene ningún usuario Admin Total al cual enviarle la factura.');
+      }
+      const pdf = await this.generarPdf(id, plantillaSolicitada);
+      const asunto = `Tu factura — El Sistema del Sol`;
+      const cuerpo = `<p>Te reenviamos tu factura: <strong>${factura.concepto}</strong>.</p><p>Total: RD$ ${Number(factura.total).toLocaleString('es-DO')}.</p><p>La encontrás adjunta en PDF.</p>`;
+      const enviado = await this.emailChannel.enviar(admin.email, asunto, cuerpo, [{ filename: 'factura.pdf', content: pdf }]);
+      if (!enviado) throw new ServiceUnavailableException('No se pudo enviar el email — revisá la configuración SMTP en Configuración de Plataforma.');
+      return { enviado: true };
+    }
+
+    const tenant = await this.prisma.tenant.findUnique({ where: { id: factura.tenantId }, select: { telefono: true } });
+    if (!tenant?.telefono) {
+      throw new BadRequestException('Este tenant no tiene teléfono configurado — no se puede reenviar por WhatsApp.');
+    }
+    // WhatsApp no soporta adjuntar el PDF acá (ver WhatsAppChannel) — va solo el resumen en texto.
+    const mensaje = `Tu factura: ${factura.concepto}. Total: RD$ ${Number(factura.total).toLocaleString('es-DO')}, vence el ${factura.fechaVencimiento.toLocaleDateString('es-DO')}.`;
+    const enviado = await this.whatsAppChannel.enviar(tenant.telefono, '', mensaje);
+    if (!enviado) throw new ServiceUnavailableException('No se pudo enviar el WhatsApp — revisá la configuración de Twilio en Configuración de Plataforma.');
+    return { enviado: true };
   }
 }

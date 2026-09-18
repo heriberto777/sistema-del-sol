@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { ModalidadFacturacion } from '@prisma/client';
+import { ModalidadFacturacion, PlantillaDocumento } from '@prisma/client';
 import { IsBoolean, IsEnum, IsInt, IsNumber, IsOptional, IsString, Max, Min } from 'class-validator';
 
 /**
@@ -52,6 +52,11 @@ export class ActualizarPlataformaConfigDto {
   @Min(0)
   @Max(100)
   porcentajeItbis?: number;
+
+  @ApiProperty({ required: false, enum: PlantillaDocumento, description: 'Diseño visual del PDF de FacturaPlataforma — override puntual al imprimir vía query param.' })
+  @IsOptional()
+  @IsEnum(PlantillaDocumento)
+  plantillaDocumento?: PlantillaDocumento;
 
   // Notificaciones — email
   @ApiProperty({ required: false })

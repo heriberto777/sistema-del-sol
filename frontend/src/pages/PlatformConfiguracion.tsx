@@ -11,6 +11,7 @@ import { NcfPlataformaPanel } from '../components/organisms/NcfPlataformaPanel/N
 import { CampoImagen } from '../components/molecules/CampoImagen/CampoImagen';
 import { Badge } from '../components/atoms/Badge/Badge';
 import { SelectorModeloIa, ModeloIa } from '../components/molecules/SelectorModeloIa/SelectorModeloIa';
+import { PLANTILLAS_DOCUMENTO, PlantillaDocumento } from '../constants/plantilla-documento';
 
 /** "Cargar modelos" de IA para productos siempre usa la API key ya guardada de PLATAFORMA — ver SelectorModeloIa. */
 async function cargarModelosPlataforma(proveedor: string): Promise<ModeloIa[]> {
@@ -32,6 +33,7 @@ export interface ConfiguracionPlataforma {
     email: string | null;
     modalidadFacturacion: 'NCF' | 'ECF';
     porcentajeItbis: number;
+    plantillaDocumento: PlantillaDocumento;
   };
   notificaciones: {
     email: {
@@ -200,6 +202,7 @@ function SeccionGeneral({ config, guardar }: SeccionProps) {
   const [direccion, setDireccion] = useState(config.general.direccion ?? '');
   const [telefono, setTelefono] = useState(config.general.telefono ?? '');
   const [email, setEmail] = useState(config.general.email ?? '');
+  const [plantillaDocumento, setPlantillaDocumento] = useState(config.general.plantillaDocumento);
 
   useEffect(() => {
     setNombreNegocio(config.general.nombreNegocio ?? '');
@@ -208,11 +211,20 @@ function SeccionGeneral({ config, guardar }: SeccionProps) {
     setDireccion(config.general.direccion ?? '');
     setTelefono(config.general.telefono ?? '');
     setEmail(config.general.email ?? '');
-  }, [config.general.nombreNegocio, config.general.logo, config.general.rnc, config.general.direccion, config.general.telefono, config.general.email]);
+    setPlantillaDocumento(config.general.plantillaDocumento);
+  }, [
+    config.general.nombreNegocio,
+    config.general.logo,
+    config.general.rnc,
+    config.general.direccion,
+    config.general.telefono,
+    config.general.email,
+    config.general.plantillaDocumento,
+  ]);
 
   function onSubmit(e: FormEvent) {
     e.preventDefault();
-    guardar.mutate({ nombreNegocio, logo, rnc, direccion, telefono, email });
+    guardar.mutate({ nombreNegocio, logo, rnc, direccion, telefono, email, plantillaDocumento });
   }
 
   return (
@@ -233,6 +245,18 @@ function SeccionGeneral({ config, guardar }: SeccionProps) {
         <FormField id="direccion" label="Dirección" value={direccion} onChange={(e) => setDireccion(e.target.value)} />
         <FormField id="telefono" label="Teléfono" value={telefono} onChange={(e) => setTelefono(e.target.value)} />
         <FormField id="email" label="Correo" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+        <div className="flex flex-col gap-1">
+          <label htmlFor="plantillaDocumento" className="text-sm font-medium text-slate-700 dark:text-slate-300">
+            Diseño de la factura
+          </label>
+          <Select id="plantillaDocumento" value={plantillaDocumento} onChange={(e) => setPlantillaDocumento(e.target.value as PlantillaDocumento)}>
+            {PLANTILLAS_DOCUMENTO.map((p) => (
+              <option key={p.value} value={p.value}>
+                {p.label}
+              </option>
+            ))}
+          </Select>
+        </div>
         <Button type="submit" disabled={guardar.isPending}>
           {guardar.isPending ? 'Guardando…' : 'Guardar'}
         </Button>
