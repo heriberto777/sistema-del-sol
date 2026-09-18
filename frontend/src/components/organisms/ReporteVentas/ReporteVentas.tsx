@@ -5,6 +5,7 @@ import { Card } from '../../atoms/Card/Card';
 import { Input } from '../../atoms/Input/Input';
 import { BotonesExportar } from '../../molecules/BotonesExportar/BotonesExportar';
 import { StatCard } from '../../molecules/StatCard/StatCard';
+import type { ClienteBasico } from '@backend-src/common/prisma/cliente-select-basico';
 
 interface FacturaReporte {
   id: string;
@@ -14,7 +15,7 @@ interface FacturaReporte {
   subtotal: string;
   itbis: string;
   total: string;
-  cliente: { nombre: string };
+  cliente: ClienteBasico;
 }
 
 interface ReporteVentasResponse {

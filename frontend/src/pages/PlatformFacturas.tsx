@@ -16,6 +16,7 @@ import { PaginaResultado } from '../types/pagina-resultado';
 import { usePlatformAuth } from '../hooks/usePlatformAuth';
 import { abrirBlob } from '../lib/descargar-archivo';
 import { PLANTILLAS_DOCUMENTO, PlantillaDocumento } from '../constants/plantilla-documento';
+import type { PagoPlataformaBasico } from '@backend-src/common/prisma/pago-plataforma-select-basico';
 
 type EstadoFactura = 'PENDIENTE' | 'PAGADA' | 'VENCIDA' | 'ANULADA';
 
@@ -39,14 +40,7 @@ interface Tenant {
   nombre: string;
 }
 
-interface Pago {
-  id: string;
-  monto: string;
-  metodoPago: 'EFECTIVO' | 'TARJETA' | 'TRANSFERENCIA';
-  referencia: string | null;
-  fecha: string;
-  registradoPor: { nombre: string } | null;
-}
+type Pago = PagoPlataformaBasico;
 
 const TONO_POR_ESTADO: Record<EstadoFactura, 'exito' | 'advertencia' | 'peligro' | 'neutro'> = {
   PENDIENTE: 'neutro',

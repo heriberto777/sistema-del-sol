@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { MetodoPago } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { INCLUDE_PAGO_PLATAFORMA_BASICO } from '../common/prisma/pago-plataforma-select-basico';
 
 @Injectable()
 export class PagosPlataformaRepository {
@@ -21,7 +22,7 @@ export class PagosPlataformaRepository {
   listarPorFactura(facturaId: string) {
     return this.prisma.pagoPlataforma.findMany({
       where: { facturaId },
-      include: { registradoPor: { select: { nombre: true } } },
+      include: INCLUDE_PAGO_PLATAFORMA_BASICO,
       orderBy: { fecha: 'desc' },
     });
   }

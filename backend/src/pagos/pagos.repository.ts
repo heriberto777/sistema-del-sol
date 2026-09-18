@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { TenantPrismaService } from '../prisma/tenant-prisma.service';
+import { INCLUDE_PAGO_BASICO } from '../common/prisma/pago-select-basico';
 
 @Injectable()
 export class PagosRepository {
@@ -21,14 +22,14 @@ export class PagosRepository {
     fecha: Date;
     userId: string | null;
   }) {
-    return this.db.pago.create({ data: params, include: { formaPago: { select: { nombre: true } } } });
+    return this.db.pago.create({ data: params, include: INCLUDE_PAGO_BASICO });
   }
 
   listarPorFactura(facturaId: string) {
     return this.db.pago.findMany({
       where: { facturaId },
       orderBy: { fecha: 'desc' },
-      include: { formaPago: { select: { nombre: true } } },
+      include: INCLUDE_PAGO_BASICO,
     });
   }
 
@@ -36,7 +37,7 @@ export class PagosRepository {
     return this.db.pago.findMany({
       where: { ordenCompraId },
       orderBy: { fecha: 'desc' },
-      include: { formaPago: { select: { nombre: true } } },
+      include: INCLUDE_PAGO_BASICO,
     });
   }
 

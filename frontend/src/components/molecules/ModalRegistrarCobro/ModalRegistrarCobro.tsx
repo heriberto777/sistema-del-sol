@@ -6,13 +6,9 @@ import { Modal } from '../Modal/Modal';
 import { FormField } from '../FormField/FormField';
 import { SelectFormaPago } from '../SelectFormaPago/SelectFormaPago';
 import { Button } from '../../atoms/Button/Button';
+import type { PagoBasico } from '@backend-src/common/prisma/pago-select-basico';
 
-interface Pago {
-  id: string;
-  monto: string;
-  formaPago: { nombre: string };
-  fecha: string;
-}
+type Pago = PagoBasico;
 
 /**
  * Extraído de FacturasTable (era privado ahí) para reusarlo también desde

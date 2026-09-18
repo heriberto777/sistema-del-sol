@@ -21,6 +21,7 @@ import { useDebouncedValue } from '../../../hooks/useDebouncedValue';
 import { useAuth } from '../../../hooks/useAuth';
 import { PaginaResultado } from '../../../types/pagina-resultado';
 import type { ClienteBasico } from '@backend-src/common/prisma/cliente-select-basico';
+import type { PagoBasico } from '@backend-src/common/prisma/pago-select-basico';
 
 interface Factura {
   id: string;
@@ -43,12 +44,7 @@ interface FacturaDetalle extends Factura {
   lineas: { producto: { nombre: string } | null; descripcionManual: string | null; cantidad: string; precioUnitario: string; montoTotal: string }[];
 }
 
-interface Pago {
-  id: string;
-  monto: string;
-  formaPago: { nombre: string };
-  fecha: string;
-}
+type Pago = PagoBasico;
 
 const TONO_POR_ESTADO: Record<Factura['estado'], 'exito' | 'neutro' | 'peligro'> = {
   EMITIDA: 'exito',

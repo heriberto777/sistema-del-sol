@@ -3,6 +3,7 @@ import { Eye, Plus, User, X } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../../lib/api-client';
 import { mensajeErrorApi } from '../../../lib/mensaje-error-api';
+import type { ClienteBasico } from '@backend-src/common/prisma/cliente-select-basico';
 import { ModalImprimir } from '../../molecules/ModalImprimir/ModalImprimir';
 import { Modal } from '../../molecules/Modal/Modal';
 import { RowActionsMenu } from '../../molecules/RowActionsMenu/RowActionsMenu';
@@ -45,7 +46,7 @@ interface Remision {
   facturaId: string | null;
   clienteId: string;
   bodegaId: string;
-  cliente: { nombre: string };
+  cliente: ClienteBasico;
   lineas: { productoId: string; varianteId: string; cantidad: string }[];
 }
 

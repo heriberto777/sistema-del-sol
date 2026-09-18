@@ -1,4 +1,5 @@
 import type { Prisma } from '@prisma/client';
+import type { SerializadoHttp } from './serializado-http';
 
 /**
  * `select` mínimo de `Cliente` para incluir en facturas/cotizaciones/
@@ -23,4 +24,4 @@ export const CLIENTE_SELECT_BASICO = {
   telefono: true,
 } satisfies Prisma.ClienteSelect;
 
-export type ClienteBasico = Prisma.ClienteGetPayload<{ select: typeof CLIENTE_SELECT_BASICO }>;
+export type ClienteBasico = SerializadoHttp<Prisma.ClienteGetPayload<{ select: typeof CLIENTE_SELECT_BASICO }>>;

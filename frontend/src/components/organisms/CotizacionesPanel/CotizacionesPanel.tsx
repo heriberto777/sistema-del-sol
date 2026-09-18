@@ -22,6 +22,7 @@ import { useDebouncedValue } from '../../../hooks/useDebouncedValue';
 import { useAuth } from '../../../hooks/useAuth';
 import { PaginaResultado } from '../../../types/pagina-resultado';
 import { mensajeErrorApi } from '../../../lib/mensaje-error-api';
+import type { ClienteBasico } from '@backend-src/common/prisma/cliente-select-basico';
 
 interface Cliente {
   id: string;
@@ -63,7 +64,7 @@ interface Cotizacion {
   fechaVigenciaHasta: string;
   facturaId: string | null;
   clienteId: string;
-  cliente: { nombre: string };
+  cliente: ClienteBasico;
   lineas: LineaCotizacion[];
 }
 
