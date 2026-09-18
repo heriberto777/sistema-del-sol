@@ -1,4 +1,4 @@
-import { CSSProperties, ReactNode, useEffect, useState } from 'react';
+import { CSSProperties, useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
 import {
@@ -33,7 +33,6 @@ import {
   PROPORCIONES_IMAGEN_TIENDA,
   ESTILOS_INSIGNIA_OFERTA_TIENDA,
   ESTILOS_INSIGNIA_SIN_STOCK_TIENDA,
-  MENU_DEFAULT,
   TemaTienda,
   ClaveMenuTienda,
   variablesCssTema,
@@ -43,6 +42,8 @@ import { TarjetaProductoTienda } from '../../../pages/tienda/TarjetaProductoTien
 import { CarritoTiendaProvider } from '../../../pages/tienda/CarritoTiendaContext';
 import { ProductoTienda } from '../../../hooks/useTienda';
 import { MensajeBannerAnuncio, TamanoFuenteBanner } from '../../../pages/tienda/BannerAnuncio';
+import { SeccionPersonalizacion } from './SeccionPersonalizacion';
+import { TEMA_DEFAULT, parsearTemaGuardado, BannerAnuncioForm, BANNER_ANUNCIO_DEFAULT, parsearBannerAnuncioGuardado } from './logica-formulario';
 
 interface Configuracion {
   clave: string;
@@ -134,22 +135,6 @@ const ETIQUETA_MENU: Record<ClaveMenuTienda, string> = {
   cuenta: 'Mi cuenta',
 };
 
-const TEMA_DEFAULT: TemaTienda = {
-  colorAcento: null,
-  colorFondo: null,
-  colorSuperficie: null,
-  colorTexto: null,
-  fuenteDisplay: null,
-  fuenteBody: null,
-  tamanoFuente: 'MEDIANO',
-  radioTarjeta: 'SUAVE',
-  sombraTarjeta: true,
-  proporcionImagen: 'CUADRADA',
-  menu: MENU_DEFAULT,
-  estiloInsigniaOferta: 'CLASICO',
-  estiloInsigniaSinStock: 'ETIQUETA',
-};
-
 const ETIQUETA_ESTILO_INSIGNIA: Record<TemaTienda['estiloInsigniaOferta'], string> = {
   CLASICO: 'Clásico',
   AHORRO: 'Ahorro explícito',
@@ -210,75 +195,6 @@ const PREVIEW_SIN_STOCK: ProductoTienda = {
   stock: 0,
   sinStock: true,
 };
-
-/** Agrupa visualmente los ~7 conceptos de la pestaña Personalización (Fase 15) — antes eran una sola columna continua sin ninguna separación. */
-function SeccionPersonalizacion({ titulo, descripcion, children }: { titulo: string; descripcion?: string; children: ReactNode }) {
-  return (
-    <div className="py-5 first:pt-0 last:pb-0">
-      <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{titulo}</h3>
-      {descripcion && <p className="mb-3 mt-1 text-xs text-slate-500 dark:text-slate-400">{descripcion}</p>}
-      <div className={clsx('flex flex-col gap-4', !descripcion && 'mt-3')}>{children}</div>
-    </div>
-  );
-}
-
-/**
- * Parseo defensivo espejo de `resolverTemaTienda` (backend) — acá no hace
- * falta validar cada campo contra su unión de valores válidos porque la
- * única fuente que escribe esta clave es este mismo formulario (controles
- * cerrados, sin texto libre); solo hay que blindar contra un JSON
- * corrupto o un cambio de forma entre versiones.
- */
-function parsearTemaGuardado(valorJson: string, colorAcentoLegacy: string): TemaTienda {
-  try {
-    const parseado = JSON.parse(valorJson);
-    return {
-      ...TEMA_DEFAULT,
-      ...parseado,
-      colorAcento: parseado.colorAcento ?? (colorAcentoLegacy || null),
-      menu: Array.isArray(parseado.menu) && parseado.menu.length === MENU_DEFAULT.length ? parseado.menu : MENU_DEFAULT,
-    };
-  } catch {
-    return { ...TEMA_DEFAULT, colorAcento: colorAcentoLegacy || null };
-  }
-}
-
-interface BannerAnuncioForm {
-  mensajes: MensajeBannerAnuncio[];
-  intervaloSegundos: number;
-}
-
-const BANNER_ANUNCIO_DEFAULT: BannerAnuncioForm = { mensajes: [], intervaloSegundos: 5 };
-
-/**
- * Parseo defensivo espejo de `resolverBannerAnuncio` (backend) — antes de
- * esta extensión la clave guardaba un string plano (un único mensaje,
- * siempre blanco sobre el acento del tema). Si el valor guardado no es
- * JSON, se materializa como ese mensaje legado con el acento ACTUAL como
- * color de fondo (en vez de "hereda del tema") — apenas el admin guarda una
- * vez desde este editor, el mensaje pasa a tener un color explícito, ya no
- * legado.
- */
-function parsearBannerAnuncioGuardado(valorCrudo: string, colorAcentoActual: string): BannerAnuncioForm {
-  if (!valorCrudo) return BANNER_ANUNCIO_DEFAULT;
-  try {
-    const parseado = JSON.parse(valorCrudo);
-    if (parseado && Array.isArray(parseado.mensajes)) {
-      return {
-        mensajes: parseado.mensajes.map((m: Partial<MensajeBannerAnuncio>) => ({
-          texto: m.texto ?? '',
-          colorFondo: m.colorFondo ?? colorAcentoActual,
-          colorTexto: m.colorTexto ?? '#ffffff',
-          tamanoFuente: m.tamanoFuente ?? 'NORMAL',
-        })),
-        intervaloSegundos: typeof parseado.intervaloSegundos === 'number' ? parseado.intervaloSegundos : 5,
-      };
-    }
-  } catch {
-    // no era JSON — es el string legado, tratado abajo.
-  }
-  return { mensajes: [{ texto: valorCrudo, colorFondo: colorAcentoActual, colorTexto: '#ffffff', tamanoFuente: 'NORMAL' }], intervaloSegundos: 5 };
-}
 
 /**
  * Configuración de la Tienda Online (plugin e-commerce v1) — guarda en el
