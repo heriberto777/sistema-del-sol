@@ -293,6 +293,19 @@ export class FacturacionService {
     const itbis = itbisLineas * signo;
     const total = (subtotalLineas + itbisLineas) * signo;
 
+    // Red de seguridad — mismo criterio que AsientosContablesService.validarBalance:
+    // la suma de los montoTotal de línea (siempre en positivo, ver
+    // mapeo de arriba) debe cuadrar contra el total de la factura antes de
+    // persistir. Hallazgo de auditoría: sin este chequeo, un descuadre de
+    // centavos (ej. un prorrateo mal reconciliado) se guardaba sin aviso.
+    const EPSILON_CUADRE_LINEAS = 0.005;
+    const sumaLineas = lineasCalculadas.reduce((acc, l) => acc + l.montoTotal, 0);
+    if (Math.abs(sumaLineas - Math.abs(total)) > EPSILON_CUADRE_LINEAS) {
+      throw new BadRequestException(
+        `Las líneas de la factura (RD$ ${sumaLineas.toFixed(2)}) no cuadran con el total (RD$ ${Math.abs(total).toFixed(2)})`,
+      );
+    }
+
     return { lineasCalculadas, subtotal, itbis, total, descuentoTotal };
   }
 

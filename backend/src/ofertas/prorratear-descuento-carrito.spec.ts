@@ -11,7 +11,16 @@ describe('prorratearDescuentoCarrito', () => {
   it('la suma de lo repartido es exactamente el descuento total', () => {
     const resultado = prorratearDescuentoCarrito(300, [100, 100, 100], 30);
 
-    expect(resultado.reduce((acc, x) => acc + x, 0)).toBeCloseTo(30);
+    expect(resultado.reduce((acc, x) => acc + x, 0)).toBe(30);
+  });
+
+  it('cuando el descuento no divide exacto entre las líneas, la última absorbe el residuo (hallazgo de auditoría)', () => {
+    // RD$10 entre 3 líneas iguales = RD$3.33... por línea — sin reconciliar,
+    // 3.33+3.33+3.33 = 9.99, no 10. La última línea se lleva el centavo extra.
+    const resultado = prorratearDescuentoCarrito(300, [100, 100, 100], 10);
+
+    expect(resultado).toEqual([3.33, 3.33, 3.34]);
+    expect(resultado.reduce((acc, x) => acc + x, 0)).toBe(10);
   });
 
   it('sin descuento de carrito, devuelve ceros para todas las líneas', () => {
