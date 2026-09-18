@@ -18,7 +18,7 @@ import { AuthService } from '../auth/auth.service';
 import { NotificacionesService } from '../notificaciones/notificaciones.service';
 import { AutorizacionesService } from '../autorizaciones/autorizaciones.service';
 import { ConfiguracionesService } from '../configuraciones/configuraciones.service';
-import { CorrelativosRepository } from '../correlativos/correlativos.repository';
+import { CorrelativosService } from '../correlativos/correlativos.service';
 
 describe('FacturacionService', () => {
   let service: FacturacionService;
@@ -38,7 +38,7 @@ describe('FacturacionService', () => {
   let notificacionesService: jest.Mocked<NotificacionesService>;
   let autorizacionesService: jest.Mocked<AutorizacionesService>;
   let configuracionesService: jest.Mocked<ConfiguracionesService>;
-  let correlativosRepository: jest.Mocked<CorrelativosRepository>;
+  let correlativosService: jest.Mocked<CorrelativosService>;
 
   // Un tx opaco: crear()/anular() abren la transacción con tenantPrisma.client.$transaction
   // y pasan este objeto a los métodos *EnTx — para las pruebas basta con que sea el mismo
@@ -132,9 +132,9 @@ describe('FacturacionService', () => {
     configuracionesService = {
       buscarValor: jest.fn().mockResolvedValue('18'),
     } as unknown as jest.Mocked<ConfiguracionesService>;
-    correlativosRepository = {
+    correlativosService = {
       siguienteEnTx: jest.fn().mockResolvedValue('00001'),
-    } as unknown as jest.Mocked<CorrelativosRepository>;
+    } as unknown as jest.Mocked<CorrelativosService>;
     service = new FacturacionService(
       repository,
       inventarioService,
@@ -152,7 +152,7 @@ describe('FacturacionService', () => {
       notificacionesService,
       autorizacionesService,
       configuracionesService,
-      correlativosRepository,
+      correlativosService,
     );
   });
 
@@ -188,11 +188,11 @@ describe('FacturacionService', () => {
     it('consume el correlativo FACTURA dentro de la misma transacción y lo persiste', async () => {
       repository.obtenerProductoConPrecioVigente.mockResolvedValue(producto(18, 100) as never);
       repository.crearFacturaEnTx.mockResolvedValue(facturaCreada() as never);
-      correlativosRepository.siguienteEnTx.mockResolvedValue('00042');
+      correlativosService.siguienteEnTx.mockResolvedValue('00042');
 
       await service.crear(dto(), 'tenant-1', 'vendedor-1');
 
-      expect(correlativosRepository.siguienteEnTx).toHaveBeenCalledWith(TX, 'tenant-1', 'FACTURA');
+      expect(correlativosService.siguienteEnTx).toHaveBeenCalledWith(TX, 'tenant-1', 'FACTURA');
       expect(repository.crearFacturaEnTx).toHaveBeenCalledWith(TX, expect.objectContaining({ numero: '00042' }));
     });
   });

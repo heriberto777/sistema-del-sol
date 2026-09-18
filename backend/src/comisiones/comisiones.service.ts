@@ -79,14 +79,19 @@ export class ComisionesService {
    * `Producto.porcentajeComision`, mutuamente excluyente con
    * `montoComisionFijo` (validado en `ProductosService`).
    */
+  // Auditoría de redondeo: en Decimal, no en `number` — mismo criterio que
+  // FacturacionService.calcularLineasYTotales. `new Prisma.Decimal(...)`
+  // envuelve explícito el valor base de cada cadena (funciona igual si ya
+  // es una instancia Decimal real, como en producción, o un `number` plano,
+  // como en los mocks de test).
   private calcularMontoComision(linea: LineaParaComision): number {
     if (!linea.producto) return 0;
     if (linea.producto.porcentajeComision != null) {
-      const montoNeto = Number(linea.cantidad) * Number(linea.precioUnitario) - Number(linea.descuento);
-      return montoNeto * (Number(linea.producto.porcentajeComision) / 100);
+      const montoNetoD = new Prisma.Decimal(linea.cantidad).times(linea.precioUnitario).minus(linea.descuento);
+      return montoNetoD.times(linea.producto.porcentajeComision).dividedBy(100).toNumber();
     }
     if (linea.producto.montoComisionFijo != null) {
-      return Number(linea.producto.montoComisionFijo) * Number(linea.cantidad);
+      return new Prisma.Decimal(linea.producto.montoComisionFijo).times(linea.cantidad).toNumber();
     }
     return 0;
   }
@@ -96,12 +101,16 @@ export class ComisionesService {
     return this.comisionesRepository.anularPorFactura(tenantId, facturaId);
   }
 
+  // Los 3 reportes de abajo acumulan `montoTotal` en Prisma.Decimal (no
+  // `number += `) — auditoría de redondeo: sumar muchas filas con `+=`
+  // nativo puede arrastrar error de punto flotante en reportes con
+  // volumen alto; se convierte a `number` solo al armar la respuesta.
   async reportePorVenta(desdeStr?: string, hastaStr?: string) {
     const { desde, hasta } = rangoPorDefecto(desdeStr, hastaStr);
     const filas = await this.comisionesRepository.listar(desde, hasta);
     const porVenta = new Map<
       string,
-      { facturaId: string; ncf: string | null; fecha: Date; cliente: string; empleado: string; montoTotal: number; cantidadLineas: number }
+      { facturaId: string; ncf: string | null; fecha: Date; cliente: string; empleado: string; montoTotal: Prisma.Decimal; cantidadLineas: number }
     >();
     for (const fila of filas) {
       const actual = porVenta.get(fila.facturaId) ?? {
@@ -110,28 +119,28 @@ export class ComisionesService {
         fecha: fila.factura.fecha,
         cliente: fila.factura.cliente.nombre,
         empleado: fila.empleado.nombre,
-        montoTotal: 0,
+        montoTotal: new Prisma.Decimal(0),
         cantidadLineas: 0,
       };
-      actual.montoTotal += Number(fila.monto);
+      actual.montoTotal = actual.montoTotal.plus(fila.monto);
       actual.cantidadLineas += 1;
       porVenta.set(fila.facturaId, actual);
     }
-    return { rango: { desde, hasta }, datos: [...porVenta.values()] };
+    return { rango: { desde, hasta }, datos: [...porVenta.values()].map((v) => ({ ...v, montoTotal: v.montoTotal.toNumber() })) };
   }
 
   async reportePorVendedor(desdeStr?: string, hastaStr?: string) {
     const { desde, hasta } = rangoPorDefecto(desdeStr, hastaStr);
     const filas = await this.comisionesRepository.listar(desde, hasta);
-    const porVendedor = new Map<string, { empleadoId: string; empleado: string; montoTotal: number; ventas: Set<string> }>();
+    const porVendedor = new Map<string, { empleadoId: string; empleado: string; montoTotal: Prisma.Decimal; ventas: Set<string> }>();
     for (const fila of filas) {
       const actual = porVendedor.get(fila.empleadoId) ?? {
         empleadoId: fila.empleadoId,
         empleado: fila.empleado.nombre,
-        montoTotal: 0,
+        montoTotal: new Prisma.Decimal(0),
         ventas: new Set<string>(),
       };
-      actual.montoTotal += Number(fila.monto);
+      actual.montoTotal = actual.montoTotal.plus(fila.monto);
       actual.ventas.add(fila.facturaId);
       porVendedor.set(fila.empleadoId, actual);
     }
@@ -140,7 +149,7 @@ export class ComisionesService {
       datos: [...porVendedor.values()].map((v) => ({
         empleadoId: v.empleadoId,
         empleado: v.empleado,
-        montoTotal: v.montoTotal,
+        montoTotal: v.montoTotal.toNumber(),
         cantidadVentas: v.ventas.size,
       })),
     };
@@ -149,18 +158,18 @@ export class ComisionesService {
   async reportePorProducto(desdeStr?: string, hastaStr?: string) {
     const { desde, hasta } = rangoPorDefecto(desdeStr, hastaStr);
     const filas = await this.comisionesRepository.listar(desde, hasta);
-    const porProducto = new Map<string, { productoId: string; producto: string; montoTotal: number; cantidadLineas: number }>();
+    const porProducto = new Map<string, { productoId: string; producto: string; montoTotal: Prisma.Decimal; cantidadLineas: number }>();
     for (const fila of filas) {
       const actual = porProducto.get(fila.productoId) ?? {
         productoId: fila.productoId,
         producto: `${fila.producto.codigo} — ${fila.producto.nombre}`,
-        montoTotal: 0,
+        montoTotal: new Prisma.Decimal(0),
         cantidadLineas: 0,
       };
-      actual.montoTotal += Number(fila.monto);
+      actual.montoTotal = actual.montoTotal.plus(fila.monto);
       actual.cantidadLineas += 1;
       porProducto.set(fila.productoId, actual);
     }
-    return { rango: { desde, hasta }, datos: [...porProducto.values()] };
+    return { rango: { desde, hasta }, datos: [...porProducto.values()].map((v) => ({ ...v, montoTotal: v.montoTotal.toNumber() })) };
   }
 }

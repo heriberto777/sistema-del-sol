@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { TASAS_TSS, TOPES_TSS } from './nomina-config';
 import { calcularIsrMensual } from './isr.util';
 
@@ -60,6 +61,15 @@ export interface ReciboCalculado {
  * disclaimer que el resto de `nomina-config.ts`) — se prefirió no arriesgar
  * el cálculo de TSS/ISR ya en producción por esta feature nueva.
  */
+/**
+ * Auditoría de redondeo: cadena completa en Decimal (mismo criterio que
+ * FacturacionService.calcularLineasYTotales) — sin ningún redondeo
+ * intermedio a centavos, igual que la versión anterior en `number` (que
+ * tampoco redondeaba nada hasta que Postgres persistía cada columna); lo
+ * único que cambia es que la aritmética ya no acumula el error binario de
+ * IEEE 754 entre la multiplicación por la tasa y el prorrateo por
+ * `factorPeriodo`.
+ */
 export function calcularRecibo(
   salarioBrutoMensual: number,
   factorPeriodo: number,
@@ -69,37 +79,48 @@ export function calcularRecibo(
   tasasTss: TasasTss = TASAS_TSS,
   topesTss: TopesTss = TOPES_TSS,
 ): ReciboCalculado {
-  const cotizableSfs = Math.min(salarioBrutoMensual, topesTss.SFS);
-  const cotizableAfp = Math.min(salarioBrutoMensual, topesTss.AFP);
+  const salarioBrutoMensualD = new Prisma.Decimal(salarioBrutoMensual);
+  const cotizableSfsD = salarioBrutoMensualD.lessThanOrEqualTo(topesTss.SFS) ? salarioBrutoMensualD : new Prisma.Decimal(topesTss.SFS);
+  const cotizableAfpD = salarioBrutoMensualD.lessThanOrEqualTo(topesTss.AFP) ? salarioBrutoMensualD : new Prisma.Decimal(topesTss.AFP);
 
-  const sfsEmpleadoMensual = cotizableSfs * tasasTss.SFS_EMPLEADO;
-  const afpEmpleadoMensual = cotizableAfp * tasasTss.AFP_EMPLEADO;
-  const sfsEmpleadorMensual = cotizableSfs * tasasTss.SFS_EMPLEADOR;
-  const afpEmpleadorMensual = cotizableAfp * tasasTss.AFP_EMPLEADOR;
-  const infotepMensual = salarioBrutoMensual * tasasTss.INFOTEP_EMPLEADOR;
+  const sfsEmpleadoMensualD = cotizableSfsD.times(tasasTss.SFS_EMPLEADO);
+  const afpEmpleadoMensualD = cotizableAfpD.times(tasasTss.AFP_EMPLEADO);
+  const sfsEmpleadorMensualD = cotizableSfsD.times(tasasTss.SFS_EMPLEADOR);
+  const afpEmpleadorMensualD = cotizableAfpD.times(tasasTss.AFP_EMPLEADOR);
+  const infotepMensualD = salarioBrutoMensualD.times(tasasTss.INFOTEP_EMPLEADOR);
 
-  const cotizableIsrMensual = salarioBrutoMensual - sfsEmpleadoMensual - afpEmpleadoMensual;
-  const isrMensual = calcularIsrMensual(cotizableIsrMensual);
+  const cotizableIsrMensualD = salarioBrutoMensualD.minus(sfsEmpleadoMensualD).minus(afpEmpleadoMensualD);
+  // calcularIsrMensual sigue en `number` de entrada/salida (también se
+  // llama sola, fuera de este flujo) — ya hace su propia aritmética en
+  // Decimal internamente.
+  const isrMensualD = new Prisma.Decimal(calcularIsrMensual(cotizableIsrMensualD.toNumber()));
 
-  const salarioBruto = salarioBrutoMensual * factorPeriodo;
-  const sfsEmpleado = sfsEmpleadoMensual * factorPeriodo;
-  const afpEmpleado = afpEmpleadoMensual * factorPeriodo;
-  const isr = isrMensual * factorPeriodo;
-  const sfsEmpleador = sfsEmpleadorMensual * factorPeriodo;
-  const afpEmpleador = afpEmpleadorMensual * factorPeriodo;
-  const infotep = infotepMensual * factorPeriodo;
+  const salarioBrutoD = salarioBrutoMensualD.times(factorPeriodo);
+  const sfsEmpleadoD = sfsEmpleadoMensualD.times(factorPeriodo);
+  const afpEmpleadoD = afpEmpleadoMensualD.times(factorPeriodo);
+  const isrD = isrMensualD.times(factorPeriodo);
+  const sfsEmpleadorD = sfsEmpleadorMensualD.times(factorPeriodo);
+  const afpEmpleadorD = afpEmpleadorMensualD.times(factorPeriodo);
+  const infotepD = infotepMensualD.times(factorPeriodo);
 
   return {
-    salarioBruto,
-    sfsEmpleado,
-    afpEmpleado,
-    isr,
+    salarioBruto: salarioBrutoD.toNumber(),
+    sfsEmpleado: sfsEmpleadoD.toNumber(),
+    afpEmpleado: afpEmpleadoD.toNumber(),
+    isr: isrD.toNumber(),
     otrasDeducciones,
     descuentoAusencias,
     montoHorasExtra,
-    salarioNeto: salarioBruto - sfsEmpleado - afpEmpleado - isr - otrasDeducciones - descuentoAusencias + montoHorasExtra,
-    sfsEmpleador,
-    afpEmpleador,
-    infotep,
+    salarioNeto: salarioBrutoD
+      .minus(sfsEmpleadoD)
+      .minus(afpEmpleadoD)
+      .minus(isrD)
+      .minus(otrasDeducciones)
+      .minus(descuentoAusencias)
+      .plus(montoHorasExtra)
+      .toNumber(),
+    sfsEmpleador: sfsEmpleadorD.toNumber(),
+    afpEmpleador: afpEmpleadorD.toNumber(),
+    infotep: infotepD.toNumber(),
   };
 }
