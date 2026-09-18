@@ -64,4 +64,30 @@ export class ClientesRepository {
   actualizar(id: string, dto: Partial<CrearClienteDto>) {
     return this.db.cliente.update({ where: { id }, data: dto });
   }
+
+  /**
+   * Estado de cuenta — mismo universo que Cuentas por Cobrar
+   * (`estado: 'EMITIDA'`, excluye BORRADOR/ANULADA) pero para TODOS los
+   * tipos de factura de un cliente puntual, no solo CRÉDITO pendiente:
+   * el signo de `total` ya viene invertido en NOTA_CREDITO (ver
+   * FacturacionService.crear, `signo = -1`), así que sumar `total` tal
+   * cual ya neta correctamente sin lógica aparte acá.
+   */
+  buscarFacturasParaEstadoCuenta(clienteId: string, desde?: Date, hasta?: Date) {
+    return this.db.factura.findMany({
+      where: {
+        clienteId,
+        estado: 'EMITIDA',
+        ...(desde || hasta ? { fecha: { ...(desde ? { gte: desde } : {}), ...(hasta ? { lte: hasta } : {}) } } : {}),
+      },
+      orderBy: { fecha: 'asc' },
+      select: { id: true, numero: true, ncf: true, tipoFactura: true, fecha: true, total: true, pagada: true },
+    });
+  }
+
+  /** Pagos parciales ya registrados contra cada factura — mismo patrón que CuentasPorCobrarRepository.sumaPagosPorFacturas. */
+  sumaPagosPorFacturas(facturaIds: string[]) {
+    if (!facturaIds.length) return Promise.resolve([]);
+    return this.db.pago.groupBy({ by: ['facturaId'], where: { facturaId: { in: facturaIds } }, _sum: { monto: true } });
+  }
 }

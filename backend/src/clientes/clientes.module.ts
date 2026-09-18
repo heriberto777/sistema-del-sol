@@ -4,9 +4,10 @@ import { ClientesController } from './clientes.controller';
 import { ClientesRepository } from './clientes.repository';
 import { ListasPrecioModule } from '../listas-precio/listas-precio.module';
 import { CategoriasClienteModule } from '../categorias-cliente/categorias-cliente.module';
+import { NotificacionesModule } from '../notificaciones/notificaciones.module';
 
 @Module({
-  imports: [ListasPrecioModule, CategoriasClienteModule],
+  imports: [ListasPrecioModule, CategoriasClienteModule, NotificacionesModule],
   controllers: [ClientesController],
   providers: [ClientesService, ClientesRepository],
   exports: [ClientesService],
