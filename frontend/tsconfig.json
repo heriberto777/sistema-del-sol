@@ -16,7 +16,11 @@
     "noFallthroughCasesInSwitch": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["src/*"],
+      // Solo para `import type` (piloto del contrato de tipos compartido,
+      // ver auditoría de comunicación frontend-backend) — nunca importar
+      // un valor real de acá, `isolatedModules` no lo permitiría emitir.
+      "@backend-src/*": ["../backend/src/*"]
     }
   },
   "include": ["src"],

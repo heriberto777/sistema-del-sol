@@ -8,6 +8,7 @@ import { Button } from '../../atoms/Button/Button';
 import { Modal } from '../../molecules/Modal/Modal';
 import { useDebouncedValue } from '../../../hooks/useDebouncedValue';
 import { PaginaResultado } from '../../../types/pagina-resultado';
+import type { ClienteBasico } from '@backend-src/common/prisma/cliente-select-basico';
 
 interface LineaFactura {
   productoId: string | null;
@@ -25,7 +26,7 @@ interface Factura {
   bodegaId: string | null;
   clienteId: string;
   total: string;
-  cliente: { nombre: string };
+  cliente: ClienteBasico;
   tieneCobro: boolean;
 }
 

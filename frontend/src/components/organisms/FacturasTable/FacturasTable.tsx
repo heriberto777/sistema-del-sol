@@ -20,6 +20,7 @@ import { BloqueTotalesDocumento } from '../../molecules/BloqueTotalesDocumento/B
 import { useDebouncedValue } from '../../../hooks/useDebouncedValue';
 import { useAuth } from '../../../hooks/useAuth';
 import { PaginaResultado } from '../../../types/pagina-resultado';
+import type { ClienteBasico } from '@backend-src/common/prisma/cliente-select-basico';
 
 interface Factura {
   id: string;
@@ -30,7 +31,7 @@ interface Factura {
   total: string;
   pagada: boolean;
   fecha: string;
-  cliente: { nombre: string };
+  cliente: ClienteBasico;
   tieneNotaAplicada: boolean;
 }
 
