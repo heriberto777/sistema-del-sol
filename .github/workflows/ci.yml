@@ -93,5 +93,18 @@ jobs:
           node-version: 20
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # El frontend importa tipos del backend vía el alias @backend-src/*
+      # (contrato de tipos compartido, ver frontend/tsconfig.json:
+      # ClienteBasico/PagoBasico/BodegaBasica/etc.) — sin generar antes el
+      # cliente de Prisma, `@prisma/client` no exporta los tipos de modelo
+      # (Bodega, Prisma, ...) y `tsc -b` falla con TS2305 (bug real
+      # encontrado: pasaba inadvertido en local porque el cliente ya
+      # estaba generado de sesiones anteriores). `prisma generate` (a
+      # diferencia de migrate/seed/etc. en este mismo package.json) no pasa
+      # por dotenv-cli — lee DATABASE_URL directo de una variable de
+      # entorno real, no hace falta un .env ni una base alcanzable.
+      - run: pnpm --filter ./backend prisma:generate
+        env:
+          DATABASE_URL: postgresql://sol:sol@localhost:5432/sistema_del_sol_test
       - run: pnpm --filter ./frontend lint
       - run: pnpm --filter ./frontend build
