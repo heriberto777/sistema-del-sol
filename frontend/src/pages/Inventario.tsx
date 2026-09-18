@@ -24,6 +24,7 @@ import { useVariantesProducto } from '../hooks/useVariantesProducto';
 import { SelectorLineaProducto } from '../components/molecules/SelectorLineaProducto/SelectorLineaProducto';
 import { PaginaResultado } from '../types/pagina-resultado';
 import { FORMATOS_IMPRESION, FormatoImpresion } from '../constants/formato-impresion';
+import { PLANTILLAS_DOCUMENTO, PlantillaDocumento } from '../constants/plantilla-documento';
 import { METODOS_APERTURA_CAJA, MetodoAperturaCaja } from '../constants/metodo-apertura-caja';
 
 interface Bodega {
@@ -31,6 +32,7 @@ interface Bodega {
   nombre: string;
   direccion: string | null;
   formatoImpresion: FormatoImpresion | null;
+  plantillaDocumento: PlantillaDocumento | null;
   metodoAperturaCaja: MetodoAperturaCaja | null;
   sucursalId: string;
   activa: boolean;
@@ -289,6 +291,8 @@ export function Inventario() {
                 <div className="mt-2 flex items-center justify-between">
                   <p className="text-xs text-slate-400">
                     {FORMATOS_IMPRESION.find((f) => f.value === bodega.formatoImpresion)?.label ?? 'Formato de la empresa'}
+                    {' · '}
+                    {PLANTILLAS_DOCUMENTO.find((p) => p.value === bodega.plantillaDocumento)?.label ?? 'Diseño de la empresa'}
                   </p>
                   <RequierePermiso permiso="admin.configuracion">
                     <div onClick={(e) => e.stopPropagation()}>
@@ -635,6 +639,7 @@ function ModalEditarBodega({ bodega, onClose }: { bodega: Bodega; onClose: () =>
   const [sucursalId, setSucursalId] = useState(bodega.sucursalId);
   const [activa, setActiva] = useState(bodega.activa);
   const [formatoImpresion, setFormatoImpresion] = useState(bodega.formatoImpresion ?? '');
+  const [plantillaDocumento, setPlantillaDocumento] = useState(bodega.plantillaDocumento ?? '');
   const [metodoAperturaCaja, setMetodoAperturaCaja] = useState(bodega.metodoAperturaCaja ?? '');
   const [error, setError] = useState<string | null>(null);
 
@@ -651,6 +656,7 @@ function ModalEditarBodega({ bodega, onClose }: { bodega: Bodega; onClose: () =>
         sucursalId,
         activa,
         formatoImpresion: formatoImpresion || null,
+        plantillaDocumento: plantillaDocumento || null,
         metodoAperturaCaja: metodoAperturaCaja || null,
       }),
     onSuccess: () => {
@@ -684,6 +690,17 @@ function ModalEditarBodega({ bodega, onClose }: { bodega: Bodega; onClose: () =>
             {FORMATOS_IMPRESION.map((f) => (
               <option key={f.value} value={f.value}>
                 {f.label}
+              </option>
+            ))}
+          </Select>
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Diseño del documento</label>
+          <Select value={plantillaDocumento} onChange={(e) => setPlantillaDocumento(e.target.value)}>
+            <option value="">Usar el default de la empresa</option>
+            {PLANTILLAS_DOCUMENTO.map((p) => (
+              <option key={p.value} value={p.value}>
+                {p.label}
               </option>
             ))}
           </Select>

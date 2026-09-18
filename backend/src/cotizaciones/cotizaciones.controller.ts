@@ -65,7 +65,7 @@ export class CotizacionesController {
     @CurrentUser() user: JwtPayloadUser,
     @Res() res: Response,
   ) {
-    const { buffer, contentType } = await this.cotizacionesService.generarImpreso(id, query.formato, user.tenantId);
+    const { buffer, contentType } = await this.cotizacionesService.generarImpreso(id, query.formato, user.tenantId, query.plantilla);
     res.set({ 'Content-Type': contentType, 'Content-Disposition': 'inline; filename="cotizacion"' });
     res.send(buffer);
   }

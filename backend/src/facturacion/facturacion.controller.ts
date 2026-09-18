@@ -81,7 +81,7 @@ export class FacturacionController {
     @CurrentUser() user: JwtPayloadUser,
     @Res() res: Response,
   ) {
-    const { buffer, contentType } = await this.facturacionService.generarImpreso(id, query.formato, user.tenantId);
+    const { buffer, contentType } = await this.facturacionService.generarImpreso(id, query.formato, user.tenantId, query.plantilla);
     res.set({ 'Content-Type': contentType, 'Content-Disposition': 'inline; filename="factura"' });
     res.send(buffer);
   }

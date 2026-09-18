@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { TenantPrismaService } from '../prisma/tenant-prisma.service';
-import { FormatoImpresion, MetodoAperturaCaja, MotivoAjusteInventario, Prisma, TipoMovimientoInventario } from '@prisma/client';
+import { FormatoImpresion, MetodoAperturaCaja, MotivoAjusteInventario, PlantillaDocumento, Prisma, TipoMovimientoInventario } from '@prisma/client';
 
 /** Un lote a acreditar en una entrada (recepción de compra, ajuste positivo, o reconstruido por una Nota de Crédito — Fase 5b). */
 export interface LoteEntrada {
@@ -610,6 +610,7 @@ export class InventarioRepository {
       sucursalId?: string;
       activa?: boolean;
       formatoImpresion?: FormatoImpresion | null;
+      plantillaDocumento?: PlantillaDocumento | null;
       metodoAperturaCaja?: MetodoAperturaCaja | null;
     },
   ) {

@@ -6,6 +6,7 @@ import { Select } from '../../atoms/Select/Select';
 import { Button } from '../../atoms/Button/Button';
 import { Card } from '../../atoms/Card/Card';
 import { FORMATOS_IMPRESION } from '../../../constants/formato-impresion';
+import { PLANTILLAS_DOCUMENTO } from '../../../constants/plantilla-documento';
 
 interface Configuracion {
   clave: string;
@@ -13,6 +14,7 @@ interface Configuracion {
 }
 
 const CLAVE_FORMATO_IMPRESION_DEFAULT = 'FORMATO_IMPRESION_DEFAULT';
+const CLAVE_PLANTILLA_DOCUMENTO_DEFAULT = 'PLANTILLA_DOCUMENTO_DEFAULT';
 
 // Ítem H-3 — logo/nota de pie tienen su propio panel con widgets adecuados
 // (CampoImagen, textarea) en vez de este input de una línea; un data URI de
@@ -31,6 +33,7 @@ function FilaConfiguracion({ configuracion }: { configuracion: Configuracion }) 
   const queryClient = useQueryClient();
   const [valor, setValor] = useState(configuracion.valor);
   const esFormatoImpresion = configuracion.clave === CLAVE_FORMATO_IMPRESION_DEFAULT;
+  const esPlantillaDocumento = configuracion.clave === CLAVE_PLANTILLA_DOCUMENTO_DEFAULT;
 
   const guardar = useMutation({
     mutationFn: async () => apiClient.put(`/admin/configuraciones/${configuracion.clave}`, { valor }),
@@ -46,6 +49,14 @@ function FilaConfiguracion({ configuracion }: { configuracion: Configuracion }) 
             {FORMATOS_IMPRESION.map((f) => (
               <option key={f.value} value={f.value}>
                 {f.label}
+              </option>
+            ))}
+          </Select>
+        ) : esPlantillaDocumento ? (
+          <Select value={valor} onChange={(e) => setValor(e.target.value)}>
+            {PLANTILLAS_DOCUMENTO.map((p) => (
+              <option key={p.value} value={p.value}>
+                {p.label}
               </option>
             ))}
           </Select>

@@ -12,10 +12,11 @@ import { paginar } from '../common/types/pagina-resultado';
 import { DocumentoPdfParams, generarDocumentoPdf } from '../common/pdf/documento-pdf';
 import { generarDocumentoTicketHtml } from '../common/pdf/documento-ticket';
 import { resolverFormatoImpresion } from '../common/impresion/resolver-formato-impresion';
+import { resolverPlantillaDocumento } from '../common/impresion/resolver-plantilla-documento';
 import { resolverPersonalizacionDocumento } from '../common/impresion/resolver-personalizacion-documento';
 import { PrismaService } from '../prisma/prisma.service';
 import { TenantPrismaService } from '../prisma/tenant-prisma.service';
-import { FormatoImpresion } from '@prisma/client';
+import { FormatoImpresion, PlantillaDocumento } from '@prisma/client';
 
 @Injectable()
 export class RemisionesService {
@@ -184,10 +185,11 @@ export class RemisionesService {
     return generarDocumentoPdf(this.mapearRemisionAParams(remision));
   }
 
-  async generarImpreso(id: string, formatoSolicitado: FormatoImpresion | undefined, tenantId: string) {
+  async generarImpreso(id: string, formatoSolicitado: FormatoImpresion | undefined, tenantId: string, plantillaSolicitada?: PlantillaDocumento) {
     const remision = await this.remisionesRepository.buscarPorId(id);
-    const [formato, personalizacion] = await Promise.all([
+    const [formato, plantilla, personalizacion] = await Promise.all([
       formatoSolicitado ?? resolverFormatoImpresion(this.prisma, tenantId, remision.bodegaId),
+      plantillaSolicitada ?? resolverPlantillaDocumento(this.prisma, tenantId, remision.bodegaId),
       resolverPersonalizacionDocumento(this.prisma, tenantId),
     ]);
     const params = { ...this.mapearRemisionAParams(remision), ...personalizacion };
@@ -195,7 +197,7 @@ export class RemisionesService {
     if (formato === 'TERMICA_80MM' || formato === 'TERMICA_58MM') {
       return { buffer: Buffer.from(generarDocumentoTicketHtml(params, formato), 'utf-8'), contentType: 'text/html; charset=utf-8' };
     }
-    const buffer = await generarDocumentoPdf(params, { tamanoPagina: formato === 'A4' ? 'a4' : 'letter' });
+    const buffer = await generarDocumentoPdf(params, { tamanoPagina: formato === 'A4' ? 'a4' : 'letter', plantilla });
     return { buffer, contentType: 'application/pdf' };
   }
 

@@ -1619,7 +1619,7 @@ describe('FacturacionService', () => {
 
       await service.generarPdf('f1');
 
-      expect(prisma.tenant.findUnique).toHaveBeenCalledWith({ where: { id: 'tenant-1' }, select: { logo: true } });
+      expect(prisma.tenant.findUnique).toHaveBeenCalledWith({ where: { id: 'tenant-1' }, select: { logo: true, nombre: true, rnc: true, direccion: true, telefono: true } });
     });
   });
 
@@ -1646,7 +1646,7 @@ describe('FacturacionService', () => {
 
       expect(contentType).toBe('application/pdf');
       expect(buffer.subarray(0, 5).toString('latin1')).toBe('%PDF-');
-      expect(prisma.tenant.findUnique).toHaveBeenCalledWith({ where: { id: 'tenant-1' }, select: { logo: true } });
+      expect(prisma.tenant.findUnique).toHaveBeenCalledWith({ where: { id: 'tenant-1' }, select: { logo: true, nombre: true, rnc: true, direccion: true, telefono: true } });
     });
   });
 

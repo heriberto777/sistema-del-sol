@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsBoolean, IsEnum, IsOptional, IsString } from 'class-validator';
-import { FormatoImpresion, MetodoAperturaCaja } from '@prisma/client';
+import { FormatoImpresion, MetodoAperturaCaja, PlantillaDocumento } from '@prisma/client';
 
 export class ActualizarBodegaDto {
   @ApiProperty({ required: false })
@@ -27,6 +27,11 @@ export class ActualizarBodegaDto {
   @IsOptional()
   @IsEnum(FormatoImpresion)
   formatoImpresion?: FormatoImpresion | null;
+
+  @ApiProperty({ enum: PlantillaDocumento, required: false, nullable: true, description: 'null = usa el default de la empresa (Configuracion[PLANTILLA_DOCUMENTO_DEFAULT]). Eje independiente de formatoImpresion (diseño visual, no tamaño de papel).' })
+  @IsOptional()
+  @IsEnum(PlantillaDocumento)
+  plantillaDocumento?: PlantillaDocumento | null;
 
   @ApiProperty({ enum: MetodoAperturaCaja, required: false, nullable: true, description: 'null = usa el default de la empresa (Configuracion[CAJA_METODO_APERTURA_DEFAULT]).' })
   @IsOptional()

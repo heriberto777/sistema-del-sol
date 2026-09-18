@@ -1,5 +1,5 @@
 import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
-import { FormatoImpresion, MetodoAperturaCaja, MotivoAjusteInventario, Prisma } from '@prisma/client';
+import { FormatoImpresion, MetodoAperturaCaja, MotivoAjusteInventario, PlantillaDocumento, Prisma } from '@prisma/client';
 import { InventarioRepository, LoteEntrada } from './inventario.repository';
 import { ProductosService } from '../productos/productos.service';
 import { VariantesService } from '../variantes/variantes.service';
@@ -527,6 +527,7 @@ export class InventarioService {
       sucursalId?: string;
       activa?: boolean;
       formatoImpresion?: FormatoImpresion | null;
+      plantillaDocumento?: PlantillaDocumento | null;
       metodoAperturaCaja?: MetodoAperturaCaja | null;
     },
   ) {

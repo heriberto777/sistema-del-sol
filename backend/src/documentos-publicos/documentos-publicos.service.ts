@@ -4,6 +4,7 @@ import { mapearFacturaAParams } from '../facturacion/mapear-factura-pdf';
 import { mapearCotizacionAParams } from '../cotizaciones/mapear-cotizacion-pdf';
 import { generarDocumentoPdf } from '../common/pdf/documento-pdf';
 import { resolverPersonalizacionDocumento } from '../common/impresion/resolver-personalizacion-documento';
+import { resolverPlantillaDocumento } from '../common/impresion/resolver-plantilla-documento';
 
 /**
  * Ítem H-4 — link público de solo lectura para que un cliente vea SU
@@ -43,8 +44,11 @@ export class DocumentosPublicosService {
 
   async obtenerFacturaPdf(id: string) {
     const factura = await this.buscarFactura(id);
-    const personalizacion = await resolverPersonalizacionDocumento(this.prisma, factura.tenantId);
-    return generarDocumentoPdf({ ...mapearFacturaAParams(factura), ...personalizacion });
+    const [personalizacion, plantilla] = await Promise.all([
+      resolverPersonalizacionDocumento(this.prisma, factura.tenantId),
+      resolverPlantillaDocumento(this.prisma, factura.tenantId, factura.bodegaId),
+    ]);
+    return generarDocumentoPdf({ ...mapearFacturaAParams(factura), ...personalizacion }, { plantilla });
   }
 
   async obtenerCotizacion(id: string) {
@@ -55,7 +59,10 @@ export class DocumentosPublicosService {
 
   async obtenerCotizacionPdf(id: string) {
     const cotizacion = await this.buscarCotizacion(id);
-    const personalizacion = await resolverPersonalizacionDocumento(this.prisma, cotizacion.tenantId);
-    return generarDocumentoPdf({ ...mapearCotizacionAParams(cotizacion), ...personalizacion });
+    const [personalizacion, plantilla] = await Promise.all([
+      resolverPersonalizacionDocumento(this.prisma, cotizacion.tenantId),
+      resolverPlantillaDocumento(this.prisma, cotizacion.tenantId, null),
+    ]);
+    return generarDocumentoPdf({ ...mapearCotizacionAParams(cotizacion), ...personalizacion }, { plantilla });
   }
 }

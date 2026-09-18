@@ -3,6 +3,7 @@ import { apiClient } from '../../../lib/api-client';
 import { mensajeErrorApi } from '../../../lib/mensaje-error-api';
 import { abrirBlob } from '../../../lib/descargar-archivo';
 import { FORMATOS_IMPRESION, FormatoImpresion } from '../../../constants/formato-impresion';
+import { PLANTILLAS_DOCUMENTO, PlantillaDocumento } from '../../../constants/plantilla-documento';
 import { Modal } from '../Modal/Modal';
 import { Select } from '../../atoms/Select/Select';
 import { Button } from '../../atoms/Button/Button';
@@ -21,8 +22,12 @@ interface ModalImprimirProps {
  */
 export function ModalImprimir({ urlBase, titulo, onClose }: ModalImprimirProps) {
   const [formato, setFormato] = useState<FormatoImpresion | ''>('');
+  const [plantilla, setPlantilla] = useState<PlantillaDocumento | ''>('');
   const [imprimiendo, setImprimiendo] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // La plantilla visual no aplica en térmico — un único layout angosto, sin variantes (ver documento-ticket.ts).
+  const muestraSelectorPlantilla = formato !== 'TERMICA_80MM' && formato !== 'TERMICA_58MM';
 
   // Enviar recibo por email/WhatsApp (plan de integración Cuadre, ítem
   // F-4) — solo existe en el backend para Facturación (recibo de venta),
@@ -39,7 +44,7 @@ export function ModalImprimir({ urlBase, titulo, onClose }: ModalImprimirProps) 
     setError(null);
     try {
       const respuesta = await apiClient.get(`${urlBase}/imprimir`, {
-        params: formato ? { formato } : undefined,
+        params: { ...(formato ? { formato } : {}), ...(muestraSelectorPlantilla && plantilla ? { plantilla } : {}) },
         responseType: 'blob',
       });
       const contentType = String(respuesta.headers['content-type'] ?? 'application/pdf');
@@ -83,6 +88,19 @@ export function ModalImprimir({ urlBase, titulo, onClose }: ModalImprimirProps) 
               ))}
             </Select>
           </div>
+          {muestraSelectorPlantilla && (
+            <div className="flex flex-col gap-1">
+              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Diseño</label>
+              <Select value={plantilla} onChange={(e) => setPlantilla(e.target.value as PlantillaDocumento | '')}>
+                <option value="">Diseño de la empresa (recomendado)</option>
+                {PLANTILLAS_DOCUMENTO.map((p) => (
+                  <option key={p.value} value={p.value}>
+                    {p.label}
+                  </option>
+                ))}
+              </Select>
+            </div>
+          )}
           {error && <p className="text-sm text-red-600">{error}</p>}
           <Button onClick={imprimir} disabled={imprimiendo} className="w-full">
             {imprimiendo ? 'Generando…' : 'Imprimir'}

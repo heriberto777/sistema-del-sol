@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto';
 import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
-import { FormatoImpresion, TipoFactura, TipoNcf } from '@prisma/client';
+import { FormatoImpresion, PlantillaDocumento, TipoFactura, TipoNcf } from '@prisma/client';
 import { FacturacionRepository } from './facturacion.repository';
 import { InventarioService } from '../inventario/inventario.service';
 import { expandirParaInventario } from '../inventario/expandir-para-inventario';
@@ -26,6 +26,7 @@ import { NotificacionesService } from '../notificaciones/notificaciones.service'
 import { EnviarReciboDto } from './dto/enviar-recibo.dto';
 import { AutorizacionesService } from '../autorizaciones/autorizaciones.service';
 import { resolverFormatoImpresion } from '../common/impresion/resolver-formato-impresion';
+import { resolverPlantillaDocumento } from '../common/impresion/resolver-plantilla-documento';
 import { resolverPersonalizacionDocumento } from '../common/impresion/resolver-personalizacion-documento';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthService } from '../auth/auth.service';
@@ -617,18 +618,20 @@ export class FacturacionService {
     return generarDocumentoPdf({ ...mapearFacturaAParams(factura), ...personalizacion });
   }
 
-  async generarImpreso(id: string, formatoSolicitado: FormatoImpresion | undefined, tenantId: string) {
+  async generarImpreso(id: string, formatoSolicitado: FormatoImpresion | undefined, tenantId: string, plantillaSolicitada?: PlantillaDocumento) {
     const factura = await this.facturacionRepository.buscarPorId(id);
-    const [formato, personalizacion] = await Promise.all([
+    const [formato, plantilla, personalizacion] = await Promise.all([
       formatoSolicitado ?? resolverFormatoImpresion(this.prisma, tenantId, factura.bodegaId),
+      plantillaSolicitada ?? resolverPlantillaDocumento(this.prisma, tenantId, factura.bodegaId),
       resolverPersonalizacionDocumento(this.prisma, tenantId),
     ]);
     const params = { ...mapearFacturaAParams(factura), ...personalizacion };
 
     if (formato === 'TERMICA_80MM' || formato === 'TERMICA_58MM') {
+      // La plantilla visual no aplica en térmico — un único layout angosto, ver documento-ticket.ts.
       return { buffer: Buffer.from(generarDocumentoTicketHtml(params, formato), 'utf-8'), contentType: 'text/html; charset=utf-8' };
     }
-    const buffer = await generarDocumentoPdf(params, { tamanoPagina: formato === 'A4' ? 'a4' : 'letter' });
+    const buffer = await generarDocumentoPdf(params, { tamanoPagina: formato === 'A4' ? 'a4' : 'letter', plantilla });
     return { buffer, contentType: 'application/pdf' };
   }
 
