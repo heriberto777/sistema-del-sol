@@ -9,6 +9,8 @@ export interface ProductoOpcion {
   id: string;
   nombre: string;
   codigo: string;
+  /** Precio de lista GENERAL, vigente — solo referencia visual (ver `onChange`), nunca el precio real a facturar. */
+  precioVenta?: string | null;
 }
 
 interface SelectorLineaProductoProps {
@@ -16,7 +18,15 @@ interface SelectorLineaProductoProps {
   productos: ProductoOpcion[];
   productoId: string;
   varianteId: string;
-  onChange: (productoId: string, varianteId: string) => void;
+  /**
+   * `precioReferencia` solo se pasa cuando se elige un producto NUEVO
+   * (no al resolver la variante por defecto) — precio de lista GENERAL,
+   * para que el formulario pueda mostrar un subtotal estimado mientras se
+   * arma el documento. Nunca confundir con el precio real: el backend
+   * resuelve el precio de verdad al guardar (lista del cliente, ofertas
+   * vigentes) y puede diferir de esta referencia.
+   */
+  onChange: (productoId: string, varianteId: string, precioReferencia?: string | null) => void;
   className?: string;
 }
 
@@ -57,7 +67,12 @@ export function SelectorLineaProducto({ productos, productoId, varianteId, onCha
 
   useEffect(() => {
     if (variantes?.length === 1 && varianteId !== variantes[0].id) {
-      onChange(productoId, variantes[0].id);
+      // Repetir `precioReferencia` (no omitirlo) — si no, este onChange
+      // "silencioso" (solo resuelve la variante única) pisaría con
+      // `undefined` el precio ya guardado por la selección del producto,
+      // ya que `TablaLineasEditable` mergea los 3 campos del onChange sin
+      // distinguir cuál vino de dónde.
+      onChange(productoId, variantes[0].id, productoElegido?.precioVenta);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [variantes]);
@@ -68,7 +83,7 @@ export function SelectorLineaProducto({ productos, productoId, varianteId, onCha
         valor={productoElegido}
         onSeleccionar={(p) => {
           setProductoElegido(p);
-          onChange(p?.id ?? '', '');
+          onChange(p?.id ?? '', '', p?.precioVenta);
         }}
         obtenerId={(p) => p.id}
         obtenerEtiqueta={(p) => `${p.codigo} — ${p.nombre}`}

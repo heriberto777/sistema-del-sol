@@ -59,6 +59,13 @@ export function ModalNuevaCotizacion({ productos, onClose }: { productos: Produc
 
   const cantidadLineas = lineas.filter((l) => l.productoId || (l.esManual && l.descripcionManual.trim())).length;
 
+  const subtotalEstimado = lineas.reduce((acc, l) => {
+    const cantidad = Number(l.cantidad) || 0;
+    if (l.esManual) return acc + cantidad * (Number(l.precioUnitario) || 0);
+    if (!l.productoId) return acc;
+    return acc + cantidad * Number(l.precioReferencia ?? 0);
+  }, 0);
+
   return (
     <ModalDocumento
       titulo="Nueva cotización"
@@ -73,6 +80,16 @@ export function ModalNuevaCotizacion({ productos, onClose }: { productos: Produc
             <span className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Líneas</span>
             <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">
               {cantidadLineas} {cantidadLineas === 1 ? 'artículo' : 'artículos'}
+            </span>
+          </div>
+
+          <div className="flex flex-col gap-1 rounded-lg bg-sol-50 p-3 dark:bg-sol-950/30">
+            <span className="text-xs font-medium uppercase tracking-wide text-sol-700 dark:text-sol-400">Subtotal estimado</span>
+            <span className="text-lg font-bold text-sol-800 dark:text-sol-300">
+              RD$ {subtotalEstimado.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </span>
+            <span className="text-[11px] leading-snug text-sol-700/70 dark:text-sol-400/70">
+              Sin ITBIS — el total exacto se calcula al guardar.
             </span>
           </div>
         </>

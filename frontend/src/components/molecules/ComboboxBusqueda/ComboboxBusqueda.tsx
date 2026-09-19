@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { useDebouncedValue } from '../../../hooks/useDebouncedValue';
 
 interface ComboboxBusquedaProps<T> {
@@ -35,7 +36,33 @@ export function ComboboxBusqueda<T>({
   const [cargando, setCargando] = useState(false);
   const [resaltado, setResaltado] = useState(0);
   const contenedorRef = useRef<HTMLDivElement>(null);
+  const listaRef = useRef<HTMLDivElement>(null);
+  const [posicion, setPosicion] = useState({ top: 0, left: 0, width: 0 });
   const textoDebounced = useDebouncedValue(texto, 300);
+  const mostrarLista = abierto && texto.trim().length > 0;
+
+  // El desplegable se porta a `document.body` (ver más abajo) para escapar
+  // de ancestros con `overflow` recortado — ej. el wrapper `overflow-x-auto`
+  // de TablaLineasEditable, que por la regla de la spec CSS ("si un eje es
+  // `visible` y el otro no, el `visible` pasa a `auto`") termina recortando
+  // en Y cualquier hijo `position: absolute` aunque visualmente debería
+  // sobresalir. Reposicionarlo en cada apertura/scroll/resize es necesario
+  // porque, al vivir fuera del árbol del contenedor, ya no se mueve solo
+  // con el layout de este.
+  useLayoutEffect(() => {
+    if (!mostrarLista) return;
+    function actualizarPosicion() {
+      const rect = contenedorRef.current?.getBoundingClientRect();
+      if (rect) setPosicion({ top: rect.bottom, left: rect.left, width: rect.width });
+    }
+    actualizarPosicion();
+    window.addEventListener('scroll', actualizarPosicion, true);
+    window.addEventListener('resize', actualizarPosicion);
+    return () => {
+      window.removeEventListener('scroll', actualizarPosicion, true);
+      window.removeEventListener('resize', actualizarPosicion);
+    };
+  }, [mostrarLista]);
 
   useEffect(() => {
     if (!abierto || textoDebounced.trim().length === 0) {
@@ -86,7 +113,12 @@ export function ComboboxBusqueda<T>({
   useEffect(() => {
     if (!abierto) return;
     function onClickFuera(e: MouseEvent) {
-      if (!contenedorRef.current?.contains(e.target as Node)) setAbierto(false);
+      const objetivo = e.target as Node;
+      // `listaRef` también se revisa porque el desplegable vive portado a
+      // `document.body` (fuera del árbol de `contenedorRef`) — sin este
+      // chequeo, el mousedown sobre una opción cerraría la lista antes de
+      // que el click en ella llegara a dispararse.
+      if (!contenedorRef.current?.contains(objetivo) && !listaRef.current?.contains(objetivo)) setAbierto(false);
     }
     document.addEventListener('mousedown', onClickFuera);
     return () => document.removeEventListener('mousedown', onClickFuera);
@@ -130,28 +162,34 @@ export function ComboboxBusqueda<T>({
         autoComplete="off"
         className={`w-full rounded-md border border-slate-300 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 ${icono ? 'pl-8 pr-3' : 'px-3'}`}
       />
-      {abierto && texto.trim().length > 0 && (
-        <div className="absolute z-50 mt-1 max-h-56 w-full overflow-auto rounded-md border border-slate-200 bg-white py-1 shadow-lg dark:border-slate-800 dark:bg-slate-900">
-          {cargando && <p className="px-3 py-2 text-sm text-slate-400">Buscando…</p>}
-          {!cargando && opciones.length === 0 && <p className="px-3 py-2 text-sm text-slate-400">Sin resultados</p>}
-          {!cargando &&
-            opciones.map((op, i) => (
-              <button
-                key={obtenerId(op)}
-                type="button"
-                onMouseEnter={() => setResaltado(i)}
-                onClick={() => seleccionar(op)}
-                className={`block w-full px-3 py-2 text-left text-sm ${
-                  i === resaltado
-                    ? 'bg-sol-50 text-sol-700 dark:bg-sol-900/30 dark:text-sol-300'
-                    : 'text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
-                }`}
-              >
-                {obtenerEtiqueta(op)}
-              </button>
-            ))}
-        </div>
-      )}
+      {mostrarLista &&
+        createPortal(
+          <div
+            ref={listaRef}
+            style={{ position: 'fixed', top: posicion.top + 4, left: posicion.left, width: posicion.width }}
+            className="z-50 max-h-56 overflow-auto rounded-md border border-slate-200 bg-white py-1 shadow-lg dark:border-slate-800 dark:bg-slate-900"
+          >
+            {cargando && <p className="px-3 py-2 text-sm text-slate-400">Buscando…</p>}
+            {!cargando && opciones.length === 0 && <p className="px-3 py-2 text-sm text-slate-400">Sin resultados</p>}
+            {!cargando &&
+              opciones.map((op, i) => (
+                <button
+                  key={obtenerId(op)}
+                  type="button"
+                  onMouseEnter={() => setResaltado(i)}
+                  onClick={() => seleccionar(op)}
+                  className={`block w-full px-3 py-2 text-left text-sm ${
+                    i === resaltado
+                      ? 'bg-sol-50 text-sol-700 dark:bg-sol-900/30 dark:text-sol-300'
+                      : 'text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
+                  }`}
+                >
+                  {obtenerEtiqueta(op)}
+                </button>
+              ))}
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }

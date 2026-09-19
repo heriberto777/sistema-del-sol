@@ -67,7 +67,13 @@ export class ProductosRepository {
   // imagen en cada tecla de búsqueda. Ver `catalogo()` para el uso que sí
   // la necesita. Mismos campos que ya devolvía este endpoint antes de
   // agregar la columna `imagen`, para no romper a ningún consumidor.
-  listar(params: { skip: number; take: number; busqueda?: string; categoriaId?: string }) {
+  //
+  // `precioVenta` (lista GENERAL, vigente) se agrega solo como referencia
+  // visual — ComboboxBusqueda/SelectorLineaProducto lo usan para un
+  // subtotal ESTIMADO mientras se arma la factura/cotización, nunca como
+  // el precio real a facturar (ese lo resuelve el backend al crear,
+  // respetando la lista de precio del cliente y ofertas vigentes).
+  async listar(params: { skip: number; take: number; busqueda?: string; categoriaId?: string }) {
     const where = this.whereBusqueda(params.busqueda, params.categoriaId);
     const select = {
       id: true,
@@ -88,11 +94,18 @@ export class ProductosRepository {
       montoComisionFijo: true,
       controlaVencimiento: true,
       destacado: true,
+      variantes: {
+        take: 1,
+        orderBy: { createdAt: 'asc' as const },
+        select: { precios: { where: { listaPrecio: 'GENERAL', vigenteHasta: null }, select: { precioVenta: true }, take: 1 } },
+      },
     } as const;
-    return Promise.all([
+    const [filas, total] = await Promise.all([
       this.db.producto.findMany({ where, orderBy: { nombre: 'asc' }, skip: params.skip, take: params.take, select }),
       this.db.producto.count({ where }),
     ]);
+    const datos = filas.map(({ variantes, ...producto }) => ({ ...producto, precioVenta: variantes[0]?.precios[0]?.precioVenta ?? null }));
+    return [datos, total] as const;
   }
 
   /**

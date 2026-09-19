@@ -185,6 +185,17 @@ function ModalNuevaFactura({ onClose }: { onClose: () => void }) {
   }
 
   const cantidadLineas = lineas.filter((l) => l.productoId || (l.esManual && l.descripcionManual.trim())).length;
+  // Estimado: para una línea de catálogo sin precio explícito, usa el
+  // precio de lista GENERAL que trajo la búsqueda (precioReferencia) —
+  // el precio real (lista del cliente, ofertas vigentes) lo resuelve el
+  // backend recién al guardar, por eso esto es "estimado", no el total.
+  const subtotalEstimado = lineas.reduce((acc, l) => {
+    const cantidad = Number(l.cantidad) || 0;
+    if (l.esManual) return acc + cantidad * (Number(l.precioUnitario) || 0);
+    if (!l.productoId) return acc;
+    const precio = l.precioUnitario ? Number(l.precioUnitario) : Number(l.precioReferencia ?? 0);
+    return acc + cantidad * precio;
+  }, 0);
 
   return (
     <ModalDocumento
@@ -203,7 +214,17 @@ function ModalNuevaFactura({ onClose }: { onClose: () => void }) {
             </span>
           </div>
 
-          <div className="flex flex-col gap-1.5 border-t border-slate-200 pt-3 dark:border-slate-800">
+          <div className="flex flex-col gap-1 rounded-lg bg-sol-50 p-3 dark:bg-sol-950/30">
+            <span className="text-xs font-medium uppercase tracking-wide text-sol-700 dark:text-sol-400">Subtotal estimado</span>
+            <span className="text-lg font-bold text-sol-800 dark:text-sol-300">
+              RD$ {subtotalEstimado.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </span>
+            <span className="text-[11px] leading-snug text-sol-700/70 dark:text-sol-400/70">
+              Sin ITBIS ni descuentos — el total exacto se calcula al guardar.
+            </span>
+          </div>
+
+          <div className="flex flex-col gap-1.5 border-t border-slate-200 pt-6 dark:border-slate-800">
             <span className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Descuento general</span>
             <Select
               value={descuentoGeneralTipo}
@@ -280,10 +301,6 @@ function ModalNuevaFactura({ onClose }: { onClose: () => void }) {
               </div>
             ))}
           </div>
-
-          <p className="text-xs text-slate-400 dark:text-slate-500">
-            El subtotal, ITBIS y total exactos se calculan al guardar (dependen de precios de catálogo, ofertas vigentes y descuentos).
-          </p>
         </>
       }
       acciones={

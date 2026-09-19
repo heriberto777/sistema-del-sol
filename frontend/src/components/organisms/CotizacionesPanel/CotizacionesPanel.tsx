@@ -76,6 +76,8 @@ export type LineaForm = {
   esManual: boolean;
   descripcionManual: string;
   precioUnitario: string;
+  /** Precio de lista GENERAL del producto elegido — solo para el subtotal estimado del panel lateral, nunca se envía al backend. */
+  precioReferencia?: string | null;
 };
 
 export const LINEA_VACIA: LineaForm = { productoId: '', varianteId: '', cantidad: '1', esManual: false, descripcionManual: '', precioUnitario: '' };
