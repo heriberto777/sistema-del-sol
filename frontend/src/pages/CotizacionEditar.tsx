@@ -1,36 +1,36 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { User } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { apiClient } from '../../../lib/api-client';
-import { Modal } from '../../molecules/Modal/Modal';
-import { ModalDocumento } from '../../molecules/ModalDocumento/ModalDocumento';
-import { FormField } from '../../molecules/FormField/FormField';
-import { ComboboxBusqueda } from '../../molecules/ComboboxBusqueda/ComboboxBusqueda';
-import { SelectorLineaProducto } from '../../molecules/SelectorLineaProducto/SelectorLineaProducto';
-import { Button } from '../../atoms/Button/Button';
-import { PaginaResultado } from '../../../types/pagina-resultado';
-import { mensajeErrorApi } from '../../../lib/mensaje-error-api';
-import { Cliente, Cotizacion, Producto, LineaForm, LINEA_VACIA } from './CotizacionesPanel';
+import { useNavigate, useParams } from 'react-router-dom';
+import { apiClient } from '../lib/api-client';
+import { PaginaDocumento } from '../components/molecules/PaginaDocumento/PaginaDocumento';
+import { FormField } from '../components/molecules/FormField/FormField';
+import { ComboboxBusqueda } from '../components/molecules/ComboboxBusqueda/ComboboxBusqueda';
+import { SelectorLineaProducto } from '../components/molecules/SelectorLineaProducto/SelectorLineaProducto';
+import { Button } from '../components/atoms/Button/Button';
+import { PaginaResultado } from '../types/pagina-resultado';
+import { mensajeErrorApi } from '../lib/mensaje-error-api';
+import { useHayCambios } from '../hooks/useHayCambios';
+import { estimarLineas } from '../lib/estimar-totales-documento';
+import type { Cliente, Cotizacion, Producto, LineaForm } from '../components/organisms/CotizacionesPanel/CotizacionesPanel';
 
-export function ModalEditarCotizacion({
-  cotizacionId,
-  numeroActual,
-  productos,
-  onClose,
-}: {
-  cotizacionId: string;
-  numeroActual: string;
-  productos: Producto[];
-  onClose: () => void;
-}) {
+export function CotizacionEditar() {
+  const { id } = useParams<{ id: string }>();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
   const [cliente, setCliente] = useState<Cliente | null>(null);
   const [valores, setValores] = useState<{ fechaVigenciaHasta: string; lineas: LineaForm[] } | null>(null);
 
+  const { data: productos } = useQuery({
+    queryKey: ['productos-select'],
+    queryFn: async () => (await apiClient.get<PaginaResultado<Producto>>('/productos', { params: { tamanoPagina: 100 } })).data.datos,
+  });
+
   const { data: detalle } = useQuery({
-    queryKey: ['cotizacion-detalle', cotizacionId],
-    queryFn: async () => (await apiClient.get<Cotizacion>(`/cotizaciones/${cotizacionId}`)).data,
+    queryKey: ['cotizacion-detalle', id],
+    queryFn: async () => (await apiClient.get<Cotizacion>(`/cotizaciones/${id}`)).data,
+    enabled: !!id,
   });
 
   useEffect(() => {
@@ -51,7 +51,7 @@ export function ModalEditarCotizacion({
 
   const guardar = useMutation({
     mutationFn: async () =>
-      apiClient.patch(`/cotizaciones/${cotizacionId}`, {
+      apiClient.patch(`/cotizaciones/${id}`, {
         clienteId: cliente?.id,
         fechaVigenciaHasta: valores!.fechaVigenciaHasta,
         lineas: valores!.lineas
@@ -64,7 +64,11 @@ export function ModalEditarCotizacion({
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['cotizaciones'] });
-      onClose();
+      // Ver el comentario equivalente en FacturacionNueva.tsx — sin esto,
+      // el guard de salir sin guardar bloqueaba este mismo `navigate()`
+      // justo después de guardar bien.
+      confirmarGuardado();
+      setTimeout(() => navigate('/cotizaciones'), 0);
     },
     onError: (err) => setError(mensajeErrorApi(err, 'No se pudo guardar la cotización. Revisa los datos.')),
   });
@@ -83,27 +87,26 @@ export function ModalEditarCotizacion({
     guardar.mutate();
   }
 
+  const [haycambios, confirmarGuardado] = useHayCambios({ cliente, valores }, valores !== null);
+
   if (!valores) {
     return (
-      <Modal titulo={`Editar cotización ${numeroActual}`} onClose={onClose}>
+      <div className="space-y-4">
         <p className="text-sm text-slate-500 dark:text-slate-400">Cargando…</p>
-      </Modal>
+      </div>
     );
   }
 
   const cantidadLineas = valores.lineas.filter((l) => l.productoId || (l.esManual && l.descripcionManual.trim())).length;
-  const subtotalEstimado = valores.lineas.reduce((acc, l) => {
-    const cantidad = Number(l.cantidad) || 0;
-    if (l.esManual) return acc + cantidad * (Number(l.precioUnitario) || 0);
-    if (!l.productoId) return acc;
-    const precio = l.precioUnitario ? Number(l.precioUnitario) : Number(l.precioReferencia ?? 0);
-    return acc + cantidad * precio;
-  }, 0);
+  const { subtotal, itbis } = estimarLineas(valores.lineas);
+  const total = subtotal + itbis;
 
   return (
-    <ModalDocumento
-      titulo={`Editar cotización ${numeroActual}`}
-      onClose={onClose}
+    <PaginaDocumento
+      titulo={`Editar cotización ${detalle?.numero ?? ''}`}
+      rutaVolver="/cotizaciones"
+      etiquetaVolver="Volver a Cotizaciones"
+      haycambios={haycambios}
       resumen={
         <>
           <div className="flex flex-col gap-1">
@@ -117,14 +120,25 @@ export function ModalEditarCotizacion({
             </span>
           </div>
 
-          <div className="flex flex-col gap-1 rounded-lg bg-sol-50 p-3 dark:bg-sol-950/30">
-            <span className="text-xs font-medium uppercase tracking-wide text-sol-700 dark:text-sol-400">Subtotal estimado</span>
-            <span className="text-lg font-bold text-sol-800 dark:text-sol-300">
-              RD$ {subtotalEstimado.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </span>
-            <span className="text-[11px] leading-snug text-sol-700/70 dark:text-sol-400/70">
-              Sin ITBIS — el total exacto se calcula al guardar.
-            </span>
+          <div className="flex flex-col gap-2 rounded-lg bg-sol-50 p-3 dark:bg-sol-950/30">
+            <span className="text-xs font-medium uppercase tracking-wide text-sol-700 dark:text-sol-400">Resumen estimado</span>
+            <div className="flex flex-col gap-1 text-sm text-slate-700 dark:text-slate-300">
+              <div className="flex justify-between">
+                <span>Subtotal</span>
+                <span className="font-mono tabular-nums">RD$ {subtotal.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>ITBIS</span>
+                <span className="font-mono tabular-nums">RD$ {itbis.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              </div>
+            </div>
+            <div className="flex items-baseline justify-between border-t border-sol-200 pt-2 dark:border-sol-800">
+              <span className="text-xs font-semibold uppercase tracking-wide text-sol-700 dark:text-sol-400">Total estimado</span>
+              <span className="text-lg font-bold text-sol-800 dark:text-sol-300">
+                RD$ {total.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </span>
+            </div>
+            <span className="text-[11px] leading-snug text-sol-700/70 dark:text-sol-400/70">El total exacto se calcula al guardar.</span>
           </div>
         </>
       }
@@ -134,12 +148,15 @@ export function ModalEditarCotizacion({
           <Button type="submit" form="form-editar-cotizacion" disabled={guardar.isPending} className="w-full">
             {guardar.isPending ? 'Guardando…' : 'Guardar'}
           </Button>
+          <Button type="button" variante="secundario" className="w-full" onClick={() => navigate('/cotizaciones')}>
+            Cancelar
+          </Button>
         </>
       }
     >
       <form id="form-editar-cotizacion" onSubmit={onSubmit} className="space-y-3">
         <p className="text-sm text-slate-500 dark:text-slate-400">
-          Número <span className="font-medium text-slate-700 dark:text-slate-300">{numeroActual}</span> (asignado automáticamente, no editable)
+          Número <span className="font-medium text-slate-700 dark:text-slate-300">{detalle?.numero}</span> (asignado automáticamente, no editable)
         </p>
         <div className="flex flex-col gap-1">
           <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Cliente</label>
@@ -180,13 +197,13 @@ export function ModalEditarCotizacion({
                 />
               ) : (
                 <SelectorLineaProducto
-                  productos={productos}
+                  productos={productos ?? []}
                   productoId={linea.productoId}
                   varianteId={linea.varianteId}
-                  onChange={(productoId, varianteId, precioReferencia) =>
+                  onChange={(productoId, varianteId, precioReferencia, itbisReferencia) =>
                     setValores({
                       ...valores,
-                      lineas: valores.lineas.map((l, idx) => (idx === i ? { ...l, productoId, varianteId, precioReferencia } : l)),
+                      lineas: valores.lineas.map((l, idx) => (idx === i ? { ...l, productoId, varianteId, precioReferencia, itbisReferencia } : l)),
                     })
                   }
                   className="min-w-[160px] flex-1"
@@ -241,11 +258,20 @@ export function ModalEditarCotizacion({
               )}
             </div>
           ))}
-          <Button type="button" variante="secundario" onClick={() => setValores({ ...valores, lineas: [...valores.lineas, LINEA_VACIA] })}>
+          <Button
+            type="button"
+            variante="secundario"
+            onClick={() =>
+              setValores({
+                ...valores,
+                lineas: [...valores.lineas, { productoId: '', varianteId: '', cantidad: '1', esManual: false, descripcionManual: '', precioUnitario: '' }],
+              })
+            }
+          >
             + Línea
           </Button>
         </div>
       </form>
-    </ModalDocumento>
+    </PaginaDocumento>
   );
 }

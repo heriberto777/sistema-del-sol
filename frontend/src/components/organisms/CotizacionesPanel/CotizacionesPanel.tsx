@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Eye } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../../../lib/api-client';
 import { ModalImprimir } from '../../molecules/ModalImprimir/ModalImprimir';
 import { RowActionsMenu } from '../../molecules/RowActionsMenu/RowActionsMenu';
@@ -14,16 +15,14 @@ import { useAuth } from '../../../hooks/useAuth';
 import { PaginaResultado } from '../../../types/pagina-resultado';
 import type { ClienteBasico } from '@backend-src/common/prisma/cliente-select-basico';
 import { ModalDetalleCotizacion } from './ModalDetalleCotizacion';
-import { ModalNuevaCotizacion } from './ModalNuevaCotizacion';
-import { ModalEditarCotizacion } from './ModalEditarCotizacion';
 import { ModalConvertirCotizacion } from './ModalConvertirCotizacion';
 
-// Solo id/nombre — es lo único que los modales de este panel leen de
-// Cliente (combobox de búsqueda + preselección al editar). `ClienteBasico`
-// sigue siendo la fuente real; acotarlo acá con Pick evita forzar campos
-// que nunca se usan. Exportado — lo comparten ModalNuevaCotizacion/
-// ModalEditarCotizacion (auditoría de estructura: modales extraídos a su
-// propio archivo, mismo criterio que ModalRegistrarCobro/ModalRegistrarPagoOrdenCompra).
+// Solo id/nombre — es lo único que las páginas de Nueva/Editar cotización
+// leen de Cliente (combobox de búsqueda + preselección al editar).
+// `ClienteBasico` sigue siendo la fuente real; acotarlo acá con Pick evita
+// forzar campos que nunca se usan. Exportado — lo comparten
+// CotizacionNueva/CotizacionEditar (frontend/src/pages), páginas en vez de
+// modales desde el Modelo B de la exploración "modal o página".
 export type Cliente = Pick<ClienteBasico, 'id' | 'nombre'>;
 
 export interface Producto {
@@ -78,6 +77,8 @@ export type LineaForm = {
   precioUnitario: string;
   /** Precio de lista GENERAL del producto elegido — solo para el subtotal estimado del panel lateral, nunca se envía al backend. */
   precioReferencia?: string | null;
+  /** % de ITBIS del producto elegido — junto con `precioReferencia`, solo para estimar el ITBIS del panel lateral, nunca se envía al backend. */
+  itbisReferencia?: string | number | null;
 };
 
 export const LINEA_VACIA: LineaForm = { productoId: '', varianteId: '', cantidad: '1', esManual: false, descripcionManual: '', precioUnitario: '' };
@@ -85,20 +86,14 @@ export const LINEA_VACIA: LineaForm = { productoId: '', varianteId: '', cantidad
 export function CotizacionesPanel() {
   const queryClient = useQueryClient();
   const { tienePermiso } = useAuth();
+  const navigate = useNavigate();
   const [busqueda, setBusqueda] = useState('');
   const [pagina, setPagina] = useState(1);
   const busquedaDebounced = useDebouncedValue(busqueda);
-  const [modalNuevaCotizacion, setModalNuevaCotizacion] = useState(false);
 
-  const [cotizacionEditando, setCotizacionEditando] = useState<Cotizacion | null>(null);
   const [cotizacionConvirtiendo, setCotizacionConvirtiendo] = useState<Cotizacion | null>(null);
   const [cotizacionImprimiendo, setCotizacionImprimiendo] = useState<Cotizacion | null>(null);
   const [cotizacionViendo, setCotizacionViendo] = useState<Cotizacion | null>(null);
-
-  const { data: productos } = useQuery({
-    queryKey: ['productos-select'],
-    queryFn: async () => (await apiClient.get<PaginaResultado<Producto>>('/productos', { params: { tamanoPagina: 100 } })).data.datos,
-  });
 
   const { data } = useQuery({
     queryKey: ['cotizaciones', pagina, busquedaDebounced],
@@ -132,7 +127,7 @@ export function CotizacionesPanel() {
               }}
               placeholder="Buscar por número o cliente…"
             />
-            {tienePermiso('cotizaciones.crear') && <Button onClick={() => setModalNuevaCotizacion(true)}>Nueva cotización</Button>}
+            {tienePermiso('cotizaciones.crear') && <Button onClick={() => navigate('/cotizaciones/nueva')}>Nueva cotización</Button>}
           </div>
         }
       >
@@ -153,7 +148,7 @@ export function CotizacionesPanel() {
                 const acciones = [
                   { etiqueta: 'Imprimir', onClick: () => setCotizacionImprimiendo(cotizacion) },
                   ...(tienePermiso('cotizaciones.editar') && cotizacion.estado === 'BORRADOR'
-                    ? [{ etiqueta: 'Editar', onClick: () => setCotizacionEditando(cotizacion) }]
+                    ? [{ etiqueta: 'Editar', onClick: () => navigate(`/cotizaciones/${cotizacion.id}/editar`) }]
                     : []),
                   ...(tienePermiso('cotizaciones.editar') && cotizacion.estado === 'BORRADOR'
                     ? [{ etiqueta: 'Enviar', onClick: () => cambiarEstado.mutate({ id: cotizacion.id, estado: 'ENVIADA' }) }]
@@ -210,18 +205,6 @@ export function CotizacionesPanel() {
         )}
       </Card>
 
-      {modalNuevaCotizacion && (
-        <ModalNuevaCotizacion productos={productos ?? []} onClose={() => setModalNuevaCotizacion(false)} />
-      )}
-
-      {cotizacionEditando && (
-        <ModalEditarCotizacion
-          cotizacionId={cotizacionEditando.id}
-          numeroActual={cotizacionEditando.numero}
-          productos={productos ?? []}
-          onClose={() => setCotizacionEditando(null)}
-        />
-      )}
       {cotizacionConvirtiendo && (
         <ModalConvertirCotizacion cotizacion={cotizacionConvirtiendo} onClose={() => setCotizacionConvirtiendo(null)} />
       )}

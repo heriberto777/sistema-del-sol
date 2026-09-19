@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Eye } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../../../lib/api-client';
 import type { ClienteBasico } from '@backend-src/common/prisma/cliente-select-basico';
 import type { BodegaBasica } from '@backend-src/common/prisma/bodega-select-basico';
@@ -15,16 +16,14 @@ import { useDebouncedValue } from '../../../hooks/useDebouncedValue';
 import { useAuth } from '../../../hooks/useAuth';
 import { PaginaResultado } from '../../../types/pagina-resultado';
 import { ModalDetalleRemision } from './ModalDetalleRemision';
-import { ModalNuevaRemision } from './ModalNuevaRemision';
-import { ModalEditarRemision } from './ModalEditarRemision';
 import { ModalConvertirRemision } from './ModalConvertirRemision';
 
-// Solo id/nombre — es lo único que los modales de este panel leen de
-// Cliente (combobox de búsqueda + preselección al editar). `ClienteBasico`
-// sigue siendo la fuente real; acotarlo acá con Pick evita forzar campos
-// que nunca se usan. Exportado — lo comparten los modales extraídos a su
-// propio archivo (auditoría de estructura, mismo criterio que
-// ModalRegistrarCobro/ModalRegistrarPagoOrdenCompra).
+// Solo id/nombre — es lo único que las páginas de Nueva/Editar remisión
+// leen de Cliente (combobox de búsqueda + preselección al editar).
+// `ClienteBasico` sigue siendo la fuente real; acotarlo acá con Pick evita
+// forzar campos que nunca se usan. Exportado — lo comparten
+// RemisionNueva/RemisionEditar (frontend/src/pages), páginas en vez de
+// modales desde el Modelo B de la exploración "modal o página".
 export type Cliente = Pick<ClienteBasico, 'id' | 'nombre'>;
 
 export interface Producto {
@@ -66,24 +65,14 @@ export type LineaForm = { productoId: string; varianteId: string; cantidad: stri
 export function RemisionesPanel() {
   const queryClient = useQueryClient();
   const { tienePermiso } = useAuth();
+  const navigate = useNavigate();
   const [busqueda, setBusqueda] = useState('');
   const [pagina, setPagina] = useState(1);
   const busquedaDebounced = useDebouncedValue(busqueda);
-  const [modalNuevaRemision, setModalNuevaRemision] = useState(false);
 
-  const [remisionEditando, setRemisionEditando] = useState<Remision | null>(null);
   const [remisionConvirtiendo, setRemisionConvirtiendo] = useState<Remision | null>(null);
   const [remisionImprimiendo, setRemisionImprimiendo] = useState<Remision | null>(null);
   const [remisionViendo, setRemisionViendo] = useState<Remision | null>(null);
-
-  const { data: productos } = useQuery({
-    queryKey: ['productos-select'],
-    queryFn: async () => (await apiClient.get<PaginaResultado<Producto>>('/productos', { params: { tamanoPagina: 100 } })).data.datos,
-  });
-  const { data: bodegas } = useQuery({
-    queryKey: ['bodegas-select'],
-    queryFn: async () => (await apiClient.get<Bodega[]>('/inventario/bodegas')).data,
-  });
 
   const { data } = useQuery({
     queryKey: ['remisiones', pagina, busquedaDebounced],
@@ -117,7 +106,7 @@ export function RemisionesPanel() {
               }}
               placeholder="Buscar por número o cliente…"
             />
-            {tienePermiso('remisiones.crear') && <Button onClick={() => setModalNuevaRemision(true)}>Nueva remisión</Button>}
+            {tienePermiso('remisiones.crear') && <Button onClick={() => navigate('/remisiones/nueva')}>Nueva remisión</Button>}
           </div>
         }
       >
@@ -136,7 +125,7 @@ export function RemisionesPanel() {
                 const acciones = [
                   { etiqueta: 'Imprimir', onClick: () => setRemisionImprimiendo(remision) },
                   ...(tienePermiso('remisiones.editar') && remision.estado === 'BORRADOR'
-                    ? [{ etiqueta: 'Editar', onClick: () => setRemisionEditando(remision) }]
+                    ? [{ etiqueta: 'Editar', onClick: () => navigate(`/remisiones/${remision.id}/editar`) }]
                     : []),
                   ...(tienePermiso('remisiones.editar') && remision.estado === 'BORRADOR'
                     ? [{ etiqueta: 'Marcar entregada', onClick: () => cambiarEstado.mutate({ id: remision.id, estado: 'ENTREGADA' }) }]
@@ -188,19 +177,6 @@ export function RemisionesPanel() {
         )}
       </Card>
 
-      {modalNuevaRemision && (
-        <ModalNuevaRemision productos={productos ?? []} bodegas={bodegas ?? []} onClose={() => setModalNuevaRemision(false)} />
-      )}
-
-      {remisionEditando && (
-        <ModalEditarRemision
-          remisionId={remisionEditando.id}
-          numeroActual={remisionEditando.numero}
-          productos={productos ?? []}
-          bodegas={bodegas ?? []}
-          onClose={() => setRemisionEditando(null)}
-        />
-      )}
       {remisionConvirtiendo && (
         <ModalConvertirRemision remision={remisionConvirtiendo} onClose={() => setRemisionConvirtiendo(null)} />
       )}

@@ -1,23 +1,34 @@
 import { FormEvent, useState } from 'react';
 import { User } from 'lucide-react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { apiClient } from '../../../lib/api-client';
-import { ModalDocumento } from '../../molecules/ModalDocumento/ModalDocumento';
-import { Card } from '../../atoms/Card/Card';
-import { FormField } from '../../molecules/FormField/FormField';
-import { ComboboxBusqueda } from '../../molecules/ComboboxBusqueda/ComboboxBusqueda';
-import { TablaLineasEditable } from '../../molecules/TablaLineasEditable/TablaLineasEditable';
-import { Button } from '../../atoms/Button/Button';
-import { PaginaResultado } from '../../../types/pagina-resultado';
-import { mensajeErrorApi } from '../../../lib/mensaje-error-api';
-import { Cliente, Producto, LineaForm, LINEA_VACIA } from './CotizacionesPanel';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
+import { apiClient } from '../lib/api-client';
+import { PaginaDocumento } from '../components/molecules/PaginaDocumento/PaginaDocumento';
+import { Card } from '../components/atoms/Card/Card';
+import { FormField } from '../components/molecules/FormField/FormField';
+import { ComboboxBusqueda } from '../components/molecules/ComboboxBusqueda/ComboboxBusqueda';
+import { TablaLineasEditable } from '../components/molecules/TablaLineasEditable/TablaLineasEditable';
+import { Button } from '../components/atoms/Button/Button';
+import { PaginaResultado } from '../types/pagina-resultado';
+import { mensajeErrorApi } from '../lib/mensaje-error-api';
+import { useHayCambios } from '../hooks/useHayCambios';
+import { estimarLineas } from '../lib/estimar-totales-documento';
+import type { Cliente, Producto, LineaForm } from '../components/organisms/CotizacionesPanel/CotizacionesPanel';
 
-export function ModalNuevaCotizacion({ productos, onClose }: { productos: Producto[]; onClose: () => void }) {
+const LINEA_VACIA: LineaForm = { productoId: '', varianteId: '', cantidad: '1', esManual: false, descripcionManual: '', precioUnitario: '' };
+
+export function CotizacionNueva() {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [cliente, setCliente] = useState<Cliente | null>(null);
   const [fechaVigenciaHasta, setFechaVigenciaHasta] = useState('');
   const [lineas, setLineas] = useState<LineaForm[]>([LINEA_VACIA]);
   const [error, setError] = useState<string | null>(null);
+
+  const { data: productos } = useQuery({
+    queryKey: ['productos-select'],
+    queryFn: async () => (await apiClient.get<PaginaResultado<Producto>>('/productos', { params: { tamanoPagina: 100 } })).data.datos,
+  });
 
   const crear = useMutation({
     mutationFn: async () =>
@@ -34,7 +45,11 @@ export function ModalNuevaCotizacion({ productos, onClose }: { productos: Produc
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['cotizaciones'] });
-      onClose();
+      // Ver el comentario equivalente en FacturacionNueva.tsx — sin esto,
+      // el guard de salir sin guardar bloqueaba este mismo `navigate()`
+      // justo después de guardar bien.
+      confirmarGuardado();
+      setTimeout(() => navigate('/cotizaciones'), 0);
     },
     onError: (err) => setError(mensajeErrorApi(err, 'No se pudo crear la cotización. Revisa los datos.')),
   });
@@ -58,18 +73,16 @@ export function ModalNuevaCotizacion({ productos, onClose }: { productos: Produc
   }
 
   const cantidadLineas = lineas.filter((l) => l.productoId || (l.esManual && l.descripcionManual.trim())).length;
-
-  const subtotalEstimado = lineas.reduce((acc, l) => {
-    const cantidad = Number(l.cantidad) || 0;
-    if (l.esManual) return acc + cantidad * (Number(l.precioUnitario) || 0);
-    if (!l.productoId) return acc;
-    return acc + cantidad * Number(l.precioReferencia ?? 0);
-  }, 0);
+  const { subtotal, itbis } = estimarLineas(lineas);
+  const total = subtotal + itbis;
+  const [haycambios, confirmarGuardado] = useHayCambios({ cliente, fechaVigenciaHasta, lineas });
 
   return (
-    <ModalDocumento
+    <PaginaDocumento
       titulo="Nueva cotización"
-      onClose={onClose}
+      rutaVolver="/cotizaciones"
+      etiquetaVolver="Volver a Cotizaciones"
+      haycambios={haycambios}
       resumen={
         <>
           <div className="flex flex-col gap-1">
@@ -83,14 +96,25 @@ export function ModalNuevaCotizacion({ productos, onClose }: { productos: Produc
             </span>
           </div>
 
-          <div className="flex flex-col gap-1 rounded-lg bg-sol-50 p-3 dark:bg-sol-950/30">
-            <span className="text-xs font-medium uppercase tracking-wide text-sol-700 dark:text-sol-400">Subtotal estimado</span>
-            <span className="text-lg font-bold text-sol-800 dark:text-sol-300">
-              RD$ {subtotalEstimado.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </span>
-            <span className="text-[11px] leading-snug text-sol-700/70 dark:text-sol-400/70">
-              Sin ITBIS — el total exacto se calcula al guardar.
-            </span>
+          <div className="flex flex-col gap-2 rounded-lg bg-sol-50 p-3 dark:bg-sol-950/30">
+            <span className="text-xs font-medium uppercase tracking-wide text-sol-700 dark:text-sol-400">Resumen estimado</span>
+            <div className="flex flex-col gap-1 text-sm text-slate-700 dark:text-slate-300">
+              <div className="flex justify-between">
+                <span>Subtotal</span>
+                <span className="font-mono tabular-nums">RD$ {subtotal.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>ITBIS</span>
+                <span className="font-mono tabular-nums">RD$ {itbis.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              </div>
+            </div>
+            <div className="flex items-baseline justify-between border-t border-sol-200 pt-2 dark:border-sol-800">
+              <span className="text-xs font-semibold uppercase tracking-wide text-sol-700 dark:text-sol-400">Total estimado</span>
+              <span className="text-lg font-bold text-sol-800 dark:text-sol-300">
+                RD$ {total.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </span>
+            </div>
+            <span className="text-[11px] leading-snug text-sol-700/70 dark:text-sol-400/70">El total exacto se calcula al guardar.</span>
           </div>
         </>
       }
@@ -99,6 +123,9 @@ export function ModalNuevaCotizacion({ productos, onClose }: { productos: Produc
           {error && <p className="text-sm text-red-600">{error}</p>}
           <Button type="submit" form="form-nueva-cotizacion" disabled={crear.isPending} className="w-full">
             {crear.isPending ? 'Creando…' : 'Crear cotización'}
+          </Button>
+          <Button type="button" variante="secundario" className="w-full" onClick={() => navigate('/cotizaciones')}>
+            Cancelar
           </Button>
         </>
       }
@@ -132,7 +159,7 @@ export function ModalNuevaCotizacion({ productos, onClose }: { productos: Produc
         <Card titulo="Líneas">
           <TablaLineasEditable
             lineas={lineas}
-            productos={productos}
+            productos={productos ?? []}
             lineaVacia={LINEA_VACIA}
             onActualizar={actualizarLinea}
             onQuitar={(i) => setLineas((prev) => prev.filter((_, idx) => idx !== i))}
@@ -141,6 +168,6 @@ export function ModalNuevaCotizacion({ productos, onClose }: { productos: Produc
           />
         </Card>
       </form>
-    </ModalDocumento>
+    </PaginaDocumento>
   );
 }

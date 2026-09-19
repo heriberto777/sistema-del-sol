@@ -9,7 +9,7 @@ interface Opcion {
 }
 
 const OPCIONES: Opcion[] = [
-  { etiqueta: 'Nueva factura', ruta: '/facturacion?crear=1', permiso: 'facturacion.crear' },
+  { etiqueta: 'Nueva factura', ruta: '/facturacion/nueva', permiso: 'facturacion.crear' },
   { etiqueta: 'Nuevo cliente', ruta: '/contactos?crear=cliente', permiso: 'clientes.crear' },
   { etiqueta: 'Nuevo proveedor', ruta: '/contactos?crear=proveedor', permiso: 'compras.crear' },
   { etiqueta: 'Nuevo producto', ruta: '/productos?crear=1', permiso: 'precios.editar' },
@@ -19,7 +19,9 @@ const OPCIONES: Opcion[] = [
 
 /**
  * Botón "+" global en la barra superior — acceso rápido a crear desde
- * cualquier pantalla, sin tener que navegar primero al módulo. Cada opción
+ * cualquier pantalla, sin tener que navegar primero al módulo. "Nueva
+ * factura" navega directo a su propia ruta (`/facturacion/nueva`, Modelo B
+ * de la exploración "modal o página"); el resto sigue el patrón anterior —
  * navega a la página dueña del formulario con `?crear=…`, que la página lee
  * al montar para abrir su modal (ver Contactos/Productos/Compras/Inventario).
  */

@@ -11,8 +11,13 @@ import { PlatformOlvidePassword } from './pages/PlatformOlvidePassword';
 import { PlatformRestablecerPassword } from './pages/PlatformRestablecerPassword';
 import { Dashboard } from './pages/Dashboard';
 import { Facturacion } from './pages/Facturacion';
+import { FacturacionNueva } from './pages/FacturacionNueva';
 import { Cotizaciones } from './pages/Cotizaciones';
+import { CotizacionNueva } from './pages/CotizacionNueva';
+import { CotizacionEditar } from './pages/CotizacionEditar';
 import { Remisiones } from './pages/Remisiones';
+import { RemisionNueva } from './pages/RemisionNueva';
+import { RemisionEditar } from './pages/RemisionEditar';
 import { NotasCredito } from './pages/NotasCredito';
 import { CuentasPorCobrar } from './pages/CuentasPorCobrar';
 import { CuentasPorPagar } from './pages/CuentasPorPagar';
@@ -184,8 +189,13 @@ const RUTAS_ADMIN = [
         children: [
           { path: '/', element: <Dashboard /> },
           { path: '/facturacion', element: <Facturacion /> },
+          { path: '/facturacion/nueva', element: <FacturacionNueva /> },
           { path: '/cotizaciones', element: <Cotizaciones /> },
+          { path: '/cotizaciones/nueva', element: <CotizacionNueva /> },
+          { path: '/cotizaciones/:id/editar', element: <CotizacionEditar /> },
           { path: '/remisiones', element: <Remisiones /> },
+          { path: '/remisiones/nueva', element: <RemisionNueva /> },
+          { path: '/remisiones/:id/editar', element: <RemisionEditar /> },
           { path: '/notas-credito', element: <NotasCredito /> },
           { path: '/cuentas-por-cobrar', element: <CuentasPorCobrar /> },
           { path: '/cuentas-por-pagar', element: <CuentasPorPagar /> },

@@ -8,6 +8,8 @@ export interface LineaEditable {
   precioUnitario: string;
   /** Precio de lista GENERAL del producto elegido — solo para el subtotal estimado del panel lateral, nunca se envía al backend. */
   precioReferencia?: string | null;
+  /** % de ITBIS del producto elegido — junto con `precioReferencia`, solo para estimar el ITBIS del panel lateral, nunca se envía al backend. */
+  itbisReferencia?: string | number | null;
   esManual: boolean;
   descripcionManual: string;
   aplicaItbis?: boolean;
@@ -77,8 +79,8 @@ export function TablaLineasEditable<T extends LineaEditable>({
                         productos={productos}
                         productoId={linea.productoId}
                         varianteId={linea.varianteId}
-                        onChange={(productoId, varianteId, precioReferencia) =>
-                          onActualizar(i, { productoId, varianteId, precioReferencia } as Partial<T>)
+                        onChange={(productoId, varianteId, precioReferencia, itbisReferencia) =>
+                          onActualizar(i, { productoId, varianteId, precioReferencia, itbisReferencia } as Partial<T>)
                         }
                       />
                     )}

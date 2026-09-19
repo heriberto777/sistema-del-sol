@@ -1,38 +1,39 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { User } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { apiClient } from '../../../lib/api-client';
-import { mensajeErrorApi } from '../../../lib/mensaje-error-api';
-import { Modal } from '../../molecules/Modal/Modal';
-import { ModalDocumento } from '../../molecules/ModalDocumento/ModalDocumento';
-import { Select } from '../../atoms/Select/Select';
-import { ComboboxBusqueda } from '../../molecules/ComboboxBusqueda/ComboboxBusqueda';
-import { SelectorLineaProducto } from '../../molecules/SelectorLineaProducto/SelectorLineaProducto';
-import { Button } from '../../atoms/Button/Button';
-import { PaginaResultado } from '../../../types/pagina-resultado';
-import { Bodega, Cliente, Producto, Remision, LineaForm } from './RemisionesPanel';
+import { useNavigate, useParams } from 'react-router-dom';
+import { apiClient } from '../lib/api-client';
+import { mensajeErrorApi } from '../lib/mensaje-error-api';
+import { PaginaDocumento } from '../components/molecules/PaginaDocumento/PaginaDocumento';
+import { Select } from '../components/atoms/Select/Select';
+import { ComboboxBusqueda } from '../components/molecules/ComboboxBusqueda/ComboboxBusqueda';
+import { SelectorLineaProducto } from '../components/molecules/SelectorLineaProducto/SelectorLineaProducto';
+import { Button } from '../components/atoms/Button/Button';
+import { PaginaResultado } from '../types/pagina-resultado';
+import { useHayCambios } from '../hooks/useHayCambios';
+import type { Bodega, Cliente, Producto, Remision, LineaForm } from '../components/organisms/RemisionesPanel/RemisionesPanel';
 
-export function ModalEditarRemision({
-  remisionId,
-  numeroActual,
-  productos,
-  bodegas,
-  onClose,
-}: {
-  remisionId: string;
-  numeroActual: string;
-  productos: Producto[];
-  bodegas: Bodega[];
-  onClose: () => void;
-}) {
+export function RemisionEditar() {
+  const { id } = useParams<{ id: string }>();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
   const [cliente, setCliente] = useState<Cliente | null>(null);
   const [valores, setValores] = useState<{ bodegaId: string; lineas: LineaForm[] } | null>(null);
 
+  const { data: productos } = useQuery({
+    queryKey: ['productos-select'],
+    queryFn: async () => (await apiClient.get<PaginaResultado<Producto>>('/productos', { params: { tamanoPagina: 100 } })).data.datos,
+  });
+  const { data: bodegas } = useQuery({
+    queryKey: ['bodegas-select'],
+    queryFn: async () => (await apiClient.get<Bodega[]>('/inventario/bodegas')).data,
+  });
+
   const { data: detalle } = useQuery({
-    queryKey: ['remision-detalle', remisionId],
-    queryFn: async () => (await apiClient.get<Remision>(`/remisiones/${remisionId}`)).data,
+    queryKey: ['remision-detalle', id],
+    queryFn: async () => (await apiClient.get<Remision>(`/remisiones/${id}`)).data,
+    enabled: !!id,
   });
 
   useEffect(() => {
@@ -46,14 +47,20 @@ export function ModalEditarRemision({
 
   const guardar = useMutation({
     mutationFn: async () =>
-      apiClient.patch(`/remisiones/${remisionId}`, {
+      apiClient.patch(`/remisiones/${id}`, {
         clienteId: cliente?.id,
         bodegaId: valores!.bodegaId,
-        lineas: valores!.lineas.filter((l) => l.productoId).map((l) => ({ productoId: l.productoId, varianteId: l.varianteId || undefined, cantidad: Number(l.cantidad) })),
+        lineas: valores!.lineas
+          .filter((l) => l.productoId)
+          .map((l) => ({ productoId: l.productoId, varianteId: l.varianteId || undefined, cantidad: Number(l.cantidad) })),
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['remisiones'] });
-      onClose();
+      // Ver el comentario equivalente en FacturacionNueva.tsx — sin esto,
+      // el guard de salir sin guardar bloqueaba este mismo `navigate()`
+      // justo después de guardar bien.
+      confirmarGuardado();
+      setTimeout(() => navigate('/remisiones'), 0);
     },
     onError: (err) => setError(mensajeErrorApi(err, 'No se pudo guardar la remisión. Revisa los datos.')),
   });
@@ -68,21 +75,25 @@ export function ModalEditarRemision({
     guardar.mutate();
   }
 
+  const [haycambios, confirmarGuardado] = useHayCambios({ cliente, valores }, valores !== null);
+
   if (!valores) {
     return (
-      <Modal titulo={`Editar remisión ${numeroActual}`} onClose={onClose}>
+      <div className="space-y-4">
         <p className="text-sm text-slate-500 dark:text-slate-400">Cargando…</p>
-      </Modal>
+      </div>
     );
   }
 
   const cantidadLineas = valores.lineas.filter((l) => l.productoId).length;
-  const bodegaSeleccionada = bodegas.find((b) => b.id === valores.bodegaId);
+  const bodegaSeleccionada = (bodegas ?? []).find((b) => b.id === valores.bodegaId);
 
   return (
-    <ModalDocumento
-      titulo={`Editar remisión ${numeroActual}`}
-      onClose={onClose}
+    <PaginaDocumento
+      titulo={`Editar remisión ${detalle?.numero ?? ''}`}
+      rutaVolver="/remisiones"
+      etiquetaVolver="Volver a Remisiones"
+      haycambios={haycambios}
       resumen={
         <>
           <div className="flex flex-col gap-1">
@@ -107,12 +118,15 @@ export function ModalEditarRemision({
           <Button type="submit" form="form-editar-remision" disabled={guardar.isPending} className="w-full">
             {guardar.isPending ? 'Guardando…' : 'Guardar'}
           </Button>
+          <Button type="button" variante="secundario" className="w-full" onClick={() => navigate('/remisiones')}>
+            Cancelar
+          </Button>
         </>
       }
     >
       <form id="form-editar-remision" onSubmit={onSubmit} className="space-y-3">
         <p className="text-sm text-slate-500 dark:text-slate-400">
-          Número <span className="font-medium text-slate-700 dark:text-slate-300">{numeroActual}</span> (asignado automáticamente, no editable)
+          Número <span className="font-medium text-slate-700 dark:text-slate-300">{detalle?.numero}</span> (asignado automáticamente, no editable)
         </p>
         <div className="flex flex-col gap-1">
           <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Cliente</label>
@@ -132,7 +146,7 @@ export function ModalEditarRemision({
           <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Bodega</label>
           <Select value={valores.bodegaId} onChange={(e) => setValores({ ...valores, bodegaId: e.target.value })} required>
             <option value="">Seleccionar…</option>
-            {bodegas.map((b) => (
+            {(bodegas ?? []).map((b) => (
               <option key={b.id} value={b.id}>
                 {b.nombre}
               </option>
@@ -145,7 +159,7 @@ export function ModalEditarRemision({
           {valores.lineas.map((linea, i) => (
             <div key={i} className="flex flex-wrap items-center gap-2">
               <SelectorLineaProducto
-                productos={productos}
+                productos={productos ?? []}
                 productoId={linea.productoId}
                 varianteId={linea.varianteId}
                 onChange={(productoId, varianteId) =>
@@ -186,6 +200,6 @@ export function ModalEditarRemision({
           </Button>
         </div>
       </form>
-    </ModalDocumento>
+    </PaginaDocumento>
   );
 }

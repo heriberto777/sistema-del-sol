@@ -1,31 +1,37 @@
 import { FormEvent, useState } from 'react';
 import { Plus, User, X } from 'lucide-react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { apiClient } from '../../../lib/api-client';
-import { mensajeErrorApi } from '../../../lib/mensaje-error-api';
-import { ModalDocumento } from '../../molecules/ModalDocumento/ModalDocumento';
-import { Card } from '../../atoms/Card/Card';
-import { Select } from '../../atoms/Select/Select';
-import { ComboboxBusqueda } from '../../molecules/ComboboxBusqueda/ComboboxBusqueda';
-import { SelectorLineaProducto } from '../../molecules/SelectorLineaProducto/SelectorLineaProducto';
-import { Button } from '../../atoms/Button/Button';
-import { PaginaResultado } from '../../../types/pagina-resultado';
-import { Bodega, Cliente, Producto, LineaForm } from './RemisionesPanel';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
+import { apiClient } from '../lib/api-client';
+import { mensajeErrorApi } from '../lib/mensaje-error-api';
+import { PaginaDocumento } from '../components/molecules/PaginaDocumento/PaginaDocumento';
+import { Card } from '../components/atoms/Card/Card';
+import { Select } from '../components/atoms/Select/Select';
+import { ComboboxBusqueda } from '../components/molecules/ComboboxBusqueda/ComboboxBusqueda';
+import { SelectorLineaProducto } from '../components/molecules/SelectorLineaProducto/SelectorLineaProducto';
+import { Button } from '../components/atoms/Button/Button';
+import { PaginaResultado } from '../types/pagina-resultado';
+import { useHayCambios } from '../hooks/useHayCambios';
+import type { Bodega, Cliente, Producto, LineaForm } from '../components/organisms/RemisionesPanel/RemisionesPanel';
 
-export function ModalNuevaRemision({
-  productos,
-  bodegas,
-  onClose,
-}: {
-  productos: Producto[];
-  bodegas: Bodega[];
-  onClose: () => void;
-}) {
+const LINEA_VACIA: LineaForm = { productoId: '', varianteId: '', cantidad: '1' };
+
+export function RemisionNueva() {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [cliente, setCliente] = useState<Cliente | null>(null);
   const [bodegaId, setBodegaId] = useState('');
-  const [lineas, setLineas] = useState<LineaForm[]>([{ productoId: '', varianteId: '', cantidad: '1' }]);
+  const [lineas, setLineas] = useState<LineaForm[]>([LINEA_VACIA]);
   const [error, setError] = useState<string | null>(null);
+
+  const { data: productos } = useQuery({
+    queryKey: ['productos-select'],
+    queryFn: async () => (await apiClient.get<PaginaResultado<Producto>>('/productos', { params: { tamanoPagina: 100 } })).data.datos,
+  });
+  const { data: bodegas } = useQuery({
+    queryKey: ['bodegas-select'],
+    queryFn: async () => (await apiClient.get<Bodega[]>('/inventario/bodegas')).data,
+  });
 
   const crear = useMutation({
     mutationFn: async () =>
@@ -38,7 +44,11 @@ export function ModalNuevaRemision({
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['remisiones'] });
-      onClose();
+      // Ver el comentario equivalente en FacturacionNueva.tsx — sin esto,
+      // el guard de salir sin guardar bloqueaba este mismo `navigate()`
+      // justo después de guardar bien.
+      confirmarGuardado();
+      setTimeout(() => navigate('/remisiones'), 0);
     },
     onError: (err) => setError(mensajeErrorApi(err, 'No se pudo crear la remisión. Revisa que el número no esté repetido.')),
   });
@@ -58,12 +68,15 @@ export function ModalNuevaRemision({
   }
 
   const cantidadLineas = lineas.filter((l) => l.productoId).length;
-  const bodegaSeleccionada = bodegas.find((b) => b.id === bodegaId);
+  const bodegaSeleccionada = (bodegas ?? []).find((b) => b.id === bodegaId);
+  const [haycambios, confirmarGuardado] = useHayCambios({ cliente, bodegaId, lineas });
 
   return (
-    <ModalDocumento
+    <PaginaDocumento
       titulo="Nueva remisión"
-      onClose={onClose}
+      rutaVolver="/remisiones"
+      etiquetaVolver="Volver a Remisiones"
+      haycambios={haycambios}
       resumen={
         <>
           <div className="flex flex-col gap-1">
@@ -87,6 +100,9 @@ export function ModalNuevaRemision({
           {error && <p className="text-sm text-red-600">{error}</p>}
           <Button type="submit" form="form-nueva-remision" disabled={crear.isPending} className="w-full">
             {crear.isPending ? 'Creando…' : 'Crear remisión'}
+          </Button>
+          <Button type="button" variante="secundario" className="w-full" onClick={() => navigate('/remisiones')}>
+            Cancelar
           </Button>
         </>
       }
@@ -115,7 +131,7 @@ export function ModalNuevaRemision({
             <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Bodega</label>
             <Select value={bodegaId} onChange={(e) => setBodegaId(e.target.value)} required>
               <option value="">Seleccionar…</option>
-              {bodegas.map((b) => (
+              {(bodegas ?? []).map((b) => (
                 <option key={b.id} value={b.id}>
                   {b.nombre}
                 </option>
@@ -140,7 +156,7 @@ export function ModalNuevaRemision({
                     <tr key={i}>
                       <td className="px-3 py-2 align-top">
                         <SelectorLineaProducto
-                          productos={productos}
+                          productos={productos ?? []}
                           productoId={linea.productoId}
                           varianteId={linea.varianteId}
                           onChange={(productoId, varianteId) => actualizarLinea(i, { productoId, varianteId })}
@@ -183,6 +199,6 @@ export function ModalNuevaRemision({
           </div>
         </Card>
       </form>
-    </ModalDocumento>
+    </PaginaDocumento>
   );
 }
