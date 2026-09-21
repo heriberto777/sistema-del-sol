@@ -24,6 +24,15 @@ export class PedidosTiendaRepository {
     });
   }
 
+  /** Dashboard "Resumen ejecutivo" — pedidos cuya factura está emitida pero no pagada todavía. Mismo join manual que `facturasPorIds`. */
+  async contarPendientes() {
+    const pedidos = await this.db.pedidoTienda.findMany({ select: { facturaId: true } });
+    if (pedidos.length === 0) return 0;
+    return this.db.factura.count({
+      where: { id: { in: pedidos.map((p) => p.facturaId) }, estado: 'EMITIDA', pagada: false },
+    });
+  }
+
   /**
    * Detalle de UN pedido para el admin del tenant (Fase 14) — mismo shape
    * que `EcommerceRepository.detallePedido` (cliente final, Fase 10), sin

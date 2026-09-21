@@ -58,6 +58,19 @@ export class ProyectosController {
     return { empleadoId: await this.proyectosService.miEmpleadoId(user.userId) };
   }
 
+  // Dashboard "Resumen ejecutivo" — rutas literales antes de ':id', mismo motivo que 'empleados'/'mi-empleado'.
+  @Get('resumen-rentabilidad')
+  @Permissions('proyectos.rentabilidad.ver')
+  resumenRentabilidad(@CurrentUser() user: JwtPayloadUser) {
+    return this.proyectosService.resumenRentabilidad(user.tenantId);
+  }
+
+  @Get('resumen-alertas')
+  @Permissions('proyectos.ver')
+  resumenAlertas() {
+    return this.proyectosService.resumenAlertas();
+  }
+
   @Get(':id')
   @Permissions('proyectos.ver')
   buscarPorId(@Param('id') id: string) {

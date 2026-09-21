@@ -196,6 +196,14 @@ export class CotizacionesService {
     return { datos: datosCrudos.map(marcarVencidaSiAplica), total, pagina, tamanoPagina };
   }
 
+  /** Dashboard "Resumen ejecutivo" — sin `desde`/`hasta` toma el mes en curso. */
+  async resumenConversion(desde?: string, hasta?: string) {
+    const hastaFecha = hasta ? new Date(hasta) : new Date();
+    const desdeFecha = desde ? new Date(desde) : new Date(hastaFecha.getFullYear(), hastaFecha.getMonth(), 1);
+    const { total, convertidas } = await this.cotizacionesRepository.contarParaConversion(desdeFecha, hastaFecha);
+    return { cotizaciones: total, convertidas, tasaConversion: total > 0 ? convertidas / total : null };
+  }
+
   async cambiarEstado(id: string, estado: 'ENVIADA' | 'ACEPTADA' | 'RECHAZADA', tenantId: string) {
     const cotizacion = await this.cotizacionesRepository.buscarPorId(id);
     this.validarQueSigaAbierta(cotizacion);

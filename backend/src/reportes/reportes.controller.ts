@@ -47,6 +47,13 @@ export class ReportesController {
     this.enviarArchivo(res, archivo);
   }
 
+  // Dashboard "Resumen ejecutivo" — tendencia de ventas de los últimos N días.
+  @Get('ventas/por-dia')
+  @Permissions('reportes.ver')
+  ventasPorDia(@Query() query: ReporteQueryDto) {
+    return this.reportesService.ventasPorDia(query.desde, query.hasta);
+  }
+
   @Get('ventas/agrupado')
   @Permissions('reportes.ver')
   reporteVentasAgrupado(@Query() query: ReporteVentasAgrupadoQueryDto) {

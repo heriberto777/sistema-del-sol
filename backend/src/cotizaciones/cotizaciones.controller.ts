@@ -31,6 +31,13 @@ export class CotizacionesController {
     return this.cotizacionesService.listar(query);
   }
 
+  // Ruta estática ANTES de ':id' — si no, ':id' la captura primero y "resumen-conversion" se interpreta como un id.
+  @Get('resumen-conversion')
+  @Permissions('cotizaciones.ver')
+  resumenConversion(@Query('desde') desde?: string, @Query('hasta') hasta?: string) {
+    return this.cotizacionesService.resumenConversion(desde, hasta);
+  }
+
   @Get(':id')
   @Permissions('cotizaciones.ver')
   buscarPorId(@Param('id') id: string) {

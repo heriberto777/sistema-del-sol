@@ -263,6 +263,11 @@ export class EcommerceService {
     return { datos, total, pagina, tamanoPagina };
   }
 
+  /** Dashboard "Resumen ejecutivo". */
+  async resumenPendientes() {
+    return { pendientes: await this.pedidosTiendaRepository.contarPendientes() };
+  }
+
   /** Fase 14 — "Ver detalle" de un pedido puntual en el panel admin (líneas de factura + datos de contacto del pedido). */
   async detallePedidoAdmin(facturaId: string) {
     const detalle = await this.pedidosTiendaRepository.detalle(facturaId);

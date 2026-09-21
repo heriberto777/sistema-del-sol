@@ -65,6 +65,44 @@ export class ProyectosRepository {
     ]);
   }
 
+  /** Dashboard "Resumen ejecutivo" — ids de proyectos EN_CURSO, para agregar su rentabilidad. */
+  idsProyectosActivos() {
+    return this.db.proyecto.findMany({ where: { estado: 'EN_CURSO' }, select: { id: true } });
+  }
+
+  /** Dashboard "Resumen ejecutivo" — hitos con fecha objetivo dentro de los próximos `diasHorizonte` días, sin completar/facturar. */
+  hitosProximos(diasHorizonte: number) {
+    const hoy = new Date();
+    const limite = new Date(hoy.getTime() + diasHorizonte * 24 * 60 * 60 * 1000);
+    return this.db.hitoProyecto.findMany({
+      where: { estado: { in: ['PENDIENTE', 'EN_CURSO'] }, fechaObjetivo: { gte: hoy, lte: limite } },
+      orderBy: { fechaObjetivo: 'asc' },
+      take: 5,
+      select: { id: true, nombre: true, fechaObjetivo: true, proyecto: { select: { nombre: true } } },
+    });
+  }
+
+  /** Dashboard "Resumen ejecutivo" — tareas de TODOS los proyectos vencidas y sin terminar (conteo exacto + primeras 10 para la lista). */
+  async tareasVencidas() {
+    const where = { estado: { not: 'TERMINADA' as const }, fechaVencimiento: { lt: new Date() } };
+    const [total, primeras] = await Promise.all([
+      this.db.tareaProyecto.count({ where }),
+      this.db.tareaProyecto.findMany({
+        where,
+        orderBy: { fechaVencimiento: 'asc' },
+        take: 10,
+        select: {
+          id: true,
+          titulo: true,
+          fechaVencimiento: true,
+          proyecto: { select: { nombre: true } },
+          responsables: { select: { empleado: { select: { nombre: true } } } },
+        },
+      }),
+    ]);
+    return { total, primeras };
+  }
+
   buscarProyectoPorId(id: string) {
     return this.db.proyecto.findUniqueOrThrow({
       where: { id },

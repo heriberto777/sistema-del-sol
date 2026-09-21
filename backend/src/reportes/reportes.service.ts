@@ -85,6 +85,30 @@ export class ReportesService {
     return { facturas, resumen, rango };
   }
 
+  /**
+   * Dashboard "Resumen ejecutivo" — tendencia diaria (gráfico de línea).
+   * Mismo criterio que `reporteVentasAgrupado`: se trae el rango completo
+   * (`facturasEnRango`, ya usado sin paginar por `reporteVentas`) y se
+   * agrega por día en Node, sin endpoint/query nuevo del lado de Postgres.
+   */
+  async ventasPorDia(desde?: string, hasta?: string) {
+    const rango = rangoPorDefecto(desde, hasta);
+    const facturas = await this.reportesRepository.facturasEnRango(rango.desde, rango.hasta);
+
+    const porDia = new Map<string, { total: number; cantidad: number }>();
+    for (const f of facturas) {
+      const clave = f.fecha.toISOString().slice(0, 10);
+      const actual = porDia.get(clave) ?? { total: 0, cantidad: 0 };
+      actual.total += Number(f.total);
+      actual.cantidad += 1;
+      porDia.set(clave, actual);
+    }
+
+    return Array.from(porDia.entries())
+      .map(([fecha, v]) => ({ fecha, ...v }))
+      .sort((a, b) => a.fecha.localeCompare(b.fecha));
+  }
+
   async exportarVentas(desde: string | undefined, hasta: string | undefined, formato: 'xlsx' | 'pdf'): Promise<ArchivoGenerado> {
     const { facturas } = await this.reporteVentas(desde, hasta);
     const filas = facturas.map((f) => ({

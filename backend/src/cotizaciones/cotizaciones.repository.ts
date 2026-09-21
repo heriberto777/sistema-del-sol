@@ -142,4 +142,14 @@ export class CotizacionesRepository {
       include: INCLUDE_COTIZACION,
     });
   }
+
+  /** Dashboard "Resumen ejecutivo" — tasa de conversión a factura en un rango. */
+  async contarParaConversion(desde: Date, hasta: Date) {
+    const where = { createdAt: { gte: desde, lte: hasta } };
+    const [total, convertidas] = await Promise.all([
+      this.db.cotizacion.count({ where }),
+      this.db.cotizacion.count({ where: { ...where, facturaId: { not: null } } }),
+    ]);
+    return { total, convertidas };
+  }
 }

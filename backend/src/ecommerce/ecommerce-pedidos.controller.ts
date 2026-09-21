@@ -17,6 +17,13 @@ export class EcommercePedidosController {
     return this.ecommerceService.listarPedidos(query);
   }
 
+  // Ruta literal antes de ':facturaId' — si no, la captura como si fuera un id.
+  @Get('pedidos/resumen-pendientes')
+  @Permissions('admin.configuracion')
+  resumenPendientes() {
+    return this.ecommerceService.resumenPendientes();
+  }
+
   @Get('pedidos/:facturaId')
   @Permissions('admin.configuracion')
   detallePedido(@Param('facturaId') facturaId: string) {

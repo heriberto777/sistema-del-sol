@@ -310,6 +310,43 @@ export class ProyectosService {
     return { facturado, costoHoras, costoGastos, costoTotal, margen, margenPorcentaje };
   }
 
+  /** Dashboard "Resumen ejecutivo" — rentabilidad sumada de todos los proyectos EN_CURSO. Mismo permiso que `calcularRentabilidad` (deriva del salario de los empleados). */
+  async resumenRentabilidad(tenantId: string) {
+    const activos = await this.proyectosRepository.idsProyectosActivos();
+    const rentabilidades = await Promise.all(activos.map((p) => this.calcularRentabilidad(p.id, tenantId)));
+    const totales = rentabilidades.reduce(
+      (acc, r) => ({ facturado: acc.facturado + r.facturado, costoTotal: acc.costoTotal + r.costoTotal }),
+      { facturado: 0, costoTotal: 0 },
+    );
+    const margen = totales.facturado - totales.costoTotal;
+    return {
+      proyectosActivos: activos.length,
+      facturado: totales.facturado,
+      costoTotal: totales.costoTotal,
+      margen,
+      margenPorcentaje: totales.facturado > 0 ? (margen / totales.facturado) * 100 : null,
+    };
+  }
+
+  /** Dashboard "Resumen ejecutivo" — hitos por vencer (14 días) y tareas vencidas, a través de TODOS los proyectos. Permiso general `proyectos.ver`: no expone nada de salario. */
+  async resumenAlertas() {
+    const [hitosProximos, tareasVencidas] = await Promise.all([
+      this.proyectosRepository.hitosProximos(14),
+      this.proyectosRepository.tareasVencidas(),
+    ]);
+    return {
+      hitosProximos: hitosProximos.map((h) => ({ id: h.id, nombre: h.nombre, fechaObjetivo: h.fechaObjetivo, proyecto: h.proyecto.nombre })),
+      tareasVencidasTotal: tareasVencidas.total,
+      tareasVencidas: tareasVencidas.primeras.map((t) => ({
+        id: t.id,
+        titulo: t.titulo,
+        fechaVencimiento: t.fechaVencimiento,
+        proyecto: t.proyecto.nombre,
+        responsables: t.responsables.map((r) => r.empleado.nombre),
+      })),
+    };
+  }
+
   /**
    * Costo interno estimado (salario de los empleados) de las horas YA
    * cargadas en las tareas de cada Hito de este proyecto — para que la UI
