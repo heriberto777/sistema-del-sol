@@ -1,6 +1,8 @@
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
+import { List } from 'lucide-react';
 import { useDebouncedValue } from '../../../hooks/useDebouncedValue';
+import { Modal } from '../Modal/Modal';
 
 interface ComboboxBusquedaProps<T> {
   id?: string;
@@ -12,6 +14,12 @@ interface ComboboxBusquedaProps<T> {
   placeholder?: string;
   /** Ícono opcional dentro del campo (ej. Cliente/Vendedor en Caja) — puramente visual, no cambia el comportamiento. */
   icono?: ReactNode;
+  /**
+   * Título del modal "Explorar" — si no se pasa, se deriva de `placeholder`
+   * (ej. "Buscar cliente…" -> "Buscar cliente"). Pasalo solo si el
+   * placeholder no alcanza para identificar qué se está por elegir.
+   */
+  tituloExplorar?: string;
 }
 
 /**
@@ -19,6 +27,15 @@ interface ComboboxBusquedaProps<T> {
  * de 100 registros (sin buscador, truncados) usados para Cliente/Producto.
  * Quien lo usa provee el `buscar(texto)` (ya sea `/clientes?busqueda=` o
  * `/productos?busqueda=`, ambos ya soportados por el backend).
+ *
+ * El botón "Explorar" (lista) abre un modal que reusa exactamente el mismo
+ * `buscar` — con texto vacío de entrada, que ya devuelve el catálogo sin
+ * filtrar (todos los `listar()` del backend tratan `busqueda: ''` como
+ * "sin filtro") — para el caso de no recordar el nombre/código exacto y
+ * necesitar mirar la lista. No agrega paginación real (cada `buscar` ya
+ * trae un límite fijo puesto por quien llama, ej. `tamanoPagina: 10`) a
+ * propósito: así el cambio no toca ninguno de los ~16 call sites
+ * existentes, solo este componente.
  */
 export function ComboboxBusqueda<T>({
   id,
@@ -29,6 +46,7 @@ export function ComboboxBusqueda<T>({
   obtenerEtiqueta,
   placeholder,
   icono,
+  tituloExplorar,
 }: ComboboxBusquedaProps<T>) {
   const [texto, setTexto] = useState('');
   const [abierto, setAbierto] = useState(false);
@@ -40,6 +58,42 @@ export function ComboboxBusqueda<T>({
   const [posicion, setPosicion] = useState({ top: 0, left: 0, width: 0 });
   const textoDebounced = useDebouncedValue(texto, 300);
   const mostrarLista = abierto && texto.trim().length > 0;
+
+  const [modalAbierto, setModalAbierto] = useState(false);
+  const [textoModal, setTextoModal] = useState('');
+  const [opcionesModal, setOpcionesModal] = useState<T[]>([]);
+  const [cargandoModal, setCargandoModal] = useState(false);
+  const textoModalDebounced = useDebouncedValue(textoModal, 300);
+
+  useEffect(() => {
+    if (!modalAbierto) return;
+    let cancelado = false;
+    setCargandoModal(true);
+    buscar(textoModalDebounced)
+      .then((resultados) => {
+        if (!cancelado) setOpcionesModal(resultados);
+      })
+      .finally(() => {
+        if (!cancelado) setCargandoModal(false);
+      });
+    return () => {
+      cancelado = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [modalAbierto, textoModalDebounced]);
+
+  function abrirExplorar() {
+    setAbierto(false);
+    setTextoModal('');
+    setOpcionesModal([]);
+    setModalAbierto(true);
+  }
+
+  function seleccionarDesdeModal(op: T) {
+    onSeleccionar(op);
+    setModalAbierto(false);
+    setTextoModal('');
+  }
 
   // El desplegable se porta a `document.body` (ver más abajo) para escapar
   // de ancestros con `overflow` recortado — ej. el wrapper `overflow-x-auto`
@@ -160,8 +214,17 @@ export function ComboboxBusqueda<T>({
         onKeyDown={onKeyDownInput}
         placeholder={placeholder ?? 'Buscar…'}
         autoComplete="off"
-        className={`w-full rounded-md border border-slate-300 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 ${icono ? 'pl-8 pr-3' : 'px-3'}`}
+        className={`w-full rounded-md border border-slate-300 py-2 pr-9 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 ${icono ? 'pl-8' : 'pl-3'}`}
       />
+      <button
+        type="button"
+        onClick={abrirExplorar}
+        className="absolute inset-y-0 right-1.5 flex items-center px-1 text-slate-400 hover:text-sol-600 dark:hover:text-sol-400"
+        aria-label="Explorar toda la lista"
+        title="Explorar toda la lista"
+      >
+        <List size={15} />
+      </button>
       {mostrarLista &&
         createPortal(
           <div
@@ -190,6 +253,38 @@ export function ComboboxBusqueda<T>({
           </div>,
           document.body,
         )}
+      {modalAbierto && (
+        <Modal titulo={tituloExplorar ?? (placeholder ?? 'Buscar…').replace(/…$/, '')} onClose={() => setModalAbierto(false)}>
+          <div className="space-y-3">
+            <input
+              type="text"
+              autoFocus
+              value={textoModal}
+              onChange={(e) => setTextoModal(e.target.value)}
+              placeholder={placeholder ?? 'Buscar…'}
+              autoComplete="off"
+              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+            />
+            <div className="max-h-[24rem] overflow-y-auto rounded-md border border-slate-200 dark:border-slate-800">
+              {cargandoModal && <p className="px-3 py-3 text-sm text-slate-400">Buscando…</p>}
+              {!cargandoModal && opcionesModal.length === 0 && (
+                <p className="px-3 py-3 text-sm text-slate-400">Sin resultados.</p>
+              )}
+              {!cargandoModal &&
+                opcionesModal.map((op) => (
+                  <button
+                    key={obtenerId(op)}
+                    type="button"
+                    onClick={() => seleccionarDesdeModal(op)}
+                    className="block w-full border-b border-slate-100 px-3 py-2.5 text-left text-sm last:border-0 text-slate-700 hover:bg-sol-50 dark:border-slate-800 dark:text-slate-300 dark:hover:bg-sol-900/20"
+                  >
+                    {obtenerEtiqueta(op)}
+                  </button>
+                ))}
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }
