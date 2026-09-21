@@ -5,6 +5,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { apiClient } from '../lib/api-client';
 import { mensajeErrorApi } from '../lib/mensaje-error-api';
 import { PaginaDocumento } from '../components/molecules/PaginaDocumento/PaginaDocumento';
+import { CardColapsable } from '../components/molecules/CardColapsable/CardColapsable';
 import { Select } from '../components/atoms/Select/Select';
 import { ComboboxBusqueda } from '../components/molecules/ComboboxBusqueda/ComboboxBusqueda';
 import { SelectorLineaProducto } from '../components/molecules/SelectorLineaProducto/SelectorLineaProducto';
@@ -20,6 +21,9 @@ export function RemisionEditar() {
   const [error, setError] = useState<string | null>(null);
   const [cliente, setCliente] = useState<Cliente | null>(null);
   const [valores, setValores] = useState<{ bodegaId: string; lineas: LineaForm[] } | null>(null);
+  // Modelo A de "más espacio para líneas" — arranca colapsada apenas
+  // carga el detalle (ver el comentario equivalente en FacturacionNueva.tsx).
+  const [infoColapsada, setInfoColapsada] = useState(false);
 
   const { data: productos } = useQuery({
     queryKey: ['productos-select'],
@@ -43,6 +47,7 @@ export function RemisionEditar() {
       bodegaId: detalle.bodegaId,
       lineas: detalle.lineas.map((l) => ({ productoId: l.productoId, varianteId: l.varianteId, cantidad: l.cantidad })),
     });
+    setInfoColapsada(true);
   }, [detalle]);
 
   const guardar = useMutation({
@@ -69,6 +74,7 @@ export function RemisionEditar() {
     e.preventDefault();
     setError(null);
     if (!cliente) {
+      setInfoColapsada(false);
       setError('Seleccioná un cliente.');
       return;
     }
@@ -124,35 +130,42 @@ export function RemisionEditar() {
         </>
       }
     >
-      <form id="form-editar-remision" onSubmit={onSubmit} className="space-y-3">
-        <p className="text-sm text-slate-500 dark:text-slate-400">
-          Número <span className="font-medium text-slate-700 dark:text-slate-300">{detalle?.numero}</span> (asignado automáticamente, no editable)
-        </p>
-        <div className="flex flex-col gap-1">
-          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Cliente</label>
-          <ComboboxBusqueda<Cliente>
-            valor={cliente}
-            onSeleccionar={setCliente}
-            obtenerId={(c) => c.id}
-            obtenerEtiqueta={(c) => c.nombre}
-            placeholder="Buscar cliente…"
-            icono={<User size={15} />}
-            buscar={async (texto) =>
-              (await apiClient.get<PaginaResultado<Cliente>>('/clientes', { params: { busqueda: texto, tamanoPagina: 10 } })).data.datos
-            }
-          />
-        </div>
-        <div className="flex flex-col gap-1">
-          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Bodega</label>
-          <Select value={valores.bodegaId} onChange={(e) => setValores({ ...valores, bodegaId: e.target.value })} required>
-            <option value="">Seleccionar…</option>
-            {(bodegas ?? []).map((b) => (
-              <option key={b.id} value={b.id}>
-                {b.nombre}
-              </option>
-            ))}
-          </Select>
-        </div>
+      <form id="form-editar-remision" onSubmit={onSubmit} className="space-y-4">
+        <CardColapsable
+          titulo={`Editar remisión ${detalle?.numero ?? ''}`}
+          colapsada={infoColapsada}
+          onToggle={() => setInfoColapsada((v) => !v)}
+          resumen={cliente ? `${cliente.nombre} · ${bodegaSeleccionada?.nombre ?? 'Sin bodega'}` : 'Sin cliente seleccionado'}
+        >
+          <p className="text-sm text-slate-500 dark:text-slate-400 sm:col-span-2">
+            Número <span className="font-medium text-slate-700 dark:text-slate-300">{detalle?.numero}</span> (asignado automáticamente, no editable)
+          </p>
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Cliente</label>
+            <ComboboxBusqueda<Cliente>
+              valor={cliente}
+              onSeleccionar={setCliente}
+              obtenerId={(c) => c.id}
+              obtenerEtiqueta={(c) => c.nombre}
+              placeholder="Buscar cliente…"
+              icono={<User size={15} />}
+              buscar={async (texto) =>
+                (await apiClient.get<PaginaResultado<Cliente>>('/clientes', { params: { busqueda: texto, tamanoPagina: 10 } })).data.datos
+              }
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Bodega</label>
+            <Select value={valores.bodegaId} onChange={(e) => setValores({ ...valores, bodegaId: e.target.value })} required>
+              <option value="">Seleccionar…</option>
+              {(bodegas ?? []).map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.nombre}
+                </option>
+              ))}
+            </Select>
+          </div>
+        </CardColapsable>
 
         <div className="space-y-2">
           <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Líneas</p>

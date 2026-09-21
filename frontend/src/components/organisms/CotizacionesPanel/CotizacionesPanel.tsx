@@ -14,6 +14,7 @@ import { useDebouncedValue } from '../../../hooks/useDebouncedValue';
 import { useAuth } from '../../../hooks/useAuth';
 import { PaginaResultado } from '../../../types/pagina-resultado';
 import type { ClienteBasico } from '@backend-src/common/prisma/cliente-select-basico';
+import type { OfertaVisibleProducto } from '../../../lib/formatear-oferta';
 import { ModalDetalleCotizacion } from './ModalDetalleCotizacion';
 import { ModalConvertirCotizacion } from './ModalConvertirCotizacion';
 
@@ -79,6 +80,8 @@ export type LineaForm = {
   precioReferencia?: string | null;
   /** % de ITBIS del producto elegido — junto con `precioReferencia`, solo para estimar el ITBIS del panel lateral, nunca se envía al backend. */
   itbisReferencia?: string | number | null;
+  /** Oferta automática vigente del producto elegido — solo para la insignia de la fila, nunca se envía al backend. */
+  oferta?: OfertaVisibleProducto | null;
 };
 
 export const LINEA_VACIA: LineaForm = { productoId: '', varianteId: '', cantidad: '1', esManual: false, descripcionManual: '', precioUnitario: '' };

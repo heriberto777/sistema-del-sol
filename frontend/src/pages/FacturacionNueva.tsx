@@ -6,6 +6,7 @@ import { apiClient } from '../lib/api-client';
 import { mensajeErrorApi } from '../lib/mensaje-error-api';
 import { Button } from '../components/atoms/Button/Button';
 import { Card } from '../components/atoms/Card/Card';
+import { CardColapsable } from '../components/molecules/CardColapsable/CardColapsable';
 import { Select } from '../components/atoms/Select/Select';
 import { ComboboxBusqueda } from '../components/molecules/ComboboxBusqueda/ComboboxBusqueda';
 import { FormField } from '../components/molecules/FormField/FormField';
@@ -30,6 +31,13 @@ interface Producto {
 
 const LINEA_VACIA: LineaEditable = { productoId: '', varianteId: '', descripcionManual: '', esManual: false, cantidad: '1', precioUnitario: '', aplicaItbis: true };
 
+const ETIQUETA_COMPROBANTE: Record<'CONSUMO' | 'CREDITO_FISCAL' | 'REGIMEN_ESPECIAL' | 'GUBERNAMENTAL', string> = {
+  CONSUMO: 'Consumo (B02)',
+  CREDITO_FISCAL: 'Crédito Fiscal (B01)',
+  REGIMEN_ESPECIAL: 'Régimen Especial (B14)',
+  GUBERNAMENTAL: 'Gubernamental (B15)',
+};
+
 export function FacturacionNueva() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -50,6 +58,11 @@ export function FacturacionNueva() {
   const [recargos, setRecargos] = useState<{ concepto: string; monto: string; gravado: boolean }[]>([]);
   const [moneda, setMoneda] = useState('DOP');
   const [error, setError] = useState<string | null>(null);
+  // Modelo A de "más espacio para líneas" — Información arranca abierta y
+  // se contrae sola en cuanto se elige un cliente, para que las líneas
+  // (que pueden crecer mucho más) ganen ese espacio. Siempre se puede
+  // reabrir a mano con el chevron.
+  const [infoColapsada, setInfoColapsada] = useState(false);
 
   // Ítem C-2 (multi-moneda) — solo para mostrarle al cliente un
   // equivalente en el documento impreso; subtotal/itbis/total internos
@@ -70,7 +83,10 @@ export function FacturacionNueva() {
   useEffect(() => {
     if (cliente?.condicionPagoPorDefecto) setTipoFactura(cliente.condicionPagoPorDefecto);
     if (cliente?.comprobanteFiscalPorDefecto) setComprobanteFiscal(cliente.comprobanteFiscalPorDefecto);
-    if (cliente) setPlazoPagoDias(cliente.plazoPagoDias);
+    if (cliente) {
+      setPlazoPagoDias(cliente.plazoPagoDias);
+      setInfoColapsada(true);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cliente?.id]);
   const { data: productos } = useQuery({
@@ -135,6 +151,7 @@ export function FacturacionNueva() {
     e.preventDefault();
     setError(null);
     if (!cliente) {
+      setInfoColapsada(false);
       setError('Seleccioná un cliente.');
       return;
     }
@@ -147,6 +164,7 @@ export function FacturacionNueva() {
       return;
     }
     if (tipoFactura === 'CONTADO' && !formaPagoId) {
+      setInfoColapsada(false);
       setError('Seleccioná la forma de pago.');
       return;
     }
@@ -185,7 +203,7 @@ export function FacturacionNueva() {
   // veces). Sin este gate, la base de "sin cambios" se fijaba ANTES de que
   // esa autoselección llegara, y la página aparecía "sucia" apenas montada,
   // sin que el usuario tocara nada (bug real, encontrado en vivo).
-  const { isPending: bodegasCargando } = useQuery({
+  const { data: bodegas, isPending: bodegasCargando } = useQuery({
     queryKey: ['bodegas-select'],
     queryFn: async () => (await apiClient.get<BodegaBasica[]>('/inventario/bodegas')).data,
   });
@@ -350,7 +368,16 @@ export function FacturacionNueva() {
       }
     >
       <form id="form-nueva-factura" onSubmit={onSubmit} className="space-y-4">
-        <Card titulo="Información de la factura" contentClassName="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <CardColapsable
+          titulo="Información de la factura"
+          colapsada={infoColapsada}
+          onToggle={() => setInfoColapsada((v) => !v)}
+          resumen={
+            cliente
+              ? `${cliente.nombre} · ${tipoFactura === 'CONTADO' ? 'Contado' : 'Crédito'} · ${ETIQUETA_COMPROBANTE[comprobanteFiscal]}${bodegaId ? ` · ${bodegas?.find((b) => b.id === bodegaId)?.nombre ?? ''}` : ''}`
+              : 'Sin cliente seleccionado'
+          }
+        >
           <div className="flex flex-col gap-1 sm:col-span-2">
             <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Cliente</label>
             <ComboboxBusqueda<Cliente>
@@ -466,7 +493,7 @@ export function FacturacionNueva() {
               </Select>
             </div>
           )}
-        </Card>
+        </CardColapsable>
 
         <Card titulo="Líneas">
           <TablaLineasEditable

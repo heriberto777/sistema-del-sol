@@ -4,6 +4,7 @@ import { PaginaResultado } from '../../../types/pagina-resultado';
 import { Select } from '../../atoms/Select/Select';
 import { ComboboxBusqueda } from '../ComboboxBusqueda/ComboboxBusqueda';
 import { useVariantesProducto, etiquetaVariante } from '../../../hooks/useVariantesProducto';
+import type { OfertaVisibleProducto } from '../../../lib/formatear-oferta';
 
 export interface ProductoOpcion {
   id: string;
@@ -13,6 +14,8 @@ export interface ProductoOpcion {
   precioVenta?: string | null;
   /** % de ITBIS del producto — junto con `precioVenta`, solo para estimar el ITBIS en el panel lateral; el real lo resuelve el backend (puede variar por ley fiscal del producto). */
   porcentajeItbis?: string | number | null;
+  /** Oferta automática vigente para este producto (mismo motor que resuelve la venta real, a cantidad=1) — solo para avisar en la fila, nunca se envía al backend. */
+  oferta?: OfertaVisibleProducto | null;
 }
 
 interface SelectorLineaProductoProps {
@@ -28,7 +31,13 @@ interface SelectorLineaProductoProps {
    * resuelve el precio de verdad al guardar (lista del cliente, ofertas
    * vigentes) y puede diferir de esta referencia.
    */
-  onChange: (productoId: string, varianteId: string, precioReferencia?: string | null, itbisReferencia?: string | number | null) => void;
+  onChange: (
+    productoId: string,
+    varianteId: string,
+    precioReferencia?: string | null,
+    itbisReferencia?: string | number | null,
+    oferta?: OfertaVisibleProducto | null,
+  ) => void;
   className?: string;
 }
 
@@ -74,7 +83,7 @@ export function SelectorLineaProducto({ productos, productoId, varianteId, onCha
       // `undefined` el precio ya guardado por la selección del producto,
       // ya que `TablaLineasEditable` mergea los 3 campos del onChange sin
       // distinguir cuál vino de dónde.
-      onChange(productoId, variantes[0].id, productoElegido?.precioVenta, productoElegido?.porcentajeItbis);
+      onChange(productoId, variantes[0].id, productoElegido?.precioVenta, productoElegido?.porcentajeItbis, productoElegido?.oferta);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [variantes]);
@@ -85,7 +94,7 @@ export function SelectorLineaProducto({ productos, productoId, varianteId, onCha
         valor={productoElegido}
         onSeleccionar={(p) => {
           setProductoElegido(p);
-          onChange(p?.id ?? '', '', p?.precioVenta, p?.porcentajeItbis);
+          onChange(p?.id ?? '', '', p?.precioVenta, p?.porcentajeItbis, p?.oferta);
         }}
         obtenerId={(p) => p.id}
         obtenerEtiqueta={(p) => `${p.codigo} — ${p.nombre}`}

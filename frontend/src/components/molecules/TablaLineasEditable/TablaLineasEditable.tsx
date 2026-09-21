@@ -1,5 +1,6 @@
 import { Plus, X } from 'lucide-react';
 import { SelectorLineaProducto, ProductoOpcion } from '../SelectorLineaProducto/SelectorLineaProducto';
+import { formatearOferta, type OfertaVisibleProducto } from '../../../lib/formatear-oferta';
 
 export interface LineaEditable {
   productoId: string;
@@ -10,9 +11,15 @@ export interface LineaEditable {
   precioReferencia?: string | null;
   /** % de ITBIS del producto elegido — junto con `precioReferencia`, solo para estimar el ITBIS del panel lateral, nunca se envía al backend. */
   itbisReferencia?: string | number | null;
+  /** Oferta automática vigente del producto elegido — solo para la insignia de la fila, nunca se envía al backend. */
+  oferta?: OfertaVisibleProducto | null;
   esManual: boolean;
   descripcionManual: string;
   aplicaItbis?: boolean;
+}
+
+function formatearPrecio(precio: string | number) {
+  return Number(precio).toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 /**
@@ -75,14 +82,21 @@ export function TablaLineasEditable<T extends LineaEditable>({
                         className="rounded-md border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
                       />
                     ) : (
-                      <SelectorLineaProducto
-                        productos={productos}
-                        productoId={linea.productoId}
-                        varianteId={linea.varianteId}
-                        onChange={(productoId, varianteId, precioReferencia, itbisReferencia) =>
-                          onActualizar(i, { productoId, varianteId, precioReferencia, itbisReferencia } as Partial<T>)
-                        }
-                      />
+                      <>
+                        <SelectorLineaProducto
+                          productos={productos}
+                          productoId={linea.productoId}
+                          varianteId={linea.varianteId}
+                          onChange={(productoId, varianteId, precioReferencia, itbisReferencia, oferta) =>
+                            onActualizar(i, { productoId, varianteId, precioReferencia, itbisReferencia, oferta } as Partial<T>)
+                          }
+                        />
+                        {linea.oferta && (
+                          <span className="inline-flex w-fit items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-400">
+                            🏷️ {formatearOferta(linea.oferta)}
+                          </span>
+                        )}
+                      </>
                     )}
                     <button
                       type="button"
@@ -108,17 +122,27 @@ export function TablaLineasEditable<T extends LineaEditable>({
                   />
                 </td>
                 <td className="px-3 py-2 align-top">
-                  {(!precioSoloManual || linea.esManual) && (
-                    <input
-                      type="number"
-                      min={0}
-                      step="0.01"
-                      placeholder={linea.esManual ? 'Precio' : 'Opcional'}
-                      value={linea.precioUnitario}
-                      onChange={(e) => onActualizar(i, { precioUnitario: e.target.value } as Partial<T>)}
-                      className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-                    />
-                  )}
+                  <div className="flex flex-col gap-1">
+                    {!linea.esManual && linea.precioReferencia != null && (
+                      <span
+                        className="font-mono text-xs text-slate-500 dark:text-slate-400"
+                        title="Precio de lista GENERAL — referencia, el backend resuelve el precio real al guardar (lista del cliente, ofertas vigentes)"
+                      >
+                        RD$ {formatearPrecio(linea.precioReferencia)}
+                      </span>
+                    )}
+                    {(!precioSoloManual || linea.esManual) && (
+                      <input
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        placeholder={linea.esManual ? 'Precio' : 'Opcional'}
+                        value={linea.precioUnitario}
+                        onChange={(e) => onActualizar(i, { precioUnitario: e.target.value } as Partial<T>)}
+                        className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                      />
+                    )}
+                  </div>
                 </td>
                 {mostrarItbis && (
                   <td className="px-3 py-2 text-center align-top">

@@ -7,6 +7,7 @@ import { VariantesService } from '../variantes/variantes.service';
 import { PreciosRepository } from '../precios/precios.repository';
 import { AnalizadorImagenService } from '../ia/analizador-imagen/analizador-imagen.service';
 import { UsoIaService } from '../ia/uso-ia.service';
+import { OfertasService } from '../ofertas/ofertas.service';
 
 describe('ProductosService', () => {
   let service: ProductosService;
@@ -17,6 +18,7 @@ describe('ProductosService', () => {
   let preciosRepository: jest.Mocked<PreciosRepository>;
   let analizadorImagenService: jest.Mocked<AnalizadorImagenService>;
   let usoIaService: jest.Mocked<UsoIaService>;
+  let ofertasService: jest.Mocked<OfertasService>;
 
   beforeEach(() => {
     repository = {
@@ -46,7 +48,17 @@ describe('ProductosService', () => {
     leyesFiscalesRepository = { buscarPorId: jest.fn() } as unknown as jest.Mocked<LeyesFiscalesRepository>;
     analizadorImagenService = { analizarDesdeDataUri: jest.fn() } as unknown as jest.Mocked<AnalizadorImagenService>;
     usoIaService = { verificarYRegistrar: jest.fn().mockResolvedValue(undefined) } as unknown as jest.Mocked<UsoIaService>;
-    service = new ProductosService(repository, categoriasRepository, leyesFiscalesRepository, variantesService, preciosRepository, analizadorImagenService, usoIaService);
+    ofertasService = { resolverOfertaVisibleProducto: jest.fn().mockResolvedValue(null) } as unknown as jest.Mocked<OfertasService>;
+    service = new ProductosService(
+      repository,
+      categoriasRepository,
+      leyesFiscalesRepository,
+      variantesService,
+      preciosRepository,
+      analizadorImagenService,
+      usoIaService,
+      ofertasService,
+    );
   });
 
   describe('analizarImagen', () => {
@@ -71,6 +83,23 @@ describe('ProductosService', () => {
 
       await expect(service.analizarImagen('data:image/jpeg;base64,abc123', 'tenant-1')).rejects.toThrow(BadRequestException);
       expect(analizadorImagenService.analizarDesdeDataUri).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('listar', () => {
+    it('adjunta la oferta visible de OfertasService a cada producto con precio', async () => {
+      repository.listar.mockResolvedValue([
+        [{ id: 'p1', categoriaId: 'cat-1', precioVenta: '150' }, { id: 'p2', categoriaId: null, precioVenta: null }] as never,
+        2,
+      ] as never);
+      ofertasService.resolverOfertaVisibleProducto.mockResolvedValue({ tipo: 'BOGO', comprarCantidad: 2, llevarCantidad: 1, porcentajeDescuentoLlevar: 100 });
+
+      const resultado = await service.listar({ pagina: 1, tamanoPagina: 10 } as never);
+
+      expect(ofertasService.resolverOfertaVisibleProducto).toHaveBeenCalledTimes(1);
+      expect(ofertasService.resolverOfertaVisibleProducto).toHaveBeenCalledWith('p1', 'cat-1', 150);
+      expect(resultado.datos[0]).toMatchObject({ id: 'p1', oferta: { tipo: 'BOGO', comprarCantidad: 2, llevarCantidad: 1, porcentajeDescuentoLlevar: 100 } });
+      expect(resultado.datos[1]).toMatchObject({ id: 'p2', oferta: null });
     });
   });
 

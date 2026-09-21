@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useParams } from 'react-router-dom';
 import { apiClient } from '../lib/api-client';
 import { PaginaDocumento } from '../components/molecules/PaginaDocumento/PaginaDocumento';
+import { CardColapsable } from '../components/molecules/CardColapsable/CardColapsable';
 import { FormField } from '../components/molecules/FormField/FormField';
 import { ComboboxBusqueda } from '../components/molecules/ComboboxBusqueda/ComboboxBusqueda';
 import { SelectorLineaProducto } from '../components/molecules/SelectorLineaProducto/SelectorLineaProducto';
@@ -12,6 +13,7 @@ import { PaginaResultado } from '../types/pagina-resultado';
 import { mensajeErrorApi } from '../lib/mensaje-error-api';
 import { useHayCambios } from '../hooks/useHayCambios';
 import { estimarLineas } from '../lib/estimar-totales-documento';
+import { formatearOferta } from '../lib/formatear-oferta';
 import type { Cliente, Cotizacion, Producto, LineaForm } from '../components/organisms/CotizacionesPanel/CotizacionesPanel';
 
 export function CotizacionEditar() {
@@ -21,6 +23,9 @@ export function CotizacionEditar() {
   const [error, setError] = useState<string | null>(null);
   const [cliente, setCliente] = useState<Cliente | null>(null);
   const [valores, setValores] = useState<{ fechaVigenciaHasta: string; lineas: LineaForm[] } | null>(null);
+  // Modelo A de "más espacio para líneas" — arranca colapsada apenas
+  // carga el detalle (ver el comentario equivalente en FacturacionNueva.tsx).
+  const [infoColapsada, setInfoColapsada] = useState(false);
 
   const { data: productos } = useQuery({
     queryKey: ['productos-select'],
@@ -47,6 +52,7 @@ export function CotizacionEditar() {
         precioUnitario: l.precioUnitario,
       })),
     });
+    setInfoColapsada(true);
   }, [detalle]);
 
   const guardar = useMutation({
@@ -77,6 +83,7 @@ export function CotizacionEditar() {
     e.preventDefault();
     setError(null);
     if (!cliente) {
+      setInfoColapsada(false);
       setError('Seleccioná un cliente.');
       return;
     }
@@ -154,32 +161,39 @@ export function CotizacionEditar() {
         </>
       }
     >
-      <form id="form-editar-cotizacion" onSubmit={onSubmit} className="space-y-3">
-        <p className="text-sm text-slate-500 dark:text-slate-400">
-          Número <span className="font-medium text-slate-700 dark:text-slate-300">{detalle?.numero}</span> (asignado automáticamente, no editable)
-        </p>
-        <div className="flex flex-col gap-1">
-          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Cliente</label>
-          <ComboboxBusqueda<Cliente>
-            valor={cliente}
-            onSeleccionar={setCliente}
-            obtenerId={(c) => c.id}
-            obtenerEtiqueta={(c) => c.nombre}
-            placeholder="Buscar cliente…"
-            icono={<User size={15} />}
-            buscar={async (texto) =>
-              (await apiClient.get<PaginaResultado<Cliente>>('/clientes', { params: { busqueda: texto, tamanoPagina: 10 } })).data.datos
-            }
+      <form id="form-editar-cotizacion" onSubmit={onSubmit} className="space-y-4">
+        <CardColapsable
+          titulo={`Editar cotización ${detalle?.numero ?? ''}`}
+          colapsada={infoColapsada}
+          onToggle={() => setInfoColapsada((v) => !v)}
+          resumen={cliente ? `${cliente.nombre} · Válida hasta ${valores.fechaVigenciaHasta}` : 'Sin cliente seleccionado'}
+        >
+          <p className="text-sm text-slate-500 dark:text-slate-400 sm:col-span-2">
+            Número <span className="font-medium text-slate-700 dark:text-slate-300">{detalle?.numero}</span> (asignado automáticamente, no editable)
+          </p>
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Cliente</label>
+            <ComboboxBusqueda<Cliente>
+              valor={cliente}
+              onSeleccionar={setCliente}
+              obtenerId={(c) => c.id}
+              obtenerEtiqueta={(c) => c.nombre}
+              placeholder="Buscar cliente…"
+              icono={<User size={15} />}
+              buscar={async (texto) =>
+                (await apiClient.get<PaginaResultado<Cliente>>('/clientes', { params: { busqueda: texto, tamanoPagina: 10 } })).data.datos
+              }
+            />
+          </div>
+          <FormField
+            id="editar-vigencia"
+            label="Válida hasta"
+            type="date"
+            value={valores.fechaVigenciaHasta}
+            onChange={(e) => setValores({ ...valores, fechaVigenciaHasta: e.target.value })}
+            required
           />
-        </div>
-        <FormField
-          id="editar-vigencia"
-          label="Válida hasta"
-          type="date"
-          value={valores.fechaVigenciaHasta}
-          onChange={(e) => setValores({ ...valores, fechaVigenciaHasta: e.target.value })}
-          required
-        />
+        </CardColapsable>
 
         <div className="space-y-2">
           <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Líneas</p>
@@ -196,18 +210,34 @@ export function CotizacionEditar() {
                   className="min-w-[160px] flex-1 rounded-md border border-slate-300 px-2 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
                 />
               ) : (
-                <SelectorLineaProducto
-                  productos={productos ?? []}
-                  productoId={linea.productoId}
-                  varianteId={linea.varianteId}
-                  onChange={(productoId, varianteId, precioReferencia, itbisReferencia) =>
-                    setValores({
-                      ...valores,
-                      lineas: valores.lineas.map((l, idx) => (idx === i ? { ...l, productoId, varianteId, precioReferencia, itbisReferencia } : l)),
-                    })
-                  }
-                  className="min-w-[160px] flex-1"
-                />
+                <div className="flex min-w-[160px] flex-1 flex-col gap-1">
+                  <SelectorLineaProducto
+                    productos={productos ?? []}
+                    productoId={linea.productoId}
+                    varianteId={linea.varianteId}
+                    onChange={(productoId, varianteId, precioReferencia, itbisReferencia, oferta) =>
+                      setValores({
+                        ...valores,
+                        lineas: valores.lineas.map((l, idx) => (idx === i ? { ...l, productoId, varianteId, precioReferencia, itbisReferencia, oferta } : l)),
+                      })
+                    }
+                  />
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {linea.precioReferencia != null && (
+                      <span
+                        className="font-mono text-xs text-slate-500 dark:text-slate-400"
+                        title="Precio de lista GENERAL — referencia, el backend resuelve el precio real al guardar"
+                      >
+                        RD$ {Number(linea.precioReferencia).toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
+                    )}
+                    {linea.oferta && (
+                      <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-400">
+                        🏷️ {formatearOferta(linea.oferta)}
+                      </span>
+                    )}
+                  </div>
+                </div>
               )}
               <input
                 type="number"

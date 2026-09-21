@@ -13,6 +13,7 @@ import { generarExcel } from '../reportes/exportadores/excel-exportador';
 import type { ArchivoGenerado } from '../reportes/reportes.service';
 import { AnalizadorImagenService } from '../ia/analizador-imagen/analizador-imagen.service';
 import { UsoIaService } from '../ia/uso-ia.service';
+import { OfertasService } from '../ofertas/ofertas.service';
 
 export interface ResumenImportacion {
   creados: number;
@@ -30,6 +31,7 @@ export class ProductosService {
     private readonly preciosRepository: PreciosRepository,
     private readonly analizadorImagenService: AnalizadorImagenService,
     private readonly usoIaService: UsoIaService,
+    private readonly ofertasService: OfertasService,
   ) {}
 
   /**
@@ -67,12 +69,25 @@ export class ProductosService {
 
   async listar(query: CatalogoQueryDto) {
     const { pagina, tamanoPagina, skip, take } = paginar(query.pagina, query.tamanoPagina);
-    const [datos, total] = await this.productosRepository.listar({
+    const [productos, total] = await this.productosRepository.listar({
       skip,
       take,
       busqueda: query.busqueda,
       categoriaId: query.categoriaId,
     });
+    // Mismo criterio que EcommerceService.adjuntarOfertas: una consulta de
+    // ofertas por producto, aceptable al tamaño de una página paginada
+    // (nunca un listado sin límite). Le avisa al buscador de líneas de
+    // Facturación/Cotización si el producto elegido ya trae un descuento
+    // automático, sin que el usuario tenga que revisar Ofertas aparte.
+    const datos = await Promise.all(
+      productos.map(async (producto) => ({
+        ...producto,
+        oferta: producto.precioVenta
+          ? await this.ofertasService.resolverOfertaVisibleProducto(producto.id, producto.categoriaId, Number(producto.precioVenta))
+          : null,
+      })),
+    );
     return { datos, total, pagina, tamanoPagina };
   }
 

@@ -1,10 +1,11 @@
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import { User } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../lib/api-client';
 import { PaginaDocumento } from '../components/molecules/PaginaDocumento/PaginaDocumento';
 import { Card } from '../components/atoms/Card/Card';
+import { CardColapsable } from '../components/molecules/CardColapsable/CardColapsable';
 import { FormField } from '../components/molecules/FormField/FormField';
 import { ComboboxBusqueda } from '../components/molecules/ComboboxBusqueda/ComboboxBusqueda';
 import { TablaLineasEditable } from '../components/molecules/TablaLineasEditable/TablaLineasEditable';
@@ -24,6 +25,13 @@ export function CotizacionNueva() {
   const [fechaVigenciaHasta, setFechaVigenciaHasta] = useState('');
   const [lineas, setLineas] = useState<LineaForm[]>([LINEA_VACIA]);
   const [error, setError] = useState<string | null>(null);
+  // Modelo A de "más espacio para líneas" — ver el comentario equivalente en FacturacionNueva.tsx.
+  const [infoColapsada, setInfoColapsada] = useState(false);
+
+  useEffect(() => {
+    if (cliente) setInfoColapsada(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cliente?.id]);
 
   const { data: productos } = useQuery({
     queryKey: ['productos-select'],
@@ -62,6 +70,7 @@ export function CotizacionNueva() {
     e.preventDefault();
     setError(null);
     if (!cliente) {
+      setInfoColapsada(false);
       setError('Seleccioná un cliente.');
       return;
     }
@@ -131,7 +140,12 @@ export function CotizacionNueva() {
       }
     >
       <form id="form-nueva-cotizacion" onSubmit={onSubmit} className="space-y-4">
-        <Card titulo="Información de la cotización" contentClassName="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <CardColapsable
+          titulo="Información de la cotización"
+          colapsada={infoColapsada}
+          onToggle={() => setInfoColapsada((v) => !v)}
+          resumen={cliente ? `${cliente.nombre}${fechaVigenciaHasta ? ` · Válida hasta ${fechaVigenciaHasta}` : ''}` : 'Sin cliente seleccionado'}
+        >
           <div className="sm:col-span-2">
             <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Cliente</label>
             <ComboboxBusqueda<Cliente>
@@ -154,7 +168,7 @@ export function CotizacionNueva() {
             onChange={(e) => setFechaVigenciaHasta(e.target.value)}
             required
           />
-        </Card>
+        </CardColapsable>
 
         <Card titulo="Líneas">
           <TablaLineasEditable

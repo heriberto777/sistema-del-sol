@@ -1,4 +1,4 @@
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import { Plus, User, X } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
@@ -6,6 +6,7 @@ import { apiClient } from '../lib/api-client';
 import { mensajeErrorApi } from '../lib/mensaje-error-api';
 import { PaginaDocumento } from '../components/molecules/PaginaDocumento/PaginaDocumento';
 import { Card } from '../components/atoms/Card/Card';
+import { CardColapsable } from '../components/molecules/CardColapsable/CardColapsable';
 import { Select } from '../components/atoms/Select/Select';
 import { ComboboxBusqueda } from '../components/molecules/ComboboxBusqueda/ComboboxBusqueda';
 import { SelectorLineaProducto } from '../components/molecules/SelectorLineaProducto/SelectorLineaProducto';
@@ -23,6 +24,13 @@ export function RemisionNueva() {
   const [bodegaId, setBodegaId] = useState('');
   const [lineas, setLineas] = useState<LineaForm[]>([LINEA_VACIA]);
   const [error, setError] = useState<string | null>(null);
+  // Modelo A de "más espacio para líneas" — ver el comentario equivalente en FacturacionNueva.tsx.
+  const [infoColapsada, setInfoColapsada] = useState(false);
+
+  useEffect(() => {
+    if (cliente) setInfoColapsada(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cliente?.id]);
 
   const { data: productos } = useQuery({
     queryKey: ['productos-select'],
@@ -61,6 +69,7 @@ export function RemisionNueva() {
     e.preventDefault();
     setError(null);
     if (!cliente) {
+      setInfoColapsada(false);
       setError('Seleccioná un cliente.');
       return;
     }
@@ -108,10 +117,12 @@ export function RemisionNueva() {
       }
     >
       <form id="form-nueva-remision" onSubmit={onSubmit} className="space-y-4">
-        <Card
+        <CardColapsable
           titulo="Información de la remisión"
           descripcion={'Se crea en borrador (sin tocar inventario) — el descuento real ocurre al marcar "Entregada".'}
-          contentClassName="grid grid-cols-1 gap-3 sm:grid-cols-2"
+          colapsada={infoColapsada}
+          onToggle={() => setInfoColapsada((v) => !v)}
+          resumen={cliente ? `${cliente.nombre}${bodegaId ? ` · ${bodegaSeleccionada?.nombre ?? ''}` : ''}` : 'Sin cliente seleccionado'}
         >
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Cliente</label>
@@ -138,7 +149,7 @@ export function RemisionNueva() {
               ))}
             </Select>
           </div>
-        </Card>
+        </CardColapsable>
 
         <Card titulo="Líneas">
           <div className="space-y-2">
