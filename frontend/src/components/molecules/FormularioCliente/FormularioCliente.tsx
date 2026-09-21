@@ -111,106 +111,114 @@ export function FormularioCliente({ cliente, onGuardado }: { cliente: Cliente | 
   }
 
   return (
-    <form onSubmit={onSubmit} className="space-y-3">
-      <FormField
-        id="cliente-nombre"
-        label="Nombre"
-        value={valores.nombre}
-        onChange={(e) => setValores((v) => ({ ...v, nombre: e.target.value }))}
-        required
-      />
-      <SelectField
-        id="cliente-tipo"
-        label="Tipo"
-        value={valores.tipo}
-        onChange={(e) => setValores((v) => ({ ...v, tipo: e.target.value as TipoCliente }))}
-      >
-        <option value="PERSONA_FISICA">Persona física</option>
-        <option value="PERSONA_JURIDICA">Persona jurídica</option>
-      </SelectField>
-      <FormField
-        id="cliente-rnc"
-        label="RNC/Cédula"
-        value={valores.rncCedula}
-        onChange={(e) => setValores((v) => ({ ...v, rncCedula: e.target.value }))}
-      />
-      <FormField
-        id="cliente-email"
-        label="Email"
-        type="email"
-        value={valores.email}
-        onChange={(e) => setValores((v) => ({ ...v, email: e.target.value }))}
-      />
-      <FormField
-        id="cliente-telefono"
-        label="Teléfono"
-        value={valores.telefono}
-        onChange={(e) => setValores((v) => ({ ...v, telefono: e.target.value }))}
-      />
-      <FormField
-        id="cliente-limite"
-        label="Límite de crédito"
-        type="number"
-        min={0}
-        value={valores.limiteCredito}
-        onChange={(e) => setValores((v) => ({ ...v, limiteCredito: e.target.value }))}
-      />
-      <div className="flex flex-col gap-1">
-        <label htmlFor="cliente-lista-precio" className="text-sm font-medium text-slate-700 dark:text-slate-300">
-          Nivel de precio
-        </label>
-        <SelectListaPrecio
-          id="cliente-lista-precio"
-          value={valores.listaPrecioId}
-          onChange={(id) => setValores((v) => ({ ...v, listaPrecioId: id }))}
+    <form onSubmit={onSubmit} className="space-y-4">
+      {/* 10 campos en una sola columna se sentían apretados en el modal `lg`
+          (el más angosto) — sin textarea ni lista embebida que justifique
+          tabs, pero sí un grid de 2 columnas como el resto de formularios
+          largos de una sola sección (ver Propiedades.tsx). */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="sm:col-span-2">
+          <FormField
+            id="cliente-nombre"
+            label="Nombre"
+            value={valores.nombre}
+            onChange={(e) => setValores((v) => ({ ...v, nombre: e.target.value }))}
+            required
+          />
+        </div>
+        <SelectField
+          id="cliente-tipo"
+          label="Tipo"
+          value={valores.tipo}
+          onChange={(e) => setValores((v) => ({ ...v, tipo: e.target.value as TipoCliente }))}
+        >
+          <option value="PERSONA_FISICA">Persona física</option>
+          <option value="PERSONA_JURIDICA">Persona jurídica</option>
+        </SelectField>
+        <FormField
+          id="cliente-rnc"
+          label="RNC/Cédula"
+          value={valores.rncCedula}
+          onChange={(e) => setValores((v) => ({ ...v, rncCedula: e.target.value }))}
         />
-      </div>
-      <div className="flex flex-col gap-1">
-        <label htmlFor="cliente-categoria" className="text-sm font-medium text-slate-700 dark:text-slate-300">
-          Categoría (segmentación, opcional)
-        </label>
-        <SelectCategoriaCliente
-          id="cliente-categoria"
-          value={valores.categoriaId}
-          onChange={(id) => setValores((v) => ({ ...v, categoriaId: id }))}
+        <FormField
+          id="cliente-email"
+          label="Email"
+          type="email"
+          value={valores.email}
+          onChange={(e) => setValores((v) => ({ ...v, email: e.target.value }))}
         />
-      </div>
+        <FormField
+          id="cliente-telefono"
+          label="Teléfono"
+          value={valores.telefono}
+          onChange={(e) => setValores((v) => ({ ...v, telefono: e.target.value }))}
+        />
+        <FormField
+          id="cliente-limite"
+          label="Límite de crédito"
+          type="number"
+          min={0}
+          value={valores.limiteCredito}
+          onChange={(e) => setValores((v) => ({ ...v, limiteCredito: e.target.value }))}
+        />
+        <div className="flex flex-col gap-1">
+          <label htmlFor="cliente-lista-precio" className="text-sm font-medium text-slate-700 dark:text-slate-300">
+            Nivel de precio
+          </label>
+          <SelectListaPrecio
+            id="cliente-lista-precio"
+            value={valores.listaPrecioId}
+            onChange={(id) => setValores((v) => ({ ...v, listaPrecioId: id }))}
+          />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label htmlFor="cliente-categoria" className="text-sm font-medium text-slate-700 dark:text-slate-300">
+            Categoría (segmentación, opcional)
+          </label>
+          <SelectCategoriaCliente
+            id="cliente-categoria"
+            value={valores.categoriaId}
+            onChange={(id) => setValores((v) => ({ ...v, categoriaId: id }))}
+          />
+        </div>
 
-      {/* Ítem "separar Comprobante Fiscal de Opción de Pago" — dos campos
-          independientes: qué NCF emite la DGII, y si se cobra al crear o
-          queda pendiente en Cuentas por Cobrar. Ambos autoseleccionan sus
-          respectivos campos al facturarle a este cliente, sin depender
-          uno del otro. */}
-      <SelectField
-        id="cliente-comprobante-fiscal"
-        label="Comprobante fiscal por defecto (opcional)"
-        value={valores.comprobanteFiscalPorDefecto}
-        onChange={(e) => setValores((v) => ({ ...v, comprobanteFiscalPorDefecto: e.target.value as TipoComprobanteFiscal | '' }))}
-      >
-        <option value="">Sin default — elegir cada vez al facturar</option>
-        <option value="CONSUMO">Consumo (B02)</option>
-        <option value="CREDITO_FISCAL">Crédito Fiscal (B01)</option>
-        <option value="REGIMEN_ESPECIAL">Régimen Especial (B14)</option>
-        <option value="GUBERNAMENTAL">Gubernamental (B15)</option>
-      </SelectField>
-      <SelectField
-        id="cliente-condicion-pago"
-        label="Opción de pago por defecto (opcional)"
-        value={valores.condicionPagoPorDefecto}
-        onChange={(e) => setValores((v) => ({ ...v, condicionPagoPorDefecto: e.target.value as CondicionPago | '' }))}
-      >
-        <option value="">Sin default — elegir cada vez al facturar</option>
-        <option value="CONTADO">Contado</option>
-        <option value="CREDITO">Crédito</option>
-      </SelectField>
-      <FormField
-        id="cliente-plazo-pago"
-        label="Días de crédito"
-        type="number"
-        min={1}
-        value={valores.plazoPagoDias}
-        onChange={(e) => setValores((v) => ({ ...v, plazoPagoDias: e.target.value }))}
-      />
+        {/* Ítem "separar Comprobante Fiscal de Opción de Pago" — dos campos
+            independientes: qué NCF emite la DGII, y si se cobra al crear o
+            queda pendiente en Cuentas por Cobrar. Ambos autoseleccionan sus
+            respectivos campos al facturarle a este cliente, sin depender
+            uno del otro. */}
+        <SelectField
+          id="cliente-comprobante-fiscal"
+          label="Comprobante fiscal por defecto (opcional)"
+          value={valores.comprobanteFiscalPorDefecto}
+          onChange={(e) => setValores((v) => ({ ...v, comprobanteFiscalPorDefecto: e.target.value as TipoComprobanteFiscal | '' }))}
+        >
+          <option value="">Sin default — elegir cada vez al facturar</option>
+          <option value="CONSUMO">Consumo (B02)</option>
+          <option value="CREDITO_FISCAL">Crédito Fiscal (B01)</option>
+          <option value="REGIMEN_ESPECIAL">Régimen Especial (B14)</option>
+          <option value="GUBERNAMENTAL">Gubernamental (B15)</option>
+        </SelectField>
+        <SelectField
+          id="cliente-condicion-pago"
+          label="Opción de pago por defecto (opcional)"
+          value={valores.condicionPagoPorDefecto}
+          onChange={(e) => setValores((v) => ({ ...v, condicionPagoPorDefecto: e.target.value as CondicionPago | '' }))}
+        >
+          <option value="">Sin default — elegir cada vez al facturar</option>
+          <option value="CONTADO">Contado</option>
+          <option value="CREDITO">Crédito</option>
+        </SelectField>
+        <FormField
+          id="cliente-plazo-pago"
+          label="Días de crédito"
+          type="number"
+          min={1}
+          value={valores.plazoPagoDias}
+          onChange={(e) => setValores((v) => ({ ...v, plazoPagoDias: e.target.value }))}
+        />
+      </div>
 
       {error && <p className="text-sm text-red-600">{error}</p>}
       <Button type="submit" disabled={guardar.isPending} className="w-full">

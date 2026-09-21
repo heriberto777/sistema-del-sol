@@ -711,7 +711,7 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
               </div>
 
               {mostrarNuevoCliente && (
-                <Modal titulo="Nuevo cliente" onClose={() => setMostrarNuevoCliente(false)}>
+                <Modal titulo="Nuevo cliente" onClose={() => setMostrarNuevoCliente(false)} ancho="xl">
                   <FormularioCliente
                     cliente={null}
                     onGuardado={(c) => {

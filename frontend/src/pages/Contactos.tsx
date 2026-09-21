@@ -147,7 +147,7 @@ export function Contactos() {
       )}
 
       {modalAbierto && pestana === 'clientes' && (
-        <Modal titulo={clienteEditando ? 'Editar cliente' : 'Nuevo cliente'} onClose={cerrarModal}>
+        <Modal titulo={clienteEditando ? 'Editar cliente' : 'Nuevo cliente'} onClose={cerrarModal} ancho="xl">
           <FormularioCliente cliente={clienteEditando} onGuardado={cerrarModal} />
         </Modal>
       )}
