@@ -1,6 +1,7 @@
 import { FormEvent, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Maximize2, Pencil, Sparkles, Trash2, X } from 'lucide-react';
+import { ChevronsLeft, ChevronsRight, Maximize2, MessageSquare, Pencil, Sparkles, Trash2, X } from 'lucide-react';
+import clsx from 'clsx';
 import { apiClient } from '../../../lib/api-client';
 import { mensajeErrorApi } from '../../../lib/mensaje-error-api';
 import { comprimirImagen } from '../../../lib/comprimir-imagen';
@@ -161,6 +162,8 @@ export function TareaPersonalModal({ tarea, onClose }: { tarea: TareaPersonal; o
   const [imagenAmpliada, setImagenAmpliada] = useState<string | null>(null);
   const [descripcion, setDescripcion] = useState(tarea.descripcion ?? '');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  // Igual criterio que KanbanTareas.tsx: sesión de "estoy leyendo esto ahora", no persiste entre aperturas.
+  const [panelNotasAbierto, setPanelNotasAbierto] = useState(true);
 
   const { data: categorias } = useQuery({
     queryKey: ['categorias-incentivo'],
@@ -244,8 +247,24 @@ export function TareaPersonalModal({ tarea, onClose }: { tarea: TareaPersonal; o
   }
 
   return (
-    <Modal titulo={tarea.titulo} onClose={onClose} ancho="xl">
-      <div className="space-y-4">
+    <Modal titulo={tarea.titulo} onClose={onClose} ancho="full">
+      <div className="mb-3 flex justify-end">
+        <button
+          type="button"
+          onClick={() => setPanelNotasAbierto((v) => !v)}
+          className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+        >
+          <MessageSquare size={13} />
+          Notas
+          {tarea.comentarios.length > 0 && (
+            <span className="rounded-full bg-sol-500 px-1.5 text-[10px] font-bold text-white">{tarea.comentarios.length}</span>
+          )}
+          {panelNotasAbierto ? <ChevronsRight size={13} /> : <ChevronsLeft size={13} />}
+        </button>
+      </div>
+
+      <div className={clsx('flex flex-col gap-5 md:items-start', panelNotasAbierto && 'md:flex-row')}>
+      <div className="min-w-0 flex-1 space-y-4">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-[2fr_1fr_1fr_1fr]">
           <div className="flex flex-col gap-1">
             <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Título</label>
@@ -323,7 +342,7 @@ export function TareaPersonalModal({ tarea, onClose }: { tarea: TareaPersonal; o
             value={descripcion}
             onChange={(e) => setDescripcion(e.target.value)}
             onBlur={() => descripcion !== (tarea.descripcion ?? '') && actualizar.mutate({ descripcion: descripcion || null })}
-            rows={3}
+            rows={7}
             placeholder="Detalle ampliado del problema o la tarea…"
             className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none focus:border-sol-500 focus:ring-2 focus:ring-sol-500/30 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
           />
@@ -373,13 +392,16 @@ export function TareaPersonalModal({ tarea, onClose }: { tarea: TareaPersonal; o
         </div>
 
         {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+      </div>
 
-        <div className="border-t border-slate-100 pt-4 dark:border-slate-800">
-          <h3 className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
+      {panelNotasAbierto && (
+        <div className="flex flex-col border-t border-slate-100 pt-5 dark:border-slate-800 md:h-[36rem] md:w-96 md:shrink-0 md:border-l md:border-t-0 md:pl-5 md:pt-0">
+          <h3 className="mb-1 shrink-0 text-sm font-semibold text-slate-700 dark:text-slate-300">
             Notas{tarea.comentarios.length > 0 && <span className="ml-1 font-normal text-slate-400">({tarea.comentarios.length})</span>}
           </h3>
 
-          <div className="max-h-[26rem] overflow-y-auto pr-1">
+          {/* min-h-0 es lo que permite que este flex item se encoja por debajo de su contenido y el overflow-y-auto de abajo scrollee de verdad (mismo criterio que KanbanTareas.tsx). */}
+          <div className="min-h-0 flex-1 overflow-y-auto pr-1">
             {tarea.comentarios.length === 0 && <p className="py-2 text-xs text-slate-400">Sin notas todavía — escribí algo abajo.</p>}
             {tarea.comentarios.map((c) => (
               <ComentarioItem
@@ -394,13 +416,13 @@ export function TareaPersonalModal({ tarea, onClose }: { tarea: TareaPersonal; o
             ))}
           </div>
 
-          <form onSubmit={onSubmit} className="mt-3 rounded-xl border border-slate-200 p-2.5 dark:border-slate-700">
+          <form onSubmit={onSubmit} className="mt-3 shrink-0 rounded-xl border border-slate-200 p-2.5 dark:border-slate-700">
             <textarea
               ref={textareaRef}
               value={contenido}
               onChange={(e) => setContenido(e.target.value)}
               placeholder="Escribí una nota — usá ``` para un bloque de código…"
-              rows={2}
+              rows={3}
               className="w-full resize-none border-none bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400 dark:text-slate-100 dark:placeholder:text-slate-500"
             />
             {imagenesPendientes.length > 0 && (
@@ -428,6 +450,7 @@ export function TareaPersonalModal({ tarea, onClose }: { tarea: TareaPersonal; o
             </div>
           </form>
         </div>
+      )}
       </div>
       {imagenAmpliada && <VisorImagen src={imagenAmpliada} onClose={() => setImagenAmpliada(null)} />}
     </Modal>
