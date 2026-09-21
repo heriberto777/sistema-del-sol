@@ -11,6 +11,7 @@ import { Select } from '../components/atoms/Select/Select';
 import { ComboboxBusqueda } from '../components/molecules/ComboboxBusqueda/ComboboxBusqueda';
 import { FormField } from '../components/molecules/FormField/FormField';
 import { Modal } from '../components/molecules/Modal/Modal';
+import { ConfirmModal } from '../components/molecules/ConfirmModal/ConfirmModal';
 import { ModalRegistrarPagoOrdenCompra } from '../components/molecules/ModalRegistrarPagoOrdenCompra/ModalRegistrarPagoOrdenCompra';
 import { SearchInput } from '../components/molecules/SearchInput/SearchInput';
 import { Paginacion } from '../components/molecules/Paginacion/Paginacion';
@@ -103,6 +104,7 @@ export function Compras() {
   const [ordenDevolviendo, setOrdenDevolviendo] = useState<OrdenCompra | null>(null);
   const [ordenViendo, setOrdenViendo] = useState<OrdenCompra | null>(null);
   const [ordenEditando, setOrdenEditando] = useState<OrdenCompra | null>(null);
+  const [ordenACancelar, setOrdenACancelar] = useState<OrdenCompra | null>(null);
   const queryClient = useQueryClient();
 
   const cambiarEstado = useMutation({
@@ -201,9 +203,7 @@ export function Compras() {
                             {
                               etiqueta: 'Cancelar',
                               tono: 'peligro' as const,
-                              onClick: () => {
-                                if (confirm(`¿Cancelar la orden ${oc.numero}?`)) cambiarEstado.mutate({ id: oc.id, estado: 'CANCELADA' });
-                              },
+                              onClick: () => setOrdenACancelar(oc),
                             },
                           ]
                         : []),
@@ -242,6 +242,23 @@ export function Compras() {
       {ordenPagando && <ModalRegistrarPagoOrdenCompra orden={ordenPagando} onClose={() => setOrdenPagando(null)} />}
       {ordenDevolviendo && <ModalDevolverOrden orden={ordenDevolviendo} onClose={() => setOrdenDevolviendo(null)} />}
       {ordenViendo && <ModalVerOrden orden={ordenViendo} onClose={() => setOrdenViendo(null)} />}
+      {ordenACancelar && (
+        <ConfirmModal
+          titulo="¿Cancelar esta orden de compra?"
+          descripcion={
+            <>
+              Se cancelará la orden <b>{ordenACancelar.numero}</b> a <b>{ordenACancelar.proveedor.nombre}</b>.
+            </>
+          }
+          confirmarTexto="Cancelar orden"
+          confirmando={cambiarEstado.isPending}
+          onConfirmar={() => {
+            cambiarEstado.mutate({ id: ordenACancelar.id, estado: 'CANCELADA' });
+            setOrdenACancelar(null);
+          }}
+          onCancelar={() => setOrdenACancelar(null)}
+        />
+      )}
     </div>
   );
 }

@@ -7,6 +7,7 @@ import { Card } from '../../atoms/Card/Card';
 import { Input } from '../../atoms/Input/Input';
 import { FormField } from '../../molecules/FormField/FormField';
 import { Modal } from '../../molecules/Modal/Modal';
+import { ConfirmModal } from '../../molecules/ConfirmModal/ConfirmModal';
 import { SearchInput } from '../../molecules/SearchInput/SearchInput';
 import { Paginacion } from '../../molecules/Paginacion/Paginacion';
 import { useDebouncedValue } from '../../../hooks/useDebouncedValue';
@@ -59,6 +60,7 @@ export function AsientosContablesTable() {
   const [pagina, setPagina] = useState(1);
   const busquedaDebounced = useDebouncedValue(busqueda);
   const [modalNuevoAsiento, setModalNuevoAsiento] = useState(false);
+  const [asientoAAnular, setAsientoAAnular] = useState<AsientoContable | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const { data, isLoading, error: errorCarga } = useQuery({
@@ -117,16 +119,7 @@ export function AsientosContablesTable() {
                   <span className="flex items-center gap-2 text-slate-500 dark:text-slate-400">
                     {asiento.origen} · {new Date(asiento.fecha).toLocaleDateString('es-DO')}
                     {!asiento.anulado && ORIGENES_ANULABLES.includes(asiento.origen) && tienePermiso('contabilidad.anular') && (
-                      <Button
-                        type="button"
-                        variante="peligro"
-                        disabled={anular.isPending}
-                        onClick={() => {
-                          if (window.confirm(`¿Anular el asiento #${asiento.numero}? Se generará un reverso.`)) {
-                            anular.mutate(asiento.id);
-                          }
-                        }}
-                      >
+                      <Button type="button" variante="peligro" disabled={anular.isPending} onClick={() => setAsientoAAnular(asiento)}>
                         Anular
                       </Button>
                     )}
@@ -159,6 +152,23 @@ export function AsientosContablesTable() {
       </Card>
 
       {modalNuevoAsiento && <ModalNuevoAsiento onClose={() => setModalNuevoAsiento(false)} />}
+      {asientoAAnular && (
+        <ConfirmModal
+          titulo="¿Anular este asiento?"
+          descripcion={
+            <>
+              Se anulará el asiento <b>#{asientoAAnular.numero} — {asientoAAnular.concepto}</b> y se generará un reverso.
+            </>
+          }
+          confirmarTexto="Anular"
+          confirmando={anular.isPending}
+          onConfirmar={() => {
+            anular.mutate(asientoAAnular.id);
+            setAsientoAAnular(null);
+          }}
+          onCancelar={() => setAsientoAAnular(null)}
+        />
+      )}
     </div>
   );
 }

@@ -9,6 +9,7 @@ import { Card } from '../../atoms/Card/Card';
 import { FormField } from '../../molecules/FormField/FormField';
 import { Select } from '../../atoms/Select/Select';
 import { Modal } from '../../molecules/Modal/Modal';
+import { ConfirmModal } from '../../molecules/ConfirmModal/ConfirmModal';
 import { ComboboxBusqueda } from '../../molecules/ComboboxBusqueda/ComboboxBusqueda';
 import { CampoImagen } from '../../molecules/CampoImagen/CampoImagen';
 import { PaginaResultado } from '../../../types/pagina-resultado';
@@ -92,6 +93,7 @@ const DESCRIPCION_TIPO: Record<TipoSeccion, string> = {
 export function SeccionesTiendaPanel() {
   const queryClient = useQueryClient();
   const [editando, setEditando] = useState<SeccionTiendaAdmin | 'nueva' | null>(null);
+  const [seccionAEliminar, setSeccionAEliminar] = useState<SeccionTiendaAdmin | null>(null);
 
   const { data: secciones, isLoading } = useQuery({
     queryKey: ['admin-secciones-tienda'],
@@ -205,7 +207,7 @@ export function SeccionesTiendaPanel() {
             </button>
             <button
               type="button"
-              onClick={() => confirm(`¿Eliminar la sección "${s.titulo}"?`) && eliminar.mutate(s.id)}
+              onClick={() => setSeccionAEliminar(s)}
               className="shrink-0 text-slate-400 hover:text-red-600"
               aria-label="Eliminar"
             >
@@ -216,6 +218,22 @@ export function SeccionesTiendaPanel() {
       </ul>
 
       {editando && <ModalSeccionTienda seccion={editando === 'nueva' ? null : editando} onClose={() => setEditando(null)} onGuardado={invalidar} />}
+      {seccionAEliminar && (
+        <ConfirmModal
+          titulo="¿Eliminar esta sección?"
+          descripcion={
+            <>
+              Se eliminará la sección <b>"{seccionAEliminar.titulo}"</b> del Home de la tienda.
+            </>
+          }
+          confirmando={eliminar.isPending}
+          onConfirmar={() => {
+            eliminar.mutate(seccionAEliminar.id);
+            setSeccionAEliminar(null);
+          }}
+          onCancelar={() => setSeccionAEliminar(null)}
+        />
+      )}
     </Card>
   );
 }

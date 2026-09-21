@@ -10,6 +10,7 @@ import { Card } from '../components/atoms/Card/Card';
 import { Select } from '../components/atoms/Select/Select';
 import { FormField } from '../components/molecules/FormField/FormField';
 import { Modal } from '../components/molecules/Modal/Modal';
+import { ConfirmModal } from '../components/molecules/ConfirmModal/ConfirmModal';
 import { CampoPin } from '../components/molecules/CampoPin/CampoPin';
 import { EstadoVacio } from '../components/molecules/EstadoVacio/EstadoVacio';
 import { RequierePermiso } from '../components/organisms/RequierePermiso/RequierePermiso';
@@ -131,10 +132,12 @@ export function Inventario() {
   const [ajusteViendo, setAjusteViendo] = useState<AjusteInventario | null>(null);
   const [ajusteEditando, setAjusteEditando] = useState<AjusteInventario | null>(null);
   const [ajusteConfirmando, setAjusteConfirmando] = useState<AjusteInventario | null>(null);
+  const [ajusteACancelar, setAjusteACancelar] = useState<AjusteInventario | null>(null);
   const [ajusteNuevo, setAjusteNuevo] = useState(false);
   const [paginaAjustes, setPaginaAjustes] = useState(1);
   const [transferenciaViendo, setTransferenciaViendo] = useState<TransferenciaInventario | null>(null);
   const [transferenciaEditando, setTransferenciaEditando] = useState<TransferenciaInventario | null>(null);
+  const [transferenciaACancelar, setTransferenciaACancelar] = useState<TransferenciaInventario | null>(null);
   const [transferenciaNueva, setTransferenciaNueva] = useState(false);
   const [paginaTransferencias, setPaginaTransferencias] = useState(1);
 
@@ -421,9 +424,7 @@ export function Inventario() {
                                   {
                                     etiqueta: 'Cancelar',
                                     tono: 'peligro' as const,
-                                    onClick: () => {
-                                      if (confirm(`¿Cancelar el ajuste ${aj.numero}?`)) cambiarEstadoAjuste.mutate({ id: aj.id, estado: 'CANCELADO' });
-                                    },
+                                    onClick: () => setAjusteACancelar(aj),
                                   },
                                 ]
                               : []),
@@ -494,10 +495,7 @@ export function Inventario() {
                                   {
                                     etiqueta: 'Cancelar',
                                     tono: 'peligro' as const,
-                                    onClick: () => {
-                                      if (confirm(`¿Cancelar la transferencia ${tr.numero}?`))
-                                        cambiarEstadoTransferencia.mutate({ id: tr.id, estado: 'CANCELADO' });
-                                    },
+                                    onClick: () => setTransferenciaACancelar(tr),
                                   },
                                 ]
                               : []),
@@ -528,10 +526,44 @@ export function Inventario() {
       {ajusteViendo && <ModalVerAjuste ajuste={ajusteViendo} onClose={() => setAjusteViendo(null)} />}
       {ajusteEditando && <ModalEditarAjuste ajuste={ajusteEditando} onClose={() => setAjusteEditando(null)} />}
       {ajusteConfirmando && <ModalConfirmarAjuste ajuste={ajusteConfirmando} onClose={() => setAjusteConfirmando(null)} />}
+      {ajusteACancelar && (
+        <ConfirmModal
+          titulo="¿Cancelar este ajuste?"
+          descripcion={
+            <>
+              Se cancelará el ajuste <b>{ajusteACancelar.numero}</b> — queda como registro histórico, sin mover stock.
+            </>
+          }
+          confirmarTexto="Cancelar ajuste"
+          confirmando={cambiarEstadoAjuste.isPending}
+          onConfirmar={() => {
+            cambiarEstadoAjuste.mutate({ id: ajusteACancelar.id, estado: 'CANCELADO' });
+            setAjusteACancelar(null);
+          }}
+          onCancelar={() => setAjusteACancelar(null)}
+        />
+      )}
       {ajusteNuevo && <ModalNuevoAjuste bodegas={bodegas ?? []} onClose={() => setAjusteNuevo(false)} />}
       {transferenciaNueva && <ModalNuevaTransferencia bodegas={bodegas ?? []} onClose={() => setTransferenciaNueva(false)} />}
       {transferenciaViendo && <ModalVerTransferencia transferencia={transferenciaViendo} onClose={() => setTransferenciaViendo(null)} />}
       {transferenciaEditando && <ModalEditarTransferencia transferencia={transferenciaEditando} onClose={() => setTransferenciaEditando(null)} />}
+      {transferenciaACancelar && (
+        <ConfirmModal
+          titulo="¿Cancelar esta transferencia?"
+          descripcion={
+            <>
+              Se cancelará la transferencia <b>{transferenciaACancelar.numero}</b>.
+            </>
+          }
+          confirmarTexto="Cancelar transferencia"
+          confirmando={cambiarEstadoTransferencia.isPending}
+          onConfirmar={() => {
+            cambiarEstadoTransferencia.mutate({ id: transferenciaACancelar.id, estado: 'CANCELADO' });
+            setTransferenciaACancelar(null);
+          }}
+          onCancelar={() => setTransferenciaACancelar(null)}
+        />
+      )}
       {bodegaEditando && <ModalEditarBodega bodega={bodegaEditando} onClose={() => setBodegaEditando(null)} />}
       {stockAjustando && bodegaSeleccionadaId && (
         <ModalAjustarStock

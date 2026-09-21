@@ -7,6 +7,7 @@ import { Card } from '../components/atoms/Card/Card';
 import { Select } from '../components/atoms/Select/Select';
 import { FormField } from '../components/molecules/FormField/FormField';
 import { Modal } from '../components/molecules/Modal/Modal';
+import { ConfirmModal } from '../components/molecules/ConfirmModal/ConfirmModal';
 import { SearchInput } from '../components/molecules/SearchInput/SearchInput';
 import { Paginacion } from '../components/molecules/Paginacion/Paginacion';
 import { EstadoVacio } from '../components/molecules/EstadoVacio/EstadoVacio';
@@ -38,6 +39,7 @@ export function Bancos() {
   const busquedaDebounced = useDebouncedValue(busqueda);
   const [modalAbierto, setModalAbierto] = useState(false);
   const [cuentaEditando, setCuentaEditando] = useState<CuentaBancaria | null>(null);
+  const [cuentaADesactivar, setCuentaADesactivar] = useState<CuentaBancaria | null>(null);
   const queryClient = useQueryClient();
 
   const { data } = useQuery({
@@ -117,11 +119,7 @@ export function Bancos() {
                               {
                                 etiqueta: 'Desactivar',
                                 tono: 'peligro',
-                                onClick: () => {
-                                  if (window.confirm(`¿Desactivar la cuenta ${c.banco} — ${c.numeroCuenta}?`)) {
-                                    desactivar.mutate(c.id);
-                                  }
-                                },
+                                onClick: () => setCuentaADesactivar(c),
                               },
                             ]}
                           />
@@ -150,6 +148,23 @@ export function Bancos() {
         <Modal titulo={`Editar cuenta — ${cuentaEditando.banco}`} onClose={() => setCuentaEditando(null)}>
           <FormularioCuentaBancaria cuenta={cuentaEditando} onGuardado={() => setCuentaEditando(null)} />
         </Modal>
+      )}
+      {cuentaADesactivar && (
+        <ConfirmModal
+          titulo="¿Desactivar esta cuenta?"
+          descripcion={
+            <>
+              Se desactivará la cuenta <b>{cuentaADesactivar.banco} — {cuentaADesactivar.numeroCuenta}</b>.
+            </>
+          }
+          confirmarTexto="Desactivar"
+          confirmando={desactivar.isPending}
+          onConfirmar={() => {
+            desactivar.mutate(cuentaADesactivar.id);
+            setCuentaADesactivar(null);
+          }}
+          onCancelar={() => setCuentaADesactivar(null)}
+        />
       )}
     </div>
   );
