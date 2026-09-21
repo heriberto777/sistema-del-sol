@@ -1,7 +1,8 @@
 import { DragEvent, MouseEvent, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { ChevronDown, ChevronRight, ChevronsDownUp, ChevronsLeft, ChevronsRight, ChevronsUpDown, MessageSquare, Pause, Play, Sparkles, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, ChevronsDownUp, ChevronsLeft, ChevronsRight, ChevronsUpDown, MessageSquare, Pause, Play, Sparkles, Trash2, UserPlus } from 'lucide-react';
 import { apiClient } from '../../../lib/api-client';
 import { mensajeErrorApi } from '../../../lib/mensaje-error-api';
 import { useAuth } from '../../../hooks/useAuth';
@@ -17,7 +18,16 @@ import { RequierePermiso } from '../RequierePermiso/RequierePermiso';
 import { BarraFormato, ContenidoComentario } from '../../molecules/ComentarioFormato/ComentarioFormato';
 import { TareaFormModal, TareaFormValues } from '../TareaFormModal/TareaFormModal';
 import { GenerarTareasIaModal, PlanIaParaCrear } from '../GenerarTareasIaModal/GenerarTareasIaModal';
-import { EmpleadoOpcion, ESTILO_PRIORIDAD_TAREA, ETIQUETA_PRIORIDAD_TAREA, Hito, Tarea } from '../../../types/proyectos';
+import {
+  EmpleadoOpcion,
+  ESTADOS_TAREA,
+  ETIQUETA_ESTADO_TAREA,
+  ESTILO_PRIORIDAD_TAREA,
+  ETIQUETA_PRIORIDAD_TAREA,
+  Hito,
+  PRIORIDADES_TAREA,
+  Tarea,
+} from '../../../types/proyectos';
 import { soloFecha, formatoFechaHoraComentario, formatearDuracion } from '../../../lib/fecha';
 import { inicialesDe } from '../../../lib/iniciales';
 
@@ -204,6 +214,21 @@ export function KanbanTareas({ proyectoId, proyectoNombre, proyectoDescripcion, 
     mutationFn: async ({ tareaId, estado }: { tareaId: string; estado: string }) => apiClient.patch(`/admin/proyectos/tareas/${tareaId}`, { estado }),
     onSuccess: invalidar,
     onError: (err) => onError(mensajeErrorApi(err, 'No se pudo cambiar el estado de la tarea.')),
+  });
+
+  /**
+   * Genérica para los campos editables directo desde el panel de detalle
+   * (Estado/Prioridad/Hito/Fecha/Descripción) — antes esa información solo
+   * se veía/editaba reabriendo `TareaFormModal` por separado (bug real
+   * reportado: la Descripción capturada al crear nunca se mostraba en el
+   * detalle). Mismo endpoint que ya usa `cambiarEstadoTarea`, que se deja
+   * intacta porque el drag-and-drop del tablero depende de su firma exacta.
+   */
+  const actualizarTarea = useMutation({
+    mutationFn: async ({ tareaId, valores }: { tareaId: string; valores: Partial<TareaFormValues> }) =>
+      apiClient.patch(`/admin/proyectos/tareas/${tareaId}`, valores),
+    onSuccess: invalidar,
+    onError: (err) => onError(mensajeErrorApi(err, 'No se pudo actualizar la tarea.')),
   });
 
   const iniciarCronometro = useMutation({
@@ -698,7 +723,7 @@ export function KanbanTareas({ proyectoId, proyectoNombre, proyectoDescripcion, 
       )}
 
       {tareaActual && (
-        <Modal titulo={tareaActual.titulo} onClose={() => setTareaAbierta(null)} ancho="xl">
+        <Modal titulo={tareaActual.titulo} onClose={() => setTareaAbierta(null)} ancho="full">
           <div className="mb-3 flex justify-end">
             <button
               type="button"
@@ -716,41 +741,81 @@ export function KanbanTareas({ proyectoId, proyectoNombre, proyectoDescripcion, 
 
           <div className={clsx('flex flex-col gap-5 md:items-start', panelComentariosAbierto && 'md:flex-row')}>
             <div className="min-w-0 flex-1 space-y-5">
-              <div>
-                <h3 className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-300">Responsables</h3>
-                <div className="flex flex-wrap gap-2">
-                  {tareaActual.responsables.map((r) => (
-                    <span
-                      key={r.empleado.id}
-                      className="flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-700 dark:bg-slate-800 dark:text-slate-300"
-                    >
-                      {r.empleado.nombre}
-                      <button
-                        type="button"
-                        onClick={() => quitarResponsable.mutate({ tareaId: tareaActual.id, empleadoId: r.empleado.id })}
-                        className="text-slate-400 hover:text-red-600"
-                      >
-                        ×
-                      </button>
-                    </span>
-                  ))}
-                </div>
-                <Select
-                  className="mt-2"
-                  value=""
-                  onChange={(e) => {
-                    if (e.target.value) asignarResponsable.mutate({ tareaId: tareaActual.id, empleadoId: e.target.value });
-                  }}
-                >
-                  <option value="">Agregar responsable…</option>
-                  {empleados
-                    ?.filter((emp) => !tareaActual.responsables.some((r) => r.empleado.id === emp.id))
-                    .map((emp) => (
-                      <option key={emp.id} value={emp.id}>
-                        {emp.nombre}
+              {/* Información — antes esto (Descripción, Prioridad, Hito, Fecha,
+                  Estado) se capturaba bien al crear/editar pero nunca se veía
+                  acá (bug real reportado: solo aparecía reabriendo "Editar").
+                  Editable directo, mismo endpoint que ya usa `cambiarEstadoTarea`. */}
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Estado</label>
+                  <Select
+                    value={tareaActual.estado}
+                    onChange={(e) => actualizarTarea.mutate({ tareaId: tareaActual.id, valores: { estado: e.target.value } })}
+                    className="text-sm"
+                  >
+                    {ESTADOS_TAREA.map((es) => (
+                      <option key={es} value={es}>
+                        {ETIQUETA_ESTADO_TAREA[es]}
                       </option>
                     ))}
-                </Select>
+                  </Select>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Prioridad</label>
+                  <Select
+                    value={tareaActual.prioridad}
+                    onChange={(e) => actualizarTarea.mutate({ tareaId: tareaActual.id, valores: { prioridad: e.target.value } })}
+                    className="text-sm"
+                  >
+                    {PRIORIDADES_TAREA.map((p) => (
+                      <option key={p} value={p}>
+                        {ETIQUETA_PRIORIDAD_TAREA[p]}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Hito</label>
+                  <Select
+                    value={tareaActual.hitoId ?? ''}
+                    onChange={(e) => actualizarTarea.mutate({ tareaId: tareaActual.id, valores: { hitoId: e.target.value || null } })}
+                    className="text-sm"
+                  >
+                    <option value="">Sin hito</option>
+                    {hitos.map((h) => (
+                      <option key={h.id} value={h.id}>
+                        {h.nombre}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Vencimiento</label>
+                  <input
+                    type="date"
+                    value={tareaActual.fechaVencimiento ? tareaActual.fechaVencimiento.slice(0, 10) : ''}
+                    onChange={(e) => actualizarTarea.mutate({ tareaId: tareaActual.id, valores: { fechaVencimiento: e.target.value || undefined } })}
+                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none transition-colors focus:border-sol-500 focus:ring-2 focus:ring-sol-500/30 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <h3 className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-300">Descripción</h3>
+                <DescripcionTarea
+                  valorInicial={tareaActual.descripcion ?? ''}
+                  onGuardar={(descripcion) => actualizarTarea.mutate({ tareaId: tareaActual.id, valores: { descripcion } })}
+                />
+              </div>
+
+              <div>
+                <h3 className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-300">Responsables</h3>
+                <SelectorResponsablesAvatar
+                  responsables={tareaActual.responsables}
+                  empleados={empleados ?? []}
+                  onAsignar={(empleadoId) => asignarResponsable.mutate({ tareaId: tareaActual.id, empleadoId })}
+                  onQuitar={(empleadoId) => quitarResponsable.mutate({ tareaId: tareaActual.id, empleadoId })}
+                />
               </div>
 
               <div>
@@ -768,6 +833,7 @@ export function KanbanTareas({ proyectoId, proyectoNombre, proyectoDescripcion, 
                 </div>
                 <FormularioHora
                   empleados={empleados ?? []}
+                  miEmpleadoId={miEmpleadoId}
                   onRegistrar={(empleadoId, fecha, horas) => registrarHora.mutate({ tareaId: tareaActual.id, empleadoId, fecha, horas })}
                   guardando={registrarHora.isPending}
                 />
@@ -775,7 +841,7 @@ export function KanbanTareas({ proyectoId, proyectoNombre, proyectoDescripcion, 
             </div>
 
             {panelComentariosAbierto && (
-              <div className="flex flex-col border-t border-slate-100 pt-5 dark:border-slate-800 md:h-[28rem] md:w-72 md:shrink-0 md:border-l md:border-t-0 md:pl-5 md:pt-0">
+              <div className="flex flex-col border-t border-slate-100 pt-5 dark:border-slate-800 md:h-[36rem] md:w-96 md:shrink-0 md:border-l md:border-t-0 md:pl-5 md:pt-0">
                 <h3 className="mb-1 shrink-0 text-sm font-semibold text-slate-700 dark:text-slate-300">
                   Comentarios{tareaActual.comentarios.length > 0 && <span className="ml-1 font-normal text-slate-400">({tareaActual.comentarios.length})</span>}
                 </h3>
@@ -833,16 +899,27 @@ export function KanbanTareas({ proyectoId, proyectoNombre, proyectoDescripcion, 
 
 function FormularioHora({
   empleados,
+  miEmpleadoId,
   onRegistrar,
   guardando,
 }: {
   empleados: EmpleadoOpcion[];
+  /** Precarga el select con quien está logueado (mismo criterio que el cronómetro) — sigue siendo editable para que un supervisor pueda cargar horas de otra persona. */
+  miEmpleadoId: string | null;
   onRegistrar: (empleadoId: string, fecha: string, horas: string) => void;
   guardando: boolean;
 }) {
-  const [empleadoId, setEmpleadoId] = useState('');
+  const [empleadoId, setEmpleadoId] = useState(miEmpleadoId ?? '');
   const [fecha, setFecha] = useState(() => new Date().toISOString().slice(0, 10));
   const [horas, setHoras] = useState('');
+
+  // Si `miEmpleado` todavía no había resuelto en el primer render (la query
+  // no tiene ningún `enabled` que la demore, pero puede tardar un toque),
+  // esto lo completa apenas llega — sin pisar una elección manual ya hecha.
+  useEffect(() => {
+    if (!empleadoId && miEmpleadoId) setEmpleadoId(miEmpleadoId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [miEmpleadoId]);
 
   return (
     <form
@@ -869,6 +946,165 @@ function FormularioHora({
         Registrar
       </Button>
     </form>
+  );
+}
+
+/** Guarda al salir del campo (blur), y solo si de verdad cambió — evita un PATCH por cada tecla. Deja de resincronizar con `valorInicial` mientras el usuario está escribiendo (foco activo), para no pisarle lo que está tipeando si en el medio se invalida la query. */
+function DescripcionTarea({ valorInicial, onGuardar }: { valorInicial: string; onGuardar: (valor: string) => void }) {
+  const [valor, setValor] = useState(valorInicial);
+  const [editando, setEditando] = useState(false);
+
+  useEffect(() => {
+    if (!editando) setValor(valorInicial);
+  }, [valorInicial, editando]);
+
+  return (
+    <textarea
+      rows={4}
+      placeholder="Sin descripción — agregá una para que el equipo tenga contexto."
+      value={valor}
+      onFocus={() => setEditando(true)}
+      onChange={(e) => setValor(e.target.value)}
+      onBlur={() => {
+        setEditando(false);
+        if (valor !== valorInicial) onGuardar(valor);
+      }}
+      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none transition-colors placeholder:text-slate-400 focus:border-sol-500 focus:ring-2 focus:ring-sol-500/30 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500"
+    />
+  );
+}
+
+/**
+ * Avatares + popover para elegir responsables — reemplaza los chips de
+ * texto + `<select>` de antes (pedido explícito, estilo ClickUp). Mismo
+ * patrón de portal+posición ya usado en `RowActionsMenu` para escapar de
+ * cualquier `overflow` recortado (acá, el propio `Modal`).
+ */
+function SelectorResponsablesAvatar({
+  responsables,
+  empleados,
+  onAsignar,
+  onQuitar,
+}: {
+  responsables: { empleado: { id: string; nombre: string } }[];
+  empleados: EmpleadoOpcion[];
+  onAsignar: (empleadoId: string) => void;
+  onQuitar: (empleadoId: string) => void;
+}) {
+  const [abierto, setAbierto] = useState(false);
+  const [posicion, setPosicion] = useState<{ top: number; left: number } | null>(null);
+  const botonRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!abierto) return;
+    // `globalThis.MouseEvent` a propósito — este archivo ya importa el
+    // `MouseEvent` de React (para el cronómetro), que no es asignable al
+    // listener nativo de `document.addEventListener`.
+    function onClickFuera(e: globalThis.MouseEvent) {
+      const objetivo = e.target as Node;
+      if (panelRef.current?.contains(objetivo) || botonRef.current?.contains(objetivo)) return;
+      setAbierto(false);
+    }
+    function cerrar() {
+      setAbierto(false);
+    }
+    document.addEventListener('mousedown', onClickFuera);
+    window.addEventListener('scroll', cerrar, true);
+    window.addEventListener('resize', cerrar);
+    return () => {
+      document.removeEventListener('mousedown', onClickFuera);
+      window.removeEventListener('scroll', cerrar, true);
+      window.removeEventListener('resize', cerrar);
+    };
+  }, [abierto]);
+
+  function alternar() {
+    if (!abierto && botonRef.current) {
+      const rect = botonRef.current.getBoundingClientRect();
+      const ANCHO_PANEL = 240;
+      setPosicion({ top: rect.bottom + 6, left: Math.min(rect.left, window.innerWidth - ANCHO_PANEL - 8) });
+    }
+    setAbierto((v) => !v);
+  }
+
+  const idsAsignados = new Set(responsables.map((r) => r.empleado.id));
+
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      {responsables.map((r, i) => (
+        <div key={r.empleado.id} className="group relative">
+          <span
+            title={r.empleado.nombre}
+            className={clsx(
+              'flex h-8 w-8 items-center justify-center rounded-full border-2 border-white text-[11px] font-bold text-white dark:border-slate-900',
+              PALETA_AVATAR[i % PALETA_AVATAR.length],
+            )}
+          >
+            {inicialesDe(r.empleado.nombre)}
+          </span>
+          <button
+            type="button"
+            onClick={() => onQuitar(r.empleado.id)}
+            aria-label={`Quitar a ${r.empleado.nombre}`}
+            className="absolute -right-1 -top-1 hidden h-4 w-4 items-center justify-center rounded-full bg-slate-700 text-[9px] text-white hover:bg-red-600 group-hover:flex"
+          >
+            ×
+          </button>
+        </div>
+      ))}
+      <button
+        ref={botonRef}
+        type="button"
+        onClick={alternar}
+        aria-label="Agregar responsable"
+        title="Agregar responsable"
+        className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-dashed border-slate-300 text-slate-400 hover:border-sol-400 hover:text-sol-600 dark:border-slate-700 dark:text-slate-500"
+      >
+        <UserPlus size={14} />
+      </button>
+
+      {abierto &&
+        posicion &&
+        createPortal(
+          <div
+            ref={panelRef}
+            style={{ position: 'fixed', top: posicion.top, left: posicion.left }}
+            className="z-50 max-h-64 w-60 overflow-auto rounded-lg border border-slate-200 bg-white py-1 shadow-lg dark:border-slate-800 dark:bg-slate-900"
+          >
+            <p className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400">Responsables</p>
+            {empleados.length === 0 && <p className="px-3 py-2 text-xs text-slate-400">Sin empleados disponibles.</p>}
+            {empleados.map((emp, i) => {
+              const asignado = idsAsignados.has(emp.id);
+              return (
+                <button
+                  key={emp.id}
+                  type="button"
+                  onClick={() => (asignado ? onQuitar(emp.id) : onAsignar(emp.id))}
+                  className={clsx(
+                    'flex w-full items-center gap-2 px-3 py-2 text-left text-sm',
+                    asignado
+                      ? 'bg-sol-50 text-sol-700 dark:bg-sol-900/20 dark:text-sol-300'
+                      : 'text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800',
+                  )}
+                >
+                  <span
+                    className={clsx(
+                      'flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[9px] font-bold text-white',
+                      PALETA_AVATAR[i % PALETA_AVATAR.length],
+                    )}
+                  >
+                    {inicialesDe(emp.nombre)}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate">{emp.nombre}</span>
+                  {asignado && <span className="text-xs">✓</span>}
+                </button>
+              );
+            })}
+          </div>,
+          document.body,
+        )}
+    </div>
   );
 }
 

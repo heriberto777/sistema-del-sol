@@ -5,11 +5,13 @@ interface ModalProps {
   titulo: string;
   onClose: () => void;
   children: ReactNode;
-  /** 'lg' (default, formularios normales), 'xl' (tablas anchas — ej. vista previa de importación) o '2xl' ("ver detalle" de un documento — más ancho en desktop/tablet para ver artículos/totales sin scroll horizontal). */
-  ancho?: 'lg' | 'xl' | '2xl';
+  /** 'lg' (default, formularios normales), 'xl' (tablas anchas — ej. vista previa de importación), '2xl' ("ver detalle" de un documento — más ancho en desktop/tablet para ver artículos/totales sin scroll horizontal) o 'full' (casi pantalla completa — detalle de tarea con panel de comentarios ancho, mismo criterio que ClickUp). */
+  ancho?: 'lg' | 'xl' | '2xl' | 'full';
 }
 
-const ANCHOS = { lg: 'max-w-lg', xl: 'max-w-4xl', '2xl': 'max-w-5xl' } as const;
+const ANCHOS = { lg: 'max-w-lg', xl: 'max-w-4xl', '2xl': 'max-w-5xl', full: 'max-w-[96rem]' } as const;
+/** Solo `full` necesita más alto que el resto — el resto se sigue viendo bien con el límite de siempre. */
+const ALTOS = { lg: 'max-h-[85vh]', xl: 'max-h-[85vh]', '2xl': 'max-h-[85vh]', full: 'max-h-[94vh]' } as const;
 
 /**
  * Overlay simple sin dependencias externas. NO cierra al hacer click en el
@@ -49,7 +51,7 @@ export function Modal({ titulo, onClose, children, ancho = 'lg' }: ModalProps) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-[1px]">
       <div
-        className={`flex max-h-[85vh] w-full ${ANCHOS[ancho]} flex-col rounded-xl border border-slate-200 bg-white shadow-xl dark:border-slate-800 dark:bg-slate-900`}
+        className={`flex ${ALTOS[ancho]} w-full ${ANCHOS[ancho]} flex-col rounded-xl border border-slate-200 bg-white shadow-xl dark:border-slate-800 dark:bg-slate-900`}
       >
         <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-6 py-4 dark:border-slate-800">
           <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">{titulo}</h2>
