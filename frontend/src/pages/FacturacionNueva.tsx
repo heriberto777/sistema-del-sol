@@ -13,7 +13,7 @@ import { FormField } from '../components/molecules/FormField/FormField';
 import { PaginaDocumento } from '../components/molecules/PaginaDocumento/PaginaDocumento';
 import { TablaLineasEditable, LineaEditable } from '../components/molecules/TablaLineasEditable/TablaLineasEditable';
 import { SelectorBodega } from '../components/molecules/SelectorBodega/SelectorBodega';
-import { SelectFormaPago } from '../components/molecules/SelectFormaPago/SelectFormaPago';
+import { SelectFormaPago, type FormaPago } from '../components/molecules/SelectFormaPago/SelectFormaPago';
 import { useListasPrecio } from '../hooks/useListasPrecio';
 import { useHayCambios } from '../hooks/useHayCambios';
 import { estimarLineas, ITBIS_GENERAL_ESTIMADO } from '../lib/estimar-totales-documento';
@@ -50,6 +50,11 @@ export function FacturacionNueva() {
   // POS (igual que POS), para que quede un registro de pago y la factura
   // salga marcada como pagada.
   const [formaPagoId, setFormaPagoId] = useState('');
+  const [formaPagoSeleccionada, setFormaPagoSeleccionada] = useState<FormaPago | undefined>(undefined);
+  // Cambio a devolver en efectivo — mismo patrón que TurnoCajaDetalle (POS):
+  // puramente de UI, nunca se manda al backend (el pago que se registra es
+  // siempre por el monto exacto de la factura).
+  const [montoRecibido, setMontoRecibido] = useState('');
   const [lineas, setLineas] = useState<LineaEditable[]>([LINEA_VACIA]);
   const [mostrarNuevoCliente, setMostrarNuevoCliente] = useState(false);
   const [listaPrecioOverride, setListaPrecioOverride] = useState('');
@@ -164,7 +169,6 @@ export function FacturacionNueva() {
       return;
     }
     if (tipoFactura === 'CONTADO' && !formaPagoId) {
-      setInfoColapsada(false);
       setError('Seleccioná la forma de pago.');
       return;
     }
@@ -196,6 +200,7 @@ export function FacturacionNueva() {
     .reduce((acc, r) => acc + (Number(r.monto) || 0) * (ITBIS_GENERAL_ESTIMADO / 100), 0);
   const itbisTotal = itbisLineasAjustado + itbisRecargos;
   const totalEstimado = subtotal - descuentoGeneral + itbisTotal + totalRecargos;
+  const cambio = formaPagoSeleccionada?.esEfectivo && montoRecibido ? Math.max(0, Number(montoRecibido) - totalEstimado) : 0;
 
   // `SelectorBodega` autoselecciona sola la bodega si el tenant solo tiene
   // una — vía su propio efecto, una vez que resuelve esta misma query
@@ -218,6 +223,8 @@ export function FacturacionNueva() {
       descuentoGeneralTipo,
       descuentoGeneralValor,
       recargos,
+      formaPagoId,
+      montoRecibido,
     },
     !bodegasCargando,
   );
@@ -275,6 +282,45 @@ export function FacturacionNueva() {
               El total exacto se calcula al guardar (lista de precio del cliente, ofertas vigentes y ley fiscal del producto).
             </span>
           </div>
+
+          {tipoFactura === 'CONTADO' && (
+            <div className="flex flex-col gap-1.5 border-t border-slate-200 pt-4 dark:border-slate-800">
+              <span className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Forma de pago</span>
+              <SelectFormaPago
+                value={formaPagoId}
+                onChange={(id, forma) => {
+                  setFormaPagoId(id);
+                  setFormaPagoSeleccionada(forma);
+                  if (!forma?.esEfectivo) setMontoRecibido('');
+                }}
+              />
+              {formaPagoSeleccionada?.esEfectivo && (
+                <div className="mt-1 flex flex-col gap-1.5 rounded-lg border border-slate-200 p-2 dark:border-slate-700">
+                  <label className="text-xs font-medium text-slate-600 dark:text-slate-400">Monto recibido</label>
+                  <input
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    placeholder="RD$"
+                    value={montoRecibido}
+                    onChange={(e) => setMontoRecibido(e.target.value)}
+                    className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                  />
+                  {montoRecibido && Number(montoRecibido) < totalEstimado && (
+                    <p className="text-[11px] text-red-600 dark:text-red-400">El monto recibido es menor al total estimado.</p>
+                  )}
+                  {montoRecibido && Number(montoRecibido) >= totalEstimado && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-medium text-slate-600 dark:text-slate-400">Cambio a devolver</span>
+                      <span className="font-mono text-sm font-semibold text-emerald-700 dark:text-emerald-400">
+                        RD$ {cambio.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="flex flex-col gap-1.5 border-t border-slate-200 pt-6 dark:border-slate-800">
             <span className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Descuento general</span>
@@ -445,13 +491,6 @@ export function FacturacionNueva() {
               <option value="GUBERNAMENTAL">Gubernamental (B15)</option>
             </Select>
           </div>
-
-          {tipoFactura === 'CONTADO' && (
-            <div className="flex flex-col gap-1">
-              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Forma de pago</label>
-              <SelectFormaPago value={formaPagoId} onChange={setFormaPagoId} />
-            </div>
-          )}
 
           {tipoFactura === 'CREDITO' && (
             <>
