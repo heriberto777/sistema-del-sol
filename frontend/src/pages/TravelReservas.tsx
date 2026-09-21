@@ -618,6 +618,8 @@ function ReservarOfertaModal({
   const [pasajeros, setPasajeros] = useState<Record<string, FormPasajero>>(Object.fromEntries(pasajeroIds.map((id) => [id, { ...PASAJERO_VACIO }])));
   // Duffel exige vincular cada bebé (infant_without_seat) a un adulto responsable — clave: id del bebé, valor: id del adulto elegido.
   const [infanteAdultoMap, setInfanteAdultoMap] = useState<Record<string, string>>({});
+  // Acordeón de pasajeros — arranca con el primero abierto, el resto colapsado.
+  const [pasajeroExpandidoId, setPasajeroExpandidoId] = useState<string | null>(pasajeroIds[0] ?? null);
 
   // Markup automático — solo sugiere el punto de partida, el campo sigue 100% editable.
   useEffect(() => {
@@ -696,78 +698,102 @@ function ReservarOfertaModal({
           />
         </div>
 
-        <div className="space-y-3">
-          {oferta.pasajeros.map((p, i) => (
-            <div key={p.id} className="rounded-lg border border-slate-200 p-3 dark:border-slate-700">
-              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
-                Pasajero {i + 1} — {ETIQUETA_TIPO_PASAJERO[p.tipo]}
-                {p.edad != null && ` (${p.edad} ${p.edad === 1 ? 'año' : 'años'})`}
-              </p>
-              {p.tipo === 'infant_without_seat' && (
-                <div className="mb-3 flex flex-col gap-1">
-                  <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Viaja con (adulto responsable)</label>
-                  <Select value={infanteAdultoMap[p.id] ?? ''} onChange={(e) => setInfanteAdultoMap((prev) => ({ ...prev, [p.id]: e.target.value }))} required>
-                    <option value="">Seleccioná un adulto…</option>
-                    {adultoIds.map((adultoId, j) => (
-                      <option key={adultoId} value={adultoId}>
-                        Pasajero {oferta.pasajeros.findIndex((pp) => pp.id === adultoId) + 1} (Adulto {j + 1})
-                      </option>
-                    ))}
-                  </Select>
-                </div>
-              )}
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div className="flex flex-col gap-1">
-                  <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Título</label>
-                  <Select value={pasajeros[p.id].titulo} onChange={(e) => actualizarPasajero(p.id, 'titulo', e.target.value)}>
-                    {TITULOS_PASAJERO.map((t) => (
-                      <option key={t.valor} value={t.valor}>
-                        {t.etiqueta}
-                      </option>
-                    ))}
-                  </Select>
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Género</label>
-                  <Select value={pasajeros[p.id].genero} onChange={(e) => actualizarPasajero(p.id, 'genero', e.target.value)}>
-                    <option value="m">Masculino</option>
-                    <option value="f">Femenino</option>
-                  </Select>
-                </div>
-                <FormField label="Nombre" value={pasajeros[p.id].nombre} onChange={(e) => actualizarPasajero(p.id, 'nombre', e.target.value)} required />
-                <FormField label="Apellido" value={pasajeros[p.id].apellido} onChange={(e) => actualizarPasajero(p.id, 'apellido', e.target.value)} required />
-                <FormField
-                  label="Fecha de nacimiento"
-                  type="date"
-                  value={pasajeros[p.id].fechaNacimiento}
-                  onChange={(e) => actualizarPasajero(p.id, 'fechaNacimiento', e.target.value)}
-                  required
-                />
-                <FormField label="Email" type="email" value={pasajeros[p.id].email} onChange={(e) => actualizarPasajero(p.id, 'email', e.target.value)} required />
-                <FormField label="Teléfono" value={pasajeros[p.id].telefono} onChange={(e) => actualizarPasajero(p.id, 'telefono', e.target.value)} required />
+        <div className="space-y-2">
+          {oferta.pasajeros.map((p, i) => {
+            const expandido = pasajeroExpandidoId === p.id;
+            const completo = !!(pasajeros[p.id].nombre && pasajeros[p.id].apellido && pasajeros[p.id].fechaNacimiento && pasajeros[p.id].email && pasajeros[p.id].telefono);
+            return (
+              <div key={p.id} className="rounded-lg border border-slate-200 dark:border-slate-700">
+                {/* Acordeón: con 3-4 pasajeros (~9 campos c/u) apilar todo abierto disparaba la altura del modal — solo uno expandido a la vez, el resto se resume en una línea con check si ya está completo. */}
+                <button
+                  type="button"
+                  onClick={() => setPasajeroExpandidoId(expandido ? null : p.id)}
+                  className="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left"
+                >
+                  <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                    Pasajero {i + 1} — {ETIQUETA_TIPO_PASAJERO[p.tipo]}
+                    {p.edad != null && ` (${p.edad} ${p.edad === 1 ? 'año' : 'años'})`}
+                  </span>
+                  <span className="flex shrink-0 items-center gap-2">
+                    {!expandido && completo && (
+                      <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                        ✓ {pasajeros[p.id].nombre} {pasajeros[p.id].apellido}
+                      </span>
+                    )}
+                    {!expandido && !completo && <span className="text-xs text-amber-600 dark:text-amber-400">Falta completar</span>}
+                    <ChevronDown size={15} className={clsx('text-slate-400 transition-transform', expandido && 'rotate-180')} />
+                  </span>
+                </button>
+                {expandido && (
+                  <div className="border-t border-slate-100 p-3 dark:border-slate-800">
+                    {p.tipo === 'infant_without_seat' && (
+                      <div className="mb-3 flex flex-col gap-1">
+                        <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Viaja con (adulto responsable)</label>
+                        <Select value={infanteAdultoMap[p.id] ?? ''} onChange={(e) => setInfanteAdultoMap((prev) => ({ ...prev, [p.id]: e.target.value }))} required>
+                          <option value="">Seleccioná un adulto…</option>
+                          {adultoIds.map((adultoId, j) => (
+                            <option key={adultoId} value={adultoId}>
+                              Pasajero {oferta.pasajeros.findIndex((pp) => pp.id === adultoId) + 1} (Adulto {j + 1})
+                            </option>
+                          ))}
+                        </Select>
+                      </div>
+                    )}
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <div className="flex flex-col gap-1">
+                        <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Título</label>
+                        <Select value={pasajeros[p.id].titulo} onChange={(e) => actualizarPasajero(p.id, 'titulo', e.target.value)}>
+                          {TITULOS_PASAJERO.map((t) => (
+                            <option key={t.valor} value={t.valor}>
+                              {t.etiqueta}
+                            </option>
+                          ))}
+                        </Select>
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Género</label>
+                        <Select value={pasajeros[p.id].genero} onChange={(e) => actualizarPasajero(p.id, 'genero', e.target.value)}>
+                          <option value="m">Masculino</option>
+                          <option value="f">Femenino</option>
+                        </Select>
+                      </div>
+                      <FormField label="Nombre" value={pasajeros[p.id].nombre} onChange={(e) => actualizarPasajero(p.id, 'nombre', e.target.value)} required />
+                      <FormField label="Apellido" value={pasajeros[p.id].apellido} onChange={(e) => actualizarPasajero(p.id, 'apellido', e.target.value)} required />
+                      <FormField
+                        label="Fecha de nacimiento"
+                        type="date"
+                        value={pasajeros[p.id].fechaNacimiento}
+                        onChange={(e) => actualizarPasajero(p.id, 'fechaNacimiento', e.target.value)}
+                        required
+                      />
+                      <FormField label="Email" type="email" value={pasajeros[p.id].email} onChange={(e) => actualizarPasajero(p.id, 'email', e.target.value)} required />
+                      <FormField label="Teléfono" value={pasajeros[p.id].telefono} onChange={(e) => actualizarPasajero(p.id, 'telefono', e.target.value)} required />
+                    </div>
+                    <p className="mb-2 mt-3 text-xs font-semibold uppercase tracking-wide text-slate-400">Pasaporte (opcional — recomendado para vuelos internacionales)</p>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                      <FormField
+                        label="Número de pasaporte"
+                        value={pasajeros[p.id].numeroPasaporte}
+                        onChange={(e) => actualizarPasajero(p.id, 'numeroPasaporte', e.target.value)}
+                      />
+                      <FormField
+                        label="País emisor (ej. DO)"
+                        maxLength={2}
+                        value={pasajeros[p.id].paisEmisionPasaporte}
+                        onChange={(e) => actualizarPasajero(p.id, 'paisEmisionPasaporte', e.target.value.toUpperCase())}
+                      />
+                      <FormField
+                        label="Vencimiento"
+                        type="date"
+                        value={pasajeros[p.id].fechaVencimientoPasaporte}
+                        onChange={(e) => actualizarPasajero(p.id, 'fechaVencimientoPasaporte', e.target.value)}
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
-              <p className="mb-2 mt-3 text-xs font-semibold uppercase tracking-wide text-slate-400">Pasaporte (opcional — recomendado para vuelos internacionales)</p>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                <FormField
-                  label="Número de pasaporte"
-                  value={pasajeros[p.id].numeroPasaporte}
-                  onChange={(e) => actualizarPasajero(p.id, 'numeroPasaporte', e.target.value)}
-                />
-                <FormField
-                  label="País emisor (ej. DO)"
-                  maxLength={2}
-                  value={pasajeros[p.id].paisEmisionPasaporte}
-                  onChange={(e) => actualizarPasajero(p.id, 'paisEmisionPasaporte', e.target.value.toUpperCase())}
-                />
-                <FormField
-                  label="Vencimiento"
-                  type="date"
-                  value={pasajeros[p.id].fechaVencimientoPasaporte}
-                  onChange={(e) => actualizarPasajero(p.id, 'fechaVencimientoPasaporte', e.target.value)}
-                />
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         <div className="flex flex-col gap-1">

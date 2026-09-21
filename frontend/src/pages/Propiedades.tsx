@@ -12,6 +12,7 @@ import { Select } from '../components/atoms/Select/Select';
 import { FormField } from '../components/molecules/FormField/FormField';
 import { Modal } from '../components/molecules/Modal/Modal';
 import { ConfirmModal } from '../components/molecules/ConfirmModal/ConfirmModal';
+import { Tabs } from '../components/molecules/Tabs/Tabs';
 import { SearchInput } from '../components/molecules/SearchInput/SearchInput';
 import { Paginacion } from '../components/molecules/Paginacion/Paginacion';
 import { EstadoVacio } from '../components/molecules/EstadoVacio/EstadoVacio';
@@ -345,6 +346,8 @@ function PropiedadFormModal({
   onGuardar: (form: FormPropiedad) => void;
 }) {
   const [form, setForm] = useState<FormPropiedad>(propiedadInicial ? formDesdePropiedad(propiedadInicial) : FORM_VACIO);
+  // 18 campos mezclando datos comerciales + descripción + amenidades — las fotos quedan aparte, en su propia columna (igual criterio que el panel lateral de notas de Proyectos/Mis Tareas).
+  const [pestana, setPestana] = useState<'general' | 'descripcion'>('general');
 
   function alternarAmenidad(nombre: string) {
     setForm((actual) => ({
@@ -362,6 +365,17 @@ function PropiedadFormModal({
     <Modal titulo={titulo} onClose={onClose} ancho="xl">
       <form onSubmit={onSubmit} className="grid gap-5 md:grid-cols-3">
         <div className="space-y-4 md:col-span-2">
+          <Tabs
+            pestanas={[
+              { id: 'general', etiqueta: 'Datos generales' },
+              { id: 'descripcion', etiqueta: 'Descripción y amenidades' },
+            ]}
+            activa={pestana}
+            onCambiar={setPestana}
+          />
+
+          {pestana === 'general' && (
+          <div className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
             <FormField id="prop-titulo" label="Título" value={form.titulo} onChange={(e) => setForm({ ...form, titulo: e.target.value })} required />
             <FormField id="prop-codigo" label="Código" value={form.codigo} onChange={(e) => setForm({ ...form, codigo: e.target.value })} required />
@@ -442,28 +456,6 @@ function PropiedadFormModal({
             onChange={(e) => setForm({ ...form, metrosTerreno: e.target.value })}
           />
 
-          <div className="flex flex-col gap-1">
-            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Descripción</label>
-            <textarea
-              rows={3}
-              value={form.descripcion}
-              onChange={(e) => setForm({ ...form, descripcion: e.target.value })}
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-            />
-          </div>
-
-          <div className="flex flex-col gap-1">
-            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Amenidades</label>
-            <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm text-slate-600 dark:text-slate-400">
-              {AMENIDADES_SUGERIDAS.map((a) => (
-                <label key={a} className="flex items-center gap-1.5">
-                  <input type="checkbox" checked={form.amenidades.includes(a)} onChange={() => alternarAmenidad(a)} className="rounded border-slate-300" />
-                  {a}
-                </label>
-              ))}
-            </div>
-          </div>
-
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="flex flex-col gap-1">
               <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Agente asignado</label>
@@ -488,6 +480,34 @@ function PropiedadFormModal({
               </Select>
             </div>
           </div>
+          </div>
+          )}
+
+          {pestana === 'descripcion' && (
+          <div className="space-y-4">
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Descripción</label>
+            <textarea
+              rows={7}
+              value={form.descripcion}
+              onChange={(e) => setForm({ ...form, descripcion: e.target.value })}
+              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+            />
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Amenidades</label>
+            <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm text-slate-600 dark:text-slate-400">
+              {AMENIDADES_SUGERIDAS.map((a) => (
+                <label key={a} className="flex items-center gap-1.5">
+                  <input type="checkbox" checked={form.amenidades.includes(a)} onChange={() => alternarAmenidad(a)} className="rounded border-slate-300" />
+                  {a}
+                </label>
+              ))}
+            </div>
+          </div>
+          </div>
+          )}
         </div>
 
         <div>

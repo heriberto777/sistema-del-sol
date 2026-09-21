@@ -10,6 +10,7 @@ import { CampoImagen } from '../components/molecules/CampoImagen/CampoImagen';
 import { GaleriaImagenes } from '../components/molecules/GaleriaImagenes/GaleriaImagenes';
 import { FormField } from '../components/molecules/FormField/FormField';
 import { Modal } from '../components/molecules/Modal/Modal';
+import { Tabs } from '../components/molecules/Tabs/Tabs';
 import { SearchInput } from '../components/molecules/SearchInput/SearchInput';
 import { Paginacion } from '../components/molecules/Paginacion/Paginacion';
 import { EstadoVacio } from '../components/molecules/EstadoVacio/EstadoVacio';
@@ -298,7 +299,7 @@ export function Productos() {
       </RequierePermiso>
 
       {modalProductoAbierto && (
-        <Modal titulo={productoEditando ? 'Editar producto' : 'Nuevo producto'} onClose={cerrarModalProducto}>
+        <Modal titulo={productoEditando ? 'Editar producto' : 'Nuevo producto'} onClose={cerrarModalProducto} ancho="xl">
           <FormularioProducto producto={productoEditando} onGuardado={cerrarModalProducto} />
         </Modal>
       )}
@@ -369,6 +370,8 @@ function FormularioProducto({ producto, onGuardado }: { producto: Producto | nul
   const [candidatosIa, setCandidatosIa] = useState<{ nombre: string; descripcion: string }[] | null>(null);
   const [errorIa, setErrorIa] = useState<string | null>(null);
   const [detalleIa, setDetalleIa] = useState('');
+  // 15+ campos repartidos en secciones bien distintas — antes todo apilado en un modal `lg` sin ancho de sobra.
+  const [pestana, setPestana] = useState<'general' | 'tienda' | 'ventas'>('general');
 
   // Editar un producto existente: la lista (GET /productos) no trae ni la
   // imagen ni (si es combo) los componentes — hay que pedir el detalle
@@ -487,7 +490,18 @@ function FormularioProducto({ producto, onGuardado }: { producto: Producto | nul
 
   return (
     <>
-    <form onSubmit={onSubmit} className="space-y-3">
+    <form onSubmit={onSubmit} className="space-y-4">
+      <Tabs
+        pestanas={[
+          { id: 'general', etiqueta: 'General' },
+          { id: 'tienda', etiqueta: 'Tienda online' },
+          { id: 'ventas', etiqueta: 'Comisión y combo' },
+        ]}
+        activa={pestana}
+        onCambiar={setPestana}
+      />
+      {pestana === 'tienda' && (
+      <div className="space-y-3">
       <CampoImagen
         valor={valores.imagen}
         onChange={(imagen) => setValores((v) => ({ ...v, imagen }))}
@@ -539,7 +553,7 @@ function FormularioProducto({ producto, onGuardado }: { producto: Producto | nul
           id="producto-descripcion-tienda"
           value={valores.descripcionTienda}
           onChange={(e) => setValores((v) => ({ ...v, descripcionTienda: e.target.value }))}
-          rows={3}
+          rows={5}
           placeholder="Detalle del producto que ve el comprador en el storefront público (opcional)"
           className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
         />
@@ -553,6 +567,11 @@ function FormularioProducto({ producto, onGuardado }: { producto: Producto | nul
         />
         Destacar en la Tienda Online
       </label>
+      </div>
+      )}
+
+      {pestana === 'general' && (
+      <div className="space-y-3">
       <div className="flex flex-col gap-1">
         <label htmlFor="producto-tipo" className="text-sm font-medium text-slate-700 dark:text-slate-300">
           Tipo
@@ -690,7 +709,11 @@ function FormularioProducto({ producto, onGuardado }: { producto: Producto | nul
         />
         Permite devolución (Nota de Crédito)
       </label>
+      </div>
+      )}
 
+      {pestana === 'ventas' && (
+      <div className="space-y-3">
       <div className="space-y-2 rounded-md border border-slate-200 p-3 dark:border-slate-800">
         <p className="text-sm font-medium text-slate-700 dark:text-slate-300">
           Comisión de venta (ítem A-1) — elegí % o monto fijo, no ambos
@@ -772,6 +795,8 @@ function FormularioProducto({ producto, onGuardado }: { producto: Producto | nul
       )}
       {valores.tipo === 'PRODUCTO' && !producto && (
         <p className="text-xs text-slate-400">Guardá el producto primero para poder armarle variantes (Talla, Color, etc.).</p>
+      )}
+      </div>
       )}
 
       {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}

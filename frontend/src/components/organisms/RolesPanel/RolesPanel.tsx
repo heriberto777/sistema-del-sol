@@ -178,14 +178,17 @@ function ModalRol({ rolId, onClose }: { rolId: string | null; onClose: () => voi
   const grupos = agruparPermisos(catalogoPermisos ?? []);
 
   return (
-    <Modal titulo={rolId ? 'Editar rol' : 'Nuevo rol'} onClose={onClose}>
+    <Modal titulo={rolId ? 'Editar rol' : 'Nuevo rol'} onClose={onClose} ancho="2xl">
       <form onSubmit={onSubmit} className="space-y-3">
-        <FormField id="rol-nombre" label="Nombre" value={nombre} onChange={(e) => setNombre(e.target.value)} required disabled={!!rolId && rolDetalle?.esSistema} />
-        <FormField id="rol-descripcion" label="Descripción (opcional)" value={descripcion} onChange={(e) => setDescripcion(e.target.value)} />
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <FormField id="rol-nombre" label="Nombre" value={nombre} onChange={(e) => setNombre(e.target.value)} required disabled={!!rolId && rolDetalle?.esSistema} />
+          <FormField id="rol-descripcion" label="Descripción (opcional)" value={descripcion} onChange={(e) => setDescripcion(e.target.value)} />
+        </div>
 
         <div className="space-y-2">
           <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Permisos</p>
-          <div className="max-h-72 space-y-3 overflow-y-auto rounded-md border border-slate-200 p-3 dark:border-slate-800">
+          {/* Antes max-h-72 (18rem) en un modal `lg` — con más ancho la lista de permisos envuelve menos por módulo, así que le damos más alto también en vez de mantener el mismo scroll apretado. */}
+          <div className="grid max-h-[28rem] grid-cols-1 gap-3 overflow-y-auto rounded-md border border-slate-200 p-3 dark:border-slate-800 sm:grid-cols-2">
             {grupos.map(([modulo, permisos]) => (
               <div key={modulo}>
                 <p className="mb-1 text-xs font-semibold uppercase text-slate-400">{modulo}</p>
