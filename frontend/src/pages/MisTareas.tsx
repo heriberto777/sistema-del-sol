@@ -161,8 +161,12 @@ function FilaTarea({
         {hecha && '✓'}
       </button>
       <span className={clsx('h-2 w-2 shrink-0 rounded-full', PUNTO_PRIORIDAD_TAREA_PERSONAL[tarea.prioridad])} />
-      <button type="button" onClick={onAbrir} className="min-w-0 flex-1 text-left">
-        <span className={clsx('truncate text-sm', hecha ? 'text-slate-400 line-through' : 'text-slate-800 dark:text-slate-100')}>{tarea.titulo}</span>
+      <button type="button" onClick={onAbrir} className="min-w-0 flex-1 truncate text-left">
+        {/* El `truncate` va en el botón (el flex item de verdad, con `min-w-0 flex-1`) — puesto
+            antes en este `<span>` interno (inline, no block) no recortaba nada: `overflow`
+            no aplica a cajas `display:inline`, así que el título se desbordaba encima de los
+            badges vecinos en pantallas angostas (bug real, reportado en móvil). */}
+        <span className={clsx('text-sm', hecha ? 'text-slate-400 line-through' : 'text-slate-800 dark:text-slate-100')}>{tarea.titulo}</span>
       </button>
       {(tarea.estado === 'EN_CURSO' || tarea.estado === 'EN_ESPERA') && (
         <span
@@ -429,7 +433,12 @@ function TarjetaKanban({
         onDragStart={onDragStart}
         onClick={onAbrir}
         className={clsx(
-          'flex cursor-pointer items-center gap-1.5 rounded-lg border-y border-r border-l-4 bg-white px-2 py-1.5 shadow-sm hover:shadow dark:border-slate-700 dark:bg-slate-900',
+          // `overflow-hidden` acá es una red de seguridad, no el fix en sí (mismo
+          // criterio que Modal.tsx) — el `truncate` del título de abajo ya debería
+          // recortarlo solo, pero sin esto un título con un token muy largo (sin
+          // espacios) o un redondeo de sub-píxel en pantallas de ~390-420px se
+          // desbordaba contra el borde de la tarjeta sin nada que lo contuviera.
+          'flex cursor-pointer items-center gap-1.5 overflow-hidden rounded-lg border-y border-r border-l-4 bg-white px-2 py-1.5 shadow-sm hover:shadow dark:border-slate-700 dark:bg-slate-900',
           'border-slate-200',
           COLOR_BORDE_ESTADO_TAREA_PERSONAL[tarea.estado],
         )}
