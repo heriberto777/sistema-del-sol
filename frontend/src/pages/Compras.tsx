@@ -253,7 +253,7 @@ function ModalVerOrden({ orden, onClose }: { orden: OrdenCompra; onClose: () => 
   });
 
   return (
-    <Modal titulo={`Orden de compra — ${orden.numero}`} onClose={onClose}>
+    <Modal titulo={`Orden de compra — ${orden.numero}`} onClose={onClose} ancho="xl">
       {!data ? (
         <p className="text-sm text-slate-400">Cargando…</p>
       ) : (
@@ -369,7 +369,7 @@ function ModalNuevaOrdenCompra({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <Modal titulo="Nueva orden de compra" onClose={onClose}>
+    <Modal titulo="Nueva orden de compra" onClose={onClose} ancho="xl">
       <form onSubmit={onSubmit} className="space-y-3">
         <div className="flex flex-col gap-1">
           <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Proveedor</label>
@@ -530,7 +530,7 @@ function ModalEditarOrdenCompra({ orden, onClose }: { orden: OrdenCompra; onClos
   }
 
   return (
-    <Modal titulo={`Editar orden de compra — ${orden.numero}`} onClose={onClose}>
+    <Modal titulo={`Editar orden de compra — ${orden.numero}`} onClose={onClose} ancho="xl">
       {!detalle ? (
         <p className="text-sm text-slate-400">Cargando…</p>
       ) : (

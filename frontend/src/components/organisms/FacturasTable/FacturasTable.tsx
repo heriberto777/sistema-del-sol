@@ -9,6 +9,7 @@ import { Button } from '../../atoms/Button/Button';
 import { Card } from '../../atoms/Card/Card';
 import { FormField } from '../../molecules/FormField/FormField';
 import { Modal } from '../../molecules/Modal/Modal';
+import { Tabs } from '../../molecules/Tabs/Tabs';
 import { ModalRegistrarCobro } from '../../molecules/ModalRegistrarCobro/ModalRegistrarCobro';
 import { CampoPin } from '../../molecules/CampoPin/CampoPin';
 import { CampoCodigoAutorizacion } from '../../molecules/CampoCodigoAutorizacion/CampoCodigoAutorizacion';
@@ -222,6 +223,8 @@ export function FacturasTable({ tiposFactura, titulo = 'Facturas', busquedaPlace
 
 function ModalDetalleFactura({ factura, onClose, onImprimir }: { factura: Factura; onClose: () => void; onImprimir: () => void }) {
   const [descargando, setDescargando] = useState(false);
+  // Solo tiene sentido si hay pagos que mostrar — si no, "Detalle" es todo el contenido y no hace falta la pestaña.
+  const [pestana, setPestana] = useState<'detalle' | 'pagos'>('detalle');
 
   const { data: detalle } = useQuery({
     queryKey: ['factura-detalle', factura.id],
@@ -269,24 +272,35 @@ function ModalDetalleFactura({ factura, onClose, onImprimir }: { factura: Factur
           </Button>
         </div>
 
-        {!detalle ? (
-          <p className="text-sm text-slate-500 dark:text-slate-400">Cargando…</p>
-        ) : (
-          <>
-            <TablaArticulosDocumento lineas={detalle.lineas} />
-            <BloqueTotalesDocumento
-              subtotal={detalle.subtotal}
-              descuento={detalle.descuento}
-              recargos={totalRecargos}
-              itbis={detalle.itbis}
-              total={detalle.total}
-            />
-          </>
+        {pagosData && pagosData.pagos.length > 0 && (
+          <Tabs
+            pestanas={[
+              { id: 'detalle', etiqueta: 'Detalle' },
+              { id: 'pagos', etiqueta: 'Pagos' },
+            ]}
+            activa={pestana}
+            onCambiar={setPestana}
+          />
         )}
 
-        {pagosData && pagosData.pagos.length > 0 && (
+        {(pestana === 'detalle' || !pagosData || pagosData.pagos.length === 0) &&
+          (!detalle ? (
+            <p className="text-sm text-slate-500 dark:text-slate-400">Cargando…</p>
+          ) : (
+            <>
+              <TablaArticulosDocumento lineas={detalle.lineas} />
+              <BloqueTotalesDocumento
+                subtotal={detalle.subtotal}
+                descuento={detalle.descuento}
+                recargos={totalRecargos}
+                itbis={detalle.itbis}
+                total={detalle.total}
+              />
+            </>
+          ))}
+
+        {pestana === 'pagos' && pagosData && pagosData.pagos.length > 0 && (
           <div className="space-y-2">
-            <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Pagos</p>
             <div className="grid grid-cols-3 gap-3 rounded-lg border border-slate-200 p-4 text-sm dark:border-slate-800">
               <div>
                 <p className="text-slate-500 dark:text-slate-400">Total</p>

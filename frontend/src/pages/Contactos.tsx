@@ -7,6 +7,7 @@ import { Button } from '../components/atoms/Button/Button';
 import { Card } from '../components/atoms/Card/Card';
 import { FormField } from '../components/molecules/FormField/FormField';
 import { Modal } from '../components/molecules/Modal/Modal';
+import { Tabs } from '../components/molecules/Tabs/Tabs';
 import { SearchInput } from '../components/molecules/SearchInput/SearchInput';
 import { Paginacion } from '../components/molecules/Paginacion/Paginacion';
 import { EstadoVacio } from '../components/molecules/EstadoVacio/EstadoVacio';
@@ -260,6 +261,8 @@ function formatoMontoEC(n: number): string {
 
 /** Todas las facturas del cliente en el período (crédito y contado, pagadas y pendientes) + su saldo actual — a diferencia de Cuentas por Cobrar, que es global y solo lo pendiente. */
 function ModalEstadoCuentaCliente({ cliente }: { cliente: Cliente }) {
+  // Resumen (filtros+totales+envío) vs. Movimientos (la tabla, que antes vivía forzada a max-h-72 dentro del mismo bloque).
+  const [pestana, setPestana] = useState<'resumen' | 'movimientos'>('resumen');
   const [desde, setDesde] = useState('');
   const [hasta, setHasta] = useState('');
   const [canal, setCanal] = useState<'EMAIL' | 'WHATSAPP'>('EMAIL');
@@ -318,10 +321,19 @@ function ModalEstadoCuentaCliente({ cliente }: { cliente: Cliente }) {
         </Button>
       </div>
 
+      <Tabs
+        pestanas={[
+          { id: 'resumen', etiqueta: 'Resumen' },
+          { id: 'movimientos', etiqueta: 'Movimientos' },
+        ]}
+        activa={pestana}
+        onCambiar={setPestana}
+      />
+
       {isLoading && <p className="text-sm text-slate-500 dark:text-slate-400">Cargando…</p>}
 
-      {data && (
-        <>
+      {data && pestana === 'resumen' && (
+        <div className="space-y-4">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div className="rounded-lg bg-slate-50 p-3 dark:bg-slate-900">
               <p className="text-xs text-slate-500 dark:text-slate-400">Total facturado</p>
@@ -339,10 +351,36 @@ function ModalEstadoCuentaCliente({ cliente }: { cliente: Cliente }) {
             </div>
           </div>
 
+          <div className="space-y-3 border-t border-slate-200 pt-4 dark:border-slate-800">
+            <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Enviar</p>
+            <div className="flex gap-2">
+              {(['EMAIL', 'WHATSAPP'] as const).map((c) => (
+                <Button key={c} type="button" variante={canal === c ? 'primario' : 'secundario'} onClick={() => elegirCanal(c)}>
+                  {c === 'EMAIL' ? 'Email' : 'WhatsApp'}
+                </Button>
+              ))}
+            </div>
+            <input
+              value={destinatario}
+              onChange={(e) => setDestinatario(e.target.value)}
+              placeholder={canal === 'EMAIL' ? 'correo@ejemplo.com' : '8095551234'}
+              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+            />
+            {mensajeEnvio && <p className="text-sm text-slate-600 dark:text-slate-400">{mensajeEnvio}</p>}
+            <Button onClick={enviar} disabled={enviando || !destinatario.trim()} className="w-full" variante="secundario">
+              {enviando ? 'Enviando…' : 'Enviar'}
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {data && pestana === 'movimientos' && (
+        <>
           {data.facturas.length === 0 ? (
             <p className="text-sm text-slate-500 dark:text-slate-400">Sin movimientos en el período.</p>
           ) : (
-            <div className="max-h-72 overflow-y-auto">
+            // Antes max-h-72 (18rem) compartiendo espacio con el resumen y "Enviar" en el mismo bloque — con su propia pestaña, la tabla puede usar bastante más alto.
+            <div className="max-h-[32rem] overflow-y-auto">
               <table className="w-full text-left text-sm">
                 <thead className="bg-slate-50 text-slate-500 dark:bg-slate-900/60 dark:text-slate-400">
                   <tr>
@@ -371,27 +409,6 @@ function ModalEstadoCuentaCliente({ cliente }: { cliente: Cliente }) {
           )}
         </>
       )}
-
-      <div className="space-y-3 border-t border-slate-200 pt-4 dark:border-slate-800">
-        <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Enviar</p>
-        <div className="flex gap-2">
-          {(['EMAIL', 'WHATSAPP'] as const).map((c) => (
-            <Button key={c} type="button" variante={canal === c ? 'primario' : 'secundario'} onClick={() => elegirCanal(c)}>
-              {c === 'EMAIL' ? 'Email' : 'WhatsApp'}
-            </Button>
-          ))}
-        </div>
-        <input
-          value={destinatario}
-          onChange={(e) => setDestinatario(e.target.value)}
-          placeholder={canal === 'EMAIL' ? 'correo@ejemplo.com' : '8095551234'}
-          className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-        />
-        {mensajeEnvio && <p className="text-sm text-slate-600 dark:text-slate-400">{mensajeEnvio}</p>}
-        <Button onClick={enviar} disabled={enviando || !destinatario.trim()} className="w-full" variante="secundario">
-          {enviando ? 'Enviando…' : 'Enviar'}
-        </Button>
-      </div>
     </div>
   );
 }

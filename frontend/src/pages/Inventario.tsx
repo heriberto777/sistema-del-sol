@@ -949,39 +949,42 @@ function ModalEditarAjuste({ ajuste, onClose }: { ajuste: AjusteInventario; onCl
   }
 
   return (
-    <Modal titulo={`Editar ajuste — ${ajuste.numero}`} onClose={onClose}>
+    <Modal titulo={`Editar ajuste — ${ajuste.numero}`} onClose={onClose} ancho="xl">
       {!detalle ? (
         <p className="text-sm text-slate-400">Cargando…</p>
       ) : (
         <form onSubmit={onSubmit} className="space-y-3">
-          {lineas.map((linea, i) => (
-            <div key={i} className="space-y-2 rounded-lg border border-slate-200 p-3 dark:border-slate-800">
-              <p className="text-sm font-medium text-slate-700 dark:text-slate-300">{linea.nombreProducto}</p>
-              <div className="flex gap-2">
-                <input
-                  type="number"
-                  placeholder="Cantidad"
-                  value={linea.cantidad}
-                  onChange={(e) => actualizarLinea(i, { cantidad: e.target.value })}
-                  className="w-28 rounded-md border border-slate-300 px-2 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+          {/* Alto fijo + scroll propio (mismo criterio que el panel de notas de Proyectos/Mis Tareas) — antes crecía sin límite con cada línea. */}
+          <div className="max-h-[24rem] space-y-2 overflow-y-auto pr-1">
+            {lineas.map((linea, i) => (
+              <div key={i} className="space-y-2 rounded-lg border border-slate-200 p-3 dark:border-slate-800">
+                <p className="text-sm font-medium text-slate-700 dark:text-slate-300">{linea.nombreProducto}</p>
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    placeholder="Cantidad"
+                    value={linea.cantidad}
+                    onChange={(e) => actualizarLinea(i, { cantidad: e.target.value })}
+                    className="w-28 rounded-md border border-slate-300 px-2 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                  />
+                  <Select value={linea.motivoAjuste} onChange={(e) => actualizarLinea(i, { motivoAjuste: e.target.value })} required>
+                    <option value="MERMA">Merma</option>
+                    <option value="ROBO_PERDIDA">Robo o pérdida</option>
+                    <option value="DANO">Daño</option>
+                    <option value="VENCIMIENTO">Vencimiento</option>
+                    <option value="CORRECCION_CONTEO">Corrección de conteo</option>
+                    <option value="OTRO">Otro</option>
+                  </Select>
+                </div>
+                <FormField
+                  id={`ajuste-editar-motivo-${i}`}
+                  label="Detalle (opcional)"
+                  value={linea.motivo}
+                  onChange={(e) => actualizarLinea(i, { motivo: e.target.value })}
                 />
-                <Select value={linea.motivoAjuste} onChange={(e) => actualizarLinea(i, { motivoAjuste: e.target.value })} required>
-                  <option value="MERMA">Merma</option>
-                  <option value="ROBO_PERDIDA">Robo o pérdida</option>
-                  <option value="DANO">Daño</option>
-                  <option value="VENCIMIENTO">Vencimiento</option>
-                  <option value="CORRECCION_CONTEO">Corrección de conteo</option>
-                  <option value="OTRO">Otro</option>
-                </Select>
               </div>
-              <FormField
-                id={`ajuste-editar-motivo-${i}`}
-                label="Detalle (opcional)"
-                value={linea.motivo}
-                onChange={(e) => actualizarLinea(i, { motivo: e.target.value })}
-              />
-            </div>
-          ))}
+            ))}
+          </div>
           {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
           <Button type="submit" disabled={guardar.isPending} className="w-full">
             {guardar.isPending ? 'Guardando…' : 'Guardar cambios'}

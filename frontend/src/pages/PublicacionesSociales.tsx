@@ -10,6 +10,7 @@ import { Badge } from '../components/atoms/Badge/Badge';
 import { Select } from '../components/atoms/Select/Select';
 import { FormField } from '../components/molecules/FormField/FormField';
 import { Modal } from '../components/molecules/Modal/Modal';
+import { Tabs } from '../components/molecules/Tabs/Tabs';
 import { ComboboxBusqueda } from '../components/molecules/ComboboxBusqueda/ComboboxBusqueda';
 import { Paginacion } from '../components/molecules/Paginacion/Paginacion';
 import { EstadoVacio } from '../components/molecules/EstadoVacio/EstadoVacio';
@@ -359,6 +360,8 @@ interface DetalleProps {
 
 function DetallePublicacionSocial({ id, onClose, tienePermiso }: DetalleProps) {
   const queryClient = useQueryClient();
+  // Columna derecha desbalanceada frente a la imagen cuando aparecían historial + formulario de cambios a la vez — separado en tabs.
+  const [pestana, setPestana] = useState<'publicacion' | 'historial'>('publicacion');
   const [formRechazoAbierto, setFormRechazoAbierto] = useState(false);
   const [motivoRechazo, setMotivoRechazo] = useState('');
   const [formCambiosAbierto, setFormCambiosAbierto] = useState(false);
@@ -506,6 +509,28 @@ function DetallePublicacionSocial({ id, onClose, tienePermiso }: DetalleProps) {
           />
 
           <div className="space-y-4">
+            {publicacion.versiones && publicacion.versiones.length > 1 && (
+              <Tabs
+                pestanas={[
+                  { id: 'publicacion', etiqueta: 'Publicación' },
+                  { id: 'historial', etiqueta: 'Historial' },
+                ]}
+                activa={pestana}
+                onCambiar={setPestana}
+              />
+            )}
+
+            {pestana === 'historial' && publicacion.versiones && publicacion.versiones.length > 1 ? (
+              <ul className="space-y-1 text-sm text-slate-700 dark:text-slate-300">
+                {publicacion.versiones.map((v) => (
+                  <li key={v.id}>
+                    <span className="font-medium">v{v.numero}</span> — {v.creadoPor.nombre} ({new Date(v.createdAt).toLocaleDateString()})
+                    {v.comentarioCambios && <span className="text-slate-500 dark:text-slate-400"> — pedido: "{v.comentarioCambios}"</span>}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+            <>
             <div>
               <p className="text-sm text-slate-500 dark:text-slate-400">Producto</p>
               <p className="font-medium text-slate-900 dark:text-slate-100">{publicacion.producto.nombre}</p>
@@ -550,20 +575,6 @@ function DetallePublicacionSocial({ id, onClose, tienePermiso }: DetalleProps) {
               <div>
                 <p className="text-sm text-slate-500 dark:text-slate-400">Motivo del rechazo</p>
                 <p className="text-sm text-slate-700 dark:text-slate-300">{publicacion.motivoRechazo}</p>
-              </div>
-            )}
-
-            {publicacion.versiones && publicacion.versiones.length > 1 && (
-              <div>
-                <p className="text-sm text-slate-500 dark:text-slate-400">Historial de versiones</p>
-                <ul className="mt-1 space-y-1 text-sm text-slate-700 dark:text-slate-300">
-                  {publicacion.versiones.map((v) => (
-                    <li key={v.id}>
-                      <span className="font-medium">v{v.numero}</span> — {v.creadoPor.nombre} ({new Date(v.createdAt).toLocaleDateString()})
-                      {v.comentarioCambios && <span className="text-slate-500 dark:text-slate-400"> — pedido: "{v.comentarioCambios}"</span>}
-                    </li>
-                  ))}
-                </ul>
               </div>
             )}
 
@@ -724,6 +735,8 @@ function DetallePublicacionSocial({ id, onClose, tienePermiso }: DetalleProps) {
                 </div>
               )}
             </div>
+            </>
+            )}
           </div>
         </div>
       )}
