@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { AlertTriangle, ArrowLeftRight, BedDouble, ChevronDown, Clock, DollarSign, Plane, Plus, Receipt, Trash2, Users, Wallet, X } from 'lucide-react';
+import { AlertTriangle, ArrowLeftRight, BedDouble, Check, ChevronDown, Clock, DollarSign, Plane, Plus, Receipt, Trash2, Users, Wallet, X } from 'lucide-react';
 import { apiClient } from '../lib/api-client';
 import { useAuth } from '../hooks/useAuth';
 import { mensajeErrorApi } from '../lib/mensaje-error-api';
@@ -619,8 +619,6 @@ function ReservarOfertaModal({
   const [pasajeros, setPasajeros] = useState<Record<string, FormPasajero>>(Object.fromEntries(pasajeroIds.map((id) => [id, { ...PASAJERO_VACIO }])));
   // Duffel exige vincular cada bebé (infant_without_seat) a un adulto responsable — clave: id del bebé, valor: id del adulto elegido.
   const [infanteAdultoMap, setInfanteAdultoMap] = useState<Record<string, string>>({});
-  // Acordeón de pasajeros — arranca con el primero abierto, el resto colapsado.
-  const [pasajeroExpandidoId, setPasajeroExpandidoId] = useState<string | null>(pasajeroIds[0] ?? null);
   // Separa "cerrar la venta" de "cargar viajeros" — antes todo en un solo scroll largo, con Notas
   // al final después de toda la lista de pasajeros.
   const [pestana, setPestana] = useState<'venta' | 'pasajeros'>('venta');
@@ -669,7 +667,7 @@ function ReservarOfertaModal({
   }
 
   return (
-    <Modal titulo="Reservar vuelo" onClose={onClose} ancho="2xl">
+    <Modal titulo="Reservar vuelo" onClose={onClose} ancho="full">
       <form onSubmit={onSubmit} className="space-y-4">
         <Tabs
           pestanas={[
@@ -726,100 +724,93 @@ function ReservarOfertaModal({
         )}
 
         {pestana === 'pasajeros' && (
-        <div className="space-y-2">
+        <div className="space-y-3">
           {oferta.pasajeros.map((p, i) => {
-            const expandido = pasajeroExpandidoId === p.id;
             const completo = !!(pasajeros[p.id].nombre && pasajeros[p.id].apellido && pasajeros[p.id].fechaNacimiento && pasajeros[p.id].email && pasajeros[p.id].telefono);
             return (
+              // Antes acordeón (un pasajero a la vez) — con el modal `full` ahora hay espacio
+              // de sobra para tener a todos los pasajeros abiertos y visibles al mismo tiempo,
+              // sin tener que hacer clic para ver/completar cada uno.
               <div key={p.id} className="rounded-lg border border-slate-200 dark:border-slate-700">
-                {/* Acordeón: con 3-4 pasajeros (~9 campos c/u) apilar todo abierto disparaba la altura del modal — solo uno expandido a la vez, el resto se resume en una línea con check si ya está completo. */}
-                <button
-                  type="button"
-                  onClick={() => setPasajeroExpandidoId(expandido ? null : p.id)}
-                  className="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left"
-                >
+                <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-3 py-2.5 dark:border-slate-800">
                   <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">
                     Pasajero {i + 1} — {ETIQUETA_TIPO_PASAJERO[p.tipo]}
                     {p.edad != null && ` (${p.edad} ${p.edad === 1 ? 'año' : 'años'})`}
                   </span>
-                  <span className="flex shrink-0 items-center gap-2">
-                    {!expandido && completo && (
-                      <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400">
-                        ✓ {pasajeros[p.id].nombre} {pasajeros[p.id].apellido}
-                      </span>
-                    )}
-                    {!expandido && !completo && <span className="text-xs text-amber-600 dark:text-amber-400">Falta completar</span>}
-                    <ChevronDown size={15} className={clsx('text-slate-400 transition-transform', expandido && 'rotate-180')} />
-                  </span>
-                </button>
-                {expandido && (
-                  <div className="border-t border-slate-100 p-3 dark:border-slate-800">
-                    {p.tipo === 'infant_without_seat' && (
-                      <div className="mb-3 flex flex-col gap-1">
-                        <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Viaja con (adulto responsable)</label>
-                        <Select value={infanteAdultoMap[p.id] ?? ''} onChange={(e) => setInfanteAdultoMap((prev) => ({ ...prev, [p.id]: e.target.value }))} required>
-                          <option value="">Seleccioná un adulto…</option>
-                          {adultoIds.map((adultoId, j) => (
-                            <option key={adultoId} value={adultoId}>
-                              Pasajero {oferta.pasajeros.findIndex((pp) => pp.id === adultoId) + 1} (Adulto {j + 1})
-                            </option>
-                          ))}
-                        </Select>
-                      </div>
-                    )}
-                    {/* 3 columnas ahora que el modal es 2xl — antes 2 dejaba 4 filas para 7 campos, ahora entra en 3. */}
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                      <div className="flex flex-col gap-1">
-                        <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Título</label>
-                        <Select value={pasajeros[p.id].titulo} onChange={(e) => actualizarPasajero(p.id, 'titulo', e.target.value)}>
-                          {TITULOS_PASAJERO.map((t) => (
-                            <option key={t.valor} value={t.valor}>
-                              {t.etiqueta}
-                            </option>
-                          ))}
-                        </Select>
-                      </div>
-                      <div className="flex flex-col gap-1">
-                        <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Género</label>
-                        <Select value={pasajeros[p.id].genero} onChange={(e) => actualizarPasajero(p.id, 'genero', e.target.value)}>
-                          <option value="m">Masculino</option>
-                          <option value="f">Femenino</option>
-                        </Select>
-                      </div>
-                      <FormField label="Nombre" value={pasajeros[p.id].nombre} onChange={(e) => actualizarPasajero(p.id, 'nombre', e.target.value)} required />
-                      <FormField label="Apellido" value={pasajeros[p.id].apellido} onChange={(e) => actualizarPasajero(p.id, 'apellido', e.target.value)} required />
-                      <FormField
-                        label="Fecha de nacimiento"
-                        type="date"
-                        value={pasajeros[p.id].fechaNacimiento}
-                        onChange={(e) => actualizarPasajero(p.id, 'fechaNacimiento', e.target.value)}
-                        required
-                      />
-                      <FormField label="Email" type="email" value={pasajeros[p.id].email} onChange={(e) => actualizarPasajero(p.id, 'email', e.target.value)} required />
-                      <FormField label="Teléfono" value={pasajeros[p.id].telefono} onChange={(e) => actualizarPasajero(p.id, 'telefono', e.target.value)} required />
+                  {completo ? (
+                    <span className="flex items-center gap-1 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                      <Check size={13} /> Completo
+                    </span>
+                  ) : (
+                    <span className="text-xs text-amber-600 dark:text-amber-400">Falta completar</span>
+                  )}
+                </div>
+                <div className="p-3">
+                  {p.tipo === 'infant_without_seat' && (
+                    <div className="mb-3 flex flex-col gap-1">
+                      <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Viaja con (adulto responsable)</label>
+                      <Select value={infanteAdultoMap[p.id] ?? ''} onChange={(e) => setInfanteAdultoMap((prev) => ({ ...prev, [p.id]: e.target.value }))} required>
+                        <option value="">Seleccioná un adulto…</option>
+                        {adultoIds.map((adultoId, j) => (
+                          <option key={adultoId} value={adultoId}>
+                            Pasajero {oferta.pasajeros.findIndex((pp) => pp.id === adultoId) + 1} (Adulto {j + 1})
+                          </option>
+                        ))}
+                      </Select>
                     </div>
-                    <p className="mb-2 mt-3 text-xs font-semibold uppercase tracking-wide text-slate-400">Pasaporte (opcional — recomendado para vuelos internacionales)</p>
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                      <FormField
-                        label="Número de pasaporte"
-                        value={pasajeros[p.id].numeroPasaporte}
-                        onChange={(e) => actualizarPasajero(p.id, 'numeroPasaporte', e.target.value)}
-                      />
-                      <FormField
-                        label="País emisor (ej. DO)"
-                        maxLength={2}
-                        value={pasajeros[p.id].paisEmisionPasaporte}
-                        onChange={(e) => actualizarPasajero(p.id, 'paisEmisionPasaporte', e.target.value.toUpperCase())}
-                      />
-                      <FormField
-                        label="Vencimiento"
-                        type="date"
-                        value={pasajeros[p.id].fechaVencimientoPasaporte}
-                        onChange={(e) => actualizarPasajero(p.id, 'fechaVencimientoPasaporte', e.target.value)}
-                      />
+                  )}
+                  {/* 4 columnas con el modal `full` — antes 3 (2xl) dejaba una fila suelta para 7 campos. */}
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                    <div className="flex flex-col gap-1">
+                      <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Título</label>
+                      <Select value={pasajeros[p.id].titulo} onChange={(e) => actualizarPasajero(p.id, 'titulo', e.target.value)}>
+                        {TITULOS_PASAJERO.map((t) => (
+                          <option key={t.valor} value={t.valor}>
+                            {t.etiqueta}
+                          </option>
+                        ))}
+                      </Select>
                     </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Género</label>
+                      <Select value={pasajeros[p.id].genero} onChange={(e) => actualizarPasajero(p.id, 'genero', e.target.value)}>
+                        <option value="m">Masculino</option>
+                        <option value="f">Femenino</option>
+                      </Select>
+                    </div>
+                    <FormField label="Nombre" value={pasajeros[p.id].nombre} onChange={(e) => actualizarPasajero(p.id, 'nombre', e.target.value)} required />
+                    <FormField label="Apellido" value={pasajeros[p.id].apellido} onChange={(e) => actualizarPasajero(p.id, 'apellido', e.target.value)} required />
+                    <FormField
+                      label="Fecha de nacimiento"
+                      type="date"
+                      value={pasajeros[p.id].fechaNacimiento}
+                      onChange={(e) => actualizarPasajero(p.id, 'fechaNacimiento', e.target.value)}
+                      required
+                    />
+                    <FormField label="Email" type="email" value={pasajeros[p.id].email} onChange={(e) => actualizarPasajero(p.id, 'email', e.target.value)} required />
+                    <FormField label="Teléfono" value={pasajeros[p.id].telefono} onChange={(e) => actualizarPasajero(p.id, 'telefono', e.target.value)} required />
                   </div>
-                )}
+                  <p className="mb-2 mt-3 text-xs font-semibold uppercase tracking-wide text-slate-400">Pasaporte (opcional — recomendado para vuelos internacionales)</p>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                    <FormField
+                      label="Número de pasaporte"
+                      value={pasajeros[p.id].numeroPasaporte}
+                      onChange={(e) => actualizarPasajero(p.id, 'numeroPasaporte', e.target.value)}
+                    />
+                    <FormField
+                      label="País emisor (ej. DO)"
+                      maxLength={2}
+                      value={pasajeros[p.id].paisEmisionPasaporte}
+                      onChange={(e) => actualizarPasajero(p.id, 'paisEmisionPasaporte', e.target.value.toUpperCase())}
+                    />
+                    <FormField
+                      label="Vencimiento"
+                      type="date"
+                      value={pasajeros[p.id].fechaVencimientoPasaporte}
+                      onChange={(e) => actualizarPasajero(p.id, 'fechaVencimientoPasaporte', e.target.value)}
+                    />
+                  </div>
+                </div>
               </div>
             );
           })}
