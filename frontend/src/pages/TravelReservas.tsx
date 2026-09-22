@@ -669,7 +669,7 @@ function ReservarOfertaModal({
   }
 
   return (
-    <Modal titulo="Reservar vuelo" onClose={onClose} ancho="xl">
+    <Modal titulo="Reservar vuelo" onClose={onClose} ancho="2xl">
       <form onSubmit={onSubmit} className="space-y-4">
         <Tabs
           pestanas={[
@@ -767,7 +767,8 @@ function ReservarOfertaModal({
                         </Select>
                       </div>
                     )}
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    {/* 3 columnas ahora que el modal es 2xl — antes 2 dejaba 4 filas para 7 campos, ahora entra en 3. */}
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                       <div className="flex flex-col gap-1">
                         <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Título</label>
                         <Select value={pasajeros[p.id].titulo} onChange={(e) => actualizarPasajero(p.id, 'titulo', e.target.value)}>
