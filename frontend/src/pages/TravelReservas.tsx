@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { AlertTriangle, ArrowLeftRight, BedDouble, Check, ChevronDown, Clock, DollarSign, Plane, Plus, Receipt, Trash2, Users, Wallet, X } from 'lucide-react';
+import { AlertTriangle, ArrowLeftRight, BedDouble, Check, ChevronDown, Clock, DollarSign, Plane, Plus, Receipt, Trash2, User, Users, Wallet, X } from 'lucide-react';
 import { apiClient } from '../lib/api-client';
 import { useAuth } from '../hooks/useAuth';
 import { mensajeErrorApi } from '../lib/mensaje-error-api';
@@ -15,6 +15,7 @@ import { AutocompleteDestinoHotel } from '../components/molecules/AutocompleteDe
 import { Modal } from '../components/molecules/Modal/Modal';
 import { ConfirmModal } from '../components/molecules/ConfirmModal/ConfirmModal';
 import { Tabs } from '../components/molecules/Tabs/Tabs';
+import { ComboboxBusqueda } from '../components/molecules/ComboboxBusqueda/ComboboxBusqueda';
 import { EstadoVacio } from '../components/molecules/EstadoVacio/EstadoVacio';
 import { StatCard } from '../components/molecules/StatCard/StatCard';
 import { RequierePermiso } from '../components/organisms/RequierePermiso/RequierePermiso';
@@ -39,6 +40,66 @@ interface ClienteOpcion {
   nombre: string;
 }
 
+/** Buscador con autocompletado (mismo patrón que FacturacionNueva.tsx) + alta rápida inline si el cliente todavía no existe — antes un <select> con hasta 200 clientes sin buscador. */
+function SelectorClienteConCrear({ cliente, onSeleccionar }: { cliente: ClienteOpcion | null; onSeleccionar: (c: ClienteOpcion | null) => void }) {
+  const [mostrarNuevo, setMostrarNuevo] = useState(false);
+
+  return (
+    <div className="flex flex-col gap-1">
+      <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Cliente</label>
+      <ComboboxBusqueda<ClienteOpcion>
+        valor={cliente}
+        onSeleccionar={onSeleccionar}
+        obtenerId={(c) => c.id}
+        obtenerEtiqueta={(c) => c.nombre}
+        placeholder="Buscar cliente…"
+        icono={<User size={15} />}
+        buscar={async (texto) =>
+          (await apiClient.get<PaginaResultado<ClienteOpcion>>('/clientes', { params: { busqueda: texto, tamanoPagina: 10 } })).data.datos
+        }
+      />
+      <button
+        type="button"
+        onClick={() => setMostrarNuevo((v) => !v)}
+        className="self-start text-xs font-medium text-sol-600 hover:text-sol-700 dark:text-sol-400"
+      >
+        + Nuevo cliente
+      </button>
+      {mostrarNuevo && (
+        <NuevoClienteInline
+          onCreado={(c) => {
+            onSeleccionar(c);
+            setMostrarNuevo(false);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function NuevoClienteInline({ onCreado }: { onCreado: (c: ClienteOpcion) => void }) {
+  const [nombre, setNombre] = useState('');
+  const [error, setError] = useState<string | null>(null);
+
+  const crear = useMutation({
+    mutationFn: async () => (await apiClient.post<ClienteOpcion>('/clientes', { nombre, tipo: 'PERSONA_FISICA' })).data,
+    onSuccess: (cliente) => onCreado(cliente),
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo crear el cliente.')),
+  });
+
+  return (
+    <div className="mt-1 flex items-end gap-2 rounded-md border border-slate-200 p-2 dark:border-slate-800">
+      <div className="flex-1">
+        <FormField id="travel-nuevo-cliente-nombre" label="Nombre del cliente" value={nombre} onChange={(e) => setNombre(e.target.value)} />
+        {error && <p className="text-xs text-red-600 dark:text-red-400">{error}</p>}
+      </div>
+      <Button type="button" variante="secundario" disabled={!nombre || crear.isPending} onClick={() => crear.mutate()}>
+        Crear
+      </Button>
+    </div>
+  );
+}
+
 /* ---------------------------------------------------------------- */
 /* Alta manual (Fase 0) — sin cambios de fondo                       */
 /* ---------------------------------------------------------------- */
@@ -60,19 +121,18 @@ function formatoMoneda(monto: string, moneda: string) {
 }
 
 function ReservaFormModal({
-  clientes,
   guardando,
   error,
   onClose,
   onGuardar,
 }: {
-  clientes: ClienteOpcion[] | undefined;
   guardando: boolean;
   error: string | null;
   onClose: () => void;
   onGuardar: (form: FormReserva) => void;
 }) {
   const [form, setForm] = useState<FormReserva>(FORM_VACIO);
+  const [cliente, setCliente] = useState<ClienteOpcion | null>(null);
   const [sugiriendo, setSugiriendo] = useState(false);
 
   function onSubmit(e: FormEvent) {
@@ -83,17 +143,13 @@ function ReservaFormModal({
   return (
     <Modal titulo="Nueva reserva manual" onClose={onClose}>
       <form onSubmit={onSubmit} className="space-y-4">
-        <div className="flex flex-col gap-1">
-          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Cliente</label>
-          <Select value={form.clienteId} onChange={(e) => setForm({ ...form, clienteId: e.target.value })} required>
-            <option value="">Seleccioná un cliente…</option>
-            {clientes?.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.nombre}
-              </option>
-            ))}
-          </Select>
-        </div>
+        <SelectorClienteConCrear
+          cliente={cliente}
+          onSeleccionar={(c) => {
+            setCliente(c);
+            setForm((f) => ({ ...f, clienteId: c?.id ?? '' }));
+          }}
+        />
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div className="flex flex-col gap-1">
@@ -591,14 +647,12 @@ const TITULOS_PASAJERO: { valor: string; etiqueta: string }[] = [
 
 function ReservarOfertaModal({
   oferta,
-  clientes,
   guardando,
   error,
   onClose,
   onGuardar,
 }: {
   oferta: OfertaVuelo;
-  clientes: ClienteOpcion[] | undefined;
   guardando: boolean;
   error: string | null;
   onClose: () => void;
@@ -613,7 +667,8 @@ function ReservarOfertaModal({
   const pasajeroIds = oferta.pasajeros.map((p) => p.id);
   const adultoIds = oferta.pasajeros.filter((p) => p.tipo === 'adult').map((p) => p.id);
   const infanteIds = oferta.pasajeros.filter((p) => p.tipo === 'infant_without_seat').map((p) => p.id);
-  const [clienteId, setClienteId] = useState('');
+  const [cliente, setCliente] = useState<ClienteOpcion | null>(null);
+  const clienteId = cliente?.id ?? '';
   const [montoVenta, setMontoVenta] = useState(oferta.montoTotal);
   const [notas, setNotas] = useState('');
   const [pasajeros, setPasajeros] = useState<Record<string, FormPasajero>>(Object.fromEntries(pasajeroIds.map((id) => [id, { ...PASAJERO_VACIO }])));
@@ -689,17 +744,7 @@ function ReservarOfertaModal({
         </div>
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <div className="flex flex-col gap-1">
-            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Cliente</label>
-            <Select value={clienteId} onChange={(e) => setClienteId(e.target.value)} required>
-              <option value="">Seleccioná un cliente…</option>
-              {clientes?.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.nombre}
-                </option>
-              ))}
-            </Select>
-          </div>
+          <SelectorClienteConCrear cliente={cliente} onSeleccionar={setCliente} />
           <FormField
             label={`Venta al cliente (costo: ${oferta.moneda} ${oferta.montoTotal})`}
             type="number"
@@ -978,7 +1023,7 @@ function PasajerosPopover({ form, setForm }: { form: typeof FORM_BUSQUEDA_VACIO;
   );
 }
 
-function BuscarVueloTab({ clientes }: { clientes: ClienteOpcion[] | undefined }) {
+function BuscarVueloTab() {
   const queryClient = useQueryClient();
   const [form, setForm] = useState(FORM_BUSQUEDA_VACIO);
   const [ofertaAReservar, setOfertaAReservar] = useState<OfertaVuelo | null>(null);
@@ -1148,7 +1193,6 @@ function BuscarVueloTab({ clientes }: { clientes: ClienteOpcion[] | undefined })
       {ofertaAReservar && (
         <ReservarOfertaModal
           oferta={ofertaAReservar}
-          clientes={clientes}
           guardando={reservar.isPending}
           error={error}
           onClose={() => setOfertaAReservar(null)}
@@ -1263,7 +1307,6 @@ function ReservarHotelModal({
   hotel,
   tarifa,
   huespedesIniciales,
-  clientes,
   guardando,
   error,
   onClose,
@@ -1272,13 +1315,13 @@ function ReservarHotelModal({
   hotel: HotelListado;
   tarifa: TarifaHotel;
   huespedesIniciales: FormHuespedHotel[];
-  clientes: ClienteOpcion[] | undefined;
   guardando: boolean;
   error: string | null;
   onClose: () => void;
   onGuardar: (dto: { clienteId: string; rateKey: string; huespedes: FormHuespedHotel[]; montoVenta: number; notas?: string }) => void;
 }) {
-  const [clienteId, setClienteId] = useState('');
+  const [cliente, setCliente] = useState<ClienteOpcion | null>(null);
+  const clienteId = cliente?.id ?? '';
   const [montoVenta, setMontoVenta] = useState(tarifa.montoNeto);
   const [notas, setNotas] = useState('');
   const [huespedes, setHuespedes] = useState<FormHuespedHotel[]>(huespedesIniciales);
@@ -1311,17 +1354,7 @@ function ReservarHotelModal({
         </div>
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <div className="flex flex-col gap-1">
-            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Cliente</label>
-            <Select value={clienteId} onChange={(e) => setClienteId(e.target.value)} required>
-              <option value="">Seleccioná un cliente…</option>
-              {clientes?.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.nombre}
-                </option>
-              ))}
-            </Select>
-          </div>
+          <SelectorClienteConCrear cliente={cliente} onSeleccionar={setCliente} />
           <FormField
             label={`Venta al cliente (costo: ${tarifa.moneda} ${tarifa.montoNeto})`}
             type="number"
@@ -1370,7 +1403,7 @@ function ReservarHotelModal({
   );
 }
 
-function BuscarHotelTab({ clientes }: { clientes: ClienteOpcion[] | undefined }) {
+function BuscarHotelTab() {
   const queryClient = useQueryClient();
   const [form, setForm] = useState(FORM_BUSQUEDA_HOTEL_VACIO);
   const [seleccion, setSeleccion] = useState<{ hotel: HotelListado; tarifa: TarifaHotel } | null>(null);
@@ -1448,7 +1481,6 @@ function BuscarHotelTab({ clientes }: { clientes: ClienteOpcion[] | undefined })
           hotel={seleccion.hotel}
           tarifa={seleccion.tarifa}
           huespedesIniciales={huespedesIniciales}
-          clientes={clientes}
           guardando={reservar.isPending}
           error={error}
           onClose={() => setSeleccion(null)}
@@ -1484,11 +1516,6 @@ export function TravelReservas() {
   const { data: reservas, isLoading } = useQuery({
     queryKey: ['travel-reservas'],
     queryFn: async () => (await apiClient.get<TravelReserva[]>('/admin/travel/reservas')).data,
-  });
-
-  const { data: clientes } = useQuery({
-    queryKey: ['clientes-opciones'],
-    queryFn: async () => (await apiClient.get<PaginaResultado<ClienteOpcion>>('/clientes', { params: { tamanoPagina: 200 } })).data.datos,
   });
 
   function invalidar() {
@@ -1584,8 +1611,8 @@ export function TravelReservas() {
         {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
 
         {vista === 'resumen' && <ResumenTab />}
-        {vista === 'buscar' && <BuscarVueloTab clientes={clientes} />}
-        {vista === 'buscarHotel' && <BuscarHotelTab clientes={clientes} />}
+        {vista === 'buscar' && <BuscarVueloTab />}
+        {vista === 'buscarHotel' && <BuscarHotelTab />}
         {vista === 'markup' && <MarkupTab />}
 
         {vista === 'reservas' && (
@@ -1712,7 +1739,6 @@ export function TravelReservas() {
 
         {modalAbierto && (
           <ReservaFormModal
-            clientes={clientes}
             guardando={crear.isPending}
             error={error}
             onClose={() => setModalAbierto(false)}
