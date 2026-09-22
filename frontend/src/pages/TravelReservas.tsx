@@ -14,6 +14,7 @@ import { AutocompleteAeropuerto } from '../components/molecules/AutocompleteAero
 import { AutocompleteDestinoHotel } from '../components/molecules/AutocompleteDestinoHotel/AutocompleteDestinoHotel';
 import { Modal } from '../components/molecules/Modal/Modal';
 import { ConfirmModal } from '../components/molecules/ConfirmModal/ConfirmModal';
+import { Tabs } from '../components/molecules/Tabs/Tabs';
 import { EstadoVacio } from '../components/molecules/EstadoVacio/EstadoVacio';
 import { StatCard } from '../components/molecules/StatCard/StatCard';
 import { RequierePermiso } from '../components/organisms/RequierePermiso/RequierePermiso';
@@ -620,6 +621,9 @@ function ReservarOfertaModal({
   const [infanteAdultoMap, setInfanteAdultoMap] = useState<Record<string, string>>({});
   // Acordeón de pasajeros — arranca con el primero abierto, el resto colapsado.
   const [pasajeroExpandidoId, setPasajeroExpandidoId] = useState<string | null>(pasajeroIds[0] ?? null);
+  // Separa "cerrar la venta" de "cargar viajeros" — antes todo en un solo scroll largo, con Notas
+  // al final después de toda la lista de pasajeros.
+  const [pestana, setPestana] = useState<'venta' | 'pasajeros'>('venta');
 
   // Markup automático — solo sugiere el punto de partida, el campo sigue 100% editable.
   useEffect(() => {
@@ -667,6 +671,17 @@ function ReservarOfertaModal({
   return (
     <Modal titulo="Reservar vuelo" onClose={onClose} ancho="xl">
       <form onSubmit={onSubmit} className="space-y-4">
+        <Tabs
+          pestanas={[
+            { id: 'venta', etiqueta: 'Datos de venta' },
+            { id: 'pasajeros', etiqueta: `Pasajeros (${oferta.pasajeros.length})` },
+          ]}
+          activa={pestana}
+          onCambiar={setPestana}
+        />
+
+        {pestana === 'venta' && (
+        <div className="space-y-4">
         <div className="rounded-lg bg-slate-50 p-3 text-sm dark:bg-slate-800/60">
           {oferta.tramosCrudo.map((t) => (
             <p key={t.id} className="text-slate-600 dark:text-slate-300">
@@ -698,6 +713,19 @@ function ReservarOfertaModal({
           />
         </div>
 
+        <div className="flex flex-col gap-1">
+          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Notas (opcional)</label>
+          <textarea
+            value={notas}
+            onChange={(e) => setNotas(e.target.value)}
+            rows={3}
+            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+          />
+        </div>
+        </div>
+        )}
+
+        {pestana === 'pasajeros' && (
         <div className="space-y-2">
           {oferta.pasajeros.map((p, i) => {
             const expandido = pasajeroExpandidoId === p.id;
@@ -795,16 +823,7 @@ function ReservarOfertaModal({
             );
           })}
         </div>
-
-        <div className="flex flex-col gap-1">
-          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Notas (opcional)</label>
-          <textarea
-            value={notas}
-            onChange={(e) => setNotas(e.target.value)}
-            rows={2}
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-          />
-        </div>
+        )}
 
         {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
 
