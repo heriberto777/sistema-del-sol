@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { ArrayMaxSize, ArrayMinSize, IsDateString, IsEmail, IsEnum, IsNumber, IsOptional, IsString, IsUUID, Length, MaxLength, Min, ValidateNested } from 'class-validator';
+import { ArrayMaxSize, ArrayMinSize, IsDateString, IsEmail, IsEnum, IsNumber, IsOptional, IsString, IsUUID, Length, Matches, MaxLength, Min, ValidateNested } from 'class-validator';
 
 export class PasajeroReservaVueloDto {
   @ApiProperty({ description: 'Debe coincidir con un id de pasajero devuelto por la oferta del proveedor' })
@@ -33,9 +33,14 @@ export class PasajeroReservaVueloDto {
   @IsEmail()
   email: string;
 
-  @ApiProperty()
+  // Duffel exige formato E.164 (código de país + número, sin espacios/guiones/paréntesis)
+  // y devuelve "phone_number invalid" en inglés sin más detalle si no lo cumple — validado
+  // acá antes de llegar a Duffel para dar un mensaje en español que diga qué corregir.
+  @ApiProperty({ description: 'Formato internacional E.164, ej: +18095551234 (código de país + número, sin espacios ni guiones)' })
   @IsString()
-  @MaxLength(30)
+  @Matches(/^\+[1-9]\d{7,14}$/, {
+    message: 'El teléfono debe estar en formato internacional, ej: +18095551234 (código de país + número, sin espacios, guiones ni paréntesis)',
+  })
   telefono: string;
 
   // Pasaporte (APIS) — opcional: no toda ruta/aerolínea lo exige, pero Duffel lo acepta sin error si se manda (confirmado contra el sandbox real).

@@ -770,6 +770,10 @@ function ReservarOfertaModal({
 
         {pestana === 'pasajeros' && (
         <div className="space-y-3">
+          {/* Duffel devuelve "phone_number invalid" sin más contexto si no es E.164 — se avisa acá arriba en vez de que el usuario lo descubra recién al chocar con el error. */}
+          <p className="rounded-lg bg-sky-50 px-3 py-2 text-xs text-sky-700 dark:bg-sky-500/10 dark:text-sky-300">
+            El teléfono de cada pasajero debe llevar el código de país, sin espacios ni guiones — ej. <span className="font-mono">+18095551234</span>.
+          </p>
           {oferta.pasajeros.map((p, i) => {
             const completo = !!(pasajeros[p.id].nombre && pasajeros[p.id].apellido && pasajeros[p.id].fechaNacimiento && pasajeros[p.id].email && pasajeros[p.id].telefono);
             return (
@@ -833,7 +837,14 @@ function ReservarOfertaModal({
                       required
                     />
                     <FormField label="Email" type="email" value={pasajeros[p.id].email} onChange={(e) => actualizarPasajero(p.id, 'email', e.target.value)} required />
-                    <FormField label="Teléfono" value={pasajeros[p.id].telefono} onChange={(e) => actualizarPasajero(p.id, 'telefono', e.target.value)} required />
+                    <FormField
+                      label="Teléfono"
+                      type="tel"
+                      placeholder="+18095551234"
+                      value={pasajeros[p.id].telefono}
+                      onChange={(e) => actualizarPasajero(p.id, 'telefono', e.target.value)}
+                      required
+                    />
                   </div>
                   <p className="mb-2 mt-3 text-xs font-semibold uppercase tracking-wide text-slate-400">Pasaporte (opcional — recomendado para vuelos internacionales)</p>
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
