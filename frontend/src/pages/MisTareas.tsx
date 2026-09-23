@@ -1,7 +1,7 @@
 import { DragEvent, FormEvent, useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { AlertTriangle, CalendarCheck, CheckCircle2, Copy, ListTodo, MessageSquare, Search, Send, Settings, Sparkles, Trash2, Plus } from 'lucide-react';
+import { AlertTriangle, CalendarCheck, Check, CheckCircle2, Copy, ListTodo, MessageSquare, Search, Send, Settings, Sparkles, Trash2, Plus } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { apiClient } from '../lib/api-client';
 import { mensajeErrorApi } from '../lib/mensaje-error-api';
@@ -425,6 +425,7 @@ function TarjetaKanban({
   }
 
   const vencimiento = tarea.fecha ? estadoVencimiento(tarea.fecha, tarea.estado) : null;
+  const hecha = tarea.estado === 'HECHA';
 
   if (densidad === 'compacta') {
     return (
@@ -438,13 +439,19 @@ function TarjetaKanban({
           // recortarlo solo, pero sin esto un título con un token muy largo (sin
           // espacios) o un redondeo de sub-píxel en pantallas de ~390-420px se
           // desbordaba contra el borde de la tarjeta sin nada que lo contuviera.
-          'flex cursor-pointer items-center gap-1.5 overflow-hidden rounded-lg border-y border-r border-l-4 bg-white px-2 py-1.5 shadow-sm hover:shadow dark:border-slate-700 dark:bg-slate-900',
+          'flex w-full min-w-0 cursor-pointer items-center gap-1.5 overflow-hidden rounded-lg border-y border-r border-l-4 bg-white px-2 py-1.5 shadow-sm hover:shadow dark:border-slate-700 dark:bg-slate-900',
           'border-slate-200',
           COLOR_BORDE_ESTADO_TAREA_PERSONAL[tarea.estado],
         )}
       >
+        {/* En Agenda semanal las tareas de todos los estados conviven en la misma columna
+            (por día, no por estado) — sin este check no había forma de distinguir a simple
+            vista una ya Hecha de una pendiente, a diferencia de la vista Lista. */}
+        {hecha && <Check size={12} className="shrink-0 text-emerald-500" />}
         <span className={clsx('h-1.5 w-1.5 shrink-0 rounded-full', PUNTO_PRIORIDAD_TAREA_PERSONAL[tarea.prioridad])} />
-        <span className="min-w-0 flex-1 truncate text-[12px] text-slate-800 dark:text-slate-100">{tarea.titulo}</span>
+        <span className={clsx('min-w-0 flex-1 truncate text-[12px]', hecha ? 'text-slate-400 line-through' : 'text-slate-800 dark:text-slate-100')}>
+          {tarea.titulo}
+        </span>
         {tarea.fecha && (
           <span className={clsx('shrink-0 rounded-full px-1.5 py-px text-[10px] font-medium', vencimiento ? CLASE_BADGE_FECHA[vencimiento] : 'text-slate-400')}>
             {vencimiento ? ETIQUETA_BADGE_FECHA[vencimiento] : formatoFechaBadge(tarea.fecha)}
@@ -492,7 +499,7 @@ function TarjetaKanban({
           </button>
         )}
       </div>
-      <p className="line-clamp-2 text-[12.5px] leading-snug text-slate-800 dark:text-slate-100">{tarea.titulo}</p>
+      <p className={clsx('line-clamp-2 text-[12.5px] leading-snug', hecha ? 'text-slate-400 line-through' : 'text-slate-800 dark:text-slate-100')}>{tarea.titulo}</p>
       {tarea.etiquetas.length > 0 && (
         <div className="mt-1 flex flex-wrap gap-1">
           {tarea.etiquetas.map((et) => (
@@ -584,7 +591,12 @@ function VistaKanban({
               onDragLeave={() => setColumnaDestacada((c) => (c === estado ? null : c))}
               onDrop={(e) => onDrop(e, estado)}
               className={clsx(
-                'flex flex-col gap-2 rounded-xl border border-dashed p-3 transition-colors',
+                // `min-w-0` acá es el fix real del desborde en mobile — sin esto, esta columna
+                // es un ítem de grid cuyo ancho mínimo por defecto (`min-width: auto`) se calcula
+                // a partir del contenido de sus tarjetas hijas; una tarjeta con texto largo
+                // empujaba el ancho de la COLUMNA (y de todo el grid) más allá del viewport,
+                // aunque la tarjeta en sí ya tuviera `overflow-hidden`/`truncate`.
+                'flex min-w-0 flex-col gap-2 rounded-xl border border-dashed p-3 transition-colors',
                 columnaDestacada === estado ? 'border-sol-400 bg-sol-50/60 dark:bg-sol-500/5' : 'border-slate-200 dark:border-slate-800',
               )}
             >
