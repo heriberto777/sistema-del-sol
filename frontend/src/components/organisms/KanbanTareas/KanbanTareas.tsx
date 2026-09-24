@@ -1108,6 +1108,13 @@ function SelectorResponsablesAvatar({
   );
 }
 
+// Debe calzar con LARGO_MAXIMO_COMENTARIO del backend
+// (`crear-comentario-tarea.dto.ts`) — acá solo para el contador y el
+// `maxLength` nativo del textarea (que trunca un paste largo en vez de
+// dejar que el usuario descubra el límite con un 400 recién al enviar).
+const LARGO_MAXIMO_COMENTARIO = 20000;
+const UMBRAL_AVISO_LARGO_COMENTARIO = LARGO_MAXIMO_COMENTARIO * 0.9;
+
 function FormularioComentario({ onComentar, guardando }: { onComentar: (contenido: string) => void; guardando: boolean }) {
   const [contenido, setContenido] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -1126,16 +1133,29 @@ function FormularioComentario({ onComentar, guardando }: { onComentar: (contenid
       <textarea
         ref={textareaRef}
         rows={2}
+        maxLength={LARGO_MAXIMO_COMENTARIO}
         placeholder="Escribí un comentario para el equipo — usá ``` para un bloque de código…"
         value={contenido}
         onChange={(e) => setContenido(e.target.value)}
         className="w-full resize-none border-none bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400 dark:text-slate-100 dark:placeholder:text-slate-500"
       />
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2">
         <BarraFormato textareaRef={textareaRef} valor={contenido} onChange={setContenido} />
-        <Button type="submit" disabled={!contenido.trim() || guardando}>
-          {guardando ? 'Enviando…' : 'Comentar'}
-        </Button>
+        <div className="flex items-center gap-2">
+          {contenido.length >= UMBRAL_AVISO_LARGO_COMENTARIO && (
+            <span
+              className={clsx(
+                'text-xs tabular-nums',
+                contenido.length >= LARGO_MAXIMO_COMENTARIO ? 'text-red-500' : 'text-slate-400 dark:text-slate-500',
+              )}
+            >
+              {contenido.length.toLocaleString('es-DO')} / {LARGO_MAXIMO_COMENTARIO.toLocaleString('es-DO')}
+            </span>
+          )}
+          <Button type="submit" disabled={!contenido.trim() || guardando}>
+            {guardando ? 'Enviando…' : 'Comentar'}
+          </Button>
+        </div>
       </div>
     </form>
   );
