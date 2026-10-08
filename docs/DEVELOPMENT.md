@@ -209,26 +209,77 @@ necesita apuntar a ese puerto — un único Proxy Host con dominio
 `app.ciguadev.com` + wildcard `*.ciguadev.com` (ver "Subdominios de
 tenant" más abajo), ambos al mismo puerto 8291.
 
+### Primera vez (provisionar el servidor)
+
 ```bash
-# en el servidor, primera vez
 cp .env.example .env   # completar con los valores reales de producción
 docker compose -f docker-compose.prod.yml up -d
+docker compose -f docker-compose.prod.yml exec api pnpm db:app-role        # una sola vez, antes del primer db:rls
+docker compose -f docker-compose.prod.yml exec api pnpm db:rls
+docker compose -f docker-compose.prod.yml exec api pnpm platform:bootstrap-admin   # una sola vez, primer super admin
+```
 
-# tras cada deploy con migración nueva
-docker compose -f docker-compose.prod.yml pull
-docker compose -f docker-compose.prod.yml up -d
+### Cada deploy — por escenario
+
+El PR/commit que agrega el cambio debería decir cuál de estos aplica (lo
+más común, por lejos, es el escenario 1). Antes de pullear en el
+servidor, esperar a que `CI` y `Deploy prod` terminen en verde en GitHub
+Actions (`gh run watch`) — pullear antes de tiempo trae la imagen vieja.
+
+**1. Solo código, sin cambios de `schema.prisma`** (el caso más común):
+
+```bash
+docker compose -f docker-compose.prod.yml pull api web
+docker compose -f docker-compose.prod.yml up -d api web
+```
+
+**2. Con migración nueva** (cambió `schema.prisma`) — además de lo de
+arriba:
+
+```bash
 docker compose -f docker-compose.prod.yml exec api pnpm prisma:migrate:deploy
+docker compose -f docker-compose.prod.yml exec api pnpm db:rls
 docker compose -f docker-compose.prod.yml exec api pnpm permisos:backfill
 ```
 
-`permisos:backfill` (idempotente, no rompe nada si no hay nada nuevo)
-siempre va después de migrar, no solo cuando "el PR agregó un permiso" —
-`prisma:migrate:deploy` solo aplica cambios de ESQUEMA; el catálogo de
-permisos y a qué rol se lo otorga (`PERMISOS_BASE`/`ROLES_BASE` en
-`roles-base.ts`) es dato de aplicación que la migración nunca siembra
-para tenants ya existentes (bug real reportado: permiso agregado al
-código + migración corrida, pero invisible en "Roles y permisos" hasta
-correr este script).
+- `db:rls` — correr **siempre** que la migración haya agregado una tabla
+  nueva con `tenantId` propio, y confirmar que el PR ya agregó esa tabla
+  al array de `backend/prisma/sql/enable-rls.sql` (si no está ahí, RLS no
+  la protege pase lo que pase — corregir el código antes, no alcanza con
+  migrar). Es idempotente (`DROP POLICY IF EXISTS` + `CREATE`), así que
+  correrlo también cuando la migración solo tocó columnas no hace daño.
+- `permisos:backfill` (idempotente, no rompe nada si no hay nada nuevo)
+  siempre va después de migrar, no solo cuando "el PR agregó un permiso"
+  — `prisma:migrate:deploy` solo aplica cambios de ESQUEMA; el catálogo
+  de permisos y a qué rol se lo otorga (`PERMISOS_BASE`/`ROLES_BASE` en
+  `roles-base.ts`) es dato de aplicación que la migración nunca siembra
+  para tenants ya existentes (bug real reportado: permiso agregado al
+  código + migración corrida, pero invisible en "Roles y permisos" hasta
+  correr este script).
+
+**3. El PR agrega su propio script de backfill de datos** (no solo de
+esquema) — pasa cuando una feature necesita migrar datos existentes, no
+solo crear columnas. Hoy en el repo hay varios de estos, cada uno atado
+a una feature puntual (`suscripciones:backfill`,
+`consumidor-final:backfill`, `correlativos:backfill`,
+`secciones-home:backfill`, `tenant-plan:backfill`,
+`mistareas:backfill`, `cuentas:backfill`,
+`configuraciones:backfill`, `notificaciones:plantillas-*:backfill`,
+`webhook-secrets:backfill`, ver `backend/package.json` para la lista
+completa) — **no se corren todos en cada deploy**, solo el que trae ese
+PR en particular, una vez, después de migrar:
+
+```bash
+docker compose -f docker-compose.prod.yml exec api pnpm <nombre-del-script>:backfill
+```
+
+### Verificación rápida (cualquier escenario)
+
+```bash
+docker compose -f docker-compose.prod.yml ps
+docker compose -f docker-compose.prod.yml logs --tail=50 api
+curl -s -o /dev/null -w "%{http_code}\n" https://app.ciguadev.com/api/docs
+```
 
 La imagen de `api` lleva `node_modules` completo (con devDependencies) a
 propósito — permite correr cualquier script operativo
