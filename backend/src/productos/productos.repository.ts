@@ -180,7 +180,7 @@ export class ProductosRepository {
           orderBy: { createdAt: 'asc' },
           select: {
             codigoBarras: true,
-            precios: { where: { listaPrecio: 'GENERAL', vigenteHasta: null }, select: { precioVenta: true }, take: 1 },
+            precios: { where: { listaPrecio: 'GENERAL', vigenteHasta: null }, select: { costo: true, precioVenta: true }, take: 1 },
             stock: { select: { cantidadActual: true } },
           },
         },

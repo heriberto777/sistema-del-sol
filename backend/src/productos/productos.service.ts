@@ -153,6 +153,7 @@ export class ProductosService {
       // antigua (variantes[0], ya viene ordenada createdAt asc) es la
       // "representativa" para el precio GENERAL de referencia. Código de
       // barras y stock, en cambio, se agregan sobre TODAS las variantes.
+      const costo = p.variantes[0]?.precios[0]?.costo;
       const precioGeneral = p.variantes[0]?.precios[0]?.precioVenta;
       const stockTotal = p.variantes.reduce(
         (acc, v) => acc + v.stock.reduce((a, s) => a + Number(s.cantidadActual), 0),
@@ -167,6 +168,7 @@ export class ProductosService {
         tipo: p.tipo,
         unidad: p.unidadMedida,
         itbis: Number(p.porcentajeItbis).toString(),
+        costo: costo !== undefined ? Number(costo).toFixed(2) : '',
         precioGeneral: precioGeneral !== undefined ? Number(precioGeneral).toFixed(2) : '',
         codigoBarras: codigosBarras,
         stockTotal: stockTotal.toString(),
@@ -182,6 +184,7 @@ export class ProductosService {
         { header: 'Tipo', key: 'tipo' },
         { header: 'Unidad', key: 'unidad' },
         { header: 'ITBIS %', key: 'itbis' },
+        { header: 'Costo', key: 'costo' },
         { header: 'Precio GENERAL', key: 'precioGeneral' },
         { header: 'Código de barras', key: 'codigoBarras', width: 20 },
         { header: 'Stock total', key: 'stockTotal' },
@@ -260,16 +263,23 @@ export class ProductosService {
     // contando en creados/actualizados Y en errores a la vez, lo cual es
     // correcto: el producto sí se tocó, pero el precio/código de barras
     // de esta fila no se pudo aplicar sin saber a cuál variante.
+    if (fila.costo !== undefined && fila.precioGeneral === undefined) {
+      throw new Error('Costo sin Precio GENERAL — no se puede calcular el margen sin un precio de venta');
+    }
+
     if (fila.precioGeneral !== undefined) {
       const varianteId = await this.variantesService.resolverObligatoria(productoId);
-      // Sin desglose costo/margen en una fila de importación masiva —
-      // costo = precioVenta (margen 0) es el punto de partida más simple;
-      // se refina después desde la pantalla de Precios si hace falta.
+      // Misma fórmula que PreciosService.crear (margen sobre costo, no
+      // sobre precio de venta) — sin "costo" en la fila, se mantiene el
+      // comportamiento de siempre: costo = precioVenta (margen 0), a
+      // refinar después desde la pantalla de Precios si hace falta.
+      const costo = fila.costo ?? fila.precioGeneral;
+      const margenPct = fila.costo !== undefined ? ((fila.precioGeneral - fila.costo) / fila.costo) * 100 : 0;
       await this.preciosRepository.crear({
         varianteId,
         listaPrecio: 'GENERAL',
-        costo: fila.precioGeneral,
-        margenPct: 0,
+        costo,
+        margenPct,
         precioVenta: fila.precioGeneral,
       });
     }

@@ -1643,10 +1643,16 @@ anterior por la UI, esa llamada explota con 400 y la fila queda en
 `errores`, aunque el nombre/categoría/código ya se hayan actualizado
 con éxito: comportamiento correcto, no un bug, ver el comentario en
 `ProductosService.importarFila`), y stock (se gestiona vía Inventario,
-nunca sobreescribiéndolo desde un catálogo). Cuando la fila trae
-`precioGeneral`, se crea un `Precio` con `costo = precioVenta` (margen
-0%) vía `PreciosRepository` — sin desglose de costo/margen en una fila
-plana, se refina después desde la pantalla de Precios si hace falta.
+nunca sobreescribiéndolo desde un catálogo — para stock inicial de una
+carga masiva nueva, el flujo recomendado es importar el catálogo sin
+stock y cargarlo después desde Conteo Físico). Cuando la fila trae
+`precioGeneral`, se crea un `Precio` vía `PreciosRepository`: con
+`costo` también presente en la fila, el margen se calcula con la misma
+fórmula que `PreciosService.crear` (`margenPct = (precioVenta - costo)
+/ costo * 100`); sin `costo`, se mantiene el comportamiento original
+(`costo = precioVenta`, margen 0%). `costo` sin `precioGeneral` en la
+misma fila es un error de fila (no hay precio de venta con el que
+calcular el margen).
 
 `PreciosRepository` se provee directo en `ProductosModule` (no
 importando `PreciosModule`) para que `ProductosService` pueda crear ese

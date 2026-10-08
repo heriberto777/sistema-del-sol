@@ -43,11 +43,21 @@ export class FilaImportarProductoDto {
   @Max(100)
   porcentajeItbis?: number;
 
-  @ApiProperty({ required: false, description: 'Si se manda, crea un Precio (lista GENERAL) con costo = precioVenta (margen 0) — refinar costo/margen después desde Precios' })
+  @ApiProperty({
+    required: false,
+    description:
+      'Si se manda, crea un Precio (lista GENERAL). Con "costo" también presente, el margen se calcula igual que en Precios; sin costo, costo = precioVenta (margen 0) — refinar después desde Precios',
+  })
   @IsOptional()
   @IsNumber()
   @Min(0)
   precioGeneral?: number;
+
+  @ApiProperty({ required: false, description: 'Requiere precioGeneral en la misma fila — el margen se calcula a partir de ambos, igual fórmula que PreciosService' })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  costo?: number;
 
   @ApiProperty({ required: false, description: 'Se asigna a la variante "por defecto" del producto — productos con variantes reales (Talla/Color) no son soportados por la importación masiva' })
   @IsOptional()

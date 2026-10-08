@@ -384,6 +384,27 @@ describe('ProductosService', () => {
       });
     });
 
+    it('crea el precio GENERAL con margen calculado cuando la fila trae costo + precioGeneral', async () => {
+      await service.importar({ productos: [{ codigo: 'P1', nombre: 'Producto', costo: 100, precioGeneral: 130 }] }, 'tenant-1');
+
+      expect(preciosRepository.crear).toHaveBeenCalledWith({
+        varianteId: 'variante-1',
+        listaPrecio: 'GENERAL',
+        costo: 100,
+        margenPct: 30,
+        precioVenta: 130,
+      });
+    });
+
+    it('rechaza la fila si trae costo sin precioGeneral', async () => {
+      const resumen = await service.importar({ productos: [{ codigo: 'P1', nombre: 'Producto', costo: 100 }] }, 'tenant-1');
+
+      expect(preciosRepository.crear).not.toHaveBeenCalled();
+      expect(resumen.errores).toEqual([
+        { codigo: 'P1', mensaje: 'Costo sin Precio GENERAL — no se puede calcular el margen sin un precio de venta' },
+      ]);
+    });
+
     it('asigna el código de barras a la variante por defecto cuando la fila lo trae', async () => {
       await service.importar({ productos: [{ codigo: 'P1', nombre: 'Producto', codigoBarras: '7501234567890' }] }, 'tenant-1');
 

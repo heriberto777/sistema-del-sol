@@ -56,6 +56,7 @@ export function ImportarProductosModal({ onImportado }: { onImportado: () => voi
         tipo: f.tipo as 'PRODUCTO' | 'SERVICIO' | undefined,
         unidadMedida: f.unidadMedida,
         porcentajeItbis: f.porcentajeItbis,
+        costo: f.costo,
         precioGeneral: f.precioGeneral,
         codigoBarras: f.codigoBarras,
       }));
@@ -73,9 +74,10 @@ export function ImportarProductosModal({ onImportado }: { onImportado: () => voi
   return (
     <div className="space-y-4">
       <p className="text-sm text-slate-500 dark:text-slate-400">
-        Subí un .xlsx con columnas <strong>Código</strong> y <strong>Nombre</strong> (mismas columnas que exporta "Exportar
-        Excel"). No se soportan productos COMBO, variantes de Talla/Color ni stock — esos se administran desde sus propias
-        pantallas.
+        Subí un .xlsx con las mismas columnas que exporta "Exportar Excel": <strong>Código</strong> y <strong>Nombre</strong>{' '}
+        son obligatorias; Categoría, Tipo, Unidad, ITBIS %, Costo, Precio GENERAL y Código de barras son opcionales. Si
+        mandás Costo junto con Precio GENERAL, el margen se calcula solo. No se soportan productos COMBO, variantes de
+        Talla/Color ni stock — para stock inicial, cargalo con Conteo Físico después de importar el catálogo.
       </p>
 
       <input
@@ -107,6 +109,7 @@ export function ImportarProductosModal({ onImportado }: { onImportado: () => voi
                   <th className="px-3 py-2 font-medium">Nombre</th>
                   <th className="px-3 py-2 font-medium">Categoría</th>
                   <th className="px-3 py-2 font-medium">Tipo</th>
+                  <th className="px-3 py-2 font-medium">Costo</th>
                   <th className="px-3 py-2 font-medium">Precio GENERAL</th>
                   <th className="px-3 py-2 font-medium">Errores</th>
                 </tr>
@@ -118,6 +121,7 @@ export function ImportarProductosModal({ onImportado }: { onImportado: () => voi
                     <td className="px-3 py-2 text-slate-700 dark:text-slate-300">{f.nombre || '—'}</td>
                     <td className="px-3 py-2 text-slate-700 dark:text-slate-300">{f.categoria ?? '—'}</td>
                     <td className="px-3 py-2 text-slate-700 dark:text-slate-300">{f.tipo ?? 'PRODUCTO'}</td>
+                    <td className="px-3 py-2 text-slate-700 dark:text-slate-300">{f.costo ?? '—'}</td>
                     <td className="px-3 py-2 text-slate-700 dark:text-slate-300">{f.precioGeneral ?? '—'}</td>
                     <td className="px-3 py-2 text-red-600">{f.errores.join('; ')}</td>
                   </tr>

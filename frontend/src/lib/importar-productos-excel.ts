@@ -5,6 +5,7 @@ export interface FilaProductoImportada {
   tipo?: string;
   unidadMedida?: string;
   porcentajeItbis?: number;
+  costo?: number;
   precioGeneral?: number;
   codigoBarras?: string;
   errores: string[];
@@ -20,6 +21,7 @@ const COLUMNAS: Record<string, keyof Omit<FilaProductoImportada, 'errores'>> = {
   'tipo': 'tipo',
   'unidad': 'unidadMedida',
   'itbis %': 'porcentajeItbis',
+  'costo': 'costo',
   'precio general': 'precioGeneral',
   'código de barras': 'codigoBarras',
   'codigo de barras': 'codigoBarras',
@@ -79,6 +81,7 @@ export async function parsearYValidarExcelProductos(archivo: File): Promise<Fila
     });
 
     const porcentajeItbis = celdaNumero(datos.porcentajeItbis);
+    const costo = celdaNumero(datos.costo);
     const precioGeneral = celdaNumero(datos.precioGeneral);
     const filaProducto: FilaProductoImportada = {
       codigo: celdaTexto(datos.codigo) ?? '',
@@ -87,6 +90,7 @@ export async function parsearYValidarExcelProductos(archivo: File): Promise<Fila
       tipo: celdaTexto(datos.tipo)?.toUpperCase(),
       unidadMedida: celdaTexto(datos.unidadMedida),
       porcentajeItbis,
+      costo,
       precioGeneral,
       codigoBarras: celdaTexto(datos.codigoBarras),
       errores: [],
@@ -104,6 +108,11 @@ export async function parsearYValidarExcelProductos(archivo: File): Promise<Fila
     }
     if (precioGeneral !== undefined && (Number.isNaN(precioGeneral) || precioGeneral < 0)) {
       filaProducto.errores.push('Precio GENERAL inválido (debe ser un número mayor o igual a 0)');
+    }
+    if (costo !== undefined && (Number.isNaN(costo) || costo < 0)) {
+      filaProducto.errores.push('Costo inválido (debe ser un número mayor o igual a 0)');
+    } else if (costo !== undefined && precioGeneral === undefined) {
+      filaProducto.errores.push('Costo sin Precio GENERAL — el margen no se puede calcular sin un precio de venta');
     }
 
     filas.push(filaProducto);
