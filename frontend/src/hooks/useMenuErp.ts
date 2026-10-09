@@ -5,9 +5,9 @@ import { DOMINIOS_MENU, UTILIDADES_GENERALES, esVisible, type DominioMenu } from
 /**
  * Filtra el esquema completo del menú (`menu-erp.ts`) contra los permisos y
  * módulos activos del usuario actual — mismo criterio que `gruposVisibles`
- * del Sidebar anterior, solo que acá filtra un nivel más adentro
- * (Dominio → Categoría → Ítem, no solo Grupo → Ítem). Compartido entre
- * `TopNavbar` (desktop) y `MobileMenuDrawer` para no duplicar la lógica.
+ * del Sidebar de 2 niveles anterior, solo que acá filtra un nivel más
+ * adentro (Dominio → Categoría → Ítem, no solo Grupo → Ítem). Usado por
+ * `SidebarErp`, el único componente de navegación (desktop y mobile).
  */
 export function useMenuErp() {
   const { tienePermiso, tieneModulo } = useAuth();
