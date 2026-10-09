@@ -41,7 +41,13 @@ import { FormasPago } from './pages/FormasPago';
 import { Reportes } from './pages/Reportes';
 import { Contabilidad } from './pages/Contabilidad';
 import { Nomina } from './pages/Nomina';
-import { RRHH } from './pages/RRHH';
+import { Puestos } from './pages/Puestos';
+import { PlantillasHorario } from './pages/PlantillasHorario';
+import { Feriados } from './pages/Feriados';
+import { TiposAusencia } from './pages/TiposAusencia';
+import { Asistencia } from './pages/Asistencia';
+import { Ausencias } from './pages/Ausencias';
+import { HorariosEmpleado } from './pages/HorariosEmpleado';
 import { Pos } from './pages/Pos';
 import { PosCaja } from './pages/PosCaja';
 import { Ia } from './pages/Ia';
@@ -253,7 +259,13 @@ const RUTAS_ADMIN = [
           { path: '/publicaciones-sociales', element: <PublicacionesSociales /> },
           { path: '/tienda-online', element: <TiendaOnline /> },
           { path: '/nomina', element: <Nomina /> },
-          { path: '/rrhh', element: <RRHH /> },
+          { path: '/puestos', element: <Puestos /> },
+          { path: '/plantillas-horario', element: <PlantillasHorario /> },
+          { path: '/feriados', element: <Feriados /> },
+          { path: '/tipos-ausencia', element: <TiposAusencia /> },
+          { path: '/asistencia', element: <Asistencia /> },
+          { path: '/ausencias', element: <Ausencias /> },
+          { path: '/horarios-empleado', element: <HorariosEmpleado /> },
           { path: '/pos', element: <Pos /> },
           { path: '/ia', element: <Ia /> },
           { path: '/notificaciones', element: <Notificaciones /> },

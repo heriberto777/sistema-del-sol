@@ -53,18 +53,21 @@ export const DOMINIOS_MENU: DominioMenu[] = [
     icono: Receipt,
     categorias: [
       {
+        // Solo lo que describe CÓMO se vende y a quién — qué ES un producto
+        // (Productos/Categorías/Niveles de precio/Atributos) vive en
+        // Inventario, es el mismo maestro de artículos sin importar el canal
+        // de venta. Auditoría de organización del menú (pedido explícito del
+        // usuario, comparando contra cómo generan/mantienen cada dato).
         categoria: 'catalogos',
         items: [
-          { id: 'productos', etiqueta: 'Productos', ruta: '/productos', permisos: ['precios.ver'], modulo: 'productos' },
-          { id: 'categorias', etiqueta: 'Categorías', ruta: '/categorias', permisos: ['precios.ver'] },
-          { id: 'niveles-precio', etiqueta: 'Niveles de precio', ruta: '/niveles-precio', permisos: ['precios.ver'] },
-          { id: 'atributos', etiqueta: 'Atributos', ruta: '/atributos', permisos: ['precios.ver'] },
           { id: 'ofertas', etiqueta: 'Ofertas', ruta: '/ofertas', permisos: ['ofertas.ver'] },
           { id: 'bonos', etiqueta: 'Bonos', ruta: '/bonos', permisos: ['bonos.ver'] },
-          { id: 'lealtad', etiqueta: 'Lealtad', ruta: '/lealtad', permisos: ['lealtad.ver'] },
           { id: 'formas-pago', etiqueta: 'Formas de pago', ruta: '/formas-pago', permisos: ['admin.configuracion'] },
           { id: 'cajas', etiqueta: 'Cajas', ruta: '/cajas', permisos: ['pos.ver'] },
           { id: 'clientes', etiqueta: 'Clientes', ruta: '/contactos', permisos: ['clientes.ver', 'compras.ver'] },
+          // Antes vivía en Seguridad y Administración — no tiene nada que
+          // ver con seguridad, es dato de Ventas/CRM igual que Clientes.
+          { id: 'categorias-cliente', etiqueta: 'Categorías de cliente', ruta: '/categorias-cliente', permisos: ['clientes.ver'] },
         ],
       },
       {
@@ -93,6 +96,10 @@ export const DOMINIOS_MENU: DominioMenu[] = [
           { id: 'ncf', etiqueta: 'NCF', ruta: '/ncf', permisos: ['admin.configuracion'] },
           { id: 'consecutivos', etiqueta: 'Consecutivos', ruta: '/consecutivos', permisos: ['admin.configuracion'] },
           { id: 'autorizaciones', etiqueta: 'Autorizaciones', ruta: '/autorizaciones', permisos: ['admin.configuracion'] },
+          // Antes en Catálogos — es un único formulario de parámetros
+          // (monto por punto, mínimo para canjear), apagado por defecto, no
+          // un listado que se visite seguido. Eso es Configuración.
+          { id: 'lealtad', etiqueta: 'Lealtad', ruta: '/lealtad', permisos: ['lealtad.ver'] },
         ],
       },
     ],
@@ -120,13 +127,29 @@ export const DOMINIOS_MENU: DominioMenu[] = [
     etiqueta: 'Inventario',
     icono: Boxes,
     categorias: [
-      { categoria: 'catalogos', items: [{ id: 'bodegas', etiqueta: 'Bodegas (Sucursales)', ruta: '/sucursales', permisos: ['sucursales.ver'] }] },
+      {
+        // Maestro de artículos — qué ES un producto y su estructura, sin
+        // importar si se vende por Facturación, POS o la Tienda Online.
+        // Antes vivían en Ventas; se mudaron acá (auditoría de
+        // organización del menú, pedido explícito del usuario).
+        categoria: 'catalogos',
+        items: [
+          { id: 'productos', etiqueta: 'Productos', ruta: '/productos', permisos: ['precios.ver'], modulo: 'productos' },
+          { id: 'categorias', etiqueta: 'Categorías', ruta: '/categorias', permisos: ['precios.ver'] },
+          { id: 'niveles-precio', etiqueta: 'Niveles de precio', ruta: '/niveles-precio', permisos: ['precios.ver'] },
+          { id: 'atributos', etiqueta: 'Atributos', ruta: '/atributos', permisos: ['precios.ver'] },
+          { id: 'bodegas', etiqueta: 'Bodegas (Sucursales)', ruta: '/sucursales', permisos: ['sucursales.ver'] },
+        ],
+      },
       {
         categoria: 'transacciones',
         items: [
           { id: 'ajuste', etiqueta: 'Ajuste de inventario', ruta: '/inventario', permisos: ['inventario.ajustar'], modulo: 'inventario' },
           { id: 'transferencia', etiqueta: 'Transferencia entre bodegas', ruta: '/inventario', permisos: ['inventario.transferir'], modulo: 'inventario' },
           { id: 'conteo', etiqueta: 'Conteo físico', ruta: '/inventario/conteos', permisos: ['inventario.contar'], modulo: 'inventario' },
+          // Antes en Configuración — es una acción (generar e imprimir en
+          // lote), no un ajuste de una vez.
+          { id: 'etiquetas', etiqueta: 'Etiquetas de código de barras', ruta: '/productos/etiquetas', permisos: ['precios.ver'], modulo: 'productos' },
         ],
       },
       {
@@ -137,7 +160,7 @@ export const DOMINIOS_MENU: DominioMenu[] = [
         ],
       },
       { categoria: 'reportes', items: [{ id: 'reportes-inventario', etiqueta: 'Inventario y rotación', ruta: '/reportes', permisos: ['reportes.ver'] }] },
-      { categoria: 'configuracion', items: [{ id: 'etiquetas', etiqueta: 'Etiquetas de código de barras', ruta: '/productos/etiquetas', permisos: ['precios.ver'], modulo: 'productos' }] },
+      { categoria: 'configuracion', items: [] },
     ],
   },
   {
@@ -147,7 +170,15 @@ export const DOMINIOS_MENU: DominioMenu[] = [
     categorias: [
       {
         categoria: 'catalogos',
-        items: [{ id: 'cuentas-bancarias', etiqueta: 'Cuentas bancarias', ruta: '/bancos', permisos: ['bancos.ver'], modulo: 'bancos' }],
+        items: [
+          { id: 'cuentas-bancarias', etiqueta: 'Cuentas bancarias', ruta: '/bancos', permisos: ['bancos.ver'], modulo: 'bancos' },
+          // Antes en Configuración — el propio backend lo llama "catálogo
+          // manual de tasas de cambio" en su propio comentario de código.
+          { id: 'tasas-cambio', etiqueta: 'Tasas de cambio', ruta: '/tasas-cambio', permisos: ['facturacion.crear'] },
+          // Faltaba del todo — Contabilidad.tsx tiene esta pestaña y no
+          // tenía ninguna entrada de menú (hallazgo de la auditoría).
+          { id: 'catalogo-cuentas', etiqueta: 'Catálogo de cuentas', ruta: '/contabilidad', permisos: ['contabilidad.ver'] },
+        ],
       },
       {
         categoria: 'transacciones',
@@ -160,7 +191,7 @@ export const DOMINIOS_MENU: DominioMenu[] = [
       },
       { categoria: 'consultas', items: [{ id: 'libro-mayor', etiqueta: 'Libro diario / mayor', ruta: '/contabilidad', permisos: ['contabilidad.ver'] }] },
       { categoria: 'reportes', items: [{ id: 'reportes-financieros', etiqueta: 'Fiscales DGII y financieros', ruta: '/reportes', permisos: ['reportes.ver'] }] },
-      { categoria: 'configuracion', items: [{ id: 'tasas-cambio', etiqueta: 'Tasas de cambio', ruta: '/tasas-cambio', permisos: ['facturacion.crear'] }] },
+      { categoria: 'configuracion', items: [] },
     ],
   },
   {
@@ -168,17 +199,38 @@ export const DOMINIOS_MENU: DominioMenu[] = [
     etiqueta: 'Nómina y RRHH',
     icono: Users,
     categorias: [
-      { categoria: 'catalogos', items: [{ id: 'empleados', etiqueta: 'Empleados y puestos', ruta: '/rrhh', permisos: ['rrhh.ver'], modulo: 'nomina' }] },
+      {
+        // "Empleados" vive en /nomina (tab propio de Nomina.tsx), NO en
+        // /rrhh como tenía antes esta entrada — error real de ruta
+        // encontrado al auditar el código (RRHH.tsx no tiene ningún tab de
+        // empleados). Las otras 6 son RRHH.tsx disuelto en páginas propias,
+        // mismo criterio que Admin.tsx.
+        categoria: 'catalogos',
+        items: [
+          { id: 'empleados', etiqueta: 'Empleados', ruta: '/nomina', permisos: ['nomina.ver'], modulo: 'nomina' },
+          { id: 'puestos', etiqueta: 'Puestos', ruta: '/puestos', permisos: ['nomina.ver'], modulo: 'nomina' },
+          { id: 'plantillas-horario', etiqueta: 'Plantillas de horario', ruta: '/plantillas-horario', permisos: ['rrhh.ver'], modulo: 'nomina' },
+          { id: 'feriados', etiqueta: 'Feriados', ruta: '/feriados', permisos: ['rrhh.ver'], modulo: 'nomina' },
+        ],
+      },
       {
         categoria: 'transacciones',
         items: [
           { id: 'procesar-nomina', etiqueta: 'Procesar nómina', ruta: '/nomina', permisos: ['nomina.editar'], modulo: 'nomina' },
-          { id: 'asistencia', etiqueta: 'Marcar asistencia', ruta: '/rrhh', permisos: ['rrhh.editar'], modulo: 'nomina' },
+          { id: 'horarios-empleado', etiqueta: 'Asignar horarios', ruta: '/horarios-empleado', permisos: ['rrhh.ver'], modulo: 'nomina' },
+          { id: 'asistencia', etiqueta: 'Marcar asistencia', ruta: '/asistencia', permisos: ['rrhh.ver'], modulo: 'nomina' },
+          { id: 'ausencias', etiqueta: 'Registrar ausencia', ruta: '/ausencias', permisos: ['rrhh.ver'], modulo: 'nomina' },
         ],
       },
       { categoria: 'consultas', items: [{ id: 'historial-nomina', etiqueta: 'Historial de nómina', ruta: '/nomina', permisos: ['nomina.ver'], modulo: 'nomina' }] },
       { categoria: 'reportes', items: [{ id: 'reportes-nomina', etiqueta: 'Nómina y asistencia', ruta: '/reportes', permisos: ['reportes.ver'] }] },
-      { categoria: 'configuracion', items: [] },
+      {
+        // "Tipos de ausencia" — el propio componente se llama
+        // TiposAusenciaConfigPanel, define reglas (si descuenta de la
+        // nómina), no es un listado que se visite seguido.
+        categoria: 'configuracion',
+        items: [{ id: 'tipos-ausencia', etiqueta: 'Tipos de ausencia', ruta: '/tipos-ausencia', permisos: ['rrhh.ver'], modulo: 'nomina' }],
+      },
     ],
   },
   {
@@ -186,7 +238,7 @@ export const DOMINIOS_MENU: DominioMenu[] = [
     etiqueta: 'Seguridad y Administración',
     icono: ShieldCheck,
     categorias: [
-      { categoria: 'catalogos', items: [{ id: 'categorias-cliente', etiqueta: 'Categorías de cliente', ruta: '/categorias-cliente', permisos: ['clientes.ver'] }] },
+      { categoria: 'catalogos', items: [] },
       { categoria: 'transacciones', items: [] },
       { categoria: 'consultas', items: [] },
       { categoria: 'reportes', items: [] },
