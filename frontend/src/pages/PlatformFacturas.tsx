@@ -395,76 +395,61 @@ export function PlatformFacturas() {
             contadores={{ VENCIDA: resumen?.cartera.cantidadVencidas, PENDIENTE: resumen?.cartera.cantidadPendientes }}
           />
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-slate-50 text-slate-500 dark:bg-slate-900/60 dark:text-slate-400">
-              <tr>
-                <th className="px-5 py-3 font-medium">Tenant</th>
-                <th className="px-5 py-3 font-medium">Concepto</th>
-                <th className="px-5 py-3 text-right font-medium">Monto</th>
-                <th className="px-5 py-3 text-right font-medium">Desc.</th>
-                <th className="px-5 py-3 text-right font-medium">ITBIS</th>
-                <th className="px-5 py-3 text-right font-medium">Mora</th>
-                <th className="px-5 py-3 text-right font-medium">Total</th>
-                <th className="px-5 py-3 font-medium">Vence</th>
-                <th className="px-5 py-3 font-medium">Estado</th>
-                <th className="px-5 py-3 font-medium">NCF</th>
-                <th className="px-5 py-3"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {facturas?.datos.map((factura) => {
-                const vencida = factura.estado === 'VENCIDA';
-                const resuelta = factura.estado === 'PAGADA' || factura.estado === 'ANULADA';
-                return (
-                  <tr key={factura.id} className={clsx('hover:bg-slate-50 dark:hover:bg-slate-800/40', resuelta && 'opacity-60')}>
-                    <td className="px-5 py-3 font-medium text-slate-900 dark:text-slate-100">{factura.tenant.nombre}</td>
-                    <td className="px-5 py-3 text-slate-600 dark:text-slate-400">{factura.concepto}</td>
-                    <td className="px-5 py-3 text-right font-mono">{Number(factura.monto).toLocaleString('es-DO', { minimumFractionDigits: 2 })}</td>
-                    <td className="px-5 py-3 text-right font-mono">
-                      {Number(factura.descuento) > 0 ? (
-                        <span className="text-emerald-600 dark:text-emerald-400">-{Number(factura.descuento).toLocaleString('es-DO', { minimumFractionDigits: 2 })}</span>
-                      ) : (
-                        <span className="text-slate-400">0.00</span>
-                      )}
-                    </td>
-                    <td className="px-5 py-3 text-right font-mono text-slate-600 dark:text-slate-400">
-                      {Number(factura.itbis).toLocaleString('es-DO', { minimumFractionDigits: 2 })}
-                    </td>
-                    <td className="px-5 py-3 text-right font-mono">
-                      {Number(factura.montoMora) > 0 ? (
-                        <span className="text-red-600 dark:text-red-400">{Number(factura.montoMora).toLocaleString('es-DO', { minimumFractionDigits: 2 })}</span>
-                      ) : (
-                        <span className="text-slate-400">0.00</span>
-                      )}
-                    </td>
-                    <td className="px-5 py-3 text-right font-mono font-semibold text-slate-900 dark:text-slate-100">
-                      RD$ {Number(factura.total).toLocaleString('es-DO', { minimumFractionDigits: 2 })}
-                    </td>
-                    <td className={clsx('px-5 py-3 font-mono text-xs', vencida ? 'font-semibold text-red-600 dark:text-red-400' : 'text-slate-500 dark:text-slate-400')}>
-                      {new Date(factura.fechaVencimiento).toLocaleDateString('es-DO')}
-                    </td>
-                    <td className="px-5 py-3">
-                      <Badge tono={TONO_POR_ESTADO[factura.estado]}>{factura.estado}</Badge>
-                    </td>
-                    <td className="px-5 py-3 font-mono text-xs text-slate-500 dark:text-slate-400">{factura.ncf ?? <span className="text-slate-400">—</span>}</td>
-                    <td className="px-5 py-3">
-                      <Button variante="secundario" onClick={() => setFacturaAbierta(factura)}>
-                        Ver
-                      </Button>
-                    </td>
-                  </tr>
-                );
-              })}
-              {facturas?.datos.length === 0 && (
-                <tr>
-                  <td colSpan={11} className="px-5 py-6 text-center text-slate-400">
-                    No hay facturas con ese filtro.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+        <div className="divide-y divide-slate-100 dark:divide-slate-800">
+          {facturas?.datos.map((factura) => {
+            const vencida = factura.estado === 'VENCIDA';
+            const resuelta = factura.estado === 'PAGADA' || factura.estado === 'ANULADA';
+            // El concepto completo (con "— Módulos: ...") puede ser larguísimo —
+            // acá solo se muestra el plan/período; el detalle completo sigue
+            // disponible en el título del modal "Ver" y en el PDF real.
+            const conceptoCorto = factura.concepto.split(' — Módulos:')[0];
+            return (
+              <div
+                key={factura.id}
+                className={clsx(
+                  'flex flex-col gap-3 px-5 py-4 hover:bg-slate-50 dark:hover:bg-slate-800/40 sm:flex-row sm:items-center sm:justify-between',
+                  resuelta && 'opacity-60',
+                )}
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="font-medium text-slate-900 dark:text-slate-100">{factura.tenant.nombre}</p>
+                    <Badge tono={TONO_POR_ESTADO[factura.estado]}>{factura.estado}</Badge>
+                  </div>
+                  <p className="mt-0.5 truncate text-sm text-slate-600 dark:text-slate-400" title={factura.concepto}>
+                    {conceptoCorto}
+                  </p>
+                  <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 font-mono text-xs text-slate-500 dark:text-slate-400">
+                    <span>Monto {Number(factura.monto).toLocaleString('es-DO', { minimumFractionDigits: 2 })}</span>
+                    {Number(factura.descuento) > 0 && (
+                      <span className="text-emerald-600 dark:text-emerald-400">
+                        Desc. -{Number(factura.descuento).toLocaleString('es-DO', { minimumFractionDigits: 2 })}
+                      </span>
+                    )}
+                    {Number(factura.itbis) > 0 && <span>ITBIS {Number(factura.itbis).toLocaleString('es-DO', { minimumFractionDigits: 2 })}</span>}
+                    {Number(factura.montoMora) > 0 && (
+                      <span className="text-red-600 dark:text-red-400">Mora {Number(factura.montoMora).toLocaleString('es-DO', { minimumFractionDigits: 2 })}</span>
+                    )}
+                    <span>{factura.ncf ?? 'Sin NCF'}</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between gap-4 sm:flex-col sm:items-end sm:justify-center sm:gap-0.5">
+                  <p className="font-mono text-lg font-semibold text-slate-900 dark:text-slate-100">
+                    RD$ {Number(factura.total).toLocaleString('es-DO', { minimumFractionDigits: 2 })}
+                  </p>
+                  <p className={clsx('font-mono text-xs', vencida ? 'font-semibold text-red-600 dark:text-red-400' : 'text-slate-500 dark:text-slate-400')}>
+                    Vence {new Date(factura.fechaVencimiento).toLocaleDateString('es-DO')}
+                  </p>
+                </div>
+
+                <Button variante="secundario" onClick={() => setFacturaAbierta(factura)}>
+                  Ver
+                </Button>
+              </div>
+            );
+          })}
+          {facturas?.datos.length === 0 && <p className="px-5 py-6 text-center text-slate-400">No hay facturas con ese filtro.</p>}
         </div>
         {facturas && (
           <div className="px-5 py-3">

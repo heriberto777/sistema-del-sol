@@ -26,7 +26,7 @@ interface Tenant {
   logo: string | null;
   estado: 'ACTIVO' | 'SUSPENDIDO' | 'CANCELADO';
   planId: string | null;
-  plan: { id: string; nombre: string } | null;
+  plan: { id: string; nombre: string; precio: string; cicloFacturacion: 'MENSUAL' | 'ANUAL' } | null;
   modulosOverride: { activo: boolean; modulo: { clave: string; nombre: string } }[];
   suscripcion: { fechaProximoCorte: string } | null;
   createdAt: string;
@@ -36,6 +36,8 @@ interface Plan {
   id: string;
   nombre: string;
   descripcion: string | null;
+  precio: string;
+  cicloFacturacion: 'MENSUAL' | 'ANUAL';
   activo: boolean;
 }
 
@@ -784,11 +786,23 @@ function ModalCambiarPlan({ tenant, planes, onClose }: { tenant: Tenant; planes:
     onError: (err) => setError(mensajeErrorApi(err, 'No se pudo cambiar el plan.')),
   });
 
+  // Cambiar el plan actualiza precio/ciclo de inmediato para la PRÓXIMA
+  // factura, pero nunca adelanta ni atrasa `fechaProximoCorte` (a propósito,
+  // ver TenantsRepository.actualizar) — si el ciclo cambia (mensual↔anual),
+  // esa próxima factura sale en la fecha YA agendada, con el ciclo viejo,
+  // pero ya cobrando el precio del plan nuevo. Sin este aviso, un admin
+  // cambiando de mensual a anual puede sorprenderse si la próxima factura
+  // (agendada para "el mes que viene") cobra de golpe el precio anual
+  // completo en vez de esperar un año (caso real, tenant CIGUADR).
+  const planNuevo = planes.find((p) => p.id === planId) ?? (tenant.plan?.id === planId ? tenant.plan : undefined);
+  const cambiaCiclo = Boolean(tenant.plan && planNuevo && planId !== tenant.planId && planNuevo.cicloFacturacion !== tenant.plan.cicloFacturacion);
+
   return (
     <Modal titulo={`Cambiar plan — ${tenant.nombre}`} onClose={onClose}>
       <div className="space-y-4">
         <p className="text-sm text-slate-500 dark:text-slate-400">
           Plan actual: <span className="font-medium text-slate-700 dark:text-slate-300">{tenant.plan?.nombre ?? 'Sin plan'}</span>
+          {tenant.plan && ` (${ETIQUETA_CICLO[tenant.plan.cicloFacturacion]})`}
         </p>
         <div>
           <label htmlFor="cambiar-plan-select" className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
@@ -800,14 +814,34 @@ function ModalCambiarPlan({ tenant, planes, onClose }: { tenant: Tenant; planes:
             </option>
             {planes.map((plan) => (
               <option key={plan.id} value={plan.id}>
-                {plan.nombre}
+                {plan.nombre} ({ETIQUETA_CICLO[plan.cicloFacturacion]})
               </option>
             ))}
             {tenant.plan && !planes.some((p) => p.id === tenant.plan!.id) && (
-              <option value={tenant.plan.id}>{tenant.plan.nombre} (inactivo)</option>
+              <option value={tenant.plan.id}>
+                {tenant.plan.nombre} (inactivo, {ETIQUETA_CICLO[tenant.plan.cicloFacturacion]})
+              </option>
             )}
           </Select>
         </div>
+
+        {cambiaCiclo && planNuevo && (
+          <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-300">
+            <p className="font-medium">Este cambio pasa de facturación {ETIQUETA_CICLO[tenant.plan!.cicloFacturacion]} a {ETIQUETA_CICLO[planNuevo.cicloFacturacion]}.</p>
+            <p className="mt-1">
+              La fecha de corte no se mueve
+              {tenant.suscripcion && (
+                <>
+                  {' '}
+                  (sigue agendada para el <strong>{new Date(tenant.suscripcion.fechaProximoCorte).toLocaleDateString('es-DO')}</strong>)
+                </>
+              )}
+              , pero esa próxima factura ya va a cobrar el precio completo del plan nuevo: RD$ {Number(planNuevo.precio).toLocaleString('es-DO')} /{' '}
+              {ETIQUETA_CICLO[planNuevo.cicloFacturacion]}.
+            </p>
+          </div>
+        )}
+
         {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
         <Button
           className="w-full"
