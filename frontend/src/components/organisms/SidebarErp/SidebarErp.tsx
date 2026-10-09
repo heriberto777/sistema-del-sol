@@ -1,30 +1,47 @@
 import { useEffect, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { ChevronRight, ExternalLink } from 'lucide-react';
+import { ChevronRight, ChevronsLeft, ChevronsRight, ExternalLink } from 'lucide-react';
 import clsx from 'clsx';
 import { useAuth } from '../../../hooks/useAuth';
 import { useMenuErp } from '../../../hooks/useMenuErp';
 import { useUrlTiendaPublica } from '../../../hooks/useUrlTiendaPublica';
 import { ETIQUETA_CATEGORIA_ERP, type CategoriaErp, type DominioMenu, type ItemMenu } from '../../../config/menu-erp';
 
-const CLAVE_DOMINIOS_ABIERTOS = 'sol_sidebar_dominios_abiertos';
-const CLAVE_CATEGORIAS_ABIERTAS = 'sol_sidebar_categorias_abiertas';
+const CLAVE_DOMINIO_ABIERTO = 'sol_sidebar_dominio_abierto';
+const CLAVE_CATEGORIA_ABIERTA = 'sol_sidebar_categoria_abierta';
+const CLAVE_COLAPSADO = 'sol_sidebar_colapsado';
 const ORDEN_CATEGORIAS: CategoriaErp[] = ['catalogos', 'transacciones', 'consultas', 'reportes', 'configuracion'];
 
-function leerSet(clave: string): Set<string> {
+function leerString(clave: string): string | null {
   try {
-    const raw = localStorage.getItem(clave);
-    return raw ? new Set(JSON.parse(raw) as string[]) : new Set();
+    return localStorage.getItem(clave);
   } catch {
-    return new Set();
+    return null;
   }
 }
 
-function escribirSet(clave: string, valor: Set<string>) {
+function escribirString(clave: string, valor: string | null) {
   try {
-    localStorage.setItem(clave, JSON.stringify(Array.from(valor)));
+    if (valor === null) localStorage.removeItem(clave);
+    else localStorage.setItem(clave, valor);
   } catch {
     // localStorage deshabilitado — el estado sigue funcionando en memoria para esta sesión.
+  }
+}
+
+function leerBooleano(clave: string): boolean {
+  try {
+    return localStorage.getItem(clave) === 'true';
+  } catch {
+    return false;
+  }
+}
+
+function escribirBooleano(clave: string, valor: boolean) {
+  try {
+    localStorage.setItem(clave, String(valor));
+  } catch {
+    // localStorage deshabilitado — el colapso sigue funcionando en memoria para esta sesión.
   }
 }
 
@@ -41,12 +58,12 @@ function ubicarRutaActiva(pathname: string, dominios: DominioMenu[]): { dominioI
 }
 
 /**
- * Sidebar ERP — acordeón real de 3 niveles (Dominio → Categoría →
- * Ítem, los 3 colapsables), reemplaza al navbar superior con flyout
- * (quedaba cortado por el scroll horizontal del contenedor — Modelo A
- * validado con el usuario sobre un artifact antes de implementarlo).
- * Un solo componente para desktop y mobile (`forzarExpandido`/`onNavegar`),
- * mismo criterio que el Sidebar original de 2 niveles.
+ * Sidebar ERP — acordeón real de 3 niveles (Dominio → Categoría → Ítem),
+ * reemplaza al navbar superior con flyout (quedaba cortado por el scroll
+ * horizontal del contenedor). Acordeón EXCLUSIVO a propósito en los dos
+ * niveles de grupo: abrir un dominio cierra el que estuviera abierto antes
+ * (y lo mismo entre categorías de un mismo dominio) — pedido explícito del
+ * usuario tras ver que Ventas y Compras quedaban abiertas a la vez.
  */
 export function SidebarErp({ onNavegar }: { onNavegar?: () => void } = {}) {
   const { usuario } = useAuth();
@@ -54,41 +71,54 @@ export function SidebarErp({ onNavegar }: { onNavegar?: () => void } = {}) {
   const urlTienda = useUrlTiendaPublica();
   const location = useLocation();
 
-  const [dominiosAbiertos, setDominiosAbiertos] = useState<Set<string>>(() => {
-    const persistidos = leerSet(CLAVE_DOMINIOS_ABIERTOS);
+  const [colapsado, setColapsado] = useState(leerBooleano(CLAVE_COLAPSADO));
+  const [dominioAbierto, setDominioAbierto] = useState<string | null>(() => {
     const activo = ubicarRutaActiva(location.pathname, dominios);
-    return activo ? new Set(persistidos).add(activo.dominioId) : persistidos;
+    return activo?.dominioId ?? leerString(CLAVE_DOMINIO_ABIERTO);
   });
-  const [categoriasAbiertas, setCategoriasAbiertas] = useState<Set<string>>(() => {
-    const persistidos = leerSet(CLAVE_CATEGORIAS_ABIERTAS);
+  const [categoriaAbierta, setCategoriaAbierta] = useState<string | null>(() => {
     const activo = ubicarRutaActiva(location.pathname, dominios);
-    return activo ? new Set(persistidos).add(activo.claveCategoria) : persistidos;
+    return activo?.claveCategoria ?? leerString(CLAVE_CATEGORIA_ABIERTA);
   });
 
   useEffect(() => {
     const activo = ubicarRutaActiva(location.pathname, dominios);
     if (!activo) return;
-    setDominiosAbiertos((prev) => (prev.has(activo.dominioId) ? prev : new Set(prev).add(activo.dominioId)));
-    setCategoriasAbiertas((prev) => (prev.has(activo.claveCategoria) ? prev : new Set(prev).add(activo.claveCategoria)));
+    setDominioAbierto(activo.dominioId);
+    setCategoriaAbierta(activo.claveCategoria);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.pathname]);
 
+  function alternarColapsado() {
+    setColapsado((prev) => {
+      const siguiente = !prev;
+      escribirBooleano(CLAVE_COLAPSADO, siguiente);
+      return siguiente;
+    });
+  }
+
   function alternarDominio(id: string) {
-    setDominiosAbiertos((prev) => {
-      const siguiente = new Set(prev);
-      if (siguiente.has(id)) siguiente.delete(id);
-      else siguiente.add(id);
-      escribirSet(CLAVE_DOMINIOS_ABIERTOS, siguiente);
+    // Clic en un dominio colapsado: expande el sidebar entero además de abrirlo — un colapsado no tiene
+    // espacio para mostrar categorías/ítems, así que no tendría sentido "abrirlo" sin expandir primero.
+    if (colapsado) {
+      setColapsado(false);
+      escribirBooleano(CLAVE_COLAPSADO, false);
+    }
+    setDominioAbierto((prev) => {
+      const siguiente = prev === id ? null : id;
+      escribirString(CLAVE_DOMINIO_ABIERTO, siguiente);
+      if (siguiente === null) {
+        setCategoriaAbierta(null);
+        escribirString(CLAVE_CATEGORIA_ABIERTA, null);
+      }
       return siguiente;
     });
   }
 
   function alternarCategoria(clave: string) {
-    setCategoriasAbiertas((prev) => {
-      const siguiente = new Set(prev);
-      if (siguiente.has(clave)) siguiente.delete(clave);
-      else siguiente.add(clave);
-      escribirSet(CLAVE_CATEGORIAS_ABIERTAS, siguiente);
+    setCategoriaAbierta((prev) => {
+      const siguiente = prev === clave ? null : clave;
+      escribirString(CLAVE_CATEGORIA_ABIERTA, siguiente);
       return siguiente;
     });
   }
@@ -110,26 +140,67 @@ export function SidebarErp({ onNavegar }: { onNavegar?: () => void } = {}) {
   }
 
   return (
-    <nav className="flex h-full w-72 shrink-0 flex-col gap-1 overflow-y-auto overflow-x-hidden border-r border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-950">
-      <div className="mb-4 flex items-center gap-2.5 px-2 pt-1">
+    <nav
+      className={clsx(
+        'sidebar-scroll flex h-full shrink-0 flex-col gap-1 overflow-y-auto overflow-x-hidden border-r border-slate-200 bg-white p-3 transition-[width] duration-150 dark:border-slate-800 dark:bg-slate-950',
+        colapsado ? 'w-[4.5rem]' : 'w-72',
+      )}
+    >
+      <div className={clsx('mb-3 flex items-center gap-2 pt-1', colapsado ? 'flex-col px-0' : 'px-2')}>
         {usuario?.tenant?.logo ? (
-          <img src={usuario.tenant.logo} alt={usuario.tenant.nombre} className="h-9 w-auto max-w-[9.5rem] shrink-0 rounded-lg object-contain shadow-sm" />
+          <img
+            src={usuario.tenant.logo}
+            alt={usuario.tenant.nombre}
+            className={clsx('shrink-0 rounded-lg object-contain shadow-sm', colapsado ? 'h-9 w-9 max-w-none' : 'h-9 w-auto max-w-[8rem]')}
+          />
         ) : (
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-sol-500 text-base font-bold text-white shadow-sm">S</div>
         )}
-        <div className="min-w-0">
-          <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">El Sistema del Sol</p>
-          {usuario?.tenant?.nombre && <p className="truncate text-xs text-slate-500 dark:text-slate-400">{usuario.tenant.nombre}</p>}
-        </div>
+        {!colapsado && (
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">El Sistema del Sol</p>
+            {usuario?.tenant?.nombre && <p className="truncate text-xs text-slate-500 dark:text-slate-400">{usuario.tenant.nombre}</p>}
+          </div>
+        )}
+        <button
+          type="button"
+          onClick={alternarColapsado}
+          title={colapsado ? 'Mostrar menú' : 'Ocultar menú'}
+          className="shrink-0 rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:text-slate-500 dark:hover:bg-slate-900 dark:hover:text-slate-300"
+        >
+          {colapsado ? <ChevronsRight size={15} /> : <ChevronsLeft size={15} />}
+        </button>
       </div>
 
-      {utilidades.map(renderItem)}
+      {utilidades.map((item) =>
+        colapsado ? (
+          <NavLink
+            key={item.id}
+            to={item.ruta}
+            end={item.ruta === '/'}
+            title={item.etiqueta}
+            onClick={onNavegar}
+            className={({ isActive }) =>
+              clsx(
+                'flex items-center justify-center rounded-lg py-2 text-xs font-semibold',
+                isActive
+                  ? 'bg-sol-50 text-sol-700 dark:bg-sol-900/40 dark:text-sol-300'
+                  : 'text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-900',
+              )
+            }
+          >
+            {item.etiqueta.slice(0, 2).toUpperCase()}
+          </NavLink>
+        ) : (
+          renderItem(item)
+        ),
+      )}
 
       {utilidades.length > 0 && dominios.length > 0 && <div className="my-1.5 border-t border-slate-100 dark:border-slate-800" />}
 
       {dominios.map((dominio) => {
         const Icono = dominio.icono;
-        const domAbierto = dominiosAbiertos.has(dominio.id);
+        const domAbierto = !colapsado && dominioAbierto === dominio.id;
         const categoriasPresentes = ORDEN_CATEGORIAS.map((k) => dominio.categorias.find((c) => c.categoria === k)).filter(
           (c): c is NonNullable<typeof c> => !!c,
         );
@@ -139,18 +210,26 @@ export function SidebarErp({ onNavegar }: { onNavegar?: () => void } = {}) {
             <button
               type="button"
               onClick={() => alternarDominio(dominio.id)}
-              className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm font-semibold text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-900"
+              title={colapsado ? dominio.etiqueta : undefined}
+              className={clsx(
+                'flex w-full items-center gap-2 rounded-lg py-2 text-left text-sm font-semibold text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-900',
+                colapsado ? 'justify-center px-0' : 'px-2.5',
+              )}
             >
               <Icono size={16} className="shrink-0 text-slate-400 dark:text-slate-500" />
-              <span className="min-w-0 flex-1 truncate">{dominio.etiqueta}</span>
-              <ChevronRight size={14} className={clsx('shrink-0 text-slate-400 transition-transform', domAbierto && 'rotate-90')} />
+              {!colapsado && (
+                <>
+                  <span className="min-w-0 flex-1 truncate">{dominio.etiqueta}</span>
+                  <ChevronRight size={14} className={clsx('shrink-0 text-slate-400 transition-transform', domAbierto && 'rotate-90')} />
+                </>
+              )}
             </button>
 
             {domAbierto && (
               <div className="ml-3 flex flex-col border-l border-slate-200 pl-2.5 dark:border-slate-800">
                 {categoriasPresentes.map((cat) => {
                   const clave = `${dominio.id}:${cat.categoria}`;
-                  const catAbierta = categoriasAbiertas.has(clave);
+                  const catAbierta = categoriaAbierta === clave;
                   return (
                     <div key={clave}>
                       <button
