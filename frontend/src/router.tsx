@@ -62,7 +62,21 @@ import { PropiedadesFavoritas } from './pages/inmobiliaria/PropiedadesFavoritas'
 import { ProyectoDetalle } from './pages/ProyectoDetalle';
 import { PublicacionesSociales } from './pages/PublicacionesSociales';
 import { TiendaOnline } from './pages/TiendaOnline';
-import { Admin } from './pages/Admin';
+import { Usuarios } from './pages/Usuarios';
+import { RolesPermisos } from './pages/RolesPermisos';
+import { DatosEmpresa } from './pages/DatosEmpresa';
+import { Ncf } from './pages/Ncf';
+import { Consecutivos } from './pages/Consecutivos';
+import { Autorizaciones } from './pages/Autorizaciones';
+import { PasarelaPago } from './pages/PasarelaPago';
+import { CategoriasCliente } from './pages/CategoriasCliente';
+import { LeyesFiscales } from './pages/LeyesFiscales';
+import { TasasCambio } from './pages/TasasCambio';
+import { Parametros } from './pages/Parametros';
+import { Documentos } from './pages/Documentos';
+import { Webhooks } from './pages/Webhooks';
+import { WhatsappConfig } from './pages/WhatsappConfig';
+import { CorreoConfig } from './pages/CorreoConfig';
 import { PlatformLogin } from './pages/PlatformLogin';
 import { PlatformDashboard } from './pages/PlatformDashboard';
 import { PlatformTenants } from './pages/PlatformTenants';
@@ -244,7 +258,21 @@ const RUTAS_ADMIN = [
           { path: '/ia', element: <Ia /> },
           { path: '/notificaciones', element: <Notificaciones /> },
           { path: '/mensajes', element: <Mensajes /> },
-          { path: '/admin', element: <Admin /> },
+          { path: '/categorias-cliente', element: <CategoriasCliente /> },
+          { path: '/leyes-fiscales', element: <LeyesFiscales /> },
+          { path: '/tasas-cambio', element: <TasasCambio /> },
+          { path: '/usuarios', element: <Usuarios /> },
+          { path: '/roles-permisos', element: <RolesPermisos /> },
+          { path: '/datos-empresa', element: <DatosEmpresa /> },
+          { path: '/ncf', element: <Ncf /> },
+          { path: '/consecutivos', element: <Consecutivos /> },
+          { path: '/autorizaciones', element: <Autorizaciones /> },
+          { path: '/pasarela-pago', element: <PasarelaPago /> },
+          { path: '/parametros', element: <Parametros /> },
+          { path: '/documentos', element: <Documentos /> },
+          { path: '/webhooks', element: <Webhooks /> },
+          { path: '/whatsapp-config', element: <WhatsappConfig /> },
+          { path: '/correo-config', element: <CorreoConfig /> },
         ],
       },
     ],
