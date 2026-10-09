@@ -4,6 +4,7 @@ import clsx from 'clsx';
 import {
   AlertTriangle,
   Barcode,
+  BadgePercent,
   BarChart3,
   Bell,
   BookOpen,
@@ -14,9 +15,12 @@ import {
   ChevronsRight,
   ClipboardCheck,
   Contact,
+  CreditCard,
   ExternalLink,
   FileText,
   FolderKanban,
+  FolderTree,
+  Gift,
   Globe,
   HandCoins,
   Handshake,
@@ -24,16 +28,20 @@ import {
   KeyRound,
   LayoutDashboard,
   Landmark,
+  Layers,
   ListChecks,
   type LucideIcon,
   Megaphone,
   MessageCircle,
+  Monitor,
   Plane,
   Receipt,
   RotateCcw,
   Settings,
   ShoppingBag,
+  SlidersHorizontal,
   Sparkles,
+  Star,
   Store,
   Tag,
   Truck,
@@ -140,6 +148,19 @@ const GRUPOS: Grupo[] = [
       // Sirve tanto a Ventas (clientes) como a Compras (proveedores) —
       // se prioriza acá por ser el uso más frecuente.
       { ruta: '/contactos', etiqueta: 'Contactos', icono: Contact, permisos: ['clientes.ver', 'compras.ver'] },
+      // Las siguientes 5 vivían como pestañas enterradas dentro de Admin
+      // (Sistema → Admin → sección → pestaña, 4 clics) sin relación con
+      // "configurar una vez y no tocar más" — son herramientas de uso
+      // diario de Ventas/POS. Antes todas exigían `admin.configuracion`
+      // ahí (más estricto que el permiso real del backend), dejando a un
+      // vendedor con `ofertas.ver`/`pos.ver` sin poder verlas ni en el
+      // menú ni en esa pestaña — ahora cada una pide el permiso real que
+      // ya exige su propio controller (auditoría de organización del Sidebar).
+      { ruta: '/ofertas', etiqueta: 'Ofertas', icono: BadgePercent, permisos: ['ofertas.ver'] },
+      { ruta: '/bonos', etiqueta: 'Bonos', icono: Gift, permisos: ['bonos.ver'] },
+      { ruta: '/lealtad', etiqueta: 'Lealtad', icono: Star, permisos: ['lealtad.ver'] },
+      { ruta: '/cajas', etiqueta: 'Cajas', icono: Monitor, permisos: ['pos.ver'] },
+      { ruta: '/formas-pago', etiqueta: 'Formas de pago', icono: CreditCard, permisos: ['admin.configuracion'] },
     ],
   },
   {
@@ -195,6 +216,12 @@ const GRUPOS: Grupo[] = [
       // Generación + impresión masiva de códigos de barra a través de
       // todo el catálogo — mismo permiso que ver Productos.
       { ruta: '/productos/etiquetas', etiqueta: 'Etiquetas de código de barras', icono: Barcode, permisos: ['precios.ver'], modulo: 'productos' },
+      // Mismo caso que Ofertas/Bonos/Lealtad arriba — vivían enterradas
+      // en Admin → Catálogo, separadas de Productos aunque se usan junto
+      // a él todo el tiempo (auditoría de organización del Sidebar).
+      { ruta: '/categorias', etiqueta: 'Categorías', icono: FolderTree, permisos: ['precios.ver'] },
+      { ruta: '/niveles-precio', etiqueta: 'Niveles de precio', icono: Layers, permisos: ['precios.ver'] },
+      { ruta: '/atributos', etiqueta: 'Atributos', icono: SlidersHorizontal, permisos: ['precios.ver'] },
     ],
   },
   {

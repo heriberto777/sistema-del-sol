@@ -10,18 +10,10 @@ import { NcfPanel } from '../components/organisms/NcfPanel/NcfPanel';
 import { TenantEmpresaPanel } from '../components/organisms/TenantEmpresaPanel/TenantEmpresaPanel';
 import { CorrelativosPanel } from '../components/organisms/CorrelativosPanel/CorrelativosPanel';
 import { PasarelaCobroConfigPanel } from '../components/organisms/PasarelaCobroConfigPanel/PasarelaCobroConfigPanel';
-import { FormasPagoPanel } from '../components/organisms/FormasPagoPanel/FormasPagoPanel';
-import { CategoriasPanel } from '../components/organisms/CategoriasPanel/CategoriasPanel';
-import { ListasPrecioPanel } from '../components/organisms/ListasPrecioPanel/ListasPrecioPanel';
-import { AtributosPanel } from '../components/organisms/AtributosPanel/AtributosPanel';
-import { OfertasPanel } from '../components/organisms/OfertasPanel/OfertasPanel';
-import { BonosPanel } from '../components/organisms/BonosPanel/BonosPanel';
 import { CategoriasClientePanel } from '../components/organisms/CategoriasClientePanel/CategoriasClientePanel';
 import { LeyesFiscalesPanel } from '../components/organisms/LeyesFiscalesPanel/LeyesFiscalesPanel';
 import { PersonalizacionDocumentosPanel } from '../components/organisms/PersonalizacionDocumentosPanel/PersonalizacionDocumentosPanel';
 import { AutorizacionesPanel } from '../components/organisms/AutorizacionesPanel/AutorizacionesPanel';
-import { LealtadPanel } from '../components/organisms/LealtadPanel/LealtadPanel';
-import { CajasPanel } from '../components/organisms/CajasPanel/CajasPanel';
 import { TasasCambioPanel } from '../components/organisms/TasasCambioPanel/TasasCambioPanel';
 import { useAuth } from '../hooks/useAuth';
 
@@ -52,15 +44,11 @@ const CATEGORIAS: Categoria[] = [
   {
     id: 'facturacion',
     etiqueta: 'Facturación',
-    descripcion: 'Numeraciones de NCF (comprobantes fiscales), formas de pago y bonos.',
+    descripcion: 'Numeraciones de NCF (comprobantes fiscales) y autorizaciones.',
     pestanas: [
       { id: 'empresa-fiscal', etiqueta: 'Datos de mi empresa', permiso: 'admin.configuracion', panel: TenantEmpresaPanel },
       { id: 'ncf', etiqueta: 'NCF', permiso: 'admin.configuracion', panel: NcfPanel },
       { id: 'consecutivos', etiqueta: 'Consecutivos', permiso: 'admin.configuracion', panel: CorrelativosPanel },
-      { id: 'formas-pago', etiqueta: 'Formas de pago', permiso: 'admin.configuracion', panel: FormasPagoPanel },
-      { id: 'cajas', etiqueta: 'Cajas', permiso: 'admin.configuracion', panel: CajasPanel },
-      { id: 'bonos', etiqueta: 'Bonos', permiso: 'admin.configuracion', panel: BonosPanel },
-      { id: 'lealtad', etiqueta: 'Lealtad', permiso: 'admin.configuracion', panel: LealtadPanel },
       { id: 'autorizaciones', etiqueta: 'Autorizaciones', permiso: 'admin.configuracion', panel: AutorizacionesPanel },
       { id: 'pasarela-cobro', etiqueta: 'Pasarela de pago', permiso: 'admin.configuracion', panel: PasarelaCobroConfigPanel },
     ],
@@ -68,13 +56,9 @@ const CATEGORIAS: Categoria[] = [
   {
     id: 'catalogo',
     etiqueta: 'Catálogo',
-    descripcion: 'Categorías de productos, niveles de precio, atributos de variantes y ofertas.',
+    descripcion: 'Categorías de cliente, leyes fiscales y tasas de cambio.',
     pestanas: [
-      { id: 'categorias', etiqueta: 'Categorías', permiso: 'admin.configuracion', panel: CategoriasPanel },
       { id: 'categorias-cliente', etiqueta: 'Categorías de cliente', permiso: 'admin.configuracion', panel: CategoriasClientePanel },
-      { id: 'listas-precio', etiqueta: 'Niveles de precio', permiso: 'admin.configuracion', panel: ListasPrecioPanel },
-      { id: 'atributos', etiqueta: 'Atributos', permiso: 'admin.configuracion', panel: AtributosPanel },
-      { id: 'ofertas', etiqueta: 'Ofertas', permiso: 'admin.configuracion', panel: OfertasPanel },
       { id: 'leyes-fiscales', etiqueta: 'Leyes fiscales', permiso: 'admin.configuracion', panel: LeyesFiscalesPanel },
       { id: 'tasas-cambio', etiqueta: 'Tasas de cambio', permiso: 'admin.configuracion', panel: TasasCambioPanel },
     ],
