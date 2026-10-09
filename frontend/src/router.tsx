@@ -30,6 +30,14 @@ import { Compras } from './pages/Compras';
 import { Contactos } from './pages/Contactos';
 import { Productos } from './pages/Productos';
 import { EtiquetasCodigoBarras } from './pages/EtiquetasCodigoBarras';
+import { Categorias } from './pages/Categorias';
+import { NivelesPrecio } from './pages/NivelesPrecio';
+import { Atributos } from './pages/Atributos';
+import { Ofertas } from './pages/Ofertas';
+import { Bonos } from './pages/Bonos';
+import { Lealtad } from './pages/Lealtad';
+import { Cajas } from './pages/Cajas';
+import { FormasPago } from './pages/FormasPago';
 import { Reportes } from './pages/Reportes';
 import { Contabilidad } from './pages/Contabilidad';
 import { Nomina } from './pages/Nomina';
@@ -197,6 +205,11 @@ const RUTAS_ADMIN = [
           { path: '/remisiones/nueva', element: <RemisionNueva /> },
           { path: '/remisiones/:id/editar', element: <RemisionEditar /> },
           { path: '/notas-credito', element: <NotasCredito /> },
+          { path: '/ofertas', element: <Ofertas /> },
+          { path: '/bonos', element: <Bonos /> },
+          { path: '/lealtad', element: <Lealtad /> },
+          { path: '/cajas', element: <Cajas /> },
+          { path: '/formas-pago', element: <FormasPago /> },
           { path: '/cuentas-por-cobrar', element: <CuentasPorCobrar /> },
           { path: '/cuentas-por-pagar', element: <CuentasPorPagar /> },
           { path: '/inventario', element: <Inventario /> },
@@ -209,6 +222,9 @@ const RUTAS_ADMIN = [
           { path: '/clientes', element: <Navigate to="/contactos" replace /> },
           { path: '/productos', element: <Productos /> },
           { path: '/productos/etiquetas', element: <EtiquetasCodigoBarras /> },
+          { path: '/categorias', element: <Categorias /> },
+          { path: '/niveles-precio', element: <NivelesPrecio /> },
+          { path: '/atributos', element: <Atributos /> },
           { path: '/reportes', element: <Reportes /> },
           { path: '/mis-tareas', element: <MisTareas /> },
           { path: '/travel/reservas', element: <TravelReservas /> },
