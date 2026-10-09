@@ -99,10 +99,15 @@ export class CobrosPublicosService {
     }
 
     const adapter = this.resolverAdapter(config.pasarelaActiva);
-    // `/api` corre bajo el mismo origen que el frontend (proxy de Vite en
-    // dev, mismo dominio detrás de un reverse proxy en producción) — no
-    // hace falta una variable de entorno nueva para la URL del backend.
-    const frontendUrl = process.env.FRONTEND_URL ?? '';
+    // A diferencia de un link interno (donde `/api` relativo basta porque
+    // corre bajo el mismo origen que el frontend), acá el dominio SÍ hace
+    // falta: `urlRetorno`/`urlCancelacion` las arma el proveedor externo
+    // (Azul/CardNet) para redirigir el navegador del cliente DESPUÉS de
+    // pagar en SU propio dominio — una URL relativa ahí se resolvería
+    // contra el dominio del proveedor, no el nuestro (bug real, mismo
+    // defecto que ya existía en el fallback de FRONTEND_URL en el resto
+    // del proyecto, que sí usa 'http://localhost:5173').
+    const frontendUrl = process.env.FRONTEND_URL ?? 'http://localhost:5173';
     const urlRetorno = `${frontendUrl}/api/cobros-publicos/${config.pasarelaActiva.toLowerCase()}/retorno`;
     const urlCancelacion = `${frontendUrl}/pagar-factura/${facturaId}/resultado?estado=cancelado`;
 

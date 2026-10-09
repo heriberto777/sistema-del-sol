@@ -19,6 +19,11 @@ export class PagosPlataformaRepository {
     return this.prisma.pagoPlataforma.create({ data: params });
   }
 
+  /** Para el chequeo de idempotencia del webhook — Stripe reintenta el mismo evento si no recibe 200. */
+  buscarPorFacturaYReferencia(facturaId: string, referencia: string) {
+    return this.prisma.pagoPlataforma.findFirst({ where: { facturaId, referencia } });
+  }
+
   listarPorFactura(facturaId: string) {
     return this.prisma.pagoPlataforma.findMany({
       where: { facturaId },

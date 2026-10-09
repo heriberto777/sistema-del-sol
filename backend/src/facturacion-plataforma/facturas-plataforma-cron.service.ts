@@ -36,15 +36,26 @@ export class FacturasPlataformaCronService {
     const hoy = new Date();
     const suscripciones = await this.suscripcionesRepository.listarActivasParaFacturar(hoy);
 
+    let generadas = 0;
     // generarDesdeSuscripcion ya avanza fechaProximoCorte internamente
     // (ver el comentario ahí) — hacerlo también acá duplicaría el avance
     // y saltearía un ciclo entero de facturación.
+    //
+    // Cada suscripción se aísla con su propio try/catch — sin esto, una
+    // excepción en CUALQUIER tenant (NCF agotado, módulo con lógica rota,
+    // etc.) corta el `for` y deja sin facturar a TODO el resto del lote
+    // del día, en silencio (bug real encontrado en la auditoría).
     for (const suscripcion of suscripciones) {
-      await this.facturasPlataformaService.generarDesdeSuscripcion(suscripcion);
+      try {
+        await this.facturasPlataformaService.generarDesdeSuscripcion(suscripcion);
+        generadas++;
+      } catch (error) {
+        this.logger.error(`No se pudo generar la factura de la suscripción ${suscripcion.id} (tenant ${suscripcion.tenantId}): ${(error as Error).message}`, (error as Error).stack);
+      }
     }
 
-    this.logger.log(`Facturación de plataforma: ${suscripciones.length} factura(s) generada(s)`);
-    return suscripciones.length;
+    this.logger.log(`Facturación de plataforma: ${generadas}/${suscripciones.length} factura(s) generada(s)`);
+    return generadas;
   }
 
   @Cron(CronExpression.EVERY_DAY_AT_8AM)
@@ -52,12 +63,18 @@ export class FacturasPlataformaCronService {
     const hoy = new Date();
     const vencidas = await this.facturasPlataformaRepository.listarVencidasPendientes(hoy);
 
+    let marcadas = 0;
     for (const factura of vencidas) {
-      await this.facturasPlataformaService.marcarVencidaConMora(factura.id, Number(factura.suscripcion.feeMoraPct));
+      try {
+        await this.facturasPlataformaService.marcarVencidaConMora(factura.id, Number(factura.suscripcion.feeMoraPct));
+        marcadas++;
+      } catch (error) {
+        this.logger.error(`No se pudo marcar VENCIDA la factura ${factura.id} (tenant ${factura.tenantId}): ${(error as Error).message}`, (error as Error).stack);
+      }
     }
 
-    this.logger.log(`Facturación de plataforma: ${vencidas.length} factura(s) marcada(s) VENCIDA con mora aplicada`);
-    return vencidas.length;
+    this.logger.log(`Facturación de plataforma: ${marcadas}/${vencidas.length} factura(s) marcada(s) VENCIDA con mora aplicada`);
+    return marcadas;
   }
 
   /**
@@ -81,11 +98,15 @@ export class FacturasPlataformaCronService {
       for (const regla of reglas) {
         const fechaObjetivo = new Date(factura.fechaVencimiento.getTime() + regla.offsetDias * MS_POR_DIA);
         if (fechaISO(fechaObjetivo) !== fechaISO(hoy)) continue;
-        if (await this.reglasNotificacionRepository.yaFueEnviada(factura.id, regla.id)) continue;
 
-        await this.facturasPlataformaService.notificarPorRegla(factura.id, regla.offsetDias, regla.canal);
-        await this.reglasNotificacionRepository.registrarEnviada(factura.id, regla.id);
-        enviadas++;
+        try {
+          if (await this.reglasNotificacionRepository.yaFueEnviada(factura.id, regla.id)) continue;
+          await this.facturasPlataformaService.notificarPorRegla(factura.id, regla.offsetDias, regla.canal);
+          await this.reglasNotificacionRepository.registrarEnviada(factura.id, regla.id);
+          enviadas++;
+        } catch (error) {
+          this.logger.error(`No se pudo enviar la notificación de vencimiento (factura ${factura.id}, regla ${regla.id}): ${(error as Error).message}`, (error as Error).stack);
+        }
       }
     }
 
@@ -107,12 +128,18 @@ export class FacturasPlataformaCronService {
     const { diasParaAutoSuspender } = await this.plataformaConfigRepository.obtenerOCrear();
     const morosas = await this.facturasPlataformaRepository.listarMorosasVencidasHace(diasParaAutoSuspender, hoy);
 
+    let suspendidos = 0;
     for (const factura of morosas) {
-      await this.tenantsService.actualizar(factura.tenantId, { estado: 'SUSPENDIDO' });
-      await this.facturasPlataformaService.notificarFactura(factura.tenantId, factura.id, 'auto_suspendido');
+      try {
+        await this.tenantsService.actualizar(factura.tenantId, { estado: 'SUSPENDIDO' });
+        await this.facturasPlataformaService.notificarFactura(factura.tenantId, factura.id, 'auto_suspendido');
+        suspendidos++;
+      } catch (error) {
+        this.logger.error(`No se pudo auto-suspender el tenant ${factura.tenantId} (factura ${factura.id}): ${(error as Error).message}`, (error as Error).stack);
+      }
     }
 
-    this.logger.log(`Auto-suspensión: ${morosas.length} tenant(s) suspendido(s) por mora`);
-    return morosas.length;
+    this.logger.log(`Auto-suspensión: ${suspendidos}/${morosas.length} tenant(s) suspendido(s) por mora`);
+    return suspendidos;
   }
 }

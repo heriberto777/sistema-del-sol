@@ -108,49 +108,58 @@ export class PlataformaConfigService implements OnModuleInit {
     }
   }
 
+  /** valor presente -> lo escribe en process.env[clave]; null/undefined/'' -> lo borra, para que un campo recién limpiado desde la pantalla deje de usarse sin reiniciar el backend. */
+  private setEnv(clave: string, valor: string | null | undefined) {
+    if (valor) {
+      process.env[clave] = valor;
+    } else {
+      delete process.env[clave];
+    }
+  }
+
   private sincronizarEnv(config: PlataformaConfiguracion) {
-    if (config.emailHabilitado !== null) process.env.EMAIL_HABILITADO = String(config.emailHabilitado);
-    if (config.smtpHost) process.env.SMTP_HOST = config.smtpHost;
-    if (config.smtpPort !== null) process.env.SMTP_PORT = String(config.smtpPort);
-    if (config.smtpUser) process.env.SMTP_USER = config.smtpUser;
-    if (config.smtpPasswordCifrado) process.env.SMTP_PASSWORD = descifrar(config.smtpPasswordCifrado);
-    if (config.smtpFrom) process.env.SMTP_FROM = config.smtpFrom;
+    this.setEnv('EMAIL_HABILITADO', config.emailHabilitado !== null ? String(config.emailHabilitado) : null);
+    this.setEnv('SMTP_HOST', config.smtpHost);
+    this.setEnv('SMTP_PORT', config.smtpPort !== null ? String(config.smtpPort) : null);
+    this.setEnv('SMTP_USER', config.smtpUser);
+    this.setEnv('SMTP_PASSWORD', config.smtpPasswordCifrado ? descifrar(config.smtpPasswordCifrado) : null);
+    this.setEnv('SMTP_FROM', config.smtpFrom);
 
-    if (config.twilioAccountSid) process.env.TWILIO_ACCOUNT_SID = config.twilioAccountSid;
-    if (config.twilioAuthTokenCifrado) process.env.TWILIO_AUTH_TOKEN = descifrar(config.twilioAuthTokenCifrado);
-    if (config.twilioWhatsappFrom) process.env.TWILIO_WHATSAPP_FROM = config.twilioWhatsappFrom;
+    this.setEnv('TWILIO_ACCOUNT_SID', config.twilioAccountSid);
+    this.setEnv('TWILIO_AUTH_TOKEN', config.twilioAuthTokenCifrado ? descifrar(config.twilioAuthTokenCifrado) : null);
+    this.setEnv('TWILIO_WHATSAPP_FROM', config.twilioWhatsappFrom);
 
-    if (config.pasarelaActiva) process.env.PASARELA_PAGO_ACTIVA = config.pasarelaActiva;
-    if (config.stripeSecretKeyCifrado) process.env.STRIPE_SECRET_KEY = descifrar(config.stripeSecretKeyCifrado);
-    if (config.stripeWebhookSecretCifrado) process.env.STRIPE_WEBHOOK_SECRET = descifrar(config.stripeWebhookSecretCifrado);
-    if (config.stripeCurrency) process.env.STRIPE_CURRENCY = config.stripeCurrency;
+    this.setEnv('PASARELA_PAGO_ACTIVA', config.pasarelaActiva);
+    this.setEnv('STRIPE_SECRET_KEY', config.stripeSecretKeyCifrado ? descifrar(config.stripeSecretKeyCifrado) : null);
+    this.setEnv('STRIPE_WEBHOOK_SECRET', config.stripeWebhookSecretCifrado ? descifrar(config.stripeWebhookSecretCifrado) : null);
+    this.setEnv('STRIPE_CURRENCY', config.stripeCurrency);
 
-    if (config.iaImagenProveedorActivo) process.env.IA_IMAGEN_PROVEEDOR_ACTIVO = config.iaImagenProveedorActivo;
+    this.setEnv('IA_IMAGEN_PROVEEDOR_ACTIVO', config.iaImagenProveedorActivo);
     // `ANTHROPIC_API_KEY` es la MISMA variable que ya lee IaClientService
     // (bot de WhatsApp) — configurarla acá no crea una credencial nueva.
-    if (config.iaClaudeApiKeyCifrado) process.env.ANTHROPIC_API_KEY = descifrar(config.iaClaudeApiKeyCifrado);
-    if (config.iaOpenaiApiKeyCifrado) process.env.OPENAI_API_KEY = descifrar(config.iaOpenaiApiKeyCifrado);
-    if (config.iaGeminiApiKeyCifrado) process.env.GEMINI_API_KEY = descifrar(config.iaGeminiApiKeyCifrado);
-    if (config.iaClaudeModelo) process.env.ANTHROPIC_MODEL = config.iaClaudeModelo;
-    if (config.iaOpenaiModelo) process.env.OPENAI_MODEL = config.iaOpenaiModelo;
-    if (config.iaGeminiModelo) process.env.GEMINI_MODEL = config.iaGeminiModelo;
+    this.setEnv('ANTHROPIC_API_KEY', config.iaClaudeApiKeyCifrado ? descifrar(config.iaClaudeApiKeyCifrado) : null);
+    this.setEnv('OPENAI_API_KEY', config.iaOpenaiApiKeyCifrado ? descifrar(config.iaOpenaiApiKeyCifrado) : null);
+    this.setEnv('GEMINI_API_KEY', config.iaGeminiApiKeyCifrado ? descifrar(config.iaGeminiApiKeyCifrado) : null);
+    this.setEnv('ANTHROPIC_MODEL', config.iaClaudeModelo);
+    this.setEnv('OPENAI_MODEL', config.iaOpenaiModelo);
+    this.setEnv('GEMINI_MODEL', config.iaGeminiModelo);
 
     // Publicaciones Sociales (Fase 2) — generación de fondo. Variables
     // NUEVAS y distintas de OPENAI_MODEL/GEMINI_MODEL de arriba (modelos
     // de generación de imagen son otra familia que los de vision/chat).
-    if (config.iaFondoProveedorActivo) process.env.IA_FONDO_PROVEEDOR_ACTIVO = config.iaFondoProveedorActivo;
-    if (config.iaOpenaiModeloFondo) process.env.OPENAI_IMAGEN_MODEL = config.iaOpenaiModeloFondo;
-    if (config.iaGeminiModeloFondo) process.env.GEMINI_IMAGEN_MODEL = config.iaGeminiModeloFondo;
+    this.setEnv('IA_FONDO_PROVEEDOR_ACTIVO', config.iaFondoProveedorActivo);
+    this.setEnv('OPENAI_IMAGEN_MODEL', config.iaOpenaiModeloFondo);
+    this.setEnv('GEMINI_IMAGEN_MODEL', config.iaGeminiModeloFondo);
 
     // Travel Management — cuenta Duffel compartida de la plataforma; es
     // literalmente lo que DuffelAdapter.habilitado/llamar() leen.
-    if (config.duffelApiTokenCifrado) process.env.DUFFEL_API_TOKEN = descifrar(config.duffelApiTokenCifrado);
-    if (config.duffelWebhookSecretCifrado) process.env.DUFFEL_WEBHOOK_SECRET = descifrar(config.duffelWebhookSecretCifrado);
+    this.setEnv('DUFFEL_API_TOKEN', config.duffelApiTokenCifrado ? descifrar(config.duffelApiTokenCifrado) : null);
+    this.setEnv('DUFFEL_WEBHOOK_SECRET', config.duffelWebhookSecretCifrado ? descifrar(config.duffelWebhookSecretCifrado) : null);
     // Hotelbeds (hoteles) — cuenta compartida, mismo criterio que Duffel. HotelbedsAdapter lee estas dos variables directamente.
-    if (config.hotelbedsApiKeyCifrado) process.env.HOTELBEDS_API_KEY = descifrar(config.hotelbedsApiKeyCifrado);
-    if (config.hotelbedsSecretCifrado) process.env.HOTELBEDS_SECRET = descifrar(config.hotelbedsSecretCifrado);
-    if (config.hotelbedsMoneda) process.env.HOTELBEDS_MONEDA = config.hotelbedsMoneda;
-    if (config.hotelbedsTasaCambio !== null) process.env.HOTELBEDS_TASA_CAMBIO = String(config.hotelbedsTasaCambio);
+    this.setEnv('HOTELBEDS_API_KEY', config.hotelbedsApiKeyCifrado ? descifrar(config.hotelbedsApiKeyCifrado) : null);
+    this.setEnv('HOTELBEDS_SECRET', config.hotelbedsSecretCifrado ? descifrar(config.hotelbedsSecretCifrado) : null);
+    this.setEnv('HOTELBEDS_MONEDA', config.hotelbedsMoneda);
+    this.setEnv('HOTELBEDS_TASA_CAMBIO', config.hotelbedsTasaCambio !== null ? String(config.hotelbedsTasaCambio) : null);
   }
 
   /** Nunca expone un secreto en texto plano — solo si hay uno guardado (*Configurado). */

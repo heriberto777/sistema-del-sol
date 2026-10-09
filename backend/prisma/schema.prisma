@@ -525,6 +525,12 @@ model PagoPlataforma {
   createdAt       DateTime          @default(now())
 
   @@index([facturaId])
+  // Defensa en profundidad para registrarPagoGateway: Postgres trata cada
+  // NULL como distinto, así que esto no afecta pagos manuales sin
+  // referencia (varios por factura, todos con referencia=null) — solo
+  // bloquea insertar dos veces la MISMA referencia (id de sesión de
+  // Stripe) para la misma factura, si el check de aplicación fallara.
+  @@unique([facturaId, referencia])
   @@map("pagos_plataforma")
 }
 

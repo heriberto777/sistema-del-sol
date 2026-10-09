@@ -162,6 +162,17 @@ describe('PlataformaConfigService', () => {
       expect(process.env.SMTP_HOST).toBeUndefined();
     });
 
+    it('borra la variable de entorno cuando el campo vuelve a null (credencial eliminada desde la pantalla) — bug real: antes quedaba la última guardada', async () => {
+      process.env.SMTP_HOST = 'smtp.viejo.com';
+      process.env.STRIPE_SECRET_KEY = 'sk_viejo';
+      repo.actualizar.mockResolvedValue({ ...CONFIG_VACIA, smtpHost: null, stripeSecretKeyCifrado: null } as never);
+
+      await service.actualizar({ smtpHost: '', stripeSecretKey: '' } as never);
+
+      expect(process.env.SMTP_HOST).toBeUndefined();
+      expect(process.env.STRIPE_SECRET_KEY).toBeUndefined();
+    });
+
     it('onModuleInit sincroniza process.env con lo ya guardado en la base', async () => {
       delete process.env.PASARELA_PAGO_ACTIVA;
       repo.obtenerOCrear.mockResolvedValue({ ...CONFIG_VACIA, pasarelaActiva: 'stripe' } as never);

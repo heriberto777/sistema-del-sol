@@ -15,6 +15,7 @@ describe('PagosPlataformaService', () => {
       crear: jest.fn().mockResolvedValue({ id: 'p1' }),
       sumaPagosFactura: jest.fn(),
       listarPorFactura: jest.fn(),
+      buscarPorFacturaYReferencia: jest.fn().mockResolvedValue(null),
     } as unknown as jest.Mocked<PagosPlataformaRepository>;
     facturasRepo = { buscarPorId: jest.fn() } as unknown as jest.Mocked<FacturasPlataformaRepository>;
     facturasService = { marcarPagada: jest.fn() } as unknown as jest.Mocked<FacturasPlataformaService>;
@@ -108,6 +109,25 @@ describe('PagosPlataformaService', () => {
       await service.registrarPagoGateway('f1', { monto: 400, referenciaExterna: 'cs_1' });
 
       expect(facturasService.marcarPagada).not.toHaveBeenCalled();
+    });
+
+    it('no duplica el pago si Stripe reintenta el mismo evento (misma referencia ya registrada)', async () => {
+      facturasRepo.buscarPorId.mockResolvedValue({ id: 'f1', tenantId: 't1', estado: 'PENDIENTE', total: 1000 } as never);
+      pagosRepo.buscarPorFacturaYReferencia.mockResolvedValue({ id: 'p-existente', referencia: 'cs_1' } as never);
+
+      const resultado = await service.registrarPagoGateway('f1', { monto: 1000, referenciaExterna: 'cs_1' });
+
+      expect(resultado).toEqual({ id: 'p-existente', referencia: 'cs_1' });
+      expect(pagosRepo.crear).not.toHaveBeenCalled();
+      expect(facturasService.marcarPagada).not.toHaveBeenCalled();
+    });
+
+    it('registra igual un pago que excede el saldo pendiente (el cobro ya se hizo en Stripe) en vez de tirar una excepción', async () => {
+      facturasRepo.buscarPorId.mockResolvedValue({ id: 'f1', tenantId: 't1', estado: 'PENDIENTE', total: 1000 } as never);
+      pagosRepo.sumaPagosFactura.mockResolvedValue(1500);
+
+      await expect(service.registrarPagoGateway('f1', { monto: 1500, referenciaExterna: 'cs_1' })).resolves.not.toThrow();
+      expect(pagosRepo.crear).toHaveBeenCalled();
     });
   });
 });

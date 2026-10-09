@@ -49,7 +49,7 @@ export class CobrosPublicosController {
     request: AuthenticatedRequest,
     res: Response,
   ) {
-    const frontendUrl = process.env.FRONTEND_URL ?? '';
+    const frontendUrl = process.env.FRONTEND_URL ?? 'http://localhost:5173';
     try {
       const { facturaId, aprobado } = await this.cobrosPublicosService.procesarRetorno(pasarela, referenciaExterna, query, request);
       // Nunca se reenvían los query params crudos del proveedor al

@@ -12,6 +12,7 @@ import { CampoImagen } from '../components/molecules/CampoImagen/CampoImagen';
 import { Badge } from '../components/atoms/Badge/Badge';
 import { SelectorModeloIa, ModeloIa } from '../components/molecules/SelectorModeloIa/SelectorModeloIa';
 import { PLANTILLAS_DOCUMENTO, PlantillaDocumento } from '../constants/plantilla-documento';
+import { mensajeErrorApi } from '../lib/mensaje-error-api';
 
 /** "Cargar modelos" de IA para productos siempre usa la API key ya guardada de PLATAFORMA — ver SelectorModeloIa. */
 async function cargarModelosPlataforma(proveedor: string): Promise<ModeloIa[]> {
@@ -126,6 +127,7 @@ type Tab = (typeof TABS)[number];
 
 export function PlatformConfiguracion() {
   const [tab, setTab] = useState<Tab>('General');
+  const [error, setError] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
   const { data: config } = useQuery({
@@ -135,12 +137,17 @@ export function PlatformConfiguracion() {
 
   const guardar = useMutation({
     mutationFn: async (data: Record<string, unknown>) => platformApiClient.patch('/platform/configuracion', data),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['platform-configuracion'] }),
+    onSuccess: () => {
+      setError(null);
+      queryClient.invalidateQueries({ queryKey: ['platform-configuracion'] });
+    },
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo guardar la configuración.')),
   });
 
   return (
     <div className="space-y-6">
       <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Configuración</h1>
+      {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
 
       <div className="mb-6 flex gap-1 overflow-x-auto border-b border-slate-200 dark:border-slate-800">
         {TABS.map((t) => (
@@ -605,7 +612,7 @@ function SeccionTravelReconciliacion() {
       setResultado(data);
       setError(null);
     },
-    onError: () => setError('No se pudo revisar la cuenta de Duffel — intentá de nuevo en unos minutos.'),
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo revisar la cuenta de Duffel — intentá de nuevo en unos minutos.')),
   });
 
   return (
@@ -1024,6 +1031,7 @@ function SeccionDominioPropio({ config, guardar }: SeccionProps) {
 /** Fase 4 — reglas de notificación de vencimiento + umbral de auto-suspensión (días de mora). */
 function SeccionVencimientos({ config, guardar }: SeccionProps) {
   const queryClient = useQueryClient();
+  const [error, setError] = useState<string | null>(null);
   const [diasParaAutoSuspender, setDiasParaAutoSuspender] = useState(String(config.autoSuspension.diasParaAutoSuspender));
 
   useEffect(() => {
@@ -1046,20 +1054,30 @@ function SeccionVencimientos({ config, guardar }: SeccionProps) {
   const crearRegla = useMutation({
     mutationFn: async () => platformApiClient.post('/platform/configuracion/reglas-notificacion', { offsetDias: Number(offsetDias), canal }),
     onSuccess: () => {
+      setError(null);
       queryClient.invalidateQueries({ queryKey: ['reglas-notificacion-vencimiento'] });
       setOffsetDias('');
     },
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo agregar la regla.')),
   });
 
   const toggleRegla = useMutation({
     mutationFn: async ({ id, activa }: { id: string; activa: boolean }) =>
       platformApiClient.patch(`/platform/configuracion/reglas-notificacion/${id}`, { activa }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['reglas-notificacion-vencimiento'] }),
+    onSuccess: () => {
+      setError(null);
+      queryClient.invalidateQueries({ queryKey: ['reglas-notificacion-vencimiento'] });
+    },
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo cambiar la regla.')),
   });
 
   const eliminarRegla = useMutation({
     mutationFn: async (id: string) => platformApiClient.delete(`/platform/configuracion/reglas-notificacion/${id}`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['reglas-notificacion-vencimiento'] }),
+    onSuccess: () => {
+      setError(null);
+      queryClient.invalidateQueries({ queryKey: ['reglas-notificacion-vencimiento'] });
+    },
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo eliminar la regla.')),
   });
 
   function onSubmitRegla(e: FormEvent) {
@@ -1093,6 +1111,7 @@ function SeccionVencimientos({ config, guardar }: SeccionProps) {
         titulo="Reglas de notificación de vencimiento"
         descripcion='Offset negativo = aviso antes del vencimiento; positivo = después (mora). Ej. "-3" avisa 3 días antes; "5" avisa 5 días después de vencida.'
       >
+        {error && <p className="mb-2 text-sm text-red-600 dark:text-red-400">{error}</p>}
         <div className="space-y-4">
           <form onSubmit={onSubmitRegla} className="flex items-end gap-2">
             <FormField

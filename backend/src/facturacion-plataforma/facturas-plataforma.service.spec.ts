@@ -83,7 +83,7 @@ describe('FacturasPlataformaService', () => {
 
   describe('generarDesdeSuscripcion', () => {
     it('el concepto incluye los módulos activos del tenant (plan + excepciones), ordenados alfabéticamente', async () => {
-      const suscripcion = { id: 's1', tenantId: 't1', plan: { nombre: 'Premium', precio: 1500, cicloFacturacion: 'MENSUAL' } } as never;
+      const suscripcion = { id: 's1', tenantId: 't1', fechaProximoCorte: new Date(), plan: { nombre: 'Premium', precio: 1500, cicloFacturacion: 'MENSUAL' } } as never;
       prisma.modulo.findMany.mockResolvedValue([
         { clave: 'facturacion', nombre: 'Facturación' },
         { clave: 'inventario', nombre: 'Inventario' },
@@ -104,7 +104,7 @@ describe('FacturasPlataformaService', () => {
     });
 
     it('sin ningún módulo del catálogo activo, el concepto no agrega "— Módulos:"', async () => {
-      const suscripcion = { id: 's1', tenantId: 't1', plan: { nombre: 'Premium', precio: 1500, cicloFacturacion: 'MENSUAL' } } as never;
+      const suscripcion = { id: 's1', tenantId: 't1', fechaProximoCorte: new Date(), plan: { nombre: 'Premium', precio: 1500, cicloFacturacion: 'MENSUAL' } } as never;
       repo.crear.mockResolvedValue({ id: 'f1' } as never);
       repo.buscarPorId.mockResolvedValue({ id: 'f1', concepto: 'x', total: 1500, fechaVencimiento: new Date() } as never);
 
@@ -118,6 +118,7 @@ describe('FacturasPlataformaService', () => {
       const suscripcion = {
         id: 's1',
         tenantId: 't1',
+        fechaProximoCorte: new Date(),
         plan: { nombre: 'Premium', precio: 1500, cicloFacturacion: 'MENSUAL' },
       } as never;
       repo.crear.mockResolvedValue({ id: 'f1', concepto: 'x', total: 1500, fechaVencimiento: new Date() } as never);
@@ -134,7 +135,7 @@ describe('FacturasPlataformaService', () => {
 
     it('no falla si el tenant no tiene ningún usuario Admin Total (solo loguea)', async () => {
       prisma.user.findFirst.mockResolvedValue(null);
-      const suscripcion = { id: 's1', tenantId: 't1', plan: { nombre: 'Básico', precio: 500, cicloFacturacion: 'MENSUAL' } } as never;
+      const suscripcion = { id: 's1', tenantId: 't1', fechaProximoCorte: new Date(), plan: { nombre: 'Básico', precio: 500, cicloFacturacion: 'MENSUAL' } } as never;
       repo.crear.mockResolvedValue({ id: 'f1' } as never);
 
       await expect(service.generarDesdeSuscripcion(suscripcion)).resolves.toBeDefined();
@@ -143,7 +144,7 @@ describe('FacturasPlataformaService', () => {
 
     it('incluye el ncf/tipoNcf asignado por NcfPlataformaService cuando hay uno disponible', async () => {
       ncfPlataformaService.asignarSiguiente.mockResolvedValue({ ncf: 'B0100000005', tipoNcf: 'B01' });
-      const suscripcion = { id: 's1', tenantId: 't1', plan: { nombre: 'Premium', precio: 1500, cicloFacturacion: 'MENSUAL' } } as never;
+      const suscripcion = { id: 's1', tenantId: 't1', fechaProximoCorte: new Date(), plan: { nombre: 'Premium', precio: 1500, cicloFacturacion: 'MENSUAL' } } as never;
       repo.crear.mockResolvedValue({ id: 'f1' } as never);
       repo.buscarPorId.mockResolvedValue({ id: 'f1', concepto: 'x', total: 1500, fechaVencimiento: new Date() } as never);
 
@@ -155,7 +156,7 @@ describe('FacturasPlataformaService', () => {
     });
 
     it('llama a EmisionECfService.emitirParaFacturaPlataforma con el id de la factura recién creada', async () => {
-      const suscripcion = { id: 's1', tenantId: 't1', plan: { nombre: 'Premium', precio: 1500, cicloFacturacion: 'MENSUAL' } } as never;
+      const suscripcion = { id: 's1', tenantId: 't1', fechaProximoCorte: new Date(), plan: { nombre: 'Premium', precio: 1500, cicloFacturacion: 'MENSUAL' } } as never;
       repo.crear.mockResolvedValue({ id: 'f1' } as never);
       repo.buscarPorId.mockResolvedValue({ id: 'f1', concepto: 'x', total: 1500, fechaVencimiento: new Date() } as never);
 
@@ -166,7 +167,7 @@ describe('FacturasPlataformaService', () => {
 
     it('crea la factura sin ncf si NcfPlataformaService no pudo asignar ninguno (sin secuencia configurada)', async () => {
       ncfPlataformaService.asignarSiguiente.mockResolvedValue(null);
-      const suscripcion = { id: 's1', tenantId: 't1', plan: { nombre: 'Premium', precio: 1500, cicloFacturacion: 'MENSUAL' } } as never;
+      const suscripcion = { id: 's1', tenantId: 't1', fechaProximoCorte: new Date(), plan: { nombre: 'Premium', precio: 1500, cicloFacturacion: 'MENSUAL' } } as never;
       repo.crear.mockResolvedValue({ id: 'f1' } as never);
       repo.buscarPorId.mockResolvedValue({ id: 'f1', concepto: 'x', total: 1500, fechaVencimiento: new Date() } as never);
 
@@ -178,7 +179,7 @@ describe('FacturasPlataformaService', () => {
 
     it('calcula itbis sobre el precio del plan y lo suma al total, con porcentajeItbis configurado', async () => {
       plataformaConfigRepository.obtenerOCrear.mockResolvedValue({ porcentajeItbis: 18 } as never);
-      const suscripcion = { id: 's1', tenantId: 't1', plan: { nombre: 'Premium', precio: 1500, cicloFacturacion: 'MENSUAL' } } as never;
+      const suscripcion = { id: 's1', tenantId: 't1', fechaProximoCorte: new Date(), plan: { nombre: 'Premium', precio: 1500, cicloFacturacion: 'MENSUAL' } } as never;
       repo.crear.mockResolvedValue({ id: 'f1' } as never);
       repo.buscarPorId.mockResolvedValue({ id: 'f1', concepto: 'x', total: 1770, fechaVencimiento: new Date() } as never);
 
@@ -195,6 +196,7 @@ describe('FacturasPlataformaService', () => {
       const suscripcion = {
         id: 's1',
         tenantId: 't1',
+        fechaProximoCorte: new Date(),
         primerPeriodoGratis: true,
         plan: { nombre: 'Premium', precio: 1500, cicloFacturacion: 'MENSUAL' },
       } as never;
@@ -218,7 +220,7 @@ describe('FacturasPlataformaService', () => {
         ciclosRestantes: 3,
         cupon: { tipo: 'PORCENTAJE', valor: 20 },
       } as never);
-      const suscripcion = { id: 's1', tenantId: 't1', primerPeriodoGratis: false, plan: { nombre: 'Premium', precio: 1000, cicloFacturacion: 'MENSUAL' } } as never;
+      const suscripcion = { id: 's1', tenantId: 't1', fechaProximoCorte: new Date(), primerPeriodoGratis: false, plan: { nombre: 'Premium', precio: 1000, cicloFacturacion: 'MENSUAL' } } as never;
       repo.crear.mockResolvedValue({ id: 'f1' } as never);
       repo.buscarPorId.mockResolvedValue({ id: 'f1', concepto: 'x', total: 944, fechaVencimiento: new Date() } as never);
 
@@ -239,7 +241,7 @@ describe('FacturasPlataformaService', () => {
         ciclosRestantes: null,
         cupon: { tipo: 'MONTO_FIJO', valor: 5000 },
       } as never);
-      const suscripcion = { id: 's1', tenantId: 't1', primerPeriodoGratis: false, plan: { nombre: 'Básico', precio: 500, cicloFacturacion: 'MENSUAL' } } as never;
+      const suscripcion = { id: 's1', tenantId: 't1', fechaProximoCorte: new Date(), primerPeriodoGratis: false, plan: { nombre: 'Básico', precio: 500, cicloFacturacion: 'MENSUAL' } } as never;
       repo.crear.mockResolvedValue({ id: 'f1' } as never);
       repo.buscarPorId.mockResolvedValue({ id: 'f1', concepto: 'x', total: 0, fechaVencimiento: new Date() } as never);
 
@@ -259,7 +261,7 @@ describe('FacturasPlataformaService', () => {
         ciclosRestantes: 1,
         cupon: { tipo: 'PORCENTAJE', valor: 10 },
       } as never);
-      const suscripcion = { id: 's1', tenantId: 't1', primerPeriodoGratis: false, plan: { nombre: 'Básico', precio: 500, cicloFacturacion: 'MENSUAL' } } as never;
+      const suscripcion = { id: 's1', tenantId: 't1', fechaProximoCorte: new Date(), primerPeriodoGratis: false, plan: { nombre: 'Básico', precio: 500, cicloFacturacion: 'MENSUAL' } } as never;
       repo.crear.mockResolvedValue({ id: 'f1' } as never);
       repo.buscarPorId.mockResolvedValue({ id: 'f1', concepto: 'x', total: 450, fechaVencimiento: new Date() } as never);
 
@@ -270,7 +272,7 @@ describe('FacturasPlataformaService', () => {
     });
 
     it('sin primer período gratis ni cupón activo, no aplica ningún descuento', async () => {
-      const suscripcion = { id: 's1', tenantId: 't1', primerPeriodoGratis: false, plan: { nombre: 'Premium', precio: 1500, cicloFacturacion: 'MENSUAL' } } as never;
+      const suscripcion = { id: 's1', tenantId: 't1', fechaProximoCorte: new Date(), primerPeriodoGratis: false, plan: { nombre: 'Premium', precio: 1500, cicloFacturacion: 'MENSUAL' } } as never;
       repo.crear.mockResolvedValue({ id: 'f1' } as never);
       repo.buscarPorId.mockResolvedValue({ id: 'f1', concepto: 'x', total: 1500, fechaVencimiento: new Date() } as never);
 
