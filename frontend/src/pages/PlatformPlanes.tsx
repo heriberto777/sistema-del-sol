@@ -191,7 +191,7 @@ function ModalVerModulos({ plan, onClose }: { plan: Plan; onClose: () => void })
   const clavesIncluidas = new Set(plan.modulos.map((pm) => pm.modulo.clave));
 
   return (
-    <Modal titulo={`Módulos de "${plan.nombre}"`} onClose={onClose}>
+    <Modal titulo={`Módulos de "${plan.nombre}"`} onClose={onClose} ancho="xl">
       <div className="space-y-4">
         <p className="text-sm text-slate-500 dark:text-slate-400">
           {plan.modulos.length} de {catalogoModulos?.length ?? '…'} módulos del catálogo incluidos.
@@ -200,7 +200,7 @@ function ModalVerModulos({ plan, onClose }: { plan: Plan; onClose: () => void })
         {!catalogoModulos && <p className="text-sm text-slate-400">Cargando catálogo de módulos…</p>}
 
         {catalogoModulos && (
-          <div className="grid grid-cols-1 gap-x-4 gap-y-2 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-x-4 gap-y-2 sm:grid-cols-2 lg:grid-cols-3">
             {catalogoModulos.map((modulo) => {
               const activo = clavesIncluidas.has(modulo.clave);
               return (
@@ -289,7 +289,7 @@ function ModalPlan({ plan, onClose }: { plan: Plan | null; onClose: () => void }
   }
 
   return (
-    <Modal titulo={plan ? `Editar "${plan.nombre}"` : 'Nuevo plan'} onClose={onClose}>
+    <Modal titulo={plan ? `Editar "${plan.nombre}"` : 'Nuevo plan'} onClose={onClose} ancho="xl">
       <form onSubmit={onSubmit} className="space-y-4">
         <FormField id="plan-nombre" label="Nombre" value={nombre} onChange={(e) => setNombre(e.target.value)} required />
         <FormField id="plan-descripcion" label="Descripción (opcional)" value={descripcion} onChange={(e) => setDescripcion(e.target.value)} />
@@ -328,7 +328,7 @@ function ModalPlan({ plan, onClose }: { plan: Plan | null; onClose: () => void }
           )}
 
           {catalogoModulos && catalogoModulos.length > 0 && (
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
               {catalogoModulos.map((modulo) => {
                 const seleccionado = modulosSeleccionados.has(modulo.clave);
                 return (

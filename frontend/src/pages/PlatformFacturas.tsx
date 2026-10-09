@@ -189,29 +189,64 @@ function PanelFactura({ factura, onClose }: { factura: FacturaPlataforma; onClos
     abrirBlob(new Blob([respuesta.data], { type: 'application/pdf' }));
   }
 
+  const conceptoCorto = factura.concepto.split(' — Módulos:')[0];
+  const fmt = (v: number | string) => Number(v).toLocaleString('es-DO', { minimumFractionDigits: 2 });
+
   return (
-    <Modal titulo={factura.concepto} onClose={onClose}>
+    <Modal titulo={conceptoCorto} onClose={onClose} ancho="xl">
       <div className="space-y-4">
-        <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700 dark:bg-slate-800/60 dark:text-slate-300">
-          <p>
-            Tenant: <span className="font-medium">{factura.tenant.nombre}</span>
-          </p>
-          <p>
-            NCF: <span className="font-mono">{factura.ncf ?? 'Sin NCF asignado'}</span>
-          </p>
-          {Number(factura.itbis) > 0 && (
-            <p className="text-slate-500 dark:text-slate-400">
-              Subtotal: RD$ {Number(factura.monto).toLocaleString('es-DO')} — ITBIS: RD$ {Number(factura.itbis).toLocaleString('es-DO')}
-            </p>
-          )}
-          <p>
-            Total: RD$ {Number(factura.total).toLocaleString('es-DO')} — Pagado: RD$ {totalPagado.toLocaleString('es-DO')} —
-            Pendiente: RD$ {Math.max(pendiente, 0).toLocaleString('es-DO')}
-          </p>
-          <p className="text-slate-500 dark:text-slate-400">
-            Vence: {new Date(factura.fechaVencimiento).toLocaleDateString('es-DO')} — Estado:{' '}
-            <Badge tono={TONO_POR_ESTADO[factura.estado]}>{factura.estado}</Badge>
-          </p>
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-slate-50 px-4 py-3 dark:bg-slate-800/60">
+          <div className="min-w-0">
+            <p className="font-medium text-slate-900 dark:text-slate-100">{factura.tenant.nombre}</p>
+            <p className="font-mono text-xs text-slate-500 dark:text-slate-400">NCF: {factura.ncf ?? 'Sin NCF asignado'}</p>
+          </div>
+          <Badge tono={TONO_POR_ESTADO[factura.estado]}>{factura.estado}</Badge>
+        </div>
+
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+          <div className="space-y-1.5 rounded-lg border border-slate-200 px-4 py-3 text-sm dark:border-slate-800">
+            <div className="flex justify-between">
+              <span className="text-slate-500 dark:text-slate-400">Monto</span>
+              <span className="font-mono">RD$ {fmt(factura.monto)}</span>
+            </div>
+            {Number(factura.descuento) > 0 && (
+              <div className="flex justify-between">
+                <span className="text-slate-500 dark:text-slate-400">Descuento</span>
+                <span className="font-mono text-emerald-600 dark:text-emerald-400">-RD$ {fmt(factura.descuento)}</span>
+              </div>
+            )}
+            {Number(factura.itbis) > 0 && (
+              <div className="flex justify-between">
+                <span className="text-slate-500 dark:text-slate-400">ITBIS</span>
+                <span className="font-mono">RD$ {fmt(factura.itbis)}</span>
+              </div>
+            )}
+            {Number(factura.montoMora) > 0 && (
+              <div className="flex justify-between">
+                <span className="text-slate-500 dark:text-slate-400">Mora</span>
+                <span className="font-mono text-red-600 dark:text-red-400">RD$ {fmt(factura.montoMora)}</span>
+              </div>
+            )}
+            <div className="flex justify-between border-t border-slate-200 pt-1.5 font-semibold text-slate-900 dark:border-slate-700 dark:text-slate-100">
+              <span>Total</span>
+              <span className="font-mono">RD$ {fmt(factura.total)}</span>
+            </div>
+          </div>
+
+          <div className="space-y-1.5 rounded-lg border border-slate-200 px-4 py-3 text-sm dark:border-slate-800">
+            <div className="flex justify-between">
+              <span className="text-slate-500 dark:text-slate-400">Pagado</span>
+              <span className="font-mono">RD$ {fmt(totalPagado)}</span>
+            </div>
+            <div className="flex justify-between font-semibold text-slate-900 dark:text-slate-100">
+              <span>Pendiente</span>
+              <span className="font-mono">RD$ {fmt(Math.max(pendiente, 0))}</span>
+            </div>
+            <div className="flex justify-between border-t border-slate-200 pt-1.5 dark:border-slate-700">
+              <span className="text-slate-500 dark:text-slate-400">Vence</span>
+              <span>{new Date(factura.fechaVencimiento).toLocaleDateString('es-DO')}</span>
+            </div>
+          </div>
         </div>
 
         <div className="flex flex-col gap-1">
