@@ -41,6 +41,8 @@ export interface LineaCotizacion {
   cantidad: string;
   precioUnitario: string;
   montoTotal?: string;
+  /** Tasa real guardada en esta línea — 0 si el toggle de ITBIS estaba apagado al crearla/guardarla. */
+  porcentajeItbis?: string;
   producto?: { nombre: string; codigo: string };
 }
 
@@ -82,9 +84,11 @@ export type LineaForm = {
   itbisReferencia?: string | number | null;
   /** Oferta automática vigente del producto elegido — solo para la insignia de la fila, nunca se envía al backend. */
   oferta?: OfertaVisibleProducto | null;
+  /** Toggle de ITBIS por línea, mismo criterio que Facturación — ausente/true = aplica, false = exenta en esta línea puntual. */
+  aplicaItbis?: boolean;
 };
 
-export const LINEA_VACIA: LineaForm = { productoId: '', varianteId: '', cantidad: '1', esManual: false, descripcionManual: '', precioUnitario: '' };
+export const LINEA_VACIA: LineaForm = { productoId: '', varianteId: '', cantidad: '1', esManual: false, descripcionManual: '', precioUnitario: '', aplicaItbis: true };
 
 export function CotizacionesPanel() {
   const queryClient = useQueryClient();

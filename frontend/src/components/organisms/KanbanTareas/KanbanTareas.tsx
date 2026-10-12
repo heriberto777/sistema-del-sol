@@ -6,6 +6,7 @@ import { ChevronDown, ChevronRight, ChevronsDownUp, ChevronsLeft, ChevronsRight,
 import { apiClient } from '../../../lib/api-client';
 import { mensajeErrorApi } from '../../../lib/mensaje-error-api';
 import { useAuth } from '../../../hooks/useAuth';
+import { useAutoAlturaTextarea } from '../../../hooks/useAutoAlturaTextarea';
 import { Button } from '../../atoms/Button/Button';
 import { Card } from '../../atoms/Card/Card';
 import { Select } from '../../atoms/Select/Select';
@@ -1118,6 +1119,7 @@ const UMBRAL_AVISO_LARGO_COMENTARIO = LARGO_MAXIMO_COMENTARIO * 0.9;
 function FormularioComentario({ onComentar, guardando }: { onComentar: (contenido: string) => void; guardando: boolean }) {
   const [contenido, setContenido] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  useAutoAlturaTextarea(textareaRef, contenido);
 
   return (
     <form

@@ -70,10 +70,11 @@ export class CotizacionesService {
     const lineasCalculadas = await Promise.all(
       lineas.map(async (linea) => {
         if (!linea.productoId) {
+          const porcentajeItbis = linea.aplicaItbis === false ? 0 : tasaItbisGeneralManual;
           const precioUnitario = linea.precioUnitario as number;
           const descuento = linea.descuento ?? 0;
           const totalLinea = linea.cantidad * precioUnitario - descuento;
-          const montoItbis = totalLinea * (tasaItbisGeneralManual / 100);
+          const montoItbis = totalLinea * (porcentajeItbis / 100);
 
           return {
             productoId: null,
@@ -82,7 +83,7 @@ export class CotizacionesService {
             cantidad: linea.cantidad,
             precioUnitario,
             descuento,
-            porcentajeItbis: tasaItbisGeneralManual,
+            porcentajeItbis,
             montoItbis,
             montoTotal: totalLinea + montoItbis,
           };
@@ -90,7 +91,9 @@ export class CotizacionesService {
         const varianteId = await this.variantesService.resolverObligatoria(linea.productoId, linea.varianteId);
         const producto = await this.cotizacionesRepository.obtenerProductoConPrecioVigente(linea.productoId, varianteId, listaPrecio);
         const precioUnitario = linea.precioUnitario ?? Number(producto.precios[0]?.precioVenta ?? 0);
-        const porcentajeItbis = Number(producto.porcentajeItbis);
+        // Toggle de ITBIS por línea, mismo criterio que FacturacionService —
+        // `aplicaItbis: false` fuerza 0% sin importar producto.porcentajeItbis.
+        const porcentajeItbis = linea.aplicaItbis === false ? 0 : Number(producto.porcentajeItbis);
         const descuento =
           linea.descuento ?? (await this.ofertasService.resolverDescuentoLinea(linea.productoId, producto.categoriaId, linea.cantidad, precioUnitario));
 
@@ -265,6 +268,13 @@ export class CotizacionesService {
           cantidad: Number(linea.cantidad),
           precioUnitario: Number(linea.precioUnitario),
           descuento: Number(linea.descuento),
+          // Si en la cotización esta línea quedó en 0% de ITBIS (toggle
+          // apagado al crearla, ítem B-7), se propaga como aplicaItbis:false
+          // para que la factura real también salga exenta — sin esto, la
+          // exención se perdía al convertir (FacturacionService recalcula
+          // su propia tasa y vuelve a cobrar ITBIS sobre una venta que el
+          // vendedor había marcado explícitamente como exenta).
+          aplicaItbis: Number(linea.porcentajeItbis) === 0 ? false : undefined,
         })),
       },
       tenantId,

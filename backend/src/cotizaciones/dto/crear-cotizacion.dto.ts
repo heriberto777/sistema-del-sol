@@ -3,6 +3,7 @@ import { Type } from 'class-transformer';
 import {
   ArrayMinSize,
   IsArray,
+  IsBoolean,
   IsDateString,
   IsNotEmpty,
   IsNumber,
@@ -51,6 +52,15 @@ export class LineaCotizacionDto {
   @IsNumber()
   @Min(0)
   descuento?: number;
+
+  @ApiProperty({
+    required: false,
+    default: true,
+    description: 'Toggle de ITBIS por línea, mismo criterio que Facturación (ítem B-7) — false fuerza 0% en esta línea sin importar producto.porcentajeItbis.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  aplicaItbis?: boolean;
 }
 
 export class CrearCotizacionDto {

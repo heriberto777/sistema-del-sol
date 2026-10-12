@@ -6,6 +6,7 @@ import { apiClient } from '../../../lib/api-client';
 import { mensajeErrorApi } from '../../../lib/mensaje-error-api';
 import { comprimirImagen } from '../../../lib/comprimir-imagen';
 import { useAuth } from '../../../hooks/useAuth';
+import { useAutoAlturaTextarea } from '../../../hooks/useAutoAlturaTextarea';
 import { Button } from '../../atoms/Button/Button';
 import { Select } from '../../atoms/Select/Select';
 import { Modal } from '../../molecules/Modal/Modal';
@@ -62,6 +63,7 @@ function ComentarioItem({
   const [modoEdicion, setModoEdicion] = useState(false);
   const [borrador, setBorrador] = useState(comentario.contenido);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  useAutoAlturaTextarea(textareaRef, borrador);
 
   function guardar(e: FormEvent) {
     e.preventDefault();
@@ -162,6 +164,7 @@ export function TareaPersonalModal({ tarea, onClose }: { tarea: TareaPersonal; o
   const [imagenAmpliada, setImagenAmpliada] = useState<string | null>(null);
   const [descripcion, setDescripcion] = useState(tarea.descripcion ?? '');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  useAutoAlturaTextarea(textareaRef, contenido);
   // Igual criterio que KanbanTareas.tsx: sesión de "estoy leyendo esto ahora", no persiste entre aperturas.
   const [panelNotasAbierto, setPanelNotasAbierto] = useState(true);
 

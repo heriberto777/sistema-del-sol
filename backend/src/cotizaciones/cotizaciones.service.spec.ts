@@ -361,6 +361,46 @@ describe('CotizacionesService', () => {
         { formaPagoId: undefined, referenciaPago: undefined },
       );
     });
+
+    it('propaga aplicaItbis:false a la factura cuando la línea quedó en 0% de ITBIS en la cotización', async () => {
+      repository.buscarPorId.mockResolvedValue({
+        id: 'c1',
+        estado: 'ACEPTADA',
+        facturaId: null,
+        clienteId: 'cliente-1',
+        lineas: [{ productoId: 'prod-1', cantidad: 1, precioUnitario: 100, descuento: 0, porcentajeItbis: 0 }],
+      } as never);
+      facturacionService.crear.mockResolvedValue({ id: 'f1', total: 100 } as never);
+
+      await service.convertirEnFactura('c1', { bodegaId: 'bodega-1', tipoFactura: 'CONTADO' }, 'tenant-1', 'vendedor-1');
+
+      expect(facturacionService.crear).toHaveBeenCalledWith(
+        expect.objectContaining({ lineas: [expect.objectContaining({ aplicaItbis: false })] }),
+        'tenant-1',
+        'vendedor-1',
+        { formaPagoId: undefined, referenciaPago: undefined },
+      );
+    });
+
+    it('no fuerza aplicaItbis cuando la línea de la cotización sí tenía ITBIS normal', async () => {
+      repository.buscarPorId.mockResolvedValue({
+        id: 'c1',
+        estado: 'ACEPTADA',
+        facturaId: null,
+        clienteId: 'cliente-1',
+        lineas: [{ productoId: 'prod-1', cantidad: 1, precioUnitario: 100, descuento: 0, porcentajeItbis: 18 }],
+      } as never);
+      facturacionService.crear.mockResolvedValue({ id: 'f1', total: 118 } as never);
+
+      await service.convertirEnFactura('c1', { bodegaId: 'bodega-1', tipoFactura: 'CONTADO' }, 'tenant-1', 'vendedor-1');
+
+      expect(facturacionService.crear).toHaveBeenCalledWith(
+        expect.objectContaining({ lineas: [expect.objectContaining({ aplicaItbis: undefined })] }),
+        'tenant-1',
+        'vendedor-1',
+        { formaPagoId: undefined, referenciaPago: undefined },
+      );
+    });
   });
 
   describe('línea manual/libre (plan de integración Cuadre, ítem B-9)', () => {
@@ -387,6 +427,39 @@ describe('CotizacionesService', () => {
       await expect(
         service.crear(dto({ lineas: [{ productoId: 'prod-1', descripcionManual: 'Instalación', cantidad: 1 } as never] }), 'tenant-1', 'vendedor-1'),
       ).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('aplicaItbis (mismo toggle que Facturación, ítem B-7)', () => {
+    it('aplicaItbis: false fuerza 0% en esa línea sin importar producto.porcentajeItbis', async () => {
+      repository.obtenerProductoConPrecioVigente.mockResolvedValue(producto(18, 100) as never);
+      repository.crearEnTx.mockResolvedValue({ id: 'c1' } as never);
+
+      await service.crear(dto({ lineas: [{ productoId: 'prod-1', cantidad: 2, aplicaItbis: false } as never] }), 'tenant-1', 'vendedor-1');
+
+      // 2*100=200 subtotal; itbis 0 porque aplicaItbis: false; total = 200
+      expect(repository.crearEnTx).toHaveBeenCalledWith(TX, expect.objectContaining({ subtotal: 200, itbis: 0, total: 200 }));
+    });
+
+    it('sin aplicaItbis (u omitido) usa el porcentajeItbis normal del producto', async () => {
+      repository.obtenerProductoConPrecioVigente.mockResolvedValue(producto(18, 100) as never);
+      repository.crearEnTx.mockResolvedValue({ id: 'c1' } as never);
+
+      await service.crear(dto({ lineas: [{ productoId: 'prod-1', cantidad: 2 }] }), 'tenant-1', 'vendedor-1');
+
+      expect(repository.crearEnTx).toHaveBeenCalledWith(TX, expect.objectContaining({ itbis: 36 }));
+    });
+
+    it('aplicaItbis:false en una línea manual fuerza 0% aunque ITBIS_GENERAL sea distinto de cero', async () => {
+      repository.crearEnTx.mockResolvedValue({ id: 'c1' } as never);
+
+      await service.crear(
+        dto({ lineas: [{ descripcionManual: 'Servicio exento', cantidad: 1, precioUnitario: 100, aplicaItbis: false } as never] }),
+        'tenant-1',
+        'vendedor-1',
+      );
+
+      expect(repository.crearEnTx).toHaveBeenCalledWith(TX, expect.objectContaining({ subtotal: 100, itbis: 0, total: 100 }));
     });
   });
 

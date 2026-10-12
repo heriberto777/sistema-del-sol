@@ -24,6 +24,9 @@ export interface ClienteFormValues {
   rncCedula: string;
   email: string;
   telefono: string;
+  direccion: string;
+  nombreContacto: string;
+  telefonoSecundario: string;
   limiteCredito: string;
   listaPrecioId: string;
   categoriaId: string;
@@ -38,6 +41,9 @@ export const CLIENTE_VACIO: ClienteFormValues = {
   rncCedula: '',
   email: '',
   telefono: '',
+  direccion: '',
+  nombreContacto: '',
+  telefonoSecundario: '',
   limiteCredito: '',
   listaPrecioId: '',
   categoriaId: '',
@@ -65,6 +71,9 @@ export function FormularioCliente({ cliente, onGuardado }: { cliente: Cliente | 
           rncCedula: cliente.rncCedula ?? '',
           email: cliente.email ?? '',
           telefono: cliente.telefono ?? '',
+          direccion: cliente.direccion ?? '',
+          nombreContacto: cliente.nombreContacto ?? '',
+          telefonoSecundario: cliente.telefonoSecundario ?? '',
           limiteCredito: cliente.limiteCredito ?? '',
           listaPrecioId: cliente.listaPrecioId ?? '',
           categoriaId: cliente.categoriaId ?? '',
@@ -83,6 +92,9 @@ export function FormularioCliente({ cliente, onGuardado }: { cliente: Cliente | 
       rncCedula: valores.rncCedula || undefined,
       email: valores.email || undefined,
       telefono: valores.telefono || undefined,
+      direccion: valores.direccion || undefined,
+      nombreContacto: valores.nombreContacto || undefined,
+      telefonoSecundario: valores.telefonoSecundario || undefined,
       limiteCredito: valores.limiteCredito ? Number(valores.limiteCredito) : undefined,
       listaPrecioId: valores.listaPrecioId || null,
       categoriaId: valores.categoriaId || null,
@@ -154,6 +166,26 @@ export function FormularioCliente({ cliente, onGuardado }: { cliente: Cliente | 
           value={valores.telefono}
           onChange={(e) => setValores((v) => ({ ...v, telefono: e.target.value }))}
         />
+        <FormField
+          id="cliente-telefono-secundario"
+          label="Teléfono secundario (opcional)"
+          value={valores.telefonoSecundario}
+          onChange={(e) => setValores((v) => ({ ...v, telefonoSecundario: e.target.value }))}
+        />
+        <FormField
+          id="cliente-contacto"
+          label="Nombre de contacto (opcional)"
+          value={valores.nombreContacto}
+          onChange={(e) => setValores((v) => ({ ...v, nombreContacto: e.target.value }))}
+        />
+        <div className="sm:col-span-2">
+          <FormField
+            id="cliente-direccion"
+            label="Dirección (opcional)"
+            value={valores.direccion}
+            onChange={(e) => setValores((v) => ({ ...v, direccion: e.target.value }))}
+          />
+        </div>
         <FormField
           id="cliente-limite"
           label="Límite de crédito"

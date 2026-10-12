@@ -50,6 +50,8 @@ export function CotizacionEditar() {
         esManual: !l.productoId,
         descripcionManual: l.descripcionManual ?? '',
         precioUnitario: l.precioUnitario,
+        // Tasa guardada en 0 = el toggle de ITBIS estaba apagado al crear/guardar esta línea.
+        aplicaItbis: l.porcentajeItbis === undefined || Number(l.porcentajeItbis) !== 0,
       })),
     });
     setInfoColapsada(true);
@@ -64,8 +66,13 @@ export function CotizacionEditar() {
           .filter((l) => l.productoId || (l.esManual && l.descripcionManual.trim()))
           .map((l) =>
             l.esManual
-              ? { descripcionManual: l.descripcionManual.trim(), cantidad: Number(l.cantidad), precioUnitario: Number(l.precioUnitario) }
-              : { productoId: l.productoId, varianteId: l.varianteId || undefined, cantidad: Number(l.cantidad) },
+              ? {
+                  descripcionManual: l.descripcionManual.trim(),
+                  cantidad: Number(l.cantidad),
+                  precioUnitario: Number(l.precioUnitario),
+                  aplicaItbis: l.aplicaItbis,
+                }
+              : { productoId: l.productoId, varianteId: l.varianteId || undefined, cantidad: Number(l.cantidad), aplicaItbis: l.aplicaItbis },
           ),
       }),
     onSuccess: () => {
@@ -262,6 +269,16 @@ export function CotizacionEditar() {
                   className="w-28 rounded-md border border-slate-300 px-2 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
                 />
               )}
+              <label className="flex items-center gap-1 whitespace-nowrap text-xs text-slate-600 dark:text-slate-400" title="Toggle de ITBIS por línea">
+                <input
+                  type="checkbox"
+                  checked={linea.aplicaItbis ?? true}
+                  onChange={(e) =>
+                    setValores({ ...valores, lineas: valores.lineas.map((l, idx) => (idx === i ? { ...l, aplicaItbis: e.target.checked } : l)) })
+                  }
+                />
+                ITBIS
+              </label>
               <button
                 type="button"
                 title={linea.esManual ? 'Volver a elegir del catálogo' : 'Línea libre sin producto del catálogo (ítem B-9)'}
@@ -294,7 +311,10 @@ export function CotizacionEditar() {
             onClick={() =>
               setValores({
                 ...valores,
-                lineas: [...valores.lineas, { productoId: '', varianteId: '', cantidad: '1', esManual: false, descripcionManual: '', precioUnitario: '' }],
+                lineas: [
+                  ...valores.lineas,
+                  { productoId: '', varianteId: '', cantidad: '1', esManual: false, descripcionManual: '', precioUnitario: '', aplicaItbis: true },
+                ],
               })
             }
           >

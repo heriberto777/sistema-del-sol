@@ -16,7 +16,7 @@ import { useHayCambios } from '../hooks/useHayCambios';
 import { estimarLineas } from '../lib/estimar-totales-documento';
 import type { Cliente, Producto, LineaForm } from '../components/organisms/CotizacionesPanel/CotizacionesPanel';
 
-const LINEA_VACIA: LineaForm = { productoId: '', varianteId: '', cantidad: '1', esManual: false, descripcionManual: '', precioUnitario: '' };
+const LINEA_VACIA: LineaForm = { productoId: '', varianteId: '', cantidad: '1', esManual: false, descripcionManual: '', precioUnitario: '', aplicaItbis: true };
 
 export function CotizacionNueva() {
   const queryClient = useQueryClient();
@@ -47,8 +47,13 @@ export function CotizacionNueva() {
           .filter((l) => l.productoId || (l.esManual && l.descripcionManual.trim()))
           .map((l) =>
             l.esManual
-              ? { descripcionManual: l.descripcionManual.trim(), cantidad: Number(l.cantidad), precioUnitario: Number(l.precioUnitario) }
-              : { productoId: l.productoId, varianteId: l.varianteId || undefined, cantidad: Number(l.cantidad) },
+              ? {
+                  descripcionManual: l.descripcionManual.trim(),
+                  cantidad: Number(l.cantidad),
+                  precioUnitario: Number(l.precioUnitario),
+                  aplicaItbis: l.aplicaItbis,
+                }
+              : { productoId: l.productoId, varianteId: l.varianteId || undefined, cantidad: Number(l.cantidad), aplicaItbis: l.aplicaItbis },
           ),
       }),
     onSuccess: () => {
@@ -179,6 +184,7 @@ export function CotizacionNueva() {
             onQuitar={(i) => setLineas((prev) => prev.filter((_, idx) => idx !== i))}
             onAgregar={(vacia) => setLineas((prev) => [...prev, vacia])}
             precioSoloManual
+            mostrarItbis
           />
         </Card>
       </form>

@@ -26,6 +26,21 @@ export class CrearClienteDto {
   @IsString()
   telefono?: string;
 
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  direccion?: string;
+
+  @ApiProperty({ required: false, description: 'Persona de contacto dentro de la empresa (útil sobre todo en persona jurídica).' })
+  @IsOptional()
+  @IsString()
+  nombreContacto?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  telefonoSecundario?: string;
+
   @ApiProperty({ required: false, default: 0 })
   @IsOptional()
   @IsNumber()
