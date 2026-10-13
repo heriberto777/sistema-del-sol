@@ -162,5 +162,67 @@ describe('generarDocumentoPdf', () => {
 
       expect(buffer.subarray(0, 5).toString('latin1')).toBe('%PDF-');
     });
+
+    describe('"Formato de Documentos" — Fase A (campos dinámicos) y Fase B1 (QR/firma genéricos)', () => {
+      // PNG 1x1 transparente — ver LOGO_1PX arriba, mismo criterio para firma/QR.
+      const IMAGEN_1PX =
+        'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
+
+      it.each(['CLASICO', 'ECF_OFICIAL', 'MINIMALISTA', 'COMPACTO', 'EDITORIAL'] as const)('%s: color de marca no rompe el documento', async (plantilla) => {
+        const buffer = await generarDocumentoPdf({ ...PARAMS_BASE, colorAcento: '#2b6cb0' }, { plantilla });
+        expect(buffer.subarray(0, 5).toString('latin1')).toBe('%PDF-');
+      });
+
+      it.each(['CLASICO', 'ECF_OFICIAL', 'MINIMALISTA', 'COMPACTO', 'EDITORIAL'] as const)('%s: oculta campos del emisor que no estén en camposEmisorVisibles', async (plantilla) => {
+        const buffer = await generarDocumentoPdf({ ...PARAMS_BASE, camposEmisorVisibles: ['rnc'] }, { plantilla });
+        expect(buffer.subarray(0, 5).toString('latin1')).toBe('%PDF-');
+      });
+
+      it.each(['CLASICO', 'ECF_OFICIAL', 'MINIMALISTA', 'COMPACTO', 'EDITORIAL'] as const)('%s: dibuja datos extra del cliente cuando se piden', async (plantilla) => {
+        const buffer = await generarDocumentoPdf(
+          { ...PARAMS_BASE, clienteDatosExtra: { rnc: '101-00000-1', direccion: 'Calle Falsa 123', telefono: '809-000-0000' }, camposClienteVisibles: ['rnc', 'direccion', 'telefono'] },
+          { plantilla },
+        );
+        expect(buffer.subarray(0, 5).toString('latin1')).toBe('%PDF-');
+      });
+
+      it.each(['CLASICO', 'ECF_OFICIAL', 'MINIMALISTA', 'COMPACTO', 'EDITORIAL'] as const)('%s: columnasLinea reducidas no rompen la tabla', async (plantilla) => {
+        const buffer = await generarDocumentoPdf({ ...PARAMS_BASE, columnasLinea: ['cantidad', 'total'] }, { plantilla });
+        expect(buffer.subarray(0, 5).toString('latin1')).toBe('%PDF-');
+      });
+
+      it.each(['CLASICO', 'ECF_OFICIAL', 'MINIMALISTA', 'COMPACTO', 'EDITORIAL'] as const)('%s: totalesVisibles reducidos no rompen el bloque de totales', async (plantilla) => {
+        const buffer = await generarDocumentoPdf({ ...PARAMS_BASE, totalesVisibles: ['total'] }, { plantilla });
+        expect(buffer.subarray(0, 5).toString('latin1')).toBe('%PDF-');
+      });
+
+      it.each(['CLASICO', 'ECF_OFICIAL', 'MINIMALISTA', 'COMPACTO', 'EDITORIAL'] as const)('%s: QR genérico no rompe el documento', async (plantilla) => {
+        const buffer = await generarDocumentoPdf({ ...PARAMS_BASE, qr: { dataUri: IMAGEN_1PX, etiqueta: 'Escanea para pagar' } }, { plantilla });
+        expect(buffer.subarray(0, 5).toString('latin1')).toBe('%PDF-');
+      });
+
+      it.each(['CLASICO', 'ECF_OFICIAL', 'MINIMALISTA', 'COMPACTO', 'EDITORIAL'] as const)('%s: firma con imagen no rompe el documento', async (plantilla) => {
+        const buffer = await generarDocumentoPdf({ ...PARAMS_BASE, firma: { etiqueta: 'Autorizado por', imagen: IMAGEN_1PX } }, { plantilla });
+        expect(buffer.subarray(0, 5).toString('latin1')).toBe('%PDF-');
+      });
+
+      it.each(['CLASICO', 'ECF_OFICIAL', 'MINIMALISTA', 'COMPACTO', 'EDITORIAL'] as const)('%s: QR y firma juntos no rompen el documento', async (plantilla) => {
+        const buffer = await generarDocumentoPdf(
+          { ...PARAMS_BASE, qr: { dataUri: IMAGEN_1PX }, firma: { etiqueta: 'Autorizado por' } },
+          { plantilla },
+        );
+        expect(buffer.subarray(0, 5).toString('latin1')).toBe('%PDF-');
+      });
+
+      it('ECF_OFICIAL sin firma explícita sigue dibujando la línea "Elaborado por" de siempre (sin cambio de comportamiento)', async () => {
+        const buffer = await generarDocumentoPdf(PARAMS_BASE, { plantilla: 'ECF_OFICIAL' });
+        expect(buffer.subarray(0, 5).toString('latin1')).toBe('%PDF-');
+      });
+
+      it('sin ninguno de los campos nuevos, el documento es idéntico en forma al comportamiento previo (regresión)', async () => {
+        const buffer = await generarDocumentoPdf(PARAMS_BASE, { plantilla: 'CLASICO' });
+        expect(buffer.subarray(0, 5).toString('latin1')).toBe('%PDF-');
+      });
+    });
   });
 });

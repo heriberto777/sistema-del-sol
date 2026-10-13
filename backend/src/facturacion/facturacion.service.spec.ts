@@ -97,6 +97,7 @@ describe('FacturacionService', () => {
       bodega: { findFirst: jest.fn().mockResolvedValue(null) },
       configuracion: { findUnique: jest.fn().mockResolvedValue(null), findMany: jest.fn().mockResolvedValue([]) },
       tenant: { findUnique: jest.fn().mockResolvedValue(null) },
+      personalizacionDocumentoTipo: { findUnique: jest.fn().mockResolvedValue(null) },
     } as unknown as jest.Mocked<PrismaService>;
     clientesService = {
       buscarPorId: jest.fn().mockResolvedValue({ id: 'cliente-1', listaPrecio: null }),
@@ -1674,7 +1675,10 @@ describe('FacturacionService', () => {
 
       await service.generarPdf('f1');
 
-      expect(prisma.tenant.findUnique).toHaveBeenCalledWith({ where: { id: 'tenant-1' }, select: { logo: true, nombre: true, rnc: true, direccion: true, telefono: true } });
+      expect(prisma.tenant.findUnique).toHaveBeenCalledWith({
+        where: { id: 'tenant-1' },
+        select: { logo: true, nombre: true, rnc: true, direccion: true, telefono: true, colorAcentoDocumentos: true },
+      });
     });
   });
 
@@ -1701,7 +1705,10 @@ describe('FacturacionService', () => {
 
       expect(contentType).toBe('application/pdf');
       expect(buffer.subarray(0, 5).toString('latin1')).toBe('%PDF-');
-      expect(prisma.tenant.findUnique).toHaveBeenCalledWith({ where: { id: 'tenant-1' }, select: { logo: true, nombre: true, rnc: true, direccion: true, telefono: true } });
+      expect(prisma.tenant.findUnique).toHaveBeenCalledWith({
+        where: { id: 'tenant-1' },
+        select: { logo: true, nombre: true, rnc: true, direccion: true, telefono: true, colorAcentoDocumentos: true },
+      });
     });
   });
 

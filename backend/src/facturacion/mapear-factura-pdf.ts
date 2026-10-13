@@ -24,7 +24,7 @@ export interface FacturaParaPdf {
   ncf: string | null;
   id: string;
   fecha: Date;
-  cliente: { nombre: string };
+  cliente: { nombre: string; rncCedula?: string | null; direccion?: string | null; telefono?: string | null };
   moneda: string;
   totalMoneda: Prisma.Decimal | null;
   lineas: {
@@ -47,6 +47,11 @@ export function mapearFacturaAParams(factura: FacturaParaPdf): DocumentoPdfParam
     numero: factura.ncf ?? factura.id,
     fecha: factura.fecha,
     cliente: factura.cliente.nombre,
+    clienteDatosExtra: {
+      rnc: factura.cliente.rncCedula ?? undefined,
+      direccion: factura.cliente.direccion ?? undefined,
+      telefono: factura.cliente.telefono ?? undefined,
+    },
     lineas: factura.lineas.map((linea) => ({
       concepto: linea.producto?.nombre ?? linea.descripcionManual ?? '',
       cantidad: linea.cantidad.toString(),

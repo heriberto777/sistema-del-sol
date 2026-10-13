@@ -53,6 +53,7 @@ import { PosCaja } from './pages/PosCaja';
 import { Ia } from './pages/Ia';
 import { Notificaciones } from './pages/Notificaciones';
 import { PlantillasNotificacion } from './pages/PlantillasNotificacion';
+import { FormatoDocumentos } from './pages/FormatoDocumentos';
 import { Mensajes } from './pages/Mensajes';
 import { Bancos } from './pages/Bancos';
 import { GastosMenores } from './pages/GastosMenores';
@@ -277,6 +278,7 @@ const RUTAS_ADMIN = [
           { path: '/ia', element: <Ia /> },
           { path: '/notificaciones', element: <Notificaciones /> },
           { path: '/plantillas-notificacion', element: <PlantillasNotificacion /> },
+          { path: '/formato-documentos', element: <FormatoDocumentos /> },
           { path: '/mensajes', element: <Mensajes /> },
           { path: '/categorias-cliente', element: <CategoriasCliente /> },
           { path: '/leyes-fiscales', element: <LeyesFiscales /> },

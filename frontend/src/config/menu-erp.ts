@@ -261,6 +261,7 @@ export const DOMINIOS_MENU: DominioMenu[] = [
           { id: 'whatsapp-config', etiqueta: 'WhatsApp', ruta: '/whatsapp-config', permisos: ['admin.configuracion'] },
           { id: 'correo-config', etiqueta: 'Correo (SMTP)', ruta: '/correo-config', permisos: ['admin.configuracion'] },
           { id: 'plantillas-notificacion', etiqueta: 'Plantillas de notificación', ruta: '/plantillas-notificacion', permisos: ['admin.configuracion'] },
+          { id: 'formato-documentos', etiqueta: 'Formato de Documentos', ruta: '/formato-documentos', permisos: ['admin.configuracion'] },
         ],
       },
     ],

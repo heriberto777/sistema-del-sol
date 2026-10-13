@@ -682,7 +682,7 @@ export class FacturacionService {
     const [formato, plantilla, personalizacion] = await Promise.all([
       formatoSolicitado ?? resolverFormatoImpresion(this.prisma, tenantId, factura.bodegaId),
       plantillaSolicitada ?? resolverPlantillaDocumento(this.prisma, tenantId, factura.bodegaId),
-      resolverPersonalizacionDocumento(this.prisma, tenantId),
+      resolverPersonalizacionDocumento(this.prisma, tenantId, 'FACTURA'),
     ]);
     const params = { ...mapearFacturaAParams(factura), ...personalizacion };
 

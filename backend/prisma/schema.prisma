@@ -18,128 +18,137 @@ enum EstadoTenant {
 }
 
 model Tenant {
-  id                   String               @id @default(uuid())
-  nombre               String
-  rnc                  String?
+  id                    String               @id @default(uuid())
+  nombre                String
+  rnc                   String?
   // Ítem "e-CF real" — datos del emisor que el propio tenant edita
   // self-service (ver TenantEmpresaController), obligatorios para
   // `sender` en el payload de Alanube. Antes de esto Tenant solo tenía
   // `rnc` (editable únicamente por el super admin de plataforma).
-  direccion            String?
-  telefono             String?
-  email                String?
+  direccion             String?
+  telefono              String?
+  email                 String?
   // Antes vivía escondido en Configuracion[DOCUMENTO_LOGO] (tenant-scoped,
   // solo el propio tenant lo veía/editaba) — promovido a campo propio
   // para que Plataforma también pueda asignarlo/verlo desde
   // /plataforma/tenants (PrismaService global, sin pasar por RLS de
   // Configuracion). `resolverPersonalizacionDocumento` sigue siendo el
   // único punto que lo resuelve para documentos/IA.
-  logo                 String?              @db.Text
-  subdominio           String               @unique
-  estado               EstadoTenant         @default(ACTIVO)
+  logo                  String?              @db.Text
+  // "Formato de Documentos" Fase A — color de marca aplicado a las 5
+  // PlantillaDocumento existentes (ver documento-pdf.ts: `colorAcento`
+  // reemplaza el color fijo de cada plantilla cuando está presente; sin
+  // esto, cero cambio visual). Tamaño/posición del logo quedan fuera de
+  // esta fase a propósito — cada plantilla lo dibuja en su propio layout
+  // fijo (badge inline en EDITORIAL, esquina en las demás) y hacerlo
+  // configurable implica tocar la geometría de cada una, no solo un color.
+  colorAcentoDocumentos String?
+  subdominio            String               @unique
+  estado                EstadoTenant         @default(ACTIVO)
   // Qué módulos tiene disponibles este tenant — ver ModuloActivoGuard.
   // Nullable a propósito: un tenant recién creado sin plan asignado cae
   // al fallback "denegar" del guard hasta que plataforma le asigne uno
   // (los tenants ya existentes se backfillean a un plan al migrar).
-  planId               String?
-  plan                 Plan?                @relation(fields: [planId], references: [id])
+  planId                String?
+  plan                  Plan?                @relation(fields: [planId], references: [id])
   // Ver ModalidadFacturacion — vive acá (no en TenantSettings) porque a
   // diferencia de esa tabla, Tenant siempre tiene una fila garantizada
   // desde su creación (TenantSettings hoy no se crea en ningún flujo).
-  modalidadFacturacion ModalidadFacturacion @default(NCF)
-  createdAt            DateTime             @default(now())
-  updatedAt            DateTime             @updatedAt
+  modalidadFacturacion  ModalidadFacturacion @default(NCF)
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
 
-  settings                  TenantSettings?
-  configuraciones           Configuracion[]
-  modulosOverride           TenantModuloOverride[]
-  users                     User[]
-  roles                     Role[]
-  auditLogs                 AuditLog[]
-  errorLogs                 ErrorLog[]
-  crmLeads                  Lead[]
-  crmEtapasPipeline         EtapaPipeline[]
-  crmOportunidades          Oportunidad[]
-  crmActividades            ActividadCrm[]
-  crmMetasVenta             MetaVentaCrm[]
-  facturas                  Factura[]
-  ncfAsignados              NcfAsignado[]
-  correlativos              Correlativo[]
-  productos                 Producto[]
-  categorias                Categoria[]
-  variantesProducto         VarianteProducto[]
-  atributos                 Atributo[]
-  bodegas                   Bodega[]
-  sucursales                Sucursal[]
-  movimientosInventario     MovimientoInventario[]
-  clientes                  Cliente[]
-  categoriasCliente         CategoriaCliente[]
-  feriados                  Feriado[]
-  puestos                   Puesto[]
-  leyesFiscales             LeyFiscal[]
-  plantillasHorario         PlantillaHorario[]
-  tiposAusenciaConfig       TipoAusenciaConfig[]
-  codigosAutorizacion       CodigoAutorizacion[]
-  comisionesVenta           ComisionVenta[]
-  configuracionLealtad      ConfiguracionLealtad?
-  movimientosLealtad        MovimientoLealtad[]
-  cajas                     Caja[]
-  tasasCambio               TasaCambio[]
-  proveedores               Proveedor[]
-  ordenesCompra             OrdenCompra[]
-  ajustesInventario         AjusteInventario[]
-  transferenciasInventario  TransferenciaInventario[]
-  conteosFisicos            ConteoFisico[]
-  webhooks                  Webhook[]
-  notificaciones            Notificacion[]
-  plantillasNotificacion    NotificacionPlantilla[]
-  ofertas                   Oferta[]
-  bonos                     Bono[]
-  lotes                     Lote[]
-  cotizaciones              Cotizacion[]
-  remisiones                Remision[]
-  cuentasContables          CuentaContable[]
-  asientosContables         AsientoContable[]
-  periodosContablesCerrados PeriodoContableCerrado[]
-  empleados                 Empleado[]
-  periodosNomina            PeriodoNomina[]
-  turnosCaja                TurnoCaja[]
-  pagos                     Pago[]
-  formasPago                FormaPago[]
-  listasPrecio              ListaPrecio[]
-  cuentasBancarias          CuentaBancaria[]
-  gastosMenores             GastoMenor[]
-  horariosEmpleado          HorarioEmpleado[]
-  registrosAsistencia       RegistroAsistencia[]
-  ausencias                 Ausencia[]
-  suscripcion               Suscripcion?
-  facturasPlataforma        FacturaPlataforma[]
-  ventasAparcadas           VentaAparcada[]
-  carritosBorrador          CarritoBorrador[]
-  whatsappConfig            WhatsappConfigTenant?
-  emailConfig               EmailConfigTenant?
-  whatsappMensajes          WhatsappMensaje[]
-  pasarelaConfig            PasarelaConfigTenant?
-  sesionesCobroFactura      SesionCobroFactura[]
-  pedidosTienda             PedidoTienda[]
-  seccionesTienda           SeccionTienda[]
-  dominios                  TenantDominio[]
-  proyectos                 Proyecto[]
-  hitosProyecto             HitoProyecto[]
-  tareasProyecto            TareaProyecto[]
-  registrosHoraProyecto     RegistroHoraProyecto[]
-  sesionesTrabajoTarea      SesionTrabajoTarea[]
-  publicacionesSociales     PublicacionSocial[]
-  propiedades               Propiedad[]
-  contratosPropiedad        ContratoPropiedad[]
-  alertasBusquedaPropiedad  AlertaBusquedaPropiedad[]
-  cobrosAlquiler            CobroAlquiler[]
-  tareasPersonales          TareaPersonal[]
-  categoriasIncentivo       CategoriaIncentivo[]
-  reservasTravel            TravelReserva[]
-  movimientosLedgerTravel   TravelLedgerMovimiento[]
-  reglasMarkupTravel        TravelReglaMarkup[]
-  usosIa                    UsoIaTenant[]
+  settings                   TenantSettings?
+  configuraciones            Configuracion[]
+  modulosOverride            TenantModuloOverride[]
+  users                      User[]
+  roles                      Role[]
+  auditLogs                  AuditLog[]
+  errorLogs                  ErrorLog[]
+  crmLeads                   Lead[]
+  crmEtapasPipeline          EtapaPipeline[]
+  crmOportunidades           Oportunidad[]
+  crmActividades             ActividadCrm[]
+  crmMetasVenta              MetaVentaCrm[]
+  facturas                   Factura[]
+  ncfAsignados               NcfAsignado[]
+  correlativos               Correlativo[]
+  productos                  Producto[]
+  categorias                 Categoria[]
+  variantesProducto          VarianteProducto[]
+  atributos                  Atributo[]
+  bodegas                    Bodega[]
+  sucursales                 Sucursal[]
+  movimientosInventario      MovimientoInventario[]
+  clientes                   Cliente[]
+  categoriasCliente          CategoriaCliente[]
+  feriados                   Feriado[]
+  puestos                    Puesto[]
+  leyesFiscales              LeyFiscal[]
+  plantillasHorario          PlantillaHorario[]
+  tiposAusenciaConfig        TipoAusenciaConfig[]
+  codigosAutorizacion        CodigoAutorizacion[]
+  comisionesVenta            ComisionVenta[]
+  configuracionLealtad       ConfiguracionLealtad?
+  movimientosLealtad         MovimientoLealtad[]
+  cajas                      Caja[]
+  tasasCambio                TasaCambio[]
+  proveedores                Proveedor[]
+  ordenesCompra              OrdenCompra[]
+  ajustesInventario          AjusteInventario[]
+  transferenciasInventario   TransferenciaInventario[]
+  conteosFisicos             ConteoFisico[]
+  webhooks                   Webhook[]
+  notificaciones             Notificacion[]
+  plantillasNotificacion     NotificacionPlantilla[]
+  ofertas                    Oferta[]
+  bonos                      Bono[]
+  lotes                      Lote[]
+  cotizaciones               Cotizacion[]
+  remisiones                 Remision[]
+  cuentasContables           CuentaContable[]
+  asientosContables          AsientoContable[]
+  periodosContablesCerrados  PeriodoContableCerrado[]
+  empleados                  Empleado[]
+  periodosNomina             PeriodoNomina[]
+  turnosCaja                 TurnoCaja[]
+  pagos                      Pago[]
+  formasPago                 FormaPago[]
+  listasPrecio               ListaPrecio[]
+  cuentasBancarias           CuentaBancaria[]
+  gastosMenores              GastoMenor[]
+  horariosEmpleado           HorarioEmpleado[]
+  registrosAsistencia        RegistroAsistencia[]
+  ausencias                  Ausencia[]
+  suscripcion                Suscripcion?
+  facturasPlataforma         FacturaPlataforma[]
+  ventasAparcadas            VentaAparcada[]
+  carritosBorrador           CarritoBorrador[]
+  whatsappConfig             WhatsappConfigTenant?
+  emailConfig                EmailConfigTenant?
+  whatsappMensajes           WhatsappMensaje[]
+  pasarelaConfig             PasarelaConfigTenant?
+  sesionesCobroFactura       SesionCobroFactura[]
+  pedidosTienda              PedidoTienda[]
+  seccionesTienda            SeccionTienda[]
+  dominios                   TenantDominio[]
+  proyectos                  Proyecto[]
+  hitosProyecto              HitoProyecto[]
+  tareasProyecto             TareaProyecto[]
+  registrosHoraProyecto      RegistroHoraProyecto[]
+  sesionesTrabajoTarea       SesionTrabajoTarea[]
+  publicacionesSociales      PublicacionSocial[]
+  propiedades                Propiedad[]
+  contratosPropiedad         ContratoPropiedad[]
+  alertasBusquedaPropiedad   AlertaBusquedaPropiedad[]
+  cobrosAlquiler             CobroAlquiler[]
+  tareasPersonales           TareaPersonal[]
+  categoriasIncentivo        CategoriaIncentivo[]
+  reservasTravel             TravelReserva[]
+  movimientosLedgerTravel    TravelLedgerMovimiento[]
+  reglasMarkupTravel         TravelReglaMarkup[]
+  usosIa                     UsoIaTenant[]
+  personalizacionesDocumento PersonalizacionDocumentoTipo[]
 
   @@map("tenants")
 }
@@ -530,13 +539,13 @@ model PagoPlataforma {
   registradoPor   PlatformAdmin?    @relation(fields: [registradoPorId], references: [id], onDelete: SetNull)
   createdAt       DateTime          @default(now())
 
-  @@index([facturaId])
   // Defensa en profundidad para registrarPagoGateway: Postgres trata cada
   // NULL como distinto, así que esto no afecta pagos manuales sin
   // referencia (varios por factura, todos con referencia=null) — solo
   // bloquea insertar dos veces la MISMA referencia (id de sesión de
   // Stripe) para la misma factura, si el check de aplicación fallara.
   @@unique([facturaId, referencia])
+  @@index([facturaId])
   @@map("pagos_plataforma")
 }
 
@@ -684,7 +693,7 @@ model PlataformaConfiguracion {
   // DuffelAdapter.habilitado/llamar() leen. "duffel_test_..." en
   // sandbox, "duffel_live_..." en producción — mismo host, cambia el
   // prefijo del token (no hay URL de sandbox separada).
-  duffelApiTokenCifrado String?
+  duffelApiTokenCifrado      String?
   // Webhook entrante de Duffel (order.airline_initiated_change_detected,
   // order_cancellation.created) — mismo esquema de firma que Stripe
   // (header `X-Duffel-Signature`, formato `t=...,v1=...`, HMAC-SHA256
@@ -695,15 +704,15 @@ model PlataformaConfiguracion {
   // mismo criterio que Duffel. Autenticación por firma (Api-key +
   // X-Signature = SHA256(apiKey+secret+timestamp)), confirmado contra el
   // sandbox real — no hay Bearer token, hace falta guardar las dos partes.
-  hotelbedsApiKeyCifrado String?
-  hotelbedsSecretCifrado String?
+  hotelbedsApiKeyCifrado     String?
+  hotelbedsSecretCifrado     String?
   // Hotelbeds cotiza siempre en EUR (confirmado contra el sandbox real, sin
   // parámetro de moneda en su API) — para vender en otra moneda hay que
   // convertir nosotros mismos. null/"EUR" = sin conversión (passthrough).
   // La tasa es manual (1 EUR = N de hotelbedsMoneda), igual criterio que las
   // tasas de ISR/TSS de Nómina: no se verifica contra una fuente en vivo.
-  hotelbedsMoneda        String?
-  hotelbedsTasaCambio    Decimal? @db.Decimal(12, 6)
+  hotelbedsMoneda            String?
+  hotelbedsTasaCambio        Decimal? @db.Decimal(12, 6)
 
   @@map("plataforma_configuracion")
 }
@@ -2322,6 +2331,54 @@ enum PlantillaDocumento {
   MINIMALISTA
   COMPACTO
   EDITORIAL
+}
+
+/// "Formato de Documentos" — qué tipo de documento imprimible personaliza
+/// cada fila de PersonalizacionDocumentoTipo. El Recibo de POS NO es un
+/// tipo aparte: una venta de POS ya es una Factura (ver CLAUDE.md), así
+/// que hereda la config de FACTURA.
+enum TipoDocumentoImpreso {
+  FACTURA
+  COTIZACION
+  REMISION
+}
+
+/// A qué apunta el bloque de QR genérico (Fase B1) — el QR real de la
+/// DGII para e-CF (Fase B2) es un caso aparte, bloqueado hasta que
+/// EmisionECfService capture el código de seguridad real de Alanube
+/// (ver generar-qr.ts y la Rev. 3 de la propuesta de diseño).
+enum QrContenido {
+  LINK_PAGO
+  TEXTO_LIBRE
+}
+
+/// "Formato de Documentos" — config por tenant y por tipo de documento
+/// (Fase A: campos dinámicos de empresa/cliente, columnas, totales,
+/// texto legal, color de marca en Tenant.colorAcentoDocumentos; Fase B1:
+/// QR genérico + firma visual). Fila ausente = comportamiento de
+/// siempre (todos los campos/columnas visibles, sin QR ni firma) — así
+/// que un tenant que nunca abrió esta pantalla no necesita backfill.
+model PersonalizacionDocumentoTipo {
+  id                    String               @id @default(uuid())
+  tenantId              String
+  tenant                Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tipoDocumento         TipoDocumentoImpreso
+  camposEmisorVisibles  String[]
+  camposClienteVisibles String[]
+  columnasLinea         String[]
+  totalesVisibles       String[]
+  textoLegal            String?              @db.Text
+  qrHabilitado          Boolean              @default(false)
+  qrContenido           QrContenido?
+  qrValor               String?              @db.Text
+  firmaHabilitada       Boolean              @default(false)
+  firmaEtiqueta         String?
+  firmaImagen           String?              @db.Text
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+
+  @@unique([tenantId, tipoDocumento])
+  @@map("personalizaciones_documento_tipo")
 }
 
 /// Cómo se abre la gaveta de dinero física al cobrar en POS (ítem F-9,
@@ -4105,25 +4162,25 @@ model HitoProyecto {
 }
 
 model TareaProyecto {
-  id               String                 @id @default(uuid())
-  tenantId         String
-  tenant           Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  proyectoId       String
-  proyecto         Proyecto               @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
-  hitoId           String?
-  hito             HitoProyecto?          @relation(fields: [hitoId], references: [id], onDelete: SetNull)
-  titulo           String
-  descripcion      String?
-  estado           EstadoTareaProyecto    @default(PENDIENTE)
-  prioridad        PrioridadTareaProyecto @default(MEDIA)
-  fechaVencimiento DateTime?
+  id                  String                 @id @default(uuid())
+  tenantId            String
+  tenant              Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  proyectoId          String
+  proyecto            Proyecto               @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
+  hitoId              String?
+  hito                HitoProyecto?          @relation(fields: [hitoId], references: [id], onDelete: SetNull)
+  titulo              String
+  descripcion         String?
+  estado              EstadoTareaProyecto    @default(PENDIENTE)
+  prioridad           PrioridadTareaProyecto @default(MEDIA)
+  fechaVencimiento    DateTime?
   // Aviso único (email + WhatsApp) a los responsables el día que llega
   // `fechaVencimiento` — ver TareasProyectoCronService. Se resetea a false
   // si se edita `fechaVencimiento` (mismo criterio que
   // HitoProyecto.alertaVencimientoEnviada/TareaPersonal.recordatorioEnviado).
-  recordatorioEnviado Boolean              @default(false)
-  createdAt        DateTime               @default(now())
-  updatedAt        DateTime               @updatedAt
+  recordatorioEnviado Boolean                @default(false)
+  createdAt           DateTime               @default(now())
+  updatedAt           DateTime               @updatedAt
 
   responsables    TareaProyectoResponsable[]
   registrosHoras  RegistroHoraProyecto[]
@@ -4575,40 +4632,40 @@ enum EstadoTareaPersonal {
 /// mismo tenant) se hace a mano en el repositorio — SIEMPRE filtrando
 /// también por `usuarioId`, no solo por `tenantId`.
 model TareaPersonal {
-  id           String                 @id @default(uuid())
-  tenantId     String
-  tenant       Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  usuarioId    String
-  usuario      User                   @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
-  titulo       String
+  id                   String                 @id @default(uuid())
+  tenantId             String
+  tenant               Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  usuarioId            String
+  usuario              User                   @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  titulo               String
   // Detalle ampliado, opcional — soporta los mismos fences ``` que
   // ComentarioTareaPersonal.contenido, mismo criterio de renderizado
   // 100% en el frontend. "Generar con IA" solo sugiere un punto de
   // partida acá, nunca escribe sola sin que se confirme.
-  descripcion  String?                @db.Text
-  prioridad    PrioridadTareaPersonal @default(MEDIA)
-  estado       EstadoTareaPersonal    @default(PENDIENTE)
+  descripcion          String?                @db.Text
+  prioridad            PrioridadTareaPersonal @default(MEDIA)
+  estado               EstadoTareaPersonal    @default(PENDIENTE)
   // Día asignado — null significa "sin fecha" (bandeja general en la
   // Lista diaria); lo usan tanto la Lista (hoy) como la Agenda semanal
   // (agrupa por este campo).
-  fecha        DateTime?
-  completadaEn DateTime?
+  fecha                DateTime?
+  completadaEn         DateTime?
   // Lista libre (chips sugeridos en el frontend, sin catálogo aparte a
   // propósito) — mismo criterio que Propiedad.amenidades/Webhook.eventos.
-  etiquetas    String[]
+  etiquetas            String[]
   // null = "Sin incentivo" (no suma ni resta al % de cumplimiento de
   // ningún renglón) — es el valor por defecto, así que ninguna tarea ya
   // creada queda afectada por este campo nuevo. onDelete: SetNull porque
   // borrar un renglón no debería borrar el historial de tareas que ya
   // sumaron a él.
   categoriaIncentivoId String?
-  categoriaIncentivo   CategoriaIncentivo? @relation(fields: [categoriaIncentivoId], references: [id], onDelete: SetNull)
+  categoriaIncentivo   CategoriaIncentivo?    @relation(fields: [categoriaIncentivoId], references: [id], onDelete: SetNull)
   // Aviso único (email + WhatsApp si el usuario tiene teléfono) el día que
   // llega `fecha` — ver TareasPersonalesCronService. Se resetea a false si
   // se edita `fecha` (mismo criterio que HitoProyecto.alertaVencimientoEnviada).
-  recordatorioEnviado Boolean                @default(false)
-  createdAt    DateTime               @default(now())
-  updatedAt    DateTime               @updatedAt
+  recordatorioEnviado  Boolean                @default(false)
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
 
   comentarios ComentarioTareaPersonal[]
 
@@ -4711,29 +4768,29 @@ enum EstadoTravelReserva {
 /// la ve Duffel. Gateado por módulo (`@RequiereModulo('travel')`, ver
 /// modulos-base.ts) igual que Inmobiliaria/Proyectos — no siempre activo.
 model TravelReserva {
-  id            String              @id @default(uuid())
-  tenantId      String
-  tenant        Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  id                     String              @id @default(uuid())
+  tenantId               String
+  tenant                 Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   // "TRV-2026-000001" — armado en TravelService a partir de
   // CorrelativosRepository.siguiente(tenantId, 'TRAVEL_RESERVA') + el año
   // actual. Nunca depende de un id de proveedor (ver comentario de arriba).
-  codigoInterno String
-  clienteId     String
-  cliente       Cliente             @relation(fields: [clienteId], references: [id])
-  tipo          TipoTravelReserva
-  estado        EstadoTravelReserva @default(PENDIENTE)
-  moneda        String              @default("USD")
+  codigoInterno          String
+  clienteId              String
+  cliente                Cliente             @relation(fields: [clienteId], references: [id])
+  tipo                   TipoTravelReserva
+  estado                 EstadoTravelReserva @default(PENDIENTE)
+  moneda                 String              @default("USD")
   // Costo real (lo que la agencia paga/pagará al proveedor) vs. venta
   // (lo que se le cobra al cliente) — la diferencia es el markup, cargado
   // a mano en esta fase (sin TravelReglaMarkup todavía, YAGNI hasta que
   // haya pricing real de un proveedor que automatizar en Fase 3).
-  montoCosto    Decimal             @db.Decimal(12, 2)
-  montoVenta    Decimal             @db.Decimal(12, 2)
-  notas         String?             @db.Text
+  montoCosto             Decimal             @db.Decimal(12, 2)
+  montoVenta             Decimal             @db.Decimal(12, 2)
+  notas                  String?             @db.Text
   // Factura real generada al confirmar el cobro (ver TravelService.facturar)
   // — mismo patrón que HitoProyecto.facturaId/CobroAlquiler.facturaId.
-  facturaId     String?             @unique
-  factura       Factura?            @relation(fields: [facturaId], references: [id])
+  facturaId              String?             @unique
+  factura                Factura?            @relation(fields: [facturaId], references: [id])
   // Fase 1b — reservada de verdad contra un proveedor (Duffel) en vez de
   // carga manual. `proveedor` null = Fase 0 (carga manual), no vacío =
   // el resto de estos campos están poblados. `montoCosto`/`moneda` en
@@ -4756,8 +4813,8 @@ model TravelReserva {
   alertaProveedorTipo    String?
   alertaProveedorDetalle String?             @db.Text
   alertaProveedorEn      DateTime?
-  createdAt     DateTime            @default(now())
-  updatedAt     DateTime            @updatedAt
+  createdAt              DateTime            @default(now())
+  updatedAt              DateTime            @updatedAt
 
   pasajeros         TravelReservaPasajero[]
   movimientosLedger TravelLedgerMovimiento[]
@@ -4771,14 +4828,14 @@ model TravelReserva {
 /// la TravelReserva padre (ya tenant-scoped) antes de confiar en nada de
 /// un pasajero.
 model TravelReservaPasajero {
-  id              String        @id @default(uuid())
-  reservaId       String
-  reserva         TravelReserva @relation(fields: [reservaId], references: [id], onDelete: Cascade)
-  nombre          String
-  apellido        String
-  fechaNacimiento DateTime?
-  tipoDocumento   String?
-  numeroDocumento String?
+  id                        String        @id @default(uuid())
+  reservaId                 String
+  reserva                   TravelReserva @relation(fields: [reservaId], references: [id], onDelete: Cascade)
+  nombre                    String
+  apellido                  String
+  fechaNacimiento           DateTime?
+  tipoDocumento             String?
+  numeroDocumento           String?
   // Vuelos internacionales (APIS) — Duffel acepta `identity_documents` en
   // la orden y lo confirmé contra el sandbox real (sin error, aunque no
   // lo exige para toda ruta/aerolínea). Opcionales a propósito: solo se
@@ -4786,9 +4843,9 @@ model TravelReservaPasajero {
   // sin ellos si la aerolínea no los pide.
   paisEmisionDocumento      String?
   fechaVencimientoDocumento DateTime?
-  email           String?
-  telefono        String?
-  createdAt       DateTime      @default(now())
+  email                     String?
+  telefono                  String?
+  createdAt                 DateTime      @default(now())
 
   @@map("travel_reserva_pasajeros")
 }
@@ -4889,24 +4946,24 @@ enum TipoActividadCrm {
 /// `clienteId` se llena en la Fase 2 al convertirlo; el Lead nunca se
 /// borra al convertirse, queda como registro de origen.
 model Lead {
-  id              String      @id @default(uuid())
-  tenantId        String
-  tenant          Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  nombre          String
-  email           String?
-  telefono        String?
-  origen          OrigenLead  @default(MANUAL)
-  estado          EstadoLead  @default(NUEVO)
+  id             String     @id @default(uuid())
+  tenantId       String
+  tenant         Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  nombre         String
+  email          String?
+  telefono       String?
+  origen         OrigenLead @default(MANUAL)
+  estado         EstadoLead @default(NUEVO)
   // Obligatorio solo cuando estado = DESCARTADO (validado en el servicio,
   // no en BD — mismo criterio que AnularFacturaDto.motivo).
-  motivoDescarte  String?
-  notas           String?
-  vendedorId      String?
-  vendedor        User?       @relation(fields: [vendedorId], references: [id], onDelete: SetNull)
-  clienteId       String?     @unique
-  cliente         Cliente?    @relation(fields: [clienteId], references: [id], onDelete: SetNull)
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
+  motivoDescarte String?
+  notas          String?
+  vendedorId     String?
+  vendedor       User?      @relation(fields: [vendedorId], references: [id], onDelete: SetNull)
+  clienteId      String?    @unique
+  cliente        Cliente?   @relation(fields: [clienteId], references: [id], onDelete: SetNull)
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
 
   oportunidades Oportunidad[]
   actividades   ActividadCrm[]
@@ -4941,31 +4998,31 @@ model EtapaPipeline {
 /// `estado = ABIERTA`; al ganar/perder queda como la última etapa
 /// recorrida (histórico, no se limpia).
 model Oportunidad {
-  id                   String            @id @default(uuid())
-  tenantId             String
-  tenant               Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  titulo               String
-  clienteId            String?
-  cliente              Cliente?          @relation(fields: [clienteId], references: [id], onDelete: SetNull)
-  leadId               String?
-  lead                 Lead?             @relation(fields: [leadId], references: [id], onDelete: SetNull)
-  etapaId              String
-  etapa                EtapaPipeline     @relation(fields: [etapaId], references: [id])
-  montoEstimado        Decimal           @db.Decimal(14, 2)
-  probabilidadPct      Int               @default(0)
-  fechaCierreEstimada  DateTime
-  vendedorId           String
-  vendedor             User              @relation(fields: [vendedorId], references: [id])
-  estado               EstadoOportunidad @default(ABIERTA)
+  id                  String            @id @default(uuid())
+  tenantId            String
+  tenant              Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  titulo              String
+  clienteId           String?
+  cliente             Cliente?          @relation(fields: [clienteId], references: [id], onDelete: SetNull)
+  leadId              String?
+  lead                Lead?             @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  etapaId             String
+  etapa               EtapaPipeline     @relation(fields: [etapaId], references: [id])
+  montoEstimado       Decimal           @db.Decimal(14, 2)
+  probabilidadPct     Int               @default(0)
+  fechaCierreEstimada DateTime
+  vendedorId          String
+  vendedor            User              @relation(fields: [vendedorId], references: [id])
+  estado              EstadoOportunidad @default(ABIERTA)
   // Texto libre por ahora (sin catálogo propio — Fase 1, ver el artifact
   // de diseño), igual criterio que RecargoFacturaDto.concepto.
-  motivoPerdida        String?
+  motivoPerdida       String?
   // Se llena en la Fase 2 al "Ganar" y generar la Cotización real —
   // @unique: una oportunidad nunca genera más de una cotización.
-  cotizacionId         String?           @unique
-  fechaCierreReal      DateTime?
-  createdAt            DateTime          @default(now())
-  updatedAt            DateTime          @updatedAt
+  cotizacionId        String?           @unique
+  fechaCierreReal     DateTime?
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
 
   actividades ActividadCrm[]
 

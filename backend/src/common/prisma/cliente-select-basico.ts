@@ -22,6 +22,10 @@ export const CLIENTE_SELECT_BASICO = {
   rncCedula: true,
   email: true,
   telefono: true,
+  // "Formato de Documentos" Fase A — para poder mostrar la dirección del
+  // cliente en el documento impreso cuando el tenant lo configure (ver
+  // documento-pdf.ts `clienteDatosExtra`/`camposClienteVisibles`).
+  direccion: true,
 } satisfies Prisma.ClienteSelect;
 
 export type ClienteBasico = SerializadoHttp<Prisma.ClienteGetPayload<{ select: typeof CLIENTE_SELECT_BASICO }>>;

@@ -127,4 +127,6 @@ export const TENANT_SCOPED_MODELS = new Set([
   'Oportunidad',
   'ActividadCrm',
   'MetaVentaCrm',
+  // "Formato de Documentos" Fase A/B1 — config por tipo de documento.
+  'PersonalizacionDocumentoTipo',
 ]);

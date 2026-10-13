@@ -254,7 +254,7 @@ export class CotizacionesService {
     const [formato, plantilla, personalizacion] = await Promise.all([
       formatoSolicitado ?? resolverFormatoImpresion(this.prisma, tenantId, null),
       plantillaSolicitada ?? resolverPlantillaDocumento(this.prisma, tenantId, null),
-      resolverPersonalizacionDocumento(this.prisma, tenantId),
+      resolverPersonalizacionDocumento(this.prisma, tenantId, 'COTIZACION'),
     ]);
     const params = { ...mapearCotizacionAParams(cotizacion), ...personalizacion };
 

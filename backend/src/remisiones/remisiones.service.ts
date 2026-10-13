@@ -171,6 +171,11 @@ export class RemisionesService {
       numero: remision.numero,
       fecha: remision.fecha,
       cliente: remision.cliente.nombre,
+      clienteDatosExtra: {
+        rnc: remision.cliente.rncCedula ?? undefined,
+        direccion: remision.cliente.direccion ?? undefined,
+        telefono: remision.cliente.telefono ?? undefined,
+      },
       mostrarPrecios: false,
       lineas: remision.lineas.map((linea) => ({
         concepto: linea.producto.nombre,
@@ -190,7 +195,7 @@ export class RemisionesService {
     const [formato, plantilla, personalizacion] = await Promise.all([
       formatoSolicitado ?? resolverFormatoImpresion(this.prisma, tenantId, remision.bodegaId),
       plantillaSolicitada ?? resolverPlantillaDocumento(this.prisma, tenantId, remision.bodegaId),
-      resolverPersonalizacionDocumento(this.prisma, tenantId),
+      resolverPersonalizacionDocumento(this.prisma, tenantId, 'REMISION'),
     ]);
     const params = { ...this.mapearRemisionAParams(remision), ...personalizacion };
 

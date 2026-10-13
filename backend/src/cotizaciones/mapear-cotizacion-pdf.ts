@@ -12,7 +12,7 @@ import { DocumentoPdfParams } from '../common/pdf/documento-pdf';
 export interface CotizacionParaPdf {
   numero: string;
   createdAt: Date;
-  cliente: { nombre: string };
+  cliente: { nombre: string; rncCedula?: string | null; direccion?: string | null; telefono?: string | null };
   lineas: {
     producto: { nombre: string } | null;
     descripcionManual: string | null;
@@ -32,6 +32,11 @@ export function mapearCotizacionAParams(cotizacion: CotizacionParaPdf): Document
     numero: cotizacion.numero,
     fecha: cotizacion.createdAt,
     cliente: cotizacion.cliente.nombre,
+    clienteDatosExtra: {
+      rnc: cotizacion.cliente.rncCedula ?? undefined,
+      direccion: cotizacion.cliente.direccion ?? undefined,
+      telefono: cotizacion.cliente.telefono ?? undefined,
+    },
     lineas: cotizacion.lineas.map((linea) => ({
       concepto: linea.producto?.nombre ?? linea.descripcionManual ?? '',
       cantidad: linea.cantidad.toString(),
