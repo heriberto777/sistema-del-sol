@@ -257,7 +257,29 @@ docker compose -f docker-compose.prod.yml exec api pnpm permisos:backfill
   código + migración corrida, pero invisible en "Roles y permisos" hasta
   correr este script).
 
-**3. El PR agrega su propio script de backfill de datos** (no solo de
+**3. El PR agrega un módulo/plugin nuevo a `MODULOS_BASE`, o cambia qué
+módulos trae un `Plan`** (`PLANES_BASE`, ambos en
+`backend/src/tenants/modulos-base.ts`) — **además** de lo del escenario 2:
+
+```bash
+docker compose -f docker-compose.prod.yml exec api pnpm planes:seed
+```
+
+Fácil de pasar por alto porque no es un backfill de datos de un tenant
+ni toca `schema.prisma` — siembra el catálogo GLOBAL (`Modulo`/`Plan`/
+`PlanModulo`, una sola fila por módulo/plan para toda la plataforma, no
+por tenant) y resincroniza qué módulos trae cada Plan base contra
+`PLANES_BASE` tal como está HOY en el código. Sin correrlo, el módulo
+nuevo directamente **no aparece** en Plataforma → Tenants → Módulos —
+`resolverModulosConOrigen()` arma esa lista leyendo la tabla `Modulo` de
+la base, nunca el array de código (bug real: se agregó el plugin de CRM
+a `MODULOS_BASE` + su migración + `permisos:backfill`, pero sin
+`planes:seed` el toggle para activarlo en un tenant no existía en
+ningún lado). Idempotente (upsert por `clave`), correrlo de más no
+rompe nada — si el PR solo agregó permisos sin tocar `MODULOS_BASE`/
+`PLANES_BASE`, no hace falta.
+
+**4. El PR agrega su propio script de backfill de datos** (no solo de
 esquema) — pasa cuando una feature necesita migrar datos existentes, no
 solo crear columnas. Hoy en el repo hay varios de estos, cada uno atado
 a una feature puntual (`suscripciones:backfill`,
