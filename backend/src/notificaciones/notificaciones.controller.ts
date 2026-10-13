@@ -25,6 +25,12 @@ export class NotificacionesController {
     return this.notificacionesService.listarPlantillas(user.tenantId);
   }
 
+  @Get('eventos-disponibles')
+  @Permissions('admin.configuracion')
+  listarEventosDisponibles() {
+    return this.notificacionesService.listarEventosDisponibles();
+  }
+
   @Post('plantillas')
   @Permissions('admin.configuracion')
   guardarPlantilla(@Body() dto: CrearPlantillaDto, @CurrentUser() user: JwtPayloadUser) {

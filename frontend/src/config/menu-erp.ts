@@ -260,6 +260,7 @@ export const DOMINIOS_MENU: DominioMenu[] = [
           { id: 'webhooks', etiqueta: 'Webhooks', ruta: '/webhooks', permisos: ['admin.configuracion'] },
           { id: 'whatsapp-config', etiqueta: 'WhatsApp', ruta: '/whatsapp-config', permisos: ['admin.configuracion'] },
           { id: 'correo-config', etiqueta: 'Correo (SMTP)', ruta: '/correo-config', permisos: ['admin.configuracion'] },
+          { id: 'plantillas-notificacion', etiqueta: 'Plantillas de notificación', ruta: '/plantillas-notificacion', permisos: ['admin.configuracion'] },
         ],
       },
     ],

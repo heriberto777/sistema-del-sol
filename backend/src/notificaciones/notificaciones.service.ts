@@ -34,6 +34,7 @@ import { mapearFacturaAParams } from '../facturacion/mapear-factura-pdf';
 import { mapearCotizacionAParams } from '../cotizaciones/mapear-cotizacion-pdf';
 import { descifrar } from '../common/utils/encriptado.util';
 import { enviarWhatsappTwilio } from '../common/utils/twilio-whatsapp.util';
+import { CATALOGO_EVENTOS_NOTIFICACION } from './catalogo-eventos-notificacion';
 
 @Injectable()
 export class NotificacionesService {
@@ -91,6 +92,10 @@ export class NotificacionesService {
 
   guardarPlantilla(tenantId: string, dto: CrearPlantillaDto) {
     return this.notificacionesRepository.upsertPlantilla(tenantId, dto);
+  }
+
+  listarEventosDisponibles() {
+    return CATALOGO_EVENTOS_NOTIFICACION;
   }
 
   async listar(tenantId: string, query: ListadoQueryDto) {
