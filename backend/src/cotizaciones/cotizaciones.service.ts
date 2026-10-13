@@ -180,9 +180,7 @@ export class CotizacionesService {
 
   async actualizar(id: string, dto: CrearCotizacionDto, tenantId: string) {
     const cotizacion = await this.cotizacionesRepository.buscarPorId(id);
-    if (cotizacion.estado !== 'BORRADOR') {
-      throw new BadRequestException('Solo se puede editar una cotización en borrador');
-    }
+    this.validarQuePuedaEditarse(cotizacion);
 
     const listaPrecio = await this.resolverListaPrecio(dto);
     const { lineasCalculadas, subtotal, itbis, descuentoTotal, total } = await this.calcularLineas(dto.lineas, listaPrecio, tenantId);
@@ -219,7 +217,7 @@ export class CotizacionesService {
 
   async cambiarEstado(id: string, estado: 'ENVIADA' | 'ACEPTADA' | 'RECHAZADA', tenantId: string) {
     const cotizacion = await this.cotizacionesRepository.buscarPorId(id);
-    this.validarQueSigaAbierta(cotizacion);
+    this.validarQuePuedaEditarse(cotizacion);
     const actualizada = await this.cotizacionesRepository.actualizarEstado(id, estado);
 
     let avisoNotificacion: string | undefined;
@@ -305,12 +303,32 @@ export class CotizacionesService {
     return factura;
   }
 
+  /** Solo usado por convertirEnFactura() — rechazada sigue sin poder convertirse directo; para eso primero hay que revivirla (ver validarQuePuedaEditarse) hasta ACEPTADA. */
   private validarQueSigaAbierta(cotizacion: { estado: string; facturaId: string | null }) {
     if (cotizacion.facturaId) {
       throw new BadRequestException('Esta cotización ya fue convertida en factura');
     }
     if (cotizacion.estado === 'RECHAZADA') {
       throw new BadRequestException('No se puede operar sobre una cotización rechazada');
+    }
+  }
+
+  /**
+   * Usado por actualizar()/cambiarEstado() — decisión explícita del
+   * usuario: una cotización se puede editar (líneas/vigencia), enviar y
+   * cambiar de estado en CUALQUIER estado, incluida una rechazada (el
+   * cliente puede pedir cambios después de decir que no, y eso la revive
+   * en vez de obligar a crear una cotización nueva desde cero) — el único
+   * estado realmente cerrado es ACEPTADA, porque ahí el cliente ya dio el
+   * visto bueno a esos términos exactos y el siguiente paso es
+   * convertirla en factura, no seguir negociándola.
+   */
+  private validarQuePuedaEditarse(cotizacion: { estado: string; facturaId: string | null }) {
+    if (cotizacion.facturaId) {
+      throw new BadRequestException('Esta cotización ya fue convertida en factura');
+    }
+    if (cotizacion.estado === 'ACEPTADA') {
+      throw new BadRequestException('No se puede modificar una cotización ya aceptada');
     }
   }
 }

@@ -251,8 +251,18 @@ describe('CotizacionesService', () => {
       );
     });
 
-    it('rechaza editar una cotización que ya no está en BORRADOR', async () => {
+    it('permite editar una cotización ya ENVIADA o RECHAZADA (el cliente pidió cambios después de verla)', async () => {
       repository.buscarPorId.mockResolvedValue({ id: 'c1', estado: 'ENVIADA', facturaId: null } as never);
+      repository.obtenerProductoConPrecioVigente.mockResolvedValue(producto(18, 200) as never);
+      repository.actualizar.mockResolvedValue({ id: 'c1' } as never);
+
+      await service.actualizar('c1', dto({ lineas: [{ productoId: 'prod-1', cantidad: 1 }] }), 'tenant-1');
+
+      expect(repository.actualizar).toHaveBeenCalled();
+    });
+
+    it('rechaza editar una cotización ya ACEPTADA', async () => {
+      repository.buscarPorId.mockResolvedValue({ id: 'c1', estado: 'ACEPTADA', facturaId: null } as never);
 
       await expect(service.actualizar('c1', dto(), 'tenant-1')).rejects.toThrow(BadRequestException);
       expect(repository.actualizar).not.toHaveBeenCalled();
@@ -266,10 +276,19 @@ describe('CotizacionesService', () => {
       await expect(service.cambiarEstado('c1', 'ENVIADA', 'tenant-1')).rejects.toThrow(BadRequestException);
     });
 
-    it('rechaza cambiar el estado de una cotización rechazada', async () => {
-      repository.buscarPorId.mockResolvedValue({ estado: 'RECHAZADA', facturaId: null } as never);
+    it('rechaza cambiar el estado de una cotización ya ACEPTADA (sin factura todavía)', async () => {
+      repository.buscarPorId.mockResolvedValue({ estado: 'ACEPTADA', facturaId: null } as never);
 
       await expect(service.cambiarEstado('c1', 'ENVIADA', 'tenant-1')).rejects.toThrow(BadRequestException);
+    });
+
+    it('permite revivir una cotización rechazada reenviándola (decisión explícita: solo ACEPTADA queda cerrada)', async () => {
+      repository.buscarPorId.mockResolvedValue({ estado: 'RECHAZADA', facturaId: null, clienteId: 'cliente-1', numero: 'COT-001', total: 354 } as never);
+      repository.actualizarEstado.mockResolvedValue({ id: 'c1', estado: 'ENVIADA' } as never);
+
+      await service.cambiarEstado('c1', 'ENVIADA', 'tenant-1');
+
+      expect(repository.actualizarEstado).toHaveBeenCalledWith('c1', 'ENVIADA');
     });
 
     it('permite cambiar el estado de una cotización abierta', async () => {

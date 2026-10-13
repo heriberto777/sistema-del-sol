@@ -180,19 +180,27 @@ export function CotizacionesPanel() {
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
               {data?.datos.map((cotizacion) => {
+                // Decisión explícita del usuario: editable/enviable/aceptar/rechazar en
+                // CUALQUIER estado (incluida una rechazada o vencida — "vencida" ni
+                // siquiera es un estado real, ver tonoYEtiquetaEstado) salvo ACEPTADA,
+                // que ya cerró la negociación y solo admite convertirse en factura.
+                const puedeEditarse = tienePermiso('cotizaciones.editar') && cotizacion.estado !== 'ACEPTADA';
                 const acciones = [
                   { etiqueta: 'Imprimir', onClick: () => setCotizacionImprimiendo(cotizacion) },
-                  ...(tienePermiso('cotizaciones.editar') && cotizacion.estado === 'BORRADOR'
+                  ...(puedeEditarse
                     ? [{ etiqueta: 'Editar', onClick: () => navigate(`/cotizaciones/${cotizacion.id}/editar`) }]
                     : []),
-                  ...(tienePermiso('cotizaciones.editar') && cotizacion.estado === 'BORRADOR'
-                    ? [{ etiqueta: 'Enviar', onClick: () => cambiarEstado.mutate({ id: cotizacion.id, estado: 'ENVIADA' }) }]
-                    : []),
-                  ...(tienePermiso('cotizaciones.editar') && (cotizacion.estado === 'BORRADOR' || cotizacion.estado === 'ENVIADA')
+                  ...(puedeEditarse
                     ? [
-                        { etiqueta: 'Aceptar', onClick: () => cambiarEstado.mutate({ id: cotizacion.id, estado: 'ACEPTADA' }) },
-                        { etiqueta: 'Rechazar', onClick: () => cambiarEstado.mutate({ id: cotizacion.id, estado: 'RECHAZADA' }), tono: 'peligro' as const },
+                        {
+                          etiqueta: cotizacion.estado === 'BORRADOR' ? 'Enviar' : 'Reenviar',
+                          onClick: () => cambiarEstado.mutate({ id: cotizacion.id, estado: 'ENVIADA' }),
+                        },
                       ]
+                    : []),
+                  ...(puedeEditarse ? [{ etiqueta: 'Aceptar', onClick: () => cambiarEstado.mutate({ id: cotizacion.id, estado: 'ACEPTADA' }) }] : []),
+                  ...(puedeEditarse && cotizacion.estado !== 'RECHAZADA'
+                    ? [{ etiqueta: 'Rechazar', onClick: () => cambiarEstado.mutate({ id: cotizacion.id, estado: 'RECHAZADA' }), tono: 'peligro' as const }]
                     : []),
                   ...(tienePermiso('cotizaciones.editar') && cotizacion.estado === 'ACEPTADA' && !cotizacion.facturaId
                     ? [{ etiqueta: 'Convertir en factura', onClick: () => setCotizacionConvirtiendo(cotizacion) }]
