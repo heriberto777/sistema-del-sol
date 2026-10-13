@@ -24,12 +24,22 @@ import { mapearCotizacionAParams } from './mapear-cotizacion-pdf';
 import { ConfiguracionesService } from '../configuraciones/configuraciones.service';
 import { CONFIGURACIONES_BASE } from '../tenants/roles-base';
 
-/** Una cotización vigente cuya fecha de validez ya pasó se muestra como vencida sin necesidad de un job que la actualice. */
-function marcarVencidaSiAplica<T extends { estado: string; fechaVigenciaHasta: Date }>(cotizacion: T): T {
-  if ((cotizacion.estado === 'BORRADOR' || cotizacion.estado === 'ENVIADA') && cotizacion.fechaVigenciaHasta < new Date()) {
-    return { ...cotizacion, estado: 'VENCIDA' };
-  }
-  return cotizacion;
+/**
+ * Una cotización vigente cuya fecha de validez ya pasó se marca como
+ * vencida sin necesidad de un job que la actualice — pero solo para
+ * AVISAR, nunca pisa `estado` (BORRADOR/ENVIADA se quedan como están en
+ * la base). Antes sobreescribía `estado: 'VENCIDA'` en la respuesta, lo
+ * que hacía que la fila perdiera sus botones de Editar/Enviar/Aceptar/
+ * Rechazar en el frontend (que decide qué mostrar mirando `estado`) en
+ * cuanto vencía — aunque el backend (`actualizar`/`cambiarEstado`, que
+ * leen el estado real vía el repositorio) nunca le puso ningún freno a
+ * una cotización vencida: sigue pudiéndose modificar/enviar/aceptar/
+ * rechazar hasta que el cliente la apruebe o la rechace (bug real
+ * reportado: "vencida" dejaba el documento sin ninguna acción visible).
+ */
+function marcarVencidaSiAplica<T extends { estado: string; fechaVigenciaHasta: Date }>(cotizacion: T): T & { vencida: boolean } {
+  const vencida = (cotizacion.estado === 'BORRADOR' || cotizacion.estado === 'ENVIADA') && cotizacion.fechaVigenciaHasta < new Date();
+  return { ...cotizacion, vencida };
 }
 
 @Injectable()

@@ -5,7 +5,7 @@ import { Badge } from '../../atoms/Badge/Badge';
 import { Button } from '../../atoms/Button/Button';
 import { TablaArticulosDocumento } from '../../molecules/TablaArticulosDocumento/TablaArticulosDocumento';
 import { BloqueTotalesDocumento } from '../../molecules/BloqueTotalesDocumento/BloqueTotalesDocumento';
-import { Cotizacion, TONO_POR_ESTADO } from './CotizacionesPanel';
+import { Cotizacion, tonoYEtiquetaEstado } from './CotizacionesPanel';
 
 export function ModalDetalleCotizacion({
   cotizacion,
@@ -25,7 +25,7 @@ export function ModalDetalleCotizacion({
     <Modal titulo={`Cotización ${cotizacion.numero}`} onClose={onClose} ancho="2xl">
       <div className="space-y-4">
         <div className="flex items-start justify-between">
-          <Badge tono={TONO_POR_ESTADO[cotizacion.estado]}>{cotizacion.estado}</Badge>
+          <Badge tono={tonoYEtiquetaEstado(cotizacion).tono}>{tonoYEtiquetaEstado(cotizacion).etiqueta}</Badge>
           <div className="text-right text-sm text-slate-500 dark:text-slate-400">
             {detalle?.createdAt && (
               <p>

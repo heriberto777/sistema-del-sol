@@ -32,7 +32,7 @@ export interface Producto {
   codigo: string;
 }
 
-export type EstadoCotizacion = 'BORRADOR' | 'ENVIADA' | 'ACEPTADA' | 'RECHAZADA' | 'VENCIDA';
+export type EstadoCotizacion = 'BORRADOR' | 'ENVIADA' | 'ACEPTADA' | 'RECHAZADA';
 
 export interface LineaCotizacion {
   productoId: string | null;
@@ -50,6 +50,11 @@ export interface Cotizacion {
   id: string;
   numero: string;
   estado: EstadoCotizacion;
+  // Derivado por el backend (fechaVigenciaHasta ya pasó) — nunca pisa
+  // `estado`, así que las acciones disponibles (Editar/Enviar/Aceptar/
+  // Rechazar) siguen siendo las del estado real: una cotización vencida
+  // sigue siendo operable hasta que el cliente la apruebe o la rechace.
+  vencida: boolean;
   total: string;
   subtotal?: string;
   descuento?: string;
@@ -67,8 +72,13 @@ export const TONO_POR_ESTADO: Record<EstadoCotizacion, 'exito' | 'advertencia' |
   ENVIADA: 'advertencia',
   ACEPTADA: 'exito',
   RECHAZADA: 'peligro',
-  VENCIDA: 'peligro',
 };
+
+/** "Vencida" es un aviso sobre el estado real, no un estado aparte — se muestra encima, pero nunca reemplaza las acciones que corresponden a BORRADOR/ENVIADA. */
+export function tonoYEtiquetaEstado(cotizacion: Pick<Cotizacion, 'estado' | 'vencida'>): { tono: 'exito' | 'advertencia' | 'peligro' | 'neutro'; etiqueta: string } {
+  if (cotizacion.vencida) return { tono: 'peligro', etiqueta: 'VENCIDA' };
+  return { tono: TONO_POR_ESTADO[cotizacion.estado], etiqueta: cotizacion.estado };
+}
 
 export type LineaForm = {
   productoId: string;
@@ -182,7 +192,7 @@ export function CotizacionesPanel() {
                     <td className="px-5 py-3 font-medium text-slate-900 dark:text-slate-100">RD$ {Number(cotizacion.total).toLocaleString('es-DO')}</td>
                     <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{new Date(cotizacion.fechaVigenciaHasta).toLocaleDateString('es-DO')}</td>
                     <td className="px-5 py-3">
-                      <Badge tono={TONO_POR_ESTADO[cotizacion.estado]}>{cotizacion.estado}</Badge>
+                      <Badge tono={tonoYEtiquetaEstado(cotizacion).tono}>{tonoYEtiquetaEstado(cotizacion).etiqueta}</Badge>
                       {cotizacion.facturaId && <span className="ml-2 text-xs text-slate-400">Ya facturada</span>}
                     </td>
                     <td className="px-5 py-3 text-right" onClick={(e) => e.stopPropagation()}>

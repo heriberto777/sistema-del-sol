@@ -193,7 +193,7 @@ describe('CotizacionesService', () => {
   });
 
   describe('buscarPorId / listar — vencimiento derivado', () => {
-    it('marca como VENCIDA una cotización BORRADOR/ENVIADA cuya vigencia ya pasó', async () => {
+    it('agrega vencida:true a una cotización BORRADOR/ENVIADA cuya vigencia ya pasó, sin tocar su estado real', async () => {
       repository.buscarPorId.mockResolvedValue({
         id: 'c1',
         estado: 'ENVIADA',
@@ -202,7 +202,12 @@ describe('CotizacionesService', () => {
 
       const resultado = await service.buscarPorId('c1');
 
-      expect(resultado.estado).toBe('VENCIDA');
+      // El estado real nunca se pisa — el frontend decide qué botones
+      // mostrar (Editar/Enviar/Aceptar/Rechazar) mirando ESTE campo, no
+      // uno sintético, así que una cotización vencida sigue siendo
+      // operable hasta que el cliente la apruebe o la rechace.
+      expect(resultado.estado).toBe('ENVIADA');
+      expect(resultado.vencida).toBe(true);
     });
 
     it('no marca como vencida una cotización ya ACEPTADA aunque la fecha haya pasado', async () => {
@@ -215,6 +220,7 @@ describe('CotizacionesService', () => {
       const resultado = await service.buscarPorId('c1');
 
       expect(resultado.estado).toBe('ACEPTADA');
+      expect(resultado.vencida).toBe(false);
     });
 
     it('no marca como vencida una cotización vigente', async () => {
@@ -227,6 +233,7 @@ describe('CotizacionesService', () => {
       const resultado = await service.buscarPorId('c1');
 
       expect(resultado.estado).toBe('ENVIADA');
+      expect(resultado.vencida).toBe(false);
     });
   });
 
