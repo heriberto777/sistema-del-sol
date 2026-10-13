@@ -222,6 +222,7 @@ export class CotizacionesService {
     this.validarQueSigaAbierta(cotizacion);
     const actualizada = await this.cotizacionesRepository.actualizarEstado(id, estado);
 
+    let avisoNotificacion: string | undefined;
     if (estado === 'ENVIADA') {
       this.eventBus.emit(EVENTOS.COTIZACION_ENVIADA, {
         tenantId,
@@ -230,9 +231,17 @@ export class CotizacionesService {
         numero: cotizacion.numero,
         total: cotizacion.total.toString(),
       });
+      // El envío real es asíncrono (Event Bus, ver EmailChannel) y nunca
+      // bloquea esta respuesta — pero si el cliente no tiene correo
+      // registrado, eso SÍ se sabe acá mismo, sin esperar nada. Sin este
+      // aviso, el único lugar donde se notaba era el log del servidor
+      // (bug real reportado: "le doy enviar y no llega el correo").
+      if (!cotizacion.cliente?.email) {
+        avisoNotificacion = 'El cliente no tiene un correo registrado — no se envió la cotización por email. Agregale uno en Clientes y volvé a enviarla, o revisá Notificaciones para ver el historial de envíos.';
+      }
     }
 
-    return actualizada;
+    return avisoNotificacion ? { ...actualizada, avisoNotificacion } : actualizada;
   }
 
   /** @deprecated usar generarImpreso — se mantiene por compatibilidad de la ruta /pdf ya existente. */

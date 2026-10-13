@@ -837,6 +837,28 @@ describe('FacturacionService', () => {
     );
   });
 
+  describe('avisoNotificacion (cliente sin correo — el envío por email nunca se intenta)', () => {
+    it('avisa en la respuesta si el cliente no tiene correo registrado', async () => {
+      clientesService.buscarPorId.mockResolvedValue({ id: 'cliente-1', listaPrecio: null, email: null } as never);
+      repository.obtenerProductoConPrecioVigente.mockResolvedValue(producto(18, 100) as never);
+      repository.crearFacturaEnTx.mockResolvedValue(facturaCreada() as never);
+
+      const resultado = await service.crear(dto(), 'tenant-1', 'vendedor-1');
+
+      expect(resultado).toEqual(expect.objectContaining({ avisoNotificacion: expect.stringContaining('no tiene un correo') }));
+    });
+
+    it('no avisa nada si el cliente sí tiene correo registrado', async () => {
+      clientesService.buscarPorId.mockResolvedValue({ id: 'cliente-1', listaPrecio: null, email: 'cliente@ejemplo.com' } as never);
+      repository.obtenerProductoConPrecioVigente.mockResolvedValue(producto(18, 100) as never);
+      repository.crearFacturaEnTx.mockResolvedValue(facturaCreada() as never);
+
+      const resultado = await service.crear(dto(), 'tenant-1', 'vendedor-1');
+
+      expect(resultado).not.toHaveProperty('avisoNotificacion');
+    });
+  });
+
   it('descuento de stock, consumo de NCF y creación de factura corren dentro de la misma transacción', async () => {
     repository.obtenerProductoConPrecioVigente.mockResolvedValue(producto(18, 100) as never);
     repository.crearFacturaEnTx.mockResolvedValue(facturaCreada() as never);

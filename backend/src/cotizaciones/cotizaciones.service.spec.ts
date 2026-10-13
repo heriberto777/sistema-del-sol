@@ -301,6 +301,38 @@ describe('CotizacionesService', () => {
 
       expect(eventBus.emit).not.toHaveBeenCalled();
     });
+
+    it('avisa en la respuesta si el cliente no tiene correo al enviar (el email nunca se intenta)', async () => {
+      repository.buscarPorId.mockResolvedValue({
+        estado: 'BORRADOR',
+        facturaId: null,
+        clienteId: 'cliente-1',
+        numero: 'COT-001',
+        total: 354,
+        cliente: { email: null },
+      } as never);
+      repository.actualizarEstado.mockResolvedValue({ id: 'c1', estado: 'ENVIADA' } as never);
+
+      const resultado = await service.cambiarEstado('c1', 'ENVIADA', 'tenant-1');
+
+      expect(resultado).toEqual(expect.objectContaining({ avisoNotificacion: expect.stringContaining('no tiene un correo') }));
+    });
+
+    it('no avisa nada si el cliente sí tiene correo registrado', async () => {
+      repository.buscarPorId.mockResolvedValue({
+        estado: 'BORRADOR',
+        facturaId: null,
+        clienteId: 'cliente-1',
+        numero: 'COT-001',
+        total: 354,
+        cliente: { email: 'cliente@ejemplo.com' },
+      } as never);
+      repository.actualizarEstado.mockResolvedValue({ id: 'c1', estado: 'ENVIADA' } as never);
+
+      const resultado = await service.cambiarEstado('c1', 'ENVIADA', 'tenant-1');
+
+      expect(resultado).not.toHaveProperty('avisoNotificacion');
+    });
   });
 
   describe('convertirEnFactura', () => {

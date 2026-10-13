@@ -652,6 +652,17 @@ export class FacturacionService {
       recargos: totalRecargos.toString(),
     });
 
+    // Mismo criterio que CotizacionesService.cambiarEstado: el envío por
+    // email es asíncrono y nunca bloquea esta respuesta, pero la ausencia
+    // de correo en el cliente se sabe de entrada — avisarla acá es lo único
+    // que distingue "no llegó por SMTP" de "nunca se intentó enviar".
+    if (!cliente.email) {
+      return {
+        ...factura,
+        avisoNotificacion:
+          'El cliente no tiene un correo registrado — no se envió la factura por email. Agregale uno en Clientes, o revisá Notificaciones para ver el historial de envíos.',
+      };
+    }
     return factura;
   }
 

@@ -137,7 +137,7 @@ export function FacturacionNueva() {
                 },
           ),
       }),
-    onSuccess: () => {
+    onSuccess: (respuesta) => {
       queryClient.invalidateQueries({ queryKey: ['facturas'] });
       // `confirmarGuardado` mueve la referencia de "sin cambios" al estado
       // actual — sin esto, el guard de salir sin guardar bloqueaba este
@@ -147,7 +147,10 @@ export function FacturacionNueva() {
       // afuera no alcanza porque `useBlocker` sigue viendo el cierre del
       // render anterior hasta que React confirma el nuevo.
       confirmarGuardado();
-      setTimeout(() => navigate('/facturacion'), 0);
+      // avisoNotificacion (cliente sin correo — ver FacturacionService.crear)
+      // viaja por location.state porque ya estamos navegando a otra página.
+      const avisoNotificacion = (respuesta.data as { avisoNotificacion?: string }).avisoNotificacion;
+      setTimeout(() => navigate('/facturacion', avisoNotificacion ? { state: { avisoNotificacion } } : undefined), 0);
     },
     onError: (err) => setError(mensajeErrorApi(err, 'No se pudo crear la factura. Revisa los datos y el stock disponible.')),
   });

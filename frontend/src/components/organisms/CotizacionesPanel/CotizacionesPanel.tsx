@@ -122,14 +122,32 @@ export function CotizacionesPanel() {
       ).data,
   });
 
+  const [avisoNotificacion, setAvisoNotificacion] = useState<string | null>(null);
+
   const cambiarEstado = useMutation({
     mutationFn: async ({ id, estado }: { id: string; estado: 'ENVIADA' | 'ACEPTADA' | 'RECHAZADA' }) =>
-      apiClient.patch(`/cotizaciones/${id}/estado`, { estado }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['cotizaciones'] }),
+      apiClient.patch<{ avisoNotificacion?: string }>(`/cotizaciones/${id}/estado`, { estado }),
+    onSuccess: (respuesta) => {
+      queryClient.invalidateQueries({ queryKey: ['cotizaciones'] });
+      setAvisoNotificacion(respuesta.data.avisoNotificacion ?? null);
+    },
   });
 
   return (
     <div className="space-y-4">
+      {avisoNotificacion && (
+        <div className="flex items-start justify-between gap-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-300">
+          <p>{avisoNotificacion}</p>
+          <div className="flex shrink-0 items-center gap-3">
+            <button className="font-medium underline" onClick={() => navigate('/notificaciones')}>
+              Ver Notificaciones
+            </button>
+            <button className="text-amber-600 hover:text-amber-800 dark:text-amber-400" onClick={() => setAvisoNotificacion(null)} aria-label="Cerrar aviso">
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
       <Card
         sinPadding
         titulo="Cotizaciones"
