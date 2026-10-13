@@ -49,7 +49,8 @@ BEGIN
       'propiedades', 'contratos_propiedad', 'alertas_busqueda_propiedad', 'cobros_alquiler',
       'tareas_personales', 'categorias_incentivo',
       'travel_reservas', 'travel_ledger_movimientos', 'travel_reglas_markup',
-      'usos_ia_tenant'
+      'usos_ia_tenant',
+      'crm_leads', 'crm_etapas_pipeline', 'crm_oportunidades', 'crm_actividades'
     ])
   LOOP
     EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY;', tabla);

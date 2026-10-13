@@ -111,6 +111,17 @@ export const PERMISOS_BASE = [
   // Reglas de markup automático (sugerencia de montoVenta) — acción de
   // configuración, separada de crear/editar/reservar.
   'travel.markup',
+  // Plugin de CRM (Fase 1) — mismo criterio opt-in que Proyectos/
+  // Inmobiliaria: ninguno empieza con 'admin.', así que Admin Total y
+  // Gerente los heredan automático vía PERMISOS_BASE; el resto de roles
+  // no los trae de fábrica. `.pipeline.configurar` (editar EtapaPipeline)
+  // separado de `.oportunidades.editar` — reordenar/renombrar etapas
+  // afecta el pipeline entero, no una oportunidad puntual, mismo criterio
+  // que `proyectos.rentabilidad.ver` separado de `proyectos.ver`.
+  'crm.ver',
+  'crm.leads.crear', 'crm.leads.editar',
+  'crm.oportunidades.crear', 'crm.oportunidades.editar', 'crm.oportunidades.eliminar',
+  'crm.pipeline.configurar',
 ];
 
 export const ROLES_BASE: Record<string, string[]> = {

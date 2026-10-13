@@ -121,4 +121,9 @@ export const TENANT_SCOPED_MODELS = new Set([
   'TravelReglaMarkup',
   // Auditoría de integraciones (2026-09) — tope mensual de IA por tenant.
   'UsoIaTenant',
+  // Plugin de CRM (Fase 1).
+  'Lead',
+  'EtapaPipeline',
+  'Oportunidad',
+  'ActividadCrm',
 ]);

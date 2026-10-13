@@ -82,6 +82,7 @@ import { BonosModule } from './bonos/bonos.module';
 import { SucursalesModule } from './sucursales/sucursales.module';
 import { EcommerceModule } from './ecommerce/ecommerce.module';
 import { AuditoriaModule } from './auditoria/auditoria.module';
+import { CrmModule } from './crm/crm.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { PermissionsGuard } from './common/guards/permissions.guard';
 import { ModuloActivoGuard } from './common/guards/modulo-activo.guard';
@@ -184,6 +185,7 @@ import { TenantMiddleware } from './common/middleware/tenant.middleware';
     EcommerceModule,
     ClienteTiendaAuthModule,
     AuditoriaModule,
+    CrmModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

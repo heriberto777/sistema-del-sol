@@ -1,4 +1,4 @@
-import { BookOpen, Boxes, FolderKanban, Globe, Home, LayoutGrid, type LucideIcon, Megaphone, Plane, Receipt, ShieldCheck, ShoppingBag, Users } from 'lucide-react';
+import { BookOpen, Boxes, FolderKanban, Globe, Home, LayoutGrid, type LucideIcon, Megaphone, Plane, Receipt, ShieldCheck, ShoppingBag, Target, Users } from 'lucide-react';
 
 export type CategoriaErp = 'catalogos' | 'transacciones' | 'consultas' | 'reportes' | 'configuracion';
 
@@ -274,6 +274,23 @@ export const DOMINIOS_MENU: DominioMenu[] = [
       { categoria: 'consultas', items: [{ id: 'proyectos', etiqueta: 'Buscar proyectos', ruta: '/proyectos', permisos: ['proyectos.ver'], modulo: 'proyectos' }] },
       { categoria: 'reportes', items: [{ id: 'rentabilidad', etiqueta: 'Rentabilidad', ruta: '/proyectos', permisos: ['proyectos.rentabilidad.ver'], modulo: 'proyectos' }] },
       { categoria: 'configuracion', items: [] },
+    ],
+  },
+  {
+    id: 'crm',
+    etiqueta: 'CRM',
+    icono: Target,
+    categorias: [
+      { categoria: 'catalogos', items: [{ id: 'crm-leads', etiqueta: 'Leads', ruta: '/crm/leads', permisos: ['crm.ver'], modulo: 'crm' }] },
+      { categoria: 'transacciones', items: [{ id: 'crm-oportunidad-nueva', etiqueta: 'Nueva oportunidad', ruta: '/crm/pipeline', permisos: ['crm.oportunidades.crear'], modulo: 'crm' }] },
+      { categoria: 'consultas', items: [{ id: 'crm-pipeline', etiqueta: 'Pipeline', ruta: '/crm/pipeline', permisos: ['crm.ver'], modulo: 'crm' }] },
+      { categoria: 'reportes', items: [] },
+      {
+        // Fase 1 — ver el artifact de diseño: reportes/dashboard de
+        // conversión quedan para la Fase 3, acá solo el catálogo de etapas.
+        categoria: 'configuracion',
+        items: [{ id: 'crm-etapas-pipeline', etiqueta: 'Etapas del pipeline', ruta: '/crm/etapas-pipeline', permisos: ['crm.pipeline.configurar'], modulo: 'crm' }],
+      },
     ],
   },
   {

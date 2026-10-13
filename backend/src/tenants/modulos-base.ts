@@ -26,6 +26,10 @@ export const MODULOS_BASE: { clave: string; nombre: string }[] = [
   { clave: 'proyectos', nombre: 'Proyectos (plugin)' },
   { clave: 'publicacionessociales', nombre: 'Publicaciones Sociales (plugin)' },
   { clave: 'travel', nombre: 'Travel Management (plugin)' },
+  // Plugin de CRM (Fase 1) — a propósito sin entrar a ningún PLAN_BASE de
+  // abajo, mismo criterio que 'travel': es un plus que la plataforma
+  // activa por tenant vía TenantModuloOverride, no algo bundleado.
+  { clave: 'crm', nombre: 'CRM (plugin)' },
 ];
 
 export const PLANES_BASE: Record<string, { descripcion: string; modulos: string[] }> = {

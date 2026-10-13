@@ -57,6 +57,10 @@ model Tenant {
   roles                     Role[]
   auditLogs                 AuditLog[]
   errorLogs                 ErrorLog[]
+  crmLeads                  Lead[]
+  crmEtapasPipeline         EtapaPipeline[]
+  crmOportunidades          Oportunidad[]
+  crmActividades            ActividadCrm[]
   facturas                  Factura[]
   ncfAsignados              NcfAsignado[]
   correlativos              Correlativo[]
@@ -778,6 +782,9 @@ model User {
   roles                                 UserRole[]
   auditLogs                             AuditLog[]
   errorLogs                             ErrorLog[]
+  crmLeadsAsignados                     Lead[]
+  crmOportunidadesAsignadas             Oportunidad[]
+  crmActividades                        ActividadCrm[]
   facturasVendedor                      Factura[]                  @relation("FacturaVendedor")
   movimientosInventario                 MovimientoInventario[]
   ordenesCompra                         OrdenCompra[]
@@ -3541,6 +3548,9 @@ model Cliente {
   contratosPropiedad          ContratoPropiedad[]
   propiedadesEnAdministracion Propiedad[]
   reservasTravel              TravelReserva[]
+  crmLead                     Lead?
+  crmOportunidades            Oportunidad[]
+  crmActividades              ActividadCrm[]
 
   @@map("clientes")
 }
@@ -4829,4 +4839,157 @@ model TravelReglaMarkup {
   updatedAt  DateTime           @updatedAt
 
   @@map("travel_reglas_markup")
+}
+
+// Plugin de CRM (Fase 1) — ver plugins/crm/README.md. Se engancha a lo
+// que ya existe (Cliente, Cotizaciones, Event Bus) en vez de duplicarlo:
+// un Lead se convierte en el Cliente de siempre (Fase 2) y una
+// Oportunidad ganada genera la Cotización de siempre (Fase 2) — acá solo
+// va la base (Leads, pipeline, actividades). Gateado por
+// `@RequiereModulo('crm')`, NO incluido en ningún Plan base a propósito:
+// es un plus que la plataforma activa por tenant vía TenantModuloOverride.
+
+enum OrigenLead {
+  MANUAL
+  WHATSAPP
+  FORMULARIO_WEB
+  IMPORTACION
+  REFERIDO
+}
+
+enum EstadoLead {
+  NUEVO
+  CONTACTADO
+  CALIFICADO
+  DESCARTADO
+  // Reservado para la Fase 2 (conversión Lead → Cliente) — el endpoint de
+  // cambiar-estado de Fase 1 no permite esta transición todavía, pero el
+  // valor ya está en el enum para no pedir otra migración al construirla.
+  CONVERTIDO
+}
+
+enum EstadoOportunidad {
+  ABIERTA
+  GANADA
+  PERDIDA
+}
+
+enum TipoActividadCrm {
+  LLAMADA
+  REUNION
+  EMAIL
+  NOTA
+  TAREA
+}
+
+/// Prospecto que todavía no es Cliente — mismo criterio que
+/// CategoriaCliente: catálogo propio del CRM, sin tocar el modelo Cliente.
+/// `clienteId` se llena en la Fase 2 al convertirlo; el Lead nunca se
+/// borra al convertirse, queda como registro de origen.
+model Lead {
+  id              String      @id @default(uuid())
+  tenantId        String
+  tenant          Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  nombre          String
+  email           String?
+  telefono        String?
+  origen          OrigenLead  @default(MANUAL)
+  estado          EstadoLead  @default(NUEVO)
+  // Obligatorio solo cuando estado = DESCARTADO (validado en el servicio,
+  // no en BD — mismo criterio que AnularFacturaDto.motivo).
+  motivoDescarte  String?
+  notas           String?
+  vendedorId      String?
+  vendedor        User?       @relation(fields: [vendedorId], references: [id], onDelete: SetNull)
+  clienteId       String?     @unique
+  cliente         Cliente?    @relation(fields: [clienteId], references: [id], onDelete: SetNull)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  oportunidades Oportunidad[]
+  actividades   ActividadCrm[]
+
+  @@map("crm_leads")
+}
+
+/// Catálogo configurable del pipeline (plano, ordenable — mismo criterio
+/// que CategoriaCliente) — cada tenant nombra sus propias etapas. Ganada/
+/// Perdida NO son filas acá: son `Oportunidad.estado`, un desenlace fuera
+/// del pipeline, no una etapa más por la que se "pasa".
+model EtapaPipeline {
+  id                  String   @id @default(uuid())
+  tenantId            String
+  tenant              Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  nombre              String
+  orden               Int
+  probabilidadDefault Int      @default(0)
+  color               String   @default("#c2660c")
+  createdAt           DateTime @default(now())
+
+  oportunidades Oportunidad[]
+
+  @@unique([tenantId, nombre])
+  @@map("crm_etapas_pipeline")
+}
+
+/// `clienteId`/`leadId` mutuamente excluyentes (validado en el servicio,
+/// mismo patrón que LineaFacturaDto.productoId/descripcionManual) — una
+/// oportunidad nace sobre un prospecto o sobre un cliente ya existente,
+/// nunca ninguno de los dos o ambos. `etapaId` solo es relevante mientras
+/// `estado = ABIERTA`; al ganar/perder queda como la última etapa
+/// recorrida (histórico, no se limpia).
+model Oportunidad {
+  id                   String            @id @default(uuid())
+  tenantId             String
+  tenant               Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  titulo               String
+  clienteId            String?
+  cliente              Cliente?          @relation(fields: [clienteId], references: [id], onDelete: SetNull)
+  leadId               String?
+  lead                 Lead?             @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  etapaId              String
+  etapa                EtapaPipeline     @relation(fields: [etapaId], references: [id])
+  montoEstimado        Decimal           @db.Decimal(14, 2)
+  probabilidadPct      Int               @default(0)
+  fechaCierreEstimada  DateTime
+  vendedorId           String
+  vendedor             User              @relation(fields: [vendedorId], references: [id])
+  estado               EstadoOportunidad @default(ABIERTA)
+  // Texto libre por ahora (sin catálogo propio — Fase 1, ver el artifact
+  // de diseño), igual criterio que RecargoFacturaDto.concepto.
+  motivoPerdida        String?
+  // Se llena en la Fase 2 al "Ganar" y generar la Cotización real —
+  // @unique: una oportunidad nunca genera más de una cotización.
+  cotizacionId         String?           @unique
+  fechaCierreReal      DateTime?
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+
+  actividades ActividadCrm[]
+
+  @@map("crm_oportunidades")
+}
+
+/// Se puede loguear sobre un Lead, una Oportunidad o un Cliente directo
+/// (exactamente uno de los tres, validado en el servicio) — sin fecha
+/// programada es una nota retroactiva, con fecha es una tarea pendiente.
+model ActividadCrm {
+  id              String           @id @default(uuid())
+  tenantId        String
+  tenant          Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tipo            TipoActividadCrm
+  descripcion     String
+  clienteId       String?
+  cliente         Cliente?         @relation(fields: [clienteId], references: [id], onDelete: SetNull)
+  leadId          String?
+  lead            Lead?            @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  oportunidadId   String?
+  oportunidad     Oportunidad?     @relation(fields: [oportunidadId], references: [id], onDelete: SetNull)
+  fechaProgramada DateTime?
+  completada      Boolean          @default(false)
+  usuarioId       String
+  usuario         User             @relation(fields: [usuarioId], references: [id])
+  createdAt       DateTime         @default(now())
+
+  @@map("crm_actividades")
 }

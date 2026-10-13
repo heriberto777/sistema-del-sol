@@ -59,6 +59,9 @@ import { Proyectos } from './pages/Proyectos';
 import { Propiedades } from './pages/Propiedades';
 import { MisTareas } from './pages/MisTareas';
 import { Auditoria } from './pages/Auditoria';
+import { CrmLeads } from './pages/CrmLeads';
+import { CrmPipeline } from './pages/CrmPipeline';
+import { CrmEtapasPipeline } from './pages/CrmEtapasPipeline';
 import { TravelReservas } from './pages/TravelReservas';
 import { Contratos } from './pages/Contratos';
 import { CobrosAlquiler } from './pages/CobrosAlquiler';
@@ -285,6 +288,9 @@ const RUTAS_ADMIN = [
           { path: '/documentos', element: <Documentos /> },
           { path: '/webhooks', element: <Webhooks /> },
           { path: '/auditoria', element: <Auditoria /> },
+          { path: '/crm/leads', element: <CrmLeads /> },
+          { path: '/crm/pipeline', element: <CrmPipeline /> },
+          { path: '/crm/etapas-pipeline', element: <CrmEtapasPipeline /> },
           { path: '/whatsapp-config', element: <WhatsappConfig /> },
           { path: '/correo-config', element: <CorreoConfig /> },
         ],
