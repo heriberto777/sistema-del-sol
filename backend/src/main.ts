@@ -5,6 +5,7 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
+import { PrismaService } from './prisma/prisma.service';
 
 async function bootstrap() {
   // rawBody: true deja request.rawBody (Buffer) disponible en TODAS las
@@ -45,7 +46,7 @@ async function bootstrap() {
       forbidNonWhitelisted: true,
     }),
   );
-  app.useGlobalFilters(new HttpExceptionFilter());
+  app.useGlobalFilters(new HttpExceptionFilter(app.get(PrismaService)));
   app.setGlobalPrefix('api');
 
   // Nunca en producción — Swagger expone el 100% de la superficie de API

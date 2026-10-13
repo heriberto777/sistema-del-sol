@@ -5,7 +5,7 @@ import clsx from 'clsx';
 import { useAuth } from '../../../hooks/useAuth';
 import { useMenuErp } from '../../../hooks/useMenuErp';
 import { useUrlTiendaPublica } from '../../../hooks/useUrlTiendaPublica';
-import { ETIQUETA_CATEGORIA_ERP, type CategoriaErp, type DominioMenu, type ItemMenu } from '../../../config/menu-erp';
+import { ETIQUETA_CATEGORIA_ERP, type CategoriaErp, type DominioMenu, type GrupoUtilidades, type ItemMenu } from '../../../config/menu-erp';
 
 const CLAVE_DOMINIO_ABIERTO = 'sol_sidebar_dominio_abierto';
 const CLAVE_CATEGORIA_ABIERTA = 'sol_sidebar_categoria_abierta';
@@ -45,8 +45,20 @@ function escribirBooleano(clave: string, valor: boolean) {
   }
 }
 
-/** Dominio + clave de categoría ("dominioId:categoria") que contienen la ruta activa, o null si ninguno. */
-function ubicarRutaActiva(pathname: string, dominios: DominioMenu[]): { dominioId: string; claveCategoria: string } | null {
+/**
+ * Grupo abierto ("dominioId" o el id de `GRUPO_MI_ESPACIO`) + clave de
+ * categoría que contienen la ruta activa, o null si ninguno. `grupoMiEspacio`
+ * no tiene categorías propias (ver comentario en menu-erp.ts) — su match
+ * abre el grupo sin intentar abrir ninguna sub-categoría.
+ */
+function ubicarRutaActiva(
+  pathname: string,
+  dominios: DominioMenu[],
+  grupoMiEspacio: GrupoUtilidades | null,
+): { dominioId: string; claveCategoria: string | null } | null {
+  if (grupoMiEspacio?.items.some((item) => item.ruta === pathname)) {
+    return { dominioId: grupoMiEspacio.id, claveCategoria: null };
+  }
   for (const dominio of dominios) {
     for (const cat of dominio.categorias) {
       if (cat.items.some((item) => item.ruta === pathname)) {
@@ -67,22 +79,22 @@ function ubicarRutaActiva(pathname: string, dominios: DominioMenu[]): { dominioI
  */
 export function SidebarErp({ onNavegar }: { onNavegar?: () => void } = {}) {
   const { usuario } = useAuth();
-  const { dominios, utilidades } = useMenuErp();
+  const { dominios, utilidades, grupoMiEspacio } = useMenuErp();
   const urlTienda = useUrlTiendaPublica();
   const location = useLocation();
 
   const [colapsado, setColapsado] = useState(leerBooleano(CLAVE_COLAPSADO));
   const [dominioAbierto, setDominioAbierto] = useState<string | null>(() => {
-    const activo = ubicarRutaActiva(location.pathname, dominios);
+    const activo = ubicarRutaActiva(location.pathname, dominios, grupoMiEspacio);
     return activo?.dominioId ?? leerString(CLAVE_DOMINIO_ABIERTO);
   });
   const [categoriaAbierta, setCategoriaAbierta] = useState<string | null>(() => {
-    const activo = ubicarRutaActiva(location.pathname, dominios);
+    const activo = ubicarRutaActiva(location.pathname, dominios, grupoMiEspacio);
     return activo?.claveCategoria ?? leerString(CLAVE_CATEGORIA_ABIERTA);
   });
 
   useEffect(() => {
-    const activo = ubicarRutaActiva(location.pathname, dominios);
+    const activo = ubicarRutaActiva(location.pathname, dominios, grupoMiEspacio);
     if (!activo) return;
     setDominioAbierto(activo.dominioId);
     setCategoriaAbierta(activo.claveCategoria);
@@ -196,7 +208,41 @@ export function SidebarErp({ onNavegar }: { onNavegar?: () => void } = {}) {
         ),
       )}
 
-      {utilidades.length > 0 && dominios.length > 0 && <div className="my-1.5 border-t border-slate-100 dark:border-slate-800" />}
+      {utilidades.length > 0 && (dominios.length > 0 || grupoMiEspacio) && <div className="my-1.5 border-t border-slate-100 dark:border-slate-800" />}
+
+      {grupoMiEspacio &&
+        (() => {
+          const IconoGrupo = grupoMiEspacio.icono;
+          const grupoAbierto = !colapsado && dominioAbierto === grupoMiEspacio.id;
+          return (
+            <div>
+              <button
+                type="button"
+                onClick={() => alternarDominio(grupoMiEspacio.id)}
+                title={colapsado ? grupoMiEspacio.etiqueta : undefined}
+                className={clsx(
+                  'flex w-full items-center gap-2 rounded-lg py-2 text-left text-sm font-semibold text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-900',
+                  colapsado ? 'justify-center px-0' : 'px-2.5',
+                )}
+              >
+                <IconoGrupo size={16} className="shrink-0 text-slate-400 dark:text-slate-500" />
+                {!colapsado && (
+                  <>
+                    <span className="min-w-0 flex-1 truncate">{grupoMiEspacio.etiqueta}</span>
+                    <ChevronRight size={14} className={clsx('shrink-0 text-slate-400 transition-transform', grupoAbierto && 'rotate-90')} />
+                  </>
+                )}
+              </button>
+              {grupoAbierto && (
+                <div className="ml-3 flex flex-col gap-0.5 border-l border-slate-200 pl-2.5 dark:border-slate-800">
+                  {grupoMiEspacio.items.map(renderItem)}
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
+      {grupoMiEspacio && dominios.length > 0 && <div className="my-1.5 border-t border-slate-100 dark:border-slate-800" />}
 
       {dominios.map((dominio) => {
         const Icono = dominio.icono;

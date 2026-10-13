@@ -17,7 +17,7 @@ BEGIN
   FOR tabla IN
     SELECT unnest(ARRAY[
       'tenant_settings', 'configuraciones', 'tenant_modulo_overrides',
-      'users', 'roles', 'audit_logs',
+      'users', 'roles', 'audit_logs', 'error_logs',
       'ncf_asignados', 'facturas',
       'productos', 'bodegas', 'movimiento_inventario',
       'proveedores', 'orden_compra', 'recepcion_compra',

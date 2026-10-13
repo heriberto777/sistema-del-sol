@@ -56,6 +56,7 @@ model Tenant {
   users                     User[]
   roles                     Role[]
   auditLogs                 AuditLog[]
+  errorLogs                 ErrorLog[]
   facturas                  Factura[]
   ncfAsignados              NcfAsignado[]
   correlativos              Correlativo[]
@@ -776,6 +777,7 @@ model User {
 
   roles                                 UserRole[]
   auditLogs                             AuditLog[]
+  errorLogs                             ErrorLog[]
   facturasVendedor                      Factura[]                  @relation("FacturaVendedor")
   movimientosInventario                 MovimientoInventario[]
   ordenesCompra                         OrdenCompra[]
@@ -869,6 +871,28 @@ model AuditLog {
 
   @@index([tenantId, entidad, entidadId])
   @@map("audit_logs")
+}
+
+/// Errores 500 (no excepciones de negocio esperables, ver
+/// HttpExceptionFilter.resolver) — antes solo iban a console.error y se
+/// perdían al reiniciar el contenedor. Solo se escribe cuando el request
+/// venía autenticado como tenant (mismo criterio que AuditLog); un error
+/// de plataforma o pre-autenticación no tiene tenantId para asociarlo.
+model ErrorLog {
+  id         String   @id @default(uuid())
+  tenantId   String
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  metodo     String
+  ruta       String
+  statusCode Int
+  mensaje    String
+  stack      String?
+  createdAt  DateTime @default(now())
+
+  @@index([tenantId, createdAt])
+  @@map("error_logs")
 }
 
 /// Bitácora de acciones del super admin de plataforma (crear/suspender

@@ -58,6 +58,7 @@ import { GastosMenores } from './pages/GastosMenores';
 import { Proyectos } from './pages/Proyectos';
 import { Propiedades } from './pages/Propiedades';
 import { MisTareas } from './pages/MisTareas';
+import { Auditoria } from './pages/Auditoria';
 import { TravelReservas } from './pages/TravelReservas';
 import { Contratos } from './pages/Contratos';
 import { CobrosAlquiler } from './pages/CobrosAlquiler';
@@ -283,6 +284,7 @@ const RUTAS_ADMIN = [
           { path: '/parametros', element: <Parametros /> },
           { path: '/documentos', element: <Documentos /> },
           { path: '/webhooks', element: <Webhooks /> },
+          { path: '/auditoria', element: <Auditoria /> },
           { path: '/whatsapp-config', element: <WhatsappConfig /> },
           { path: '/correo-config', element: <CorreoConfig /> },
         ],

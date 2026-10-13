@@ -1,6 +1,8 @@
 import { ArgumentsHost, Catch, ExceptionFilter, HttpException, HttpStatus } from '@nestjs/common';
-import { Request, Response } from 'express';
+import { Response } from 'express';
 import { Prisma } from '@prisma/client';
+import { PrismaService } from '../../prisma/prisma.service';
+import { AuthenticatedRequest } from '../types/authenticated-request';
 
 // Códigos de Prisma que representan errores de cliente esperables, no bugs
 // del servidor — sin este mapeo, findUniqueOrThrow/findFirstOrThrow (usado
@@ -20,15 +22,21 @@ const PRISMA_MENSAJE: Partial<Record<string, string>> = {
 
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
+  // Opcional: en tests unitarios de otros filtros/pipes se instancia este
+  // filtro sin Prisma — el registro en ErrorLog es un extra, nunca debe
+  // poder romper la respuesta de error que el cliente sí necesita.
+  constructor(private readonly prisma?: PrismaService) {}
+
   catch(exception: unknown, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
-    const request = ctx.getRequest<Request>();
+    const request = ctx.getRequest<AuthenticatedRequest>();
 
     const { status, mensaje } = this.resolver(exception);
 
     if (status === HttpStatus.INTERNAL_SERVER_ERROR) {
       console.error(exception);
+      this.registrarErrorLog(exception, request, status);
     }
 
     response.status(status).json({
@@ -37,6 +45,34 @@ export class HttpExceptionFilter implements ExceptionFilter {
       timestamp: new Date().toISOString(),
       message: mensaje,
     });
+  }
+
+  /**
+   * Antes un 500 solo iba a console.error y se perdía al reiniciar el
+   * contenedor — nadie dentro del tenant podía verlo (ver pantalla
+   * "Auditoría y Logs" en Configuración). Solo se escribe si el request
+   * venía autenticado como tenant (igual criterio que AuditLogInterceptor);
+   * fire-and-forget, nunca debe bloquear ni poder tumbar la respuesta real.
+   */
+  private registrarErrorLog(exception: unknown, request: AuthenticatedRequest, status: HttpStatus) {
+    const tenantId = request.user?.tenantId;
+    if (!tenantId || !this.prisma) return;
+
+    this.prisma.errorLog
+      .create({
+        data: {
+          tenantId,
+          userId: request.user.userId,
+          metodo: request.method,
+          ruta: request.url,
+          statusCode: status,
+          mensaje: exception instanceof Error ? exception.message : 'Error interno',
+          stack: exception instanceof Error ? exception.stack : undefined,
+        },
+      })
+      .catch((error) => {
+        console.error('No se pudo escribir el error log', error);
+      });
   }
 
   private resolver(exception: unknown): { status: HttpStatus; mensaje: string | string[] } {

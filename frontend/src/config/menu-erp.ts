@@ -1,4 +1,4 @@
-import { BookOpen, Boxes, FolderKanban, Globe, Home, type LucideIcon, Megaphone, Plane, Receipt, ShieldCheck, ShoppingBag, Users } from 'lucide-react';
+import { BookOpen, Boxes, FolderKanban, Globe, Home, LayoutGrid, type LucideIcon, Megaphone, Plane, Receipt, ShieldCheck, ShoppingBag, Users } from 'lucide-react';
 
 export type CategoriaErp = 'catalogos' | 'transacciones' | 'consultas' | 'reportes' | 'configuracion';
 
@@ -240,7 +240,13 @@ export const DOMINIOS_MENU: DominioMenu[] = [
     categorias: [
       { categoria: 'catalogos', items: [] },
       { categoria: 'transacciones', items: [] },
-      { categoria: 'consultas', items: [] },
+      {
+        // Auditoría ya se graba sola desde hace tiempo (AuditLogInterceptor
+        // global) — esto solo la expone. Separado de "configuracion" porque
+        // es consulta de histórico, no un parámetro que se edita.
+        categoria: 'consultas',
+        items: [{ id: 'auditoria', etiqueta: 'Auditoría y logs', ruta: '/auditoria', permisos: ['auditoria.ver'] }],
+      },
       { categoria: 'reportes', items: [] },
       {
         categoria: 'configuracion',
@@ -327,18 +333,38 @@ export const DOMINIOS_MENU: DominioMenu[] = [
 ];
 
 /**
- * Utilidades sin dominio (antes "sueltos arriba" del Sidebar) — Reportes es
- * un hub transversal, Mis Tareas es personal, ninguno encaja en el molde de
- * 5 categorías de un dominio de negocio.
+ * Solo Dashboard queda realmente suelto — es el "home", nunca tuvo sentido
+ * meterlo dentro de un grupo colapsable (segunda auditoría de menú, pedido
+ * explícito del usuario: "muchos ítems sueltos arriba").
  */
-export const UTILIDADES_GENERALES: ItemMenu[] = [
-  { id: 'dashboard', etiqueta: 'Dashboard', ruta: '/', permisos: ['reportes.ver'] },
-  { id: 'reportes', etiqueta: 'Reportes', ruta: '/reportes', permisos: ['reportes.ver'] },
-  { id: 'mis-tareas', etiqueta: 'Mis tareas', ruta: '/mis-tareas', modulo: 'mistareas' },
-  { id: 'notificaciones', etiqueta: 'Notificaciones', ruta: '/notificaciones', permisos: ['notificaciones.ver'] },
-  { id: 'mensajes', etiqueta: 'Mensajes', ruta: '/mensajes', permisos: ['whatsapp.mensajes.ver'] },
-  { id: 'ia', etiqueta: 'IA', ruta: '/ia', permisos: ['ia.usar'], modulo: 'ia' },
-];
+export const UTILIDADES_GENERALES: ItemMenu[] = [{ id: 'dashboard', etiqueta: 'Dashboard', ruta: '/', permisos: ['reportes.ver'] }];
+
+export interface GrupoUtilidades {
+  id: string;
+  etiqueta: string;
+  icono: LucideIcon;
+  items: ItemMenu[];
+}
+
+/**
+ * Antes vivían sueltos junto a Dashboard. Siguen sin encajar en el molde de
+ * 5 categorías de un dominio de negocio (Reportes es un hub transversal,
+ * Mis Tareas es personal) — por eso NO son un `DominioMenu` más, es un grupo
+ * colapsable aparte sin sub-categorías (ver el render dedicado en
+ * SidebarErp.tsx, participa del mismo acordeón exclusivo que los dominios).
+ */
+export const GRUPO_MI_ESPACIO: GrupoUtilidades = {
+  id: 'mi-espacio',
+  etiqueta: 'Mi espacio',
+  icono: LayoutGrid,
+  items: [
+    { id: 'reportes', etiqueta: 'Reportes', ruta: '/reportes', permisos: ['reportes.ver'] },
+    { id: 'mis-tareas', etiqueta: 'Mis tareas', ruta: '/mis-tareas', modulo: 'mistareas' },
+    { id: 'notificaciones', etiqueta: 'Notificaciones', ruta: '/notificaciones', permisos: ['notificaciones.ver'] },
+    { id: 'mensajes', etiqueta: 'Mensajes', ruta: '/mensajes', permisos: ['whatsapp.mensajes.ver'] },
+    { id: 'ia', etiqueta: 'IA', ruta: '/ia', permisos: ['ia.usar'], modulo: 'ia' },
+  ],
+};
 
 export function esVisible(item: ItemMenu, tienePermiso: (p: string) => boolean, tieneModulo: (m: string) => boolean): boolean {
   if (item.modulo && !tieneModulo(item.modulo)) return false;
