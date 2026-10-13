@@ -131,6 +131,14 @@ export const PERMISOS_BASE = [
   // criterio que `crm.leads.convertir`.
   'crm.oportunidades.convertir',
   'crm.pipeline.configurar',
+  // Fase 3 — dashboard de conversión/forecast y progreso de metas de
+  // venta (expone montos reales por vendedor, separado de `crm.ver` por
+  // el mismo motivo que `proyectos.rentabilidad.ver`).
+  'crm.reportes.ver',
+  // Definir CUÁNTO debe vender cada vendedor es una decisión de gerencia,
+  // separada de `crm.oportunidades.*` — un vendedor con `crm.reportes.ver`
+  // puede ver su propio progreso sin poder cambiarse la meta a sí mismo.
+  'crm.metas.configurar',
 ];
 
 export const ROLES_BASE: Record<string, string[]> = {

@@ -61,6 +61,7 @@ model Tenant {
   crmEtapasPipeline         EtapaPipeline[]
   crmOportunidades          Oportunidad[]
   crmActividades            ActividadCrm[]
+  crmMetasVenta             MetaVentaCrm[]
   facturas                  Factura[]
   ncfAsignados              NcfAsignado[]
   correlativos              Correlativo[]
@@ -785,6 +786,7 @@ model User {
   crmLeadsAsignados                     Lead[]
   crmOportunidadesAsignadas             Oportunidad[]
   crmActividades                        ActividadCrm[]
+  crmMetasVenta                         MetaVentaCrm[]
   facturasVendedor                      Factura[]                  @relation("FacturaVendedor")
   movimientosInventario                 MovimientoInventario[]
   ordenesCompra                         OrdenCompra[]
@@ -4987,9 +4989,34 @@ model ActividadCrm {
   oportunidad     Oportunidad?     @relation(fields: [oportunidadId], references: [id], onDelete: SetNull)
   fechaProgramada DateTime?
   completada      Boolean          @default(false)
+  // Fase 3 — evita que ActividadesCrmCronService reenvíe el mismo aviso
+  // de "hoy vence" todos los días mientras siga sin completarse (mismo
+  // criterio que TareaPersonal.recordatorioEnviado).
+  avisoEnviado    Boolean          @default(false)
   usuarioId       String
   usuario         User             @relation(fields: [usuarioId], references: [id])
   createdAt       DateTime         @default(now())
 
   @@map("crm_actividades")
+}
+
+/// Meta de venta por vendedor y mes (Fase 3) — sin precedente en el
+/// resto del sistema (ComisionVenta es % sobre venta real, no un objetivo
+/// numérico; CategoriaIncentivo no tiene vendedor ni período). Un
+/// vendedor puede no tener meta un mes dado — ausencia de fila, no un
+/// valor en cero.
+model MetaVentaCrm {
+  id         String   @id @default(uuid())
+  tenantId   String
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  vendedorId String
+  vendedor   User     @relation(fields: [vendedorId], references: [id])
+  anio       Int
+  mes        Int
+  montoMeta  Decimal  @db.Decimal(14, 2)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([tenantId, vendedorId, anio, mes])
+  @@map("crm_metas_venta")
 }

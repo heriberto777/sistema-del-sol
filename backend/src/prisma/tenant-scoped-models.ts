@@ -126,4 +126,5 @@ export const TENANT_SCOPED_MODELS = new Set([
   'EtapaPipeline',
   'Oportunidad',
   'ActividadCrm',
+  'MetaVentaCrm',
 ]);

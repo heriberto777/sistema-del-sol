@@ -10,6 +10,7 @@ import { CORRELATIVOS_BASE } from './correlativos-base';
 import { PLANTILLAS_PUBLICACIONES_SOCIALES_BASE } from '../notificaciones/plantillas-publicaciones-sociales-base';
 import { PLANTILLAS_COMENTARIOS_TAREA_BASE } from '../notificaciones/plantillas-comentarios-tarea-base';
 import { PLANTILLAS_VENCIMIENTO_TAREAS_BASE } from '../notificaciones/plantillas-vencimiento-tareas-base';
+import { PLANTILLAS_CRM_BASE } from '../notificaciones/plantillas-crm-base';
 import { PLANTILLAS_VENTAS_BASE } from '../notificaciones/plantillas-ventas-base';
 import { PLANTILLAS_ALERTAS_OPERATIVAS_BASE } from '../notificaciones/plantillas-alertas-operativas-base';
 import { ModoReseteoTenant } from './dto/resetear-tenant.dto';
@@ -165,6 +166,11 @@ export class TenantsRepository {
       // Aviso de "hoy vence" (Mis Tareas + tareas de Proyectos) — mismo criterio.
       await tx.notificacionPlantilla.createMany({
         data: PLANTILLAS_VENCIMIENTO_TAREAS_BASE.map((p) => ({ tenantId: tenant.id, ...p })),
+      });
+
+      // Aviso de "hoy vence" para actividades del CRM (Fase 3) — mismo criterio.
+      await tx.notificacionPlantilla.createMany({
+        data: PLANTILLAS_CRM_BASE.map((p) => ({ tenantId: tenant.id, ...p })),
       });
 
       // Factura creada / cotización enviada — mismo criterio, ver el
@@ -384,6 +390,7 @@ export class TenantsRepository {
     await tx.notificacionPlantilla.createMany({ data: PLANTILLAS_PUBLICACIONES_SOCIALES_BASE.map((p) => ({ tenantId, ...p })) });
     await tx.notificacionPlantilla.createMany({ data: PLANTILLAS_COMENTARIOS_TAREA_BASE.map((p) => ({ tenantId, ...p })) });
     await tx.notificacionPlantilla.createMany({ data: PLANTILLAS_VENCIMIENTO_TAREAS_BASE.map((p) => ({ tenantId, ...p })) });
+    await tx.notificacionPlantilla.createMany({ data: PLANTILLAS_CRM_BASE.map((p) => ({ tenantId, ...p })) });
     await tx.notificacionPlantilla.createMany({ data: PLANTILLAS_VENTAS_BASE.map((p) => ({ tenantId, ...p })) });
     await tx.notificacionPlantilla.createMany({ data: PLANTILLAS_ALERTAS_OPERATIVAS_BASE.map((p) => ({ tenantId, ...p })) });
 

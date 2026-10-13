@@ -109,3 +109,27 @@ export interface EntradaTimeline {
   resumen: string;
   meta?: { rol?: string; telefono?: string; id?: string };
 }
+
+/** Dashboard CRM (Fase 3) — ver CrmReportesService en el backend. */
+export interface DashboardCrm {
+  pipelineAbierto: { cantidad: number; montoTotal: number };
+  ganadas: { cantidad: number; montoTotal: number };
+  perdidas: { cantidad: number; montoTotal: number };
+  tasaConversion: number | null;
+  cicloPromedioDias: number | null;
+  embudoLeads: Record<EstadoLead, number>;
+  forecastPorMes: { mes: string; montoPonderado: number }[];
+  rankingVendedores: { vendedorId: string; nombre: string; cantidadGanadas: number; montoGanado: number }[];
+}
+
+/** Meta de venta por vendedor/mes con progreso real ya calculado (Fase 3) — ver MetasVentaService en el backend. */
+export interface MetaVenta {
+  id: string;
+  vendedorId: string;
+  nombre: string;
+  anio: number;
+  mes: number;
+  montoMeta: number;
+  montoReal: number;
+  porcentajeCumplido: number;
+}

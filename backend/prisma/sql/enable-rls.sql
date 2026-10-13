@@ -50,7 +50,7 @@ BEGIN
       'tareas_personales', 'categorias_incentivo',
       'travel_reservas', 'travel_ledger_movimientos', 'travel_reglas_markup',
       'usos_ia_tenant',
-      'crm_leads', 'crm_etapas_pipeline', 'crm_oportunidades', 'crm_actividades'
+      'crm_leads', 'crm_etapas_pipeline', 'crm_oportunidades', 'crm_actividades', 'crm_metas_venta'
     ])
   LOOP
     EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY;', tabla);

@@ -25,6 +25,7 @@ export const EVENTOS = {
   TAREA_PROYECTO_COMENTADA: 'proyectos.tarea_comentada',
   TAREA_PROYECTO_VENCE_HOY: 'proyectos.tarea_vence_hoy',
   TAREA_PERSONAL_VENCE_HOY: 'tareas_personales.vence_hoy',
+  CRM_ACTIVIDAD_VENCE_HOY: 'crm.actividad_vence_hoy',
 } as const;
 
 export type NombreEvento = (typeof EVENTOS)[keyof typeof EVENTOS];
@@ -235,5 +236,13 @@ export interface TareaPersonalVenceHoyPayload {
   tenantId: string;
   tareaId: string;
   tareaTitulo: string;
+  usuarioId: string;
+}
+
+/** Emitido por ActividadesCrmCronService (Fase 3) el día que llega `fechaProgramada` — mismo criterio que TareaPersonalVenceHoyPayload: la actividad es de un vendedor puntual, no de equipo. */
+export interface CrmActividadVenceHoyPayload {
+  tenantId: string;
+  actividadId: string;
+  descripcion: string;
   usuarioId: string;
 }

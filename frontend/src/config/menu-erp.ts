@@ -284,12 +284,19 @@ export const DOMINIOS_MENU: DominioMenu[] = [
       { categoria: 'catalogos', items: [{ id: 'crm-leads', etiqueta: 'Leads', ruta: '/crm/leads', permisos: ['crm.ver'], modulo: 'crm' }] },
       { categoria: 'transacciones', items: [{ id: 'crm-oportunidad-nueva', etiqueta: 'Nueva oportunidad', ruta: '/crm/pipeline', permisos: ['crm.oportunidades.crear'], modulo: 'crm' }] },
       { categoria: 'consultas', items: [{ id: 'crm-pipeline', etiqueta: 'Pipeline', ruta: '/crm/pipeline', permisos: ['crm.ver'], modulo: 'crm' }] },
-      { categoria: 'reportes', items: [] },
       {
-        // Fase 1 — ver el artifact de diseño: reportes/dashboard de
-        // conversión quedan para la Fase 3, acá solo el catálogo de etapas.
+        // Fase 3 — embudo de conversión/forecast/ranking de vendedores.
+        categoria: 'reportes',
+        items: [{ id: 'crm-dashboard', etiqueta: 'Dashboard CRM', ruta: '/crm/dashboard', permisos: ['crm.reportes.ver'], modulo: 'crm' }],
+      },
+      {
         categoria: 'configuracion',
-        items: [{ id: 'crm-etapas-pipeline', etiqueta: 'Etapas del pipeline', ruta: '/crm/etapas-pipeline', permisos: ['crm.pipeline.configurar'], modulo: 'crm' }],
+        items: [
+          { id: 'crm-etapas-pipeline', etiqueta: 'Etapas del pipeline', ruta: '/crm/etapas-pipeline', permisos: ['crm.pipeline.configurar'], modulo: 'crm' },
+          // Fase 3 — objetivo mensual por vendedor, separado del catálogo
+          // de etapas (son datos de gestión de equipo, no del pipeline en sí).
+          { id: 'crm-metas-venta', etiqueta: 'Metas de venta', ruta: '/crm/metas-venta', permisos: ['crm.reportes.ver'], modulo: 'crm' },
+        ],
       },
     ],
   },

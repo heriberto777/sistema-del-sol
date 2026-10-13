@@ -22,6 +22,7 @@ import {
   TareaProyectoComentadaPayload,
   TareaProyectoVenceHoyPayload,
   TareaPersonalVenceHoyPayload,
+  CrmActividadVenceHoyPayload,
   WhatsappRequiereAtencionPayload,
 } from '../event-bus/events';
 import { PrismaService } from '../prisma/prisma.service';
@@ -363,6 +364,18 @@ export class NotificacionesService {
     await this.enviar({ tenantId: payload.tenantId, canal: 'EMAIL', clave: 'tarea_personal_vence_hoy', destinatario: usuario.email, variables });
     if (usuario.telefono) {
       await this.enviar({ tenantId: payload.tenantId, canal: 'WHATSAPP', clave: 'tarea_personal_vence_hoy', destinatario: usuario.telefono, variables });
+    }
+  }
+
+  /** Emitido por ActividadesCrmCronService (Fase 3) el día que llega `fechaProgramada` — mismo criterio que `alVencerTareaPersonalHoy`: la actividad es de un vendedor puntual, el único destinatario posible es su dueño. */
+  @OnEvent(EVENTOS.CRM_ACTIVIDAD_VENCE_HOY)
+  async alVencerActividadCrmHoy(payload: CrmActividadVenceHoyPayload) {
+    const usuario = await this.prisma.user.findUnique({ where: { id: payload.usuarioId } });
+    if (!usuario) return;
+    const variables = { actividad_descripcion: payload.descripcion };
+    await this.enviar({ tenantId: payload.tenantId, canal: 'EMAIL', clave: 'crm_actividad_vence_hoy', destinatario: usuario.email, variables });
+    if (usuario.telefono) {
+      await this.enviar({ tenantId: payload.tenantId, canal: 'WHATSAPP', clave: 'crm_actividad_vence_hoy', destinatario: usuario.telefono, variables });
     }
   }
 
