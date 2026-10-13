@@ -99,3 +99,13 @@ export const ETIQUETA_TIPO_ACTIVIDAD: Record<TipoActividadCrm, string> = {
   NOTA: 'Nota',
   TAREA: 'Tarea',
 };
+
+export type TipoEntradaTimeline = 'whatsapp' | 'lealtad' | 'cotizacion' | 'factura';
+
+/** Ficha 360° (Fase 2) — ver ClienteTimelineService en el backend. */
+export interface EntradaTimeline {
+  tipo: TipoEntradaTimeline;
+  fecha: string;
+  resumen: string;
+  meta?: { rol?: string; telefono?: string; id?: string };
+}

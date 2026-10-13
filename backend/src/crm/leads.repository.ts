@@ -67,6 +67,11 @@ export class LeadsRepository {
     return this.db.lead.update({ where: { id }, data: { estado, motivoDescarte } });
   }
 
+  /** Fase 2 — el Lead nunca se borra al convertirse, queda como registro de origen (ver schema.prisma). */
+  marcarConvertido(id: string, clienteId: string) {
+    return this.db.lead.update({ where: { id }, data: { estado: 'CONVERTIDO', clienteId } });
+  }
+
   /** Valida que un vendedorId pertenezca a ESTE tenant antes de asignarlo — User es tenant-scoped, así que un id de otro tenant tira 404 acá (prevención de IDOR, ver CLAUDE.md). */
   validarVendedorDelTenant(id: string) {
     return this.db.user.findUniqueOrThrow({ where: { id }, select: { id: true } });

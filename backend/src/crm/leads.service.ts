@@ -1,13 +1,18 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { LeadsRepository } from './leads.repository';
+import { ClientesService } from '../clientes/clientes.service';
 import { CrearLeadDto } from './dto/crear-lead.dto';
 import { CambiarEstadoLeadDto } from './dto/cambiar-estado-lead.dto';
+import { ConvertirLeadDto } from './dto/convertir-lead.dto';
 import { ListarLeadsQueryDto } from './dto/listar-leads-query.dto';
 import { paginar } from '../common/types/pagina-resultado';
 
 @Injectable()
 export class LeadsService {
-  constructor(private readonly leadsRepository: LeadsRepository) {}
+  constructor(
+    private readonly leadsRepository: LeadsRepository,
+    private readonly clientesService: ClientesService,
+  ) {}
 
   async crear(dto: CrearLeadDto, tenantId: string, usuarioActualId: string) {
     const vendedorId = dto.vendedorId ?? usuarioActualId;
@@ -56,5 +61,27 @@ export class LeadsService {
       throw new BadRequestException('Indicá un motivo para descartar el lead.');
     }
     return this.leadsRepository.cambiarEstado(id, dto.estado, dto.estado === 'DESCARTADO' ? dto.motivoDescarte : null);
+  }
+
+  /**
+   * Fase 2 — reusa ClientesService.crear() tal cual (dispara
+   * EVENTOS.CLIENTE_CREADO, valida listaPrecioId/categoriaId, etc.), el
+   * CRM no duplica esa lógica. nombre/email/telefono se heredan del Lead;
+   * `dto.tipo`/`rncCedula` son lo único que el Lead no tenía y el Cliente
+   * sí necesita. También la usa internamente
+   * OportunidadesService.convertirEnCotizacion() cuando la oportunidad
+   * ganada está sobre un Lead en vez de un Cliente ya existente.
+   */
+  async convertir(id: string, dto: ConvertirLeadDto, tenantId: string) {
+    const lead = await this.leadsRepository.buscarPorId(id);
+    if (lead.estado === 'CONVERTIDO') {
+      throw new BadRequestException('Este lead ya fue convertido en cliente.');
+    }
+    const cliente = await this.clientesService.crear(
+      { nombre: lead.nombre, email: lead.email ?? undefined, telefono: lead.telefono ?? undefined, tipo: dto.tipo ?? 'PERSONA_FISICA', rncCedula: dto.rncCedula },
+      tenantId,
+    );
+    await this.leadsRepository.marcarConvertido(id, cliente.id);
+    return cliente;
   }
 }

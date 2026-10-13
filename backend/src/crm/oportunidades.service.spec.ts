@@ -4,12 +4,14 @@ import { OportunidadesRepository } from './oportunidades.repository';
 import { EtapasPipelineService } from './etapas-pipeline.service';
 import { LeadsService } from './leads.service';
 import { ClientesService } from '../clientes/clientes.service';
+import { CotizacionesService } from '../cotizaciones/cotizaciones.service';
 
 describe('OportunidadesService', () => {
   let repository: jest.Mocked<OportunidadesRepository>;
   let etapasPipelineService: jest.Mocked<EtapasPipelineService>;
   let leadsService: jest.Mocked<LeadsService>;
   let clientesService: jest.Mocked<ClientesService>;
+  let cotizacionesService: jest.Mocked<CotizacionesService>;
   let service: OportunidadesService;
 
   function dto(overrides: Record<string, unknown> = {}) {
@@ -33,15 +35,20 @@ describe('OportunidadesService', () => {
       actualizar: jest.fn(),
       cambiarEtapa: jest.fn(),
       cerrar: jest.fn(),
+      cerrarConCotizacion: jest.fn().mockResolvedValue({ id: 'op-1', estado: 'GANADA' }),
       eliminar: jest.fn(),
       validarVendedorDelTenant: jest.fn().mockResolvedValue({ id: 'user-2' }),
     } as unknown as jest.Mocked<OportunidadesRepository>;
     etapasPipelineService = {
       buscarPorId: jest.fn().mockResolvedValue({ id: 'etapa-1', probabilidadDefault: 30 }),
     } as unknown as jest.Mocked<EtapasPipelineService>;
-    leadsService = { buscarPorId: jest.fn().mockResolvedValue({ id: 'lead-1' }) } as unknown as jest.Mocked<LeadsService>;
+    leadsService = {
+      buscarPorId: jest.fn().mockResolvedValue({ id: 'lead-1' }),
+      convertir: jest.fn().mockResolvedValue({ id: 'cliente-del-lead' }),
+    } as unknown as jest.Mocked<LeadsService>;
     clientesService = { buscarPorId: jest.fn().mockResolvedValue({ id: 'cliente-1' }) } as unknown as jest.Mocked<ClientesService>;
-    service = new OportunidadesService(repository, etapasPipelineService, leadsService, clientesService);
+    cotizacionesService = { crear: jest.fn().mockResolvedValue({ id: 'cotizacion-1' }) } as unknown as jest.Mocked<CotizacionesService>;
+    service = new OportunidadesService(repository, etapasPipelineService, leadsService, clientesService, cotizacionesService);
   });
 
   describe('crear', () => {
@@ -118,6 +125,59 @@ describe('OportunidadesService', () => {
       await service.eliminar('op-1');
 
       expect(repository.eliminar).toHaveBeenCalledWith('op-1');
+    });
+  });
+
+  describe('convertirEnCotizacion (Fase 2)', () => {
+    it('genera la cotización directo contra el cliente cuando la oportunidad ya tiene uno', async () => {
+      repository.buscarPorId.mockResolvedValue({
+        id: 'op-1',
+        estado: 'ABIERTA',
+        titulo: 'Venta anual',
+        montoEstimado: '1500',
+        clienteId: 'cliente-1',
+        leadId: null,
+      } as never);
+
+      await service.convertirEnCotizacion('op-1', { fechaVigenciaHastaCotizacion: '2099-01-01' }, 'tenant-1', 'user-1');
+
+      expect(leadsService.convertir).not.toHaveBeenCalled();
+      expect(cotizacionesService.crear).toHaveBeenCalledWith(
+        { clienteId: 'cliente-1', fechaVigenciaHasta: '2099-01-01', lineas: [{ descripcionManual: 'Venta anual', cantidad: 1, precioUnitario: 1500 }] },
+        'tenant-1',
+        'user-1',
+      );
+      expect(repository.cerrarConCotizacion).toHaveBeenCalledWith('op-1', 'cotizacion-1', undefined);
+    });
+
+    it('convierte el lead en cliente primero cuando la oportunidad todavía no tiene cliente', async () => {
+      repository.buscarPorId.mockResolvedValue({
+        id: 'op-1',
+        estado: 'ABIERTA',
+        titulo: 'Venta mayorista',
+        montoEstimado: '3000',
+        clienteId: null,
+        leadId: 'lead-1',
+      } as never);
+
+      await service.convertirEnCotizacion('op-1', { fechaVigenciaHastaCotizacion: '2099-01-01', tipoClienteNuevo: 'PERSONA_JURIDICA' }, 'tenant-1', 'user-1');
+
+      expect(leadsService.convertir).toHaveBeenCalledWith('lead-1', { tipo: 'PERSONA_JURIDICA', rncCedula: undefined }, 'tenant-1');
+      expect(cotizacionesService.crear).toHaveBeenCalledWith(
+        expect.objectContaining({ clienteId: 'cliente-del-lead' }),
+        'tenant-1',
+        'user-1',
+      );
+      expect(repository.cerrarConCotizacion).toHaveBeenCalledWith('op-1', 'cotizacion-1', 'cliente-del-lead');
+    });
+
+    it('rechaza convertir una oportunidad que ya está cerrada', async () => {
+      repository.buscarPorId.mockResolvedValue({ id: 'op-1', estado: 'GANADA' } as never);
+
+      await expect(service.convertirEnCotizacion('op-1', { fechaVigenciaHastaCotizacion: '2099-01-01' }, 'tenant-1', 'user-1')).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(cotizacionesService.crear).not.toHaveBeenCalled();
     });
   });
 });

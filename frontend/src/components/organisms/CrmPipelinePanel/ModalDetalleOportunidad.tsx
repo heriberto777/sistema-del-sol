@@ -1,19 +1,30 @@
+import { useState } from 'react';
 import { Modal } from '../../molecules/Modal/Modal';
 import { Badge } from '../../atoms/Badge/Badge';
 import { ActividadesCrmPanel } from '../ActividadesCrmPanel/ActividadesCrmPanel';
+import { ModalTimelineCliente } from '../ModalTimelineCliente/ModalTimelineCliente';
 import { Oportunidad } from '../../../types/crm';
 
 const TONO_ESTADO: Record<Oportunidad['estado'], 'neutro' | 'exito' | 'peligro'> = { ABIERTA: 'neutro', GANADA: 'exito', PERDIDA: 'peligro' };
 
 export function ModalDetalleOportunidad({ oportunidad, onClose }: { oportunidad: Oportunidad; onClose: () => void }) {
+  const [viendoTimeline, setViendoTimeline] = useState(false);
+
   return (
     <Modal titulo={oportunidad.titulo} onClose={onClose} ancho="xl">
       <div className="space-y-5">
-        <div className="flex flex-wrap items-center gap-2">
-          <Badge tono={TONO_ESTADO[oportunidad.estado]}>{oportunidad.estado}</Badge>
-          <span className="text-xs text-slate-400">
-            Etapa: {oportunidad.etapa.nombre} · {oportunidad.probabilidadPct}% de probabilidad
-          </span>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge tono={TONO_ESTADO[oportunidad.estado]}>{oportunidad.estado}</Badge>
+            <span className="text-xs text-slate-400">
+              Etapa: {oportunidad.etapa.nombre} · {oportunidad.probabilidadPct}% de probabilidad
+            </span>
+          </div>
+          {oportunidad.clienteId && (
+            <button type="button" onClick={() => setViendoTimeline(true)} className="text-sm font-medium text-sol-600 hover:text-sol-700 dark:text-sol-400">
+              Ver timeline del cliente
+            </button>
+          )}
         </div>
 
         <div className="grid grid-cols-2 gap-3 text-sm">
@@ -41,11 +52,25 @@ export function ModalDetalleOportunidad({ oportunidad, onClose }: { oportunidad:
           </div>
         )}
 
+        {oportunidad.cotizacionId && (
+          <div className="rounded-lg border border-sol-200 bg-sol-50 p-3 text-sm text-sol-800 dark:border-sol-900 dark:bg-sol-900/10 dark:text-sol-300">
+            Esta oportunidad ya generó una cotización — revisala en Cotizaciones.
+          </div>
+        )}
+
         <div>
           <h3 className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-300">Actividades</h3>
           <ActividadesCrmPanel referencia={{ oportunidadId: oportunidad.id }} />
         </div>
       </div>
+
+      {viendoTimeline && oportunidad.clienteId && (
+        <ModalTimelineCliente
+          clienteId={oportunidad.clienteId}
+          nombreCliente={oportunidad.cliente?.nombre ?? oportunidad.lead?.nombre ?? ''}
+          onClose={() => setViendoTimeline(false)}
+        />
+      )}
     </Modal>
   );
 }

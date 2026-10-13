@@ -14,5 +14,9 @@ import { PublicacionesSocialesModule } from '../publicaciones-sociales/publicaci
   imports: [IaModule, WhatsappConfigModule, ProductosModule, PublicacionesSocialesModule],
   controllers: [WhatsappWebhookController, WhatsappBandejaController],
   providers: [WhatsappBotService, WhatsappMensajesRepository, WhatsappMensajesAdminRepository, WhatsappBandejaService],
+  // Exporta el repositorio directo (no un servicio) — mismo criterio que ProyectosModule
+  // exportando ProyectosRepository: el CRM (Fase 2, ficha 360°) solo necesita leer la
+  // conversación de un teléfono, no la lógica de bandeja/atención humana.
+  exports: [WhatsappMensajesAdminRepository],
 })
 export class WhatsappBotModule {}

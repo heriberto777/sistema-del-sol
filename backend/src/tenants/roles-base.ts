@@ -120,7 +120,16 @@ export const PERMISOS_BASE = [
   // que `proyectos.rentabilidad.ver` separado de `proyectos.ver`.
   'crm.ver',
   'crm.leads.crear', 'crm.leads.editar',
+  // Fase 2 — crea un Cliente real (dispara CLIENTE_CREADO) a partir de un
+  // Lead, separado de `.editar` a propósito: es una acción con efecto
+  // fuera del CRM (alta real en Contactos), mismo criterio que
+  // `proyectos.facturar` separado de `proyectos.editar`.
+  'crm.leads.convertir',
   'crm.oportunidades.crear', 'crm.oportunidades.editar', 'crm.oportunidades.eliminar',
+  // Fase 2 — "Ganar y generar cotización" (puede convertir un Lead en
+  // Cliente de paso) es más sensible que solo marcar ganada/perdida, mismo
+  // criterio que `crm.leads.convertir`.
+  'crm.oportunidades.convertir',
   'crm.pipeline.configurar',
 ];
 

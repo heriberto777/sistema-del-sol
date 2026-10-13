@@ -4,6 +4,7 @@ import { OportunidadesService } from './oportunidades.service';
 import { CrearOportunidadDto } from './dto/crear-oportunidad.dto';
 import { CambiarEtapaOportunidadDto } from './dto/cambiar-etapa-oportunidad.dto';
 import { CerrarOportunidadDto } from './dto/cerrar-oportunidad.dto';
+import { ConvertirOportunidadDto } from './dto/convertir-oportunidad.dto';
 import { ListarOportunidadesQueryDto } from './dto/listar-oportunidades-query.dto';
 import { Permissions } from '../common/decorators/permissions.decorator';
 import { RequiereModulo } from '../common/decorators/requiere-modulo.decorator';
@@ -64,5 +65,11 @@ export class OportunidadesController {
   @Permissions('crm.oportunidades.eliminar')
   eliminar(@Param('id') id: string) {
     return this.oportunidadesService.eliminar(id);
+  }
+
+  @Post(':id/convertir')
+  @Permissions('crm.oportunidades.convertir')
+  convertirEnCotizacion(@Param('id') id: string, @Body() dto: ConvertirOportunidadDto, @CurrentUser() user: JwtPayloadUser) {
+    return this.oportunidadesService.convertirEnCotizacion(id, dto, user.tenantId, user.userId);
   }
 }

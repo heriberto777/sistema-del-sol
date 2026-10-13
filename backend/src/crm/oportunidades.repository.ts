@@ -93,6 +93,24 @@ export class OportunidadesRepository {
     });
   }
 
+  /**
+   * Fase 2 — "Ganar y generar cotización". `clienteId` se pasa SOLO
+   * cuando la oportunidad estaba sobre un Lead recién convertido (ver
+   * OportunidadesService.convertirEnCotizacion) — ahí sí queda con
+   * clienteId Y leadId a la vez (el Lead se conserva como historial de
+   * origen), excepción deliberada a la regla de "exactamente uno" que
+   * rige en crear()/actualizar(): una vez GANADA, `actualizar()` ya la
+   * bloquea (validarQueSigaAbierta), así que ese invariante relajado
+   * nunca se vuelve a chequear sobre este registro.
+   */
+  cerrarConCotizacion(id: string, cotizacionId: string, clienteId?: string) {
+    return this.db.oportunidad.update({
+      where: { id },
+      data: { estado: 'GANADA', cotizacionId, fechaCierreReal: new Date(), ...(clienteId ? { clienteId } : {}) },
+      include: INCLUDE_OPORTUNIDAD,
+    });
+  }
+
   /** Valida que un vendedorId pertenezca a ESTE tenant antes de asignarlo (mismo criterio que LeadsRepository.validarVendedorDelTenant). */
   validarVendedorDelTenant(id: string) {
     return this.db.user.findUniqueOrThrow({ where: { id }, select: { id: true } });

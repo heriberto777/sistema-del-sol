@@ -3,9 +3,11 @@ import { OportunidadesRepository } from './oportunidades.repository';
 import { EtapasPipelineService } from './etapas-pipeline.service';
 import { LeadsService } from './leads.service';
 import { ClientesService } from '../clientes/clientes.service';
+import { CotizacionesService } from '../cotizaciones/cotizaciones.service';
 import { CrearOportunidadDto } from './dto/crear-oportunidad.dto';
 import { CambiarEtapaOportunidadDto } from './dto/cambiar-etapa-oportunidad.dto';
 import { CerrarOportunidadDto } from './dto/cerrar-oportunidad.dto';
+import { ConvertirOportunidadDto } from './dto/convertir-oportunidad.dto';
 import { ListarOportunidadesQueryDto } from './dto/listar-oportunidades-query.dto';
 import { paginar } from '../common/types/pagina-resultado';
 
@@ -16,6 +18,7 @@ export class OportunidadesService {
     private readonly etapasPipelineService: EtapasPipelineService,
     private readonly leadsService: LeadsService,
     private readonly clientesService: ClientesService,
+    private readonly cotizacionesService: CotizacionesService,
   ) {}
 
   /**
@@ -111,6 +114,44 @@ export class OportunidadesService {
       throw new BadRequestException('Indicá un motivo para marcar la oportunidad como perdida.');
     }
     return this.oportunidadesRepository.cerrar(id, dto.estado, dto.motivoPerdida);
+  }
+
+  /**
+   * Fase 2 — "Ganar y generar cotización" en un solo paso. Si la
+   * oportunidad está sobre un Lead (sin Cliente todavía), primero lo
+   * convierte (LeadsService.convertir — dispara CLIENTE_CREADO como
+   * cualquier alta normal de cliente) y recién ahí genera la cotización
+   * contra ese Cliente nuevo. La cotización sale con una única línea
+   * manual (ítem B-9: descripcionManual + precioUnitario), usando el
+   * título y el monto estimado de la oportunidad — Fase 2 no modela
+   * líneas de producto propias en Oportunidad, eso queda fuera de
+   * alcance (ver el artifact de diseño).
+   */
+  async convertirEnCotizacion(id: string, dto: ConvertirOportunidadDto, tenantId: string, vendedorId: string) {
+    const oportunidad = await this.oportunidadesRepository.buscarPorId(id);
+    this.validarQueSigaAbierta(oportunidad);
+
+    let clienteId = oportunidad.clienteId;
+    if (!clienteId) {
+      const cliente = await this.leadsService.convertir(
+        oportunidad.leadId as string,
+        { tipo: dto.tipoClienteNuevo, rncCedula: dto.rncCedulaClienteNuevo },
+        tenantId,
+      );
+      clienteId = cliente.id;
+    }
+
+    const cotizacion = await this.cotizacionesService.crear(
+      {
+        clienteId,
+        fechaVigenciaHasta: dto.fechaVigenciaHastaCotizacion,
+        lineas: [{ descripcionManual: oportunidad.titulo, cantidad: 1, precioUnitario: Number(oportunidad.montoEstimado) }],
+      },
+      tenantId,
+      vendedorId,
+    );
+
+    return this.oportunidadesRepository.cerrarConCotizacion(id, cotizacion.id, oportunidad.clienteId ? undefined : clienteId);
   }
 
   /** `cotizacionId` todavía no se usa en Fase 1 (se llena recién en la Fase 2, al ganar) — el chequeo queda listo para entonces. */

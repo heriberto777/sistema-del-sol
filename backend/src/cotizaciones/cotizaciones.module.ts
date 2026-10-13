@@ -13,5 +13,6 @@ import { ConfiguracionesModule } from '../configuraciones/configuraciones.module
   imports: [FacturacionModule, ClientesModule, VariantesModule, OfertasModule, CorrelativosModule, ConfiguracionesModule],
   controllers: [CotizacionesController],
   providers: [CotizacionesService, CotizacionesRepository],
+  exports: [CotizacionesService],
 })
 export class CotizacionesModule {}

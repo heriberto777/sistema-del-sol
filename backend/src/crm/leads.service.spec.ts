@@ -1,9 +1,11 @@
 import { BadRequestException } from '@nestjs/common';
 import { LeadsService } from './leads.service';
 import { LeadsRepository } from './leads.repository';
+import { ClientesService } from '../clientes/clientes.service';
 
 describe('LeadsService', () => {
   let repository: jest.Mocked<LeadsRepository>;
+  let clientesService: jest.Mocked<ClientesService>;
   let service: LeadsService;
 
   beforeEach(() => {
@@ -13,9 +15,11 @@ describe('LeadsService', () => {
       buscarPorId: jest.fn(),
       actualizar: jest.fn(),
       cambiarEstado: jest.fn(),
+      marcarConvertido: jest.fn(),
       validarVendedorDelTenant: jest.fn().mockResolvedValue({ id: 'user-2' }),
     } as unknown as jest.Mocked<LeadsRepository>;
-    service = new LeadsService(repository);
+    clientesService = { crear: jest.fn().mockResolvedValue({ id: 'cliente-nuevo' }) } as unknown as jest.Mocked<ClientesService>;
+    service = new LeadsService(repository, clientesService);
   });
 
   describe('crear', () => {
@@ -63,6 +67,34 @@ describe('LeadsService', () => {
       await service.cambiarEstado('lead-1', { estado: 'CONTACTADO' });
 
       expect(repository.cambiarEstado).toHaveBeenCalledWith('lead-1', 'CONTACTADO', null);
+    });
+  });
+
+  describe('convertir (Fase 2)', () => {
+    it('crea el cliente heredando nombre/email/telefono del lead y marca el lead como CONVERTIDO', async () => {
+      repository.buscarPorId.mockResolvedValue({
+        id: 'lead-1',
+        estado: 'CALIFICADO',
+        nombre: 'Ferretería Pérez',
+        email: 'ferreteria@ejemplo.com',
+        telefono: '8095551111',
+      } as never);
+
+      const cliente = await service.convertir('lead-1', { tipo: 'PERSONA_JURIDICA', rncCedula: '101-1' }, 'tenant-1');
+
+      expect(clientesService.crear).toHaveBeenCalledWith(
+        { nombre: 'Ferretería Pérez', email: 'ferreteria@ejemplo.com', telefono: '8095551111', tipo: 'PERSONA_JURIDICA', rncCedula: '101-1' },
+        'tenant-1',
+      );
+      expect(repository.marcarConvertido).toHaveBeenCalledWith('lead-1', 'cliente-nuevo');
+      expect(cliente).toEqual({ id: 'cliente-nuevo' });
+    });
+
+    it('rechaza convertir un lead ya convertido', async () => {
+      repository.buscarPorId.mockResolvedValue({ id: 'lead-1', estado: 'CONVERTIDO' } as never);
+
+      await expect(service.convertir('lead-1', {}, 'tenant-1')).rejects.toThrow(BadRequestException);
+      expect(clientesService.crear).not.toHaveBeenCalled();
     });
   });
 });

@@ -3,6 +3,7 @@ import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { LeadsService } from './leads.service';
 import { CrearLeadDto } from './dto/crear-lead.dto';
 import { CambiarEstadoLeadDto } from './dto/cambiar-estado-lead.dto';
+import { ConvertirLeadDto } from './dto/convertir-lead.dto';
 import { ListarLeadsQueryDto } from './dto/listar-leads-query.dto';
 import { Permissions } from '../common/decorators/permissions.decorator';
 import { RequiereModulo } from '../common/decorators/requiere-modulo.decorator';
@@ -44,5 +45,11 @@ export class LeadsController {
   @Permissions('crm.leads.editar')
   cambiarEstado(@Param('id') id: string, @Body() dto: CambiarEstadoLeadDto) {
     return this.leadsService.cambiarEstado(id, dto);
+  }
+
+  @Post(':id/convertir')
+  @Permissions('crm.leads.convertir')
+  convertir(@Param('id') id: string, @Body() dto: ConvertirLeadDto, @CurrentUser() user: JwtPayloadUser) {
+    return this.leadsService.convertir(id, dto, user.tenantId);
   }
 }
