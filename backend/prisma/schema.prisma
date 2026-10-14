@@ -2374,6 +2374,14 @@ model PersonalizacionDocumentoTipo {
   firmaHabilitada       Boolean              @default(false)
   firmaEtiqueta         String?
   firmaImagen           String?              @db.Text
+  // "Formato de Documentos" Fase C — layout de bloques libres (editor de
+  // canvas). null = sigue usando una de las 5 PlantillaDocumento fijas
+  // (ver resolver-plantilla-documento.ts), exactamente el comportamiento
+  // de antes de esta fase. Formato: ver LayoutDocumento en
+  // backend/src/common/pdf/documento-pdf-layout.ts — array de bloques
+  // con posición/tamaño en PORCENTAJE de la página (no puntos), para que
+  // el mismo layout sirva tanto en Carta como en A4.
+  layoutPersonalizado   Json?
   createdAt             DateTime             @default(now())
   updatedAt             DateTime             @updatedAt
 

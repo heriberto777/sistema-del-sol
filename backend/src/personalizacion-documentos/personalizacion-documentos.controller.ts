@@ -5,6 +5,7 @@ import { TipoDocumentoImpreso } from '@prisma/client';
 import { PersonalizacionDocumentosService } from './personalizacion-documentos.service';
 import { ActualizarPersonalizacionTipoDto } from './dto/actualizar-personalizacion-tipo.dto';
 import { ActualizarMarcaDocumentosDto } from './dto/actualizar-marca-documentos.dto';
+import { ActualizarLayoutDocumentoDto } from './dto/actualizar-layout-documento.dto';
 import { Permissions } from '../common/decorators/permissions.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtPayloadUser } from '../common/types/authenticated-request';
@@ -38,6 +39,14 @@ export class PersonalizacionDocumentosController {
   @Permissions('admin.configuracion')
   actualizarTipo(@Param('tipo') tipo: string, @Body() dto: ActualizarPersonalizacionTipoDto, @CurrentUser() user: JwtPayloadUser) {
     return this.service.actualizarTipo(user.tenantId, validarTipo(tipo), dto);
+  }
+
+  // Fase C — editor de canvas, separado del guardado de la Fase A (actualizarTipo) para no pisar
+  // uno al guardar el otro por separado (ver PersonalizacionDocumentosRepository.actualizarLayout).
+  @Put(':tipo/layout')
+  @Permissions('admin.configuracion')
+  actualizarLayout(@Param('tipo') tipo: string, @Body() dto: ActualizarLayoutDocumentoDto, @CurrentUser() user: JwtPayloadUser) {
+    return this.service.actualizarLayout(user.tenantId, validarTipo(tipo), dto.bloques);
   }
 
   @Get(':tipo/preview')

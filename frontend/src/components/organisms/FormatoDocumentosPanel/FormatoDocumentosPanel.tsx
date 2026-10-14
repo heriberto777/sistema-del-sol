@@ -8,6 +8,8 @@ import { Card } from '../../atoms/Card/Card';
 import { Button } from '../../atoms/Button/Button';
 import { Select } from '../../atoms/Select/Select';
 import { CampoImagen } from '../../molecules/CampoImagen/CampoImagen';
+import { EditorLayoutDocumento } from '../EditorLayoutDocumento/EditorLayoutDocumento';
+import { BloqueLayout } from '../../../types/layout-documento';
 
 type TipoDocumento = 'FACTURA' | 'COTIZACION' | 'REMISION';
 type QrContenido = 'LINK_PAGO' | 'TEXTO_LIBRE';
@@ -26,6 +28,7 @@ interface TipoPersonalizacion {
   firmaHabilitada: boolean;
   firmaEtiqueta: string;
   firmaImagen: string;
+  layoutPersonalizado: BloqueLayout[] | null;
 }
 
 interface PersonalizacionDocumentos {
@@ -149,6 +152,31 @@ export function FormatoDocumentosPanel() {
 }
 
 function FormularioTipo({ tipo }: { tipo: TipoPersonalizacion }) {
+  const [modoEditor, setModoEditor] = useState(tipo.layoutPersonalizado !== null);
+
+  if (modoEditor) {
+    return <EditorLayoutDocumento tipoDocumento={tipo.tipoDocumento} bloquesGuardados={tipo.layoutPersonalizado} onCerrar={() => setModoEditor(false)} />;
+  }
+
+  return (
+    <div className="space-y-4">
+      {tipo.layoutPersonalizado !== null && (
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-sol-300 bg-sol-50 px-4 py-2.5 text-sm text-sol-800 dark:border-sol-800 dark:bg-sol-900/30 dark:text-sol-200">
+          <span>Este documento ya tiene un editor visual personalizado activo — los campos de abajo no se usan mientras esté activo.</span>
+          <Button type="button" variante="secundario" onClick={() => setModoEditor(true)}>
+            Editar layout
+          </Button>
+        </div>
+      )}
+      <FormularioSimple tipo={tipo} />
+      <button type="button" onClick={() => setModoEditor(true)} className="text-xs text-sol-600 hover:underline dark:text-sol-400">
+        Usar editor visual (mover y redimensionar bloques libremente) →
+      </button>
+    </div>
+  );
+}
+
+function FormularioSimple({ tipo }: { tipo: TipoPersonalizacion }) {
   const queryClient = useQueryClient();
   const esRemision = tipo.tipoDocumento === 'REMISION';
 

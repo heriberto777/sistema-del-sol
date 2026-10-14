@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { TipoDocumentoImpreso } from '@prisma/client';
+import { Prisma, TipoDocumentoImpreso } from '@prisma/client';
 import { TenantPrismaService } from '../prisma/tenant-prisma.service';
 import { ActualizarPersonalizacionTipoDto } from './dto/actualizar-personalizacion-tipo.dto';
 
@@ -42,6 +42,24 @@ export class PersonalizacionDocumentosRepository {
       where: { tenantId_tipoDocumento: { tenantId, tipoDocumento } },
       create: { tenantId, tipoDocumento, ...datos },
       update: datos,
+    });
+  }
+
+  /** Guarda (o borra, con `bloques: null`) el layout de bloques libres de la Fase C — separado de `upsertTipo` para no pisar los campos de la Fase A al guardar uno u otro por separado. `Prisma.DbNull` (no `JsonNull`) para que "sin layout" sea un NULL real de la columna, no el valor JSON `null` — así `validarLayoutDocumento`/la resolución por defecto lo leen exactamente igual que una fila que nunca tuvo layout. */
+  actualizarLayout(tenantId: string, tipoDocumento: TipoDocumentoImpreso, bloques: Record<string, unknown>[] | null) {
+    const layoutPersonalizado = bloques && bloques.length > 0 ? ({ bloques } as Prisma.InputJsonValue) : Prisma.DbNull;
+    return this.db.personalizacionDocumentoTipo.upsert({
+      where: { tenantId_tipoDocumento: { tenantId, tipoDocumento } },
+      create: {
+        tenantId,
+        tipoDocumento,
+        camposEmisorVisibles: [],
+        camposClienteVisibles: [],
+        columnasLinea: [],
+        totalesVisibles: [],
+        layoutPersonalizado,
+      },
+      update: { layoutPersonalizado },
     });
   }
 }

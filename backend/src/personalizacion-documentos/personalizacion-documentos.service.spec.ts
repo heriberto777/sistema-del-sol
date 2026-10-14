@@ -4,14 +4,17 @@ import { PrismaService } from '../prisma/prisma.service';
 import { resolverPlantillaDocumento } from '../common/impresion/resolver-plantilla-documento';
 import { resolverPersonalizacionDocumento } from '../common/impresion/resolver-personalizacion-documento';
 import { generarDocumentoPdf } from '../common/pdf/documento-pdf';
+import { generarDocumentoPdfLayout } from '../common/pdf/documento-pdf-layout';
 
 jest.mock('../common/impresion/resolver-plantilla-documento');
 jest.mock('../common/impresion/resolver-personalizacion-documento');
 jest.mock('../common/pdf/documento-pdf');
+jest.mock('../common/pdf/documento-pdf-layout');
 
 const resolverPlantillaDocumentoMock = resolverPlantillaDocumento as jest.Mock;
 const resolverPersonalizacionDocumentoMock = resolverPersonalizacionDocumento as jest.Mock;
 const generarDocumentoPdfMock = generarDocumentoPdf as jest.Mock;
+const generarDocumentoPdfLayoutMock = generarDocumentoPdfLayout as jest.Mock;
 
 describe('PersonalizacionDocumentosService', () => {
   let repository: jest.Mocked<PersonalizacionDocumentosRepository>;
@@ -23,11 +26,13 @@ describe('PersonalizacionDocumentosService', () => {
       actualizarMarca: jest.fn(),
       listarTipos: jest.fn(),
       upsertTipo: jest.fn(),
+      actualizarLayout: jest.fn(),
     } as unknown as jest.Mocked<PersonalizacionDocumentosRepository>;
     service = new PersonalizacionDocumentosService(repository, {} as PrismaService);
     resolverPlantillaDocumentoMock.mockReset().mockResolvedValue('CLASICO');
-    resolverPersonalizacionDocumentoMock.mockReset().mockResolvedValue({});
+    resolverPersonalizacionDocumentoMock.mockReset().mockResolvedValue({ layoutPersonalizado: null });
     generarDocumentoPdfMock.mockReset().mockResolvedValue(Buffer.from('%PDF-fake'));
+    generarDocumentoPdfLayoutMock.mockReset().mockResolvedValue(Buffer.from('%PDF-layout'));
   });
 
   describe('listar', () => {
@@ -75,6 +80,20 @@ describe('PersonalizacionDocumentosService', () => {
       expect(cotizacion.camposEmisorVisibles).toEqual([]);
       expect(cotizacion.qrHabilitado).toBe(false);
     });
+
+    it('expone los bloques del layout personalizado cuando hay uno guardado, null si no', async () => {
+      repository.obtenerMarca.mockResolvedValue({ colorAcentoDocumentos: null, logo: null });
+      repository.listarTipos.mockResolvedValue([
+        { tipoDocumento: 'FACTURA', layoutPersonalizado: { bloques: [{ tipo: 'tabla_lineas', x: 5, y: 10, w: 90, h: 40 }] } } as never,
+      ]);
+
+      const resultado = await service.listar('tenant-1');
+
+      const factura = resultado.tipos.find((t) => t.tipoDocumento === 'FACTURA')!;
+      const remision = resultado.tipos.find((t) => t.tipoDocumento === 'REMISION')!;
+      expect(factura.layoutPersonalizado).toEqual([{ tipo: 'tabla_lineas', x: 5, y: 10, w: 90, h: 40 }]);
+      expect(remision.layoutPersonalizado).toBeNull();
+    });
   });
 
   describe('actualizarMarca', () => {
@@ -97,6 +116,19 @@ describe('PersonalizacionDocumentosService', () => {
     });
   });
 
+  describe('actualizarLayout', () => {
+    it('delega en el repositorio con los bloques tal cual', async () => {
+      const bloques = [{ tipo: 'tabla_lineas', x: 5, y: 10, w: 90, h: 40 }];
+      await service.actualizarLayout('tenant-1', 'FACTURA', bloques);
+      expect(repository.actualizarLayout).toHaveBeenCalledWith('tenant-1', 'FACTURA', bloques);
+    });
+
+    it('sin bloques (undefined), guarda null — vuelve a la plantilla fija', async () => {
+      await service.actualizarLayout('tenant-1', 'FACTURA', undefined);
+      expect(repository.actualizarLayout).toHaveBeenCalledWith('tenant-1', 'FACTURA', null);
+    });
+  });
+
   describe('generarPreview', () => {
     it('genera un PDF de muestra con la plantilla y personalización resueltas', async () => {
       resolverPlantillaDocumentoMock.mockResolvedValue('EDITORIAL');
@@ -116,6 +148,17 @@ describe('PersonalizacionDocumentosService', () => {
       await service.generarPreview('tenant-1', 'REMISION');
 
       expect(generarDocumentoPdfMock).toHaveBeenCalledWith(expect.objectContaining({ tipoDocumento: 'Remisión', mostrarPrecios: false }), expect.anything());
+    });
+
+    it('con un layout personalizado guardado, usa el motor de layout en vez de la plantilla fija', async () => {
+      const layout = { bloques: [{ tipo: 'tabla_lineas', x: 5, y: 10, w: 90, h: 40 }] };
+      resolverPersonalizacionDocumentoMock.mockResolvedValue({ colorAcento: '#c7922f', layoutPersonalizado: layout });
+
+      const buffer = await service.generarPreview('tenant-1', 'FACTURA');
+
+      expect(generarDocumentoPdfLayoutMock).toHaveBeenCalledWith(expect.objectContaining({ tipoDocumento: 'Factura de venta', colorAcento: '#c7922f' }), layout);
+      expect(generarDocumentoPdfMock).not.toHaveBeenCalled();
+      expect(buffer.toString('latin1')).toBe('%PDF-layout');
     });
   });
 });

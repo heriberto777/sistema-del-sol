@@ -13,7 +13,7 @@ import { paginar } from '../common/types/pagina-resultado';
 import { EventBusService } from '../event-bus/event-bus.service';
 import { EVENTOS } from '../event-bus/events';
 import { generarDocumentoPdf } from '../common/pdf/documento-pdf';
-import { generarDocumentoTicketHtml } from '../common/pdf/documento-ticket';
+import { generarDocumentoImpreso } from '../common/pdf/generar-documento-impreso';
 import { resolverFormatoImpresion } from '../common/impresion/resolver-formato-impresion';
 import { resolverPlantillaDocumento } from '../common/impresion/resolver-plantilla-documento';
 import { resolverPersonalizacionDocumento } from '../common/impresion/resolver-personalizacion-documento';
@@ -256,13 +256,9 @@ export class CotizacionesService {
       plantillaSolicitada ?? resolverPlantillaDocumento(this.prisma, tenantId, null),
       resolverPersonalizacionDocumento(this.prisma, tenantId, 'COTIZACION'),
     ]);
-    const params = { ...mapearCotizacionAParams(cotizacion), ...personalizacion };
-
-    if (formato === 'TERMICA_80MM' || formato === 'TERMICA_58MM') {
-      return { buffer: Buffer.from(generarDocumentoTicketHtml(params, formato), 'utf-8'), contentType: 'text/html; charset=utf-8' };
-    }
-    const buffer = await generarDocumentoPdf(params, { tamanoPagina: formato === 'A4' ? 'a4' : 'letter', plantilla });
-    return { buffer, contentType: 'application/pdf' };
+    const { layoutPersonalizado, ...resto } = personalizacion;
+    const params = { ...mapearCotizacionAParams(cotizacion), ...resto };
+    return generarDocumentoImpreso(params, formato, plantilla, layoutPersonalizado);
   }
 
   async convertirEnFactura(id: string, dto: ConvertirCotizacionDto, tenantId: string, vendedorId: string) {

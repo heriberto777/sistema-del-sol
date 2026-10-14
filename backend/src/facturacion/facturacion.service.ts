@@ -21,7 +21,7 @@ import { ListarFacturasQueryDto } from './dto/listar-facturas-query.dto';
 import { ListadoQueryDto } from '../common/dto/listado-query.dto';
 import { paginar } from '../common/types/pagina-resultado';
 import { generarDocumentoPdf } from '../common/pdf/documento-pdf';
-import { generarDocumentoTicketHtml } from '../common/pdf/documento-ticket';
+import { generarDocumentoImpreso } from '../common/pdf/generar-documento-impreso';
 import { NotificacionesService } from '../notificaciones/notificaciones.service';
 import { EnviarReciboDto } from './dto/enviar-recibo.dto';
 import { AutorizacionesService } from '../autorizaciones/autorizaciones.service';
@@ -684,14 +684,9 @@ export class FacturacionService {
       plantillaSolicitada ?? resolverPlantillaDocumento(this.prisma, tenantId, factura.bodegaId),
       resolverPersonalizacionDocumento(this.prisma, tenantId, 'FACTURA'),
     ]);
-    const params = { ...mapearFacturaAParams(factura), ...personalizacion };
-
-    if (formato === 'TERMICA_80MM' || formato === 'TERMICA_58MM') {
-      // La plantilla visual no aplica en térmico — un único layout angosto, ver documento-ticket.ts.
-      return { buffer: Buffer.from(generarDocumentoTicketHtml(params, formato), 'utf-8'), contentType: 'text/html; charset=utf-8' };
-    }
-    const buffer = await generarDocumentoPdf(params, { tamanoPagina: formato === 'A4' ? 'a4' : 'letter', plantilla });
-    return { buffer, contentType: 'application/pdf' };
+    const { layoutPersonalizado, ...resto } = personalizacion;
+    const params = { ...mapearFacturaAParams(factura), ...resto };
+    return generarDocumentoImpreso(params, formato, plantilla, layoutPersonalizado);
   }
 
   async listar(query: ListarFacturasQueryDto) {

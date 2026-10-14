@@ -7,6 +7,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { resolverPlantillaDocumento } from '../common/impresion/resolver-plantilla-documento';
 import { resolverPersonalizacionDocumento } from '../common/impresion/resolver-personalizacion-documento';
 import { generarDocumentoPdf } from '../common/pdf/documento-pdf';
+import { generarDocumentoPdfLayout } from '../common/pdf/documento-pdf-layout';
 
 const TIPOS: TipoDocumentoImpreso[] = ['FACTURA', 'COTIZACION', 'REMISION'];
 
@@ -53,6 +54,7 @@ export class PersonalizacionDocumentosService {
           firmaHabilitada: fila?.firmaHabilitada ?? false,
           firmaEtiqueta: fila?.firmaEtiqueta ?? '',
           firmaImagen: fila?.firmaImagen ?? '',
+          layoutPersonalizado: (fila?.layoutPersonalizado as { bloques?: unknown[] } | null)?.bloques ?? null,
         };
       }),
     };
@@ -66,6 +68,10 @@ export class PersonalizacionDocumentosService {
     return this.repository.upsertTipo(tenantId, tipoDocumento, dto);
   }
 
+  actualizarLayout(tenantId: string, tipoDocumento: TipoDocumentoImpreso, bloques: Record<string, unknown>[] | null | undefined) {
+    return this.repository.actualizarLayout(tenantId, tipoDocumento, bloques ?? null);
+  }
+
   /** Vista previa — genera un PDF con datos de ejemplo y la configuración YA GUARDADA para ese tipo (no la del formulario sin guardar: guardar primero, previsualizar después, mismo criterio simple que el resto del sistema). */
   async generarPreview(tenantId: string, tipoDocumento: TipoDocumentoImpreso): Promise<Buffer> {
     const [plantilla, personalizacion] = await Promise.all([
@@ -73,22 +79,22 @@ export class PersonalizacionDocumentosService {
       resolverPersonalizacionDocumento(this.prisma, tenantId, tipoDocumento),
     ]);
 
-    return generarDocumentoPdf(
-      {
-        tipoDocumento: ETIQUETA_TIPO[tipoDocumento],
-        numero: 'B0200000001',
-        fecha: new Date(),
-        cliente: 'Cliente de ejemplo, SRL',
-        clienteDatosExtra: { rnc: '130-00000-1', direccion: 'Calle Ejemplo #1, Santo Domingo', telefono: '809-000-0000' },
-        lineas: lineasDeMuestra(),
-        mostrarPrecios: tipoDocumento !== 'REMISION',
-        subtotal: 2150,
-        descuento: 0,
-        itbis: 387,
-        total: 2537,
-        ...personalizacion,
-      },
-      { plantilla },
-    );
+    const { layoutPersonalizado, ...resto } = personalizacion;
+    const params = {
+      tipoDocumento: ETIQUETA_TIPO[tipoDocumento],
+      numero: 'B0200000001',
+      fecha: new Date(),
+      cliente: 'Cliente de ejemplo, SRL',
+      clienteDatosExtra: { rnc: '130-00000-1', direccion: 'Calle Ejemplo #1, Santo Domingo', telefono: '809-000-0000' },
+      lineas: lineasDeMuestra(),
+      mostrarPrecios: tipoDocumento !== 'REMISION',
+      subtotal: 2150,
+      descuento: 0,
+      itbis: 387,
+      total: 2537,
+      ...resto,
+    };
+
+    return layoutPersonalizado ? generarDocumentoPdfLayout(params, layoutPersonalizado) : generarDocumentoPdf(params, { plantilla });
   }
 }

@@ -2,7 +2,8 @@ import PDFDocument from 'pdfkit';
 import { PlantillaDocumento } from '@prisma/client';
 import { formatearMontoDop } from './formato-monto';
 
-const MARGEN = 40;
+/** Exportado para documento-pdf-layout.ts (Fase C — editor de bloques), que reusa el mismo margen/fila que las 5 plantillas fijas. */
+export const MARGEN = 40;
 const ALTO_FILA = 20;
 
 export interface LineaDocumentoPdf {
@@ -37,8 +38,8 @@ export interface FirmaDocumentoPdf {
   imagen?: string;
 }
 
-type ColumnaLinea = 'cantidad' | 'precioUnitario' | 'total';
-type FilaTotal = 'subtotal' | 'descuento' | 'itbis' | 'total';
+export type ColumnaLinea = 'cantidad' | 'precioUnitario' | 'total';
+export type FilaTotal = 'subtotal' | 'descuento' | 'itbis' | 'total';
 
 export interface DocumentoPdfParams {
   tipoDocumento: string;
@@ -127,8 +128,8 @@ export function generarDocumentoPdf(
   });
 }
 
-/** Inserta el logo si hay uno y es un data URI decodificable — silencioso ante cualquier error, nunca bloquea el documento. Devuelve si lo pudo dibujar (para que quien llama decida si reserva espacio). */
-function insertarLogo(doc: PDFKit.PDFDocument, logo: string | undefined, x: number, y: number, ancho: number, alto: number): boolean {
+/** Inserta el logo si hay uno y es un data URI decodificable — silencioso ante cualquier error, nunca bloquea el documento. Devuelve si lo pudo dibujar (para que quien llama decida si reserva espacio). Exportado: también lo usa documento-pdf-layout.ts para el bloque "imagen_libre" (misma decodificación, cualquier imagen). */
+export function insertarLogo(doc: PDFKit.PDFDocument, logo: string | undefined, x: number, y: number, ancho: number, alto: number): boolean {
   if (!logo) return false;
   try {
     const base64 = logo.includes(',') ? logo.split(',')[1] : logo;
@@ -139,21 +140,21 @@ function insertarLogo(doc: PDFKit.PDFDocument, logo: string | undefined, x: numb
   }
 }
 
-/** Qué columnas de la tabla de líneas van activas, en orden fijo (concepto siempre va primero y no se puede ocultar). */
-function columnasActivas(mostrarPrecios: boolean, columnasLinea?: ColumnaLinea[]): ColumnaLinea[] {
+/** Qué columnas de la tabla de líneas van activas, en orden fijo (concepto siempre va primero y no se puede ocultar). Exportado para documento-pdf-layout.ts. */
+export function columnasActivas(mostrarPrecios: boolean, columnasLinea?: ColumnaLinea[]): ColumnaLinea[] {
   if (!mostrarPrecios) return ['cantidad'];
   if (columnasLinea && columnasLinea.length > 0) return (['cantidad', 'precioUnitario', 'total'] as ColumnaLinea[]).filter((c) => columnasLinea.includes(c));
   return ['cantidad', 'precioUnitario', 'total'];
 }
 
-function valorColumna(linea: LineaDocumentoPdf, columna: ColumnaLinea): string {
+export function valorColumna(linea: LineaDocumentoPdf, columna: ColumnaLinea): string {
   if (columna === 'cantidad') return linea.cantidad;
   if (columna === 'precioUnitario') return linea.precioUnitario ?? '—';
   return linea.total ?? '—';
 }
 
-/** Qué filas del bloque de totales van activas — por defecto, todas las que tengan un valor presente (comportamiento actual, sin romper nada). */
-function totalesActivos(params: DocumentoPdfParams): FilaTotal[] {
+/** Qué filas del bloque de totales van activas — por defecto, todas las que tengan un valor presente (comportamiento actual, sin romper nada). Exportado para documento-pdf-layout.ts. */
+export function totalesActivos(params: DocumentoPdfParams): FilaTotal[] {
   const presentes: FilaTotal[] = [];
   if (params.subtotal !== undefined) presentes.push('subtotal');
   if (params.descuento) presentes.push('descuento');
@@ -163,7 +164,7 @@ function totalesActivos(params: DocumentoPdfParams): FilaTotal[] {
   return presentes.filter((f) => params.totalesVisibles!.includes(f));
 }
 
-function emisorCampoVisible(params: DocumentoPdfParams, campo: 'rnc' | 'direccion' | 'telefono'): boolean {
+export function emisorCampoVisible(params: DocumentoPdfParams, campo: 'rnc' | 'direccion' | 'telefono'): boolean {
   return !params.camposEmisorVisibles || params.camposEmisorVisibles.includes(campo);
 }
 
@@ -171,8 +172,8 @@ function clienteCampoVisible(params: DocumentoPdfParams, campo: 'rnc' | 'direcci
   return !!params.camposClienteVisibles?.includes(campo) && !!params.clienteDatosExtra?.[campo];
 }
 
-/** Líneas extra del cliente (RNC/dirección/teléfono) a continuación del nombre — "Formato de Documentos" Fase A. Sin `camposClienteVisibles`/`clienteDatosExtra`, no dibuja nada (comportamiento actual). */
-function datosClienteExtra(params: DocumentoPdfParams): string[] {
+/** Líneas extra del cliente (RNC/dirección/teléfono) a continuación del nombre — "Formato de Documentos" Fase A. Sin `camposClienteVisibles`/`clienteDatosExtra`, no dibuja nada (comportamiento actual). Exportado para documento-pdf-layout.ts. */
+export function datosClienteExtra(params: DocumentoPdfParams): string[] {
   const lineas: string[] = [];
   if (clienteCampoVisible(params, 'rnc')) lineas.push(`RNC/Céd.: ${params.clienteDatosExtra!.rnc}`);
   if (clienteCampoVisible(params, 'direccion')) lineas.push(params.clienteDatosExtra!.direccion!);

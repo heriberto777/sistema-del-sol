@@ -1,9 +1,25 @@
 import { TipoDocumentoImpreso } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { EmisorDocumentoPdf, FirmaDocumentoPdf, QrDocumentoPdf } from '../pdf/documento-pdf';
+import { LayoutDocumento } from '../pdf/documento-pdf-layout';
 import { generarQrDataUri } from '../qr/generar-qr';
 
 export const CLAVE_DOCUMENTO_NOTA_PIE = 'DOCUMENTO_NOTA_PIE';
+
+/**
+ * "Formato de Documentos" Fase C — valida la forma mínima de lo que haya
+ * en `PersonalizacionDocumentoTipo.layoutPersonalizado` (JSON sin tipar a
+ * nivel de base). Cualquier cosa que no sea `{ bloques: [...] }` se trata
+ * como "no hay layout personalizado" (null) en vez de romper la
+ * impresión — mismo criterio defensivo que `insertarLogo` ante un logo
+ * corrupto: una fila mal guardada no puede tumbar la generación del PDF.
+ */
+function validarLayoutDocumento(valor: unknown): LayoutDocumento | null {
+  if (!valor || typeof valor !== 'object') return null;
+  const bloques = (valor as { bloques?: unknown }).bloques;
+  if (!Array.isArray(bloques) || bloques.length === 0) return null;
+  return { bloques: bloques as LayoutDocumento['bloques'] };
+}
 
 /**
  * Personalización de documentos imprimibles. Dos capas:
@@ -39,6 +55,7 @@ export async function resolverPersonalizacionDocumento(
   totalesVisibles?: ('subtotal' | 'descuento' | 'itbis' | 'total')[];
   qr?: QrDocumentoPdf;
   firma?: FirmaDocumentoPdf;
+  layoutPersonalizado?: LayoutDocumento | null;
 }> {
   const [tenant, notaPieFila, configTipo] = await Promise.all([
     prisma.tenant.findUnique({
@@ -70,5 +87,6 @@ export async function resolverPersonalizacionDocumento(
     totalesVisibles: configTipo ? (configTipo.totalesVisibles as ('subtotal' | 'descuento' | 'itbis' | 'total')[]) : undefined,
     qr,
     firma,
+    layoutPersonalizado: configTipo ? validarLayoutDocumento(configTipo.layoutPersonalizado) : null,
   };
 }

@@ -10,7 +10,7 @@ import { ConvertirRemisionDto } from './dto/convertir-remision.dto';
 import { ListadoQueryDto } from '../common/dto/listado-query.dto';
 import { paginar } from '../common/types/pagina-resultado';
 import { DocumentoPdfParams, generarDocumentoPdf } from '../common/pdf/documento-pdf';
-import { generarDocumentoTicketHtml } from '../common/pdf/documento-ticket';
+import { generarDocumentoImpreso } from '../common/pdf/generar-documento-impreso';
 import { resolverFormatoImpresion } from '../common/impresion/resolver-formato-impresion';
 import { resolverPlantillaDocumento } from '../common/impresion/resolver-plantilla-documento';
 import { resolverPersonalizacionDocumento } from '../common/impresion/resolver-personalizacion-documento';
@@ -197,13 +197,9 @@ export class RemisionesService {
       plantillaSolicitada ?? resolverPlantillaDocumento(this.prisma, tenantId, remision.bodegaId),
       resolverPersonalizacionDocumento(this.prisma, tenantId, 'REMISION'),
     ]);
-    const params = { ...this.mapearRemisionAParams(remision), ...personalizacion };
-
-    if (formato === 'TERMICA_80MM' || formato === 'TERMICA_58MM') {
-      return { buffer: Buffer.from(generarDocumentoTicketHtml(params, formato), 'utf-8'), contentType: 'text/html; charset=utf-8' };
-    }
-    const buffer = await generarDocumentoPdf(params, { tamanoPagina: formato === 'A4' ? 'a4' : 'letter', plantilla });
-    return { buffer, contentType: 'application/pdf' };
+    const { layoutPersonalizado, ...resto } = personalizacion;
+    const params = { ...this.mapearRemisionAParams(remision), ...resto };
+    return generarDocumentoImpreso(params, formato, plantilla, layoutPersonalizado);
   }
 
   private validarQueSigaAbierta(remision: { estado: string; facturaId: string | null }) {

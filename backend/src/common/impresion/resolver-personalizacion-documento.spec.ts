@@ -203,4 +203,41 @@ describe('resolverPersonalizacionDocumento', () => {
       expect(resultado.firma).toBeUndefined();
     });
   });
+
+  describe('"Formato de Documentos" Fase C (layoutPersonalizado)', () => {
+    it('sin fila configurada, layoutPersonalizado es null (sigue usando la plantilla fija)', async () => {
+      const prisma = crearPrismaMock({ configTipo: null });
+
+      const resultado = await resolverPersonalizacionDocumento(prisma, 'tenant-1', 'FACTURA');
+
+      expect(resultado.layoutPersonalizado).toBeNull();
+    });
+
+    it('con un layout válido guardado, lo devuelve tal cual', async () => {
+      const bloques = [{ tipo: 'tabla_lineas', x: 5, y: 10, w: 90, h: 40 }];
+      const prisma = crearPrismaMock({ configTipo: { layoutPersonalizado: { bloques } } });
+
+      const resultado = await resolverPersonalizacionDocumento(prisma, 'tenant-1', 'FACTURA');
+
+      expect(resultado.layoutPersonalizado).toEqual({ bloques });
+    });
+
+    it('con JSON guardado malformado (sin bloques, o con bloques vacío), trata como sin layout en vez de romper', async () => {
+      const prismaSinBloques = crearPrismaMock({ configTipo: { layoutPersonalizado: { algoRaro: true } } });
+      const prismaBloquesVacios = crearPrismaMock({ configTipo: { layoutPersonalizado: { bloques: [] } } });
+      const prismaNoEsObjeto = crearPrismaMock({ configTipo: { layoutPersonalizado: 'texto-suelto' } });
+
+      expect((await resolverPersonalizacionDocumento(prismaSinBloques, 'tenant-1', 'FACTURA')).layoutPersonalizado).toBeNull();
+      expect((await resolverPersonalizacionDocumento(prismaBloquesVacios, 'tenant-1', 'FACTURA')).layoutPersonalizado).toBeNull();
+      expect((await resolverPersonalizacionDocumento(prismaNoEsObjeto, 'tenant-1', 'FACTURA')).layoutPersonalizado).toBeNull();
+    });
+
+    it('sin tipoDocumento, layoutPersonalizado es null (no aplica fuera de un documento imprimible)', async () => {
+      const prisma = crearPrismaMock({});
+
+      const resultado = await resolverPersonalizacionDocumento(prisma, 'tenant-1');
+
+      expect(resultado.layoutPersonalizado).toBeNull();
+    });
+  });
 });
