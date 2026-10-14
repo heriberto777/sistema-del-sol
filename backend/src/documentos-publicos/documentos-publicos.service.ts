@@ -39,7 +39,8 @@ export class DocumentosPublicosService {
   async obtenerFactura(id: string) {
     const factura = await this.buscarFactura(id);
     const personalizacion = await resolverPersonalizacionDocumento(this.prisma, factura.tenantId, 'FACTURA');
-    return { ...mapearFacturaAParams(factura), ...personalizacion };
+    // El layout de bloques de la Fase C es interno del motor de PDF — esta vista pública no lo necesita (ver comentario en VerDocumentoPublico.tsx). `undefined` se cae solo al serializar a JSON.
+    return { ...mapearFacturaAParams(factura), ...personalizacion, layoutPersonalizado: undefined };
   }
 
   async obtenerFacturaPdf(id: string) {
@@ -50,7 +51,7 @@ export class DocumentosPublicosService {
   async obtenerCotizacion(id: string) {
     const cotizacion = await this.buscarCotizacion(id);
     const personalizacion = await resolverPersonalizacionDocumento(this.prisma, cotizacion.tenantId, 'COTIZACION');
-    return { ...mapearCotizacionAParams(cotizacion), ...personalizacion };
+    return { ...mapearCotizacionAParams(cotizacion), ...personalizacion, layoutPersonalizado: undefined };
   }
 
   async obtenerCotizacionPdf(id: string) {

@@ -211,7 +211,8 @@ function dibujarBloque(doc: PDFKit.PDFDocument, bloque: BloqueLayout, ctx: Conte
     case 'datos_empresa': {
       doc.font('Helvetica-Bold').fontSize(11).fillColor(colorTexto).text(params.emisor?.nombre ?? '', x, y, { width: w });
       doc.font('Helvetica').fontSize(9).fillColor(colorGris);
-      const campos = bloque.campos ?? ['rnc', 'direccion', 'telefono'];
+      // Array vacío = mismo criterio que `undefined` (ver nota en documento-pdf.ts `totalesActivos`).
+      const campos = bloque.campos && bloque.campos.length > 0 ? bloque.campos : ['rnc', 'direccion', 'telefono'];
       if (campos.includes('rnc') && params.emisor?.rnc) doc.text(`RNC: ${params.emisor.rnc}`, x, doc.y, { width: w });
       if (campos.includes('direccion') && params.emisor?.direccion) doc.text(params.emisor.direccion, x, doc.y, { width: w });
       if (campos.includes('telefono') && params.emisor?.telefono) doc.text(`Tel: ${params.emisor.telefono}`, x, doc.y, { width: w });
@@ -221,7 +222,7 @@ function dibujarBloque(doc: PDFKit.PDFDocument, bloque: BloqueLayout, ctx: Conte
     case 'datos_cliente': {
       doc.font('Helvetica-Bold').fontSize(11).fillColor(colorTexto).text(params.cliente, x, y, { width: w });
       doc.font('Helvetica').fontSize(9).fillColor(colorGris);
-      const campos = bloque.campos ?? ['rnc', 'direccion', 'telefono'];
+      const campos = bloque.campos && bloque.campos.length > 0 ? bloque.campos : ['rnc', 'direccion', 'telefono'];
       const extra = params.clienteDatosExtra;
       if (campos.includes('rnc') && extra?.rnc) doc.text(`RNC/Céd.: ${extra.rnc}`, x, doc.y, { width: w });
       if (campos.includes('direccion') && extra?.direccion) doc.text(extra.direccion, x, doc.y, { width: w });
@@ -242,7 +243,8 @@ function dibujarBloque(doc: PDFKit.PDFDocument, bloque: BloqueLayout, ctx: Conte
         ...(params.itbis !== undefined ? (['itbis'] as const) : []),
         ...(params.total !== undefined ? (['total'] as const) : []),
       ];
-      const filasActivas = (bloque.filas ?? presentes).filter((f) => presentes.includes(f));
+      const filasConfiguradas = bloque.filas && bloque.filas.length > 0 ? bloque.filas : presentes;
+      const filasActivas = filasConfiguradas.filter((f) => presentes.includes(f));
       doc.y = y;
       doc.font('Helvetica').fontSize(9.5).fillColor(colorGris);
       if (filasActivas.includes('subtotal')) doc.text(`Subtotal: ${formatearMontoDop(params.subtotal!)}`, x, doc.y, { width: w, align: 'right' });

@@ -153,19 +153,28 @@ export function valorColumna(linea: LineaDocumentoPdf, columna: ColumnaLinea): s
   return linea.total ?? '—';
 }
 
-/** Qué filas del bloque de totales van activas — por defecto, todas las que tengan un valor presente (comportamiento actual, sin romper nada). Exportado para documento-pdf-layout.ts. */
+/**
+ * Qué filas del bloque de totales van activas — por defecto, todas las
+ * que tengan un valor presente. Un array VACÍO se trata igual que "no
+ * configurado" (no solo `undefined`): guardar el formulario de "Formato
+ * de Documentos" sin tocar esta sección manda `[]`, y si eso se
+ * interpretara como "ocultar todo" el total de la factura desaparecería
+ * silenciosamente la primera vez que alguien guarda sin querer tocar
+ * esto — hallazgo real, encontrado probando el link público en vivo.
+ */
 export function totalesActivos(params: DocumentoPdfParams): FilaTotal[] {
   const presentes: FilaTotal[] = [];
   if (params.subtotal !== undefined) presentes.push('subtotal');
   if (params.descuento) presentes.push('descuento');
   if (params.itbis !== undefined) presentes.push('itbis');
   if (params.total !== undefined) presentes.push('total');
-  if (!params.totalesVisibles) return presentes;
+  if (!params.totalesVisibles || params.totalesVisibles.length === 0) return presentes;
   return presentes.filter((f) => params.totalesVisibles!.includes(f));
 }
 
+/** Mismo criterio que `totalesActivos`: un array vacío (formulario guardado sin tocar esta sección) se trata igual que "no configurado" — mostrar todo. */
 export function emisorCampoVisible(params: DocumentoPdfParams, campo: 'rnc' | 'direccion' | 'telefono'): boolean {
-  return !params.camposEmisorVisibles || params.camposEmisorVisibles.includes(campo);
+  return !params.camposEmisorVisibles || params.camposEmisorVisibles.length === 0 || params.camposEmisorVisibles.includes(campo);
 }
 
 function clienteCampoVisible(params: DocumentoPdfParams, campo: 'rnc' | 'direccion' | 'telefono'): boolean {
