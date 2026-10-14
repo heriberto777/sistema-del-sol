@@ -6,6 +6,7 @@ import { WhatsappBotModule } from '../whatsapp-bot/whatsapp-bot.module';
 import { LeadsController } from './leads.controller';
 import { LeadsService } from './leads.service';
 import { LeadsRepository } from './leads.repository';
+import { LeadsEventosService } from './leads-eventos.service';
 import { EtapasPipelineController } from './etapas-pipeline.controller';
 import { EtapasPipelineService } from './etapas-pipeline.service';
 import { EtapasPipelineRepository } from './etapas-pipeline.repository';
@@ -60,6 +61,7 @@ import { MetasVentaRepository } from './metas-venta.repository';
   providers: [
     LeadsService,
     LeadsRepository,
+    LeadsEventosService,
     EtapasPipelineService,
     EtapasPipelineRepository,
     OportunidadesService,

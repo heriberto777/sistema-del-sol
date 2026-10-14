@@ -232,9 +232,39 @@ export class WhatsappBotService {
     // dos igual por error, priorizamos el producto puntual.
     if (buscarProducto) {
       await this.intentarEnviarProducto(config, from, diaRD, buscarProducto);
+      await this.intentarRegistrarConsultaProducto(config, from, perfilNombre, mensajeEntrante.id, buscarProducto);
     } else if (buscarCategoria) {
       await this.intentarEnviarCatalogoCategoria(config, from, diaRD, buscarCategoria);
     }
+  }
+
+  /**
+   * CRM "Cotización conectada" Fase 2 — preguntar por un producto real es
+   * una intención de compra, no una falla de la IA (a diferencia de
+   * `requiereHumano`). Solo chequea `Cliente` (nunca `Lead`): alguien que
+   * YA es cliente real sigue su conversación normal sin ningún efecto
+   * nuevo, pero un Lead sin convertir todavía SÍ dispara esto en cada
+   * consulta — el evento se encarga de reusar el Lead existente en vez
+   * de duplicarlo (ver EcommerceService.consultaWhatsappProducto, mismo
+   * criterio, con el hallazgo real que motivó esto). Emite un evento (CRM
+   * lo escucha aparte, si está activo para el tenant — este servicio no
+   * conoce a sus consumidores) y escala a un humano con el mismo
+   * mecanismo que ya existe para "la IA no entendió", para que alguien
+   * del equipo se entere a tiempo de cerrar la venta.
+   */
+  private async intentarRegistrarConsultaProducto(config: ConfigBot, from: string, perfilNombre: string | null, mensajeEntranteId: string, textoBusqueda: string) {
+    const telefono = from.replace(/^whatsapp:/, '');
+    const cliente = await this.prisma.cliente.findFirst({ where: { tenantId: config.tenantId, telefono }, select: { id: true } });
+    if (cliente) return;
+
+    this.eventBus.emit(EVENTOS.CONSULTA_PRODUCTO_DESCONOCIDO, {
+      tenantId: config.tenantId,
+      telefono,
+      nombre: perfilNombre,
+      productoNombre: textoBusqueda,
+      origen: 'WHATSAPP',
+    });
+    await this.marcarYNotificar(config.tenantId, mensajeEntranteId, from);
   }
 
   /**

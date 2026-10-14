@@ -9,6 +9,8 @@ import { ClientesService } from '../clientes/clientes.service';
 import { FacturacionService } from '../facturacion/facturacion.service';
 import { VariantesService } from '../variantes/variantes.service';
 import { OfertasService } from '../ofertas/ofertas.service';
+import { EventBusService } from '../event-bus/event-bus.service';
+import { EVENTOS } from '../event-bus/events';
 import { AuthenticatedRequest } from '../common/types/authenticated-request';
 
 const TENANT_ACTIVO = { id: 't1', nombre: 'Tenant Demo', estado: 'ACTIVO', plan: { modulos: [{ modulo: { clave: 'ecommerce' } }] } };
@@ -26,6 +28,8 @@ describe('EcommerceService', () => {
   let prisma: {
     tenant: { findUnique: jest.Mock };
     tenantModuloOverride: { findFirst: jest.Mock };
+    cliente: { findFirst: jest.Mock };
+    lead: { findFirst: jest.Mock };
     configuracion: { findMany: jest.Mock };
   };
   let ecommerceRepository: jest.Mocked<EcommerceRepository>;
@@ -37,11 +41,14 @@ describe('EcommerceService', () => {
   let variantesService: jest.Mocked<VariantesService>;
   let ofertasService: jest.Mocked<OfertasService>;
   let jwtService: jest.Mocked<JwtService>;
+  let eventBus: jest.Mocked<EventBusService>;
 
   beforeEach(() => {
     prisma = {
       tenant: { findUnique: jest.fn().mockResolvedValue(TENANT_ACTIVO) },
       tenantModuloOverride: { findFirst: jest.fn().mockResolvedValue(null) },
+      cliente: { findFirst: jest.fn().mockResolvedValue(null) },
+      lead: { findFirst: jest.fn().mockResolvedValue(null) },
       configuracion: {
         findMany: jest.fn().mockResolvedValue([
           { clave: 'TIENDA_ACTIVA', valor: 'true' },
@@ -106,6 +113,7 @@ describe('EcommerceService', () => {
       verify: jest.fn(),
       sign: jest.fn(),
     } as unknown as jest.Mocked<JwtService>;
+    eventBus = { emit: jest.fn(), on: jest.fn() } as unknown as jest.Mocked<EventBusService>;
 
     service = new EcommerceService(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -119,6 +127,7 @@ describe('EcommerceService', () => {
       variantesService,
       ofertasService,
       jwtService,
+      eventBus,
     );
   });
 
@@ -612,6 +621,39 @@ describe('EcommerceService', () => {
     it('reordenarSecciones: delega el arreglo completo de ids al repositorio', async () => {
       await service.reordenarSecciones({ ids: ['s2', 's1'] });
       expect(seccionesTiendaRepository.reordenar).toHaveBeenCalledWith(['s2', 's1']);
+    });
+  });
+
+  describe('consultaWhatsappProducto (CRM "Cotización conectada" Fase 2)', () => {
+    it('emite CONSULTA_PRODUCTO_DESCONOCIDO si el teléfono no es ya un Cliente', async () => {
+      prisma.cliente.findFirst.mockResolvedValue(null);
+
+      await service.consultaWhatsappProducto('demo', { nombre: 'Ana', telefono: '8095551234', productoNombre: 'Yogurt Fresa' });
+
+      expect(eventBus.emit).toHaveBeenCalledWith(EVENTOS.CONSULTA_PRODUCTO_DESCONOCIDO, {
+        tenantId: 't1',
+        telefono: '8095551234',
+        nombre: 'Ana',
+        productoNombre: 'Yogurt Fresa',
+        origen: 'TIENDA',
+      });
+    });
+
+    it('no emite nada si el teléfono ya es un Cliente', async () => {
+      prisma.cliente.findFirst.mockResolvedValue({ id: 'c1' });
+
+      await service.consultaWhatsappProducto('demo', { nombre: 'Ana', telefono: '8095551234', productoNombre: 'Yogurt Fresa' });
+
+      expect(eventBus.emit).not.toHaveBeenCalled();
+    });
+
+    it('un Lead sin convertir SÍ emite (solo Cliente excluye, nunca Lead — hallazgo real: una segunda consulta de un Lead existente antes no dejaba rastro)', async () => {
+      prisma.cliente.findFirst.mockResolvedValue(null);
+      prisma.lead.findFirst.mockResolvedValue({ id: 'l1' });
+
+      await service.consultaWhatsappProducto('demo', { nombre: 'Ana', telefono: '8095551234', productoNombre: 'Yogurt Fresa' });
+
+      expect(eventBus.emit).toHaveBeenCalledWith(EVENTOS.CONSULTA_PRODUCTO_DESCONOCIDO, expect.objectContaining({ telefono: '8095551234' }));
     });
   });
 });

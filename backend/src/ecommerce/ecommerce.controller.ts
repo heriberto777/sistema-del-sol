@@ -7,6 +7,7 @@ import { PrevisualizarPedidoTiendaDto } from './dto/previsualizar-pedido-tienda.
 import { ActualizarPerfilClienteTiendaDto } from './dto/actualizar-perfil-cliente-tienda.dto';
 import { ActualizarDireccionClienteDto, CrearDireccionClienteDto } from './dto/direccion-cliente.dto';
 import { GuardarCarritoTiendaDto } from './dto/guardar-carrito-tienda.dto';
+import { ConsultaWhatsappProductoDto } from './dto/consulta-whatsapp-producto.dto';
 import { Public } from '../common/decorators/public.decorator';
 import { AuthenticatedRequest } from '../common/types/authenticated-request';
 import { ClienteTiendaAuthGuard } from '../cliente-tienda-auth/guards/cliente-tienda-auth.guard';
@@ -54,6 +55,12 @@ export class EcommerceController {
   @Get('productos/:productoId')
   producto(@Param('subdominio') subdominio: string, @Param('productoId') productoId: string, @Req() request: AuthenticatedRequest) {
     return this.ecommerceService.producto(subdominio, productoId, request);
+  }
+
+  /** CRM "Cotización conectada" Fase 2 — ver el comentario en EcommerceService.consultaWhatsappProducto. */
+  @Post('productos/:productoId/consulta-whatsapp')
+  consultaWhatsappProducto(@Param('subdominio') subdominio: string, @Body() dto: ConsultaWhatsappProductoDto) {
+    return this.ecommerceService.consultaWhatsappProducto(subdominio, dto);
   }
 
   @Post('pedidos')

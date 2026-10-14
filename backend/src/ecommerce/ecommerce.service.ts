@@ -15,6 +15,9 @@ import { ActualizarDireccionClienteDto, CrearDireccionClienteDto } from './dto/d
 import { GuardarCarritoTiendaDto } from './dto/guardar-carrito-tienda.dto';
 import { CrearSeccionTiendaDto } from './dto/crear-seccion-tienda.dto';
 import { ReordenarSeccionesTiendaDto } from './dto/reordenar-secciones-tienda.dto';
+import { ConsultaWhatsappProductoDto } from './dto/consulta-whatsapp-producto.dto';
+import { EventBusService } from '../event-bus/event-bus.service';
+import { EVENTOS } from '../event-bus/events';
 import { ListadoQueryDto } from '../common/dto/listado-query.dto';
 import { ClientesService } from '../clientes/clientes.service';
 import { FacturacionService } from '../facturacion/facturacion.service';
@@ -38,7 +41,39 @@ export class EcommerceService {
     private readonly variantesService: VariantesService,
     private readonly ofertasService: OfertasService,
     private readonly jwtService: JwtService,
+    private readonly eventBus: EventBusService,
   ) {}
+
+  /**
+   * CRM "Cotización conectada" Fase 2 — nunca bloquea la apertura del
+   * link `wa.me` del frontend (se llama antes, en paralelo, sin esperar
+   * nada crítico). Solo chequea `Cliente` (nunca `Lead`): un comprador
+   * que YA es cliente real no necesita tracking — pero si ya es un Lead
+   * sin convertir, cada consulta nueva SÍ debe emitir el evento, para que
+   * `LeadsEventosService` registre la actividad en su timeline (reusa el
+   * Lead existente, no duplica) — hallazgo real probando esto en vivo:
+   * chequear también `Lead` acá hacía que la SEGUNDA consulta de un mismo
+   * prospecto no dejara ningún rastro. Mismo criterio de "sin normalizar
+   * formato de teléfono" que el resto del código (no hay librería de
+   * formato en el repo) — un mismo número escrito distinto en dos
+   * canales puede no matchear, limitación conocida y aceptada.
+   */
+  async consultaWhatsappProducto(subdominio: string, dto: ConsultaWhatsappProductoDto) {
+    const { tenant } = await this.resolverTiendaPublica(subdominio);
+    const telefono = dto.telefono.trim();
+
+    const cliente = await this.prisma.cliente.findFirst({ where: { tenantId: tenant.id, telefono }, select: { id: true } });
+    if (!cliente) {
+      this.eventBus.emit(EVENTOS.CONSULTA_PRODUCTO_DESCONOCIDO, {
+        tenantId: tenant.id,
+        telefono,
+        nombre: dto.nombre.trim(),
+        productoNombre: dto.productoNombre,
+        origen: 'TIENDA',
+      });
+    }
+    return { ok: true };
+  }
 
   /**
    * Fase 13 — cruza cada producto contra el motor de Ofertas real

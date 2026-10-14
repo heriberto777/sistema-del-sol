@@ -33,6 +33,7 @@ describe('WhatsappBotService', () => {
     categoria: { findMany: jest.Mock };
     user: { findFirst: jest.Mock };
     tareaPersonal: { findMany: jest.Mock };
+    cliente: { findFirst: jest.Mock };
   };
   let whatsappMensajesRepository: jest.Mocked<WhatsappMensajesRepository>;
   let conversacionIaService: jest.Mocked<ConversacionIaService>;
@@ -47,6 +48,7 @@ describe('WhatsappBotService', () => {
       categoria: { findMany: jest.fn().mockResolvedValue([]) },
       user: { findFirst: jest.fn().mockResolvedValue(null) },
       tareaPersonal: { findMany: jest.fn().mockResolvedValue([]) },
+      cliente: { findFirst: jest.fn().mockResolvedValue(null) },
     };
     whatsappMensajesRepository = {
       crear: jest.fn().mockResolvedValue(MENSAJE_ENTRANTE),
@@ -232,6 +234,43 @@ describe('WhatsappBotService', () => {
 
       expect(prisma.producto.findMany).not.toHaveBeenCalled();
       expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('procesarMensajeEntrante — CRM "Cotización conectada" Fase 2 (consulta de producto de un desconocido)', () => {
+    beforeEach(() => {
+      conversacionIaService.completar.mockResolvedValue('{"respuesta":"Sí, mirá","requiereHumano":false,"buscarProducto":"yogurt"}');
+    });
+
+    it('sin Cliente (sea o no ya un Lead sin convertir): emite CONSULTA_PRODUCTO_DESCONOCIDO y escala a humano — solo Cliente excluye, nunca Lead (hallazgo real: una segunda consulta de un Lead ya existente antes no dejaba ningún rastro)', async () => {
+      await service.procesarMensajeEntrante(CONFIG_BASE, 'whatsapp:+18095551234', 'tienen yogurt?', 'Rosa Martínez');
+
+      expect(eventBus.emit).toHaveBeenCalledWith(EVENTOS.CONSULTA_PRODUCTO_DESCONOCIDO, {
+        tenantId: 't1',
+        telefono: '+18095551234',
+        nombre: 'Rosa Martínez',
+        productoNombre: 'yogurt',
+        origen: 'WHATSAPP',
+      });
+      expect(prisma.whatsappMensaje.update).toHaveBeenCalledWith({ where: { id: 'm1' }, data: { requiereAtencionHumana: true } });
+      expect(eventBus.emit).toHaveBeenCalledWith(EVENTOS.WHATSAPP_REQUIERE_ATENCION, expect.objectContaining({ tenantId: 't1' }));
+    });
+
+    it('cliente ya conocido: no emite nada ni escala — sigue la conversación normal', async () => {
+      prisma.cliente.findFirst.mockResolvedValue({ id: 'c1' });
+
+      await service.procesarMensajeEntrante(CONFIG_BASE, 'whatsapp:+18095551234', 'tienen yogurt?');
+
+      expect(eventBus.emit).not.toHaveBeenCalledWith(EVENTOS.CONSULTA_PRODUCTO_DESCONOCIDO, expect.anything());
+      expect(prisma.whatsappMensaje.update).not.toHaveBeenCalled();
+    });
+
+    it('buscarCategoria (no buscarProducto): no dispara nada de esto', async () => {
+      conversacionIaService.completar.mockResolvedValue('{"respuesta":"Mirá","requiereHumano":false,"buscarCategoria":"lácteos"}');
+
+      await service.procesarMensajeEntrante(CONFIG_BASE, 'whatsapp:+18095551234', 'qué tienen de lácteos?');
+
+      expect(eventBus.emit).not.toHaveBeenCalledWith(EVENTOS.CONSULTA_PRODUCTO_DESCONOCIDO, expect.anything());
     });
   });
 

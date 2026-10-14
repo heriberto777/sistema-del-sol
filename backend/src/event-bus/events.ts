@@ -28,6 +28,7 @@ export const EVENTOS = {
   CRM_ACTIVIDAD_VENCE_HOY: 'crm.actividad_vence_hoy',
   COTIZACION_RESPONDIDA: 'cotizaciones.respondida',
   COTIZACION_CONVERTIDA_FACTURA: 'cotizaciones.convertida_factura',
+  CONSULTA_PRODUCTO_DESCONOCIDO: 'crm.consulta_producto_desconocido',
 } as const;
 
 export type NombreEvento = (typeof EVENTOS)[keyof typeof EVENTOS];
@@ -273,4 +274,23 @@ export interface CotizacionConvertidaFacturaPayload {
   tenantId: string;
   cotizacionId: string;
   facturaId: string;
+}
+
+/**
+ * CRM "Cotización conectada" Fase 2 — alguien que NO es Cliente ni Lead
+ * de este tenant preguntó por un producto real, por WhatsApp
+ * (`WhatsappBotService`, cuando la IA resuelve `buscarProducto` y el
+ * remitente no coincide con ningún Cliente/Lead) o desde el botón
+ * "Preguntar por WhatsApp" de la Tienda Online (`EcommerceService`). Cada
+ * emisor ya hizo su propio chequeo de "es desconocido" antes de emitir —
+ * `LeadsEventosService` nunca vuelve a chequearlo, solo deduplica por
+ * teléfono (puede llegar más de una vez para el mismo número) y respeta
+ * si el tenant tiene el módulo CRM activo.
+ */
+export interface ConsultaProductoDesconocidoPayload {
+  tenantId: string;
+  telefono: string;
+  nombre: string | null;
+  productoNombre: string;
+  origen: 'WHATSAPP' | 'TIENDA';
 }
