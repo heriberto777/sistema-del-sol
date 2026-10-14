@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { CondicionPago, TipoCliente, TipoComprobanteFiscal } from '@prisma/client';
-import { IsEmail, IsEnum, IsInt, IsNumber, IsOptional, IsString, IsUUID, Min } from 'class-validator';
+import { IsBoolean, IsEmail, IsEnum, IsInt, IsNumber, IsOptional, IsString, IsUUID, Min } from 'class-validator';
 
 export class CrearClienteDto {
   @ApiProperty()
@@ -84,4 +84,13 @@ export class CrearClienteDto {
   @IsInt()
   @Min(1)
   plazoPagoDias?: number;
+
+  @ApiProperty({
+    required: false,
+    default: true,
+    description: 'Si recibe los avisos automáticos de Factura/Nota de Crédito/Nota de Débito/Cotización por email/WhatsApp.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  notificacionesHabilitadas?: boolean;
 }

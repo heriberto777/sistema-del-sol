@@ -3558,6 +3558,15 @@ model Cliente {
   telefonoSecundario          String?
   limiteCredito               Decimal                @default(0) @db.Decimal(14, 2)
   activo                      Boolean                @default(true)
+  // Preferencia del cliente para recibir los avisos automáticos de
+  // Factura/Nota de Crédito/Nota de Débito/Cotización por email/WhatsApp
+  // (ver NotificacionesService.alFacturarse/alEnviarCotizacion). Default
+  // `true` para no cambiar el comportamiento de ningún cliente existente
+  // al migrar. No reemplaza el interruptor de NotificacionPlantilla por
+  // tenant+canal+evento (Configuración → Plantillas) — ambos tienen que
+  // dar "sí" para que salga el mensaje, este es el filtro fino por
+  // cliente, aquel sigue siendo el apagado general del negocio.
+  notificacionesHabilitadas  Boolean                @default(true)
   // Contacto genérico sembrado al provisionar el tenant (ver
   // TenantsRepository.crearConProvisioning) — lo usa POS como cliente
   // por defecto en la venta rápida, para no exigir elegir un cliente

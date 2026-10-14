@@ -156,18 +156,30 @@ export class NotificacionesService {
   async alFacturarse(payload: FacturaCreadaPayload) {
     const cliente = await this.prisma.cliente.findUnique({ where: { id: payload.clienteId } });
     if (!cliente) return;
+    // === false explícito, no `!cliente.notificacionesHabilitadas`: un
+    // cliente sin este campo migrado todavía (o un mock de test) debe
+    // seguir mandando por defecto, igual que el default `true` de la
+    // columna — ver el comentario en schema.prisma.
+    if (cliente.notificacionesHabilitadas === false) return;
+
+    // Nota de Crédito/Débito comparte el modelo Factura y este mismo
+    // evento, pero avisarle al cliente con el texto de "tu factura ya
+    // está lista" es semánticamente incorrecto para esos dos casos —
+    // clave de plantilla propia por tipo.
+    const clave =
+      payload.tipoFactura === 'NOTA_CREDITO' ? 'nota_credito_creada' : payload.tipoFactura === 'NOTA_DEBITO' ? 'nota_debito_creada' : 'factura_creada';
 
     const variables = { cliente_nombre: cliente.nombre, factura_total: payload.total, link: this.enlacePublico('facturas', payload.facturaId) };
 
     if (cliente.email) {
       const adjuntoPdf = await this.generarAdjuntoFacturaPdf(payload.facturaId);
-      await this.enviar({ tenantId: payload.tenantId, canal: 'EMAIL', clave: 'factura_creada', destinatario: cliente.email, variables, adjuntoPdf });
+      await this.enviar({ tenantId: payload.tenantId, canal: 'EMAIL', clave, destinatario: cliente.email, variables, adjuntoPdf });
     }
     // Por WhatsApp solo se envía si el tenant configuró una plantilla
-    // WHATSAPP para "factura_creada" — enviar() no hace nada si no existe
-    // una plantilla activa, así que esto es un no-op silencioso por defecto.
+    // WHATSAPP para esa clave — enviar() no hace nada si no existe una
+    // plantilla activa, así que esto es un no-op silencioso por defecto.
     if (cliente.telefono) {
-      await this.enviar({ tenantId: payload.tenantId, canal: 'WHATSAPP', clave: 'factura_creada', destinatario: cliente.telefono, variables });
+      await this.enviar({ tenantId: payload.tenantId, canal: 'WHATSAPP', clave, destinatario: cliente.telefono, variables });
     }
   }
 
@@ -175,6 +187,8 @@ export class NotificacionesService {
   async alEnviarCotizacion(payload: CotizacionEnviadaPayload) {
     const cliente = await this.prisma.cliente.findUnique({ where: { id: payload.clienteId } });
     if (!cliente) return;
+    // Mismo criterio que alFacturarse — ver el comentario ahí.
+    if (cliente.notificacionesHabilitadas === false) return;
 
     const variables = {
       cliente_nombre: cliente.nombre,

@@ -166,6 +166,54 @@ describe('NotificacionesService', () => {
       ).resolves.not.toThrow();
       expect(repository.buscarPlantilla).not.toHaveBeenCalled();
     });
+
+    it('no envía nada si el cliente desactivó las notificaciones automáticas', async () => {
+      prisma.cliente.findUnique.mockResolvedValue({
+        id: 'c1',
+        nombre: 'Cliente X',
+        email: 'x@y.com',
+        telefono: '+18095551234',
+        notificacionesHabilitadas: false,
+      });
+
+      await service.alFacturarse({ tenantId: 't1', facturaId: 'f1', clienteId: 'c1', total: '100', subtotal: '85', itbis: '15', tipoFactura: 'CONTADO' });
+
+      expect(repository.buscarPlantilla).not.toHaveBeenCalled();
+    });
+
+    it('un cliente sin el campo migrado (undefined) sigue recibiendo notificaciones — el default es enviar', async () => {
+      prisma.cliente.findUnique.mockResolvedValue({ id: 'c1', nombre: 'Cliente X', email: 'x@y.com', telefono: null });
+      repository.buscarPlantilla.mockResolvedValue({ activa: true, asunto: null, cuerpo: 'x' } as never);
+      repository.crearNotificacion.mockResolvedValue({ id: 'n1' } as never);
+      emailChannel.enviar.mockResolvedValue(true);
+
+      await service.alFacturarse({ tenantId: 't1', facturaId: 'f1', clienteId: 'c1', total: '100', subtotal: '85', itbis: '15', tipoFactura: 'CONTADO' });
+
+      expect(repository.buscarPlantilla).toHaveBeenCalledWith('t1', 'EMAIL', 'factura_creada');
+    });
+
+    it('usa la clave "nota_credito_creada" para una Nota de Crédito, no "factura_creada"', async () => {
+      prisma.cliente.findUnique.mockResolvedValue({ id: 'c1', nombre: 'Cliente X', email: 'x@y.com', telefono: null, notificacionesHabilitadas: true });
+      repository.buscarPlantilla.mockResolvedValue({ activa: true, asunto: null, cuerpo: 'x' } as never);
+      repository.crearNotificacion.mockResolvedValue({ id: 'n1' } as never);
+      emailChannel.enviar.mockResolvedValue(true);
+
+      await service.alFacturarse({ tenantId: 't1', facturaId: 'f1', clienteId: 'c1', total: '100', subtotal: '85', itbis: '15', tipoFactura: 'NOTA_CREDITO' });
+
+      expect(repository.buscarPlantilla).toHaveBeenCalledWith('t1', 'EMAIL', 'nota_credito_creada');
+      expect(repository.buscarPlantilla).not.toHaveBeenCalledWith('t1', 'EMAIL', 'factura_creada');
+    });
+
+    it('usa la clave "nota_debito_creada" para una Nota de Débito', async () => {
+      prisma.cliente.findUnique.mockResolvedValue({ id: 'c1', nombre: 'Cliente X', email: 'x@y.com', telefono: null, notificacionesHabilitadas: true });
+      repository.buscarPlantilla.mockResolvedValue({ activa: true, asunto: null, cuerpo: 'x' } as never);
+      repository.crearNotificacion.mockResolvedValue({ id: 'n1' } as never);
+      emailChannel.enviar.mockResolvedValue(true);
+
+      await service.alFacturarse({ tenantId: 't1', facturaId: 'f1', clienteId: 'c1', total: '100', subtotal: '85', itbis: '15', tipoFactura: 'NOTA_DEBITO' });
+
+      expect(repository.buscarPlantilla).toHaveBeenCalledWith('t1', 'EMAIL', 'nota_debito_creada');
+    });
   });
 
   describe('alEnviarCotizacion', () => {
@@ -197,6 +245,20 @@ describe('NotificacionesService', () => {
       await expect(
         service.alEnviarCotizacion({ tenantId: 't1', cotizacionId: 'cot1', clienteId: 'c1', numero: 'COT-001', total: '354' }),
       ).resolves.not.toThrow();
+      expect(repository.buscarPlantilla).not.toHaveBeenCalled();
+    });
+
+    it('no envía nada si el cliente desactivó las notificaciones automáticas', async () => {
+      prisma.cliente.findUnique.mockResolvedValue({
+        id: 'c1',
+        nombre: 'Cliente X',
+        email: 'x@y.com',
+        telefono: '+18095551234',
+        notificacionesHabilitadas: false,
+      });
+
+      await service.alEnviarCotizacion({ tenantId: 't1', cotizacionId: 'cot1', clienteId: 'c1', numero: 'COT-001', total: '354' });
+
       expect(repository.buscarPlantilla).not.toHaveBeenCalled();
     });
   });

@@ -1,16 +1,17 @@
 import { CanalNotificacion } from '@prisma/client';
 
 /**
- * Factura creada y cotización enviada — las dos notificaciones más
- * básicas del sistema (avisarle al cliente que le llegó un documento) no
- * tenían ninguna plantilla por defecto, a diferencia de Publicaciones
- * Sociales/Comentarios de tarea/Vencimiento de tareas (ver los otros
- * `plantillas-*-base.ts`): `NotificacionesService.enviar()` no manda nada
- * hasta que exista una `NotificacionPlantilla` activa para
- * (tenantId, canal, clave), así que sin esto el botón "Enviar" de una
- * cotización (o crear una factura) nunca mandaba el correo/WhatsApp y no
- * había ningún aviso de que faltaba configurar algo (bug real reportado
- * — "le doy enviar y no llega el correo").
+ * Factura creada, Nota de Crédito/Débito creada y cotización enviada —
+ * las notificaciones más básicas del sistema (avisarle al cliente que le
+ * llegó un documento) no tenían ninguna plantilla por defecto, a
+ * diferencia de Publicaciones Sociales/Comentarios de tarea/Vencimiento
+ * de tareas (ver los otros `plantillas-*-base.ts`):
+ * `NotificacionesService.enviar()` no manda nada hasta que exista una
+ * `NotificacionPlantilla` activa para (tenantId, canal, clave), así que
+ * sin esto el botón "Enviar" de una cotización (o crear una factura)
+ * nunca mandaba el correo/WhatsApp y no había ningún aviso de que
+ * faltaba configurar algo (bug real reportado — "le doy enviar y no
+ * llega el correo").
  *
  * Se siembra en dos lugares (mismo criterio que las demás
  * `*_BASE`): acá mismo para tenants YA existentes (vía
@@ -39,5 +40,30 @@ export const PLANTILLAS_VENTAS_BASE: { canal: CanalNotificacion; clave: string; 
     canal: 'WHATSAPP',
     clave: 'cotizacion_enviada',
     cuerpo: 'Hola {{cliente_nombre}}, te enviamos la cotización {{cotizacion_numero}} por RD$ {{cotizacion_total}}: {{link}}',
+  },
+  // Nota de Crédito/Débito comparte el modelo Factura y el evento
+  // FACTURA_CREADA, pero con clave de plantilla propia — ver el
+  // comentario en NotificacionesService.alFacturarse.
+  {
+    canal: 'EMAIL',
+    clave: 'nota_credito_creada',
+    asunto: 'Nota de crédito por RD$ {{factura_total}}',
+    cuerpo: 'Hola {{cliente_nombre}}, te generamos una nota de crédito por <strong>RD$ {{factura_total}}</strong>. Podés verla acá: {{link}}',
+  },
+  {
+    canal: 'WHATSAPP',
+    clave: 'nota_credito_creada',
+    cuerpo: 'Hola {{cliente_nombre}}, te generamos una nota de crédito por RD$ {{factura_total}}: {{link}}',
+  },
+  {
+    canal: 'EMAIL',
+    clave: 'nota_debito_creada',
+    asunto: 'Nota de débito por RD$ {{factura_total}}',
+    cuerpo: 'Hola {{cliente_nombre}}, te generamos una nota de débito por <strong>RD$ {{factura_total}}</strong>. Podés verla acá: {{link}}',
+  },
+  {
+    canal: 'WHATSAPP',
+    clave: 'nota_debito_creada',
+    cuerpo: 'Hola {{cliente_nombre}}, te generamos una nota de débito por RD$ {{factura_total}}: {{link}}',
   },
 ];

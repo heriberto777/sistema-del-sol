@@ -50,6 +50,30 @@ export const CATALOGO_EVENTOS_NOTIFICACION: EventoNotificacion[] = [
     ],
   },
   {
+    clave: 'nota_credito_creada',
+    etiqueta: 'Nota de crédito creada',
+    modulo: 'Ventas',
+    canales: ['EMAIL', 'WHATSAPP'],
+    descripcion: 'Al crear una nota de crédito, si el cliente tiene email/teléfono cargado.',
+    variables: [
+      { nombre: 'cliente_nombre', descripcion: 'Nombre del cliente' },
+      { nombre: 'factura_total', descripcion: 'Monto de la nota de crédito' },
+      { nombre: 'link', descripcion: 'Link público para ver la nota de crédito' },
+    ],
+  },
+  {
+    clave: 'nota_debito_creada',
+    etiqueta: 'Nota de débito creada',
+    modulo: 'Ventas',
+    canales: ['EMAIL', 'WHATSAPP'],
+    descripcion: 'Al crear una nota de débito, si el cliente tiene email/teléfono cargado.',
+    variables: [
+      { nombre: 'cliente_nombre', descripcion: 'Nombre del cliente' },
+      { nombre: 'factura_total', descripcion: 'Monto de la nota de débito' },
+      { nombre: 'link', descripcion: 'Link público para ver la nota de débito' },
+    ],
+  },
+  {
     clave: 'ncf_por_agotarse',
     etiqueta: 'NCF por agotarse',
     modulo: 'Ventas',

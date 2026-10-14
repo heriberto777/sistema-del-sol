@@ -52,6 +52,7 @@ export const CLIENTE_SELECT_COMPLETO = {
   telefonoSecundario: true,
   limiteCredito: true,
   activo: true,
+  notificacionesHabilitadas: true,
   esConsumidorFinal: true,
   listaPrecioId: true,
   categoriaId: true,
