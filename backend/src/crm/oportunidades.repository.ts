@@ -8,6 +8,7 @@ const INCLUDE_OPORTUNIDAD = {
   lead: { select: { id: true, nombre: true } },
   etapa: { select: { id: true, nombre: true, color: true, orden: true } },
   vendedor: { select: { id: true, nombre: true } },
+  cotizacion: { select: { id: true, numero: true, estado: true, total: true } },
 } satisfies Prisma.OportunidadInclude;
 
 interface FiltrosOportunidades {
@@ -94,19 +95,21 @@ export class OportunidadesRepository {
   }
 
   /**
-   * Fase 2 — "Ganar y generar cotización". `clienteId` se pasa SOLO
+   * CRM "Cotización conectada" — generar la cotización ya NO marca la
+   * oportunidad GANADA (antes sí, ver el comentario en schema.prisma):
+   * sigue ABIERTA hasta que el cliente la aprueba y el vendedor la
+   * convierte en factura (OportunidadesEventosService escucha
+   * COTIZACION_CONVERTIDA_FACTURA para eso). `clienteId` se pasa SOLO
    * cuando la oportunidad estaba sobre un Lead recién convertido (ver
    * OportunidadesService.convertirEnCotizacion) — ahí sí queda con
    * clienteId Y leadId a la vez (el Lead se conserva como historial de
    * origen), excepción deliberada a la regla de "exactamente uno" que
-   * rige en crear()/actualizar(): una vez GANADA, `actualizar()` ya la
-   * bloquea (validarQueSigaAbierta), así que ese invariante relajado
-   * nunca se vuelve a chequear sobre este registro.
+   * rige en crear()/actualizar().
    */
-  cerrarConCotizacion(id: string, cotizacionId: string, clienteId?: string) {
+  vincularCotizacion(id: string, cotizacionId: string, clienteId?: string) {
     return this.db.oportunidad.update({
       where: { id },
-      data: { estado: 'GANADA', cotizacionId, fechaCierreReal: new Date(), ...(clienteId ? { clienteId } : {}) },
+      data: { cotizacionId, ...(clienteId ? { clienteId } : {}) },
       include: INCLUDE_OPORTUNIDAD,
     });
   }

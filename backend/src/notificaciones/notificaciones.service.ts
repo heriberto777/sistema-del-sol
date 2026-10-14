@@ -8,6 +8,7 @@ import { renderizarPlantilla } from './plantilla-renderer';
 import { CLIENTE_SELECT_BASICO } from '../common/prisma/cliente-select-basico';
 import {
   CotizacionEnviadaPayload,
+  CotizacionRespondidaPayload,
   EVENTOS,
   FacturaCreadaPayload,
   HitoProyectoPorVencerPayload,
@@ -204,6 +205,34 @@ export class NotificacionesService {
     if (cliente.telefono) {
       await this.enviar({ tenantId: payload.tenantId, canal: 'WHATSAPP', clave: 'cotizacion_enviada', destinatario: cliente.telefono, variables });
     }
+  }
+
+  /**
+   * CRM "Cotización conectada" — avisa por EMAIL al vendedor de la
+   * cotización cuando el CLIENTE respondió desde el link público (no
+   * cuando el staff cambia el estado a mano, eso no emite este evento —
+   * ver el comentario en CotizacionRespondidaPayload). Independiente de
+   * OportunidadesEventosService: a este listener no le importa si la
+   * cotización está vinculada a una Oportunidad o no, siempre avisa al
+   * vendedor de la cotización misma.
+   */
+  @OnEvent(EVENTOS.COTIZACION_RESPONDIDA)
+  async alResponderCotizacionCrm(payload: CotizacionRespondidaPayload) {
+    const vendedor = await this.prisma.user.findUnique({ where: { id: payload.vendedorId } });
+    if (!vendedor) return;
+
+    const clave = payload.decision === 'ACEPTADA' ? 'cotizacion_aprobada_vendedor' : 'cotizacion_rechazada_vendedor';
+    await this.enviar({
+      tenantId: payload.tenantId,
+      canal: 'EMAIL',
+      clave,
+      destinatario: vendedor.email,
+      variables: {
+        cliente_nombre: payload.clienteNombre,
+        cotizacion_numero: payload.numero,
+        motivo: payload.motivo ? `: ${payload.motivo}` : '.',
+      },
+    });
   }
 
   @OnEvent(EVENTOS.STOCK_BAJO)

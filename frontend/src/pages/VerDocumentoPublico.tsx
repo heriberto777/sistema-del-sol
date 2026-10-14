@@ -1,8 +1,11 @@
+import { useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { documentosPublicosApiClient } from '../lib/documentos-publicos-api-client';
 import { Button } from '../components/atoms/Button/Button';
+import { Modal } from '../components/molecules/Modal/Modal';
 import { ThemeToggle } from '../components/molecules/ThemeToggle/ThemeToggle';
+import { mensajeErrorApi } from '../lib/mensaje-error-api';
 
 type CampoEmisorCliente = 'rnc' | 'direccion' | 'telefono';
 type ColumnaLinea = 'cantidad' | 'precioUnitario' | 'total';
@@ -61,6 +64,9 @@ interface DocumentoPublico {
   totalesVisibles?: FilaTotal[];
   qr?: QrPublico;
   firma?: FirmaPublico;
+  /** CRM "Cotización conectada" — solo viene para tipo "cotizacion", nunca para factura. */
+  estado?: 'BORRADOR' | 'ENVIADA' | 'ACEPTADA' | 'RECHAZADA' | 'VENCIDA';
+  motivoRechazo?: string;
 }
 
 function formatoRD(valor: number) {
@@ -95,6 +101,97 @@ function campoClienteVisible(campos: CampoEmisorCliente[] | undefined, campo: Ca
 function filaTotalVisible(totalesVisibles: FilaTotal[] | undefined, fila: FilaTotal, presente: boolean): boolean {
   if (!presente) return false;
   return !totalesVisibles || totalesVisibles.length === 0 || totalesVisibles.includes(fila);
+}
+
+/**
+ * CRM "Cotización conectada" — botones Aprobar/Rechazar en el link
+ * público de la cotización, sin login (mismo criterio de "UUID como
+ * capability token" que el resto de esta página). ACEPTADA es el único
+ * estado que ya no deja responder — RECHAZADA sigue abierta por si el
+ * cliente cambia de opinión y aprueba después.
+ */
+function AccionesCotizacion({ id, estado, motivoRechazo }: { id: string; estado: DocumentoPublico['estado']; motivoRechazo?: string }) {
+  const queryClient = useQueryClient();
+  const [rechazando, setRechazando] = useState(false);
+  const [motivo, setMotivo] = useState('');
+  const [error, setError] = useState<string | null>(null);
+
+  const responder = useMutation({
+    mutationFn: async (body: { decision: 'ACEPTADA' | 'RECHAZADA'; motivo?: string }) =>
+      documentosPublicosApiClient.post(`/documentos-publicos/cotizaciones/${id}/responder`, body),
+    onSuccess: () => {
+      setRechazando(false);
+      setMotivo('');
+      queryClient.invalidateQueries({ queryKey: ['documento-publico', 'cotizacion', id] });
+    },
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo registrar tu respuesta. Probá de nuevo en un momento.')),
+  });
+
+  if (estado === 'ACEPTADA') {
+    return (
+      <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800 dark:border-emerald-900 dark:bg-emerald-900/20 dark:text-emerald-300">
+        Aprobaste esta cotización. Nuestro equipo te va a contactar para confirmar los detalles.
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      {estado === 'RECHAZADA' && (
+        <p className="text-xs text-slate-500 dark:text-slate-400">
+          Ya habías rechazado esta cotización{motivoRechazo ? ` (${motivoRechazo})` : ''} — si cambiaste de opinión, podés aprobarla igual.
+        </p>
+      )}
+      {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+      <div className="flex gap-2">
+        <Button
+          className="flex-1"
+          disabled={responder.isPending}
+          onClick={() => {
+            setError(null);
+            responder.mutate({ decision: 'ACEPTADA' });
+          }}
+        >
+          {responder.isPending ? 'Enviando…' : 'Aprobar'}
+        </Button>
+        <Button className="flex-1" variante="secundario" disabled={responder.isPending} onClick={() => setRechazando(true)}>
+          Rechazar
+        </Button>
+      </div>
+
+      {rechazando && (
+        <Modal titulo="Rechazar cotización" onClose={() => setRechazando(false)}>
+          <div className="space-y-3">
+            <p className="text-sm text-slate-600 dark:text-slate-400">Contanos brevemente por qué, para que puedan ajustarla si hace falta.</p>
+            <textarea
+              value={motivo}
+              onChange={(e) => setMotivo(e.target.value)}
+              rows={3}
+              autoFocus
+              placeholder="ej. El precio no nos cuadra, necesitamos otra cantidad…"
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-sol-500 focus:ring-2 focus:ring-sol-500/30 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+            />
+            {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+            <div className="flex justify-end gap-2">
+              <Button variante="secundario" onClick={() => setRechazando(false)}>
+                Cancelar
+              </Button>
+              <Button
+                variante="peligro"
+                disabled={responder.isPending || !motivo.trim()}
+                onClick={() => {
+                  setError(null);
+                  responder.mutate({ decision: 'RECHAZADA', motivo: motivo.trim() });
+                }}
+              >
+                {responder.isPending ? 'Enviando…' : 'Confirmar rechazo'}
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
 }
 
 /**
@@ -257,6 +354,8 @@ function VerDocumentoPublico({ tipo }: { tipo: 'factura' | 'cotizacion' }) {
             )}
 
             {documento.notaPie && <p className="border-t border-slate-100 pt-3 text-xs text-slate-500 dark:border-slate-800 dark:text-slate-400">{documento.notaPie}</p>}
+
+            {tipo === 'cotizacion' && id && <AccionesCotizacion id={id} estado={documento.estado} motivoRechazo={documento.motivoRechazo} />}
 
             <Button className="w-full" onClick={() => window.open(`/api/documentos-publicos/${segmento}/${id}/pdf`, '_blank')}>
               Descargar PDF

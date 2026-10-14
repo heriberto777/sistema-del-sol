@@ -74,6 +74,29 @@ export const CATALOGO_EVENTOS_NOTIFICACION: EventoNotificacion[] = [
     ],
   },
   {
+    clave: 'cotizacion_aprobada_vendedor',
+    etiqueta: 'Cotización aprobada por el cliente',
+    modulo: 'CRM',
+    canales: ['EMAIL'],
+    descripcion: 'Cuando el cliente aprueba una cotización desde el link público. Se avisa al vendedor de esa oportunidad.',
+    variables: [
+      { nombre: 'cliente_nombre', descripcion: 'Nombre del cliente' },
+      { nombre: 'cotizacion_numero', descripcion: 'Número de la cotización' },
+    ],
+  },
+  {
+    clave: 'cotizacion_rechazada_vendedor',
+    etiqueta: 'Cotización rechazada por el cliente',
+    modulo: 'CRM',
+    canales: ['EMAIL'],
+    descripcion: 'Cuando el cliente rechaza una cotización desde el link público. Se avisa al vendedor de esa oportunidad.',
+    variables: [
+      { nombre: 'cliente_nombre', descripcion: 'Nombre del cliente' },
+      { nombre: 'cotizacion_numero', descripcion: 'Número de la cotización' },
+      { nombre: 'motivo', descripcion: 'Motivo del rechazo (ya viene formateado con ": " adelante, o vacío si no escribió uno)' },
+    ],
+  },
+  {
     clave: 'ncf_por_agotarse',
     etiqueta: 'NCF por agotarse',
     modulo: 'Ventas',

@@ -12,6 +12,7 @@ import { EtapasPipelineRepository } from './etapas-pipeline.repository';
 import { OportunidadesController } from './oportunidades.controller';
 import { OportunidadesService } from './oportunidades.service';
 import { OportunidadesRepository } from './oportunidades.repository';
+import { OportunidadesEventosService } from './oportunidades-eventos.service';
 import { ActividadesCrmController } from './actividades-crm.controller';
 import { ActividadesCrmService } from './actividades-crm.service';
 import { ActividadesCrmRepository } from './actividades-crm.repository';
@@ -63,6 +64,7 @@ import { MetasVentaRepository } from './metas-venta.repository';
     EtapasPipelineRepository,
     OportunidadesService,
     OportunidadesRepository,
+    OportunidadesEventosService,
     ActividadesCrmService,
     ActividadesCrmRepository,
     ActividadesCrmCronService,

@@ -66,4 +66,22 @@ export const PLANTILLAS_VENTAS_BASE: { canal: CanalNotificacion; clave: string; 
     clave: 'nota_debito_creada',
     cuerpo: 'Hola {{cliente_nombre}}, te generamos una nota de débito por RD$ {{factura_total}}: {{link}}',
   },
+  // CRM "Cotización conectada" — a diferencia de todo lo de arriba (avisos
+  // AL CLIENTE), estas dos van al VENDEDOR cuando el cliente responde
+  // desde el link público (DocumentosPublicosService.responderCotizacion)
+  // — solo EMAIL, no tiene sentido un WhatsApp interno de "aviso al
+  // equipo" todavía.
+  {
+    canal: 'EMAIL',
+    clave: 'cotizacion_aprobada_vendedor',
+    asunto: '{{cliente_nombre}} aprobó la cotización {{cotizacion_numero}}',
+    cuerpo:
+      'Hola, {{cliente_nombre}} aprobó la cotización <strong>{{cotizacion_numero}}</strong>. Revisala y convertila en factura cuando confirmes stock y precio.',
+  },
+  {
+    canal: 'EMAIL',
+    clave: 'cotizacion_rechazada_vendedor',
+    asunto: '{{cliente_nombre}} rechazó la cotización {{cotizacion_numero}}',
+    cuerpo: 'Hola, {{cliente_nombre}} rechazó la cotización <strong>{{cotizacion_numero}}</strong>{{motivo}}',
+  },
 ];

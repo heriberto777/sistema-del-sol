@@ -35,7 +35,7 @@ describe('OportunidadesService', () => {
       actualizar: jest.fn(),
       cambiarEtapa: jest.fn(),
       cerrar: jest.fn(),
-      cerrarConCotizacion: jest.fn().mockResolvedValue({ id: 'op-1', estado: 'GANADA' }),
+      vincularCotizacion: jest.fn().mockResolvedValue({ id: 'op-1', estado: 'ABIERTA' }),
       eliminar: jest.fn(),
       validarVendedorDelTenant: jest.fn().mockResolvedValue({ id: 'user-2' }),
     } as unknown as jest.Mocked<OportunidadesRepository>;
@@ -147,7 +147,27 @@ describe('OportunidadesService', () => {
         'tenant-1',
         'user-1',
       );
-      expect(repository.cerrarConCotizacion).toHaveBeenCalledWith('op-1', 'cotizacion-1', undefined);
+      expect(repository.vincularCotizacion).toHaveBeenCalledWith('op-1', 'cotizacion-1', undefined);
+    });
+
+    it('usa líneas reales del catálogo cuando se las pasan, en vez de la línea manual por defecto', async () => {
+      repository.buscarPorId.mockResolvedValue({
+        id: 'op-1',
+        estado: 'ABIERTA',
+        titulo: 'Venta anual',
+        montoEstimado: '1500',
+        clienteId: 'cliente-1',
+        leadId: null,
+      } as never);
+      const lineas = [{ productoId: 'prod-1', cantidad: 2 }];
+
+      await service.convertirEnCotizacion('op-1', { fechaVigenciaHastaCotizacion: '2099-01-01', lineas } as never, 'tenant-1', 'user-1');
+
+      expect(cotizacionesService.crear).toHaveBeenCalledWith(
+        expect.objectContaining({ lineas }),
+        'tenant-1',
+        'user-1',
+      );
     });
 
     it('convierte el lead en cliente primero cuando la oportunidad todavía no tiene cliente', async () => {
@@ -168,7 +188,7 @@ describe('OportunidadesService', () => {
         'tenant-1',
         'user-1',
       );
-      expect(repository.cerrarConCotizacion).toHaveBeenCalledWith('op-1', 'cotizacion-1', 'cliente-del-lead');
+      expect(repository.vincularCotizacion).toHaveBeenCalledWith('op-1', 'cotizacion-1', 'cliente-del-lead');
     });
 
     it('rechaza convertir una oportunidad que ya está cerrada', async () => {

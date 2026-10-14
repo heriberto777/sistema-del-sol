@@ -26,6 +26,8 @@ export const EVENTOS = {
   TAREA_PROYECTO_VENCE_HOY: 'proyectos.tarea_vence_hoy',
   TAREA_PERSONAL_VENCE_HOY: 'tareas_personales.vence_hoy',
   CRM_ACTIVIDAD_VENCE_HOY: 'crm.actividad_vence_hoy',
+  COTIZACION_RESPONDIDA: 'cotizaciones.respondida',
+  COTIZACION_CONVERTIDA_FACTURA: 'cotizaciones.convertida_factura',
 } as const;
 
 export type NombreEvento = (typeof EVENTOS)[keyof typeof EVENTOS];
@@ -245,4 +247,30 @@ export interface CrmActividadVenceHoyPayload {
   actividadId: string;
   descripcion: string;
   usuarioId: string;
+}
+
+/**
+ * CRM "Cotización conectada" — emitido por
+ * DocumentosPublicosService.responderCotizacion() cuando el CLIENTE
+ * aprueba o rechaza desde el link público (no cuando el staff cambia el
+ * estado a mano vía CotizacionesService.cambiarEstado, eso no dispara
+ * esto). Dos consumidores independientes: OportunidadesEventosService
+ * (actividad/Oportunidad Perdida) y NotificacionesService (avisa por
+ * email al vendedor).
+ */
+export interface CotizacionRespondidaPayload {
+  tenantId: string;
+  cotizacionId: string;
+  vendedorId: string;
+  clienteNombre: string;
+  numero: string;
+  decision: 'ACEPTADA' | 'RECHAZADA';
+  motivo?: string;
+}
+
+/** Emitido por CotizacionesService.convertirEnFactura() — OportunidadesEventosService lo escucha para recién ahí marcar GANADA la Oportunidad vinculada (si hay una). */
+export interface CotizacionConvertidaFacturaPayload {
+  tenantId: string;
+  cotizacionId: string;
+  facturaId: string;
 }

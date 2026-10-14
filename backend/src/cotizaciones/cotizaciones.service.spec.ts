@@ -383,6 +383,21 @@ describe('CotizacionesService', () => {
       expect(repository.marcarConvertida).toHaveBeenCalledWith('c1', 'f1');
     });
 
+    it('CRM "Cotización conectada" — emite COTIZACION_CONVERTIDA_FACTURA al convertir', async () => {
+      repository.buscarPorId.mockResolvedValue({
+        id: 'c1',
+        estado: 'ACEPTADA',
+        facturaId: null,
+        clienteId: 'cliente-1',
+        lineas: [{ productoId: 'prod-1', cantidad: 2, precioUnitario: 150, descuento: 0 }],
+      } as never);
+      facturacionService.crear.mockResolvedValue({ id: 'f1', total: 354 } as never);
+
+      await service.convertirEnFactura('c1', { bodegaId: 'bodega-1', tipoFactura: 'CONTADO' }, 'tenant-1', 'vendedor-1');
+
+      expect(eventBus.emit).toHaveBeenCalledWith(EVENTOS.COTIZACION_CONVERTIDA_FACTURA, { tenantId: 'tenant-1', cotizacionId: 'c1', facturaId: 'f1' });
+    });
+
     it('rechaza convertir una cotización ya convertida', async () => {
       repository.buscarPorId.mockResolvedValue({ estado: 'ACEPTADA', facturaId: 'f-existente' } as never);
 

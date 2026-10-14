@@ -2,6 +2,22 @@ export type OrigenLead = 'MANUAL' | 'WHATSAPP' | 'FORMULARIO_WEB' | 'IMPORTACION
 export type EstadoLead = 'NUEVO' | 'CONTACTADO' | 'CALIFICADO' | 'DESCARTADO' | 'CONVERTIDO';
 export type EstadoOportunidad = 'ABIERTA' | 'GANADA' | 'PERDIDA';
 export type TipoActividadCrm = 'LLAMADA' | 'REUNION' | 'EMAIL' | 'NOTA' | 'TAREA';
+export type EstadoCotizacionCrm = 'BORRADOR' | 'ENVIADA' | 'ACEPTADA' | 'RECHAZADA' | 'VENCIDA';
+
+export interface CotizacionDeOportunidad {
+  id: string;
+  numero: string;
+  estado: EstadoCotizacionCrm;
+  total: string;
+}
+
+export const ETIQUETA_ESTADO_COTIZACION_CRM: Record<EstadoCotizacionCrm, string> = {
+  BORRADOR: 'Borrador',
+  ENVIADA: 'Enviada — esperando respuesta',
+  ACEPTADA: 'Aprobada por el cliente',
+  RECHAZADA: 'Rechazada por el cliente',
+  VENCIDA: 'Vencida',
+};
 
 export interface UsuarioBasico {
   id: string;
@@ -50,6 +66,7 @@ export interface Oportunidad {
   estado: EstadoOportunidad;
   motivoPerdida: string | null;
   cotizacionId: string | null;
+  cotizacion: CotizacionDeOportunidad | null;
   fechaCierreReal: string | null;
   createdAt: string;
 }

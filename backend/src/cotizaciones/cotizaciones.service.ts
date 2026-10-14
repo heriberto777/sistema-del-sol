@@ -295,6 +295,10 @@ export class CotizacionesService {
     );
 
     await this.cotizacionesRepository.marcarConvertida(id, factura.id);
+    // CRM "Cotización conectada" — si esta cotización está vinculada a una
+    // Oportunidad, OportunidadesEventosService la marca Ganada recién acá
+    // (no antes): generar/aprobar la cotización no implica haberla cobrado.
+    this.eventBus.emit(EVENTOS.COTIZACION_CONVERTIDA_FACTURA, { tenantId, cotizacionId: id, facturaId: factura.id });
     return factura;
   }
 

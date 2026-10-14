@@ -117,15 +117,18 @@ export class OportunidadesService {
   }
 
   /**
-   * Fase 2 — "Ganar y generar cotización" en un solo paso. Si la
-   * oportunidad está sobre un Lead (sin Cliente todavía), primero lo
+   * CRM "Cotización conectada" — genera la Cotización real de la
+   * Oportunidad. Si está sobre un Lead (sin Cliente todavía), primero lo
    * convierte (LeadsService.convertir — dispara CLIENTE_CREADO como
    * cualquier alta normal de cliente) y recién ahí genera la cotización
-   * contra ese Cliente nuevo. La cotización sale con una única línea
-   * manual (ítem B-9: descripcionManual + precioUnitario), usando el
-   * título y el monto estimado de la oportunidad — Fase 2 no modela
-   * líneas de producto propias en Oportunidad, eso queda fuera de
-   * alcance (ver el artifact de diseño).
+   * contra ese Cliente nuevo.
+   *
+   * `dto.lineas` son líneas reales del catálogo (mismo DTO que crear una
+   * cotización normal) — si se omiten, cae al comportamiento anterior de
+   * una única línea manual con el título/monto estimado, por
+   * compatibilidad. Generar la cotización NO gana la oportunidad sola —
+   * sigue ABIERTA hasta que el cliente la aprueba desde el link público y
+   * el vendedor la convierte en factura (ver OportunidadesEventosService).
    */
   async convertirEnCotizacion(id: string, dto: ConvertirOportunidadDto, tenantId: string, vendedorId: string) {
     const oportunidad = await this.oportunidadesRepository.buscarPorId(id);
@@ -145,13 +148,13 @@ export class OportunidadesService {
       {
         clienteId,
         fechaVigenciaHasta: dto.fechaVigenciaHastaCotizacion,
-        lineas: [{ descripcionManual: oportunidad.titulo, cantidad: 1, precioUnitario: Number(oportunidad.montoEstimado) }],
+        lineas: dto.lineas ?? [{ descripcionManual: oportunidad.titulo, cantidad: 1, precioUnitario: Number(oportunidad.montoEstimado) }],
       },
       tenantId,
       vendedorId,
     );
 
-    return this.oportunidadesRepository.cerrarConCotizacion(id, cotizacion.id, oportunidad.clienteId ? undefined : clienteId);
+    return this.oportunidadesRepository.vincularCotizacion(id, cotizacion.id, oportunidad.clienteId ? undefined : clienteId);
   }
 
   /** `cotizacionId` todavía no se usa en Fase 1 (se llena recién en la Fase 2, al ganar) — el chequeo queda listo para entonces. */

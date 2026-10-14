@@ -1,7 +1,8 @@
-import { Controller, Get, Param, Res } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Res } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
 import { DocumentosPublicosService } from './documentos-publicos.service';
+import { ResponderCotizacionDto } from './dto/responder-cotizacion.dto';
 import { Public } from '../common/decorators/public.decorator';
 
 /**
@@ -38,5 +39,11 @@ export class DocumentosPublicosController {
     const buffer = await this.documentosPublicosService.obtenerCotizacionPdf(id);
     res.set({ 'Content-Type': 'application/pdf', 'Content-Disposition': 'inline; filename="cotizacion.pdf"' });
     res.send(buffer);
+  }
+
+  /** CRM "Cotización conectada" — el cliente aprueba/rechaza sin login, mismo criterio de "UUID como capability token" que el resto de este controller. */
+  @Post('cotizaciones/:id/responder')
+  responderCotizacion(@Param('id') id: string, @Body() dto: ResponderCotizacionDto) {
+    return this.documentosPublicosService.responderCotizacion(id, dto);
   }
 }

@@ -263,6 +263,48 @@ describe('NotificacionesService', () => {
     });
   });
 
+  describe('alResponderCotizacionCrm (CRM "Cotización conectada")', () => {
+    it('no hace nada si el vendedor ya no existe', async () => {
+      prisma.user.findUnique.mockResolvedValue(null);
+
+      await service.alResponderCotizacionCrm({ tenantId: 't1', cotizacionId: 'c1', vendedorId: 'v1', clienteNombre: 'Ana', numero: 'COT-1', decision: 'ACEPTADA' });
+
+      expect(repository.buscarPlantilla).not.toHaveBeenCalled();
+    });
+
+    it('ACEPTADA: usa la clave "cotizacion_aprobada_vendedor"', async () => {
+      prisma.user.findUnique.mockResolvedValue({ id: 'v1', email: 'vendedor@x.com' });
+      repository.buscarPlantilla.mockResolvedValue({ activa: true, asunto: 'x', cuerpo: 'x' } as never);
+      repository.crearNotificacion.mockResolvedValue({ id: 'n1' } as never);
+      emailChannel.enviar.mockResolvedValue(true);
+
+      await service.alResponderCotizacionCrm({ tenantId: 't1', cotizacionId: 'c1', vendedorId: 'v1', clienteNombre: 'Ana', numero: 'COT-1', decision: 'ACEPTADA' });
+
+      expect(repository.buscarPlantilla).toHaveBeenCalledWith('t1', 'EMAIL', 'cotizacion_aprobada_vendedor');
+      expect(emailChannel.enviar).toHaveBeenCalledWith('vendedor@x.com', 'x', 'x', undefined, 't1');
+    });
+
+    it('RECHAZADA: usa la clave "cotizacion_rechazada_vendedor" y formatea el motivo con ": " adelante', async () => {
+      prisma.user.findUnique.mockResolvedValue({ id: 'v1', email: 'vendedor@x.com' });
+      repository.buscarPlantilla.mockResolvedValue({ activa: true, asunto: null, cuerpo: 'Motivo{{motivo}}' } as never);
+      repository.crearNotificacion.mockResolvedValue({ id: 'n1' } as never);
+      emailChannel.enviar.mockResolvedValue(true);
+
+      await service.alResponderCotizacionCrm({
+        tenantId: 't1',
+        cotizacionId: 'c1',
+        vendedorId: 'v1',
+        clienteNombre: 'Ana',
+        numero: 'COT-1',
+        decision: 'RECHAZADA',
+        motivo: 'Precio alto',
+      });
+
+      expect(repository.buscarPlantilla).toHaveBeenCalledWith('t1', 'EMAIL', 'cotizacion_rechazada_vendedor');
+      expect(emailChannel.enviar).toHaveBeenCalledWith('vendedor@x.com', '', 'Motivo: Precio alto', undefined, 't1');
+    });
+  });
+
   describe('alVencerLote (Fase 5b)', () => {
     it('notifica por email a los usuarios con rol Admin Total/Almacenero', async () => {
       prisma.user.findMany.mockResolvedValue([{ id: 'u1', email: 'admin@x.com' }, { id: 'u2', email: 'almacen@x.com' }]);

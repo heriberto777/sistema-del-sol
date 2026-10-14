@@ -1,13 +1,23 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Modal } from '../../molecules/Modal/Modal';
 import { Badge } from '../../atoms/Badge/Badge';
 import { ActividadesCrmPanel } from '../ActividadesCrmPanel/ActividadesCrmPanel';
 import { ModalTimelineCliente } from '../ModalTimelineCliente/ModalTimelineCliente';
-import { Oportunidad } from '../../../types/crm';
+import { Button } from '../../atoms/Button/Button';
+import { ETIQUETA_ESTADO_COTIZACION_CRM, Oportunidad } from '../../../types/crm';
 
 const TONO_ESTADO: Record<Oportunidad['estado'], 'neutro' | 'exito' | 'peligro'> = { ABIERTA: 'neutro', GANADA: 'exito', PERDIDA: 'peligro' };
+const TONO_ESTADO_COTIZACION: Record<string, 'neutro' | 'exito' | 'peligro' | 'advertencia'> = {
+  BORRADOR: 'neutro',
+  ENVIADA: 'advertencia',
+  ACEPTADA: 'exito',
+  RECHAZADA: 'peligro',
+  VENCIDA: 'peligro',
+};
 
 export function ModalDetalleOportunidad({ oportunidad, onClose }: { oportunidad: Oportunidad; onClose: () => void }) {
+  const navigate = useNavigate();
   const [viendoTimeline, setViendoTimeline] = useState(false);
 
   return (
@@ -52,9 +62,16 @@ export function ModalDetalleOportunidad({ oportunidad, onClose }: { oportunidad:
           </div>
         )}
 
-        {oportunidad.cotizacionId && (
-          <div className="rounded-lg border border-sol-200 bg-sol-50 p-3 text-sm text-sol-800 dark:border-sol-900 dark:bg-sol-900/10 dark:text-sol-300">
-            Esta oportunidad ya generó una cotización — revisala en Cotizaciones.
+        {oportunidad.cotizacion && (
+          <div className="flex items-center justify-between gap-3 rounded-lg border border-sol-200 bg-sol-50 p-3 text-sm dark:border-sol-900 dark:bg-sol-900/10">
+            <div className="flex items-center gap-2">
+              <span className="font-medium text-sol-900 dark:text-sol-200">Cotización {oportunidad.cotizacion.numero}</span>
+              <Badge tono={TONO_ESTADO_COTIZACION[oportunidad.cotizacion.estado]}>{ETIQUETA_ESTADO_COTIZACION_CRM[oportunidad.cotizacion.estado]}</Badge>
+              <span className="font-mono text-sol-800 dark:text-sol-300">RD$ {Number(oportunidad.cotizacion.total).toLocaleString('es-DO', { minimumFractionDigits: 2 })}</span>
+            </div>
+            <Button variante="secundario" onClick={() => navigate('/cotizaciones')}>
+              Ver en Cotizaciones
+            </Button>
           </div>
         )}
 

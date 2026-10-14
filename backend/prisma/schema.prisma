@@ -1469,10 +1469,16 @@ model Cotizacion {
   // Se completa al convertirla en factura; a partir de ahí es de solo lectura.
   facturaId          String?          @unique
   factura            Factura?         @relation(fields: [facturaId], references: [id])
+  // CRM "Cotización conectada" — motivo que el cliente escribe al rechazar
+  // desde el link público (ver DocumentosPublicosService.responderCotizacion).
+  // null mientras no la rechazó, o si la aprobó directamente.
+  motivoRechazo      String?          @db.Text
   createdAt          DateTime         @default(now())
   updatedAt          DateTime         @updatedAt
 
-  lineas LineaCotizacion[]
+  lineas      LineaCotizacion[]
+  // Lado inverso de Oportunidad.cotizacionId — ver el comentario ahí.
+  oportunidad Oportunidad?
 
   @@unique([tenantId, numero])
   @@index([tenantId, estado])
@@ -5034,9 +5040,16 @@ model Oportunidad {
   // Texto libre por ahora (sin catálogo propio — Fase 1, ver el artifact
   // de diseño), igual criterio que RecargoFacturaDto.concepto.
   motivoPerdida       String?
-  // Se llena en la Fase 2 al "Ganar" y generar la Cotización real —
-  // @unique: una oportunidad nunca genera más de una cotización.
+  // Se llena al generar la Cotización real (OportunidadesService.
+  // convertirEnCotizacion) — @unique: una oportunidad nunca genera más de
+  // una cotización. Relación REAL (antes era un id suelto sin @relation,
+  // hallazgo real del artifact "CRM Conectado") — generar la cotización
+  // YA NO marca la oportunidad GANADA: sigue ABIERTA hasta que el cliente
+  // la aprueba desde el link público Y el vendedor confirma convirtiéndola
+  // en factura (ver OportunidadesEventosService, que escucha
+  // COTIZACION_CONVERTIDA_FACTURA para recién ahí cerrarla).
   cotizacionId        String?           @unique
+  cotizacion          Cotizacion?       @relation(fields: [cotizacionId], references: [id], onDelete: SetNull)
   fechaCierreReal     DateTime?
   createdAt           DateTime          @default(now())
   updatedAt           DateTime          @updatedAt
