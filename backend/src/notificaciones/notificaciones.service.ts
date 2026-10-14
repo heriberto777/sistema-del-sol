@@ -29,7 +29,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CrearPlantillaDto } from './dto/crear-plantilla.dto';
 import { ListadoQueryDto } from '../common/dto/listado-query.dto';
 import { paginar } from '../common/types/pagina-resultado';
-import { generarDocumentoPdf } from '../common/pdf/documento-pdf';
+import { generarPdfPersonalizado } from '../common/pdf/generar-documento-impreso';
 import { mapearFacturaAParams } from '../facturacion/mapear-factura-pdf';
 import { mapearCotizacionAParams } from '../cotizaciones/mapear-cotizacion-pdf';
 import { descifrar } from '../common/utils/encriptado.util';
@@ -131,7 +131,7 @@ export class NotificacionesService {
         include: { cliente: { select: CLIENTE_SELECT_BASICO }, lineas: { include: { producto: true } }, recargos: { orderBy: { orden: 'asc' } } },
       });
       if (!factura) return undefined;
-      return { filename: 'factura.pdf', content: await generarDocumentoPdf(mapearFacturaAParams(factura)) };
+      return { filename: 'factura.pdf', content: await generarPdfPersonalizado(this.prisma, factura.tenantId, 'FACTURA', mapearFacturaAParams(factura), factura.bodegaId) };
     } catch (error) {
       this.logger.warn(`No se pudo generar el PDF adjunto de la factura ${facturaId}: ${(error as Error).message}`);
       return undefined;
@@ -145,7 +145,7 @@ export class NotificacionesService {
         include: { cliente: { select: CLIENTE_SELECT_BASICO }, lineas: { include: { producto: true } } },
       });
       if (!cotizacion) return undefined;
-      return { filename: 'cotizacion.pdf', content: await generarDocumentoPdf(mapearCotizacionAParams(cotizacion)) };
+      return { filename: 'cotizacion.pdf', content: await generarPdfPersonalizado(this.prisma, cotizacion.tenantId, 'COTIZACION', mapearCotizacionAParams(cotizacion)) };
     } catch (error) {
       this.logger.warn(`No se pudo generar el PDF adjunto de la cotización ${cotizacionId}: ${(error as Error).message}`);
       return undefined;

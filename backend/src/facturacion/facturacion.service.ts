@@ -20,8 +20,7 @@ import { TasasCambioService } from '../tasas-cambio/tasas-cambio.service';
 import { ListarFacturasQueryDto } from './dto/listar-facturas-query.dto';
 import { ListadoQueryDto } from '../common/dto/listado-query.dto';
 import { paginar } from '../common/types/pagina-resultado';
-import { generarDocumentoPdf } from '../common/pdf/documento-pdf';
-import { generarDocumentoImpreso } from '../common/pdf/generar-documento-impreso';
+import { generarDocumentoImpreso, generarPdfPersonalizado } from '../common/pdf/generar-documento-impreso';
 import { NotificacionesService } from '../notificaciones/notificaciones.service';
 import { EnviarReciboDto } from './dto/enviar-recibo.dto';
 import { AutorizacionesService } from '../autorizaciones/autorizaciones.service';
@@ -673,8 +672,7 @@ export class FacturacionService {
   /** @deprecated usar generarImpreso — se mantiene por compatibilidad de la ruta /pdf ya existente. */
   async generarPdf(id: string) {
     const factura = await this.facturacionRepository.buscarPorId(id);
-    const personalizacion = await resolverPersonalizacionDocumento(this.prisma, factura.tenantId);
-    return generarDocumentoPdf({ ...mapearFacturaAParams(factura), ...personalizacion });
+    return generarPdfPersonalizado(this.prisma, factura.tenantId, 'FACTURA', mapearFacturaAParams(factura), factura.bodegaId);
   }
 
   async generarImpreso(id: string, formatoSolicitado: FormatoImpresion | undefined, tenantId: string, plantillaSolicitada?: PlantillaDocumento) {
@@ -904,7 +902,9 @@ export class FacturacionService {
     // líneas/cliente/recargos) de la línea de arriba, no hace falta un
     // segundo findUnique.
     const adjuntoPdf =
-      dto.canal === 'EMAIL' ? { filename: 'factura.pdf', content: await generarDocumentoPdf(mapearFacturaAParams(factura)) } : undefined;
+      dto.canal === 'EMAIL'
+        ? { filename: 'factura.pdf', content: await generarPdfPersonalizado(this.prisma, tenantId, 'FACTURA', mapearFacturaAParams(factura), factura.bodegaId) }
+        : undefined;
     const enviado = await this.notificacionesService.enviar({
       tenantId,
       canal: dto.canal,

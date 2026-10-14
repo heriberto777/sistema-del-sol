@@ -63,6 +63,8 @@ describe('CotizacionesService', () => {
     prisma = {
       bodega: { findFirst: jest.fn().mockResolvedValue(null) },
       configuracion: { findUnique: jest.fn().mockResolvedValue(null), findMany: jest.fn().mockResolvedValue([]) },
+      tenant: { findUnique: jest.fn().mockResolvedValue(null) },
+      personalizacionDocumentoTipo: { findUnique: jest.fn().mockResolvedValue(null) },
     } as unknown as jest.Mocked<PrismaService>;
     tenantPrisma = { client: { $transaction: jest.fn((cb: (tx: unknown) => unknown) => cb(TX)) } };
     configuracionesService = { buscarValor: jest.fn().mockResolvedValue('18') } as unknown as jest.Mocked<ConfiguracionesService>;

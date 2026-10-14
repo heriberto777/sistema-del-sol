@@ -12,8 +12,7 @@ import { ListadoQueryDto } from '../common/dto/listado-query.dto';
 import { paginar } from '../common/types/pagina-resultado';
 import { EventBusService } from '../event-bus/event-bus.service';
 import { EVENTOS } from '../event-bus/events';
-import { generarDocumentoPdf } from '../common/pdf/documento-pdf';
-import { generarDocumentoImpreso } from '../common/pdf/generar-documento-impreso';
+import { generarDocumentoImpreso, generarPdfPersonalizado } from '../common/pdf/generar-documento-impreso';
 import { resolverFormatoImpresion } from '../common/impresion/resolver-formato-impresion';
 import { resolverPlantillaDocumento } from '../common/impresion/resolver-plantilla-documento';
 import { resolverPersonalizacionDocumento } from '../common/impresion/resolver-personalizacion-documento';
@@ -245,7 +244,7 @@ export class CotizacionesService {
   /** @deprecated usar generarImpreso — se mantiene por compatibilidad de la ruta /pdf ya existente. */
   async generarPdf(id: string) {
     const cotizacion = await this.cotizacionesRepository.buscarPorId(id);
-    return generarDocumentoPdf(mapearCotizacionAParams(cotizacion));
+    return generarPdfPersonalizado(this.prisma, cotizacion.tenantId, 'COTIZACION', mapearCotizacionAParams(cotizacion));
   }
 
   /** Cotización no tiene bodegaId (no toca stock hasta convertirse en factura) — solo aplica el default de tenant. */

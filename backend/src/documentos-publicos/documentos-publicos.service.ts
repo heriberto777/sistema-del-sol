@@ -2,9 +2,8 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { mapearFacturaAParams } from '../facturacion/mapear-factura-pdf';
 import { mapearCotizacionAParams } from '../cotizaciones/mapear-cotizacion-pdf';
-import { generarDocumentoPdf } from '../common/pdf/documento-pdf';
+import { generarPdfPersonalizado } from '../common/pdf/generar-documento-impreso';
 import { resolverPersonalizacionDocumento } from '../common/impresion/resolver-personalizacion-documento';
-import { resolverPlantillaDocumento } from '../common/impresion/resolver-plantilla-documento';
 import { CLIENTE_SELECT_BASICO } from '../common/prisma/cliente-select-basico';
 
 /**
@@ -39,31 +38,23 @@ export class DocumentosPublicosService {
 
   async obtenerFactura(id: string) {
     const factura = await this.buscarFactura(id);
-    const personalizacion = await resolverPersonalizacionDocumento(this.prisma, factura.tenantId);
+    const personalizacion = await resolverPersonalizacionDocumento(this.prisma, factura.tenantId, 'FACTURA');
     return { ...mapearFacturaAParams(factura), ...personalizacion };
   }
 
   async obtenerFacturaPdf(id: string) {
     const factura = await this.buscarFactura(id);
-    const [personalizacion, plantilla] = await Promise.all([
-      resolverPersonalizacionDocumento(this.prisma, factura.tenantId),
-      resolverPlantillaDocumento(this.prisma, factura.tenantId, factura.bodegaId),
-    ]);
-    return generarDocumentoPdf({ ...mapearFacturaAParams(factura), ...personalizacion }, { plantilla });
+    return generarPdfPersonalizado(this.prisma, factura.tenantId, 'FACTURA', mapearFacturaAParams(factura), factura.bodegaId);
   }
 
   async obtenerCotizacion(id: string) {
     const cotizacion = await this.buscarCotizacion(id);
-    const personalizacion = await resolverPersonalizacionDocumento(this.prisma, cotizacion.tenantId);
+    const personalizacion = await resolverPersonalizacionDocumento(this.prisma, cotizacion.tenantId, 'COTIZACION');
     return { ...mapearCotizacionAParams(cotizacion), ...personalizacion };
   }
 
   async obtenerCotizacionPdf(id: string) {
     const cotizacion = await this.buscarCotizacion(id);
-    const [personalizacion, plantilla] = await Promise.all([
-      resolverPersonalizacionDocumento(this.prisma, cotizacion.tenantId),
-      resolverPlantillaDocumento(this.prisma, cotizacion.tenantId, null),
-    ]);
-    return generarDocumentoPdf({ ...mapearCotizacionAParams(cotizacion), ...personalizacion }, { plantilla });
+    return generarPdfPersonalizado(this.prisma, cotizacion.tenantId, 'COTIZACION', mapearCotizacionAParams(cotizacion));
   }
 }

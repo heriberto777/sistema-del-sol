@@ -9,8 +9,8 @@ import { CrearRemisionDto } from './dto/crear-remision.dto';
 import { ConvertirRemisionDto } from './dto/convertir-remision.dto';
 import { ListadoQueryDto } from '../common/dto/listado-query.dto';
 import { paginar } from '../common/types/pagina-resultado';
-import { DocumentoPdfParams, generarDocumentoPdf } from '../common/pdf/documento-pdf';
-import { generarDocumentoImpreso } from '../common/pdf/generar-documento-impreso';
+import { DocumentoPdfParams } from '../common/pdf/documento-pdf';
+import { generarDocumentoImpreso, generarPdfPersonalizado } from '../common/pdf/generar-documento-impreso';
 import { resolverFormatoImpresion } from '../common/impresion/resolver-formato-impresion';
 import { resolverPlantillaDocumento } from '../common/impresion/resolver-plantilla-documento';
 import { resolverPersonalizacionDocumento } from '../common/impresion/resolver-personalizacion-documento';
@@ -187,7 +187,7 @@ export class RemisionesService {
   /** @deprecated usar generarImpreso — se mantiene por compatibilidad de la ruta /pdf ya existente. */
   async generarPdf(id: string) {
     const remision = await this.remisionesRepository.buscarPorId(id);
-    return generarDocumentoPdf(this.mapearRemisionAParams(remision));
+    return generarPdfPersonalizado(this.prisma, remision.tenantId, 'REMISION', this.mapearRemisionAParams(remision), remision.bodegaId);
   }
 
   async generarImpreso(id: string, formatoSolicitado: FormatoImpresion | undefined, tenantId: string, plantillaSolicitada?: PlantillaDocumento) {

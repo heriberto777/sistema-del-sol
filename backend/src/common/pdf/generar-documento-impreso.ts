@@ -1,7 +1,10 @@
-import { FormatoImpresion, PlantillaDocumento } from '@prisma/client';
+import { FormatoImpresion, PlantillaDocumento, TipoDocumentoImpreso } from '@prisma/client';
+import { PrismaService } from '../../prisma/prisma.service';
 import { DocumentoPdfParams, generarDocumentoPdf } from './documento-pdf';
 import { LayoutDocumento, generarDocumentoPdfLayout } from './documento-pdf-layout';
 import { generarDocumentoTicketHtml } from './documento-ticket';
+import { resolverPlantillaDocumento } from '../impresion/resolver-plantilla-documento';
+import { resolverPersonalizacionDocumento } from '../impresion/resolver-personalizacion-documento';
 
 /**
  * Punto único donde Facturación/Cotizaciones/Remisiones deciden CÓMO
@@ -28,4 +31,32 @@ export async function generarDocumentoImpreso(
     ? await generarDocumentoPdfLayout(params, layoutPersonalizado, { tamanoPagina })
     : await generarDocumentoPdf(params, { tamanoPagina, plantilla });
   return { buffer, contentType: 'application/pdf' };
+}
+
+/**
+ * Para los casos que SIEMPRE son PDF (nunca térmico) y no pasan por
+ * `/imprimir`: adjuntos de email (notificaciones, "enviar recibo"), el
+ * link público del cliente, y las rutas `/pdf` viejas mantenidas por
+ * compatibilidad. Resuelve plantilla + personalización (color de marca,
+ * campos/columnas/totales, QR/firma, layout de bloques libres) de la
+ * misma forma que `generarImpreso()` — antes cada uno de estos
+ * call sites llamaba a `generarDocumentoPdf()` pelado, así que cambiar
+ * `PLANTILLA_DOCUMENTO_DEFAULT` o el color de marca no se reflejaba ahí
+ * (hallazgo real, reportado por el usuario: "todo el sistema está
+ * desvinculado" de la plantilla configurada salvo la impresión directa).
+ */
+export async function generarPdfPersonalizado(
+  prisma: PrismaService,
+  tenantId: string,
+  tipoDocumento: TipoDocumentoImpreso,
+  paramsBase: DocumentoPdfParams,
+  bodegaId?: string | null,
+): Promise<Buffer> {
+  const [plantilla, personalizacion] = await Promise.all([
+    resolverPlantillaDocumento(prisma, tenantId, bodegaId ?? null),
+    resolverPersonalizacionDocumento(prisma, tenantId, tipoDocumento),
+  ]);
+  const { layoutPersonalizado, ...resto } = personalizacion;
+  const params = { ...paramsBase, ...resto };
+  return layoutPersonalizado ? generarDocumentoPdfLayout(params, layoutPersonalizado) : generarDocumentoPdf(params, { plantilla });
 }
