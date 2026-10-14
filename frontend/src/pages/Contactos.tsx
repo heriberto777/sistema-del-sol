@@ -13,8 +13,10 @@ import { Paginacion } from '../components/molecules/Paginacion/Paginacion';
 import { EstadoVacio } from '../components/molecules/EstadoVacio/EstadoVacio';
 import { RowActionsMenu } from '../components/molecules/RowActionsMenu/RowActionsMenu';
 import { RequierePermiso } from '../components/organisms/RequierePermiso/RequierePermiso';
+import { ModalTimelineCliente } from '../components/organisms/ModalTimelineCliente/ModalTimelineCliente';
 import { FormularioCliente, type Cliente } from '../components/molecules/FormularioCliente/FormularioCliente';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
+import { useAuth } from '../hooks/useAuth';
 import { PaginaResultado } from '../types/pagina-resultado';
 import { abrirBlob } from '../lib/descargar-archivo';
 
@@ -50,6 +52,7 @@ export function Contactos() {
   const [modalAbierto, setModalAbierto] = useState(false);
   const [clientePuntos, setClientePuntos] = useState<Cliente | null>(null);
   const [clienteEstadoCuenta, setClienteEstadoCuenta] = useState<Cliente | null>(null);
+  const [clienteTimeline, setClienteTimeline] = useState<Cliente | null>(null);
 
   useEffect(() => {
     const crear = searchParams.get('crear');
@@ -130,6 +133,7 @@ export function Contactos() {
             onNuevo={abrirNuevo}
             onVerPuntos={setClientePuntos}
             onVerEstadoCuenta={setClienteEstadoCuenta}
+            onVerTimeline={setClienteTimeline}
           />
         </RequierePermiso>
       ) : (
@@ -165,6 +169,13 @@ export function Contactos() {
         <Modal titulo={`Estado de cuenta — ${clienteEstadoCuenta.nombre}`} onClose={() => setClienteEstadoCuenta(null)} ancho="xl">
           <ModalEstadoCuentaCliente cliente={clienteEstadoCuenta} />
         </Modal>
+      )}
+      {clienteTimeline && (
+        <ModalTimelineCliente
+          clienteId={clienteTimeline.id}
+          nombreCliente={clienteTimeline.nombre}
+          onClose={() => setClienteTimeline(null)}
+        />
       )}
     </div>
   );
@@ -433,7 +444,10 @@ function ListaClientes({
   onNuevo,
   onVerPuntos,
   onVerEstadoCuenta,
-}: ListaProps<Cliente> & { onVerPuntos: (c: Cliente) => void; onVerEstadoCuenta: (c: Cliente) => void }) {
+  onVerTimeline,
+}: ListaProps<Cliente> & { onVerPuntos: (c: Cliente) => void; onVerEstadoCuenta: (c: Cliente) => void; onVerTimeline: (c: Cliente) => void }) {
+  const { tieneModulo, tienePermiso } = useAuth();
+  const puedeVerTimelineCrm = tieneModulo('crm') && tienePermiso('crm.ver');
   const { data } = useQuery({
     queryKey: ['clientes', pagina, busquedaDebounced],
     queryFn: async () =>
@@ -505,6 +519,7 @@ function ListaClientes({
                           { etiqueta: 'Editar', onClick: () => onEditar(cliente) },
                           { etiqueta: 'Ver historial de puntos', onClick: () => onVerPuntos(cliente) },
                           { etiqueta: 'Estado de cuenta', onClick: () => onVerEstadoCuenta(cliente) },
+                          ...(puedeVerTimelineCrm ? [{ etiqueta: 'Timeline / actividad CRM', onClick: () => onVerTimeline(cliente) }] : []),
                         ]}
                       />
                     </td>

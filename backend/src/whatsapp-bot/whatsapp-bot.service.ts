@@ -20,12 +20,13 @@ const MAX_PRODUCTOS_CATALOGO_CATEGORIA = 5;
 
 const PROMPT_SCAFFOLDING = `Sos un asistente virtual de atención al cliente por WhatsApp.
 Respondé ÚNICAMENTE con un JSON válido, sin texto adicional antes o después, con este formato exacto:
-{"respuesta": "texto de tu respuesta al cliente", "requiereHumano": true o false, "buscarProducto": "texto o null", "buscarCategoria": "texto o null"}
+{"respuesta": "texto de tu respuesta al cliente", "requiereHumano": true o false, "buscarProducto": "texto o null", "buscarCategoria": "texto o null", "itemsPedido": [{"producto": "texto", "cantidad": numero}] o null}
 Nunca inventes ni afirmes datos de facturas, pedidos, saldos o cuentas de clientes — no tenés acceso a esa información. Si te preguntan algo así, o el cliente pide hablar con una persona, o no podés resolver la consulta, marcá "requiereHumano": true y respondé que un representante lo va a contactar.
-Si el cliente pregunta por UN producto puntual del catálogo (por nombre o palabra clave, pidiendo o no una foto), llená "buscarProducto" con esa palabra clave y dejá "buscarCategoria" en null — el sistema busca el producto y adjunta su foto aparte si lo encuentra, vos NO prometas la foto en tu texto (puede que no se encuentre).
-Si el cliente pregunta por una CATEGORÍA o tipo de productos en general (no uno puntual — ej. "qué tienen de bebidas", "quiero ver ropa de niño"), llená "buscarCategoria" con esa categoría o palabra clave y dejá "buscarProducto" en null — el sistema manda varias fotos de esa categoría aparte, vos tampoco prometas las fotos en tu texto.
-Si el cliente pide ver "el catálogo" o "qué tienen" en general, SIN mencionar un producto puntual ni una categoría, dejá los dos campos en null y tu "respuesta" debe preguntarle qué categoría o qué producto le interesa, en vez de asumir uno.
-"buscarProducto" y "buscarCategoria" nunca van los dos con valor a la vez.`;
+Si el cliente pregunta por UN producto puntual del catálogo (por nombre o palabra clave, pidiendo o no una foto), llená "buscarProducto" con esa palabra clave y dejá los demás campos de búsqueda en null — el sistema busca el producto y adjunta su foto aparte si lo encuentra, vos NO prometas la foto en tu texto (puede que no se encuentre).
+Si el cliente pregunta por una CATEGORÍA o tipo de productos en general (no uno puntual — ej. "qué tienen de bebidas", "quiero ver ropa de niño"), llená "buscarCategoria" con esa categoría o palabra clave y dejá los demás campos de búsqueda en null — el sistema manda varias fotos de esa categoría aparte, vos tampoco prometas las fotos en tu texto.
+Si el cliente pide ver "el catálogo" o "qué tienen" en general, SIN mencionar un producto puntual ni una categoría, dejá los campos de búsqueda en null y tu "respuesta" debe preguntarle qué categoría o qué producto le interesa, en vez de asumir uno.
+Si el cliente te dice que QUIERE COMPRAR o pide un pedido de uno o más productos puntuales (frases como "quiero", "me llevo", "dame 2 de...", "quiero hacer un pedido de..." — no una simple pregunta), llená "itemsPedido" con la lista de {"producto": texto, "cantidad": número} que pidió y dejá "buscarProducto"/"buscarCategoria" en null. MUY IMPORTANTE: vos NUNCA confirmás un pedido, nunca decís que ya quedó registrado/procesado/confirmado ni das un número de orden — tu "respuesta" debe decir algo como "tomé nota, un representante te va a contactar para confirmar los detalles y el pago", porque el pedido todavía no se procesó, solo quedó anotado para que un humano lo revise.
+"buscarProducto", "buscarCategoria" e "itemsPedido" nunca van dos de ellos con valor a la vez.`;
 
 /**
  * Fase 1 del asistente interno (control de acceso por RBAC real, ver
@@ -218,7 +219,7 @@ export class WhatsappBotService {
       system,
     });
 
-    const { respuesta, requiereHumano, buscarProducto, buscarCategoria } = this.parsearRespuestaIa(textoIa);
+    const { respuesta, requiereHumano, buscarProducto, buscarCategoria, itemsPedido } = this.parsearRespuestaIa(textoIa);
 
     await this.whatsappMensajesRepository.crear({ tenantId, telefono: from, rol: 'ASISTENTE', contenido: respuesta, diaRD });
 
@@ -228,14 +229,60 @@ export class WhatsappBotService {
 
     await this.enviarRespuesta(config, from, respuesta);
 
-    // Mutuamente excluyentes (ver PROMPT_SCAFFOLDING) — si la IA llenó los
-    // dos igual por error, priorizamos el producto puntual.
+    // Mutuamente excluyentes (ver PROMPT_SCAFFOLDING) — si la IA llenó más
+    // de uno igual por error, priorizamos el producto puntual.
     if (buscarProducto) {
       await this.intentarEnviarProducto(config, from, diaRD, buscarProducto);
       await this.intentarRegistrarConsultaProducto(config, from, perfilNombre, mensajeEntrante.id, buscarProducto);
     } else if (buscarCategoria) {
       await this.intentarEnviarCatalogoCategoria(config, from, diaRD, buscarCategoria);
+    } else if (itemsPedido) {
+      await this.registrarPedidoSugerido(config, from, perfilNombre, mensajeEntrante.id, itemsPedido, body);
     }
+  }
+
+  /**
+   * CRM "Cotización conectada" Fase 3 — la IA detectó intención de COMPRA
+   * (no solo consulta). A diferencia de `intentarRegistrarConsultaProducto`
+   * (Fase 2), esto se registra siempre, incluso si ya es un Cliente real
+   * — y siempre escala a un humano: una intención de compra concreta
+   * amerita atención sin importar si ya es conocido. Intenta resolver
+   * cada ítem contra el catálogo real (mismo criterio "no adivinar" que
+   * `intentarEnviarProducto`: solo usa el producto real si hay EXACTAMENTE
+   * 1 coincidencia, si no deja el texto tal cual lo pidió el cliente para
+   * que el vendedor lo revise a mano). Nunca procesa ni confirma nada por
+   * su cuenta — ver PROMPT_SCAFFOLDING, el texto que el cliente recibe ya
+   * aclara que falta la confirmación de un representante.
+   */
+  private async registrarPedidoSugerido(
+    config: ConfigBot,
+    from: string,
+    perfilNombre: string | null,
+    mensajeEntranteId: string,
+    items: { producto: string; cantidad: number }[],
+    textoOriginal: string,
+  ) {
+    const lineas = await Promise.all(
+      items.map(async (item) => {
+        const candidatos = await this.prisma.producto.findMany({
+          where: { tenantId: config.tenantId, activo: true, nombre: { contains: item.producto, mode: 'insensitive' } },
+          select: { id: true, nombre: true },
+          take: 2,
+        });
+        return candidatos.length === 1
+          ? { productoId: candidatos[0].id, nombre: candidatos[0].nombre, cantidad: item.cantidad }
+          : { nombre: item.producto, cantidad: item.cantidad };
+      }),
+    );
+
+    this.eventBus.emit(EVENTOS.WHATSAPP_PEDIDO_SUGERIDO, {
+      tenantId: config.tenantId,
+      telefono: from.replace(/^whatsapp:/, ''),
+      nombre: perfilNombre,
+      lineas,
+      textoOriginal,
+    });
+    await this.marcarYNotificar(config.tenantId, mensajeEntranteId, from);
   }
 
   /**
@@ -407,32 +454,52 @@ export class WhatsappBotService {
     if (!enviado) this.logger.error(`Twilio respondió con error al contestar a ${to}`);
   }
 
-  private parsearRespuestaIa(
-    texto: string | null,
-  ): { respuesta: string; requiereHumano: boolean; buscarProducto: string | null; buscarCategoria: string | null } {
-    if (!texto) return { respuesta: MENSAJE_FALLBACK, requiereHumano: true, buscarProducto: null, buscarCategoria: null };
+  private parsearRespuestaIa(texto: string | null): {
+    respuesta: string;
+    requiereHumano: boolean;
+    buscarProducto: string | null;
+    buscarCategoria: string | null;
+    itemsPedido: { producto: string; cantidad: number }[] | null;
+  } {
+    if (!texto) return { respuesta: MENSAJE_FALLBACK, requiereHumano: true, buscarProducto: null, buscarCategoria: null, itemsPedido: null };
     try {
       const parseado = JSON.parse(texto) as {
         respuesta?: unknown;
         requiereHumano?: unknown;
         buscarProducto?: unknown;
         buscarCategoria?: unknown;
+        itemsPedido?: unknown;
       };
       if (typeof parseado.respuesta === 'string') {
         const buscarProducto = typeof parseado.buscarProducto === 'string' && parseado.buscarProducto.trim() ? parseado.buscarProducto.trim() : null;
+        const itemsPedido =
+          !buscarProducto && Array.isArray(parseado.itemsPedido)
+            ? (parseado.itemsPedido as unknown[])
+                .filter(
+                  (item): item is { producto: string; cantidad: number } =>
+                    !!item &&
+                    typeof item === 'object' &&
+                    typeof (item as Record<string, unknown>).producto === 'string' &&
+                    ((item as Record<string, unknown>).producto as string).trim().length > 0 &&
+                    typeof (item as Record<string, unknown>).cantidad === 'number' &&
+                    ((item as Record<string, unknown>).cantidad as number) > 0,
+                )
+                .map((item) => ({ producto: item.producto.trim(), cantidad: item.cantidad }))
+            : null;
         return {
           respuesta: parseado.respuesta,
           requiereHumano: Boolean(parseado.requiereHumano),
           buscarProducto,
-          // Mutuamente excluyentes — si la IA llenó los dos, priorizamos buscarProducto (ver PROMPT_SCAFFOLDING).
+          // Mutuamente excluyentes — si la IA llenó más de uno, priorizamos buscarProducto (ver PROMPT_SCAFFOLDING).
           buscarCategoria:
             !buscarProducto && typeof parseado.buscarCategoria === 'string' && parseado.buscarCategoria.trim() ? parseado.buscarCategoria.trim() : null,
+          itemsPedido: itemsPedido && itemsPedido.length > 0 ? itemsPedido : null,
         };
       }
     } catch {
       // sigue al fallback de abajo
     }
     this.logger.warn('La IA no devolvió el JSON esperado — fail-safe a requiereHumano');
-    return { respuesta: MENSAJE_FALLBACK, requiereHumano: true, buscarProducto: null, buscarCategoria: null };
+    return { respuesta: MENSAJE_FALLBACK, requiereHumano: true, buscarProducto: null, buscarCategoria: null, itemsPedido: null };
   }
 }

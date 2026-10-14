@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { User } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { apiClient } from '../lib/api-client';
 import { PaginaDocumento } from '../components/molecules/PaginaDocumento/PaginaDocumento';
 import { Card } from '../components/atoms/Card/Card';
@@ -15,15 +15,36 @@ import { mensajeErrorApi } from '../lib/mensaje-error-api';
 import { useHayCambios } from '../hooks/useHayCambios';
 import { estimarLineas } from '../lib/estimar-totales-documento';
 import type { Cliente, Producto, LineaForm } from '../components/organisms/CotizacionesPanel/CotizacionesPanel';
+import type { LineaPedidoSugerido } from '../types/crm';
 
 const LINEA_VACIA: LineaForm = { productoId: '', varianteId: '', cantidad: '1', esManual: false, descripcionManual: '', precioUnitario: '', aplicaItbis: true };
+
+/**
+ * CRM "Cotización conectada" Fase 3 — `ActividadesCrmPanel` navega para
+ * acá con esto en `location.state` cuando un vendedor usa un borrador de
+ * pedido que el bot de WhatsApp sugirió. `clienteId` llega solo (sin
+ * nombre) porque la actividad de origen no trae el Cliente completo
+ * embebido — se resuelve acá con una consulta propia.
+ */
+export interface CotizacionNuevaState {
+  clienteId: string;
+  lineasSugeridas: LineaPedidoSugerido[];
+}
+
+function lineaDesdeSugerida(sugerida: LineaPedidoSugerido): LineaForm {
+  return sugerida.productoId
+    ? { ...LINEA_VACIA, productoId: sugerida.productoId, cantidad: String(sugerida.cantidad) }
+    : { ...LINEA_VACIA, esManual: true, descripcionManual: sugerida.nombre, cantidad: String(sugerida.cantidad) };
+}
 
 export function CotizacionNueva() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const location = useLocation();
+  const estadoInicial = location.state as CotizacionNuevaState | null;
   const [cliente, setCliente] = useState<Cliente | null>(null);
   const [fechaVigenciaHasta, setFechaVigenciaHasta] = useState('');
-  const [lineas, setLineas] = useState<LineaForm[]>([LINEA_VACIA]);
+  const [lineas, setLineas] = useState<LineaForm[]>(estadoInicial?.lineasSugeridas?.length ? estadoInicial.lineasSugeridas.map(lineaDesdeSugerida) : [LINEA_VACIA]);
   const [error, setError] = useState<string | null>(null);
   // Modelo A de "más espacio para líneas" — ver el comentario equivalente en FacturacionNueva.tsx.
   const [infoColapsada, setInfoColapsada] = useState(false);
@@ -32,6 +53,19 @@ export function CotizacionNueva() {
     if (cliente) setInfoColapsada(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cliente?.id]);
+
+  // CRM "Cotización conectada" Fase 3 — preselecciona el cliente cuando se
+  // llega desde "Usar esta sugerencia" (ComboboxBusqueda necesita el
+  // nombre, no solo el id, para mostrar el valor ya elegido).
+  useQuery({
+    queryKey: ['cliente-preseleccionado', estadoInicial?.clienteId],
+    queryFn: async () => {
+      const { data } = await apiClient.get<Cliente>(`/clientes/${estadoInicial!.clienteId}`);
+      setCliente(data);
+      return data;
+    },
+    enabled: !!estadoInicial?.clienteId,
+  });
 
   const { data: productos } = useQuery({
     queryKey: ['productos-select'],

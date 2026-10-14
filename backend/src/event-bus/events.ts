@@ -29,6 +29,7 @@ export const EVENTOS = {
   COTIZACION_RESPONDIDA: 'cotizaciones.respondida',
   COTIZACION_CONVERTIDA_FACTURA: 'cotizaciones.convertida_factura',
   CONSULTA_PRODUCTO_DESCONOCIDO: 'crm.consulta_producto_desconocido',
+  WHATSAPP_PEDIDO_SUGERIDO: 'crm.whatsapp_pedido_sugerido',
 } as const;
 
 export type NombreEvento = (typeof EVENTOS)[keyof typeof EVENTOS];
@@ -293,4 +294,30 @@ export interface ConsultaProductoDesconocidoPayload {
   nombre: string | null;
   productoNombre: string;
   origen: 'WHATSAPP' | 'TIENDA';
+}
+
+/** Una línea del borrador de pedido que la IA armó de la conversación — `productoId` ausente = no matcheó ningún producto real, el vendedor completa el precio a mano. */
+export interface LineaPedidoSugerido {
+  productoId?: string;
+  nombre: string;
+  cantidad: number;
+}
+
+/**
+ * CRM "Cotización conectada" Fase 3 — la IA detectó en la conversación de
+ * WhatsApp que el cliente quiere comprar (no solo preguntar) uno o más
+ * productos puntuales. NUNCA se procesa solo — `LeadsEventosService`
+ * solo registra un borrador (`ActividadCrm.lineasSugeridas`) para que un
+ * vendedor lo revise; nada se le confirma al cliente todavía (ver el
+ * texto de `PROMPT_SCAFFOLDING`). A diferencia de
+ * `ConsultaProductoDesconocidoPayload`, esto se registra SIEMPRE (incluso
+ * si ya es un Cliente real) y siempre escala a un humano — una intención
+ * de compra real amerita atención sin importar si ya es conocido.
+ */
+export interface WhatsappPedidoSugeridoPayload {
+  tenantId: string;
+  telefono: string;
+  nombre: string | null;
+  lineas: LineaPedidoSugerido[];
+  textoOriginal: string;
 }

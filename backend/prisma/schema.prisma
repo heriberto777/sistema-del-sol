@@ -5080,6 +5080,15 @@ model ActividadCrm {
   // de "hoy vence" todos los días mientras siga sin completarse (mismo
   // criterio que TareaPersonal.recordatorioEnviado).
   avisoEnviado    Boolean          @default(false)
+  // CRM "Cotización conectada" Fase 3 — borrador de líneas que el bot de
+  // WhatsApp armó de una conversación real (ver WhatsappBotService/
+  // LeadsEventosService), NUNCA enviado ni confirmado solo: un vendedor
+  // siempre lo revisa antes de generar una cotización real. Formato:
+  // `{ productoId?: string; nombre: string; cantidad: number }[]` —
+  // `productoId` ausente significa que el texto no matcheó ningún
+  // producto real del catálogo (el vendedor completa el precio a mano).
+  // null en cualquier otra actividad que no sea este tipo puntual.
+  lineasSugeridas Json?
   usuarioId       String
   usuario         User             @relation(fields: [usuarioId], references: [id])
   createdAt       DateTime         @default(now())

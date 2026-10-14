@@ -71,6 +71,13 @@ export interface Oportunidad {
   createdAt: string;
 }
 
+/** Línea de un borrador de pedido que la IA de WhatsApp armó de una conversación real (CRM "Cotización conectada" Fase 3) — `productoId` ausente = no matcheó ningún producto real del catálogo. */
+export interface LineaPedidoSugerido {
+  productoId?: string;
+  nombre: string;
+  cantidad: number;
+}
+
 export interface ActividadCrm {
   id: string;
   tipo: TipoActividadCrm;
@@ -80,6 +87,8 @@ export interface ActividadCrm {
   oportunidadId: string | null;
   fechaProgramada: string | null;
   completada: boolean;
+  /** Solo presente en la actividad automática que el bot de WhatsApp genera al detectar intención de compra — nunca se procesó solo, es un borrador para que un vendedor lo revise. */
+  lineasSugeridas: LineaPedidoSugerido[] | null;
   usuarioId: string;
   usuario: UsuarioBasico;
   createdAt: string;

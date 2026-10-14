@@ -274,6 +274,71 @@ describe('WhatsappBotService', () => {
     });
   });
 
+  describe('procesarMensajeEntrante — CRM "Cotización conectada" Fase 3 (itemsPedido)', () => {
+    it('emite WHATSAPP_PEDIDO_SUGERIDO con el producto real cuando matchea exactamente 1 en el catálogo', async () => {
+      conversacionIaService.completar.mockResolvedValue(
+        '{"respuesta":"Tomé nota, un representante te confirma","requiereHumano":false,"itemsPedido":[{"producto":"yogurt","cantidad":2}]}',
+      );
+      prisma.producto.findMany.mockResolvedValue([{ id: 'p1', nombre: 'Yogurt Fresa' }]);
+
+      await service.procesarMensajeEntrante(CONFIG_BASE, 'whatsapp:+18095551234', 'quiero 2 yogurt', 'Rosa Martínez');
+
+      expect(eventBus.emit).toHaveBeenCalledWith(EVENTOS.WHATSAPP_PEDIDO_SUGERIDO, {
+        tenantId: 't1',
+        telefono: '+18095551234',
+        nombre: 'Rosa Martínez',
+        lineas: [{ productoId: 'p1', nombre: 'Yogurt Fresa', cantidad: 2 }],
+        textoOriginal: 'quiero 2 yogurt',
+      });
+      expect(prisma.whatsappMensaje.update).toHaveBeenCalledWith({ where: { id: 'm1' }, data: { requiereAtencionHumana: true } });
+    });
+
+    it('sin match único en el catálogo, deja el texto tal cual lo pidió el cliente (sin productoId)', async () => {
+      conversacionIaService.completar.mockResolvedValue(
+        '{"respuesta":"Tomé nota","requiereHumano":false,"itemsPedido":[{"producto":"algo raro","cantidad":1}]}',
+      );
+      prisma.producto.findMany.mockResolvedValue([]);
+
+      await service.procesarMensajeEntrante(CONFIG_BASE, 'whatsapp:+18095551234', 'quiero algo raro');
+
+      expect(eventBus.emit).toHaveBeenCalledWith(
+        EVENTOS.WHATSAPP_PEDIDO_SUGERIDO,
+        expect.objectContaining({ lineas: [{ nombre: 'algo raro', cantidad: 1 }] }),
+      );
+    });
+
+    it('ya es Cliente: igual emite y escala — a diferencia de Fase 2, una intención de compra real siempre se registra', async () => {
+      prisma.cliente.findFirst.mockResolvedValue({ id: 'c1' });
+      conversacionIaService.completar.mockResolvedValue(
+        '{"respuesta":"Tomé nota","requiereHumano":false,"itemsPedido":[{"producto":"yogurt","cantidad":1}]}',
+      );
+      prisma.producto.findMany.mockResolvedValue([]);
+
+      await service.procesarMensajeEntrante(CONFIG_BASE, 'whatsapp:+18095551234', 'quiero yogurt');
+
+      expect(eventBus.emit).toHaveBeenCalledWith(EVENTOS.WHATSAPP_PEDIDO_SUGERIDO, expect.anything());
+      expect(prisma.whatsappMensaje.update).toHaveBeenCalled();
+    });
+
+    it('itemsPedido vacío o inválido: no emite nada', async () => {
+      conversacionIaService.completar.mockResolvedValue('{"respuesta":"Hola","requiereHumano":false,"itemsPedido":[]}');
+
+      await service.procesarMensajeEntrante(CONFIG_BASE, 'whatsapp:+18095551234', 'hola');
+
+      expect(eventBus.emit).not.toHaveBeenCalledWith(EVENTOS.WHATSAPP_PEDIDO_SUGERIDO, expect.anything());
+    });
+
+    it('buscarProducto tiene prioridad si la IA llena los dos por error', async () => {
+      conversacionIaService.completar.mockResolvedValue(
+        '{"respuesta":"Mirá","requiereHumano":false,"buscarProducto":"yogurt","itemsPedido":[{"producto":"yogurt","cantidad":1}]}',
+      );
+
+      await service.procesarMensajeEntrante(CONFIG_BASE, 'whatsapp:+18095551234', 'tienen yogurt?');
+
+      expect(eventBus.emit).not.toHaveBeenCalledWith(EVENTOS.WHATSAPP_PEDIDO_SUGERIDO, expect.anything());
+    });
+  });
+
   describe('procesarMensajeEntrante — buscarCategoria', () => {
     const PRODUCTOS_LACTEOS = [
       { id: 'p1', nombre: 'Yogurt Fresa', imagen: 'data:image/png;base64,abc', categoria: { nombre: 'Lácteos' }, descripcionTienda: null, variantes: [{ precios: [{ precioVenta: '59.00' }] }] },

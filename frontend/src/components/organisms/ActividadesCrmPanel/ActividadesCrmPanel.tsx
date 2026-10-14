@@ -1,13 +1,54 @@
 import { FormEvent, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Check, Trash2 } from 'lucide-react';
 import { apiClient } from '../../../lib/api-client';
 import { Button } from '../../atoms/Button/Button';
 import { PaginaResultado } from '../../../types/pagina-resultado';
-import { ActividadCrm, ETIQUETA_TIPO_ACTIVIDAD, TipoActividadCrm } from '../../../types/crm';
+import { ActividadCrm, ETIQUETA_TIPO_ACTIVIDAD, LineaPedidoSugerido, TipoActividadCrm } from '../../../types/crm';
 import { mensajeErrorApi } from '../../../lib/mensaje-error-api';
+import type { CotizacionNuevaState } from '../../../pages/CotizacionNueva';
 
 type Referencia = { clienteId: string; leadId?: never; oportunidadId?: never } | { leadId: string; clienteId?: never; oportunidadId?: never } | { oportunidadId: string; clienteId?: never; leadId?: never };
+
+/**
+ * CRM "Cotización conectada" Fase 3 — borrador que el bot de WhatsApp
+ * armó de una conversación real, NUNCA procesado solo: el vendedor lo ve
+ * acá y decide. Si la actividad ya resolvió un `clienteId` (es un
+ * Cliente real, no solo un Lead), puede generarle la cotización ya mismo
+ * prellenada con estas líneas — `Cotizacion.clienteId` es obligatorio,
+ * así que un Lead sin convertir solo puede leer la sugerencia, no usarla
+ * todavía.
+ */
+function SugerenciaPedido({ lineas, clienteId }: { lineas: LineaPedidoSugerido[]; clienteId: string | null }) {
+  const navigate = useNavigate();
+
+  return (
+    <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 p-2.5 dark:border-amber-900 dark:bg-amber-900/10">
+      <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-400">Sugerencia de pedido — sin confirmar</p>
+      <ul className="space-y-0.5 text-sm text-amber-900 dark:text-amber-200">
+        {lineas.map((l, i) => (
+          <li key={i} className="flex items-center gap-1.5">
+            <span className="font-mono">{l.cantidad}x</span>
+            <span>{l.nombre}</span>
+            {!l.productoId && <span className="text-[11px] text-amber-600 dark:text-amber-500">(sin matchear en el catálogo)</span>}
+          </li>
+        ))}
+      </ul>
+      {clienteId ? (
+        <Button
+          type="button"
+          className="mt-2"
+          onClick={() => navigate('/cotizaciones/nueva', { state: { clienteId, lineasSugeridas: lineas } satisfies CotizacionNuevaState })}
+        >
+          Usar esta sugerencia
+        </Button>
+      ) : (
+        <p className="mt-1.5 text-[11px] text-amber-700 dark:text-amber-400">Todavía es un prospecto — convertilo en cliente para poder generarle la cotización.</p>
+      )}
+    </div>
+  );
+}
 
 /** Timeline + alta rápida de actividades (llamada/reunión/email/nota/tarea) — se embebe en el detalle de un Lead o una Oportunidad. Exactamente una referencia (ver crm.ts). */
 export function ActividadesCrmPanel({ referencia }: { referencia: Referencia }) {
@@ -114,6 +155,8 @@ export function ActividadesCrmPanel({ referencia }: { referencia: Referencia }) 
               <p className={a.completada ? 'mt-1 text-slate-400 line-through dark:text-slate-500' : 'mt-1 text-slate-700 dark:text-slate-300'}>
                 {a.descripcion}
               </p>
+
+              {a.lineasSugeridas && a.lineasSugeridas.length > 0 && <SugerenciaPedido lineas={a.lineasSugeridas} clienteId={a.clienteId} />}
             </div>
             <div className="flex shrink-0 items-center gap-1">
               {a.fechaProgramada && (

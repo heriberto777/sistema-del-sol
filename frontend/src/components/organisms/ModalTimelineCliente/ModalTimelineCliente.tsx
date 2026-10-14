@@ -4,6 +4,7 @@ import { apiClient } from '../../../lib/api-client';
 import { Modal } from '../../molecules/Modal/Modal';
 import { EstadoVacio } from '../../molecules/EstadoVacio/EstadoVacio';
 import { EntradaTimeline, TipoEntradaTimeline } from '../../../types/crm';
+import { ActividadesCrmPanel } from '../ActividadesCrmPanel/ActividadesCrmPanel';
 
 const ICONO_POR_TIPO: Record<TipoEntradaTimeline, typeof MessageCircle> = {
   whatsapp: MessageCircle,
@@ -29,8 +30,11 @@ const ETIQUETA_POR_TIPO: Record<TipoEntradaTimeline, string> = {
 /**
  * Ficha 360° (Fase 2) — mezcla WhatsApp (join por teléfono, sin FK real
  * — ver el backend), Lealtad, Cotizaciones y Facturas de un Cliente en un
- * solo feed. Solo lectura: no hay acciones acá, para eso están las
- * pantallas de cada módulo.
+ * solo feed. El feed en sí es de solo lectura (para eso están las
+ * pantallas de cada módulo); el bloque de "Actividades CRM" debajo (Fase
+ * 3) sí tiene acciones — es donde el vendedor ve y usa un pedido sugerido
+ * por WhatsApp cuando el teléfono ya es un Cliente real (si no se
+ * mostrara acá, no tendría ninguna otra pantalla donde verlo).
  */
 export function ModalTimelineCliente({ clienteId, nombreCliente, onClose }: { clienteId: string; nombreCliente: string; onClose: () => void }) {
   const { data, isLoading } = useQuery({
@@ -62,6 +66,11 @@ export function ModalTimelineCliente({ clienteId, nombreCliente, onClose }: { cl
             </div>
           );
         })}
+      </div>
+
+      <div className="mt-5 border-t border-slate-200 pt-4 dark:border-slate-800">
+        <h3 className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-300">Actividades CRM</h3>
+        <ActividadesCrmPanel referencia={{ clienteId }} />
       </div>
     </Modal>
   );
