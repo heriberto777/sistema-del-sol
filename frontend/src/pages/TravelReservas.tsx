@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useRef, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import clsx from 'clsx';
 import { AlertTriangle, ArrowLeftRight, BedDouble, Check, ChevronDown, Clock, DollarSign, Plane, Plus, Receipt, Trash2, User, Users, Wallet, X } from 'lucide-react';
@@ -544,7 +544,8 @@ const FORM_BUSQUEDA_VACIO = {
   // Edad exacta de cada niño/bebé — Duffel resuelve el tipo (child/infant_without_seat) según la edad, no hay que elegirlo a mano.
   ninos: [] as number[],
   infantes: [] as number[],
-  cabina: 'economy' as 'economy' | 'premium_economy' | 'business' | 'first',
+  // '' = todas las cabinas (Duffel las devuelve mezcladas si no se manda cabin_class) — antes forzaba "economy" de arranque.
+  cabina: '' as '' | 'economy' | 'premium_economy' | 'business' | 'first',
 };
 
 /** "PT9H30M" -> "9h 30m" — Duffel siempre manda duración ISO 8601. */
@@ -569,6 +570,39 @@ function duracionTotalMinutos(oferta: OfertaVuelo): number {
 function ofertaEsDirecta(oferta: OfertaVuelo): boolean {
   return oferta.tramosCrudo.every((t) => t.segments.length === 1);
 }
+function aerolineaDeOferta(oferta: OfertaVuelo): string {
+  return oferta.tramosCrudo[0]?.segments[0]?.marketing_carrier.name ?? '—';
+}
+function logoDeOferta(oferta: OfertaVuelo): string | null {
+  return oferta.tramosCrudo[0]?.segments[0]?.marketing_carrier.logo_symbol_url ?? null;
+}
+/** Mayor cantidad de escalas entre los tramos de la oferta (ej. ida directa + vuelta con 1 escala -> 1). */
+function escalasMaxDeOferta(oferta: OfertaVuelo): number {
+  return Math.max(0, ...oferta.tramosCrudo.map((t) => t.segments.length - 1));
+}
+
+type FranjaHoraria = 'madrugada' | 'manana' | 'tarde' | 'noche';
+const FRANJAS_HORARIAS: { id: FranjaHoraria; etiqueta: string; rango: string }[] = [
+  { id: 'madrugada', etiqueta: 'Madrugada', rango: '00:00–06:00' },
+  { id: 'manana', etiqueta: 'Mañana', rango: '06:00–12:00' },
+  { id: 'tarde', etiqueta: 'Tarde', rango: '12:00–18:00' },
+  { id: 'noche', etiqueta: 'Noche', rango: '18:00–24:00' },
+];
+/** Franja horaria de la salida del PRIMER tramo — lo que el usuario ve primero al comparar opciones. */
+function franjaHorariaDeOferta(oferta: OfertaVuelo): FranjaHoraria {
+  const hora = Number(formatoHoraVuelo(oferta.tramosCrudo[0]?.segments[0]?.departing_at ?? '00:00').slice(0, 2));
+  if (hora < 6) return 'madrugada';
+  if (hora < 12) return 'manana';
+  if (hora < 18) return 'tarde';
+  return 'noche';
+}
+
+function toggleEnSet<T>(set: Set<T>, valor: T): Set<T> {
+  const nuevo = new Set(set);
+  if (nuevo.has(valor)) nuevo.delete(valor);
+  else nuevo.add(valor);
+  return nuevo;
+}
 
 const ETIQUETA_TIPO_PASAJERO: Record<string, string> = { adult: 'Adulto', child: 'Niño', infant_without_seat: 'Bebé' };
 
@@ -578,18 +612,36 @@ const ORDENES_VUELO = [
   { id: 'duracion', etiqueta: 'Más rápido' },
 ] as const;
 
+/** Logo real de la aerolínea (Duffel lo manda por segmento) — si no vino o falla al cargar, cae a las iniciales de siempre. */
+function LogoAerolinea({ nombre, logoUrl }: { nombre: string; logoUrl: string | null }) {
+  const [fallo, setFallo] = useState(false);
+  if (logoUrl && !fallo) {
+    return (
+      <img
+        src={logoUrl}
+        alt={nombre}
+        className="h-9 w-9 shrink-0 rounded-full border border-slate-100 bg-white object-contain p-1 dark:border-slate-700"
+        onError={() => setFallo(true)}
+      />
+    );
+  }
+  return (
+    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sol-100 text-xs font-bold text-sol-700 dark:bg-sol-500/10 dark:text-sol-400">
+      {nombre.slice(0, 2).toUpperCase()}
+    </span>
+  );
+}
+
 /** Fila de resultado — estilo comparativo (aerolínea/badges + horarios + precio) inspirado en Trip.com. */
 function FilaOferta({ oferta, onReservar }: { oferta: OfertaVuelo; onReservar: () => void }) {
   const minutosParaExpirar = Math.max(0, Math.round((new Date(oferta.expiraEn).getTime() - Date.now()) / 60_000));
   const directo = ofertaEsDirecta(oferta);
-  const aerolinea = oferta.tramosCrudo[0]?.segments[0]?.marketing_carrier.name ?? '—';
+  const aerolinea = aerolineaDeOferta(oferta);
 
   return (
     <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900 sm:flex-row sm:items-center">
       <div className="flex shrink-0 items-center gap-2.5 sm:w-40">
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sol-100 text-xs font-bold text-sol-700 dark:bg-sol-500/10 dark:text-sol-400">
-          {aerolinea.slice(0, 2).toUpperCase()}
-        </span>
+        <LogoAerolinea nombre={aerolinea} logoUrl={logoDeOferta(oferta)} />
         <div className="min-w-0">
           <p className="truncate text-sm font-semibold text-slate-800 dark:text-slate-100">{aerolinea}</p>
           <span
@@ -1053,37 +1105,171 @@ function PasajerosPopover({ form, setForm }: { form: typeof FORM_BUSQUEDA_VACIO;
   );
 }
 
+/** YYYY-MM-DD + N días (puede ser negativo) — sin líos de zona horaria, se arma a mediodía local nomás para el cálculo de calendario. */
+function sumarDias(fechaIso: string, dias: number): string {
+  const fecha = new Date(`${fechaIso}T12:00:00`);
+  fecha.setDate(fecha.getDate() + dias);
+  return fecha.toISOString().slice(0, 10);
+}
+
+const OFFSETS_MATRIZ_FECHAS = [-3, -2, -1, 0, 1, 2, 3] as const;
+
+/**
+ * Barra de precios de días cercanos (±3 días) — dispara una búsqueda
+ * liviana por cada día (solo nos interesa el precio más bajo, no el
+ * detalle de ofertas) vía useQueries, en paralelo. El día 0 (la fecha ya
+ * buscada) NO dispara una llamada extra — reusa el resultado de la
+ * búsqueda principal que ya está en pantalla. "Ida y vuelta" desplaza
+ * AMBAS fechas por el mismo delta (mantiene la duración del viaje), nunca
+ * fija el regreso — variar solo la ida y dejar el regreso fijo daría
+ * viajes de duración distinta entre un día y otro, más confuso que útil.
+ */
+function MatrizFechas({
+  form,
+  precioActual,
+  onSeleccionarFecha,
+}: {
+  form: typeof FORM_BUSQUEDA_VACIO;
+  precioActual: { monto: number; moneda: string } | null;
+  onSeleccionarFecha: (fechaSalida: string, fechaRegreso: string) => void;
+}) {
+  const offsetsAConsultar = OFFSETS_MATRIZ_FECHAS.filter((o) => o !== 0);
+
+  const resultados = useQueries({
+    queries: offsetsAConsultar.map((offset) => {
+      const fechaSalida = sumarDias(form.fechaSalida, offset);
+      const fechaRegreso = form.tipoViaje === 'ida_vuelta' ? sumarDias(form.fechaRegreso, offset) : '';
+      return {
+        queryKey: [
+          'travel-matriz-fechas',
+          form.origen,
+          form.destino,
+          fechaSalida,
+          fechaRegreso,
+          form.adultos,
+          form.ninos,
+          form.infantes,
+          form.cabina,
+        ],
+        queryFn: async (): Promise<{ monto: number; moneda: string } | null> => {
+          const tramos =
+            form.tipoViaje === 'ida'
+              ? [{ origen: form.origen.toUpperCase(), destino: form.destino.toUpperCase(), fecha: fechaSalida }]
+              : [
+                  { origen: form.origen.toUpperCase(), destino: form.destino.toUpperCase(), fecha: fechaSalida },
+                  { origen: form.destino.toUpperCase(), destino: form.origen.toUpperCase(), fecha: fechaRegreso },
+                ];
+          const { data } = await apiClient.post<ResultadoBusquedaVuelos>('/admin/travel/vuelos/buscar', {
+            tramos,
+            pasajeros: [
+              ...Array.from({ length: form.adultos }, () => ({ tipo: 'adult' })),
+              ...form.ninos.map((edad) => ({ edad })),
+              ...form.infantes.map((edad) => ({ edad })),
+            ],
+            cabina: form.cabina || undefined,
+          });
+          if (data.ofertas.length === 0) return null;
+          const masBarata = data.ofertas.reduce((min, o) => (Number(o.montoTotal) < Number(min.montoTotal) ? o : min));
+          return { monto: Number(masBarata.montoTotal), moneda: masBarata.moneda };
+        },
+        staleTime: 5 * 60_000,
+        retry: false,
+      };
+    }),
+  });
+
+  const dias = OFFSETS_MATRIZ_FECHAS.map((offset) => {
+    if (offset === 0) return { offset, precio: precioActual, cargando: false };
+    const resultado = resultados[offsetsAConsultar.indexOf(offset)];
+    return { offset, precio: resultado?.data ?? null, cargando: resultado?.isLoading ?? false };
+  });
+
+  const precioMinimo = Math.min(...dias.map((d) => d.precio?.monto).filter((m): m is number => typeof m === 'number'));
+
+  return (
+    <div className="flex gap-2 overflow-x-auto rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
+      {dias.map((d) => {
+        const fecha = sumarDias(form.fechaSalida, d.offset);
+        const fechaObj = new Date(`${fecha}T12:00:00`);
+        const esActual = d.offset === 0;
+        const esMasBarato = !esActual && typeof d.precio?.monto === 'number' && d.precio.monto === precioMinimo;
+        return (
+          <button
+            key={d.offset}
+            type="button"
+            disabled={esActual}
+            onClick={() => onSeleccionarFecha(fecha, form.tipoViaje === 'ida_vuelta' ? sumarDias(form.fechaRegreso, d.offset) : form.fechaRegreso)}
+            className={clsx(
+              'flex min-w-[92px] shrink-0 flex-col items-center gap-0.5 rounded-lg border px-2 py-2 text-xs transition-colors',
+              esActual ? 'border-sol-500 bg-sol-50 dark:bg-sol-500/10' : 'border-slate-200 hover:border-sol-400 dark:border-slate-700',
+            )}
+          >
+            <span className="capitalize text-slate-500 dark:text-slate-400">{fechaObj.toLocaleDateString('es-DO', { weekday: 'short' })}</span>
+            <span className="font-semibold text-slate-800 dark:text-slate-100">{fechaObj.getDate()}</span>
+            {d.cargando ? (
+              <span className="text-slate-300 dark:text-slate-600">…</span>
+            ) : d.precio ? (
+              <span className={clsx('font-semibold', esMasBarato ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-500 dark:text-slate-400')}>
+                {d.precio.moneda} {d.precio.monto.toLocaleString('es-DO', { maximumFractionDigits: 0 })}
+              </span>
+            ) : (
+              <span className="text-slate-300 dark:text-slate-600">N/D</span>
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function BuscarVueloTab() {
   const queryClient = useQueryClient();
   const [form, setForm] = useState(FORM_BUSQUEDA_VACIO);
   const [ofertaAReservar, setOfertaAReservar] = useState<OfertaVuelo | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [orden, setOrden] = useState<(typeof ORDENES_VUELO)[number]['id']>('recomendado');
-  const [soloDirectos, setSoloDirectos] = useState(false);
+  const [filtroEscalas, setFiltroEscalas] = useState<'todos' | 'directo' | 'max1'>('todos');
+  // Sets vacíos = sin filtrar por ese criterio (se ve todo) — mismo criterio que "ningún checkbox tildado = todos".
+  const [horariosSeleccionados, setHorariosSeleccionados] = useState<Set<FranjaHoraria>>(new Set());
+  const [aerolineasSeleccionadas, setAerolineasSeleccionadas] = useState<Set<string>>(new Set());
 
   const buscar = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (formParaBuscar: typeof FORM_BUSQUEDA_VACIO) => {
       const tramos =
-        form.tipoViaje === 'ida'
-          ? [{ origen: form.origen.toUpperCase(), destino: form.destino.toUpperCase(), fecha: form.fechaSalida }]
+        formParaBuscar.tipoViaje === 'ida'
+          ? [{ origen: formParaBuscar.origen.toUpperCase(), destino: formParaBuscar.destino.toUpperCase(), fecha: formParaBuscar.fechaSalida }]
           : [
-              { origen: form.origen.toUpperCase(), destino: form.destino.toUpperCase(), fecha: form.fechaSalida },
-              { origen: form.destino.toUpperCase(), destino: form.origen.toUpperCase(), fecha: form.fechaRegreso },
+              { origen: formParaBuscar.origen.toUpperCase(), destino: formParaBuscar.destino.toUpperCase(), fecha: formParaBuscar.fechaSalida },
+              { origen: formParaBuscar.destino.toUpperCase(), destino: formParaBuscar.origen.toUpperCase(), fecha: formParaBuscar.fechaRegreso },
             ];
       return (
         await apiClient.post<ResultadoBusquedaVuelos>('/admin/travel/vuelos/buscar', {
           tramos,
           pasajeros: [
-            ...Array.from({ length: form.adultos }, () => ({ tipo: 'adult' })),
-            ...form.ninos.map((edad) => ({ edad })),
-            ...form.infantes.map((edad) => ({ edad })),
+            ...Array.from({ length: formParaBuscar.adultos }, () => ({ tipo: 'adult' })),
+            ...formParaBuscar.ninos.map((edad) => ({ edad })),
+            ...formParaBuscar.infantes.map((edad) => ({ edad })),
           ],
-          cabina: form.cabina,
+          // "" -> no se manda cabin_class (Duffel exige el campo ausente, no vacío, para traer todas las cabinas).
+          cabina: formParaBuscar.cabina || undefined,
         })
       ).data;
     },
+    onSuccess: () => {
+      // Resultados nuevos — los filtros de la búsqueda anterior podían referirse a aerolíneas/franjas que ya no aplican.
+      setFiltroEscalas('todos');
+      setHorariosSeleccionados(new Set());
+      setAerolineasSeleccionadas(new Set());
+    },
     onError: (err) => setError(mensajeErrorApi(err, 'No se pudo buscar vuelos.')),
   });
+
+  /** Dispara una nueva búsqueda con un form explícito (ej. desde la matriz de fechas) sin depender del `form` del cierre — useMutation lee el argumento, no el estado. */
+  function buscarCon(formParaBuscar: typeof FORM_BUSQUEDA_VACIO) {
+    setForm(formParaBuscar);
+    setError(null);
+    buscar.mutate(formParaBuscar);
+  }
 
   const reservar = useMutation({
     mutationFn: async (dto: Parameters<Parameters<typeof ReservarOfertaModal>[0]['onGuardar']>[0]) =>
@@ -1099,7 +1285,7 @@ function BuscarVueloTab() {
 
   function onSubmit(e: FormEvent) {
     e.preventDefault();
-    buscar.mutate();
+    buscarCon(form);
   }
 
   return (
@@ -1156,6 +1342,7 @@ function BuscarVueloTab() {
             <div className="flex flex-col gap-1 lg:col-span-1">
               <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Cabina</label>
               <Select value={form.cabina} onChange={(e) => setForm({ ...form, cabina: e.target.value as typeof form.cabina })}>
+                <option value="">Todas las cabinas</option>
                 <option value="economy">Económica</option>
                 <option value="premium_economy">Premium</option>
                 <option value="business">Business</option>
@@ -1174,8 +1361,16 @@ function BuscarVueloTab() {
       {error && <ErrorBusquedaTravel mensaje={error} />}
 
       {buscar.data && (() => {
+        const aerolineasDisponibles = [...new Set(buscar.data.ofertas.map(aerolineaDeOferta))].sort();
+        const preciosOfertas = buscar.data.ofertas.map((o) => Number(o.montoTotal));
+        const precioActual = preciosOfertas.length
+          ? { monto: Math.min(...preciosOfertas), moneda: buscar.data.ofertas[0].moneda }
+          : null;
+
         const ofertasFiltradas = buscar.data.ofertas
-          .filter((o) => !soloDirectos || ofertaEsDirecta(o))
+          .filter((o) => filtroEscalas === 'todos' || (filtroEscalas === 'directo' ? ofertaEsDirecta(o) : escalasMaxDeOferta(o) <= 1))
+          .filter((o) => horariosSeleccionados.size === 0 || horariosSeleccionados.has(franjaHorariaDeOferta(o)))
+          .filter((o) => aerolineasSeleccionadas.size === 0 || aerolineasSeleccionadas.has(aerolineaDeOferta(o)))
           .slice()
           .sort((a, b) => {
             if (orden === 'precio') return Number(a.montoTotal) - Number(b.montoTotal);
@@ -1183,38 +1378,121 @@ function BuscarVueloTab() {
             return 0;
           });
 
+        const hayFiltrosActivos = filtroEscalas !== 'todos' || horariosSeleccionados.size > 0 || aerolineasSeleccionadas.size > 0;
+
         return (
           <div className="space-y-3">
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
-              <div className="flex gap-1">
-                {ORDENES_VUELO.map((o) => (
-                  <button
-                    key={o.id}
-                    type="button"
-                    onClick={() => setOrden(o.id)}
-                    className={clsx(
-                      'rounded-lg px-3 py-1.5 text-xs font-semibold',
-                      orden === o.id ? 'bg-sol-100 text-sol-700 dark:bg-sol-500/10 dark:text-sol-400' : 'text-slate-500 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-800',
-                    )}
-                  >
-                    {o.etiqueta}
-                  </button>
-                ))}
+            <MatrizFechas form={form} precioActual={precioActual} onSeleccionarFecha={(fechaSalida, fechaRegreso) => buscarCon({ ...form, fechaSalida, fechaRegreso })} />
+
+            <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex gap-1">
+                  {ORDENES_VUELO.map((o) => (
+                    <button
+                      key={o.id}
+                      type="button"
+                      onClick={() => setOrden(o.id)}
+                      className={clsx(
+                        'rounded-lg px-3 py-1.5 text-xs font-semibold',
+                        orden === o.id ? 'bg-sol-100 text-sol-700 dark:bg-sol-500/10 dark:text-sol-400' : 'text-slate-500 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-800',
+                      )}
+                    >
+                      {o.etiqueta}
+                    </button>
+                  ))}
+                </div>
+                <span className="text-xs text-slate-400">
+                  {ofertasFiltradas.length} de {buscar.data.ofertas.length} oferta(s)
+                </span>
               </div>
-              <label className="flex items-center gap-1.5 text-xs font-medium text-slate-600 dark:text-slate-300">
-                <input type="checkbox" checked={soloDirectos} onChange={(e) => setSoloDirectos(e.target.checked)} />
-                Solo directos
-              </label>
-              <span className="text-xs text-slate-400">
-                {ofertasFiltradas.length} de {buscar.data.ofertas.length} oferta(s)
-              </span>
+
+              <div className="flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-slate-100 pt-3 dark:border-slate-800">
+                <div className="flex items-center gap-1">
+                  <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Escalas</span>
+                  {([
+                    { id: 'todos', etiqueta: 'Todos' },
+                    { id: 'directo', etiqueta: 'Directo' },
+                    { id: 'max1', etiqueta: 'Máx. 1 escala' },
+                  ] as const).map((opt) => (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => setFiltroEscalas(opt.id)}
+                      className={clsx(
+                        'rounded-full px-2.5 py-1 text-[11px] font-semibold',
+                        filtroEscalas === opt.id
+                          ? 'bg-sol-100 text-sol-700 dark:bg-sol-500/10 dark:text-sol-400'
+                          : 'text-slate-500 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-800',
+                      )}
+                    >
+                      {opt.etiqueta}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="flex flex-wrap items-center gap-1">
+                  <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Horario de salida</span>
+                  {FRANJAS_HORARIAS.map((f) => (
+                    <button
+                      key={f.id}
+                      type="button"
+                      title={f.rango}
+                      onClick={() => setHorariosSeleccionados((prev) => toggleEnSet(prev, f.id))}
+                      className={clsx(
+                        'rounded-full px-2.5 py-1 text-[11px] font-semibold',
+                        horariosSeleccionados.has(f.id)
+                          ? 'bg-sol-100 text-sol-700 dark:bg-sol-500/10 dark:text-sol-400'
+                          : 'text-slate-500 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-800',
+                      )}
+                    >
+                      {f.etiqueta}
+                    </button>
+                  ))}
+                </div>
+
+                {aerolineasDisponibles.length > 1 && (
+                  <div className="flex flex-wrap items-center gap-1">
+                    <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Aerolínea</span>
+                    {aerolineasDisponibles.map((a) => (
+                      <button
+                        key={a}
+                        type="button"
+                        onClick={() => setAerolineasSeleccionadas((prev) => toggleEnSet(prev, a))}
+                        className={clsx(
+                          'rounded-full px-2.5 py-1 text-[11px] font-semibold',
+                          aerolineasSeleccionadas.has(a)
+                            ? 'bg-sol-100 text-sol-700 dark:bg-sol-500/10 dark:text-sol-400'
+                            : 'text-slate-500 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-800',
+                        )}
+                      >
+                        {a}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
 
             {ofertasFiltradas.map((oferta) => (
               <FilaOferta key={oferta.id} oferta={oferta} onReservar={() => setOfertaAReservar(oferta)} />
             ))}
             {ofertasFiltradas.length === 0 && (
-              <p className="text-sm text-slate-500 dark:text-slate-400">Ninguna oferta directa — desmarcá el filtro para ver todas.</p>
+              <div className="flex flex-col items-start gap-2 rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400">
+                <p>Ninguna oferta coincide con los filtros elegidos.</p>
+                {hayFiltrosActivos && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFiltroEscalas('todos');
+                      setHorariosSeleccionados(new Set());
+                      setAerolineasSeleccionadas(new Set());
+                    }}
+                    className="text-xs font-semibold text-sol-600 hover:text-sol-700 dark:text-sol-400"
+                  >
+                    Limpiar filtros
+                  </button>
+                )}
+              </div>
             )}
           </div>
         );
