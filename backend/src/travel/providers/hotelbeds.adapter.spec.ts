@@ -1,12 +1,14 @@
 import { ServiceUnavailableException } from '@nestjs/common';
 import { HotelbedsAdapter } from './hotelbeds.adapter';
 import { RedisService } from '../../redis/redis.service';
+import { CredencialesHotelbeds } from './hotel-provider.interface';
+
+const CREDENCIALES: CredencialesHotelbeds = { apiKey: 'key123', secret: 'secret123', moneda: 'EUR', tasaCambio: 1 };
 
 describe('HotelbedsAdapter', () => {
   let adapter: HotelbedsAdapter;
   let fetchMock: jest.Mock;
   let redisMock: jest.Mocked<Pick<RedisService, 'obtenerJson' | 'guardarJson'>>;
-  const ENV_ORIGINAL = { ...process.env };
 
   beforeEach(() => {
     redisMock = { obtenerJson: jest.fn().mockResolvedValue(null), guardarJson: jest.fn().mockResolvedValue(undefined) };
@@ -16,33 +18,17 @@ describe('HotelbedsAdapter', () => {
   });
 
   afterEach(() => {
-    process.env = { ...ENV_ORIGINAL };
     jest.restoreAllMocks();
   });
 
-  it('habilitado es false sin API key o sin secret', () => {
-    delete process.env.HOTELBEDS_API_KEY;
-    delete process.env.HOTELBEDS_SECRET;
-    expect(adapter.habilitado).toBe(false);
-
-    process.env.HOTELBEDS_API_KEY = 'key123';
-    expect(adapter.habilitado).toBe(false); // falta el secret
-
-    process.env.HOTELBEDS_SECRET = 'secret123';
-    expect(adapter.habilitado).toBe(true);
-  });
-
   it('buscarHoteles lanza ServiceUnavailableException sin llamar a fetch si faltan las credenciales', async () => {
-    delete process.env.HOTELBEDS_API_KEY;
-    await expect(adapter.buscarHoteles({ destino: 'PMI', checkIn: '2026-12-10', checkOut: '2026-12-12', ocupacion: { habitaciones: 1, adultos: 2, ninos: 0 } })).rejects.toThrow(
-      ServiceUnavailableException,
-    );
+    await expect(
+      adapter.buscarHoteles({ ...CREDENCIALES, apiKey: '' }, { destino: 'PMI', checkIn: '2026-12-10', checkOut: '2026-12-12', ocupacion: { habitaciones: 1, adultos: 2, ninos: 0 } }),
+    ).rejects.toThrow(ServiceUnavailableException);
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('buscarHoteles manda Api-key + X-Signature y normaliza los hoteles (shape confirmado en vivo)', async () => {
-    process.env.HOTELBEDS_API_KEY = 'key123';
-    process.env.HOTELBEDS_SECRET = 'secret123';
     fetchMock.mockResolvedValue({
       ok: true,
       json: async () => ({
@@ -68,7 +54,7 @@ describe('HotelbedsAdapter', () => {
       }),
     });
 
-    const resultado = await adapter.buscarHoteles({ destino: 'PMI', checkIn: '2026-12-10', checkOut: '2026-12-12', ocupacion: { habitaciones: 1, adultos: 2, ninos: 0 } });
+    const resultado = await adapter.buscarHoteles(CREDENCIALES, { destino: 'PMI', checkIn: '2026-12-10', checkOut: '2026-12-12', ocupacion: { habitaciones: 1, adultos: 2, ninos: 0 } });
 
     expect(resultado.hoteles).toEqual([
       {
@@ -96,14 +82,12 @@ describe('HotelbedsAdapter', () => {
   });
 
   it('confirmarTarifa (checkrates) re-cotiza y devuelve el rateKey final', async () => {
-    process.env.HOTELBEDS_API_KEY = 'key123';
-    process.env.HOTELBEDS_SECRET = 'secret123';
     fetchMock.mockResolvedValue({
       ok: true,
       json: async () => ({ hotel: { totalNet: '198.36', rooms: [{ rates: [{ rateKey: 'RK1-CONFIRMADO' }] }] } }),
     });
 
-    const resultado = await adapter.confirmarTarifa('RK1');
+    const resultado = await adapter.confirmarTarifa(CREDENCIALES, 'RK1');
 
     expect(resultado).toEqual({ rateKey: 'RK1-CONFIRMADO', montoNeto: '198.36', moneda: 'EUR' });
     const [, opciones] = fetchMock.mock.calls[0];
@@ -111,11 +95,9 @@ describe('HotelbedsAdapter', () => {
   });
 
   it('crearReserva manda holder/rooms/paxes sin ningún dato de pago (confirmado en vivo)', async () => {
-    process.env.HOTELBEDS_API_KEY = 'key123';
-    process.env.HOTELBEDS_SECRET = 'secret123';
     fetchMock.mockResolvedValue({ ok: true, json: async () => ({ booking: { reference: '1-8322356', totalNet: 198.36 } }) });
 
-    const resultado = await adapter.crearReserva({
+    const resultado = await adapter.crearReserva(CREDENCIALES, {
       rateKey: 'RK1',
       titular: { nombre: 'Juan', apellido: 'Pérez' },
       huespedes: [
@@ -135,11 +117,9 @@ describe('HotelbedsAdapter', () => {
   });
 
   it('cotizarCancelacion usa cancellationFlag=SIMULATION', async () => {
-    process.env.HOTELBEDS_API_KEY = 'key123';
-    process.env.HOTELBEDS_SECRET = 'secret123';
     fetchMock.mockResolvedValue({ ok: true, json: async () => ({ booking: { cancellationReference: 'CANC-1' }, cancellationAmount: 0, currency: 'EUR' }) });
 
-    const resultado = await adapter.cotizarCancelacion('1-8322356');
+    const resultado = await adapter.cotizarCancelacion(CREDENCIALES, '1-8322356');
 
     expect(resultado).toEqual({ id: 'CANC-1', montoReembolso: '0.00', moneda: 'EUR' });
     const [url] = fetchMock.mock.calls[0];
@@ -147,12 +127,10 @@ describe('HotelbedsAdapter', () => {
   });
 
   it('confirmarCancelacion usa cancellationFlag=CANCELLATION y acredita lo LIBERADO de la deuda, no la penalidad (confirmado en vivo)', async () => {
-    process.env.HOTELBEDS_API_KEY = 'key123';
-    process.env.HOTELBEDS_SECRET = 'secret123';
     // Penalidad de 50 sobre un total original de 198.36 -> se libera 148.36, no 50.
     fetchMock.mockResolvedValue({ ok: true, json: async () => ({ cancellationAmount: 50, currency: 'EUR' }) });
 
-    const resultado = await adapter.confirmarCancelacion('1-8322356', 198.36);
+    const resultado = await adapter.confirmarCancelacion(CREDENCIALES, '1-8322356', 198.36);
 
     expect(resultado).toEqual({ reembolsado: true, montoReembolso: '148.36', moneda: 'EUR' });
     const [url] = fetchMock.mock.calls[0];
@@ -160,91 +138,59 @@ describe('HotelbedsAdapter', () => {
   });
 
   it('confirmarCancelacion sin penalidad libera el monto original completo', async () => {
-    process.env.HOTELBEDS_API_KEY = 'key123';
-    process.env.HOTELBEDS_SECRET = 'secret123';
     fetchMock.mockResolvedValue({ ok: true, json: async () => ({ cancellationAmount: 0, currency: 'EUR' }) });
 
-    const resultado = await adapter.confirmarCancelacion('1-8322356', 198.36);
+    const resultado = await adapter.confirmarCancelacion(CREDENCIALES, '1-8322356', 198.36);
 
     expect(resultado).toEqual({ reembolsado: true, montoReembolso: '198.36', moneda: 'EUR' });
   });
 
   it('traduce un error {error: string} (ej. firma inválida, confirmado en vivo)', async () => {
-    process.env.HOTELBEDS_API_KEY = 'key123';
-    process.env.HOTELBEDS_SECRET = 'secret123';
     fetchMock.mockResolvedValue({ ok: false, status: 401, json: async () => ({ error: 'Request signature verification failed' }) });
 
-    await expect(adapter.confirmarTarifa('RK1')).rejects.toThrow('Request signature verification failed');
+    await expect(adapter.confirmarTarifa(CREDENCIALES, 'RK1')).rejects.toThrow('Request signature verification failed');
   });
 
   it('traduce un error {error: {code, message}} (ej. datos inválidos, confirmado en vivo)', async () => {
-    process.env.HOTELBEDS_API_KEY = 'key123';
-    process.env.HOTELBEDS_SECRET = 'secret123';
     fetchMock.mockResolvedValue({ ok: false, status: 400, json: async () => ({ error: { code: 'INVALID_DATA', message: 'Error at property stay: Attribute is mandatory' } }) });
 
-    await expect(adapter.confirmarTarifa('RK1')).rejects.toThrow('Error at property stay: Attribute is mandatory');
+    await expect(adapter.confirmarTarifa(CREDENCIALES, 'RK1')).rejects.toThrow('Error at property stay: Attribute is mandatory');
   });
 
   it('lanza ServiceUnavailableException si la petición de red falla', async () => {
-    process.env.HOTELBEDS_API_KEY = 'key123';
-    process.env.HOTELBEDS_SECRET = 'secret123';
     fetchMock.mockRejectedValue(new Error('ECONNRESET'));
 
-    await expect(adapter.confirmarTarifa('RK1')).rejects.toThrow(ServiceUnavailableException);
+    await expect(adapter.confirmarTarifa(CREDENCIALES, 'RK1')).rejects.toThrow(ServiceUnavailableException);
   });
 
   describe('conversión de moneda (Hotelbeds siempre cotiza en EUR)', () => {
-    beforeEach(() => {
-      process.env.HOTELBEDS_API_KEY = 'key123';
-      process.env.HOTELBEDS_SECRET = 'secret123';
-    });
-
-    it('sin HOTELBEDS_MONEDA configurada, pasa los montos de Hotelbeds tal cual en EUR', async () => {
+    it('sin moneda distinta configurada, pasa los montos de Hotelbeds tal cual en EUR', async () => {
       fetchMock.mockResolvedValue({ ok: true, json: async () => ({ hotel: { totalNet: '198.36', rooms: [{ rates: [{ rateKey: 'RK1' }] }] } }) });
-      const resultado = await adapter.confirmarTarifa('RK1');
+      const resultado = await adapter.confirmarTarifa(CREDENCIALES, 'RK1');
       expect(resultado).toEqual({ rateKey: 'RK1', montoNeto: '198.36', moneda: 'EUR' });
     });
 
-    it('con HOTELBEDS_MONEDA=USD y una tasa configurada, convierte el monto y cambia la moneda devuelta', async () => {
-      process.env.HOTELBEDS_MONEDA = 'USD';
-      process.env.HOTELBEDS_TASA_CAMBIO = '1.08';
+    it('con moneda USD y una tasa configurada, convierte el monto y cambia la moneda devuelta', async () => {
       fetchMock.mockResolvedValue({ ok: true, json: async () => ({ hotel: { totalNet: '100.00', rooms: [{ rates: [{ rateKey: 'RK1' }] }] } }) });
 
-      const resultado = await adapter.confirmarTarifa('RK1');
+      const resultado = await adapter.confirmarTarifa({ ...CREDENCIALES, moneda: 'USD', tasaCambio: 1.08 }, 'RK1');
 
       expect(resultado).toEqual({ rateKey: 'RK1', montoNeto: '108.00', moneda: 'USD' });
     });
 
-    it('con moneda distinta de EUR pero sin tasa configurada, no rompe — usa tasa 1 como fallback seguro', async () => {
-      process.env.HOTELBEDS_MONEDA = 'USD';
-      delete process.env.HOTELBEDS_TASA_CAMBIO;
-      fetchMock.mockResolvedValue({ ok: true, json: async () => ({ hotel: { totalNet: '100.00', rooms: [{ rates: [{ rateKey: 'RK1' }] }] } }) });
-
-      const resultado = await adapter.confirmarTarifa('RK1');
-
-      expect(resultado).toEqual({ rateKey: 'RK1', montoNeto: '100.00', moneda: 'USD' });
-    });
-
     it('confirmarCancelacion convierte la penalidad ANTES de restarla del monto original (ambos ya en la moneda configurada)', async () => {
-      process.env.HOTELBEDS_MONEDA = 'USD';
-      process.env.HOTELBEDS_TASA_CAMBIO = '1.10';
       // Penalidad real de Hotelbeds: 50 EUR -> 55 USD. Original ya guardado en USD: 218.196 (198.36 EUR * 1.10).
       fetchMock.mockResolvedValue({ ok: true, json: async () => ({ cancellationAmount: 50 }) });
 
-      const resultado = await adapter.confirmarCancelacion('1-8322356', 218.2);
+      const resultado = await adapter.confirmarCancelacion({ ...CREDENCIALES, moneda: 'USD', tasaCambio: 1.1 }, '1-8322356', 218.2);
 
       expect(resultado).toEqual({ reembolsado: true, montoReembolso: '163.20', moneda: 'USD' });
     });
   });
 
   describe('buscarDestinos', () => {
-    beforeEach(() => {
-      process.env.HOTELBEDS_API_KEY = 'key123';
-      process.env.HOTELBEDS_SECRET = 'secret123';
-    });
-
     it('devuelve [] sin llamar a fetch si la consulta está vacía', async () => {
-      const resultado = await adapter.buscarDestinos('   ');
+      const resultado = await adapter.buscarDestinos(CREDENCIALES, '   ');
       expect(resultado).toEqual([]);
       expect(fetchMock).not.toHaveBeenCalled();
     });
@@ -263,7 +209,7 @@ describe('HotelbedsAdapter', () => {
           }),
         });
 
-      const resultado = await adapter.buscarDestinos('santo');
+      const resultado = await adapter.buscarDestinos(CREDENCIALES, 'santo');
 
       expect(resultado).toEqual([{ codigo: 'DOM', nombre: 'Santo Domingo', pais: 'República Dominicana', bandera: '🇩🇴' }]);
       // Una sola página porque total(3) <= PAGE(1000)
@@ -279,7 +225,7 @@ describe('HotelbedsAdapter', () => {
         json: async () => ({ total: 1, destinations: [{ code: 'PUJ', name: { content: 'Punta Cana' }, countryCode: 'DO' }] }),
       });
 
-      await adapter.buscarDestinos('punta');
+      await adapter.buscarDestinos(CREDENCIALES, 'punta');
       expect(redisMock.guardarJson).toHaveBeenCalledWith(
         'travel:hotelbeds:destinos',
         [{ code: 'PUJ', nombre: 'Punta Cana', pais: 'República Dominicana', bandera: '🇩🇴' }],
@@ -288,7 +234,7 @@ describe('HotelbedsAdapter', () => {
 
       // Simula el hit de caché que guardarJson dejó guardado.
       redisMock.obtenerJson.mockResolvedValue([{ code: 'PUJ', nombre: 'Punta Cana', pais: 'República Dominicana', bandera: '🇩🇴' }]);
-      const resultado2 = await adapter.buscarDestinos('cana');
+      const resultado2 = await adapter.buscarDestinos(CREDENCIALES, 'cana');
 
       expect(resultado2).toEqual([{ codigo: 'PUJ', nombre: 'Punta Cana', pais: 'República Dominicana', bandera: '🇩🇴' }]);
       expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -297,7 +243,7 @@ describe('HotelbedsAdapter', () => {
     it('un cache-hit en Redis no llama a fetch en absoluto', async () => {
       redisMock.obtenerJson.mockResolvedValue([{ code: 'DOM', nombre: 'Santo Domingo', pais: 'República Dominicana', bandera: '🇩🇴' }]);
 
-      const resultado = await adapter.buscarDestinos('santo');
+      const resultado = await adapter.buscarDestinos(CREDENCIALES, 'santo');
 
       expect(resultado).toEqual([{ codigo: 'DOM', nombre: 'Santo Domingo', pais: 'República Dominicana', bandera: '🇩🇴' }]);
       expect(fetchMock).not.toHaveBeenCalled();

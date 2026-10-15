@@ -4,6 +4,8 @@ import { TravelService } from './travel.service';
 import { BuscarVuelosDto } from './dto/buscar-vuelos.dto';
 import { Permissions } from '../common/decorators/permissions.decorator';
 import { RequiereModulo } from '../common/decorators/requiere-modulo.decorator';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { JwtPayloadUser } from '../common/types/authenticated-request';
 
 /** Búsqueda pura contra el proveedor activo — no toca ninguna tabla propia, por eso vive aparte de TravelController (que sí administra TravelReserva). */
 @ApiBearerAuth()
@@ -15,7 +17,7 @@ export class TravelVuelosController {
 
   @Post('buscar')
   @Permissions('travel.buscar')
-  buscar(@Body() dto: BuscarVuelosDto) {
-    return this.travelService.buscarVuelos(dto);
+  buscar(@Body() dto: BuscarVuelosDto, @CurrentUser() user: JwtPayloadUser) {
+    return this.travelService.buscarVuelos(dto, user.tenantId);
   }
 }

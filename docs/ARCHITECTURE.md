@@ -2057,6 +2057,140 @@ DESPUÉS de verificar, nunca los query params crudos del proveedor, así
 que no hay forma de fabricar una URL "?estado=aprobado" desde el
 cliente.
 
+## Travel Management (plugin, `backend/src/travel/`)
+
+Búsqueda/reserva real de vuelos (Duffel) y hoteles (Hotelbeds), más
+carga manual de reservas hechas fuera del sistema. Gateado por módulo
+(`@RequiereModulo('travel')` en cada controller de negocio, igual que
+Inmobiliaria/Proyectos) — el tenant lo recibe vía su Plan o un
+`TenantModuloOverride` puntual desde `/plataforma/tenants`. Sin
+directorio propio en `plugins/` (la implementación vive directo en
+`backend/src/travel/` + `backend/src/travel-config/`), a diferencia de
+Inmobiliaria/Proyectos que sí tienen manifiesto — nunca se llegó a
+sumarle uno.
+
+### Credenciales por tenant, no una cuenta compartida de plataforma
+
+**Decisión revertida**: el diseño original (`docs/Sistema_del_Sol_Travel_Management_Plugin.md`,
+"Los Dos Pagos del Vuelo") asumía una única cuenta de Duffel/Hotelbeds
+compartida por toda la plataforma — cada tenant era una agencia
+operando con el Balance mayorista de Sistema del Sol. Se decidió
+después que cada tenant trae su PROPIA cuenta de ambos proveedores.
+`TravelConfigTenant` (`backend/src/travel-config/`) sigue el mismo
+molde de 4 capas que `WhatsappConfigTenant`/`PasarelaConfigTenant`
+(`obtenerOCrear`/`aplicarCampoSecreto`/`aFormaSegura`, secretos
+cifrados con `encriptado.util.ts`, nunca devueltos en claro — solo
+`xxxConfigurado: boolean`). Pantalla tenant-scoped en `/travel-config`
+(`TravelConfigPanel.tsx`), **sin** `@RequiereModulo('travel')` a
+propósito (mismo criterio que `WhatsappConfigController`: cargar la
+cuenta es un paso de Administración, no debería bloquearse si el módulo
+todavía no está activo).
+
+**Sin fallback a ninguna cuenta compartida** (decisión explícita): un
+tenant que no configuró su cuenta no puede buscar ni reservar —
+`TravelConfigService.obtenerCredencialesDuffel()`/
+`obtenerCredencialesHotelbeds()` lanzan `ServiceUnavailableException`
+(503) con un mensaje accionable, y `TravelReservas.tsx` lo detecta por
+el texto del mensaje para mostrar un link directo a Configuración →
+Viajes en vez de un error genérico (`ErrorBusquedaTravel`, ver
+`TravelReservas.tsx`).
+
+Esto dejó obsoleta la pantalla vieja de Plataforma → Configuración
+("Travel Management (Duffel)"/"(Hotelbeds)"/reconciliación) — se
+retiró por completo junto con las 6 columnas `duffel*`/`hotelbeds*` de
+`PlataformaConfiguracion` (migración que las dropea; se perdía
+cualquier token que hubiera cargado ahí, decisión aceptada
+explícitamente) y el permiso de plataforma `platform.travel.reconciliar`.
+
+### `DuffelAdapter`/`HotelbedsAdapter` — sin estado de tenant
+
+Ambos adapters (`providers/duffel.adapter.ts`, `providers/hotelbeds.adapter.ts`)
+son singletons **sin ningún campo de credenciales propio** — cada
+método de `TravelProvider`/`HotelProvider` recibe las credenciales
+(`CredencialesDuffel`/`CredencialesHotelbeds`) como primer parámetro,
+ya resueltas por quien llama (`TravelService`, vía
+`TravelConfigService`). Esto es deliberado: permite que el mismo
+adapter sirva a cualquier tenant en la misma request sin reinyectarlo
+ni cachear nada por tenant. `CredencialesHotelbeds` lleva también
+`moneda`/`tasaCambio` (antes leídos de `HOTELBEDS_MONEDA`/
+`HOTELBEDS_TASA_CAMBIO`), porque la conversión de moneda ya no es un
+parámetro global sino parte de la cuenta del tenant.
+
+La caché en Redis del catálogo de destinos de Hotelbeds
+(`travel:hotelbeds:destinos`, ~7300 registros) sigue siendo una ÚNICA
+clave compartida entre todos los tenants a propósito — es el catálogo
+de ciudades/países de Hotelbeds, idéntico para cualquier cuenta real
+(no depende de qué credenciales lo pidieron), así que compartirlo
+ahorra cuota diaria del sandbox en vez de que cada tenant reconstruya
+el mismo catálogo.
+
+`DuffelAdapter.listarOrdenes()` ya no está marcado "solo para
+reconciliación de Plataforma" — ahora lo usa
+`TravelReconciliacionService` de forma tenant-scoped (ver abajo).
+
+### Webhook de Duffel — resolver el tenant ANTES de verificar la firma
+
+Problema real que trajo el cambio a credenciales por tenant: el webhook
+(`POST /api/webhooks/duffel`, `@Public()`) antes validaba la firma
+contra un único secreto posible (`DUFFEL_WEBHOOK_SECRET` global). Con
+un secreto por tenant, hace falta saber A QUIÉN pertenece el evento
+ANTES de poder elegir con qué secreto verificarlo —
+`TravelWebhookController.recibir()` resuelve esto en el mismo orden que
+ya probó `WhatsappWebhookController` (resuelve por el número `To` antes
+de validar la firma de Twilio):
+
+1. Parsear el JSON del body (sin verificar nada todavía).
+2. `DuffelWebhookService.resolverTenantPorEvento()` extrae el id de
+   orden del evento (`extraerIdOrdenDuffel()` en `duffel-webhook.util.ts`,
+   función pura, sin acceso a BD/secretos) y busca qué `TravelReserva`
+   tiene ese `proveedorOrdenId` — su `tenantId` es el tenant del evento.
+   Sin match → `null` → 200 sin verificar nada (nada que hacer, nada
+   que confiar).
+3. `obtenerSecretoWebhook(tenantId)` descifra el
+   `duffelWebhookSecretCifrado` de ESE tenant (consulta con
+   `PrismaService` global + `tenantId` explícito, nunca
+   `TenantPrismaService` — el webhook corre sin `request.user`, ver
+   `project_tenantprisma_fuera_de_request`).
+4. Recién ahí se verifica la firma (`verificarFirmaDuffel`) contra ese
+   secreto. Inválida → 400, como siempre.
+5. `procesarEvento(evento, tenantId)` aplica la alerta, con el
+   `updateMany` scopeado también por `tenantId` además de
+   `proveedorOrdenId` (defensa en profundidad — Duffel garantiza que el
+   id de orden es único igual).
+
+Resolver el tenant con un dato público del body (el id de orden) **no
+es un problema de seguridad**: la firma sigue siendo la única puerta
+para que el evento tenga cualquier efecto real — elegir contra qué
+secreto comparar no es información privilegiada. Verificado en vivo
+simulando los 3 casos (firma válida → aplica la alerta scopeada al
+tenant correcto; firma inválida → 400; id de orden desconocido → 200
+sin siquiera intentar verificar).
+
+### Reconciliación — de Plataforma a tenant
+
+También era un endpoint de Plataforma (`platform.travel.reconciliar`)
+contra la cuenta única compartida. Ahora `TravelReconciliacionController`
+(`GET /api/admin/travel/reconciliacion`, permiso `admin.configuracion`,
+mismo nivel que configurar la cuenta) vive del lado del tenant:
+`TravelReconciliacionService.reconciliar(tenantId)` resuelve las
+credenciales de ESE tenant, pagina `listarOrdenes()` (tope 10 páginas
+de 50) y cruza cada orden real contra `TravelReserva` **scopeado por
+`tenantId`** para detectar órdenes huérfanas (existen en Duffel, sin
+reserva interna) y cancelaciones no reflejadas (Duffel la marca
+cancelada, la reserva interna sigue sin estarlo — el webhook no la
+capturó). Nunca corrige nada solo, es un reporte. UI integrada en la
+misma pantalla `/travel-config` (`SeccionReconciliacion`), no en una
+pestaña aparte.
+
+### Balance/ledger — ya no es un pool compartido
+
+`TravelLedgerMovimiento` (DEBITO al reservar, CREDITO al reembolsar/
+cancelar) sigue siendo tenant-scoped como antes, pero ahora refleja el
+Balance de la cuenta PROPIA de cada tenant, no una porción de un pool
+compartido entre todos — `TravelService.saldoLedger()` sigue siendo la
+misma suma `CREDITO - DEBITO` agrupada por moneda, el cambio es
+puramente conceptual (a qué cuenta real corresponde ese saldo).
+
 ## Configuración de plataforma (`backend/src/plataforma-config/`)
 
 Antes de esta fase, la pasarela de pago, SMTP y Twilio solo se

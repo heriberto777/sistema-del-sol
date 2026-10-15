@@ -12,6 +12,7 @@ import { FacturacionService } from '../facturacion/facturacion.service';
 import { TasasCambioService } from '../tasas-cambio/tasas-cambio.service';
 import { TravelProviderService } from './providers/travel-provider.service';
 import { HotelProviderService } from './providers/hotel-provider.service';
+import { TravelConfigService } from '../travel-config/travel-config.service';
 
 const ETIQUETA_TIPO: Record<string, string> = { VUELO: 'Boleto aéreo', HOTEL: 'Reserva de hotel' };
 
@@ -34,6 +35,7 @@ export class TravelService {
     private readonly travelProviderService: TravelProviderService,
     private readonly hotelProviderService: HotelProviderService,
     private readonly tasasCambioService: TasasCambioService,
+    private readonly travelConfigService: TravelConfigService,
   ) {}
 
   async crear(dto: CrearReservaTravelDto, tenantId: string) {
@@ -125,28 +127,30 @@ export class TravelService {
     return { facturaId: factura.id, numero: factura.numero, total: factura.total };
   }
 
-  buscarVuelos(dto: BuscarVuelosDto) {
-    return this.travelProviderService.activo.buscarVuelos(dto);
+  async buscarVuelos(dto: BuscarVuelosDto, tenantId: string) {
+    const credenciales = await this.travelConfigService.obtenerCredencialesDuffel(tenantId);
+    return this.travelProviderService.activo.buscarVuelos(credenciales, dto);
   }
 
   /**
    * Reserva de verdad contra el proveedor activo — re-price obligatorio
    * (nunca se confía en el precio que vio el usuario al buscar, puede
-   * haber cambiado o expirado) y pago siempre vía Balance compartido de
-   * la plataforma (nunca tarjeta — ver "Los Dos Pagos del Vuelo"). El
-   * débito contra ese Balance queda registrado en el ledger interno para
-   * saber cuánto le corresponde a este tenant.
+   * haber cambiado o expirado) y pago siempre vía el Balance de la
+   * cuenta de Duffel PROPIA de este tenant (nunca tarjeta — ver "Los Dos
+   * Pagos del Vuelo"). El débito contra ese Balance queda registrado en
+   * el ledger interno del tenant para trazabilidad.
    */
   async reservarOfertaVuelo(dto: ReservarOfertaVueloDto, tenantId: string) {
     await this.clientesService.buscarPorId(dto.clienteId);
 
+    const credenciales = await this.travelConfigService.obtenerCredencialesDuffel(tenantId);
     const proveedor = this.travelProviderService.activo;
-    const oferta = await proveedor.obtenerOferta(dto.ofertaId);
+    const oferta = await proveedor.obtenerOferta(credenciales, dto.ofertaId);
     if (new Date(oferta.expiraEn) < new Date()) {
       throw new BadRequestException('Esta oferta ya expiró — hay que buscar de nuevo.');
     }
 
-    const orden = await proveedor.crearOrdenVuelo({
+    const orden = await proveedor.crearOrdenVuelo(credenciales, {
       ofertaId: oferta.id,
       pasajeros: dto.pasajeros,
       montoBalance: Number(oferta.montoTotal),
@@ -187,12 +191,14 @@ export class TravelService {
     return reserva;
   }
 
-  buscarDestinosHotel(query: string) {
-    return this.hotelProviderService.activo.buscarDestinos(query);
+  async buscarDestinosHotel(query: string, tenantId: string) {
+    const credenciales = await this.travelConfigService.obtenerCredencialesHotelbeds(tenantId);
+    return this.hotelProviderService.activo.buscarDestinos(credenciales, query);
   }
 
-  buscarHoteles(dto: BuscarHotelesDto) {
-    return this.hotelProviderService.activo.buscarHoteles({
+  async buscarHoteles(dto: BuscarHotelesDto, tenantId: string) {
+    const credenciales = await this.travelConfigService.obtenerCredencialesHotelbeds(tenantId);
+    return this.hotelProviderService.activo.buscarHoteles(credenciales, {
       destino: dto.destino,
       checkIn: dto.checkIn,
       checkOut: dto.checkOut,
@@ -207,19 +213,19 @@ export class TravelService {
    * de Duffel, Hotelbeds no pide ningún dato de pago al reservar
    * (confirmado contra el sandbox real) — es facturación neta con
    * liquidación periódica, no un Balance prefondeado; el DEBITO al ledger
-   * interno igual aplica: es cuánto le va a facturar Hotelbeds a la
-   * plataforma por esta reserva, y de ahí cuánto le corresponde a este
-   * tenant. Fase 1 — una sola habitación por reserva (ver
-   * ReservarHotelDto/BuscarHotelesDto).
+   * interno igual aplica: es cuánto le va a facturar Hotelbeds a este
+   * tenant por esta reserva. Fase 1 — una sola habitación por reserva
+   * (ver ReservarHotelDto/BuscarHotelesDto).
    */
   async reservarHotel(dto: ReservarHotelDto, tenantId: string) {
     await this.clientesService.buscarPorId(dto.clienteId);
 
+    const credenciales = await this.travelConfigService.obtenerCredencialesHotelbeds(tenantId);
     const proveedor = this.hotelProviderService.activo;
-    const tarifa = await proveedor.confirmarTarifa(dto.rateKey);
+    const tarifa = await proveedor.confirmarTarifa(credenciales, dto.rateKey);
 
     const titular = dto.huespedes[0];
-    const orden = await proveedor.crearReserva({
+    const orden = await proveedor.crearReserva(credenciales, {
       rateKey: tarifa.rateKey,
       titular: { nombre: titular.nombre, apellido: titular.apellido },
       huespedes: dto.huespedes,
@@ -267,13 +273,15 @@ export class TravelService {
    * la misma reserva, así que acá se guarda igual el `id` que devuelve
    * (para trazabilidad) pero confirmarCancelacionProveedor() nunca lo usa.
    */
-  async cotizarCancelacionProveedor(id: string) {
+  async cotizarCancelacionProveedor(id: string, tenantId: string) {
     const reserva = await this.repository.buscarPorId(id);
     if (!reserva.proveedorOrdenId) {
       throw new BadRequestException('Esta reserva no fue hecha contra un proveedor — no hay una orden que cancelar (usá eliminar si es carga manual).');
     }
-    const proveedorActivo = reserva.proveedor === 'hotelbeds' ? this.hotelProviderService.activo : this.travelProviderService.activo;
-    const cotizacion = await proveedorActivo.cotizarCancelacion(reserva.proveedorOrdenId);
+    const cotizacion =
+      reserva.proveedor === 'hotelbeds'
+        ? await this.hotelProviderService.activo.cotizarCancelacion(await this.travelConfigService.obtenerCredencialesHotelbeds(tenantId), reserva.proveedorOrdenId)
+        : await this.travelProviderService.activo.cotizarCancelacion(await this.travelConfigService.obtenerCredencialesDuffel(tenantId), reserva.proveedorOrdenId);
     await this.repository.marcarCancelacionCotizada(id, cotizacion.id);
     return cotizacion;
   }
@@ -288,8 +296,8 @@ export class TravelService {
     // Hotelbeds confirma contra la MISMA referencia de la reserva (no tiene un id de cancelación separado como Duffel) y necesita el monto original para calcular qué se libera de la deuda.
     const resultado =
       reserva.proveedor === 'hotelbeds'
-        ? await this.hotelProviderService.activo.confirmarCancelacion(reserva.proveedorOrdenId!, Number(reserva.montoCosto))
-        : await this.travelProviderService.activo.confirmarCancelacion(reserva.proveedorCancelacionId);
+        ? await this.hotelProviderService.activo.confirmarCancelacion(await this.travelConfigService.obtenerCredencialesHotelbeds(tenantId), reserva.proveedorOrdenId!, Number(reserva.montoCosto))
+        : await this.travelProviderService.activo.confirmarCancelacion(await this.travelConfigService.obtenerCredencialesDuffel(tenantId), reserva.proveedorCancelacionId);
     await this.repository.marcarCanceladaPorProveedor(id);
 
     if (resultado.reembolsado && resultado.montoReembolso) {
@@ -317,7 +325,7 @@ export class TravelService {
     return { ...resumen, saldoLedger };
   }
 
-  /** Saldo (CREDITO - DEBITO) del tenant contra el Balance compartido de la plataforma, agrupado por moneda — sin cachear, bajo volumen esperado en esta fase. */
+  /** Saldo (CREDITO - DEBITO) del tenant contra el Balance de su propia cuenta de Duffel/Hotelbeds, agrupado por moneda — sin cachear, bajo volumen esperado en esta fase. */
   async saldoLedger() {
     const movimientos = await this.repository.listarLedger();
     const saldos = new Map<string, number>();

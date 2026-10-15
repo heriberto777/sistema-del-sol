@@ -1,10 +1,12 @@
 import { ServiceUnavailableException } from '@nestjs/common';
 import { DuffelAdapter } from './duffel.adapter';
+import { CredencialesDuffel } from './travel-provider.interface';
+
+const CREDENCIALES: CredencialesDuffel = { token: 'duffel_test_123' };
 
 describe('DuffelAdapter', () => {
   let adapter: DuffelAdapter;
   let fetchMock: jest.Mock;
-  const ENV_ORIGINAL = { ...process.env };
 
   beforeEach(() => {
     adapter = new DuffelAdapter();
@@ -13,31 +15,17 @@ describe('DuffelAdapter', () => {
   });
 
   afterEach(() => {
-    process.env = { ...ENV_ORIGINAL };
     jest.restoreAllMocks();
   });
 
-  it('habilitado es false sin DUFFEL_API_TOKEN', () => {
-    delete process.env.DUFFEL_API_TOKEN;
-    expect(adapter.habilitado).toBe(false);
-  });
-
-  it('habilitado es true con DUFFEL_API_TOKEN', () => {
-    process.env.DUFFEL_API_TOKEN = 'duffel_test_123';
-    expect(adapter.habilitado).toBe(true);
-  });
-
   it('buscarVuelos lanza ServiceUnavailableException sin llamar a fetch si falta el token', async () => {
-    delete process.env.DUFFEL_API_TOKEN;
-
     await expect(
-      adapter.buscarVuelos({ tramos: [{ origen: 'SDQ', destino: 'MAD', fecha: '2026-11-10' }], pasajeros: [{ tipo: 'adult' }] }),
+      adapter.buscarVuelos({ token: '' }, { tramos: [{ origen: 'SDQ', destino: 'MAD', fecha: '2026-11-10' }], pasajeros: [{ tipo: 'adult' }] }),
     ).rejects.toThrow(ServiceUnavailableException);
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('buscarVuelos llama a /air/offer_requests con el header Duffel-Version y normaliza las ofertas', async () => {
-    process.env.DUFFEL_API_TOKEN = 'duffel_test_123';
     fetchMock.mockResolvedValue({
       ok: true,
       json: async () => ({
@@ -58,7 +46,7 @@ describe('DuffelAdapter', () => {
       }),
     });
 
-    const resultado = await adapter.buscarVuelos({
+    const resultado = await adapter.buscarVuelos(CREDENCIALES, {
       tramos: [{ origen: 'SDQ', destino: 'MAD', fecha: '2026-11-10' }],
       pasajeros: [{ tipo: 'adult' }],
       cabina: 'economy',
@@ -87,10 +75,9 @@ describe('DuffelAdapter', () => {
   });
 
   it('buscarVuelos manda "age" en vez de "type" cuando el pasajero trae edad (mutuamente excluyentes, confirmado en vivo)', async () => {
-    process.env.DUFFEL_API_TOKEN = 'duffel_test_123';
     fetchMock.mockResolvedValue({ ok: true, json: async () => ({ data: { id: 'orq_1', offers: [] } }) });
 
-    await adapter.buscarVuelos({
+    await adapter.buscarVuelos(CREDENCIALES, {
       tramos: [{ origen: 'SDQ', destino: 'MAD', fecha: '2026-11-10' }],
       pasajeros: [{ tipo: 'adult' }, { edad: 8 }, { edad: 1 }],
     });
@@ -101,13 +88,12 @@ describe('DuffelAdapter', () => {
   });
 
   it('crearOrdenVuelo manda el pago como Balance (nunca tarjeta) y devuelve el localizador', async () => {
-    process.env.DUFFEL_API_TOKEN = 'duffel_test_123';
     fetchMock.mockResolvedValue({
       ok: true,
       json: async () => ({ data: { id: 'ord_1', booking_reference: 'ABC123', total_amount: '450.00', total_currency: 'USD' } }),
     });
 
-    const resultado = await adapter.crearOrdenVuelo({
+    const resultado = await adapter.crearOrdenVuelo(CREDENCIALES, {
       ofertaId: 'off_1',
       pasajeros: [{ id: 'pas_1', nombre: 'Juan', apellido: 'Pérez', fechaNacimiento: '1990-01-01', genero: 'm', titulo: 'mr', email: 'j@x.com', telefono: '+18095551234' }],
       montoBalance: 450,
@@ -123,13 +109,12 @@ describe('DuffelAdapter', () => {
   });
 
   it('crearOrdenVuelo incluye identity_documents solo si el pasajero aportó pasaporte completo (confirmado que Duffel lo acepta en vivo)', async () => {
-    process.env.DUFFEL_API_TOKEN = 'duffel_test_123';
     fetchMock.mockResolvedValue({
       ok: true,
       json: async () => ({ data: { id: 'ord_1', booking_reference: 'ABC123', total_amount: '450.00', total_currency: 'USD' } }),
     });
 
-    await adapter.crearOrdenVuelo({
+    await adapter.crearOrdenVuelo(CREDENCIALES, {
       ofertaId: 'off_1',
       pasajeros: [
         {
@@ -158,13 +143,12 @@ describe('DuffelAdapter', () => {
   });
 
   it('crearOrdenVuelo vincula al infante con su adulto responsable vía infant_passenger_id (confirmado en vivo)', async () => {
-    process.env.DUFFEL_API_TOKEN = 'duffel_test_123';
     fetchMock.mockResolvedValue({
       ok: true,
       json: async () => ({ data: { id: 'ord_1', booking_reference: 'ABC123', total_amount: '506.58', total_currency: 'USD' } }),
     });
 
-    await adapter.crearOrdenVuelo({
+    await adapter.crearOrdenVuelo(CREDENCIALES, {
       ofertaId: 'off_1',
       pasajeros: [
         {
@@ -200,7 +184,6 @@ describe('DuffelAdapter', () => {
   });
 
   it('listarOrdenes normaliza las órdenes y devuelve el cursor de paginación (confirmado en vivo: meta.after)', async () => {
-    process.env.DUFFEL_API_TOKEN = 'duffel_test_123';
     fetchMock.mockResolvedValue({
       ok: true,
       json: async () => ({
@@ -212,7 +195,7 @@ describe('DuffelAdapter', () => {
       }),
     });
 
-    const resultado = await adapter.listarOrdenes();
+    const resultado = await adapter.listarOrdenes(CREDENCIALES);
 
     expect(resultado.cursorSiguiente).toBe('cursor_pagina_2');
     expect(resultado.ordenes).toEqual([
@@ -225,28 +208,25 @@ describe('DuffelAdapter', () => {
   });
 
   it('listarOrdenes manda el cursor recibido como "after"', async () => {
-    process.env.DUFFEL_API_TOKEN = 'duffel_test_123';
     fetchMock.mockResolvedValue({ ok: true, json: async () => ({ data: [], meta: { after: null } }) });
 
-    await adapter.listarOrdenes('cursor_previo');
+    await adapter.listarOrdenes(CREDENCIALES, 'cursor_previo');
 
     const [url] = fetchMock.mock.calls[0];
     expect(url).toBe('https://api.duffel.com/air/orders?limit=50&after=cursor_previo');
   });
 
   it('traduce offer_no_longer_available a un mensaje de negocio claro', async () => {
-    process.env.DUFFEL_API_TOKEN = 'duffel_test_123';
     fetchMock.mockResolvedValue({
       ok: false,
       status: 422,
       json: async () => ({ errors: [{ type: 'airline_error', code: 'offer_no_longer_available', title: 'Offer no longer available' }] }),
     });
 
-    await expect(adapter.obtenerOferta('off_expirada')).rejects.toThrow(/expiró o fue reservada/);
+    await expect(adapter.obtenerOferta(CREDENCIALES, 'off_expirada')).rejects.toThrow(/expiró o fue reservada/);
   });
 
   it('traduce rate_limit_error a un mensaje de negocio claro tras agotar los reintentos', async () => {
-    process.env.DUFFEL_API_TOKEN = 'duffel_test_123';
     // ratelimit-reset ya vencido -> espera calculada 0ms, no ralentiza el test real.
     fetchMock.mockResolvedValue({
       ok: false,
@@ -255,20 +235,19 @@ describe('DuffelAdapter', () => {
       json: async () => ({ errors: [{ type: 'rate_limit_error', title: 'Too many requests' }] }),
     });
 
-    await expect(adapter.obtenerOferta('off_1')).rejects.toThrow(/limitando las solicitudes/);
+    await expect(adapter.obtenerOferta(CREDENCIALES, 'off_1')).rejects.toThrow(/limitando las solicitudes/);
     expect(fetchMock).toHaveBeenCalledTimes(3); // intento inicial + 2 reintentos (MAX_REINTENTOS_RATE_LIMIT)
   });
 
   it('cotizarCancelacion y confirmarCancelacion siguen el flujo de 2 pasos', async () => {
-    process.env.DUFFEL_API_TOKEN = 'duffel_test_123';
     fetchMock
       .mockResolvedValueOnce({ ok: true, json: async () => ({ data: { id: 'orc_1', refund_amount: '300.00', refund_currency: 'USD' } }) })
       .mockResolvedValueOnce({ ok: true, json: async () => ({ data: { refund_amount: '300.00', refund_currency: 'USD' } }) });
 
-    const cotizacion = await adapter.cotizarCancelacion('ord_1');
+    const cotizacion = await adapter.cotizarCancelacion(CREDENCIALES, 'ord_1');
     expect(cotizacion).toEqual({ id: 'orc_1', montoReembolso: '300.00', moneda: 'USD' });
 
-    const confirmacion = await adapter.confirmarCancelacion('orc_1');
+    const confirmacion = await adapter.confirmarCancelacion(CREDENCIALES, 'orc_1');
     expect(confirmacion).toEqual({ reembolsado: true, montoReembolso: '300.00', moneda: 'USD' });
 
     expect(fetchMock.mock.calls[0][0]).toBe('https://api.duffel.com/air/order_cancellations');
@@ -276,15 +255,13 @@ describe('DuffelAdapter', () => {
   });
 
   it('lanza ServiceUnavailableException si la petición de red falla incluso tras reintentar (operación de lectura)', async () => {
-    process.env.DUFFEL_API_TOKEN = 'duffel_test_123';
     fetchMock.mockRejectedValue(new Error('ECONNRESET'));
 
-    await expect(adapter.obtenerOferta('off_1')).rejects.toThrow(ServiceUnavailableException);
+    await expect(adapter.obtenerOferta(CREDENCIALES, 'off_1')).rejects.toThrow(ServiceUnavailableException);
     expect(fetchMock).toHaveBeenCalledTimes(3); // intento inicial + 2 reintentos, obtenerOferta es de lectura
   });
 
   it('un fallo de red transitorio se recupera solo (obtenerOferta reintenta y el segundo intento funciona)', async () => {
-    process.env.DUFFEL_API_TOKEN = 'duffel_test_123';
     fetchMock
       .mockRejectedValueOnce(new Error('ECONNRESET'))
       .mockResolvedValueOnce({
@@ -292,18 +269,17 @@ describe('DuffelAdapter', () => {
         json: async () => ({ data: { id: 'off_1', total_amount: '450.00', total_currency: 'USD', expires_at: '2026-11-01T00:00:00Z', owner: { name: 'Iberia' }, slices: [], passengers: [] } }),
       });
 
-    const resultado = await adapter.obtenerOferta('off_1');
+    const resultado = await adapter.obtenerOferta(CREDENCIALES, 'off_1');
 
     expect(resultado.id).toBe('off_1');
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it('crearOrdenVuelo NUNCA reintenta ante un fallo de red — podría duplicar una orden real ya cobrada', async () => {
-    process.env.DUFFEL_API_TOKEN = 'duffel_test_123';
     fetchMock.mockRejectedValue(new Error('ECONNRESET'));
 
     await expect(
-      adapter.crearOrdenVuelo({
+      adapter.crearOrdenVuelo(CREDENCIALES, {
         ofertaId: 'off_1',
         pasajeros: [{ id: 'pas_1', nombre: 'Juan', apellido: 'Pérez', fechaNacimiento: '1990-01-01', genero: 'm', titulo: 'mr', email: 'j@x.com', telefono: '+18095551234' }],
         montoBalance: 450,
@@ -314,10 +290,9 @@ describe('DuffelAdapter', () => {
   });
 
   it('confirmarCancelacion NUNCA reintenta ante un fallo de red — podría duplicar un reembolso real', async () => {
-    process.env.DUFFEL_API_TOKEN = 'duffel_test_123';
     fetchMock.mockRejectedValue(new Error('ECONNRESET'));
 
-    await expect(adapter.confirmarCancelacion('orc_1')).rejects.toThrow(ServiceUnavailableException);
+    await expect(adapter.confirmarCancelacion(CREDENCIALES, 'orc_1')).rejects.toThrow(ServiceUnavailableException);
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });

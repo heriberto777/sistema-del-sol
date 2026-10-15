@@ -75,8 +75,8 @@ export class TravelController {
 
   @Post(':id/cancelacion/cotizar')
   @Permissions('travel.cancelar')
-  cotizarCancelacion(@Param('id') id: string) {
-    return this.travelService.cotizarCancelacionProveedor(id);
+  cotizarCancelacion(@Param('id') id: string, @CurrentUser() user: JwtPayloadUser) {
+    return this.travelService.cotizarCancelacionProveedor(id, user.tenantId);
   }
 
   @Post(':id/cancelacion/confirmar')

@@ -92,14 +92,6 @@ export interface ConfiguracionPlataforma {
   iaAsistente: {
     limiteMensual: number;
   };
-  travel: {
-    duffelApiTokenConfigurado: boolean;
-    duffelWebhookSecretConfigurado: boolean;
-    hotelbedsApiKeyConfigurado: boolean;
-    hotelbedsSecretConfigurado: boolean;
-    hotelbedsMoneda: string;
-    hotelbedsTasaCambio: number | null;
-  };
 }
 
 // Fase 4 — reglas de notificación de vencimiento configurables.
@@ -121,7 +113,6 @@ const TABS = [
   'Webhook',
   'Vencimientos',
   'Dominio propio',
-  'Travel',
 ] as const;
 type Tab = (typeof TABS)[number];
 
@@ -184,13 +175,6 @@ export function PlatformConfiguracion() {
           {tab === 'Webhook' && <SeccionWebhook config={config} guardar={guardar} />}
           {tab === 'Vencimientos' && <SeccionVencimientos config={config} guardar={guardar} />}
           {tab === 'Dominio propio' && <SeccionDominioPropio config={config} guardar={guardar} />}
-          {tab === 'Travel' && (
-            <div className="space-y-4">
-              <SeccionTravel config={config} guardar={guardar} />
-              <SeccionTravelHotelbeds config={config} guardar={guardar} />
-              <SeccionTravelReconciliacion />
-            </div>
-          )}
         </>
       )}
     </div>
@@ -445,225 +429,6 @@ function SeccionPasarela({ config, guardar }: SeccionProps) {
           {guardar.isPending ? 'Guardando…' : 'Guardar'}
         </Button>
       </form>
-    </Card>
-  );
-}
-
-function SeccionTravel({ config, guardar }: SeccionProps) {
-  const travel = config.travel;
-  const [duffelApiToken, setDuffelApiToken] = useState('');
-  const [duffelWebhookSecret, setDuffelWebhookSecret] = useState('');
-
-  function onSubmit(e: FormEvent) {
-    e.preventDefault();
-    guardar.mutate({
-      ...(duffelApiToken !== '' ? { duffelApiToken } : {}),
-      ...(duffelWebhookSecret !== '' ? { duffelWebhookSecret } : {}),
-    });
-    setDuffelApiToken('');
-    setDuffelWebhookSecret('');
-  }
-
-  return (
-    <Card
-      titulo="Travel Management (Duffel)"
-      descripcion="Cuenta única y compartida de la plataforma para reservar vuelos — cada agencia (tenant) no trae la suya propia."
-    >
-      <form onSubmit={onSubmit} className="max-w-md space-y-3">
-        <FormField
-          id="duffelApiToken"
-          label="Duffel API Token"
-          type="password"
-          value={duffelApiToken}
-          onChange={(e) => setDuffelApiToken(e.target.value)}
-          placeholder={travel.duffelApiTokenConfigurado ? PLACEHOLDER_CONFIGURADO : 'duffel_test_...'}
-        />
-        <p className="text-xs text-slate-400">
-          "duffel_test_..." para probar en sandbox, "duffel_live_..." en producción — es el mismo endpoint de Duffel, solo cambia el
-          prefijo del token.
-        </p>
-
-        <div className="space-y-2 border-t border-slate-200 pt-3 dark:border-slate-800">
-          <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Webhook de Duffel</p>
-          <p className="text-xs text-slate-400">
-            Registrá esta URL en el panel de Duffel (Webhooks) para recibir avisos de cambios de itinerario o cancelaciones hechas
-            fuera de esta plataforma:
-          </p>
-          <code className="block break-all rounded-lg bg-slate-100 px-3 py-2 text-xs text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-            {window.location.origin}/api/webhooks/duffel
-          </code>
-          <FormField
-            id="duffelWebhookSecret"
-            label="Webhook Secret"
-            type="password"
-            value={duffelWebhookSecret}
-            onChange={(e) => setDuffelWebhookSecret(e.target.value)}
-            placeholder={travel.duffelWebhookSecretConfigurado ? PLACEHOLDER_CONFIGURADO : 'whsec_...'}
-          />
-        </div>
-
-        <Button type="submit" disabled={guardar.isPending}>
-          {guardar.isPending ? 'Guardando…' : 'Guardar'}
-        </Button>
-      </form>
-    </Card>
-  );
-}
-
-function SeccionTravelHotelbeds({ config, guardar }: SeccionProps) {
-  const travel = config.travel;
-  const [hotelbedsApiKey, setHotelbedsApiKey] = useState('');
-  const [hotelbedsSecret, setHotelbedsSecret] = useState('');
-  const [moneda, setMoneda] = useState(travel.hotelbedsMoneda);
-  const [tasaCambio, setTasaCambio] = useState(travel.hotelbedsTasaCambio !== null ? String(travel.hotelbedsTasaCambio) : '');
-
-  function onSubmit(e: FormEvent) {
-    e.preventDefault();
-    guardar.mutate({
-      ...(hotelbedsApiKey !== '' ? { hotelbedsApiKey } : {}),
-      ...(hotelbedsSecret !== '' ? { hotelbedsSecret } : {}),
-      hotelbedsMoneda: moneda,
-      ...(moneda !== 'EUR' && tasaCambio !== '' ? { hotelbedsTasaCambio: Number(tasaCambio) } : {}),
-    });
-    setHotelbedsApiKey('');
-    setHotelbedsSecret('');
-  }
-
-  return (
-    <Card
-      titulo="Travel Management (Hotelbeds)"
-      descripcion="Cuenta única y compartida de la plataforma para reservar hoteles — factura neto con liquidación periódica, nunca pide tarjeta al reservar."
-    >
-      <form onSubmit={onSubmit} className="max-w-md space-y-3">
-        <FormField
-          id="hotelbedsApiKey"
-          label="Api Key"
-          type="password"
-          value={hotelbedsApiKey}
-          onChange={(e) => setHotelbedsApiKey(e.target.value)}
-          placeholder={travel.hotelbedsApiKeyConfigurado ? PLACEHOLDER_CONFIGURADO : 'Api key de developer.hotelbeds.com'}
-        />
-        <FormField
-          id="hotelbedsSecret"
-          label="Secret"
-          type="password"
-          value={hotelbedsSecret}
-          onChange={(e) => setHotelbedsSecret(e.target.value)}
-          placeholder={travel.hotelbedsSecretConfigurado ? PLACEHOLDER_CONFIGURADO : 'Secret compartido'}
-        />
-        <p className="text-xs text-slate-400">Las dos firman cada request (X-Signature) — sandbox de test, mismo host que producción.</p>
-
-        <div className="border-t border-slate-100 pt-3 dark:border-slate-800">
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div className="flex flex-col gap-1">
-              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Moneda de venta</label>
-              <Select value={moneda} onChange={(e) => setMoneda(e.target.value)}>
-                <option value="EUR">EUR (sin conversión — la nativa de Hotelbeds)</option>
-                <option value="USD">USD</option>
-                <option value="DOP">DOP</option>
-              </Select>
-            </div>
-            {moneda !== 'EUR' && (
-              <FormField
-                label={`Tasa: 1 EUR = ? ${moneda}`}
-                type="number"
-                min="0.000001"
-                step="0.000001"
-                value={tasaCambio}
-                onChange={(e) => setTasaCambio(e.target.value)}
-                placeholder="ej. 1.08"
-                required
-              />
-            )}
-          </div>
-          <p className="mt-2 text-xs text-slate-400">
-            Hotelbeds cotiza siempre en EUR — si vendés en otra moneda, la tasa es manual (actualizala vos, no se consulta ningún tipo de cambio en vivo).
-          </p>
-        </div>
-
-        <Button type="submit" disabled={guardar.isPending || (moneda !== 'EUR' && !tasaCambio)}>
-          {guardar.isPending ? 'Guardando…' : 'Guardar'}
-        </Button>
-      </form>
-    </Card>
-  );
-}
-
-interface ResumenReconciliacionTravel {
-  totalOrdenesRevisadas: number;
-  ordenesHuerfanas: { id: string; localizador: string; montoTotal: string; moneda: string; creadaEn: string; canceladaEn: string | null }[];
-  cancelacionesNoReflejadas: { ordenId: string; reservaId: string; tenantId: string; codigoInterno: string; canceladaEn: string }[];
-}
-
-/**
- * Duffel no expone el saldo real del Balance por API (confirmado contra
- * el sandbox real: /air/balances, /balances y /air/balance dan 404) —
- * esto NO compara números, cruza las órdenes reales de la cuenta contra
- * las TravelReserva internas para detectar huérfanas o cancelaciones que
- * el webhook no capturó. Nunca corrige nada solo, es un reporte.
- */
-function SeccionTravelReconciliacion() {
-  const [resultado, setResultado] = useState<ResumenReconciliacionTravel | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  const revisar = useMutation({
-    mutationFn: async () => (await platformApiClient.get<ResumenReconciliacionTravel>('/platform/travel/reconciliacion')).data,
-    onSuccess: (data) => {
-      setResultado(data);
-      setError(null);
-    },
-    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo revisar la cuenta de Duffel — intentá de nuevo en unos minutos.')),
-  });
-
-  return (
-    <Card
-      titulo="Reconciliación de la cuenta Duffel"
-      descripcion="Cruza las órdenes reales de la cuenta compartida contra las reservas internas — no corrige nada solo, solo reporta."
-    >
-      <Button onClick={() => revisar.mutate()} disabled={revisar.isPending}>
-        {revisar.isPending ? 'Revisando…' : 'Revisar ahora'}
-      </Button>
-      {error && <p className="mt-3 text-sm text-red-600 dark:text-red-400">{error}</p>}
-
-      {resultado && (
-        <div className="mt-4 space-y-4">
-          <p className="text-xs text-slate-400">{resultado.totalOrdenesRevisadas} orden(es) revisada(s) en Duffel.</p>
-
-          <div>
-            <p className="mb-2 text-sm font-medium text-slate-700 dark:text-slate-300">
-              Órdenes huérfanas (existen en Duffel, sin reserva interna) — {resultado.ordenesHuerfanas.length}
-            </p>
-            {resultado.ordenesHuerfanas.length === 0 ? (
-              <p className="text-xs text-slate-400">Ninguna.</p>
-            ) : (
-              <ul className="space-y-1 text-xs text-slate-600 dark:text-slate-300">
-                {resultado.ordenesHuerfanas.map((o) => (
-                  <li key={o.id} className="rounded bg-amber-50 px-2 py-1 dark:bg-amber-500/10">
-                    {o.localizador} — {o.moneda} {o.montoTotal} — {new Date(o.creadaEn).toLocaleDateString('es-DO')}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-
-          <div>
-            <p className="mb-2 text-sm font-medium text-slate-700 dark:text-slate-300">
-              Cancelaciones no reflejadas internamente — {resultado.cancelacionesNoReflejadas.length}
-            </p>
-            {resultado.cancelacionesNoReflejadas.length === 0 ? (
-              <p className="text-xs text-slate-400">Ninguna.</p>
-            ) : (
-              <ul className="space-y-1 text-xs text-slate-600 dark:text-slate-300">
-                {resultado.cancelacionesNoReflejadas.map((c) => (
-                  <li key={c.ordenId} className="rounded bg-red-50 px-2 py-1 dark:bg-red-500/10">
-                    {c.codigoInterno} — cancelada en Duffel el {new Date(c.canceladaEn).toLocaleDateString('es-DO')}, sigue sin marcar CANCELADA internamente
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        </div>
-      )}
     </Card>
   );
 }

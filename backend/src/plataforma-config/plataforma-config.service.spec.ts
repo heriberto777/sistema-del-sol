@@ -24,12 +24,6 @@ const CONFIG_VACIA = {
   webhookUrl: null,
   webhookSecretCifrado: null,
   webhookActivo: false,
-  duffelApiTokenCifrado: null,
-  duffelWebhookSecretCifrado: null,
-  hotelbedsApiKeyCifrado: null,
-  hotelbedsSecretCifrado: null,
-  hotelbedsMoneda: null,
-  hotelbedsTasaCambio: null,
 };
 
 describe('PlataformaConfigService', () => {
@@ -64,51 +58,6 @@ describe('PlataformaConfigService', () => {
       const resultado = await service.obtener();
       expect(resultado.pasarela.stripeSecretKeyConfigurado).toBe(false);
       expect(resultado.notificaciones.email.passwordConfigurado).toBe(false);
-      expect(resultado.travel.duffelApiTokenConfigurado).toBe(false);
-    });
-
-    it('travel — reporta configurado:true sin exponer el token en texto plano', async () => {
-      repo.obtenerOCrear.mockResolvedValue({ ...CONFIG_VACIA, duffelApiTokenCifrado: cifrar('duffel_test_real') } as never);
-
-      const resultado = await service.obtener();
-
-      expect(resultado.travel.duffelApiTokenConfigurado).toBe(true);
-      expect(JSON.stringify(resultado)).not.toContain('duffel_test_real');
-    });
-
-    it('travel — reporta duffelWebhookSecretConfigurado:true sin exponer el secreto en texto plano', async () => {
-      repo.obtenerOCrear.mockResolvedValue({ ...CONFIG_VACIA, duffelWebhookSecretCifrado: cifrar('whsec_duffel_real') } as never);
-
-      const resultado = await service.obtener();
-
-      expect(resultado.travel.duffelWebhookSecretConfigurado).toBe(true);
-      expect(JSON.stringify(resultado)).not.toContain('whsec_duffel_real');
-    });
-
-    it('travel — reporta hotelbedsApiKeyConfigurado/hotelbedsSecretConfigurado:true sin exponerlos en texto plano', async () => {
-      repo.obtenerOCrear.mockResolvedValue({ ...CONFIG_VACIA, hotelbedsApiKeyCifrado: cifrar('hb_key_real'), hotelbedsSecretCifrado: cifrar('hb_secret_real') } as never);
-
-      const resultado = await service.obtener();
-
-      expect(resultado.travel.hotelbedsApiKeyConfigurado).toBe(true);
-      expect(resultado.travel.hotelbedsSecretConfigurado).toBe(true);
-      expect(JSON.stringify(resultado)).not.toContain('hb_key_real');
-      expect(JSON.stringify(resultado)).not.toContain('hb_secret_real');
-    });
-
-    it('travel — hotelbedsMoneda por defecto es EUR y hotelbedsTasaCambio null (sin conversión configurada)', async () => {
-      const resultado = await service.obtener();
-      expect(resultado.travel.hotelbedsMoneda).toBe('EUR');
-      expect(resultado.travel.hotelbedsTasaCambio).toBeNull();
-    });
-
-    it('travel — expone hotelbedsMoneda/hotelbedsTasaCambio guardados (no son secretos, van en claro)', async () => {
-      repo.obtenerOCrear.mockResolvedValue({ ...CONFIG_VACIA, hotelbedsMoneda: 'USD', hotelbedsTasaCambio: 1.08 } as never);
-
-      const resultado = await service.obtener();
-
-      expect(resultado.travel.hotelbedsMoneda).toBe('USD');
-      expect(resultado.travel.hotelbedsTasaCambio).toBe(1.08);
     });
   });
 
@@ -180,46 +129,6 @@ describe('PlataformaConfigService', () => {
       await service.onModuleInit();
 
       expect(process.env.PASARELA_PAGO_ACTIVA).toBe('stripe');
-    });
-
-    it('travel — sincroniza el token descifrado a DUFFEL_API_TOKEN (lo que lee DuffelAdapter)', async () => {
-      delete process.env.DUFFEL_API_TOKEN;
-      repo.actualizar.mockResolvedValue({ ...CONFIG_VACIA, duffelApiTokenCifrado: cifrar('duffel_test_real') } as never);
-
-      await service.actualizar({ duffelApiToken: 'duffel_test_real' } as never);
-
-      expect(process.env.DUFFEL_API_TOKEN).toBe('duffel_test_real');
-    });
-
-    it('travel — sincroniza el secreto descifrado a DUFFEL_WEBHOOK_SECRET (lo que lee TravelWebhookController)', async () => {
-      delete process.env.DUFFEL_WEBHOOK_SECRET;
-      repo.actualizar.mockResolvedValue({ ...CONFIG_VACIA, duffelWebhookSecretCifrado: cifrar('whsec_duffel_real') } as never);
-
-      await service.actualizar({ duffelWebhookSecret: 'whsec_duffel_real' } as never);
-
-      expect(process.env.DUFFEL_WEBHOOK_SECRET).toBe('whsec_duffel_real');
-    });
-
-    it('travel — sincroniza las credenciales de Hotelbeds descifradas a HOTELBEDS_API_KEY/HOTELBEDS_SECRET (lo que lee HotelbedsAdapter)', async () => {
-      delete process.env.HOTELBEDS_API_KEY;
-      delete process.env.HOTELBEDS_SECRET;
-      repo.actualizar.mockResolvedValue({ ...CONFIG_VACIA, hotelbedsApiKeyCifrado: cifrar('hb_key_real'), hotelbedsSecretCifrado: cifrar('hb_secret_real') } as never);
-
-      await service.actualizar({ hotelbedsApiKey: 'hb_key_real', hotelbedsSecret: 'hb_secret_real' } as never);
-
-      expect(process.env.HOTELBEDS_API_KEY).toBe('hb_key_real');
-      expect(process.env.HOTELBEDS_SECRET).toBe('hb_secret_real');
-    });
-
-    it('travel — sincroniza hotelbedsMoneda/hotelbedsTasaCambio a HOTELBEDS_MONEDA/HOTELBEDS_TASA_CAMBIO (lo que lee HotelbedsAdapter)', async () => {
-      delete process.env.HOTELBEDS_MONEDA;
-      delete process.env.HOTELBEDS_TASA_CAMBIO;
-      repo.actualizar.mockResolvedValue({ ...CONFIG_VACIA, hotelbedsMoneda: 'USD', hotelbedsTasaCambio: 1.08 } as never);
-
-      await service.actualizar({ hotelbedsMoneda: 'USD', hotelbedsTasaCambio: 1.08 } as never);
-
-      expect(process.env.HOTELBEDS_MONEDA).toBe('USD');
-      expect(process.env.HOTELBEDS_TASA_CAMBIO).toBe('1.08');
     });
 
     it('el modelo elegido por proveedor se guarda y se sincroniza a su variable de entorno', async () => {

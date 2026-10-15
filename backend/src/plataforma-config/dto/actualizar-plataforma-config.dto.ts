@@ -252,36 +252,4 @@ export class ActualizarPlataformaConfigDto {
   @Min(0)
   iaAsistenteLimiteMensual?: number;
 
-  // Travel Management (plugin) — cuenta Duffel única y compartida de la plataforma (decisión B2B)
-  @ApiProperty({ required: false, description: '"duffel_test_..." en sandbox / "duffel_live_..." en producción — "" borra el override guardado' })
-  @IsOptional()
-  @IsString()
-  duffelApiToken?: string;
-
-  @ApiProperty({ required: false, description: 'Secreto para verificar la firma del webhook de Duffel (X-Duffel-Signature) — "" borra el override guardado' })
-  @IsOptional()
-  @IsString()
-  duffelWebhookSecret?: string;
-
-  // Hotelbeds (plugin, hoteles) — cuenta única y compartida de la plataforma, mismo criterio B2B que Duffel.
-  @ApiProperty({ required: false, description: '"" borra el override guardado' })
-  @IsOptional()
-  @IsString()
-  hotelbedsApiKey?: string;
-
-  @ApiProperty({ required: false, description: 'Usado junto al Api-key para firmar cada request (X-Signature) — "" borra el override guardado' })
-  @IsOptional()
-  @IsString()
-  hotelbedsSecret?: string;
-
-  @ApiProperty({ required: false, description: 'Moneda en la que se muestran/venden las tarifas de hotel — Hotelbeds siempre cotiza en EUR, esto convierte. Vacío o "EUR" = sin conversión.' })
-  @IsOptional()
-  @IsString()
-  hotelbedsMoneda?: string;
-
-  @ApiProperty({ required: false, description: 'Tasa manual 1 EUR = N de hotelbedsMoneda — obligatoria si hotelbedsMoneda no es EUR' })
-  @IsOptional()
-  @IsNumber()
-  @Min(0.000001)
-  hotelbedsTasaCambio?: number;
 }

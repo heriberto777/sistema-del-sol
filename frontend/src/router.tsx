@@ -90,6 +90,7 @@ import { Parametros } from './pages/Parametros';
 import { Documentos } from './pages/Documentos';
 import { Webhooks } from './pages/Webhooks';
 import { WhatsappConfig } from './pages/WhatsappConfig';
+import { TravelConfig } from './pages/TravelConfig';
 import { CorreoConfig } from './pages/CorreoConfig';
 import { PlatformLogin } from './pages/PlatformLogin';
 import { PlatformDashboard } from './pages/PlatformDashboard';
@@ -300,6 +301,7 @@ const RUTAS_ADMIN = [
           { path: '/crm/dashboard', element: <CrmDashboard /> },
           { path: '/crm/metas-venta', element: <CrmMetasVenta /> },
           { path: '/whatsapp-config', element: <WhatsappConfig /> },
+          { path: '/travel-config', element: <TravelConfig /> },
           { path: '/correo-config', element: <CorreoConfig /> },
         ],
       },

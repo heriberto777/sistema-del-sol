@@ -329,7 +329,10 @@ export const DOMINIOS_MENU: DominioMenu[] = [
       { categoria: 'transacciones', items: [{ id: 'reservar-vuelo', etiqueta: 'Buscar y reservar vuelo', ruta: '/travel/reservas', permisos: ['travel.reservar'], modulo: 'travel' }] },
       { categoria: 'consultas', items: [{ id: 'reservas', etiqueta: 'Mis reservas', ruta: '/travel/reservas', permisos: ['travel.ver'], modulo: 'travel' }] },
       { categoria: 'reportes', items: [] },
-      { categoria: 'configuracion', items: [] },
+      {
+        categoria: 'configuracion',
+        items: [{ id: 'travel-config', etiqueta: 'Cuenta Duffel / Hotelbeds', ruta: '/travel-config', permisos: ['admin.configuracion'], modulo: 'travel' }],
+      },
     ],
   },
   {

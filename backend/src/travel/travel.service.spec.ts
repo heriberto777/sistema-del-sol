@@ -9,6 +9,10 @@ import { TravelProviderService } from './providers/travel-provider.service';
 import { TravelProvider } from './providers/travel-provider.interface';
 import { HotelProviderService } from './providers/hotel-provider.service';
 import { HotelProvider } from './providers/hotel-provider.interface';
+import { TravelConfigService } from '../travel-config/travel-config.service';
+
+const CREDENCIALES_DUFFEL = { token: 'duffel_test_real' };
+const CREDENCIALES_HOTELBEDS = { apiKey: 'key', secret: 'secret', moneda: 'EUR', tasaCambio: 1 };
 
 describe('TravelService', () => {
   let service: TravelService;
@@ -21,6 +25,7 @@ describe('TravelService', () => {
   let proveedorHotel: jest.Mocked<HotelProvider>;
   let hotelProviderService: jest.Mocked<HotelProviderService>;
   let tasasCambioService: jest.Mocked<TasasCambioService>;
+  let travelConfigService: jest.Mocked<TravelConfigService>;
 
   beforeEach(() => {
     repository = {
@@ -45,7 +50,6 @@ describe('TravelService', () => {
     facturacionService = { crear: jest.fn() } as unknown as jest.Mocked<FacturacionService>;
     proveedor = {
       clave: 'duffel',
-      habilitado: true,
       buscarVuelos: jest.fn(),
       obtenerOferta: jest.fn(),
       crearOrdenVuelo: jest.fn(),
@@ -55,7 +59,6 @@ describe('TravelService', () => {
     travelProviderService = { activo: proveedor } as unknown as jest.Mocked<TravelProviderService>;
     proveedorHotel = {
       clave: 'hotelbeds',
-      habilitado: true,
       buscarHoteles: jest.fn(),
       confirmarTarifa: jest.fn(),
       crearReserva: jest.fn(),
@@ -64,7 +67,11 @@ describe('TravelService', () => {
     } as unknown as jest.Mocked<HotelProvider>;
     hotelProviderService = { activo: proveedorHotel } as unknown as jest.Mocked<HotelProviderService>;
     tasasCambioService = { buscarPorMoneda: jest.fn() } as unknown as jest.Mocked<TasasCambioService>;
-    service = new TravelService(repository, clientesService, correlativosRepository, facturacionService, travelProviderService, hotelProviderService, tasasCambioService);
+    travelConfigService = {
+      obtenerCredencialesDuffel: jest.fn().mockResolvedValue(CREDENCIALES_DUFFEL),
+      obtenerCredencialesHotelbeds: jest.fn().mockResolvedValue(CREDENCIALES_HOTELBEDS),
+    } as unknown as jest.Mocked<TravelConfigService>;
+    service = new TravelService(repository, clientesService, correlativosRepository, facturacionService, travelProviderService, hotelProviderService, tasasCambioService, travelConfigService);
   });
 
   describe('crear', () => {
@@ -210,11 +217,12 @@ describe('TravelService', () => {
   });
 
   describe('buscarVuelos', () => {
-    it('delega en el proveedor activo', async () => {
+    it('resuelve las credenciales de Duffel del tenant y delega en el proveedor activo', async () => {
       proveedor.buscarVuelos.mockResolvedValue({ solicitudId: 'orq_1', ofertas: [] });
       const dto = { tramos: [{ origen: 'SDQ', destino: 'MAD', fecha: '2026-12-10' }], pasajeros: [{ tipo: 'adult' as const }] };
-      await service.buscarVuelos(dto);
-      expect(proveedor.buscarVuelos).toHaveBeenCalledWith(dto);
+      await service.buscarVuelos(dto, 't1');
+      expect(travelConfigService.obtenerCredencialesDuffel).toHaveBeenCalledWith('t1');
+      expect(proveedor.buscarVuelos).toHaveBeenCalledWith(CREDENCIALES_DUFFEL, dto);
     });
   });
 
@@ -250,7 +258,7 @@ describe('TravelService', () => {
 
       const reserva = await service.reservarOfertaVuelo(dto, 't1');
 
-      expect(proveedor.crearOrdenVuelo).toHaveBeenCalledWith({ ofertaId: 'off_1', pasajeros: dto.pasajeros, montoBalance: 450, monedaBalance: 'USD' });
+      expect(proveedor.crearOrdenVuelo).toHaveBeenCalledWith(CREDENCIALES_DUFFEL, { ofertaId: 'off_1', pasajeros: dto.pasajeros, montoBalance: 450, monedaBalance: 'USD' });
       expect(repository.crearDesdeProveedor).toHaveBeenCalledWith(
         expect.objectContaining({
           tenantId: 't1',
@@ -273,10 +281,16 @@ describe('TravelService', () => {
   });
 
   describe('buscarHoteles', () => {
-    it('delega en el proveedor de hoteles activo', async () => {
+    it('resuelve las credenciales de Hotelbeds del tenant y delega en el proveedor activo', async () => {
       proveedorHotel.buscarHoteles.mockResolvedValue({ hoteles: [] });
-      await service.buscarHoteles({ destino: 'PMI', checkIn: '2026-12-10', checkOut: '2026-12-12', habitaciones: 1, adultos: 2, ninos: 0 } as never);
-      expect(proveedorHotel.buscarHoteles).toHaveBeenCalledWith({ destino: 'PMI', checkIn: '2026-12-10', checkOut: '2026-12-12', ocupacion: { habitaciones: 1, adultos: 2, ninos: 0 } });
+      await service.buscarHoteles({ destino: 'PMI', checkIn: '2026-12-10', checkOut: '2026-12-12', habitaciones: 1, adultos: 2, ninos: 0 } as never, 't1');
+      expect(travelConfigService.obtenerCredencialesHotelbeds).toHaveBeenCalledWith('t1');
+      expect(proveedorHotel.buscarHoteles).toHaveBeenCalledWith(CREDENCIALES_HOTELBEDS, {
+        destino: 'PMI',
+        checkIn: '2026-12-10',
+        checkOut: '2026-12-12',
+        ocupacion: { habitaciones: 1, adultos: 2, ninos: 0 },
+      });
     });
   });
 
@@ -303,8 +317,9 @@ describe('TravelService', () => {
 
       const reserva = await service.reservarHotel(dto, 't1');
 
-      expect(proveedorHotel.confirmarTarifa).toHaveBeenCalledWith('RK1');
+      expect(proveedorHotel.confirmarTarifa).toHaveBeenCalledWith(CREDENCIALES_HOTELBEDS, 'RK1');
       expect(proveedorHotel.crearReserva).toHaveBeenCalledWith(
+        CREDENCIALES_HOTELBEDS,
         expect.objectContaining({ rateKey: 'RK1-CONFIRMADO', titular: { nombre: 'Juan', apellido: 'Pérez' }, huespedes: dto.huespedes }),
       );
       expect(repository.crearDesdeProveedorHotel).toHaveBeenCalledWith(
@@ -330,7 +345,7 @@ describe('TravelService', () => {
   describe('cotizarCancelacionProveedor', () => {
     it('rechaza si la reserva no tiene una orden de proveedor (es carga manual)', async () => {
       repository.buscarPorId.mockResolvedValue({ id: 'r1', proveedorOrdenId: null } as never);
-      await expect(service.cotizarCancelacionProveedor('r1')).rejects.toThrow(BadRequestException);
+      await expect(service.cotizarCancelacionProveedor('r1', 't1')).rejects.toThrow(BadRequestException);
       expect(proveedor.cotizarCancelacion).not.toHaveBeenCalled();
     });
 
@@ -338,9 +353,9 @@ describe('TravelService', () => {
       repository.buscarPorId.mockResolvedValue({ id: 'r1', proveedorOrdenId: 'ord_1', proveedor: 'duffel' } as never);
       proveedor.cotizarCancelacion.mockResolvedValue({ id: 'orc_1', montoReembolso: '300.00', moneda: 'USD' });
 
-      const resultado = await service.cotizarCancelacionProveedor('r1');
+      const resultado = await service.cotizarCancelacionProveedor('r1', 't1');
 
-      expect(proveedor.cotizarCancelacion).toHaveBeenCalledWith('ord_1');
+      expect(proveedor.cotizarCancelacion).toHaveBeenCalledWith(CREDENCIALES_DUFFEL, 'ord_1');
       expect(proveedorHotel.cotizarCancelacion).not.toHaveBeenCalled();
       expect(repository.marcarCancelacionCotizada).toHaveBeenCalledWith('r1', 'orc_1');
       expect(resultado).toEqual({ id: 'orc_1', montoReembolso: '300.00', moneda: 'USD' });
@@ -350,9 +365,9 @@ describe('TravelService', () => {
       repository.buscarPorId.mockResolvedValue({ id: 'r1', proveedorOrdenId: '1-8322356', proveedor: 'hotelbeds' } as never);
       proveedorHotel.cotizarCancelacion.mockResolvedValue({ id: 'CANC-1', montoReembolso: '0', moneda: 'EUR' });
 
-      const resultado = await service.cotizarCancelacionProveedor('r1');
+      const resultado = await service.cotizarCancelacionProveedor('r1', 't1');
 
-      expect(proveedorHotel.cotizarCancelacion).toHaveBeenCalledWith('1-8322356');
+      expect(proveedorHotel.cotizarCancelacion).toHaveBeenCalledWith(CREDENCIALES_HOTELBEDS, '1-8322356');
       expect(proveedor.cotizarCancelacion).not.toHaveBeenCalled();
       expect(resultado).toEqual({ id: 'CANC-1', montoReembolso: '0', moneda: 'EUR' });
     });
@@ -371,7 +386,7 @@ describe('TravelService', () => {
 
       await service.confirmarCancelacionProveedor('r1', 't1');
 
-      expect(proveedor.confirmarCancelacion).toHaveBeenCalledWith('orc_1');
+      expect(proveedor.confirmarCancelacion).toHaveBeenCalledWith(CREDENCIALES_DUFFEL, 'orc_1');
       expect(proveedorHotel.confirmarCancelacion).not.toHaveBeenCalled();
       expect(repository.marcarCanceladaPorProveedor).toHaveBeenCalledWith('r1');
       expect(repository.registrarMovimientoLedger).toHaveBeenCalledWith(
@@ -393,7 +408,7 @@ describe('TravelService', () => {
 
       await service.confirmarCancelacionProveedor('r1', 't1');
 
-      expect(proveedorHotel.confirmarCancelacion).toHaveBeenCalledWith('1-8322356', 198.36);
+      expect(proveedorHotel.confirmarCancelacion).toHaveBeenCalledWith(CREDENCIALES_HOTELBEDS, '1-8322356', 198.36);
       expect(proveedor.confirmarCancelacion).not.toHaveBeenCalled();
       expect(repository.registrarMovimientoLedger).toHaveBeenCalledWith(
         expect.objectContaining({ tenantId: 't1', reservaId: 'r1', tipo: 'CREDITO', monto: 198.36, moneda: 'EUR' }),

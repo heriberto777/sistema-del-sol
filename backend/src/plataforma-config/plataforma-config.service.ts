@@ -72,8 +72,6 @@ export class PlataformaConfigService implements OnModuleInit {
     if (dto.iaFondoLimiteMensual !== undefined) data.iaFondoLimiteMensual = dto.iaFondoLimiteMensual;
     if (dto.iaImagenLimiteMensual !== undefined) data.iaImagenLimiteMensual = dto.iaImagenLimiteMensual;
     if (dto.iaAsistenteLimiteMensual !== undefined) data.iaAsistenteLimiteMensual = dto.iaAsistenteLimiteMensual;
-    if (dto.hotelbedsMoneda !== undefined) data.hotelbedsMoneda = dto.hotelbedsMoneda || null;
-    if (dto.hotelbedsTasaCambio !== undefined) data.hotelbedsTasaCambio = dto.hotelbedsTasaCambio;
 
     this.aplicarCampoSecreto(data, 'smtpPasswordCifrado', dto.smtpPassword);
     this.aplicarCampoSecreto(data, 'twilioAuthTokenCifrado', dto.twilioAuthToken);
@@ -84,10 +82,6 @@ export class PlataformaConfigService implements OnModuleInit {
     this.aplicarCampoSecreto(data, 'iaClaudeApiKeyCifrado', dto.iaClaudeApiKey);
     this.aplicarCampoSecreto(data, 'iaOpenaiApiKeyCifrado', dto.iaOpenaiApiKey);
     this.aplicarCampoSecreto(data, 'iaGeminiApiKeyCifrado', dto.iaGeminiApiKey);
-    this.aplicarCampoSecreto(data, 'duffelApiTokenCifrado', dto.duffelApiToken);
-    this.aplicarCampoSecreto(data, 'duffelWebhookSecretCifrado', dto.duffelWebhookSecret);
-    this.aplicarCampoSecreto(data, 'hotelbedsApiKeyCifrado', dto.hotelbedsApiKey);
-    this.aplicarCampoSecreto(data, 'hotelbedsSecretCifrado', dto.hotelbedsSecret);
 
     const actualizado = await this.repository.actualizar(config.id, data);
     this.sincronizarEnv(actualizado);
@@ -150,16 +144,6 @@ export class PlataformaConfigService implements OnModuleInit {
     this.setEnv('IA_FONDO_PROVEEDOR_ACTIVO', config.iaFondoProveedorActivo);
     this.setEnv('OPENAI_IMAGEN_MODEL', config.iaOpenaiModeloFondo);
     this.setEnv('GEMINI_IMAGEN_MODEL', config.iaGeminiModeloFondo);
-
-    // Travel Management — cuenta Duffel compartida de la plataforma; es
-    // literalmente lo que DuffelAdapter.habilitado/llamar() leen.
-    this.setEnv('DUFFEL_API_TOKEN', config.duffelApiTokenCifrado ? descifrar(config.duffelApiTokenCifrado) : null);
-    this.setEnv('DUFFEL_WEBHOOK_SECRET', config.duffelWebhookSecretCifrado ? descifrar(config.duffelWebhookSecretCifrado) : null);
-    // Hotelbeds (hoteles) — cuenta compartida, mismo criterio que Duffel. HotelbedsAdapter lee estas dos variables directamente.
-    this.setEnv('HOTELBEDS_API_KEY', config.hotelbedsApiKeyCifrado ? descifrar(config.hotelbedsApiKeyCifrado) : null);
-    this.setEnv('HOTELBEDS_SECRET', config.hotelbedsSecretCifrado ? descifrar(config.hotelbedsSecretCifrado) : null);
-    this.setEnv('HOTELBEDS_MONEDA', config.hotelbedsMoneda);
-    this.setEnv('HOTELBEDS_TASA_CAMBIO', config.hotelbedsTasaCambio !== null ? String(config.hotelbedsTasaCambio) : null);
   }
 
   /** Nunca expone un secreto en texto plano — solo si hay uno guardado (*Configurado). */
@@ -231,14 +215,6 @@ export class PlataformaConfigService implements OnModuleInit {
       },
       iaAsistente: {
         limiteMensual: config.iaAsistenteLimiteMensual,
-      },
-      travel: {
-        duffelApiTokenConfigurado: Boolean(config.duffelApiTokenCifrado),
-        duffelWebhookSecretConfigurado: Boolean(config.duffelWebhookSecretCifrado),
-        hotelbedsApiKeyConfigurado: Boolean(config.hotelbedsApiKeyCifrado),
-        hotelbedsSecretConfigurado: Boolean(config.hotelbedsSecretCifrado),
-        hotelbedsMoneda: config.hotelbedsMoneda ?? 'EUR',
-        hotelbedsTasaCambio: config.hotelbedsTasaCambio !== null ? Number(config.hotelbedsTasaCambio) : null,
       },
     };
   }

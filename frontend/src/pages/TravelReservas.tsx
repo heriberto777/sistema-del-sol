@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
 import clsx from 'clsx';
 import { AlertTriangle, ArrowLeftRight, BedDouble, Check, ChevronDown, Clock, DollarSign, Plane, Plus, Receipt, Trash2, User, Users, Wallet, X } from 'lucide-react';
 import { apiClient } from '../lib/api-client';
@@ -38,6 +39,24 @@ import {
 interface ClienteOpcion {
   id: string;
   nombre: string;
+}
+
+/** Texto literal que manda TravelConfigService cuando el tenant no cargó su cuenta — ver obtenerCredencialesDuffel/obtenerCredencialesHotelbeds. */
+const SIN_CUENTA_PROPIA = 'todavía no configuró su cuenta de';
+
+/** Error de búsqueda/reserva — si es por falta de cuenta propia, agrega el link directo a Configuración → Viajes en vez de dejar al usuario adivinar qué hacer. */
+function ErrorBusquedaTravel({ mensaje }: { mensaje: string }) {
+  if (!mensaje.includes(SIN_CUENTA_PROPIA)) {
+    return <p className="text-sm text-red-600 dark:text-red-400">{mensaje}</p>;
+  }
+  return (
+    <p className="text-sm text-red-600 dark:text-red-400">
+      {mensaje}{' '}
+      <Link to="/travel-config" className="font-medium underline">
+        Ir a Configuración → Viajes
+      </Link>
+    </p>
+  );
 }
 
 /** Buscador con autocompletado (mismo patrón que FacturacionNueva.tsx) + alta rápida inline si el cliente todavía no existe — antes un <select> con hasta 200 clientes sin buscador. */
@@ -1152,7 +1171,7 @@ function BuscarVueloTab() {
         </form>
       </Card>
 
-      {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+      {error && <ErrorBusquedaTravel mensaje={error} />}
 
       {buscar.data && (() => {
         const ofertasFiltradas = buscar.data.ofertas
@@ -1476,7 +1495,7 @@ function BuscarHotelTab() {
         </form>
       </Card>
 
-      {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+      {error && <ErrorBusquedaTravel mensaje={error} />}
 
       {buscar.data && (
         <div className="space-y-3">

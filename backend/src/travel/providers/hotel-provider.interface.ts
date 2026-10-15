@@ -92,19 +92,28 @@ export interface ReservaHotelCreada {
   moneda: string;
 }
 
+/** Cuenta de Hotelbeds PROPIA del tenant (ver TravelConfigService) — nunca una cuenta compartida de plataforma. */
+export interface CredencialesHotelbeds {
+  apiKey: string;
+  secret: string;
+  /** "EUR" = sin conversión — Hotelbeds siempre cotiza en EUR. */
+  moneda: string;
+  /** 1 EUR = tasaCambio unidades de `moneda` — 1 cuando moneda es "EUR". */
+  tasaCambio: number;
+}
+
 export interface HotelProvider {
   readonly clave: string;
-  readonly habilitado: boolean;
 
   /** Autocompletar de destino — catálogo propio del proveedor, NO son códigos IATA (ver comentario en HotelbedsAdapter). */
-  buscarDestinos(query: string): Promise<DestinoHotel[]>;
+  buscarDestinos(credenciales: CredencialesHotelbeds, query: string): Promise<DestinoHotel[]>;
 
-  buscarHoteles(request: BuscarHotelesRequest): Promise<ResultadoBusquedaHoteles>;
+  buscarHoteles(credenciales: CredencialesHotelbeds, request: BuscarHotelesRequest): Promise<ResultadoBusquedaHoteles>;
 
   /** Re-cotiza (checkrates) — nunca confiar en el precio de la búsqueda al reservar. */
-  confirmarTarifa(rateKey: string): Promise<TarifaConfirmadaHotel>;
+  confirmarTarifa(credenciales: CredencialesHotelbeds, rateKey: string): Promise<TarifaConfirmadaHotel>;
 
-  crearReserva(request: CrearReservaHotelRequest): Promise<ReservaHotelCreada>;
+  crearReserva(credenciales: CredencialesHotelbeds, request: CrearReservaHotelRequest): Promise<ReservaHotelCreada>;
 
   /**
    * Paso 1 de 2 — simulación (confirmado contra el sandbox real:
@@ -112,7 +121,7 @@ export interface HotelProvider {
    * respuesta igual dice "CANCELLED" — nunca leer ese campo para saber si
    * se ejecutó de verdad, solo usarlo para extraer el monto/moneda).
    */
-  cotizarCancelacion(referenciaReserva: string): Promise<CotizacionCancelacionVuelo>;
+  cotizarCancelacion(credenciales: CredencialesHotelbeds, referenciaReserva: string): Promise<CotizacionCancelacionVuelo>;
 
   /**
    * Paso 2 de 2 — ejecuta la cancelación de verdad
@@ -124,5 +133,5 @@ export interface HotelProvider {
    * `montoOriginal - penalidad`, y solo el adapter tiene ambos números
    * para calcularlo bien.
    */
-  confirmarCancelacion(referenciaReserva: string, montoOriginal: number): Promise<ResultadoCancelacionVuelo>;
+  confirmarCancelacion(credenciales: CredencialesHotelbeds, referenciaReserva: string, montoOriginal: number): Promise<ResultadoCancelacionVuelo>;
 }

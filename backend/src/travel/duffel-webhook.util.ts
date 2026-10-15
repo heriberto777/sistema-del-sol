@@ -1,6 +1,39 @@
 import { createHmac, timingSafeEqual } from 'crypto';
 
 /**
+ * Envelope real de un webhook de Duffel — la doc pública confirma el
+ * esquema de firma (ver verificarFirmaDuffel) y los nombres de evento,
+ * pero NO se pudo confirmar en vivo la forma exacta del envelope (no hay
+ * forma de recibir un webhook real sin una URL pública desde este
+ * entorno de desarrollo). Se acepta un cuerpo laxo, con varias rutas
+ * posibles para encontrar el id de la orden.
+ */
+export interface DuffelWebhookEvento {
+  type?: string;
+  object_id?: string;
+  data?: {
+    id?: string;
+    order_id?: string;
+    object?: { id?: string; order_id?: string };
+    [key: string]: unknown;
+  };
+}
+
+/**
+ * Cada tenant tiene su PROPIA cuenta de Duffel — el controller necesita
+ * saber a qué tenant pertenece un webhook ANTES de poder verificar su
+ * firma (el secreto es por tenant). Esta función es pura (sin acceso a
+ * BD/secretos) justamente para poder correr sobre el body SIN verificar
+ * todavía — resolver el tenant por un dato público del evento nunca es un
+ * problema de seguridad (mismo criterio que WhatsappWebhookController
+ * resolviendo por el número `To` antes de validar la firma de Twilio): la
+ * firma sigue siendo la única puerta para que el evento tenga efecto.
+ */
+export function extraerIdOrdenDuffel(evento: DuffelWebhookEvento): string | undefined {
+  return evento.data?.order_id ?? evento.data?.object?.order_id ?? evento.object_id ?? evento.data?.id ?? evento.data?.object?.id;
+}
+
+/**
  * Verificación de firma de webhook de Duffel — mismo esquema que Stripe
  * (confirmado contra la doc pública de Duffel: header `X-Duffel-Signature`
  * con formato `t=<timestamp>,v1=<firma>`, HMAC-SHA256 sobre

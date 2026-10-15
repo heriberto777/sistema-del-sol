@@ -142,23 +142,27 @@ export interface ResultadoListadoOrdenes {
   cursorSiguiente: string | null;
 }
 
+/** Cuenta de Duffel PROPIA del tenant (ver TravelConfigService) — nunca una cuenta compartida de plataforma. */
+export interface CredencialesDuffel {
+  token: string;
+}
+
 export interface TravelProvider {
   readonly clave: string;
-  readonly habilitado: boolean;
 
-  buscarVuelos(request: BuscarVuelosRequest): Promise<ResultadoBusquedaVuelos>;
+  buscarVuelos(credenciales: CredencialesDuffel, request: BuscarVuelosRequest): Promise<ResultadoBusquedaVuelos>;
 
   /** Re-consulta la oferta para revalidar precio/disponibilidad antes de reservar — nunca confiar en una oferta cacheada sin este paso (ver §12 del doc original). */
-  obtenerOferta(ofertaId: string): Promise<OfertaVuelo>;
+  obtenerOferta(credenciales: CredencialesDuffel, ofertaId: string): Promise<OfertaVuelo>;
 
-  crearOrdenVuelo(request: CrearOrdenVueloRequest): Promise<OrdenVuelo>;
+  crearOrdenVuelo(credenciales: CredencialesDuffel, request: CrearOrdenVueloRequest): Promise<OrdenVuelo>;
 
   /** Paso 1 de 2 — cotiza el reembolso sin ejecutar la cancelación todavía. */
-  cotizarCancelacion(ordenId: string): Promise<CotizacionCancelacionVuelo>;
+  cotizarCancelacion(credenciales: CredencialesDuffel, ordenId: string): Promise<CotizacionCancelacionVuelo>;
 
   /** Paso 2 de 2 — confirma la cancelación cotizada por cotizarCancelacion(). */
-  confirmarCancelacion(cancelacionId: string): Promise<ResultadoCancelacionVuelo>;
+  confirmarCancelacion(credenciales: CredencialesDuffel, cancelacionId: string): Promise<ResultadoCancelacionVuelo>;
 
-  /** Solo para reconciliación (Plataforma) — lista las órdenes reales de la cuenta compartida, paginado con cursor. */
-  listarOrdenes(cursor?: string): Promise<ResultadoListadoOrdenes>;
+  /** Lista las órdenes reales de la cuenta de ESTE tenant, paginado con cursor — ver TravelReconciliacionService. */
+  listarOrdenes(credenciales: CredencialesDuffel, cursor?: string): Promise<ResultadoListadoOrdenes>;
 }

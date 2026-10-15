@@ -2,6 +2,7 @@ import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common'
 import {
   BuscarVuelosRequest,
   CotizacionCancelacionVuelo,
+  CredencialesDuffel,
   CrearOrdenVueloRequest,
   OfertaVuelo,
   OrdenVuelo,
@@ -86,8 +87,10 @@ function normalizarOferta(o: DuffelOferta): OfertaVuelo {
 /**
  * `fetch` nativo directo contra la REST API de Duffel — mismo criterio
  * que StripeAdapter/AlanubeAdapter: sin SDK oficial (existe `@duffel/api`
- * en npm, pero un puñado de llamadas HTTP no lo justifica). Sin
- * DUFFEL_API_TOKEN, degrada con un error claro en vez de crashear.
+ * en npm, pero un puñado de llamadas HTTP no lo justifica). El token es
+ * la cuenta de Duffel PROPIA de cada tenant (ver TravelConfigService),
+ * nunca `process.env` — el llamador (TravelService) la resuelve antes de
+ * invocar cualquier método de acá.
  *
  * Todas las formas devueltas son las normalizadas de TravelProvider, no
  * el JSON crudo de Duffel — ver ese archivo para el porqué.
@@ -97,20 +100,12 @@ export class DuffelAdapter implements TravelProvider {
   private readonly logger = new Logger(DuffelAdapter.name);
   readonly clave = 'duffel';
 
-  get habilitado(): boolean {
-    return Boolean(process.env.DUFFEL_API_TOKEN);
-  }
-
-  private requerirToken(): string {
-    const token = process.env.DUFFEL_API_TOKEN;
-    if (!token) {
-      throw new ServiceUnavailableException('El proveedor de vuelos no está disponible todavía (falta DUFFEL_API_TOKEN)');
-    }
-    return token;
-  }
-
-  private async llamar<T>(path: string, init: { method: 'GET' | 'POST'; body?: unknown; reintentarEnFalloDeRed?: boolean }): Promise<T> {
-    const cuerpo = await this.llamarCrudo(path, init);
+  private async llamar<T>(
+    credenciales: CredencialesDuffel,
+    path: string,
+    init: { method: 'GET' | 'POST'; body?: unknown; reintentarEnFalloDeRed?: boolean },
+  ): Promise<T> {
+    const cuerpo = await this.llamarCrudo(credenciales, path, init);
     return (cuerpo as { data: T }).data;
   }
 
@@ -132,10 +127,14 @@ export class DuffelAdapter implements TravelProvider {
    *   listarOrdenes), donde reintentar es inofensivo.
    */
   private async llamarCrudo(
+    credenciales: CredencialesDuffel,
     path: string,
     init: { method: 'GET' | 'POST'; body?: unknown; reintentarEnFalloDeRed?: boolean },
   ): Promise<{ data: unknown; meta?: { after: string | null } }> {
-    const token = this.requerirToken();
+    const { token } = credenciales;
+    if (!token) {
+      throw new ServiceUnavailableException('Este tenant todavía no configuró su cuenta de Duffel — cargala en Configuración → Viajes.');
+    }
     const maxReintentosRed = init.reintentarEnFalloDeRed ? 2 : 0;
 
     let intentosRateLimit = 0;
@@ -205,11 +204,11 @@ export class DuffelAdapter implements TravelProvider {
     }
   }
 
-  async buscarVuelos(request: BuscarVuelosRequest): Promise<ResultadoBusquedaVuelos> {
+  async buscarVuelos(credenciales: CredencialesDuffel, request: BuscarVuelosRequest): Promise<ResultadoBusquedaVuelos> {
     const data = await this.llamar<{
       id: string;
       offers: DuffelOferta[];
-    }>('/air/offer_requests?return_offers=true', {
+    }>(credenciales, '/air/offer_requests?return_offers=true', {
       method: 'POST',
       body: {
         slices: request.tramos.map((t) => ({ origin: t.origen, destination: t.destino, departure_date: t.fecha })),
@@ -227,18 +226,18 @@ export class DuffelAdapter implements TravelProvider {
     };
   }
 
-  async obtenerOferta(ofertaId: string): Promise<OfertaVuelo> {
-    const o = await this.llamar<DuffelOferta>(`/air/offers/${ofertaId}`, { method: 'GET', reintentarEnFalloDeRed: true });
+  async obtenerOferta(credenciales: CredencialesDuffel, ofertaId: string): Promise<OfertaVuelo> {
+    const o = await this.llamar<DuffelOferta>(credenciales, `/air/offers/${ofertaId}`, { method: 'GET', reintentarEnFalloDeRed: true });
     return normalizarOferta(o);
   }
 
-  async crearOrdenVuelo(request: CrearOrdenVueloRequest): Promise<OrdenVuelo> {
+  async crearOrdenVuelo(credenciales: CredencialesDuffel, request: CrearOrdenVueloRequest): Promise<OrdenVuelo> {
     // Nunca reintentarEnFalloDeRed acá: si la red falla justo después de que
     // Duffel ya procesó el cobro/la reserva, un reintento automático
     // podría duplicar una orden real (y cobrar el Balance dos veces). Si
-    // falla, el usuario tiene que revisar el estado (reconciliación de
-    // Plataforma) antes de reintentar a mano.
-    const orden = await this.llamar<{ id: string; booking_reference: string; total_amount: string; total_currency: string }>('/air/orders', {
+    // falla, el usuario tiene que revisar el estado (reconciliación) antes
+    // de reintentar a mano.
+    const orden = await this.llamar<{ id: string; booking_reference: string; total_amount: string; total_currency: string }>(credenciales, '/air/orders', {
       method: 'POST',
       body: {
         type: 'instant',
@@ -276,29 +275,30 @@ export class DuffelAdapter implements TravelProvider {
     return { id: orden.id, localizador: orden.booking_reference, montoTotal: orden.total_amount, moneda: orden.total_currency };
   }
 
-  async cotizarCancelacion(ordenId: string): Promise<CotizacionCancelacionVuelo> {
+  async cotizarCancelacion(credenciales: CredencialesDuffel, ordenId: string): Promise<CotizacionCancelacionVuelo> {
     // No mueve dinero, pero SÍ crea un recurso en Duffel — mismo criterio conservador, mejor que el usuario reintente a mano si falla.
-    const cancelacion = await this.llamar<{ id: string; refund_amount: string | null; refund_currency: string | null }>('/air/order_cancellations', {
+    const cancelacion = await this.llamar<{ id: string; refund_amount: string | null; refund_currency: string | null }>(credenciales, '/air/order_cancellations', {
       method: 'POST',
       body: { order_id: ordenId },
     });
     return { id: cancelacion.id, montoReembolso: cancelacion.refund_amount, moneda: cancelacion.refund_currency };
   }
 
-  async confirmarCancelacion(cancelacionId: string): Promise<ResultadoCancelacionVuelo> {
+  async confirmarCancelacion(credenciales: CredencialesDuffel, cancelacionId: string): Promise<ResultadoCancelacionVuelo> {
     // Igual criterio que crearOrdenVuelo — esto ejecuta el reembolso real, nunca reintentar a ciegas ante un fallo de red.
     const confirmada = await this.llamar<{ refund_amount: string | null; refund_currency: string | null }>(
+      credenciales,
       `/air/order_cancellations/${cancelacionId}/actions/confirm`,
       { method: 'POST' },
     );
     return { reembolsado: Boolean(confirmada.refund_amount), montoReembolso: confirmada.refund_amount, moneda: confirmada.refund_currency };
   }
 
-  async listarOrdenes(cursor?: string): Promise<ResultadoListadoOrdenes> {
+  async listarOrdenes(credenciales: CredencialesDuffel, cursor?: string): Promise<ResultadoListadoOrdenes> {
     const params = new URLSearchParams({ limit: '50' });
     if (cursor) params.set('after', cursor);
 
-    const cuerpo = await this.llamarCrudo(`/air/orders?${params.toString()}`, { method: 'GET', reintentarEnFalloDeRed: true });
+    const cuerpo = await this.llamarCrudo(credenciales, `/air/orders?${params.toString()}`, { method: 'GET', reintentarEnFalloDeRed: true });
     const ordenes = cuerpo.data as DuffelOrdenListado[];
 
     return {

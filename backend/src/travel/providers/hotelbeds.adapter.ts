@@ -4,6 +4,7 @@ import { RedisService } from '../../redis/redis.service';
 import { CotizacionCancelacionVuelo, ResultadoCancelacionVuelo } from './travel-provider.interface';
 import {
   BuscarHotelesRequest,
+  CredencialesHotelbeds,
   CrearReservaHotelRequest,
   DestinoHotel,
   HotelListado,
@@ -102,7 +103,9 @@ function normalizarHotel(h: HotelHotelbeds, moneda: string, tasa: number): Hotel
  * DuffelAdapter/StripeAdapter: sin SDK oficial. Autenticación por firma
  * (no Bearer): header `Api-key` + `X-Signature` =
  * SHA256(apiKey + secret + timestamp_segundos) en hex, recalculada en
- * cada request (confirmado contra el sandbox real).
+ * cada request (confirmado contra el sandbox real). Las credenciales son
+ * la cuenta de Hotelbeds PROPIA de cada tenant (ver TravelConfigService),
+ * nunca `process.env`.
  */
 @Injectable()
 export class HotelbedsAdapter implements HotelProvider {
@@ -116,35 +119,18 @@ export class HotelbedsAdapter implements HotelProvider {
   // porque el Content API del sandbox tiene cuota diaria limitada
   // (confirmado en vivo: "Quota exceeded" tras reconstruir el catálogo
   // varias veces) — en memoria se perdía en cada reinicio del proceso,
-  // en Redis sobrevive.
+  // en Redis sobrevive. Clave ÚNICA compartida entre todos los tenants a
+  // propósito: es el catálogo de ciudades/países de Hotelbeds, idéntico
+  // para cualquier cuenta — no es dato sensible ni depende de qué
+  // credenciales lo pidieron, así que compartirlo ahorra cuota diaria en
+  // vez de que cada tenant reconstruya el mismo catálogo.
   private static readonly CLAVE_CACHE_DESTINOS = 'travel:hotelbeds:destinos';
   private static readonly CACHE_DESTINOS_TTL_SEGUNDOS = 24 * 60 * 60;
 
   constructor(private readonly redis: RedisService) {}
 
-  get habilitado(): boolean {
-    return Boolean(process.env.HOTELBEDS_API_KEY && process.env.HOTELBEDS_SECRET);
-  }
-
-  /** null/"EUR" = sin conversión — Hotelbeds siempre cotiza en EUR (confirmado contra el sandbox real). */
-  private monedaYTasa(): { moneda: string; tasa: number } {
-    const moneda = process.env.HOTELBEDS_MONEDA || 'EUR';
-    if (moneda === 'EUR') return { moneda, tasa: 1 };
-    const tasa = Number(process.env.HOTELBEDS_TASA_CAMBIO);
-    return { moneda, tasa: Number.isFinite(tasa) && tasa > 0 ? tasa : 1 };
-  }
-
-  private convertirDesdeEur(montoEur: string | number): string {
-    return (Number(montoEur) * this.monedaYTasa().tasa).toFixed(2);
-  }
-
-  private credenciales(): { apiKey: string; secret: string } {
-    const apiKey = process.env.HOTELBEDS_API_KEY;
-    const secret = process.env.HOTELBEDS_SECRET;
-    if (!apiKey || !secret) {
-      throw new ServiceUnavailableException('El proveedor de hoteles no está disponible todavía (falta configurar Hotelbeds)');
-    }
-    return { apiKey, secret };
+  private convertirDesdeEur(montoEur: string | number, credenciales: CredencialesHotelbeds): string {
+    return (Number(montoEur) * credenciales.tasaCambio).toFixed(2);
   }
 
   private firmar(apiKey: string, secret: string): string {
@@ -152,8 +138,11 @@ export class HotelbedsAdapter implements HotelProvider {
     return createHash('sha256').update(`${apiKey}${secret}${timestamp}`).digest('hex');
   }
 
-  private async llamar<T>(path: string, method: 'GET' | 'POST' | 'DELETE', body?: unknown): Promise<T> {
-    const { apiKey, secret } = this.credenciales();
+  private async llamar<T>(credenciales: CredencialesHotelbeds, path: string, method: 'GET' | 'POST' | 'DELETE', body?: unknown): Promise<T> {
+    const { apiKey, secret } = credenciales;
+    if (!apiKey || !secret) {
+      throw new ServiceUnavailableException('Este tenant todavía no configuró su cuenta de Hotelbeds — cargala en Configuración → Viajes.');
+    }
 
     let respuesta: Response;
     try {
@@ -192,7 +181,7 @@ export class HotelbedsAdapter implements HotelProvider {
    * real de 1000 por página) y filtrar acá. Se cachea en memoria por
    * proceso — ver CACHE_DESTINOS_TTL_MS.
    */
-  private async obtenerCatalogoDestinos(): Promise<{ code: string; nombre: string; pais: string; bandera: string }[]> {
+  private async obtenerCatalogoDestinos(credenciales: CredencialesHotelbeds): Promise<{ code: string; nombre: string; pais: string; bandera: string }[]> {
     const cacheado = await this.redis.obtenerJson<{ code: string; nombre: string; pais: string; bandera: string }[]>(HotelbedsAdapter.CLAVE_CACHE_DESTINOS);
     if (cacheado) return cacheado;
 
@@ -202,6 +191,7 @@ export class HotelbedsAdapter implements HotelProvider {
     let total = Infinity;
     while (from <= total) {
       const data = await this.llamar<{ destinations: DestinoHotelbedsCrudo[]; total: number }>(
+        credenciales,
         `/hotel-content-api/1.0/locations/destinations?fields=code,name,countryCode&language=CAS&from=${from}&to=${from + PAGE - 1}`,
         'GET',
       );
@@ -217,37 +207,36 @@ export class HotelbedsAdapter implements HotelProvider {
     return catalogo;
   }
 
-  async buscarDestinos(query: string): Promise<DestinoHotel[]> {
+  async buscarDestinos(credenciales: CredencialesHotelbeds, query: string): Promise<DestinoHotel[]> {
     const q = normalizarTexto(query.trim());
     if (!q) return [];
-    const catalogo = await this.obtenerCatalogoDestinos();
+    const catalogo = await this.obtenerCatalogoDestinos(credenciales);
     return catalogo
       .filter((d) => normalizarTexto(d.nombre).includes(q) || normalizarTexto(d.pais).includes(q) || normalizarTexto(d.code).includes(q))
       .slice(0, 10)
       .map((d) => ({ codigo: d.code, nombre: d.nombre, pais: d.pais, bandera: d.bandera }));
   }
 
-  async buscarHoteles(request: BuscarHotelesRequest): Promise<ResultadoBusquedaHoteles> {
-    const data = await this.llamar<{ hotels?: { hotels: HotelHotelbeds[] } }>('/hotel-api/1.0/hotels', 'POST', {
+  async buscarHoteles(credenciales: CredencialesHotelbeds, request: BuscarHotelesRequest): Promise<ResultadoBusquedaHoteles> {
+    const data = await this.llamar<{ hotels?: { hotels: HotelHotelbeds[] } }>(credenciales, '/hotel-api/1.0/hotels', 'POST', {
       stay: { checkIn: request.checkIn, checkOut: request.checkOut },
       occupancies: [{ rooms: request.ocupacion.habitaciones, adults: request.ocupacion.adultos, children: request.ocupacion.ninos }],
       destination: { code: request.destino },
     });
 
-    const { moneda, tasa } = this.monedaYTasa();
-    return { hoteles: (data.hotels?.hotels ?? []).map((h) => normalizarHotel(h, moneda, tasa)) };
+    return { hoteles: (data.hotels?.hotels ?? []).map((h) => normalizarHotel(h, credenciales.moneda, credenciales.tasaCambio)) };
   }
 
-  async confirmarTarifa(rateKey: string): Promise<TarifaConfirmadaHotel> {
-    const data = await this.llamar<{ hotel: { rooms: RoomHotelbeds[]; totalNet: string } }>('/hotel-api/1.0/checkrates', 'POST', {
+  async confirmarTarifa(credenciales: CredencialesHotelbeds, rateKey: string): Promise<TarifaConfirmadaHotel> {
+    const data = await this.llamar<{ hotel: { rooms: RoomHotelbeds[]; totalNet: string } }>(credenciales, '/hotel-api/1.0/checkrates', 'POST', {
       rooms: [{ rateKey }],
     });
     const rateConfirmada = data.hotel.rooms[0]?.rates[0];
-    return { rateKey: rateConfirmada?.rateKey ?? rateKey, montoNeto: this.convertirDesdeEur(data.hotel.totalNet), moneda: this.monedaYTasa().moneda };
+    return { rateKey: rateConfirmada?.rateKey ?? rateKey, montoNeto: this.convertirDesdeEur(data.hotel.totalNet, credenciales), moneda: credenciales.moneda };
   }
 
-  async crearReserva(request: CrearReservaHotelRequest): Promise<ReservaHotelCreada> {
-    const data = await this.llamar<{ booking: { reference: string; totalNet: number } }>('/hotel-api/1.0/bookings', 'POST', {
+  async crearReserva(credenciales: CredencialesHotelbeds, request: CrearReservaHotelRequest): Promise<ReservaHotelCreada> {
+    const data = await this.llamar<{ booking: { reference: string; totalNet: number } }>(credenciales, '/hotel-api/1.0/bookings', 'POST', {
       holder: { name: request.titular.nombre, surname: request.titular.apellido },
       rooms: [
         {
@@ -258,19 +247,21 @@ export class HotelbedsAdapter implements HotelProvider {
       clientReference: request.referenciaCliente,
     });
 
-    return { referencia: data.booking.reference, montoTotal: this.convertirDesdeEur(data.booking.totalNet), moneda: this.monedaYTasa().moneda };
+    return { referencia: data.booking.reference, montoTotal: this.convertirDesdeEur(data.booking.totalNet, credenciales), moneda: credenciales.moneda };
   }
 
-  async cotizarCancelacion(referenciaReserva: string): Promise<CotizacionCancelacionVuelo> {
+  async cotizarCancelacion(credenciales: CredencialesHotelbeds, referenciaReserva: string): Promise<CotizacionCancelacionVuelo> {
     const data = await this.llamar<{ booking: { cancellationReference: string }; cancellationAmount?: number }>(
+      credenciales,
       `/hotel-api/1.0/bookings/${referenciaReserva}?cancellationFlag=SIMULATION`,
       'DELETE',
     );
-    return { id: data.booking.cancellationReference, montoReembolso: this.convertirDesdeEur(data.cancellationAmount ?? 0), moneda: this.monedaYTasa().moneda };
+    return { id: data.booking.cancellationReference, montoReembolso: this.convertirDesdeEur(data.cancellationAmount ?? 0, credenciales), moneda: credenciales.moneda };
   }
 
-  async confirmarCancelacion(referenciaReserva: string, montoOriginal: number): Promise<ResultadoCancelacionVuelo> {
+  async confirmarCancelacion(credenciales: CredencialesHotelbeds, referenciaReserva: string, montoOriginal: number): Promise<ResultadoCancelacionVuelo> {
     const data = await this.llamar<{ cancellationAmount?: number }>(
+      credenciales,
       `/hotel-api/1.0/bookings/${referenciaReserva}?cancellationFlag=CANCELLATION`,
       'DELETE',
     );
@@ -279,8 +270,8 @@ export class HotelbedsAdapter implements HotelProvider {
     // restar contra montoOriginal (que ya llega en esa misma moneda — es
     // reserva.montoCosto, guardado ya convertido al crear la reserva) — lo
     // que se libera de la deuda original es la diferencia, nunca la penalidad.
-    const penalidad = Number(this.convertirDesdeEur(data.cancellationAmount ?? 0));
+    const penalidad = Number(this.convertirDesdeEur(data.cancellationAmount ?? 0, credenciales));
     const montoLiberado = Math.max(0, montoOriginal - penalidad);
-    return { reembolsado: montoLiberado > 0, montoReembolso: montoLiberado.toFixed(2), moneda: this.monedaYTasa().moneda };
+    return { reembolsado: montoLiberado > 0, montoReembolso: montoLiberado.toFixed(2), moneda: credenciales.moneda };
   }
 }

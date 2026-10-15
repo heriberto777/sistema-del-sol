@@ -1,22 +1,22 @@
-import { Controller, Get, UseGuards } from '@nestjs/common';
+import { Controller, Get } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { TravelReconciliacionService } from './travel-reconciliacion.service';
-import { Public } from '../common/decorators/public.decorator';
-import { PlatformPermissions } from '../common/decorators/platform-permissions.decorator';
-import { PlatformAuthGuard } from '../platform-auth/guards/platform-auth.guard';
-import { PlatformPermissionsGuard } from '../common/guards/platform-permissions.guard';
+import { Permissions } from '../common/decorators/permissions.decorator';
+import { RequiereModulo } from '../common/decorators/requiere-modulo.decorator';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { JwtPayloadUser } from '../common/types/authenticated-request';
 
+/** Reconciliación de la PROPIA cuenta de Duffel del tenant — ya no es un endpoint de Plataforma (ver TravelReconciliacionService). */
 @ApiBearerAuth()
-@ApiTags('platform-travel')
-@Public() // el JwtAuthGuard global de tenants no debe intervenir aquí
-@UseGuards(PlatformAuthGuard, PlatformPermissionsGuard)
-@Controller('platform/travel/reconciliacion')
+@ApiTags('travel')
+@RequiereModulo('travel')
+@Controller('admin/travel/reconciliacion')
 export class TravelReconciliacionController {
   constructor(private readonly service: TravelReconciliacionService) {}
 
   @Get()
-  @PlatformPermissions('platform.travel.reconciliar')
-  reconciliar() {
-    return this.service.reconciliar();
+  @Permissions('admin.configuracion')
+  reconciliar(@CurrentUser() user: JwtPayloadUser) {
+    return this.service.reconciliar(user.tenantId);
   }
 }

@@ -128,6 +128,7 @@ model Tenant {
   emailConfig                EmailConfigTenant?
   whatsappMensajes           WhatsappMensaje[]
   pasarelaConfig             PasarelaConfigTenant?
+  travelConfig               TravelConfigTenant?
   sesionesCobroFactura       SesionCobroFactura[]
   pedidosTienda              PedidoTienda[]
   seccionesTienda            SeccionTienda[]
@@ -684,36 +685,6 @@ model PlataformaConfiguracion {
   iaImagenLimiteMensual    Int @default(20)
   iaAsistenteLimiteMensual Int @default(50)
 
-  // Travel Management (plugin) — token de Duffel, cuenta ÚNICA y
-  // COMPARTIDA de la plataforma (decisión B2B confirmada: agencias
-  // usan Sistema del Sol, no traen su propia cuenta Duffel cada una —
-  // ver docs/Sistema_del_Sol_Travel_Management_Plugin.md y el análisis
-  // "Los Dos Pagos del Vuelo"). Mismo patrón que stripeSecretKeyCifrado:
-  // sincronizarEnv() la vuelca a DUFFEL_API_TOKEN, que es lo que
-  // DuffelAdapter.habilitado/llamar() leen. "duffel_test_..." en
-  // sandbox, "duffel_live_..." en producción — mismo host, cambia el
-  // prefijo del token (no hay URL de sandbox separada).
-  duffelApiTokenCifrado      String?
-  // Webhook entrante de Duffel (order.airline_initiated_change_detected,
-  // order_cancellation.created) — mismo esquema de firma que Stripe
-  // (header `X-Duffel-Signature`, formato `t=...,v1=...`, HMAC-SHA256
-  // sobre `${timestamp}.${body}`), confirmado contra la doc pública de
-  // Duffel. sincronizarEnv() la vuelca a DUFFEL_WEBHOOK_SECRET.
-  duffelWebhookSecretCifrado String?
-  // Hotelbeds (hoteles) — cuenta única y compartida de la plataforma,
-  // mismo criterio que Duffel. Autenticación por firma (Api-key +
-  // X-Signature = SHA256(apiKey+secret+timestamp)), confirmado contra el
-  // sandbox real — no hay Bearer token, hace falta guardar las dos partes.
-  hotelbedsApiKeyCifrado     String?
-  hotelbedsSecretCifrado     String?
-  // Hotelbeds cotiza siempre en EUR (confirmado contra el sandbox real, sin
-  // parámetro de moneda en su API) — para vender en otra moneda hay que
-  // convertir nosotros mismos. null/"EUR" = sin conversión (passthrough).
-  // La tasa es manual (1 EUR = N de hotelbedsMoneda), igual criterio que las
-  // tasas de ISR/TSS de Nómina: no se verifica contra una fuente en vivo.
-  hotelbedsMoneda            String?
-  hotelbedsTasaCambio        Decimal? @db.Decimal(12, 6)
-
   @@map("plataforma_configuracion")
 }
 
@@ -1195,6 +1166,34 @@ model PasarelaConfigTenant {
   updatedAt DateTime @updatedAt
 
   @@map("pasarela_config_tenant")
+}
+
+/// Travel Management (plugin) — cuenta de Duffel/Hotelbeds PROPIA de cada
+/// tenant (decisión revertida: ya no es la cuenta única y compartida de
+/// plataforma que describía PlataformaConfiguracion — ver ARCHITECTURE.md).
+/// Mismo patrón que WhatsappConfigTenant/PasarelaConfigTenant: secretos
+/// cifrados, nunca se devuelven en claro.
+model TravelConfigTenant {
+  id       String @id @default(uuid())
+  tenantId String @unique
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  duffelApiTokenCifrado String?
+  // Verifica la firma (X-Duffel-Signature) del webhook entrante de ESTE
+  // tenant — el tenant se resuelve ANTES, cruzando `object_id` del evento
+  // contra `TravelReserva.proveedorOrdenId` (ver TravelWebhookController),
+  // nunca por este campo.
+  duffelWebhookSecretCifrado String?
+  hotelbedsApiKeyCifrado     String?
+  hotelbedsSecretCifrado     String?
+  // Hotelbeds siempre cotiza en EUR — null/"EUR" = sin conversión.
+  hotelbedsMoneda     String?
+  hotelbedsTasaCambio Decimal? @db.Decimal(12, 6)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("travel_config_tenant")
 }
 
 /// Ledger de intentos de cobro por pasarela (ítem C-1) — dos propósitos:
