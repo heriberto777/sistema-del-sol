@@ -7,12 +7,21 @@ import { PrismaClient } from '@prisma/client';
 import { AppModule } from '../src/app.module';
 import { HttpExceptionFilter } from '../src/common/filters/http-exception.filter';
 import { DuffelAdapter } from '../src/travel/providers/duffel.adapter';
+import { cifrar } from '../src/common/utils/encriptado.util';
+
+// `cifrar()`/`descifrar()` necesitan ENCRYPTION_KEY en el entorno — jest.setup.js
+// no la define (mismo criterio que platform.e2e-spec.ts, que la setea a mano).
+process.env.ENCRYPTION_KEY ??= 'clave-de-prueba-e2e-64-caracteres-para-scrypt-1234567890abcdef';
 
 /**
  * Doble de prueba de DuffelAdapter — los e2e no pueden depender de la
  * API real de Duffel (necesitaría un token real, sería lento/frágil y
  * gastaría el sandbox). Devuelve siempre lo mismo, determinístico,
- * respetando la forma normalizada de TravelProvider.
+ * respetando la forma normalizada de TravelProvider. Las credenciales
+ * que recibe cada método (primer argumento) no importan para este doble
+ * — lo que SÍ hace falta de verdad es que `TravelConfigTenant` del
+ * tenant tenga algo cargado, porque `TravelService` resuelve las
+ * credenciales (y 503 si faltan) ANTES de llamar al proveedor.
  */
 const OFERTA_FAKE = {
   id: 'off_fake',
@@ -24,7 +33,6 @@ const OFERTA_FAKE = {
 };
 const duffelAdapterFake = {
   clave: 'duffel',
-  habilitado: true,
   buscarVuelos: jest.fn().mockResolvedValue({ solicitudId: 'orq_fake', ofertas: [OFERTA_FAKE] }),
   obtenerOferta: jest.fn().mockResolvedValue(OFERTA_FAKE),
   crearOrdenVuelo: jest.fn().mockResolvedValue({ id: 'ord_fake', localizador: 'FAKE123', montoTotal: '450.00', moneda: 'USD' }),
@@ -46,6 +54,7 @@ describe('Travel Management (e2e)', () => {
   const SUBDOMINIO_A = 'e2e-travel-a';
   const SUBDOMINIO_B = 'e2e-travel-b';
   const PASSWORD = 'Test1234!';
+  const WEBHOOK_SECRET_A = 'whsec_test_duffel_tenant_a';
 
   let tenantAId: string;
   let tenantBId: string;
@@ -118,6 +127,15 @@ describe('Travel Management (e2e)', () => {
     const clienteA = await prisma.cliente.create({ data: { tenantId: tenantAId, nombre: 'Cliente Travel A' } });
     clienteAId = clienteA.id;
     await prisma.cliente.create({ data: { tenantId: tenantBId, nombre: 'Cliente Travel B' } });
+
+    // Tenant A trae su propia cuenta de Duffel — el token en sí no lo usa
+    // nadie de verdad (DuffelAdapter está mockeado más abajo), pero
+    // TravelConfigService.obtenerCredencialesDuffel() tira 503 antes de
+    // llegar al proveedor si esta fila no existe. El tenant B a propósito
+    // NO tiene ninguna, para los tests de aislamiento del webhook.
+    await prisma.travelConfigTenant.create({
+      data: { tenantId: tenantAId, duffelApiTokenCifrado: cifrar('duffel_test_fake_e2e'), duffelWebhookSecretCifrado: cifrar(WEBHOOK_SECRET_A) },
+    });
 
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
       .overrideProvider(DuffelAdapter)
@@ -412,53 +430,72 @@ describe('Travel Management (e2e)', () => {
     });
   });
 
-  describe('POST /webhooks/duffel', () => {
-    const SECRET = 'whsec_test_duffel';
-    const ENV_ORIGINAL = process.env.DUFFEL_WEBHOOK_SECRET;
-
+  describe('POST /webhooks/duffel (cada tenant tiene su propio webhook secret)', () => {
     function firmar(payload: string, secret: string): string {
       const timestamp = Math.floor(Date.now() / 1000);
       const firmaHex = createHmac('sha256', secret).update(`${timestamp}.${payload}`).digest('hex');
       return `t=${timestamp},v1=${firmaHex}`;
     }
 
-    beforeAll(() => {
-      process.env.DUFFEL_WEBHOOK_SECRET = SECRET;
-    });
-
-    afterAll(() => {
-      process.env.DUFFEL_WEBHOOK_SECRET = ENV_ORIGINAL;
-    });
-
-    it('rechaza sin DUFFEL_WEBHOOK_SECRET configurado', async () => {
-      delete process.env.DUFFEL_WEBHOOK_SECRET;
+    it('ignora (200, sin verificar nada) un evento cuyo id de orden no coincide con ninguna reserva — no hay tenant a quien validarle la firma', async () => {
       await request(app.getHttpServer())
         .post('/api/webhooks/duffel')
-        .set('x-duffel-signature', 't=123,v1=firma-invalida')
-        .send({ type: 'order.airline_initiated_change_detected' })
-        .expect(400);
-      process.env.DUFFEL_WEBHOOK_SECRET = SECRET;
+        .set('x-duffel-signature', 't=123,v1=firma-que-nunca-se-llega-a-chequear')
+        .send({ type: 'order.airline_initiated_change_detected', data: { order_id: 'ord_que_no_existe' } })
+        .expect(200);
     });
 
-    it('rechaza sin header de firma', async () => {
-      await request(app.getHttpServer()).post('/api/webhooks/duffel').send({ type: 'order.airline_initiated_change_detected' }).expect(400);
+    it('rechaza (400) si el tenant resuelto por el id de orden no tiene webhook secret configurado', async () => {
+      // Tenant B nunca cargó TravelConfigTenant en este suite — su propia reserva sí resuelve el tenant, pero no hay secreto con qué validar.
+      const reservaTemporal = await prisma.travelReserva.create({
+        data: {
+          tenantId: tenantBId,
+          codigoInterno: 'TRV-E2E-SIN-SECRET',
+          clienteId: (await prisma.cliente.findFirstOrThrow({ where: { tenantId: tenantBId } })).id,
+          tipo: 'VUELO',
+          estado: 'CONFIRMADA',
+          moneda: 'USD',
+          montoCosto: 100,
+          montoVenta: 120,
+          proveedor: 'duffel',
+          proveedorOrdenId: 'ord_fake_tenant_b_sin_secret',
+        },
+      });
+
+      try {
+        await request(app.getHttpServer())
+          .post('/api/webhooks/duffel')
+          .set('x-duffel-signature', 't=123,v1=no-importa-no-hay-secreto-con-que-compararla')
+          .send({ type: 'order.airline_initiated_change_detected', data: { order_id: 'ord_fake_tenant_b_sin_secret' } })
+          .expect(400);
+      } finally {
+        // El test de "resumen" más abajo asume que B nunca tuvo ninguna reserva — esta era solo para resolver el tenant del webhook.
+        await prisma.travelReserva.delete({ where: { id: reservaTemporal.id } });
+      }
+    });
+
+    it('rechaza sin header de firma (tenant A sí tiene webhook secret, pero falta el header)', async () => {
+      await request(app.getHttpServer())
+        .post('/api/webhooks/duffel')
+        .send({ type: 'order.airline_initiated_change_detected', data: { order_id: 'ord_fake' } })
+        .expect(400);
     });
 
     it('rechaza una firma inválida', async () => {
       await request(app.getHttpServer())
         .post('/api/webhooks/duffel')
         .set('x-duffel-signature', 't=123,v1=firma-invalida')
-        .send({ type: 'order.airline_initiated_change_detected' })
+        .send({ type: 'order.airline_initiated_change_detected', data: { order_id: 'ord_fake' } })
         .expect(400);
     });
 
-    it('con firma válida, marca la alerta CAMBIO_ITINERARIO en la reserva con esa orden de Duffel', async () => {
+    it('con firma válida (verificada contra el secreto de ESE tenant), marca la alerta CAMBIO_ITINERARIO en la reserva con esa orden de Duffel', async () => {
       const payload = JSON.stringify({ type: 'order.airline_initiated_change_detected', data: { order_id: 'ord_fake' } });
-      const firma = firmar(payload, SECRET);
+      const firma = firmar(payload, WEBHOOK_SECRET_A);
 
       await request(app.getHttpServer()).post('/api/webhooks/duffel').set('x-duffel-signature', firma).set('Content-Type', 'application/json').send(payload).expect(200);
 
-      const reserva = await prisma.travelReserva.findFirstOrThrow({ where: { proveedorOrdenId: 'ord_fake' } });
+      const reserva = await prisma.travelReserva.findFirstOrThrow({ where: { proveedorOrdenId: 'ord_fake', tenantId: tenantAId } });
       expect(reserva.alertaProveedorTipo).toBe('CAMBIO_ITINERARIO');
       expect(reserva.alertaProveedorDetalle).toContain('itinerario');
     });
