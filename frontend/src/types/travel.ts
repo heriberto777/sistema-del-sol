@@ -36,6 +36,12 @@ export interface TravelReserva {
   updatedAt: string;
 }
 
+/** Equipaje incluido para un pasajero en un segmento — esquema documentado de Duffel, TODAVÍA NO confirmado contra el sandbox real (a diferencia del resto de esta interfaz) — campos opcionales a propósito, si el nombre real difiere simplemente no se muestra nada, nunca rompe. */
+export interface EquipajeSegmentoVuelo {
+  type: 'checked' | 'carry_on';
+  quantity: number;
+}
+
 /// Segmento real de un tramo de vuelo — forma confirmada contra el
 /// sandbox real de Duffel (no inventada). `passenger_id` es el mismo id
 /// que hay que mandar en `pasajeros[].id` al reservar.
@@ -45,9 +51,17 @@ export interface SegmentoVueloCrudo {
   arriving_at: string;
   marketing_carrier_flight_number: string;
   marketing_carrier: { name: string; iata_code: string; logo_symbol_url: string | null };
+  /** Aerolínea que opera el vuelo de verdad (vuelo code-share) — ausente o igual a marketing_carrier cuando no aplica. NO confirmado contra el sandbox real todavía. */
+  operating_carrier?: { name: string; iata_code: string } | null;
   origin: { iata_code: string; city_name: string | null };
   destination: { iata_code: string; city_name: string | null };
-  passengers: { passenger_id: string }[];
+  passengers: {
+    passenger_id: string;
+    /** Nombre comercial de la tarifa que usa la aerolínea (ej. "Economy Light") — NO confirmado contra el sandbox real todavía. */
+    cabin_class_marketing_name?: string | null;
+    /** NO confirmado contra el sandbox real todavía. */
+    baggages?: EquipajeSegmentoVuelo[];
+  }[];
 }
 
 export interface TramoVueloCrudo {

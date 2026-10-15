@@ -32,6 +32,7 @@ import {
   ResultadoBusquedaVuelos,
   TarifaHotel,
   TIPOS_TRAVEL_RESERVA,
+  TramoVueloCrudo,
   TravelReglaMarkup,
   TravelReserva,
 } from '../types/travel';
@@ -632,11 +633,35 @@ function LogoAerolinea({ nombre, logoUrl }: { nombre: string; logoUrl: string | 
   );
 }
 
+/** "Operado por X" solo cuando la aerolínea que opera el vuelo de verdad (code-share) difiere de la que vendió el ticket — null = no aplica, no mostrar nada. */
+function operadoPorDeTramo(tramo: TramoVueloCrudo): string | null {
+  const seg = tramo.segments[0];
+  if (!seg?.operating_carrier || seg.operating_carrier.iata_code === seg.marketing_carrier.iata_code) return null;
+  return seg.operating_carrier.name;
+}
+
+/** Nombre comercial de la tarifa (ej. "Economy Light") del primer pasajero/segmento — representativo de toda la oferta, igual criterio que aerolineaDeOferta. */
+function nombreTarifaDeOferta(oferta: OfertaVuelo): string | null {
+  return oferta.tramosCrudo[0]?.segments[0]?.passengers[0]?.cabin_class_marketing_name ?? null;
+}
+
+/** "1 maleta de mano + 1 facturada" — resumen legible del equipaje incluido, o null si Duffel no lo trajo. */
+function equipajeDeOferta(oferta: OfertaVuelo): string | null {
+  const baggages = oferta.tramosCrudo[0]?.segments[0]?.passengers[0]?.baggages;
+  if (!baggages || baggages.length === 0) return null;
+  return baggages
+    .filter((b) => b.quantity > 0)
+    .map((b) => `${b.quantity} maleta${b.quantity === 1 ? '' : 's'} ${b.type === 'checked' ? 'facturada' : 'de mano'}${b.quantity === 1 ? '' : 's'}`)
+    .join(' + ');
+}
+
 /** Fila de resultado — estilo comparativo (aerolínea/badges + horarios + precio) inspirado en Trip.com. */
 function FilaOferta({ oferta, onReservar }: { oferta: OfertaVuelo; onReservar: () => void }) {
   const minutosParaExpirar = Math.max(0, Math.round((new Date(oferta.expiraEn).getTime() - Date.now()) / 60_000));
   const directo = ofertaEsDirecta(oferta);
   const aerolinea = aerolineaDeOferta(oferta);
+  const nombreTarifa = nombreTarifaDeOferta(oferta);
+  const equipaje = equipajeDeOferta(oferta);
 
   return (
     <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900 sm:flex-row sm:items-center">
@@ -656,16 +681,29 @@ function FilaOferta({ oferta, onReservar }: { oferta: OfertaVuelo; onReservar: (
       </div>
 
       <div className="flex-1 space-y-1.5">
-        {oferta.tramosCrudo.map((tramo) => (
-          <div key={tramo.id} className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-sm">
-            <span className="font-semibold text-slate-800 dark:text-slate-100">
-              {tramo.origin.iata_code} {formatoHoraVuelo(tramo.segments[0]?.departing_at ?? '')} → {tramo.destination.iata_code}{' '}
-              {formatoHoraVuelo(tramo.segments[tramo.segments.length - 1]?.arriving_at ?? '')}
-            </span>
-            <span className="text-slate-400">{formatoDuracionIso(tramo.duration)}</span>
-            <span className="text-slate-400">{tramo.segments.length === 1 ? 'Directo' : `${tramo.segments.length - 1} escala(s)`}</span>
-          </div>
-        ))}
+        {oferta.tramosCrudo.map((tramo) => {
+          const operadoPor = operadoPorDeTramo(tramo);
+          return (
+            <div key={tramo.id}>
+              <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-sm">
+                <span className="font-semibold text-slate-800 dark:text-slate-100">
+                  {tramo.origin.iata_code} {formatoHoraVuelo(tramo.segments[0]?.departing_at ?? '')} → {tramo.destination.iata_code}{' '}
+                  {formatoHoraVuelo(tramo.segments[tramo.segments.length - 1]?.arriving_at ?? '')}
+                </span>
+                <span className="text-slate-400">{formatoDuracionIso(tramo.duration)}</span>
+                <span className="text-slate-400">{tramo.segments.length === 1 ? 'Directo' : `${tramo.segments.length - 1} escala(s)`}</span>
+              </div>
+              {operadoPor && <p className="text-xs text-slate-400">Operado por {operadoPor}</p>}
+            </div>
+          );
+        })}
+        {(nombreTarifa || equipaje) && (
+          <p className="flex flex-wrap items-center gap-x-2 text-xs text-slate-500 dark:text-slate-400">
+            {nombreTarifa && <span className="font-medium">Tarifa {nombreTarifa}</span>}
+            {nombreTarifa && equipaje && <span>·</span>}
+            {equipaje && <span>{equipaje}</span>}
+          </p>
+        )}
       </div>
 
       <div className="flex shrink-0 items-center justify-between gap-4 border-t border-slate-100 pt-3 dark:border-slate-800 sm:w-44 sm:flex-col sm:items-end sm:border-t-0 sm:pt-0">
@@ -1187,8 +1225,8 @@ function MatrizFechas({
   const precioMinimo = Math.min(...dias.map((d) => d.precio?.monto).filter((m): m is number => typeof m === 'number'));
 
   return (
-    <div className="flex gap-2 overflow-x-auto rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
-      {dias.map((d) => {
+    <div className="grid grid-cols-7 overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
+      {dias.map((d, i) => {
         const fecha = sumarDias(form.fechaSalida, d.offset);
         const fechaObj = new Date(`${fecha}T12:00:00`);
         const esActual = d.offset === 0;
@@ -1200,21 +1238,30 @@ function MatrizFechas({
             disabled={esActual}
             onClick={() => onSeleccionarFecha(fecha, form.tipoViaje === 'ida_vuelta' ? sumarDias(form.fechaRegreso, d.offset) : form.fechaRegreso)}
             className={clsx(
-              'flex min-w-[92px] shrink-0 flex-col items-center gap-0.5 rounded-lg border px-2 py-2 text-xs transition-colors',
-              esActual ? 'border-sol-500 bg-sol-50 dark:bg-sol-500/10' : 'border-slate-200 hover:border-sol-400 dark:border-slate-700',
+              'flex flex-col items-center gap-0.5 border-r border-slate-100 px-1 py-2.5 text-xs transition-colors last:border-r-0 dark:border-slate-800',
+              esActual ? 'bg-sol-500 text-white' : 'hover:bg-slate-50 dark:hover:bg-slate-800/60',
+              i === 0 && 'rounded-l-xl',
+              i === dias.length - 1 && 'rounded-r-xl',
             )}
           >
-            <span className="capitalize text-slate-500 dark:text-slate-400">{fechaObj.toLocaleDateString('es-DO', { weekday: 'short' })}</span>
-            <span className="font-semibold text-slate-800 dark:text-slate-100">{fechaObj.getDate()}</span>
+            <span className={clsx('capitalize', esActual ? 'text-white/80' : 'text-slate-500 dark:text-slate-400')}>
+              {fechaObj.toLocaleDateString('es-DO', { weekday: 'short' })} {fechaObj.getDate()}
+            </span>
             {d.cargando ? (
-              <span className="text-slate-300 dark:text-slate-600">…</span>
+              <span className={esActual ? 'text-white/70' : 'text-slate-300 dark:text-slate-600'}>…</span>
             ) : d.precio ? (
-              <span className={clsx('font-semibold', esMasBarato ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-500 dark:text-slate-400')}>
+              <span
+                className={clsx(
+                  'font-semibold',
+                  esActual ? 'text-white' : esMasBarato ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-700 dark:text-slate-300',
+                )}
+              >
                 {d.precio.moneda} {d.precio.monto.toLocaleString('es-DO', { maximumFractionDigits: 0 })}
               </span>
             ) : (
-              <span className="text-slate-300 dark:text-slate-600">N/D</span>
+              <span className={esActual ? 'text-white/70' : 'text-slate-300 dark:text-slate-600'}>N/D</span>
             )}
+            {esActual && <span className="text-[9px] font-semibold uppercase text-white/80">Seleccionado</span>}
           </button>
         );
       })}
@@ -1381,11 +1428,74 @@ function BuscarVueloTab() {
         const hayFiltrosActivos = filtroEscalas !== 'todos' || horariosSeleccionados.size > 0 || aerolineasSeleccionadas.size > 0;
 
         return (
-          <div className="space-y-3">
-            <MatrizFechas form={form} precioActual={precioActual} onSeleccionarFecha={(fechaSalida, fechaRegreso) => buscarCon({ ...form, fechaSalida, fechaRegreso })} />
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
+            <aside className="space-y-5 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900 lg:w-56 lg:shrink-0">
+              <div>
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Filtros</p>
+                <p className="mb-1.5 text-xs font-medium text-slate-600 dark:text-slate-300">Escalas</p>
+                <div className="space-y-1.5">
+                  {([
+                    { id: 'todos', etiqueta: 'Todos' },
+                    { id: 'directo', etiqueta: 'Directo' },
+                    { id: 'max1', etiqueta: 'Máx. 1 escala' },
+                  ] as const).map((opt) => (
+                    <label key={opt.id} className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
+                      <input type="radio" name="filtro-escalas" checked={filtroEscalas === opt.id} onChange={() => setFiltroEscalas(opt.id)} />
+                      {opt.etiqueta}
+                    </label>
+                  ))}
+                </div>
+              </div>
 
-            <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
-              <div className="flex flex-wrap items-center justify-between gap-3">
+              {aerolineasDisponibles.length > 1 && (
+                <div>
+                  <p className="mb-1.5 text-xs font-medium text-slate-600 dark:text-slate-300">Aerolíneas</p>
+                  <div className="space-y-1.5">
+                    {aerolineasDisponibles.map((a) => (
+                      <label key={a} className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
+                        <input
+                          type="checkbox"
+                          checked={aerolineasSeleccionadas.has(a)}
+                          onChange={() => setAerolineasSeleccionadas((prev) => toggleEnSet(prev, a))}
+                        />
+                        {a}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <p className="mb-1.5 text-xs font-medium text-slate-600 dark:text-slate-300">Horario de salida</p>
+                <div className="space-y-1.5">
+                  {FRANJAS_HORARIAS.map((f) => (
+                    <label key={f.id} title={f.rango} className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
+                      <input type="checkbox" checked={horariosSeleccionados.has(f.id)} onChange={() => setHorariosSeleccionados((prev) => toggleEnSet(prev, f.id))} />
+                      {f.etiqueta}
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {hayFiltrosActivos && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFiltroEscalas('todos');
+                    setHorariosSeleccionados(new Set());
+                    setAerolineasSeleccionadas(new Set());
+                  }}
+                  className="text-xs font-semibold text-sol-600 hover:text-sol-700 dark:text-sol-400"
+                >
+                  Limpiar filtros
+                </button>
+              )}
+            </aside>
+
+            <div className="min-w-0 flex-1 space-y-3">
+              <MatrizFechas form={form} precioActual={precioActual} onSeleccionarFecha={(fechaSalida, fechaRegreso) => buscarCon({ ...form, fechaSalida, fechaRegreso })} />
+
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
                 <div className="flex gap-1">
                   {ORDENES_VUELO.map((o) => (
                     <button
@@ -1406,94 +1516,28 @@ function BuscarVueloTab() {
                 </span>
               </div>
 
-              <div className="flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-slate-100 pt-3 dark:border-slate-800">
-                <div className="flex items-center gap-1">
-                  <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Escalas</span>
-                  {([
-                    { id: 'todos', etiqueta: 'Todos' },
-                    { id: 'directo', etiqueta: 'Directo' },
-                    { id: 'max1', etiqueta: 'Máx. 1 escala' },
-                  ] as const).map((opt) => (
+              {ofertasFiltradas.map((oferta) => (
+                <FilaOferta key={oferta.id} oferta={oferta} onReservar={() => setOfertaAReservar(oferta)} />
+              ))}
+              {ofertasFiltradas.length === 0 && (
+                <div className="flex flex-col items-start gap-2 rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400">
+                  <p>Ninguna oferta coincide con los filtros elegidos.</p>
+                  {hayFiltrosActivos && (
                     <button
-                      key={opt.id}
                       type="button"
-                      onClick={() => setFiltroEscalas(opt.id)}
-                      className={clsx(
-                        'rounded-full px-2.5 py-1 text-[11px] font-semibold',
-                        filtroEscalas === opt.id
-                          ? 'bg-sol-100 text-sol-700 dark:bg-sol-500/10 dark:text-sol-400'
-                          : 'text-slate-500 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-800',
-                      )}
+                      onClick={() => {
+                        setFiltroEscalas('todos');
+                        setHorariosSeleccionados(new Set());
+                        setAerolineasSeleccionadas(new Set());
+                      }}
+                      className="text-xs font-semibold text-sol-600 hover:text-sol-700 dark:text-sol-400"
                     >
-                      {opt.etiqueta}
+                      Limpiar filtros
                     </button>
-                  ))}
+                  )}
                 </div>
-
-                <div className="flex flex-wrap items-center gap-1">
-                  <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Horario de salida</span>
-                  {FRANJAS_HORARIAS.map((f) => (
-                    <button
-                      key={f.id}
-                      type="button"
-                      title={f.rango}
-                      onClick={() => setHorariosSeleccionados((prev) => toggleEnSet(prev, f.id))}
-                      className={clsx(
-                        'rounded-full px-2.5 py-1 text-[11px] font-semibold',
-                        horariosSeleccionados.has(f.id)
-                          ? 'bg-sol-100 text-sol-700 dark:bg-sol-500/10 dark:text-sol-400'
-                          : 'text-slate-500 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-800',
-                      )}
-                    >
-                      {f.etiqueta}
-                    </button>
-                  ))}
-                </div>
-
-                {aerolineasDisponibles.length > 1 && (
-                  <div className="flex flex-wrap items-center gap-1">
-                    <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Aerolínea</span>
-                    {aerolineasDisponibles.map((a) => (
-                      <button
-                        key={a}
-                        type="button"
-                        onClick={() => setAerolineasSeleccionadas((prev) => toggleEnSet(prev, a))}
-                        className={clsx(
-                          'rounded-full px-2.5 py-1 text-[11px] font-semibold',
-                          aerolineasSeleccionadas.has(a)
-                            ? 'bg-sol-100 text-sol-700 dark:bg-sol-500/10 dark:text-sol-400'
-                            : 'text-slate-500 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-800',
-                        )}
-                      >
-                        {a}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
+              )}
             </div>
-
-            {ofertasFiltradas.map((oferta) => (
-              <FilaOferta key={oferta.id} oferta={oferta} onReservar={() => setOfertaAReservar(oferta)} />
-            ))}
-            {ofertasFiltradas.length === 0 && (
-              <div className="flex flex-col items-start gap-2 rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400">
-                <p>Ninguna oferta coincide con los filtros elegidos.</p>
-                {hayFiltrosActivos && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setFiltroEscalas('todos');
-                      setHorariosSeleccionados(new Set());
-                      setAerolineasSeleccionadas(new Set());
-                    }}
-                    className="text-xs font-semibold text-sol-600 hover:text-sol-700 dark:text-sol-400"
-                  >
-                    Limpiar filtros
-                  </button>
-                )}
-              </div>
-            )}
           </div>
         );
       })()}
