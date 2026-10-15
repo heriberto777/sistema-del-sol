@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useLocation } from 'react-router-dom';
 import { apiClient } from '../../../lib/api-client';
 import { Card } from '../../atoms/Card/Card';
 import { Badge } from '../../atoms/Badge/Badge';
@@ -17,7 +18,11 @@ import { ModalDetalleLead } from './ModalDetalleLead';
 
 export function CrmLeadsPanel() {
   const { tienePermiso } = useAuth();
-  const [busqueda, setBusqueda] = useState('');
+  const location = useLocation();
+  // "El ancla" — la Bandeja de WhatsApp manda para acá con esto en
+  // location.state cuando el vendedor hace clic en "Ver lead" de una
+  // conversación, para no hacerlo buscar el teléfono a mano.
+  const [busqueda, setBusqueda] = useState((location.state as { busquedaInicial?: string } | null)?.busquedaInicial ?? '');
   const [estado, setEstado] = useState<EstadoLead | ''>('');
   const [pagina, setPagina] = useState(1);
   const busquedaDebounced = useDebouncedValue(busqueda);

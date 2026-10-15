@@ -94,6 +94,9 @@ export interface ActividadCrm {
   createdAt: string;
 }
 
+/** "El ancla" — resuelve si el teléfono de una conversación de WhatsApp ya es Cliente/Lead del tenant (ver ContactoTelefonoService en el backend). */
+export type ContactoPorTelefono = { tipo: 'CLIENTE'; id: string; nombre: string } | { tipo: 'LEAD'; id: string; nombre: string; estado: EstadoLead } | { tipo: 'DESCONOCIDO' };
+
 export const ETIQUETA_ORIGEN_LEAD: Record<OrigenLead, string> = {
   MANUAL: 'Manual',
   WHATSAPP: 'WhatsApp',

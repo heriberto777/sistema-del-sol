@@ -27,6 +27,9 @@ import { CrmReportesRepository } from './crm-reportes.repository';
 import { MetasVentaController } from './metas-venta.controller';
 import { MetasVentaService } from './metas-venta.service';
 import { MetasVentaRepository } from './metas-venta.repository';
+import { ContactoTelefonoController } from './contacto-telefono.controller';
+import { ContactoTelefonoService } from './contacto-telefono.service';
+import { ContactoTelefonoRepository } from './contacto-telefono.repository';
 
 /**
  * Plugin de CRM (Fase 1 + Fase 2 + Fase 3) — ver el artifact de diseño
@@ -46,6 +49,11 @@ import { MetasVentaRepository } from './metas-venta.repository';
  * (MetasVentaService) y el cron de actividades vencidas
  * (ActividadesCrmCronService, sin controller — @Cron se registra solo,
  * ScheduleModule ya es global en AppModule).
+ *
+ * "El ancla" agrega: `ContactoTelefonoService`, que le dice a la Bandeja
+ * de WhatsApp (`ConversacionWhatsapp.tsx`, fuera de este módulo) si el
+ * teléfono de la conversación ya es Cliente/Lead, para ofrecer "armar
+ * cotización"/"ver lead"/"crear lead" sin que el vendedor lo busque a mano.
  */
 @Module({
   imports: [ClientesModule, CotizacionesModule, LealtadModule, WhatsappBotModule],
@@ -57,6 +65,7 @@ import { MetasVentaRepository } from './metas-venta.repository';
     ClienteTimelineController,
     CrmReportesController,
     MetasVentaController,
+    ContactoTelefonoController,
   ],
   providers: [
     LeadsService,
@@ -76,6 +85,8 @@ import { MetasVentaRepository } from './metas-venta.repository';
     CrmReportesRepository,
     MetasVentaService,
     MetasVentaRepository,
+    ContactoTelefonoService,
+    ContactoTelefonoRepository,
   ],
 })
 export class CrmModule {}

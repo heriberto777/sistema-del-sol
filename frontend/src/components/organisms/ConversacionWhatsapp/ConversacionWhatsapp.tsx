@@ -1,11 +1,17 @@
 import { useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Check, Package, Send } from 'lucide-react';
 import { apiClient } from '../../../lib/api-client';
 import { mensajeErrorApi } from '../../../lib/mensaje-error-api';
 import { useDebouncedValue } from '../../../hooks/useDebouncedValue';
+import { useAuth } from '../../../hooks/useAuth';
 import type { ProductoCatalogo } from '../CatalogoProductosPos/CatalogoProductosPos';
 import type { PaginaResultado } from '../../../types/pagina-resultado';
+import type { CotizacionNuevaState } from '../../../pages/CotizacionNueva';
+import { Badge } from '../../atoms/Badge/Badge';
+import { ETIQUETA_ESTADO_LEAD, type ContactoPorTelefono } from '../../../types/crm';
+import { ModalFormLead } from '../CrmLeadsPanel/ModalFormLead';
 import { QUERY_KEY_PENDIENTES } from '../BandejaWhatsappDrawer/BandejaWhatsappDrawer';
 
 export interface MensajeConversacion {
@@ -41,17 +47,32 @@ export function ConversacionWhatsapp({
   accionesExtra?: ReactNode;
 }) {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const { tieneModulo, tienePermiso } = useAuth();
   const [texto, setTexto] = useState('');
   const [busquedaProducto, setBusquedaProducto] = useState('');
   const [mostrarBuscadorProducto, setMostrarBuscadorProducto] = useState(false);
+  const [mostrarCrearLead, setMostrarCrearLead] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const busquedaDebounced = useDebouncedValue(busquedaProducto);
+  const telefonoLegible = telefono.replace(/^whatsapp:/, '');
+  const puedeVerContactoCrm = tieneModulo('crm') && tienePermiso('crm.ver');
 
   const { data: conversacion, isLoading: cargandoConversacion } = useQuery({
     queryKey: ['whatsapp-bandeja-conversacion', telefono],
     queryFn: async () => (await apiClient.get<MensajeConversacion[]>(`/admin/whatsapp-bandeja/${encodeURIComponent(telefono)}/conversacion`)).data,
     refetchInterval: 10_000,
     refetchIntervalInBackground: true,
+  });
+
+  // "El ancla" — resuelve si este teléfono ya es Cliente/Lead del tenant,
+  // para ofrecer la acción correcta en vez de que el vendedor lo busque a
+  // mano. Se oculta solo (query deshabilitada) si el tenant no tiene CRM
+  // activo o el usuario no tiene permiso para verlo.
+  const { data: contacto, refetch: refetchContacto } = useQuery({
+    queryKey: ['crm-contacto-por-telefono', telefonoLegible],
+    queryFn: async () => (await apiClient.get<ContactoPorTelefono>('/crm/contactos/por-telefono', { params: { telefono: telefonoLegible } })).data,
+    enabled: puedeVerContactoCrm,
   });
 
   const { data: resultadosProducto, isFetching: buscandoProducto } = useQuery({
@@ -83,7 +104,6 @@ export function ConversacionWhatsapp({
     onError: (err) => setError(mensajeErrorApi(err, 'No se pudo marcar como atendido.')),
   });
 
-  const telefonoLegible = telefono.replace(/^whatsapp:/, '');
   const perfilNombre = conversacion?.find((m) => m.perfilNombre)?.perfilNombre ?? null;
 
   return (
@@ -109,6 +129,45 @@ export function ConversacionWhatsapp({
         </button>
         {accionesExtra}
       </div>
+
+      {puedeVerContactoCrm && contacto && (
+        <div className="flex items-center justify-between gap-2 border-b border-slate-200 bg-slate-50 px-4 py-2 dark:border-slate-700 dark:bg-slate-900/40">
+          <Badge tono={contacto.tipo === 'CLIENTE' ? 'exito' : contacto.tipo === 'LEAD' ? 'advertencia' : 'neutro'}>
+            {contacto.tipo === 'CLIENTE' && `Cliente: ${contacto.nombre}`}
+            {contacto.tipo === 'LEAD' && `Lead: ${contacto.nombre} · ${ETIQUETA_ESTADO_LEAD[contacto.estado]}`}
+            {contacto.tipo === 'DESCONOCIDO' && 'Sin registrar'}
+          </Badge>
+          {contacto.tipo === 'CLIENTE' && tienePermiso('cotizaciones.crear') && (
+            <button
+              type="button"
+              onClick={() =>
+                navigate('/cotizaciones/nueva', { state: { clienteId: contacto.id, lineasSugeridas: [] } satisfies CotizacionNuevaState })
+              }
+              className="shrink-0 rounded-full border border-sol-300 px-2.5 py-1 text-xs font-medium text-sol-700 hover:bg-sol-50 dark:border-sol-700 dark:text-sol-300 dark:hover:bg-sol-950/40"
+            >
+              Armar cotización
+            </button>
+          )}
+          {contacto.tipo === 'LEAD' && (
+            <button
+              type="button"
+              onClick={() => navigate('/crm/leads', { state: { busquedaInicial: telefonoLegible } })}
+              className="shrink-0 rounded-full border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+            >
+              Ver lead
+            </button>
+          )}
+          {contacto.tipo === 'DESCONOCIDO' && tienePermiso('crm.leads.crear') && (
+            <button
+              type="button"
+              onClick={() => setMostrarCrearLead(true)}
+              className="shrink-0 rounded-full border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+            >
+              Crear lead
+            </button>
+          )}
+        </div>
+      )}
 
       <div className="flex-1 space-y-2 overflow-y-auto bg-slate-50 px-4 py-3 dark:bg-slate-950">
         {cargandoConversacion && <p className="text-sm text-slate-500 dark:text-slate-400">Cargando…</p>}
@@ -212,6 +271,15 @@ export function ConversacionWhatsapp({
           <Send size={16} />
         </button>
       </div>
+
+      {mostrarCrearLead && (
+        <ModalFormLead
+          lead={null}
+          prefill={{ nombre: perfilNombre ?? undefined, telefono: telefonoLegible, origen: 'WHATSAPP' }}
+          onCreado={() => refetchContacto()}
+          onClose={() => setMostrarCrearLead(false)}
+        />
+      )}
     </div>
   );
 }

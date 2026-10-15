@@ -7,22 +7,41 @@ import { Button } from '../../atoms/Button/Button';
 import { mensajeErrorApi } from '../../../lib/mensaje-error-api';
 import { ETIQUETA_ORIGEN_LEAD, Lead, OrigenLead } from '../../../types/crm';
 
-export function ModalFormLead({ lead, onClose }: { lead: Lead | null; onClose: () => void }) {
+/** Solo se usa cuando `lead` es `null` (alta nueva) — ej. "Crear Lead" desde la Bandeja de WhatsApp, que ya conoce el teléfono y el origen. */
+interface PrefillLead {
+  nombre?: string;
+  telefono?: string;
+  origen?: OrigenLead;
+}
+
+export function ModalFormLead({
+  lead,
+  onClose,
+  prefill,
+  onCreado,
+}: {
+  lead: Lead | null;
+  onClose: () => void;
+  prefill?: PrefillLead;
+  /** Llamado con el lead recién creado (no en edición) — ej. para que la Bandeja de WhatsApp refresque el badge Cliente/Lead sin esperar el refetchInterval. */
+  onCreado?: (lead: Lead) => void;
+}) {
   const queryClient = useQueryClient();
-  const [nombre, setNombre] = useState(lead?.nombre ?? '');
+  const [nombre, setNombre] = useState(lead?.nombre ?? prefill?.nombre ?? '');
   const [email, setEmail] = useState(lead?.email ?? '');
-  const [telefono, setTelefono] = useState(lead?.telefono ?? '');
-  const [origen, setOrigen] = useState<OrigenLead>(lead?.origen ?? 'MANUAL');
+  const [telefono, setTelefono] = useState(lead?.telefono ?? prefill?.telefono ?? '');
+  const [origen, setOrigen] = useState<OrigenLead>(lead?.origen ?? prefill?.origen ?? 'MANUAL');
   const [notas, setNotas] = useState(lead?.notas ?? '');
   const [error, setError] = useState<string | null>(null);
 
   const guardar = useMutation({
     mutationFn: async () => {
       const data = { nombre, email: email || undefined, telefono: telefono || undefined, origen, notas: notas || undefined };
-      return lead ? apiClient.patch(`/crm/leads/${lead.id}`, data) : apiClient.post('/crm/leads', data);
+      return lead ? apiClient.patch<Lead>(`/crm/leads/${lead.id}`, data) : apiClient.post<Lead>('/crm/leads', data);
     },
-    onSuccess: () => {
+    onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ['crm-leads'] });
+      if (!lead) onCreado?.(res.data);
       onClose();
     },
     onError: (err) => setError(mensajeErrorApi(err, 'No se pudo guardar el lead.')),
