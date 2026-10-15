@@ -70,6 +70,7 @@ describe('FacturacionService', () => {
     repository = {
       obtenerProductoConPrecioVigente: jest.fn(),
       obtenerModalidadFacturacion: jest.fn().mockResolvedValue('NCF'),
+      obtenerRequiereComprobanteFiscal: jest.fn().mockResolvedValue(true),
       siguienteNcfEnTx: jest.fn().mockResolvedValue({ ncf: 'B0200000001', restantes: 999, umbralAlerta: null, sucursalIdUsado: null }),
       crearFacturaEnTx: jest.fn(),
       buscarPorId: jest.fn(),
@@ -765,6 +766,43 @@ describe('FacturacionService', () => {
 
       expect(repository.siguienteNcfEnTx).toHaveBeenCalledWith(TX, 'B01', 's1');
       expect(repository.crearFacturaEnTx).toHaveBeenCalledWith(TX, expect.objectContaining({ pagada: true }));
+    });
+  });
+
+  describe('requiereComprobanteFiscal (negocio sin comprobante fiscal)', () => {
+    it.each(['CONTADO', 'CREDITO'] as const)('%s nunca consume una secuencia de NCF cuando el tenant lo tiene desactivado', async (tipoFactura) => {
+      repository.obtenerRequiereComprobanteFiscal.mockResolvedValue(false);
+      repository.obtenerProductoConPrecioVigente.mockResolvedValue(producto(18, 100) as never);
+      repository.crearFacturaEnTx.mockResolvedValue(facturaCreada({ ncf: null, tipoNcf: null }) as never);
+
+      await service.crear(dto({ tipoFactura }), 'tenant-1', 'vendedor-1');
+
+      expect(repository.siguienteNcfEnTx).not.toHaveBeenCalled();
+      expect(repository.crearFacturaEnTx).toHaveBeenCalledWith(TX, expect.objectContaining({ ncf: null, tipoNcf: null }));
+    });
+
+    it('tampoco consume NCF en una Nota de Crédito/Débito cuando el tenant lo tiene desactivado', async () => {
+      repository.obtenerRequiereComprobanteFiscal.mockResolvedValue(false);
+      repository.obtenerProductoConPrecioVigente.mockResolvedValue(producto(18, 100) as never);
+      repository.crearFacturaEnTx.mockResolvedValue(facturaCreada({ id: 'nc1', total: -118, ncf: null, tipoNcf: null }) as never);
+
+      await service.crear(
+        dto({ tipoFactura: 'NOTA_CREDITO', facturaOrigenId: 'f-original' }),
+        'tenant-1',
+        'vendedor-1',
+      );
+
+      expect(repository.siguienteNcfEnTx).not.toHaveBeenCalled();
+      expect(repository.crearFacturaEnTx).toHaveBeenCalledWith(TX, expect.objectContaining({ ncf: null, tipoNcf: null }));
+    });
+
+    it('con el interruptor activado (default), sigue consumiendo NCF como siempre', async () => {
+      repository.obtenerProductoConPrecioVigente.mockResolvedValue(producto(18, 100) as never);
+      repository.crearFacturaEnTx.mockResolvedValue(facturaCreada() as never);
+
+      await service.crear(dto({ tipoFactura: 'CONTADO' }), 'tenant-1', 'vendedor-1');
+
+      expect(repository.siguienteNcfEnTx).toHaveBeenCalledWith(TX, 'B02', 's1');
     });
   });
 

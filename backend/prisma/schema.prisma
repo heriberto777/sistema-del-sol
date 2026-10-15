@@ -55,6 +55,13 @@ model Tenant {
   // diferencia de esa tabla, Tenant siempre tiene una fila garantizada
   // desde su creación (TenantSettings hoy no se crea en ningún flujo).
   modalidadFacturacion  ModalidadFacturacion @default(NCF)
+  // Negocio que no es contribuyente de la DGII (o no quiere emitir
+  // comprobante fiscal) — con esto en false, FacturacionService.crear()
+  // nunca resuelve tipoNcf/consume una secuencia (ver siguienteNcfEnTx),
+  // la factura queda con ncf/tipoNcf null y nunca aparece en los reportes
+  // 607/608 (ver ReportesFiscalesRepository). Default true: cero cambio
+  // de comportamiento para tenants existentes.
+  requiereComprobanteFiscal Boolean          @default(true)
   createdAt             DateTime             @default(now())
   updatedAt             DateTime             @updatedAt
 

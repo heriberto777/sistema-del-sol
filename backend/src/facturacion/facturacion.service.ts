@@ -499,19 +499,27 @@ export class FacturacionService {
     const montoPagadoAlCrear = pagosResueltos.reduce((acc, p) => acc + p.monto, 0);
     const pagadaAlCrear = dto.tipoFactura !== 'CREDITO' && montoPagadoAlCrear >= totalConRecargos - EPSILON_PAGOS && montoPagadoAlCrear > 0;
 
-    const modalidad = await this.facturacionRepository.obtenerModalidadFacturacion(tenantId);
-    let tipoNcf: TipoNcf;
-    if (dto.tipoFactura === 'NOTA_CREDITO' || dto.tipoFactura === 'NOTA_DEBITO') {
-      tipoNcf = (modalidad === 'ECF' ? ECF_POR_TIPO : NCF_POR_TIPO)[dto.tipoFactura];
-    } else {
-      // Comprobante fiscal explícito (independiente de tipoFactura) o,
-      // si no se manda, el que corresponde por defecto según la opción
-      // de pago — mismo comportamiento de siempre para quien todavía no
-      // manda `comprobanteFiscal` (POS, conversión de Cotizaciones/
-      // Remisiones).
-      const comprobanteFiscal = dto.comprobanteFiscal ?? (dto.tipoFactura === 'CONTADO' ? 'CONSUMO' : 'CREDITO_FISCAL');
-      const mapa = TIPO_NCF_COMPLETO[comprobanteFiscal];
-      tipoNcf = modalidad === 'ECF' ? mapa.ecf : mapa.ncf;
+    // Negocio que no es contribuyente de la DGII (o no emite comprobante
+    // fiscal) — tipoNcf queda en null para TODA factura de este tenant
+    // (venta normal o nota), nunca se toca una secuencia de NcfAsignado.
+    // Ver NcfPanel ("Comprobante fiscal") y ReportesFiscalesRepository
+    // (607/608 excluyen facturas con ncf null).
+    const requiereComprobanteFiscal = await this.facturacionRepository.obtenerRequiereComprobanteFiscal(tenantId);
+    let tipoNcf: TipoNcf | null = null;
+    if (requiereComprobanteFiscal) {
+      const modalidad = await this.facturacionRepository.obtenerModalidadFacturacion(tenantId);
+      if (dto.tipoFactura === 'NOTA_CREDITO' || dto.tipoFactura === 'NOTA_DEBITO') {
+        tipoNcf = (modalidad === 'ECF' ? ECF_POR_TIPO : NCF_POR_TIPO)[dto.tipoFactura];
+      } else {
+        // Comprobante fiscal explícito (independiente de tipoFactura) o,
+        // si no se manda, el que corresponde por defecto según la opción
+        // de pago — mismo comportamiento de siempre para quien todavía no
+        // manda `comprobanteFiscal` (POS, conversión de Cotizaciones/
+        // Remisiones).
+        const comprobanteFiscal = dto.comprobanteFiscal ?? (dto.tipoFactura === 'CONTADO' ? 'CONSUMO' : 'CREDITO_FISCAL');
+        const mapa = TIPO_NCF_COMPLETO[comprobanteFiscal];
+        tipoNcf = modalidad === 'ECF' ? mapa.ecf : mapa.ncf;
+      }
     }
     // Generado ANTES de la transacción: el descuento/reintegro de stock
     // (abajo) necesita `referenciaId` para vincular cada movimiento de lote
@@ -588,13 +596,20 @@ export class FacturacionService {
         }
       }
 
-      const { ncf, restantes, umbralAlerta, sucursalIdUsado } = await this.facturacionRepository.siguienteNcfEnTx(
-        tx,
-        tipoNcf,
-        bodega.sucursalId,
-      );
-      if (umbralAlerta != null && restantes <= umbralAlerta) {
-        this.eventBus.emit(EVENTOS.NCF_POR_AGOTARSE, { tenantId, tipoNcf, sucursalId: sucursalIdUsado, restantes, umbralAlerta });
+      let ncf: string | null = null;
+      if (tipoNcf) {
+        const tipoNcfResuelto = tipoNcf;
+        const resultado = await this.facturacionRepository.siguienteNcfEnTx(tx, tipoNcfResuelto, bodega.sucursalId);
+        ncf = resultado.ncf;
+        if (resultado.umbralAlerta != null && resultado.restantes <= resultado.umbralAlerta) {
+          this.eventBus.emit(EVENTOS.NCF_POR_AGOTARSE, {
+            tenantId,
+            tipoNcf: tipoNcfResuelto,
+            sucursalId: resultado.sucursalIdUsado,
+            restantes: resultado.restantes,
+            umbralAlerta: resultado.umbralAlerta,
+          });
+        }
       }
       // Número interno de empresa, distinto del NCF — mismo mecanismo que
       // ya usan Cotizaciones/Remisiones (ítem "consistencia visual de

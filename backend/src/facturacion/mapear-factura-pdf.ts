@@ -22,6 +22,10 @@ export const NOMBRE_TIPO_FACTURA: Record<TipoFactura, string> = {
 export interface FacturaParaPdf {
   tipoFactura: TipoFactura;
   ncf: string | null;
+  // Número interno de empresa (ver FacturacionService.crear) — se usa como
+  // "número" del documento cuando no hay NCF (tenant sin comprobante
+  // fiscal, ver Tenant.requiereComprobanteFiscal), en vez del id crudo.
+  numero: string | null;
   id: string;
   fecha: Date;
   cliente: { nombre: string; rncCedula?: string | null; direccion?: string | null; telefono?: string | null };
@@ -44,7 +48,7 @@ export interface FacturaParaPdf {
 export function mapearFacturaAParams(factura: FacturaParaPdf): DocumentoPdfParams {
   return {
     tipoDocumento: NOMBRE_TIPO_FACTURA[factura.tipoFactura],
-    numero: factura.ncf ?? factura.id,
+    numero: factura.ncf ?? factura.numero ?? factura.id,
     fecha: factura.fecha,
     cliente: factura.cliente.nombre,
     clienteDatosExtra: {

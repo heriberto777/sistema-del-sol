@@ -20,9 +20,12 @@ export class ReportesFiscalesRepository {
     return this.tenantPrisma.client;
   }
 
+  // `ncf: { not: null }` — una factura de un tenant sin comprobante fiscal
+  // (ver Tenant.requiereComprobanteFiscal/NcfPanel) no es un documento
+  // fiscal real; nunca debe terminar en un archivo que se manda a la DGII.
   ventasEnRango(desde: Date, hasta: Date) {
     return this.db.factura.findMany({
-      where: { estado: 'EMITIDA', fecha: { gte: desde, lte: finDelDia(hasta) } },
+      where: { estado: 'EMITIDA', fecha: { gte: desde, lte: finDelDia(hasta) }, ncf: { not: null } },
       orderBy: { fecha: 'asc' },
       include: { cliente: { select: CLIENTE_SELECT_BASICO } },
     });
@@ -30,7 +33,7 @@ export class ReportesFiscalesRepository {
 
   anuladasEnRango(desde: Date, hasta: Date) {
     return this.db.factura.findMany({
-      where: { estado: 'ANULADA', fecha: { gte: desde, lte: finDelDia(hasta) } },
+      where: { estado: 'ANULADA', fecha: { gte: desde, lte: finDelDia(hasta) }, ncf: { not: null } },
       orderBy: { fecha: 'asc' },
     });
   }

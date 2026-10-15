@@ -28,6 +28,23 @@ export class NcfRepository {
     return tenant.modalidadFacturacion;
   }
 
+  async obtenerRequiereComprobante(tenantId: string): Promise<boolean> {
+    const tenant = await this.db.tenant.findUniqueOrThrow({
+      where: { id: tenantId },
+      select: { requiereComprobanteFiscal: true },
+    });
+    return tenant.requiereComprobanteFiscal;
+  }
+
+  async actualizarRequiereComprobante(tenantId: string, requiereComprobanteFiscal: boolean) {
+    const tenant = await this.db.tenant.update({
+      where: { id: tenantId },
+      data: { requiereComprobanteFiscal },
+      select: { requiereComprobanteFiscal: true },
+    });
+    return tenant.requiereComprobanteFiscal;
+  }
+
   listar() {
     return this.db.ncfAsignado.findMany({
       include: { sucursal: { select: { id: true, nombre: true } } },

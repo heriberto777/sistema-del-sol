@@ -36,6 +36,15 @@ export class FacturacionRepository {
     return tenant.modalidadFacturacion;
   }
 
+  /** Negocio que no es contribuyente de la DGII — ver FacturacionService.crear(), que con esto en false nunca resuelve tipoNcf ni consume una secuencia. */
+  async obtenerRequiereComprobanteFiscal(tenantId: string): Promise<boolean> {
+    const tenant = await this.db.tenant.findUniqueOrThrow({
+      where: { id: tenantId },
+      select: { requiereComprobanteFiscal: true },
+    });
+    return tenant.requiereComprobanteFiscal;
+  }
+
   /**
    * Precio cuelga de VarianteProducto (Fase 3c) — `varianteId` ya viene
    * resuelto por `FacturacionService.crear()` (ver `VariantesService.
@@ -144,8 +153,10 @@ export class FacturacionRepository {
       vendedorId: string;
       bodegaId: string;
       tipoFactura: TipoFactura;
-      ncf?: string;
-      tipoNcf?: TipoNcf;
+      // null explícito (no solo ausente) — negocio sin comprobante fiscal,
+      // ver FacturacionService.crear()/requiereComprobanteFiscal.
+      ncf?: string | null;
+      tipoNcf?: TipoNcf | null;
       facturaOrigenId?: string;
       // Solo lo llenan las ventas de POS — ver PosService.registrarVenta.
       // formaPagoId/referenciaPago acá son ya la "forma de pago principal"

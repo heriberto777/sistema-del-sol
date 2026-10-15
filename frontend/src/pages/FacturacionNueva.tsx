@@ -15,6 +15,7 @@ import { TablaLineasEditable, LineaEditable } from '../components/molecules/Tabl
 import { SelectorBodega } from '../components/molecules/SelectorBodega/SelectorBodega';
 import { SelectFormaPago, type FormaPago } from '../components/molecules/SelectFormaPago/SelectFormaPago';
 import { useListasPrecio } from '../hooks/useListasPrecio';
+import { useRequiereComprobanteFiscal } from '../hooks/useRequiereComprobanteFiscal';
 import { useHayCambios } from '../hooks/useHayCambios';
 import { estimarLineas, ITBIS_GENERAL_ESTIMADO } from '../lib/estimar-totales-documento';
 import { PaginaResultado } from '../types/pagina-resultado';
@@ -79,6 +80,7 @@ export function FacturacionNueva() {
 
   const { data: listasPrecio } = useListasPrecio();
   const listaPrecioResuelta = cliente?.listaPrecio?.nombre ?? 'GENERAL';
+  const requiereComprobanteFiscal = useRequiereComprobanteFiscal();
 
   // Comprobante fiscal y opción de pago por defecto del cliente (ítem
   // "separar Comprobante Fiscal de Opción de Pago") — autoseleccionan,
@@ -108,7 +110,7 @@ export function FacturacionNueva() {
         clienteId: cliente?.id,
         bodegaId,
         tipoFactura,
-        comprobanteFiscal,
+        comprobanteFiscal: requiereComprobanteFiscal ? comprobanteFiscal : undefined,
         listaPrecio: listaPrecioOverride || undefined,
         plazoPagoDias: tipoFactura === 'CREDITO' ? plazoPagoDias : undefined,
         formaPagoId: tipoFactura === 'CONTADO' ? formaPagoId || undefined : undefined,
@@ -423,7 +425,7 @@ export function FacturacionNueva() {
           onToggle={() => setInfoColapsada((v) => !v)}
           resumen={
             cliente
-              ? `${cliente.nombre} · ${tipoFactura === 'CONTADO' ? 'Contado' : 'Crédito'} · ${ETIQUETA_COMPROBANTE[comprobanteFiscal]}${bodegaId ? ` · ${bodegas?.find((b) => b.id === bodegaId)?.nombre ?? ''}` : ''}`
+              ? `${cliente.nombre} · ${tipoFactura === 'CONTADO' ? 'Contado' : 'Crédito'}${requiereComprobanteFiscal ? ` · ${ETIQUETA_COMPROBANTE[comprobanteFiscal]}` : ''}${bodegaId ? ` · ${bodegas?.find((b) => b.id === bodegaId)?.nombre ?? ''}` : ''}`
               : 'Sin cliente seleccionado'
           }
         >
@@ -482,18 +484,20 @@ export function FacturacionNueva() {
             </Select>
           </div>
 
-          <div className="flex flex-col gap-1">
-            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Comprobante fiscal</label>
-            <Select
-              value={comprobanteFiscal}
-              onChange={(e) => setComprobanteFiscal(e.target.value as typeof comprobanteFiscal)}
-            >
-              <option value="CONSUMO">Consumo (B02)</option>
-              <option value="CREDITO_FISCAL">Crédito Fiscal (B01)</option>
-              <option value="REGIMEN_ESPECIAL">Régimen Especial (B14)</option>
-              <option value="GUBERNAMENTAL">Gubernamental (B15)</option>
-            </Select>
-          </div>
+          {requiereComprobanteFiscal && (
+            <div className="flex flex-col gap-1">
+              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Comprobante fiscal</label>
+              <Select
+                value={comprobanteFiscal}
+                onChange={(e) => setComprobanteFiscal(e.target.value as typeof comprobanteFiscal)}
+              >
+                <option value="CONSUMO">Consumo (B02)</option>
+                <option value="CREDITO_FISCAL">Crédito Fiscal (B01)</option>
+                <option value="REGIMEN_ESPECIAL">Régimen Especial (B14)</option>
+                <option value="GUBERNAMENTAL">Gubernamental (B15)</option>
+              </Select>
+            </div>
+          )}
 
           {tipoFactura === 'CREDITO' && (
             <>

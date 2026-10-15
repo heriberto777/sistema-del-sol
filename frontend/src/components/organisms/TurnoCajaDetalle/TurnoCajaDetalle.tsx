@@ -19,6 +19,7 @@ import { FormularioCliente } from '../../molecules/FormularioCliente/FormularioC
 import { useAuth } from '../../../hooks/useAuth';
 import { useAtajosTeclado } from '../../../hooks/useAtajosTeclado';
 import { useListasPrecio } from '../../../hooks/useListasPrecio';
+import { useRequiereComprobanteFiscal } from '../../../hooks/useRequiereComprobanteFiscal';
 import { useDebouncedValue } from '../../../hooks/useDebouncedValue';
 import { PaginaResultado } from '../../../types/pagina-resultado';
 import type { ClienteCompleto } from '@backend-src/common/prisma/cliente-select-basico';
@@ -246,6 +247,7 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
   const [mostrarNuevoCliente, setMostrarNuevoCliente] = useState(false);
   const { data: listasPrecio } = useListasPrecio();
   const listaPrecioResuelta = cliente?.listaPrecio?.nombre ?? 'GENERAL';
+  const requiereComprobanteFiscal = useRequiereComprobanteFiscal();
   const [modalMovimiento, setModalMovimiento] = useState(false);
   const [modalCerrarTurno, setModalCerrarTurno] = useState(false);
   const [modalDescuento, setModalDescuento] = useState(false);
@@ -376,7 +378,7 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
         vendedorEmpleadoId: vendedor?.id,
         listaPrecio: listaPrecioOverride || undefined,
         tipoFactura,
-        comprobanteFiscal,
+        comprobanteFiscal: requiereComprobanteFiscal ? comprobanteFiscal : undefined,
         pagos,
         // `descuento` solo se manda si el cajero realmente lo tocó con F8
         // (Descuento) — mandar siempre 0 por defecto bloqueaba las ofertas
@@ -749,15 +751,17 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
                         <option value="CREDITO">Crédito</option>
                       </Select>
                     </div>
-                    <div className="flex flex-col gap-1">
-                      <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Comprobante fiscal</label>
-                      <Select value={comprobanteFiscal} onChange={(e) => setComprobanteFiscal(e.target.value as TipoComprobanteFiscal)}>
-                        <option value="CONSUMO">Consumo (B02)</option>
-                        <option value="CREDITO_FISCAL">Crédito Fiscal (B01)</option>
-                        <option value="REGIMEN_ESPECIAL">Régimen Especial (B14)</option>
-                        <option value="GUBERNAMENTAL">Gubernamental (B15)</option>
-                      </Select>
-                    </div>
+                    {requiereComprobanteFiscal && (
+                      <div className="flex flex-col gap-1">
+                        <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Comprobante fiscal</label>
+                        <Select value={comprobanteFiscal} onChange={(e) => setComprobanteFiscal(e.target.value as TipoComprobanteFiscal)}>
+                          <option value="CONSUMO">Consumo (B02)</option>
+                          <option value="CREDITO_FISCAL">Crédito Fiscal (B01)</option>
+                          <option value="REGIMEN_ESPECIAL">Régimen Especial (B14)</option>
+                          <option value="GUBERNAMENTAL">Gubernamental (B15)</option>
+                        </Select>
+                      </div>
+                    )}
                   </div>
                 </div>
               </details>

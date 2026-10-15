@@ -20,6 +20,14 @@ export class NcfService {
     return this.ncfRepository.actualizarModalidad(tenantId, modalidad);
   }
 
+  obtenerRequiereComprobante(tenantId: string) {
+    return this.ncfRepository.obtenerRequiereComprobante(tenantId);
+  }
+
+  actualizarRequiereComprobante(tenantId: string, requiereComprobanteFiscal: boolean) {
+    return this.ncfRepository.actualizarRequiereComprobante(tenantId, requiereComprobanteFiscal);
+  }
+
   listar() {
     return this.ncfRepository.listar();
   }

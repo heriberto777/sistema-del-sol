@@ -61,6 +61,16 @@ export function NcfPanel() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin-ncf-modalidad'] }),
   });
 
+  const { data: requiereComprobante } = useQuery({
+    queryKey: ['admin-ncf-requiere-comprobante'],
+    queryFn: async () => (await apiClient.get<boolean>('/admin/ncf/requiere-comprobante')).data,
+  });
+
+  const cambiarRequiereComprobante = useMutation({
+    mutationFn: async (valor: boolean) => apiClient.patch('/admin/ncf/requiere-comprobante', { requiereComprobanteFiscal: valor }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin-ncf-requiere-comprobante'] }),
+  });
+
   const crear = useMutation({
     mutationFn: async () =>
       apiClient.post('/admin/ncf', {
@@ -92,6 +102,40 @@ export function NcfPanel() {
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+      <Card className="lg:col-span-3" titulo="Comprobante fiscal">
+        <p className="text-sm text-slate-500 dark:text-slate-400">
+          Apagalo solo si esta empresa no es contribuyente de la DGII o no factura con comprobante fiscal. Con esto
+          apagado, las facturas se emiten únicamente con el número interno de la empresa (sin NCF/e-CF) y nunca
+          aparecen en los reportes 606/607/608.
+        </p>
+        <div className="mt-3 flex items-center gap-3">
+          <Button
+            type="button"
+            variante={requiereComprobante !== false ? 'primario' : 'secundario'}
+            disabled={cambiarRequiereComprobante.isPending}
+            onClick={() => cambiarRequiereComprobante.mutate(true)}
+          >
+            Emite comprobante fiscal
+          </Button>
+          <Button
+            type="button"
+            variante={requiereComprobante === false ? 'primario' : 'secundario'}
+            disabled={cambiarRequiereComprobante.isPending}
+            onClick={() => cambiarRequiereComprobante.mutate(false)}
+          >
+            Sin comprobante fiscal
+          </Button>
+        </div>
+        {requiereComprobante === false && (
+          <p className="mt-3 text-sm text-amber-600 dark:text-amber-400">
+            Facturación sin comprobante fiscal activada — revisá que esto sea correcto para la situación fiscal de
+            esta empresa.
+          </p>
+        )}
+      </Card>
+
+      {requiereComprobante === false ? null : (
+      <>
       <Card className="lg:col-span-3" titulo="Modalidad de facturación">
         <p className="text-sm text-slate-500 dark:text-slate-400">
           NCF tradicional o e-CF (comprobante electrónico DGII). En modalidad e-CF, las facturas se numeran con
@@ -216,6 +260,8 @@ export function NcfPanel() {
           </tbody>
         </table>
       </Card>
+      </>
+      )}
     </div>
   );
 }

@@ -4,6 +4,7 @@ import { NcfService } from './ncf.service';
 import { CrearNcfDto } from './dto/crear-ncf.dto';
 import { ActualizarNcfDto } from './dto/actualizar-ncf.dto';
 import { ActualizarModalidadFacturacionDto } from './dto/actualizar-modalidad-facturacion.dto';
+import { ActualizarRequiereComprobanteDto } from './dto/actualizar-requiere-comprobante.dto';
 import { Permissions } from '../common/decorators/permissions.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtPayloadUser } from '../common/types/authenticated-request';
@@ -34,6 +35,19 @@ export class NcfController {
   @Permissions('admin.configuracion')
   actualizarModalidad(@Body() dto: ActualizarModalidadFacturacionDto, @CurrentUser() user: JwtPayloadUser) {
     return this.ncfService.actualizarModalidad(user.tenantId, dto.modalidad);
+  }
+
+  // Rutas literales declaradas ANTES de ':id', mismo motivo que 'modalidad' arriba.
+  @Get('requiere-comprobante')
+  @Permissions('admin.configuracion')
+  obtenerRequiereComprobante(@CurrentUser() user: JwtPayloadUser) {
+    return this.ncfService.obtenerRequiereComprobante(user.tenantId);
+  }
+
+  @Patch('requiere-comprobante')
+  @Permissions('admin.configuracion')
+  actualizarRequiereComprobante(@Body() dto: ActualizarRequiereComprobanteDto, @CurrentUser() user: JwtPayloadUser) {
+    return this.ncfService.actualizarRequiereComprobante(user.tenantId, dto.requiereComprobanteFiscal);
   }
 
   @Post()
