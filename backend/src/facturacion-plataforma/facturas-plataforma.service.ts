@@ -16,6 +16,7 @@ import { SuscripcionesRepository } from './suscripciones.repository';
 import { CuponesPlataformaRepository } from './cupones/cupones-plataforma.repository';
 import { sumarCiclo, sumarCiclos } from './sumar-ciclo.util';
 import { resolverModulosConOrigen } from '../planes/resolver-modulos-activos';
+import { TenantsService } from '../tenants/tenants.service';
 
 const CICLO_ES: Record<string, string> = { MENSUAL: 'mensual', ANUAL: 'anual' };
 const CICLO_ES_PLURAL: Record<string, string> = { MENSUAL: 'meses', ANUAL: 'años' };
@@ -35,6 +36,7 @@ export class FacturasPlataformaService {
     private readonly prisma: PrismaService,
     private readonly suscripcionesRepository: SuscripcionesRepository,
     private readonly cuponesPlataformaRepository: CuponesPlataformaRepository,
+    private readonly tenantsService: TenantsService,
   ) {}
 
   listar(query: Parameters<FacturasPlataformaRepository['listar']>[0]) {
@@ -293,7 +295,28 @@ export class FacturasPlataformaService {
   }
 
   async marcarPagada(id: string, fechaPago: Date) {
-    return this.facturasPlataformaRepository.marcarEstado(id, 'PAGADA', fechaPago);
+    const factura = await this.facturasPlataformaRepository.marcarEstado(id, 'PAGADA', fechaPago);
+    await this.reactivarSiCorresponde(factura.tenantId, factura.id);
+    return factura;
+  }
+
+  /**
+   * El email de auto-suspensión le promete al tenant "pagá para
+   * reactivar" (ver CUERPOS.auto_suspendido más abajo) — antes de esto
+   * esa promesa era falsa: pagar solo marcaba la factura PAGADA, nunca
+   * tocaba Tenant.estado, y el tenant quedaba SUSPENDIDO hasta que un
+   * super admin lo reactivara a mano. Reactiva SOLO si ya no le queda
+   * NINGUNA otra factura VENCIDA a este tenant — pagar una de varias
+   * vencidas no debe reabrir el servicio con otra deuda todavía sin
+   * cubrir.
+   */
+  private async reactivarSiCorresponde(tenantId: string, facturaPagadaId: string) {
+    const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId }, select: { estado: true } });
+    if (tenant?.estado !== 'SUSPENDIDO') return;
+    if (await this.facturasPlataformaRepository.tieneFacturasVencidas(tenantId)) return;
+
+    await this.tenantsService.actualizar(tenantId, { estado: 'ACTIVO' });
+    await this.notificarFactura(tenantId, facturaPagadaId, 'reactivado');
   }
 
   async marcarVencidaConMora(id: string, feeMoraPct: number) {
@@ -361,7 +384,7 @@ export class FacturasPlataformaService {
   }
 
   /** Igual criterio que PlatformAuthService.olvidePassword: HTML inline, sin plantillas por-tenant (eso es NotificacionesService, tenant-scoped). */
-  async notificarFactura(tenantId: string, facturaId: string, motivo: 'generada' | 'vencida' | 'manual' | 'auto_suspendido') {
+  async notificarFactura(tenantId: string, facturaId: string, motivo: 'generada' | 'vencida' | 'manual' | 'auto_suspendido' | 'reactivado') {
     const admin = await this.prisma.user.findFirst({
       where: { tenantId, roles: { some: { role: { nombre: 'Admin Total' } } } },
       orderBy: { createdAt: 'asc' },
@@ -378,12 +401,14 @@ export class FacturasPlataformaService {
       vencida: 'Factura vencida — El Sistema del Sol',
       manual: 'Nuevo cargo — El Sistema del Sol',
       auto_suspendido: 'Tu cuenta fue suspendida por falta de pago — El Sistema del Sol',
+      reactivado: 'Tu cuenta fue reactivada — El Sistema del Sol',
     };
     const CUERPOS: Record<typeof motivo, string> = {
       generada: `<p>Se generó una nueva factura por tu suscripción: <strong>${factura.concepto}</strong>.</p><p>Total: RD$ ${Number(factura.total).toLocaleString('es-DO')}, vence el ${factura.fechaVencimiento.toLocaleDateString('es-DO')}.</p><p><a href="${enlacePago}">Pagar en línea</a></p>`,
       vencida: `<p>Tu factura <strong>${factura.concepto}</strong> venció sin pago registrado y se le aplicó un cargo por mora.</p><p>Nuevo total: RD$ ${Number(factura.total).toLocaleString('es-DO')}.</p><p><a href="${enlacePago}">Pagar en línea</a></p>`,
       manual: `<p>Se generó un cargo puntual: <strong>${factura.concepto}</strong>.</p><p>Total: RD$ ${Number(factura.total).toLocaleString('es-DO')}, vence el ${factura.fechaVencimiento.toLocaleDateString('es-DO')}.</p><p><a href="${enlacePago}">Pagar en línea</a></p>`,
       auto_suspendido: `<p>Tu cuenta fue suspendida automáticamente por tener la factura <strong>${factura.concepto}</strong> vencida sin pago registrado.</p><p>Total pendiente: RD$ ${Number(factura.total).toLocaleString('es-DO')}.</p><p><a href="${enlacePago}">Pagar en línea para reactivar</a></p>`,
+      reactivado: `<p>Tu cuenta fue reactivada automáticamente — se registró el pago de la factura <strong>${factura.concepto}</strong> y ya no tenés facturas vencidas pendientes.</p>`,
     };
     const asunto = ASUNTOS[motivo];
     const cuerpo = CUERPOS[motivo];

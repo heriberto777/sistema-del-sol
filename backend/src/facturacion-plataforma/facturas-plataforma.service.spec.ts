@@ -10,6 +10,7 @@ import { EmisionECfService } from '../emision-ecf/emision-ecf.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { SuscripcionesRepository } from './suscripciones.repository';
 import { CuponesPlataformaRepository } from './cupones/cupones-plataforma.repository';
+import { TenantsService } from '../tenants/tenants.service';
 
 describe('FacturasPlataformaService', () => {
   let service: FacturasPlataformaService;
@@ -29,6 +30,7 @@ describe('FacturasPlataformaService', () => {
   };
   let suscripcionesRepository: jest.Mocked<SuscripcionesRepository>;
   let cuponesPlataformaRepository: jest.Mocked<CuponesPlataformaRepository>;
+  let tenantsService: jest.Mocked<TenantsService>;
 
   beforeEach(() => {
     repo = {
@@ -39,6 +41,7 @@ describe('FacturasPlataformaService', () => {
       marcarEstado: jest.fn(),
       contarPagos: jest.fn(),
       listarVencidasPendientes: jest.fn(),
+      tieneFacturasVencidas: jest.fn().mockResolvedValue(false),
     } as unknown as jest.Mocked<FacturasPlataformaRepository>;
     emailChannel = { enviar: jest.fn().mockResolvedValue(true) } as unknown as jest.Mocked<EmailChannel>;
     whatsAppChannel = { enviar: jest.fn().mockResolvedValue(true) } as unknown as jest.Mocked<WhatsAppChannel>;
@@ -67,6 +70,7 @@ describe('FacturasPlataformaService', () => {
       decrementarCiclos: jest.fn().mockResolvedValue(undefined),
       desactivarAplicacion: jest.fn().mockResolvedValue(undefined),
     } as unknown as jest.Mocked<CuponesPlataformaRepository>;
+    tenantsService = { actualizar: jest.fn().mockResolvedValue(undefined) } as unknown as jest.Mocked<TenantsService>;
     service = new FacturasPlataformaService(
       repo,
       emailChannel,
@@ -78,6 +82,7 @@ describe('FacturasPlataformaService', () => {
       prisma as unknown as PrismaService,
       suscripcionesRepository,
       cuponesPlataformaRepository,
+      tenantsService,
     );
   });
 
@@ -585,6 +590,39 @@ describe('FacturasPlataformaService', () => {
 
       expect(repo.actualizar).toHaveBeenCalledWith('f1', { montoMora: 50, total: 1050 });
       expect(repo.marcarEstado).toHaveBeenCalledWith('f1', 'VENCIDA');
+    });
+  });
+
+  describe('marcarPagada (auto-reactivación)', () => {
+    it('tenant ACTIVO: marca la factura pagada sin tocar al tenant', async () => {
+      repo.marcarEstado.mockResolvedValue({ id: 'f1', tenantId: 't1' } as never);
+      prisma.tenant.findUnique.mockResolvedValue({ estado: 'ACTIVO' });
+
+      await service.marcarPagada('f1', new Date());
+
+      expect(tenantsService.actualizar).not.toHaveBeenCalled();
+    });
+
+    it('tenant SUSPENDIDO con OTRA factura todavía vencida: no reactiva (evita reabrir el servicio con deuda pendiente)', async () => {
+      repo.marcarEstado.mockResolvedValue({ id: 'f1', tenantId: 't1' } as never);
+      prisma.tenant.findUnique.mockResolvedValue({ estado: 'SUSPENDIDO' });
+      repo.tieneFacturasVencidas.mockResolvedValue(true);
+
+      await service.marcarPagada('f1', new Date());
+
+      expect(tenantsService.actualizar).not.toHaveBeenCalled();
+    });
+
+    it('tenant SUSPENDIDO sin ninguna otra factura vencida: reactiva y notifica', async () => {
+      repo.marcarEstado.mockResolvedValue({ id: 'f1', tenantId: 't1' } as never);
+      prisma.tenant.findUnique.mockResolvedValue({ estado: 'SUSPENDIDO' });
+      repo.tieneFacturasVencidas.mockResolvedValue(false);
+      repo.buscarPorId.mockResolvedValue({ id: 'f1', tenantId: 't1', concepto: 'Suscripción X', total: 1000, fechaVencimiento: new Date() } as never);
+
+      await service.marcarPagada('f1', new Date());
+
+      expect(tenantsService.actualizar).toHaveBeenCalledWith('t1', { estado: 'ACTIVO' });
+      expect(emailChannel.enviar).toHaveBeenCalledWith('admin@tenant.com', expect.stringContaining('reactivada'), expect.any(String));
     });
   });
 

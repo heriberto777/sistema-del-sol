@@ -77,6 +77,12 @@ export class FacturasPlataformaRepository {
     return this.prisma.facturaPlataforma.update({ where: { id }, data: { estado, fechaPago } });
   }
 
+  /** Auto-reactivación (ver FacturasPlataformaService.marcarPagada) — true si a ESTE tenant le queda alguna otra factura vencida sin pagar. */
+  async tieneFacturasVencidas(tenantId: string): Promise<boolean> {
+    const cantidad = await this.prisma.facturaPlataforma.count({ where: { tenantId, estado: 'VENCIDA' } });
+    return cantidad > 0;
+  }
+
   contarPagos(facturaId: string) {
     return this.prisma.pagoPlataforma.count({ where: { facturaId } });
   }

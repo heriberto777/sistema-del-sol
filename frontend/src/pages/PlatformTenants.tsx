@@ -345,27 +345,43 @@ function PanelModulosTenant({ tenant, onClose }: { tenant: Tenant; onClose: () =
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['platform-tenant-modulos', tenant.id] }),
   });
 
+  // Excepciones primero — con el catálogo completo a la vista (a propósito,
+  // ver resolverModulosConOrigen), lo que de verdad hay que notar a simple
+  // vista es qué se apartó del plan, no recorrer todo el listado buscándolo.
+  const modulosOrdenados = modulos ? [...modulos].sort((a, b) => Number(b.origen === 'override') - Number(a.origen === 'override')) : [];
+  const cantidadExcepciones = modulos?.filter((m) => m.origen === 'override').length ?? 0;
+
   return (
     <Modal titulo={`Módulos — ${tenant.nombre}`} onClose={onClose}>
-      <div className="mb-4 flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2 text-sm dark:bg-slate-800/60">
+      <div className="mb-4 flex flex-wrap items-center gap-2 rounded-lg bg-slate-50 px-3 py-2 text-sm dark:bg-slate-800/60">
         <span className="text-slate-500 dark:text-slate-400">Plan:</span>
         <Badge tono="neutro">{tenant.plan?.nombre ?? 'Sin plan'}</Badge>
+        {cantidadExcepciones > 0 && (
+          <Badge tono="advertencia">
+            {cantidadExcepciones} excepci{cantidadExcepciones === 1 ? 'ón' : 'ones'}
+          </Badge>
+        )}
       </div>
       <p className="mb-3 text-xs text-slate-400">
-        Los módulos marcados como &quot;excepción&quot; no vienen del plan — fueron activados o desactivados puntualmente
-        para este tenant.
+        Los módulos marcados como &quot;Excepción&quot; no vienen del plan — fueron activados o desactivados puntualmente
+        para este tenant. Aparecen primero en la lista.
       </p>
       <div className="max-h-96 space-y-2 overflow-y-auto">
-        {modulos?.map((modulo) => (
+        {modulosOrdenados.map((modulo) => (
           <div
             key={modulo.clave}
-            className="flex items-center justify-between rounded-md border border-slate-200 px-3 py-2 dark:border-slate-800"
+            className={
+              modulo.origen === 'override'
+                ? 'flex items-center justify-between rounded-md border border-amber-300 bg-amber-50 px-3 py-2 dark:border-amber-800 dark:bg-amber-900/20'
+                : 'flex items-center justify-between rounded-md border border-slate-200 px-3 py-2 dark:border-slate-800'
+            }
           >
-            <div>
-              <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{modulo.nombre}</p>
-              <p className="text-xs text-slate-400">
-                {modulo.origen === 'override' ? 'Excepción para este tenant' : 'Heredado del plan'}
-              </p>
+            <div className="flex items-center gap-2">
+              <div>
+                <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{modulo.nombre}</p>
+                <p className="text-xs text-slate-400">{modulo.origen === 'override' ? 'Excepción para este tenant' : 'Heredado del plan'}</p>
+              </div>
+              {modulo.origen === 'override' && <Badge tono="advertencia">Excepción</Badge>}
             </div>
             <div className="flex items-center gap-2">
               {modulo.origen === 'override' && (
@@ -694,23 +710,16 @@ export function PlatformTenants() {
                   </td>
                   <td className="px-5 py-3">
                     {tenant.modulosOverride.length === 0 ? (
-                      <span className="text-xs text-slate-400">—</span>
+                      <span className="text-xs text-slate-400">Sin excepciones</span>
                     ) : (
-                      <div className="flex flex-wrap gap-1">
-                        {tenant.modulosOverride.map((ov) => (
-                          <span
-                            key={ov.modulo.clave}
-                            className={
-                              ov.activo
-                                ? 'rounded-md bg-emerald-50 px-1.5 py-0.5 text-[11px] font-medium text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
-                                : 'rounded-md bg-red-50 px-1.5 py-0.5 text-[11px] font-medium text-red-700 line-through dark:bg-red-900/30 dark:text-red-400'
-                            }
-                          >
-                            {ov.activo ? '+ ' : ''}
-                            {ov.modulo.nombre}
-                          </span>
-                        ))}
-                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setTenantModulos(tenant)}
+                        title="Ver cuáles son"
+                        className="rounded-md bg-amber-50 px-2 py-1 text-xs font-medium text-amber-700 hover:bg-amber-100 dark:bg-amber-900/30 dark:text-amber-400 dark:hover:bg-amber-900/50"
+                      >
+                        {tenant.modulosOverride.length} excepci{tenant.modulosOverride.length === 1 ? 'ón' : 'ones'}
+                      </button>
                     )}
                   </td>
                   <td className="px-5 py-3">
