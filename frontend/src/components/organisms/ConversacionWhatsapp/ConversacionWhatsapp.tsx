@@ -1,17 +1,20 @@
 import { useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Check, Package, Send } from 'lucide-react';
+import { ArrowLeft, Check, FileText, Package, Send } from 'lucide-react';
 import { apiClient } from '../../../lib/api-client';
 import { mensajeErrorApi } from '../../../lib/mensaje-error-api';
+import { inicialesContacto } from '../../../lib/iniciales';
 import { useDebouncedValue } from '../../../hooks/useDebouncedValue';
 import { useAuth } from '../../../hooks/useAuth';
 import type { ProductoCatalogo } from '../CatalogoProductosPos/CatalogoProductosPos';
 import type { PaginaResultado } from '../../../types/pagina-resultado';
 import type { CotizacionNuevaState } from '../../../pages/CotizacionNueva';
+import { Avatar } from '../../atoms/Avatar/Avatar';
 import { Badge } from '../../atoms/Badge/Badge';
 import { ETIQUETA_ESTADO_LEAD, type ContactoPorTelefono } from '../../../types/crm';
 import { ModalFormLead } from '../CrmLeadsPanel/ModalFormLead';
+import { ModalEnviarDocumentoWhatsapp } from './ModalEnviarDocumentoWhatsapp';
 import { QUERY_KEY_PENDIENTES } from '../BandejaWhatsappDrawer/BandejaWhatsappDrawer';
 
 export interface MensajeConversacion {
@@ -53,6 +56,7 @@ export function ConversacionWhatsapp({
   const [busquedaProducto, setBusquedaProducto] = useState('');
   const [mostrarBuscadorProducto, setMostrarBuscadorProducto] = useState(false);
   const [mostrarCrearLead, setMostrarCrearLead] = useState(false);
+  const [mostrarEnviarDocumento, setMostrarEnviarDocumento] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const busquedaDebounced = useDebouncedValue(busquedaProducto);
   const telefonoLegible = telefono.replace(/^whatsapp:/, '');
@@ -114,6 +118,7 @@ export function ConversacionWhatsapp({
             <ArrowLeft size={18} />
           </button>
         )}
+        <Avatar iniciales={inicialesContacto(perfilNombre, telefonoLegible)} seed={telefonoLegible} size="sm" />
         <div className="min-w-0 flex-1">
           <span className="block truncate font-medium text-slate-900 dark:text-slate-100">{perfilNombre ?? telefonoLegible}</span>
           {perfilNombre && <span className="block truncate text-xs text-slate-400">{telefonoLegible}</span>}
@@ -137,16 +142,30 @@ export function ConversacionWhatsapp({
             {contacto.tipo === 'LEAD' && `Lead: ${contacto.nombre} · ${ETIQUETA_ESTADO_LEAD[contacto.estado]}`}
             {contacto.tipo === 'DESCONOCIDO' && 'Sin registrar'}
           </Badge>
-          {contacto.tipo === 'CLIENTE' && tienePermiso('cotizaciones.crear') && (
-            <button
-              type="button"
-              onClick={() =>
-                navigate('/cotizaciones/nueva', { state: { clienteId: contacto.id, lineasSugeridas: [] } satisfies CotizacionNuevaState })
-              }
-              className="shrink-0 rounded-full border border-sol-300 px-2.5 py-1 text-xs font-medium text-sol-700 hover:bg-sol-50 dark:border-sol-700 dark:text-sol-300 dark:hover:bg-sol-950/40"
-            >
-              Armar cotización
-            </button>
+          {contacto.tipo === 'CLIENTE' && (
+            <div className="flex shrink-0 items-center gap-2">
+              {tienePermiso('cotizaciones.crear') && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    navigate('/cotizaciones/nueva', { state: { clienteId: contacto.id, lineasSugeridas: [] } satisfies CotizacionNuevaState })
+                  }
+                  className="rounded-full border border-sol-300 px-2.5 py-1 text-xs font-medium text-sol-700 hover:bg-sol-50 dark:border-sol-700 dark:text-sol-300 dark:hover:bg-sol-950/40"
+                >
+                  Armar cotización
+                </button>
+              )}
+              {(tienePermiso('clientes.ver') || tienePermiso('facturacion.ver') || tienePermiso('cotizaciones.ver')) && (
+                <button
+                  type="button"
+                  onClick={() => setMostrarEnviarDocumento(true)}
+                  className="flex items-center gap-1 rounded-full border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                >
+                  <FileText size={12} />
+                  Enviar documento
+                </button>
+              )}
+            </div>
           )}
           {contacto.tipo === 'LEAD' && (
             <button
@@ -278,6 +297,15 @@ export function ConversacionWhatsapp({
           prefill={{ nombre: perfilNombre ?? undefined, telefono: telefonoLegible, origen: 'WHATSAPP' }}
           onCreado={() => refetchContacto()}
           onClose={() => setMostrarCrearLead(false)}
+        />
+      )}
+
+      {mostrarEnviarDocumento && contacto?.tipo === 'CLIENTE' && (
+        <ModalEnviarDocumentoWhatsapp
+          telefono={telefono}
+          clienteId={contacto.id}
+          clienteNombre={contacto.nombre}
+          onClose={() => setMostrarEnviarDocumento(false)}
         />
       )}
     </div>

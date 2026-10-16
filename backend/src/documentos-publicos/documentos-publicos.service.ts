@@ -5,6 +5,7 @@ import { EVENTOS } from '../event-bus/events';
 import { mapearFacturaAParams } from '../facturacion/mapear-factura-pdf';
 import { mapearCotizacionAParams } from '../cotizaciones/mapear-cotizacion-pdf';
 import { generarPdfPersonalizado } from '../common/pdf/generar-documento-impreso';
+import { generarEstadoCuentaPdf, LineaEstadoCuentaPdf } from '../common/pdf/estado-cuenta-pdf';
 import { resolverPersonalizacionDocumento } from '../common/impresion/resolver-personalizacion-documento';
 import { CLIENTE_SELECT_BASICO } from '../common/prisma/cliente-select-basico';
 import { ResponderCotizacionDto } from './dto/responder-cotizacion.dto';
@@ -72,6 +73,56 @@ export class DocumentosPublicosService {
   async obtenerCotizacionPdf(id: string) {
     const cotizacion = await this.buscarCotizacion(id);
     return generarPdfPersonalizado(this.prisma, cotizacion.tenantId, 'COTIZACION', mapearCotizacionAParams(cotizacion));
+  }
+
+  /**
+   * Link público del estado de cuenta — mismo criterio que Factura/
+   * Cotización de arriba (UUID como capability token, `PrismaService`
+   * global porque el tenant no se conoce hasta resolver el id), pero
+   * duplica la consulta de `ClientesRepository.buscarFacturasParaEstadoCuenta`/
+   * `sumaPagosPorFacturas` en vez de reusar `ClientesService`: ese
+   * servicio usa `TenantPrismaService` (request-scoped, requiere
+   * `request.user.tenantId` del JWT), que nunca se puebla en una ruta
+   * `@Public()` — mismo motivo por el que este archivo ya duplica
+   * `buscarFactura`/`buscarCotizacion` en vez de llamar a
+   * FacturacionService/CotizacionesService.
+   */
+  async obtenerEstadoCuentaPdf(clienteId: string) {
+    const cliente = await this.prisma.cliente.findUnique({ where: { id: clienteId } });
+    if (!cliente) throw new NotFoundException('Cliente no encontrado');
+
+    const facturas = await this.prisma.factura.findMany({
+      where: { clienteId, estado: 'EMITIDA' },
+      orderBy: { fecha: 'asc' },
+      select: { id: true, numero: true, ncf: true, tipoFactura: true, fecha: true, total: true, pagada: true },
+    });
+    const pendientes = facturas.filter((f) => !f.pagada);
+    const pagos = pendientes.length
+      ? await this.prisma.pago.groupBy({ by: ['facturaId'], where: { facturaId: { in: pendientes.map((f) => f.id) } }, _sum: { monto: true } })
+      : [];
+    const pagadoPorFactura = new Map(pagos.map((p) => [p.facturaId, Number(p._sum.monto ?? 0)]));
+
+    const lineas: LineaEstadoCuentaPdf[] = facturas.map((f) => {
+      const total = Number(f.total);
+      const pagado = f.pagada ? total : (pagadoPorFactura.get(f.id) ?? 0);
+      return { numero: f.numero, ncf: f.ncf, tipoFactura: f.tipoFactura, fecha: f.fecha, total, saldoPendiente: total - pagado };
+    });
+    const totalFacturado = lineas.reduce((acc, l) => acc + l.total, 0);
+    const saldoPendiente = lineas.reduce((acc, l) => acc + l.saldoPendiente, 0);
+
+    const personalizacion = await resolverPersonalizacionDocumento(this.prisma, cliente.tenantId);
+    return generarEstadoCuentaPdf({
+      cliente: { nombre: cliente.nombre, rncCedula: cliente.rncCedula ?? undefined, email: cliente.email ?? undefined, telefono: cliente.telefono ?? undefined },
+      emisor: personalizacion.emisor,
+      logo: personalizacion.logo,
+      notaPie: personalizacion.notaPie,
+      desde: null,
+      hasta: null,
+      facturas: lineas,
+      totalFacturado,
+      totalPagado: totalFacturado - saldoPendiente,
+      saldoPendiente,
+    });
   }
 
   /**

@@ -9,9 +9,15 @@ import { IaModule } from '../ia/ia.module';
 import { WhatsappConfigModule } from '../whatsapp-config/whatsapp-config.module';
 import { ProductosModule } from '../productos/productos.module';
 import { PublicacionesSocialesModule } from '../publicaciones-sociales/publicaciones-sociales.module';
+import { ClientesModule } from '../clientes/clientes.module';
+import { FacturacionModule } from '../facturacion/facturacion.module';
+import { CotizacionesModule } from '../cotizaciones/cotizaciones.module';
 
 @Module({
-  imports: [IaModule, WhatsappConfigModule, ProductosModule, PublicacionesSocialesModule],
+  // ClientesModule/FacturacionModule/CotizacionesModule: "Enviar documento"
+  // desde la Bandeja (ver WhatsappBandejaService.enviarDocumento) — ninguno
+  // de los tres importa WhatsappBotModule, sin riesgo de ciclo.
+  imports: [IaModule, WhatsappConfigModule, ProductosModule, PublicacionesSocialesModule, ClientesModule, FacturacionModule, CotizacionesModule],
   controllers: [WhatsappWebhookController, WhatsappBandejaController],
   providers: [WhatsappBotService, WhatsappMensajesRepository, WhatsappMensajesAdminRepository, WhatsappBandejaService],
   // Exporta el repositorio directo (no un servicio) — mismo criterio que ProyectosModule

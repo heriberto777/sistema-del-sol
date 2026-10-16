@@ -1,6 +1,10 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { ChevronsLeft, ChevronsRight } from 'lucide-react';
+import clsx from 'clsx';
 import { apiClient } from '../lib/api-client';
+import { inicialesContacto } from '../lib/iniciales';
+import { Avatar } from '../components/atoms/Avatar/Avatar';
 import { SearchInput } from '../components/molecules/SearchInput/SearchInput';
 import { EstadoVacio } from '../components/molecules/EstadoVacio/EstadoVacio';
 import { RequierePermiso } from '../components/organisms/RequierePermiso/RequierePermiso';
@@ -14,6 +18,24 @@ interface ConversacionResumen {
   createdAt: string;
 }
 
+const CLAVE_COLAPSADO = 'sol_mensajes_contactos_colapsado';
+
+function leerColapsado(): boolean {
+  try {
+    return localStorage.getItem(CLAVE_COLAPSADO) === 'true';
+  } catch {
+    return false;
+  }
+}
+
+function guardarColapsado(valor: boolean) {
+  try {
+    localStorage.setItem(CLAVE_COLAPSADO, String(valor));
+  } catch {
+    // localStorage deshabilitado — el colapso sigue funcionando en memoria para esta sesión.
+  }
+}
+
 /**
  * Inbox completo de WhatsApp (`whatsapp.mensajes.ver`, solo Gerente/Admin
  * Total — ver roles-base.ts) — TODAS las conversaciones, no solo las
@@ -24,6 +46,14 @@ interface ConversacionResumen {
 export function Mensajes() {
   const [busqueda, setBusqueda] = useState('');
   const [telefonoSeleccionado, setTelefonoSeleccionado] = useState<string | null>(null);
+  const [colapsado, setColapsado] = useState(leerColapsado);
+
+  function alternarColapsado() {
+    setColapsado((v) => {
+      guardarColapsado(!v);
+      return !v;
+    });
+  }
 
   const { data: conversaciones, isLoading } = useQuery({
     queryKey: ['whatsapp-mensajes-conversaciones'],
@@ -49,36 +79,59 @@ export function Mensajes() {
         </div>
 
         <div className="flex h-[calc(100vh-220px)] min-h-[420px] overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
-          <div className="flex w-80 shrink-0 flex-col border-r border-slate-200 dark:border-slate-800">
-            <div className="border-b border-slate-200 p-3 dark:border-slate-800">
-              <SearchInput value={busqueda} onChange={setBusqueda} placeholder="Buscar por teléfono o nombre…" />
+          <div
+            className={clsx(
+              'flex shrink-0 flex-col border-r border-slate-200 transition-[width] dark:border-slate-800',
+              colapsado ? 'w-[4.5rem]' : 'w-80',
+            )}
+          >
+            <div className={clsx('flex items-center gap-2 border-b border-slate-200 p-3 dark:border-slate-800', colapsado && 'justify-center')}>
+              {!colapsado && <SearchInput value={busqueda} onChange={setBusqueda} placeholder="Buscar por teléfono o nombre…" />}
+              <button
+                type="button"
+                onClick={alternarColapsado}
+                title={colapsado ? 'Expandir contactos' : 'Colapsar contactos'}
+                className="shrink-0 rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-300"
+              >
+                {colapsado ? <ChevronsRight size={16} /> : <ChevronsLeft size={16} />}
+              </button>
             </div>
             <div className="flex-1 overflow-y-auto">
-              {isLoading && <p className="p-4 text-sm text-slate-500 dark:text-slate-400">Cargando…</p>}
-              {!isLoading && conversacionesFiltradas.length === 0 && (
+              {isLoading && !colapsado && <p className="p-4 text-sm text-slate-500 dark:text-slate-400">Cargando…</p>}
+              {!isLoading && !colapsado && conversacionesFiltradas.length === 0 && (
                 <div className="p-4">
                   <EstadoVacio titulo="Sin conversaciones" descripcion="Todavía no hay mensajes de WhatsApp para este negocio." />
                 </div>
               )}
               <div className="divide-y divide-slate-100 dark:divide-slate-800">
-                {conversacionesFiltradas.map((c) => (
-                  <button
-                    key={c.id}
-                    type="button"
-                    onClick={() => setTelefonoSeleccionado(c.telefono)}
-                    className={`flex w-full flex-col gap-1 px-4 py-3 text-left hover:bg-slate-50 dark:hover:bg-slate-800/60 ${
-                      telefonoSeleccionado === c.telefono ? 'bg-slate-50 dark:bg-slate-800/60' : ''
-                    }`}
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="truncate font-medium text-slate-900 dark:text-slate-100">
-                        {c.perfilNombre ?? c.telefono.replace(/^whatsapp:/, '')}
-                      </span>
-                      <span className="shrink-0 text-xs text-slate-400">{new Date(c.createdAt).toLocaleDateString('es-DO')}</span>
-                    </div>
-                    <span className="truncate text-sm text-slate-500 dark:text-slate-400">{c.contenido}</span>
-                  </button>
-                ))}
+                {conversacionesFiltradas.map((c) => {
+                  const telefonoLegible = c.telefono.replace(/^whatsapp:/, '');
+                  const seleccionada = telefonoSeleccionado === c.telefono;
+                  return (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => setTelefonoSeleccionado(c.telefono)}
+                      title={colapsado ? (c.perfilNombre ?? telefonoLegible) : undefined}
+                      className={clsx(
+                        'flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-slate-50 dark:hover:bg-slate-800/60',
+                        colapsado && 'justify-center px-0 py-2.5',
+                        seleccionada && 'bg-slate-50 dark:bg-slate-800/60',
+                      )}
+                    >
+                      <Avatar iniciales={inicialesContacto(c.perfilNombre, telefonoLegible)} seed={telefonoLegible} size={colapsado ? 'md' : 'sm'} />
+                      {!colapsado && (
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="truncate font-medium text-slate-900 dark:text-slate-100">{c.perfilNombre ?? telefonoLegible}</span>
+                            <span className="shrink-0 text-xs text-slate-400">{new Date(c.createdAt).toLocaleDateString('es-DO')}</span>
+                          </div>
+                          <span className="block truncate text-sm text-slate-500 dark:text-slate-400">{c.contenido}</span>
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           </div>

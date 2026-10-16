@@ -131,6 +131,16 @@ export class CotizacionesRepository {
     ]);
   }
 
+  /** Para "Enviar cotizaciones" desde la Bandeja de WhatsApp (ver WhatsappBandejaService.enviarDocumento) — no hay paginación, siempre es un vistazo rápido de las últimas N. */
+  listarRecientesPorCliente(clienteId: string, take: number) {
+    return this.db.cotizacion.findMany({
+      where: { clienteId },
+      orderBy: { createdAt: 'desc' },
+      take,
+      select: { id: true, numero: true, total: true, estado: true, createdAt: true },
+    });
+  }
+
   actualizarEstado(id: string, estado: EstadoCotizacion) {
     return this.db.cotizacion.update({ where: { id }, data: { estado }, include: INCLUDE_COTIZACION });
   }

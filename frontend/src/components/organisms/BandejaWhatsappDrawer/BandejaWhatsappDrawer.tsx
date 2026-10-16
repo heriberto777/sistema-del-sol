@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { MessageCircle, X } from 'lucide-react';
 import { apiClient } from '../../../lib/api-client';
+import { inicialesContacto } from '../../../lib/iniciales';
+import { Avatar } from '../../atoms/Avatar/Avatar';
 import { EstadoVacio } from '../../molecules/EstadoVacio/EstadoVacio';
 import { ConversacionWhatsapp } from '../ConversacionWhatsapp/ConversacionWhatsapp';
 import { useBandejaWhatsappDrawer } from './BandejaWhatsappDrawerContext';
@@ -84,22 +86,26 @@ export function BandejaWhatsappDrawer() {
                 </div>
               )}
               <div className="divide-y divide-slate-100 dark:divide-slate-800">
-                {pendientes?.map((mensaje) => (
-                  <button
-                    key={mensaje.id}
-                    type="button"
-                    onClick={() => setTelefonoActivo(mensaje.telefono)}
-                    className="flex w-full flex-col gap-1 px-5 py-3 text-left hover:bg-slate-50 dark:hover:bg-slate-800/60"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="font-medium text-slate-900 dark:text-slate-100">
-                        {mensaje.perfilNombre ?? mensaje.telefono.replace(/^whatsapp:/, '')}
-                      </span>
-                      <span className="text-xs text-slate-400">{new Date(mensaje.createdAt).toLocaleString('es-DO')}</span>
-                    </div>
-                    <span className="truncate text-sm text-slate-500 dark:text-slate-400">{mensaje.contenido}</span>
-                  </button>
-                ))}
+                {pendientes?.map((mensaje) => {
+                  const telefonoLegible = mensaje.telefono.replace(/^whatsapp:/, '');
+                  return (
+                    <button
+                      key={mensaje.id}
+                      type="button"
+                      onClick={() => setTelefonoActivo(mensaje.telefono)}
+                      className="flex w-full items-center gap-3 px-5 py-3 text-left hover:bg-slate-50 dark:hover:bg-slate-800/60"
+                    >
+                      <Avatar iniciales={inicialesContacto(mensaje.perfilNombre, telefonoLegible)} seed={telefonoLegible} size="sm" />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between">
+                          <span className="truncate font-medium text-slate-900 dark:text-slate-100">{mensaje.perfilNombre ?? telefonoLegible}</span>
+                          <span className="shrink-0 text-xs text-slate-400">{new Date(mensaje.createdAt).toLocaleString('es-DO')}</span>
+                        </div>
+                        <span className="block truncate text-sm text-slate-500 dark:text-slate-400">{mensaje.contenido}</span>
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
             </div>
           </>

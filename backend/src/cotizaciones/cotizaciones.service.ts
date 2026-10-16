@@ -206,6 +206,11 @@ export class CotizacionesService {
     return { datos: datosCrudos.map(marcarVencidaSiAplica), total, pagina, tamanoPagina };
   }
 
+  /** Ver WhatsappBandejaService.enviarDocumento — "Cotizaciones recientes" desde la Bandeja de WhatsApp. */
+  listarRecientesPorCliente(clienteId: string, take = 5) {
+    return this.cotizacionesRepository.listarRecientesPorCliente(clienteId, take);
+  }
+
   /** Dashboard "Resumen ejecutivo" — sin `desde`/`hasta` toma el mes en curso. */
   async resumenConversion(desde?: string, hasta?: string) {
     const hastaFecha = hasta ? new Date(hasta) : new Date();

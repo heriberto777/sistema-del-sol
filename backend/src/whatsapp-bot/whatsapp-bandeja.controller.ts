@@ -2,6 +2,7 @@ import { Body, Controller, ForbiddenException, Get, Param, Patch, Post } from '@
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { WhatsappBandejaService } from './whatsapp-bandeja.service';
 import { ResponderWhatsappDto } from './dto/responder-whatsapp.dto';
+import { EnviarDocumentoWhatsappDto } from './dto/enviar-documento-whatsapp.dto';
 import { Permissions } from '../common/decorators/permissions.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtPayloadUser } from '../common/types/authenticated-request';
@@ -58,5 +59,19 @@ export class WhatsappBandejaController {
   @Permissions('whatsapp.bandeja.usar')
   marcarAtendido(@Param('telefono') telefono: string) {
     return this.whatsappBandejaService.marcarAtendido(telefono);
+  }
+
+  /** Para el modal "Enviar documento" — ver WhatsappBandejaService.obtenerDocumentosCliente. */
+  @Get('clientes/:clienteId/documentos')
+  @Permissions('whatsapp.bandeja.usar')
+  documentosCliente(@Param('clienteId') clienteId: string, @CurrentUser() user: JwtPayloadUser) {
+    return this.whatsappBandejaService.obtenerDocumentosCliente(clienteId, user.permisos);
+  }
+
+  /** "Enviar documento" (factura/cotización/estado de cuenta) desde la barra contextual CRM — cada `tipo` exige además su propio permiso de lectura (ver WhatsappBandejaService.enviarDocumento). */
+  @Post(':telefono/enviar-documento')
+  @Permissions('whatsapp.bandeja.usar')
+  enviarDocumento(@Param('telefono') telefono: string, @Body() dto: EnviarDocumentoWhatsappDto, @CurrentUser() user: JwtPayloadUser) {
+    return this.whatsappBandejaService.enviarDocumento(user.tenantId, telefono, dto, user.permisos);
   }
 }

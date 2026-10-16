@@ -46,4 +46,11 @@ export class DocumentosPublicosController {
   responderCotizacion(@Param('id') id: string, @Body() dto: ResponderCotizacionDto) {
     return this.documentosPublicosService.responderCotizacion(id, dto);
   }
+
+  @Get('clientes/:id/estado-cuenta/pdf')
+  async pdfEstadoCuenta(@Param('id') id: string, @Res() res: Response) {
+    const buffer = await this.documentosPublicosService.obtenerEstadoCuentaPdf(id);
+    res.set({ 'Content-Type': 'application/pdf', 'Content-Disposition': 'inline; filename="estado-de-cuenta.pdf"' });
+    res.send(buffer);
+  }
 }
