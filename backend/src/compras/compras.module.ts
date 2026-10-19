@@ -6,9 +6,10 @@ import { InventarioModule } from '../inventario/inventario.module';
 import { PagosModule } from '../pagos/pagos.module';
 import { VariantesModule } from '../variantes/variantes.module';
 import { CorrelativosModule } from '../correlativos/correlativos.module';
+import { ProductosModule } from '../productos/productos.module';
 
 @Module({
-  imports: [InventarioModule, PagosModule, VariantesModule, CorrelativosModule],
+  imports: [InventarioModule, PagosModule, VariantesModule, CorrelativosModule, ProductosModule],
   controllers: [ComprasController],
   providers: [ComprasService, ComprasRepository],
   exports: [ComprasService],

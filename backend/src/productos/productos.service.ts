@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { Prisma, TipoProducto } from '@prisma/client';
 import { ProductosRepository } from './productos.repository';
-import { CrearProductoDto, ComponenteComboDto } from './dto/crear-producto.dto';
+import { CrearProductoDto, ComponenteComboDto, UnidadConversionDto } from './dto/crear-producto.dto';
 import { CatalogoQueryDto } from './dto/catalogo-query.dto';
 import { ImportarProductosDto, FilaImportarProductoDto } from './dto/importar-productos.dto';
 import { paginar } from '../common/types/pagina-resultado';
@@ -14,6 +14,7 @@ import type { ArchivoGenerado } from '../reportes/reportes.service';
 import { AnalizadorImagenService } from '../ia/analizador-imagen/analizador-imagen.service';
 import { UsoIaService } from '../ia/uso-ia.service';
 import { OfertasService } from '../ofertas/ofertas.service';
+import { UnidadesMedidaRepository } from '../unidades-medida/unidades-medida.repository';
 
 export interface ResumenImportacion {
   creados: number;
@@ -32,6 +33,7 @@ export class ProductosService {
     private readonly analizadorImagenService: AnalizadorImagenService,
     private readonly usoIaService: UsoIaService,
     private readonly ofertasService: OfertasService,
+    private readonly unidadesMedidaRepository: UnidadesMedidaRepository,
   ) {}
 
   /**
@@ -64,6 +66,10 @@ export class ProductosService {
     if (dto.leyFiscalId) {
       await this.leyesFiscalesRepository.buscarPorId(dto.leyFiscalId);
     }
+    if (dto.unidadMedidaBaseId) {
+      await this.unidadesMedidaRepository.buscarPorId(dto.unidadMedidaBaseId);
+    }
+    await this.validarUnidadesConversion(dto.unidadMedidaBaseId, dto.unidadesConversion);
     return this.productosRepository.crear(dto, tenantId);
   }
 
@@ -117,6 +123,13 @@ export class ProductosService {
     }
     if (dto.leyFiscalId) {
       await this.leyesFiscalesRepository.buscarPorId(dto.leyFiscalId);
+    }
+    if (dto.unidadMedidaBaseId) {
+      await this.unidadesMedidaRepository.buscarPorId(dto.unidadMedidaBaseId);
+    }
+    if (dto.unidadesConversion !== undefined) {
+      const baseId = dto.unidadMedidaBaseId !== undefined ? dto.unidadMedidaBaseId : (await this.productosRepository.buscarPorId(id)).unidadMedidaBaseId;
+      await this.validarUnidadesConversion(baseId, dto.unidadesConversion);
     }
     if (dto.porcentajeComision !== undefined || dto.montoComisionFijo !== undefined) {
       const actual = await this.productosRepository.buscarPorId(id);
@@ -324,5 +337,45 @@ export class ProductosService {
     if (porcentajeComision != null && montoComisionFijo != null) {
       throw new BadRequestException('Un producto no puede tener porcentajeComision y montoComisionFijo a la vez — elegí uno');
     }
+  }
+
+  /**
+   * Conversión de unidades — opt-in: solo tiene sentido con una unidad base
+   * definida. `unidadMedidaRepository.buscarPorId` es tenant-scoped (404 si
+   * es de otro tenant, mismo criterio que categoriaId/leyFiscalId).
+   */
+  private async validarUnidadesConversion(unidadMedidaBaseId: string | null | undefined, unidadesConversion: UnidadConversionDto[] | undefined) {
+    if (!unidadesConversion?.length) return;
+    if (!unidadMedidaBaseId) {
+      throw new BadRequestException('No se puede definir unidadesConversion sin antes elegir una unidad base (unidadMedidaBaseId)');
+    }
+    if (unidadesConversion.some((u) => u.unidadMedidaId === unidadMedidaBaseId)) {
+      throw new BadRequestException('Una unidad de conversión no puede ser la misma que la unidad base');
+    }
+    const ids = unidadesConversion.map((u) => u.unidadMedidaId);
+    if (new Set(ids).size !== ids.length) {
+      throw new BadRequestException('No se puede repetir la misma unidad de conversión más de una vez');
+    }
+    await Promise.all([unidadMedidaBaseId, ...ids].map((unidadId) => this.unidadesMedidaRepository.buscarPorId(unidadId)));
+  }
+
+  /**
+   * Usado por Compras (y, a futuro, Ventas) para convertir una línea
+   * expresada en una unidad alternativa a unidades base antes de tocar
+   * Stock/Kardex — ver ARCHITECTURE.md "Conversión de unidades de medida".
+   * Sin `unidadMedidaId` (comportamiento histórico, sin conversión), o si
+   * coincide con la unidad base del producto, el factor es 1. Si no
+   * coincide con ninguna `ProductoUnidadConversion` del producto, 400 — no
+   * tiene sentido comprar/vender en una unidad que ese producto no define.
+   */
+  async resolverFactorConversion(productoId: string, unidadMedidaId: string | undefined): Promise<number> {
+    if (!unidadMedidaId) return 1;
+    const producto = await this.productosRepository.buscarPorId(productoId);
+    if (unidadMedidaId === producto.unidadMedidaBaseId) return 1;
+    const conversion = producto.unidadesConversion.find((u) => u.unidadMedidaId === unidadMedidaId);
+    if (!conversion) {
+      throw new BadRequestException(`La unidad elegida no es válida para el producto "${producto.nombre}"`);
+    }
+    return Number(conversion.factorConversion);
   }
 }

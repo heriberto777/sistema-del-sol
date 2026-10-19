@@ -7,6 +7,7 @@ import { InventarioService } from '../inventario/inventario.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { TenantPrismaService } from '../prisma/tenant-prisma.service';
 import { CorrelativosRepository } from '../correlativos/correlativos.repository';
+import { ProductosService } from '../productos/productos.service';
 
 describe('RemisionesService', () => {
   let service: RemisionesService;
@@ -14,6 +15,7 @@ describe('RemisionesService', () => {
   let facturacionService: jest.Mocked<FacturacionService>;
   let variantesService: jest.Mocked<VariantesService>;
   let inventarioService: jest.Mocked<InventarioService>;
+  let productosService: jest.Mocked<ProductosService>;
   let correlativosRepository: jest.Mocked<CorrelativosRepository>;
   let prisma: jest.Mocked<PrismaService>;
   let tenantPrisma: { client: { $transaction: jest.Mock } };
@@ -60,12 +62,14 @@ describe('RemisionesService', () => {
       entradaStockEnTx: jest.fn().mockResolvedValue(undefined),
     } as unknown as jest.Mocked<InventarioService>;
     correlativosRepository = { siguienteEnTx: jest.fn().mockResolvedValue('REM-00001') } as unknown as jest.Mocked<CorrelativosRepository>;
+    productosService = { resolverFactorConversion: jest.fn().mockResolvedValue(1) } as unknown as jest.Mocked<ProductosService>;
     tenantPrisma = { client: { $transaction: jest.fn((cb: (tx: unknown) => unknown) => cb(TX)) } };
     service = new RemisionesService(
       repository,
       facturacionService,
       variantesService,
       inventarioService,
+      productosService,
       correlativosRepository,
       prisma,
       tenantPrisma as unknown as TenantPrismaService,
@@ -89,9 +93,26 @@ describe('RemisionesService', () => {
         bodegaId: 'bodega-1',
         vendedorId: 'vendedor-1',
         numero: 'REM-00001',
-        lineas: [{ productoId: 'prod-1', varianteId: 'variante-1', cantidad: 3 }],
+        lineas: [{ productoId: 'prod-1', varianteId: 'variante-1', unidadMedidaId: undefined, factorConversion: 1, cantidad: 3 }],
       });
       expect(facturacionService.crear).not.toHaveBeenCalled();
+    });
+
+    it('conversión de unidades (Fase 3): resuelve el factor vía ProductosService y lo persiste como snapshot de la línea', async () => {
+      repository.crearEnTx.mockResolvedValue({ id: 'r1' } as never);
+      productosService.resolverFactorConversion.mockResolvedValue(144);
+
+      await service.crear(
+        { clienteId: 'cliente-1', bodegaId: 'bodega-1', lineas: [{ productoId: 'prod-1', cantidad: 2, unidadMedidaId: 'caja-1' }] },
+        'tenant-1',
+        'vendedor-1',
+      );
+
+      expect(productosService.resolverFactorConversion).toHaveBeenCalledWith('prod-1', 'caja-1');
+      expect(repository.crearEnTx).toHaveBeenCalledWith(
+        TX,
+        expect.objectContaining({ lineas: [expect.objectContaining({ unidadMedidaId: 'caja-1', factorConversion: 144, cantidad: 2 })] }),
+      );
     });
   });
 
@@ -106,7 +127,7 @@ describe('RemisionesService', () => {
 
       expect(repository.actualizar).toHaveBeenCalledWith('r1', {
         ...dto,
-        lineas: [{ productoId: 'prod-2', varianteId: 'variante-1', cantidad: 5 }],
+        lineas: [{ productoId: 'prod-2', varianteId: 'variante-1', unidadMedidaId: undefined, factorConversion: 1, cantidad: 5 }],
       });
     });
 
@@ -227,6 +248,36 @@ describe('RemisionesService', () => {
         motivo: 'Anulación de remisión REM-001',
       });
       expect(inventarioService.verificarYDescontarStockEnTx).not.toHaveBeenCalled();
+    });
+
+    it('conversión de unidades (Fase 3): BORRADOR → ENTREGADA descuenta stock en unidades base usando el factorConversion de la línea', async () => {
+      repository.buscarPorId.mockResolvedValue({
+        id: 'r1',
+        estado: 'BORRADOR',
+        facturaId: null,
+        numero: 'REM-001',
+        bodegaId: 'bodega-1',
+        lineas: [lineaRemision({ cantidad: 2, factorConversion: 144 })],
+      } as never);
+
+      await service.cambiarEstado('r1', 'ENTREGADA', 'tenant-1', 'user-1');
+
+      expect(inventarioService.verificarYDescontarStockEnTx).toHaveBeenCalledWith(TX, expect.objectContaining({ cantidad: 288 }));
+    });
+
+    it('conversión de unidades (Fase 3): ENTREGADA → ANULADA reintegra en unidades base', async () => {
+      repository.buscarPorId.mockResolvedValue({
+        id: 'r1',
+        estado: 'ENTREGADA',
+        facturaId: null,
+        numero: 'REM-001',
+        bodegaId: 'bodega-1',
+        lineas: [lineaRemision({ cantidad: 2, factorConversion: 144 })],
+      } as never);
+
+      await service.cambiarEstado('r1', 'ANULADA', 'tenant-1', 'user-1');
+
+      expect(inventarioService.entradaStockEnTx).toHaveBeenCalledWith(TX, expect.objectContaining({ cantidad: 288 }));
     });
   });
 

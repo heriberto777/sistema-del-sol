@@ -749,10 +749,230 @@ aproximación).
 - **FIFO/Último Costo**: no se construyó una interfaz polimórfica para
   métodos de costeo alternativos — Promedio Ponderado es el único
   método real hoy, YAGNI hasta que alguien necesite de verdad otro.
-- **"Solicitud de Compra" con límite de presupuesto** y **conversión de
-  unidades de medida** (comprar por Caja, vender por Unidad): otros dos
-  gaps encontrados en la misma auditoría, explícitamente fuera de
-  alcance de esta entrega.
+- **"Solicitud de Compra" con límite de presupuesto**: gap encontrado en
+  la misma auditoría, explícitamente fuera de alcance de esta entrega
+  (la conversión de unidades de medida, el otro gap de esa auditoría,
+  se construyó después — ver la sección siguiente).
+
+## Conversión de unidades de medida
+
+Gap real encontrado en la auditoría de la sección anterior: no había
+forma de crear unidades de medida nuevas (`Producto.unidadMedida` era
+una lista cerrada de valores fijos en código, ítem E-8 de Cuadre — ver
+más abajo) ni de expresar que un producto se compra por Caja pero su
+stock/venta vive en Unidad. Pedido explícito del usuario, con dos
+decisiones de alcance tomadas en contra de la opción más simple que se
+recomendó: **varias unidades alternativas por producto** (no una sola)
+y **Compras y Ventas juntas** (Ventas, Fase 3, todavía no construida —
+ver el final de esta sección).
+
+### Catálogo y conversión por producto (Fase 1)
+
+`UnidadMedida` (tenant-scoped, `codigo`/`nombre`/`activa`, sembrado al
+provisionar con `UNIDADES_MEDIDA_BASE`: UND/CAJA/DOC/LB/KG/LT,
+editable desde `/inventario/configuracion`) reemplaza de a poco al
+viejo `UNIDADES_MEDIDA` (lista cerrada en TS, ítem E-8 de Cuadre) — ese
+campo (`Producto.unidadMedida: String`) queda intacto y marcado
+`@deprecated` en el schema, nunca se borra ni se reescribe desde el
+formulario nuevo (compatibilidad con Excel import/reportes viejos).
+
+El motor de conversión real es **opt-in por producto**, mismo criterio
+que `controlaVencimiento`: `Producto.unidadMedidaBaseId` (nullable — la
+unidad en la que viven `Stock`/`MovimientoInventario`/`Kardex`/
+`costoPromedio`, nunca cambia una vez que el producto tiene
+movimientos) y `ProductoUnidadConversion` (tabla hija sin `tenantId`
+propio, igual patrón que `ComponenteCombo`: `productoId`,
+`unidadMedidaId`, `factorConversion` — cuántas unidades BASE equivalen
+a 1 de esa unidad alternativa, ej. 144 si "Caja" es la alternativa y la
+base es "Unidad"). `ProductosService.validarUnidadesConversion` exige
+una base antes de aceptar conversiones, rechaza que una conversión
+coincida con la base o se repita, y valida cada id contra el catálogo
+tenant-scoped. Un producto sin `unidadMedidaBaseId` sigue funcionando
+exactamente igual que antes de esta feature.
+
+**Diseño clave — la conversión se empuja al borde, nunca al centro**:
+`Stock`/`MovimientoInventario`/`Kardex`/el motor de costeo (sección
+anterior) siguen operando en unidades base, sin ningún cambio — la
+conversión ocurre solo en el único punto de contacto de cada módulo con
+`InventarioService`. `ProductosService.resolverFactorConversion(productoId,
+unidadMedidaId?)` es el método central: sin `unidadMedidaId` (o si
+coincide con la base) devuelve 1 (comportamiento histórico); si no
+coincide con ninguna `ProductoUnidadConversion` del producto, 400.
+
+### Compras (Fase 2)
+
+`LineaOc`/`LineaRecepcion` ganan `unidadMedidaId`/`factorConversion` —
+`cantidad`/`costoUnitario`/`cantidadRecibida` quedan en ESA unidad (ej.
+10 Cajas a RD$72/Caja), nunca en unidades base. `factorConversion` es
+un **snapshot** tomado con `resolverFactorConversion` al crear/editar
+la OC (`ComprasService.crear()`/`actualizar()`) — si el catálogo de
+conversión del producto cambia después, una OC ya emitida no se ve
+afectada, mismo criterio que un precio ya facturado no cambia si la
+lista de precios cambia después.
+
+Al recibir (`ComprasService.recibir()`), `unidadMedidaId`/
+`factorConversion` se **heredan** de la `LineaOc` correspondiente —
+igual que `varianteId`, nunca se vuelven a pedir en
+`RecibirOrdenCompraDto`. La conversión a unidades base ocurre ahí
+mismo, en el único punto de contacto con `InventarioService.
+entradaStockEnTx`: `cantidadBase = cantidadRecibida * factorConversion`,
+`costoUnitarioBase = costoUnitario / factorConversion` (y la cantidad
+de cualquier lote Fase 5b también va en base, es la que termina en
+`Stock`). `LineaRecepcion` guarda `cantidadRecibida`/`costoUnitario` en
+la unidad elegida (para mostrar/auditar), no el valor convertido.
+
+`LineaOc.cantidadRecibida` (para decidir `RECIBIDA_PARCIAL`/
+`RECIBIDA_TOTAL`, y lo que compara `ComprasService.devolver()`) se
+acumula **en la unidad elegida al ordenar**, nunca en base — comparar
+"pedido 10 Cajas" contra "recibido 10 Cajas" tiene que vivir en el
+mismo espacio de unidades; convertir uno de los dos a base sin el otro
+sería un bug real. Al devolver, mismo patrón que recibir: `cantidad`
+(unidad elegida) se compara contra `cantidadRecibida` y actualiza la OC
+tal cual, pero `InventarioService.verificarYDescontarStockEnTx` recibe
+`cantidad * factorConversion` (base). `LineaDevolucionCompra` no lleva
+`unidadMedidaId` propio — decisión de alcance acotado, audita en la
+misma unidad que la OC (consultable ahí).
+
+### Backfill y fuera de alcance
+
+- **Tenants existentes**: `pnpm --filter ./backend
+  unidades-medida:backfill` siembra `UNIDADES_MEDIDA_BASE` donde falte
+  y vincula cada `Producto` sin `unidadMedidaBaseId` a una
+  `UnidadMedida` creada (o encontrada) a partir de su `unidadMedida` de
+  texto libre actual — no agrega ninguna `ProductoUnidadConversion`
+  (esa es una decisión del admin del tenant, no algo inferible de datos
+  viejos).
+- **"Solicitud de Compra" con límite de presupuesto**: sigue fuera de
+  alcance (ver la sección anterior).
+
+### Ventas (Fase 3) — Facturación, Cotizaciones, Remisiones
+
+Mismo patrón que Compras, aplicado a cada módulo de venta —
+`LineaFactura`/`LineaRemision` ganan `unidadMedidaId`/`factorConversion`
+(ambos necesarios: los dos mueven stock); `LineaCotizacion` gana solo
+`unidadMedidaId` (nunca toca Stock, no necesita snapshot de factor).
+
+**Facturación** (`FacturacionService.calcularLineasYTotales`) resuelve
+`factorConversion` vía `ProductosService.resolverFactorConversion` para
+una venta normal (CONTADO/CREDITO) — `cantidad`/`precioUnitario` quedan
+en la unidad elegida, `costoUnitario` que arma el motor de costeo
+(sección "Costeo de inventario" arriba) termina siendo
+automáticamente "costo por unidad elegida" porque se divide por
+`linea.cantidad` (no por la cantidad base) — ninguna fórmula de esa
+sección necesitó cambiar. El único punto de contacto con
+`InventarioService` (`verificarYDescontarStockEnTx`/
+`entradaStockEnTx`/`expandirParaInventario`) recibe
+`cantidad * factorConversion`.
+
+**NOTA_CREDITO/NOTA_DEBITO — unidad heredada, nunca re-elegida**: la
+unidad de cada línea de una nota se resuelve contra la línea de la
+`facturaOrigenId` con el mismo `productoId` (`unidadMedidaId` del DTO
+se ignora por completo para estas dos) — mismo criterio que
+`ComprasService.devolver()` heredando de la `LineaOc`. Es necesario
+para que `FacturacionService.anular()` pueda comparar
+`yaDevueltoPorProducto` (acumulado de `lineaNota.cantidad` de todas las
+notas contra una línea) contra `linea.cantidad` de la factura original
+sin mezclar unidades — si una nota pudiera elegir una unidad distinta
+a la de la venta, esa resta quedaría corrupta sin que nada lo avise.
+
+**Remisiones** (`RemisionesService.resolverLineas`) resuelve y
+snapshotea su propio `factorConversion` al crear/editar (como Compras)
+porque una Remisión mueve stock ella misma en `cambiarEstado()`
+(BORRADOR→ENTREGADA descuenta, ENTREGADA→ANULADA reintegra) — ninguno
+de esos dos movimientos pasa por `FacturacionService.crear()`.
+`convertirEnFactura()` solo propaga `unidadMedidaId` (no el factor):
+`FacturacionService` resuelve el suyo fresco al convertir, igual
+criterio que `precioUnitario` nunca se re-usa tal cual de un documento
+a otro.
+
+**Cotizaciones**: documento sin efecto fiscal, nunca toca
+`InventarioService` — `calcularLineas` solo propaga `unidadMedidaId`
+tal cual (sin resolver nada), y `convertirEnFactura()` lo pasa a
+`LineaFacturaDto.unidadMedidaId`, donde recién se resuelve el factor.
+
+**POS**: capa delgada sobre `FacturacionService.crear()` — el backend
+ya soporta unidad de conversión en una venta de POS sin ningún cambio
+adicional (`RegistrarVentaDto`/`CotizarVentaDto` reusan `LineaFacturaDto`
+tal cual). `PosService.registrarDevolucion()` (Nota de Crédito desde
+POS) tampoco necesitó cambios: no manda `unidadMedidaId`, así que
+siempre hereda de la factura origen — mismo camino que cualquier otra
+nota.
+
+### El carrito del POS (`TurnoCajaDetalle.tsx`) y el precio por unidad alternativa
+
+El carrito (~1800 líneas, pantalla de mayor tráfico del sistema — atajos
+de teclado, aparcar/restaurar venta, descuentos, devolución) sí tiene
+`SelectorUnidadLinea` por línea, con el mismo criterio de identidad que
+el resto del carrito: `claveLinea` (productoId+varianteId) NO incluye
+la unidad — cambiar de unidad es un campo mutable más de una línea ya
+existente (como `precioUnitario`/`cantidad`), no crea una línea nueva.
+Esto significa que **no se puede tener en el carrito, a la vez, "2
+Unidades sueltas" y "1 Caja" del mismo producto** como dos líneas
+separadas — agregar el mismo producto otra vez suma a la línea que ya
+existe, en la unidad que esa línea ya tenga. Decisión de alcance
+deliberada: evita rehacer la identidad de línea (y todo lo que la usa:
+merge al agregar, descuento por línea, quitar del carrito) en la
+pantalla más grande y de mayor riesgo del sistema, a cambio de un caso
+de uso raro en la práctica.
+
+**Hallazgo real durante la verificación en vivo**: `producto.precios[0]
+?.precioVenta` (el precio de lista que `calcularLineasYTotales`/
+`CotizacionesService.calcularLineas` usan como default cuando la línea
+no manda `precioUnitario`) es **siempre el precio en la unidad BASE** —
+no existe, en ningún punto del sistema, un "precio por Caja" propio.
+Antes de este hallazgo, elegir una unidad alternativa y dejar el precio
+en blanco habría vendido 1 Caja al precio de 1 Unidad, en silencio — un
+error de monto real, no solo de presentación. Corregido con una
+validación explícita en `FacturacionService.calcularLineasYTotales` y
+`CotizacionesService.calcularLineas`: si la línea usa una unidad
+distinta a la base (`factorConversion !== 1`, o `unidadMedidaId !==
+producto.unidadMedidaBaseId` en Cotizaciones, que no resuelve el
+factor) y no trae `precioUnitario`, 400 explícito en vez de un monto
+incorrecto. El carrito del POS muestra el campo de precio editable
+(igual criterio visual que `precioVariable`, ítem E-8) apenas se elige
+una unidad alternativa, con un aviso explícito de que no hay precio
+automático — y solo manda `precioUnitario` al backend cuando la línea
+tiene una unidad elegida (una línea en la unidad base nunca lo manda,
+conserva el comportamiento de siempre: precio resuelto en vivo contra
+el catálogo al momento de la venta, no congelado al agregar al
+carrito).
+
+**Segundo hallazgo relacionado, también corregido**: el mismo payload del
+carrito (`registrarVenta`/`onAbrirCheckout` en `TurnoCajaDetalle.tsx`)
+nunca mandaba `precioUnitario` para NINGUNA línea, ni siquiera para un
+producto `precioVariable` (ítem E-8) cuyo precio el cajero edita a mano
+en el carrito — el campo se mostraba editable, pero el valor tipeado se
+descartaba en silencio al cobrar, y la venta siempre terminaba cobrando
+el precio vigente del catálogo. Preexistente, sin tests, no relacionado
+con unidades — encontrado al revisar esta misma zona del código.
+Corregido con el mismo mecanismo: se manda `precioUnitario` cuando la
+línea es `precioVariable` O usa una unidad distinta a la base; cualquier
+otra línea sigue sin mandarlo (el backend resuelve el precio vigente al
+momento de la venta, no uno congelado al agregar al carrito). Verificado
+en vivo: un producto `precioVariable` con precio de lista RD$100,
+editado a RD$80 en el carrito, cobra RD$94.40 (80 + 18% ITBIS) en vez de
+RD$118.00.
+
+`VentaAparcadaLinea` (F12, "Guardar venta"/aparcar) sí persiste
+`unidadMedidaId` (columna real, migración propia) — puramente para
+restaurar el carrito tal cual quedó; nunca se usa para mover stock
+desde ahí, y al recuperar la venta aparcada y cobrarla de verdad, es
+`POST /pos/ventas` el que resuelve su propio `factorConversion` fresco,
+igual que cualquier otra venta. El borrador silencioso del carrito
+(`CarritoBorrador.lineas`, columna `Json`, autoguardado debounced en
+cada cambio) también preserva la unidad sin necesitar ninguna migración
+— es JSON libre, el campo nuevo en `LineaBorradorCarritoDto` alcanza.
+
+**Cubierto con UI real, verificado en vivo** (crear, no solo backend):
+`FacturacionNueva`/`CotizacionNueva` (vía el componente compartido
+`TablaLineasEditable`, que de paso cubre `ModalGenerarCotizacionOportunidad`
+del CRM), `CotizacionEditar`, `RemisionNueva`/`RemisionEditar`
+(`SelectorUnidadLinea` propio, igual patrón que Compras), el carrito del
+POS (`TurnoCajaDetalle.tsx`), y `EmitirNotaForm`/`ModalDevolucion` (solo
+lectura — muestran la unidad heredada junto a "original"/"disponible",
+nunca la dejan elegir). El componente compartido
+`TablaArticulosDocumento` (usado por "Ver detalle" de Factura/
+Cotización/Remisión) también muestra la unidad.
 
 ## Vencimientos — lotes con consumo FEFO (Fase 5b de adopción de Cuadre)
 

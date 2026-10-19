@@ -17,6 +17,24 @@ export class ComponenteComboDto {
   cantidad: number;
 }
 
+/**
+ * Unidad alternativa de compra/venta para este producto (ej. "Caja" = 144
+ * unidades de la unidad base) — ver ProductoUnidadConversion en el schema y
+ * "Conversión de unidades de medida" en ARCHITECTURE.md. `factorConversion`
+ * siempre expresa cuántas unidades BASE equivalen a 1 de esta unidad
+ * alternativa.
+ */
+export class UnidadConversionDto {
+  @ApiProperty()
+  @IsUUID()
+  unidadMedidaId: string;
+
+  @ApiProperty({ description: 'Cuántas unidades base equivalen a 1 de esta unidad alternativa — ej. 144 si esta unidad es "Caja" y la base es "Unidad".' })
+  @IsNumber()
+  @IsPositive()
+  factorConversion: number;
+}
+
 export class ImagenProductoDto {
   @ApiProperty({ description: 'Data URI completa (data:image/...;base64,...), misma validación que `imagen`.' })
   @IsString()
@@ -51,10 +69,32 @@ export class CrearProductoDto {
   @IsUUID()
   categoriaId?: string | null;
 
-  @ApiProperty({ required: false, default: 'UND', enum: UNIDADES_MEDIDA })
+  @ApiProperty({ required: false, default: 'UND', enum: UNIDADES_MEDIDA, deprecated: true, description: 'Deprecado — se mantiene por compatibilidad con Excel import/reportes viejos. El formulario nuevo usa unidadMedidaBaseId.' })
   @IsOptional()
   @IsIn(UNIDADES_MEDIDA)
   unidadMedida?: string;
+
+  @ApiProperty({
+    required: false,
+    nullable: true,
+    description:
+      'Unidad BASE del motor de conversión (opt-in) — la unidad en la que viven Stock/Kardex/costoPromedio. null explícito la quita (el producto vuelve a funcionar sin conversión). No cambiarla una vez que el producto tiene movimientos.',
+  })
+  @IsOptional()
+  @IsUUID()
+  unidadMedidaBaseId?: string | null;
+
+  @ApiProperty({
+    type: [UnidadConversionDto],
+    required: false,
+    description:
+      'Unidades alternativas de compra/venta (ej. Caja=144 unidades) — solo tiene efecto si se definió unidadMedidaBaseId. Sin enviar el campo, las conversiones existentes quedan igual; `[]` las vacía; con elementos, las reemplaza por completo.',
+  })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => UnidadConversionDto)
+  unidadesConversion?: UnidadConversionDto[];
 
   @ApiProperty({ required: false, default: 18 })
   @IsOptional()

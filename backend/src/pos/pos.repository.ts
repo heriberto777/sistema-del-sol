@@ -32,7 +32,7 @@ const INCLUDE_VENTA_APARCADA = {
   cliente: { select: { id: true, nombre: true } },
   vendedorEmpleado: { select: { id: true, nombre: true } },
   lineas: {
-    include: { producto: { select: { codigo: true, nombre: true } } },
+    include: { producto: { select: { codigo: true, nombre: true } }, unidadMedida: true },
   },
 } as const;
 
@@ -222,7 +222,15 @@ export class PosRepository {
     clienteId?: string;
     vendedorEmpleadoId?: string;
     nota?: string;
-    lineas: { productoId: string; varianteId: string; cantidad: number; precioUnitario: number; porcentajeItbis: number; descuento?: number }[];
+    lineas: {
+      productoId: string;
+      varianteId: string;
+      unidadMedidaId?: string;
+      cantidad: number;
+      precioUnitario: number;
+      porcentajeItbis: number;
+      descuento?: number;
+    }[];
   }) {
     return this.db.ventaAparcada.create({
       data: {

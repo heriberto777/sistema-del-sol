@@ -1,6 +1,7 @@
 interface LineaArticulo {
   producto?: { nombre: string } | null;
   descripcionManual?: string | null;
+  unidadMedida?: { nombre: string } | null;
   cantidad: string | number;
   precioUnitario?: string | number;
   montoTotal?: string | number;
@@ -33,7 +34,9 @@ export function TablaArticulosDocumento({ lineas, mostrarPrecios = true }: { lin
           {lineas.map((linea, i) => (
             <tr key={i}>
               <td className="px-4 py-2 text-slate-700 dark:text-slate-300">{linea.producto?.nombre ?? linea.descripcionManual}</td>
-              <td className="px-4 py-2 text-right text-slate-700 dark:text-slate-300">{linea.cantidad}</td>
+              <td className="px-4 py-2 text-right text-slate-700 dark:text-slate-300">
+                {linea.cantidad} {linea.unidadMedida?.nombre ?? ''}
+              </td>
               {mostrarPrecios && (
                 <>
                   <td className="px-4 py-2 text-right text-slate-700 dark:text-slate-300">

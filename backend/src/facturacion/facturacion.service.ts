@@ -33,6 +33,7 @@ import { ConfiguracionesService } from '../configuraciones/configuraciones.servi
 import { CONFIGURACIONES_BASE } from '../tenants/roles-base';
 import { mapearFacturaAParams } from './mapear-factura-pdf';
 import { CorrelativosService } from '../correlativos/correlativos.service';
+import { ProductosService } from '../productos/productos.service';
 
 const NCF_POR_TIPO: Record<TipoFactura, TipoNcf> = {
   CREDITO: 'B01',
@@ -88,6 +89,7 @@ export class FacturacionService {
     private readonly autorizacionesService: AutorizacionesService,
     private readonly configuracionesService: ConfiguracionesService,
     private readonly correlativosService: CorrelativosService,
+    private readonly productosService: ProductosService,
   ) {}
 
   /**
@@ -118,6 +120,14 @@ export class FacturacionService {
     },
     cliente: { listaPrecio?: { nombre: string } | null },
     tenantId: string,
+    // Conversión de unidades — solo para NOTA_CREDITO/NOTA_DEBITO: la
+    // unidad de cada línea se HEREDA de la línea de la factura origen con
+    // el mismo productoId (nunca se vuelve a elegir, mismo criterio que
+    // ComprasService.devolver() hereda de la LineaOc) — evita que una nota
+    // devuelva "2 Cajas" contra una venta de "20 Unidades" y descuadre la
+    // comparación de cantidades ya devueltas en anular(). Sin esto
+    // (CONTADO/CREDITO), cada línea resuelve su propia unidad desde el DTO.
+    facturaOrigenLineas?: { productoId: string | null; unidadMedidaId: string | null; factorConversion: Prisma.Decimal }[],
   ) {
     if (dto.descuentoGeneralPct && dto.descuentoGeneralMonto) {
       throw new BadRequestException('Enviá descuentoGeneralPct o descuentoGeneralMonto, no ambos');
@@ -164,6 +174,8 @@ export class FacturacionService {
             productoId: null,
             varianteId: null,
             descripcionManual: linea.descripcionManual,
+            unidadMedidaId: null as string | null,
+            factorConversion: 1,
             cantidad: linea.cantidad,
             precioUnitario,
             descuento: descuentoD.toNumber(),
@@ -185,11 +197,33 @@ export class FacturacionService {
         // una resolución distinta de la otra.
         const varianteId = await this.variantesService.resolverObligatoria(linea.productoId, linea.varianteId);
         const producto = await this.facturacionRepository.obtenerProductoConPrecioVigente(linea.productoId, varianteId, listaPrecio);
+        // Conversión de unidades — ver el comentario del parámetro
+        // `facturaOrigenLineas` más arriba.
+        let unidadMedidaId: string | null;
+        let factorConversion: number;
+        if (facturaOrigenLineas) {
+          const lineaOrigen = facturaOrigenLineas.find((l) => l.productoId === linea.productoId);
+          unidadMedidaId = lineaOrigen?.unidadMedidaId ?? null;
+          factorConversion = Number(lineaOrigen?.factorConversion ?? 1);
+        } else {
+          unidadMedidaId = linea.unidadMedidaId ?? null;
+          factorConversion = await this.productosService.resolverFactorConversion(linea.productoId, linea.unidadMedidaId);
+        }
         // Ítem E-8: un producto con permiteDevolucion:false no puede
         // incluirse en una Nota de Crédito (ej. productos perecederos que
         // el negocio nunca acepta de vuelta).
         if (dto.tipoFactura === 'NOTA_CREDITO' && !producto.permiteDevolucion) {
           throw new BadRequestException(`El producto "${producto.nombre}" no permite devoluciones`);
+        }
+        // Conversión de unidades — `producto.precios[0]?.precioVenta` es
+        // SIEMPRE el precio de lista en la unidad BASE (no existe un precio
+        // por unidad alternativa). Sin esta validación, elegir "Caja" y
+        // dejar el precio en blanco vendería 1 Caja al precio de 1 Unidad
+        // en silencio — un error de monto real, no solo de presentación.
+        if (factorConversion !== 1 && linea.precioUnitario === undefined) {
+          throw new BadRequestException(
+            `"${producto.nombre}" usa una unidad distinta a la base en esta línea — indicá el precio para esa unidad, no hay uno automático.`,
+          );
         }
         // `producto.precios[0]?.precioVenta`/`producto.porcentajeItbis`/
         // `leyFiscal.porcentajeItbisAPagar` ya son Prisma.Decimal — se usan
@@ -245,6 +279,8 @@ export class FacturacionService {
           productoId: linea.productoId as string | null,
           varianteId: varianteId as string | null,
           descripcionManual: undefined as string | undefined,
+          unidadMedidaId,
+          factorConversion,
           cantidad: linea.cantidad,
           precioUnitario: precioUnitarioD.toNumber(),
           descuento: descuentoD.toNumber(),
@@ -429,12 +465,13 @@ export class FacturacionService {
     // contra una factura CONTADO y maneja el reembolso ahí mismo) — con
     // este criterio la regla es pareja en todo el sistema sin romper esa
     // devolución, que nunca deja fila en `Pago`.
+    let facturaOrigen: Awaited<ReturnType<FacturacionRepository['buscarPorId']>> | undefined;
     if (dto.tipoFactura === 'NOTA_CREDITO' || dto.tipoFactura === 'NOTA_DEBITO') {
       if (!dto.facturaOrigenId) {
         throw new BadRequestException('facturaOrigenId es requerido para notas de crédito/débito');
       }
       // findUniqueOrThrow tenant-scoped: 404 si la factura origen es de otro tenant.
-      await this.facturacionRepository.buscarPorId(dto.facturaOrigenId);
+      facturaOrigen = await this.facturacionRepository.buscarPorId(dto.facturaOrigenId);
       const montoPagado = await this.pagosService.sumaPagosFactura(dto.facturaOrigenId);
       if (montoPagado > 0) {
         throw new BadRequestException(
@@ -454,7 +491,12 @@ export class FacturacionService {
     // La sucursal de la bodega (ítem B-2) también decide de qué secuencia
     // de NCF se descuenta, más abajo.
     const bodega = await this.inventarioService.validarAccesoBodega(dto.bodegaId, vendedorId);
-    const { lineasCalculadas, subtotal, itbis, total, descuentoTotal } = await this.calcularLineasYTotales(dto, cliente, tenantId);
+    const { lineasCalculadas, subtotal, itbis, total, descuentoTotal } = await this.calcularLineasYTotales(
+      dto,
+      cliente,
+      tenantId,
+      facturaOrigen?.lineas,
+    );
 
     // Ítem B-4 — recargos post-subtotal (Imprevistos, Viáticos, etc.),
     // solo en ventas normales: mismo criterio que el descuento general de
@@ -567,7 +609,11 @@ export class FacturacionService {
           // `costoUnitario` a `entradaStockEnTx`: una devolución no
           // revaloriza el promedio como si fuera una compra nueva.
           let costoTotalLinea = 0;
-          for (const item of expandirParaInventario(linea, linea.productoId, linea.cantidad, linea.varianteId ?? undefined)) {
+          // Conversión de unidades — `linea.cantidad` queda en la unidad
+          // elegida (heredada de la factura origen, ver
+          // calcularLineasYTotales); Stock vive en base.
+          const cantidadBase = linea.cantidad * linea.factorConversion;
+          for (const item of expandirParaInventario(linea, linea.productoId, cantidadBase, linea.varianteId ?? undefined)) {
             // Fase 5b — solo la línea directa (no un componente de combo,
             // ver expandirParaInventario) reconstruye sola de qué lote(s)
             // salió la venta original; un componente de combo con
@@ -604,7 +650,10 @@ export class FacturacionService {
           // unitario de línea consistente con lo que de verdad salió de
           // Inventario — ver ContabilidadEventosService (Costo de Ventas).
           let costoTotalLinea = 0;
-          for (const item of expandirParaInventario(linea, linea.productoId, linea.cantidad, linea.varianteId ?? undefined)) {
+          // Conversión de unidades — ver el comentario equivalente en el
+          // bloque de NOTA_CREDITO más arriba.
+          const cantidadBase = linea.cantidad * linea.factorConversion;
+          for (const item of expandirParaInventario(linea, linea.productoId, cantidadBase, linea.varianteId ?? undefined)) {
             const stock = await this.inventarioService.verificarYDescontarStockEnTx(tx, {
               tenantId,
               productoId: item.productoId,
@@ -839,7 +888,10 @@ export class FacturacionService {
             // retirar de nuevo acá.
             if (!linea.productoId) continue;
             const producto = { tipoProducto: linea.producto!.tipo, componentesCombo: linea.producto!.componentes };
-            for (const item of expandirParaInventario(producto, linea.productoId, Number(linea.cantidad), linea.varianteId ?? undefined)) {
+            // Conversión de unidades — `linea.cantidad` queda en la unidad
+            // elegida, Stock vive en base.
+            const cantidadBase = Number(linea.cantidad) * Number(linea.factorConversion ?? 1);
+            for (const item of expandirParaInventario(producto, linea.productoId, cantidadBase, linea.varianteId ?? undefined)) {
               await this.inventarioService.verificarYDescontarStockEnTx(tx, {
                 tenantId,
                 productoId: item.productoId,
@@ -876,7 +928,12 @@ export class FacturacionService {
             const cantidadAReintegrar = Number(linea.cantidad) - yaDevuelto;
             if (cantidadAReintegrar > 0) {
               const producto = { tipoProducto: linea.producto!.tipo, componentesCombo: linea.producto!.componentes };
-              for (const item of expandirParaInventario(producto, linea.productoId, cantidadAReintegrar, linea.varianteId ?? undefined)) {
+              // `cantidadAReintegrar`/`yaDevuelto` están en la unidad elegida
+              // (toda nota contra esta línea hereda la misma unidad, ver
+              // calcularLineasYTotales — nunca se mezclan unidades acá);
+              // Stock vive en base.
+              const cantidadAReintegrarBase = cantidadAReintegrar * Number(linea.factorConversion ?? 1);
+              for (const item of expandirParaInventario(producto, linea.productoId, cantidadAReintegrarBase, linea.varianteId ?? undefined)) {
                 await this.inventarioService.entradaStockEnTx(tx, {
                   tenantId,
                   productoId: item.productoId,

@@ -155,6 +155,31 @@ describe('CotizacionesService', () => {
       expect(correlativosRepository.siguienteEnTx).toHaveBeenCalledWith(TX, 'tenant-1', 'COTIZACION');
       expect(repository.crearEnTx).toHaveBeenCalledWith(TX, expect.objectContaining({ numero: 'COT-00001' }));
     });
+
+    it('conversión de unidades (Fase 3): persiste unidadMedidaId tal cual, sin resolver ningún factor (no toca Stock)', async () => {
+      repository.obtenerProductoConPrecioVigente.mockResolvedValue(producto(18, 100) as never);
+      repository.crearEnTx.mockResolvedValue({ id: 'c1' } as never);
+
+      await service.crear(
+        dto({ lineas: [{ productoId: 'prod-1', cantidad: 2, unidadMedidaId: 'caja-1', precioUnitario: 72 } as never] }),
+        'tenant-1',
+        'vendedor-1',
+      );
+
+      expect(repository.crearEnTx).toHaveBeenCalledWith(
+        TX,
+        expect.objectContaining({ lineas: [expect.objectContaining({ unidadMedidaId: 'caja-1' })] }),
+      );
+    });
+
+    it('rechaza una línea con unidad distinta a la base si no se manda precioUnitario (no hay precio automático por unidad alternativa)', async () => {
+      repository.obtenerProductoConPrecioVigente.mockResolvedValue(producto(18, 100) as never);
+
+      await expect(
+        service.crear(dto({ lineas: [{ productoId: 'prod-1', cantidad: 2, unidadMedidaId: 'caja-1' } as never] }), 'tenant-1', 'vendedor-1'),
+      ).rejects.toThrow(BadRequestException);
+      expect(repository.crearEnTx).not.toHaveBeenCalled();
+    });
   });
 
   describe('ofertas automáticas (Fase 4b)', () => {
@@ -396,6 +421,26 @@ describe('CotizacionesService', () => {
       await service.convertirEnFactura('c1', { bodegaId: 'bodega-1', tipoFactura: 'CONTADO' }, 'tenant-1', 'vendedor-1');
 
       expect(eventBus.emit).toHaveBeenCalledWith(EVENTOS.COTIZACION_CONVERTIDA_FACTURA, { tenantId: 'tenant-1', cotizacionId: 'c1', facturaId: 'f1' });
+    });
+
+    it('conversión de unidades (Fase 3): propaga unidadMedidaId a la factura tal cual, sin resolver ningún factor acá', async () => {
+      repository.buscarPorId.mockResolvedValue({
+        id: 'c1',
+        estado: 'ACEPTADA',
+        facturaId: null,
+        clienteId: 'cliente-1',
+        lineas: [{ productoId: 'prod-1', cantidad: 2, precioUnitario: 150, descuento: 0, unidadMedidaId: 'caja-1' }],
+      } as never);
+      facturacionService.crear.mockResolvedValue({ id: 'f1', total: 354 } as never);
+
+      await service.convertirEnFactura('c1', { bodegaId: 'bodega-1', tipoFactura: 'CONTADO' }, 'tenant-1', 'vendedor-1');
+
+      expect(facturacionService.crear).toHaveBeenCalledWith(
+        expect.objectContaining({ lineas: [expect.objectContaining({ unidadMedidaId: 'caja-1' })] }),
+        'tenant-1',
+        'vendedor-1',
+        expect.anything(),
+      );
     });
 
     it('rechaza convertir una cotización ya convertida', async () => {

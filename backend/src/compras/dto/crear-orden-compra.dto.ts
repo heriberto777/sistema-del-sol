@@ -12,12 +12,21 @@ export class LineaOcDto {
   @IsUUID()
   varianteId?: string;
 
-  @ApiProperty()
+  @ApiProperty({
+    required: false,
+    description:
+      'Unidad en la que se expresan cantidad/costoUnitario de esta línea (ej. "Caja") — debe ser la unidad base o una ProductoUnidadConversion del producto. Sin este campo, cantidad/costoUnitario quedan en la unidad base (comportamiento histórico).',
+  })
+  @IsOptional()
+  @IsUUID()
+  unidadMedidaId?: string;
+
+  @ApiProperty({ description: 'En la unidad elegida (unidadMedidaId) — ej. 10 Cajas, no 1440 unidades.' })
   @IsNumber()
   @IsPositive()
   cantidad: number;
 
-  @ApiProperty()
+  @ApiProperty({ description: 'Costo por unidad elegida (unidadMedidaId) — ej. costo por Caja, no por unidad suelta.' })
   @IsNumber()
   @IsPositive()
   costoUnitario: number;

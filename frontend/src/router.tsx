@@ -25,6 +25,7 @@ import { Inventario } from './pages/Inventario';
 import { Conteos } from './pages/Conteos';
 import { ConteoDetalle } from './pages/ConteoDetalle';
 import { InventarioAlertas } from './pages/InventarioAlertas';
+import { ConfiguracionInventario } from './pages/ConfiguracionInventario';
 import { Sucursales } from './pages/Sucursales';
 import { Compras } from './pages/Compras';
 import { Contactos } from './pages/Contactos';
@@ -245,6 +246,7 @@ const RUTAS_ADMIN = [
           { path: '/inventario/conteos', element: <Conteos /> },
           { path: '/inventario/conteos/:id', element: <ConteoDetalle /> },
           { path: '/inventario/alertas', element: <InventarioAlertas /> },
+          { path: '/inventario/configuracion', element: <ConfiguracionInventario /> },
           { path: '/sucursales', element: <Sucursales /> },
           { path: '/compras', element: <Compras /> },
           { path: '/contactos', element: <Contactos /> },

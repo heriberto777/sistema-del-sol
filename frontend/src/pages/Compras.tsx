@@ -20,6 +20,7 @@ import { RowActionsMenu } from '../components/molecules/RowActionsMenu/RowAction
 import { RequierePermiso } from '../components/organisms/RequierePermiso/RequierePermiso';
 import { SelectorLineaProducto } from '../components/molecules/SelectorLineaProducto/SelectorLineaProducto';
 import { SelectorBodega } from '../components/molecules/SelectorBodega/SelectorBodega';
+import { SelectorUnidadLinea } from '../components/molecules/SelectorUnidadLinea/SelectorUnidadLinea';
 import { useAuth } from '../hooks/useAuth';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { PaginaResultado } from '../types/pagina-resultado';
@@ -52,6 +53,7 @@ interface LineaOcDetalle {
   cantidad: string;
   cantidadRecibida: string;
   costoUnitario: string;
+  unidadMedida: { id: string; nombre: string } | null;
   producto: Producto;
 }
 
@@ -303,9 +305,16 @@ function ModalVerOrden({ orden, onClose }: { orden: OrdenCompra; onClose: () => 
                       <td className="px-3 py-2">
                         {linea.producto.codigo} — {linea.producto.nombre}
                       </td>
-                      <td className="px-3 py-2">{Number(linea.cantidad)}</td>
-                      <td className="px-3 py-2">{Number(linea.cantidadRecibida)}</td>
-                      <td className="px-3 py-2">RD$ {Number(linea.costoUnitario).toLocaleString('es-DO')}</td>
+                      <td className="px-3 py-2">
+                        {Number(linea.cantidad)} {linea.unidadMedida?.nombre ?? ''}
+                      </td>
+                      <td className="px-3 py-2">
+                        {Number(linea.cantidadRecibida)} {linea.unidadMedida?.nombre ?? ''}
+                      </td>
+                      <td className="px-3 py-2">
+                        RD$ {Number(linea.costoUnitario).toLocaleString('es-DO')}
+                        {linea.unidadMedida ? ` / ${linea.unidadMedida.nombre}` : ''}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -336,7 +345,7 @@ function ModalVerOrden({ orden, onClose }: { orden: OrdenCompra; onClose: () => 
 function ModalNuevaOrdenCompra({ onClose }: { onClose: () => void }) {
   const queryClient = useQueryClient();
   const [proveedor, setProveedor] = useState<Proveedor | null>(null);
-  const [lineas, setLineas] = useState([{ productoId: '', varianteId: '', cantidad: '1', costoUnitario: '' }]);
+  const [lineas, setLineas] = useState([{ productoId: '', varianteId: '', unidadMedidaId: '', cantidad: '1', costoUnitario: '' }]);
   const [mostrarNuevoProveedor, setMostrarNuevoProveedor] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -360,6 +369,7 @@ function ModalNuevaOrdenCompra({ onClose }: { onClose: () => void }) {
           .map((l) => ({
             productoId: l.productoId,
             varianteId: l.varianteId || undefined,
+            unidadMedidaId: l.unidadMedidaId || undefined,
             cantidad: Number(l.cantidad),
             costoUnitario: Number(l.costoUnitario),
           })),
@@ -422,13 +432,19 @@ function ModalNuevaOrdenCompra({ onClose }: { onClose: () => void }) {
         <div className="space-y-2">
           <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Líneas</p>
           {lineas.map((linea, i) => (
-            <div key={i} className="flex gap-2">
+            <div key={i} className="flex flex-wrap gap-2">
               <SelectorLineaProducto
                 productos={productos ?? []}
                 productoId={linea.productoId}
                 varianteId={linea.varianteId}
-                onChange={(productoId, varianteId) => actualizarLinea(i, { productoId, varianteId })}
+                onChange={(productoId, varianteId) => actualizarLinea(i, { productoId, varianteId, unidadMedidaId: '' })}
                 className="flex-1"
+              />
+              <SelectorUnidadLinea
+                productoId={linea.productoId}
+                value={linea.unidadMedidaId}
+                onChange={(unidadMedidaId) => actualizarLinea(i, { unidadMedidaId })}
+                className="w-32"
               />
               <input
                 type="number"
@@ -461,7 +477,7 @@ function ModalNuevaOrdenCompra({ onClose }: { onClose: () => void }) {
           ))}
           <button
             type="button"
-            onClick={() => setLineas((prev) => [...prev, { productoId: '', varianteId: '', cantidad: '1', costoUnitario: '' }])}
+            onClick={() => setLineas((prev) => [...prev, { productoId: '', varianteId: '', unidadMedidaId: '', cantidad: '1', costoUnitario: '' }])}
             className="text-sm font-medium text-sol-600 hover:text-sol-700 dark:text-sol-400"
           >
             + Agregar línea
@@ -484,7 +500,7 @@ function ModalNuevaOrdenCompra({ onClose }: { onClose: () => void }) {
 /** Ítem E-1 — editar una OC en BORRADOR (el proveedor no se puede cambiar, solo las líneas). */
 function ModalEditarOrdenCompra({ orden, onClose }: { orden: OrdenCompra; onClose: () => void }) {
   const queryClient = useQueryClient();
-  const [lineas, setLineas] = useState<{ productoId: string; varianteId: string; cantidad: string; costoUnitario: string }[]>([]);
+  const [lineas, setLineas] = useState<{ productoId: string; varianteId: string; unidadMedidaId: string; cantidad: string; costoUnitario: string }[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   const { data: detalle } = useQuery({
@@ -502,6 +518,7 @@ function ModalEditarOrdenCompra({ orden, onClose }: { orden: OrdenCompra; onClos
         detalle.lineas.map((l) => ({
           productoId: l.productoId,
           varianteId: l.varianteId,
+          unidadMedidaId: l.unidadMedida?.id ?? '',
           cantidad: String(l.cantidad),
           costoUnitario: String(l.costoUnitario),
         })),
@@ -524,6 +541,7 @@ function ModalEditarOrdenCompra({ orden, onClose }: { orden: OrdenCompra; onClos
           .map((l) => ({
             productoId: l.productoId,
             varianteId: l.varianteId || undefined,
+            unidadMedidaId: l.unidadMedidaId || undefined,
             cantidad: Number(l.cantidad),
             costoUnitario: Number(l.costoUnitario),
           })),
@@ -559,13 +577,19 @@ function ModalEditarOrdenCompra({ orden, onClose }: { orden: OrdenCompra; onClos
           <div className="space-y-2">
             <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Líneas</p>
             {lineas.map((linea, i) => (
-              <div key={i} className="flex gap-2">
+              <div key={i} className="flex flex-wrap gap-2">
                 <SelectorLineaProducto
                   productos={productos ?? []}
                   productoId={linea.productoId}
                   varianteId={linea.varianteId}
-                  onChange={(productoId, varianteId) => actualizarLinea(i, { productoId, varianteId })}
+                  onChange={(productoId, varianteId) => actualizarLinea(i, { productoId, varianteId, unidadMedidaId: '' })}
                   className="flex-1"
+                />
+                <SelectorUnidadLinea
+                  productoId={linea.productoId}
+                  value={linea.unidadMedidaId}
+                  onChange={(unidadMedidaId) => actualizarLinea(i, { unidadMedidaId })}
+                  className="w-32"
                 />
                 <input
                   type="number"
@@ -598,7 +622,7 @@ function ModalEditarOrdenCompra({ orden, onClose }: { orden: OrdenCompra; onClos
             ))}
             <button
               type="button"
-              onClick={() => setLineas((prev) => [...prev, { productoId: '', varianteId: '', cantidad: '1', costoUnitario: '' }])}
+              onClick={() => setLineas((prev) => [...prev, { productoId: '', varianteId: '', unidadMedidaId: '', cantidad: '1', costoUnitario: '' }])}
               className="text-sm font-medium text-sol-600 hover:text-sol-700 dark:text-sol-400"
             >
               + Agregar línea
@@ -749,7 +773,9 @@ function ModalRecibirOrden({ orden, onClose }: { orden: OrdenCompra; onClose: ()
               <div key={linea.productoId} className="space-y-1">
                 <div className="flex items-center gap-2 text-sm">
                   <span className="flex-1">{nombreProducto(linea.productoId)}</span>
-                  <span className="text-slate-400">pendiente {pendiente}</span>
+                  <span className="text-slate-400">
+                    pendiente {pendiente} {linea.unidadMedida?.nombre ?? ''}
+                  </span>
                   <input
                     type="number"
                     min={0}
@@ -759,6 +785,7 @@ function ModalRecibirOrden({ orden, onClose }: { orden: OrdenCompra; onClose: ()
                     onChange={(e) => setCantidades((prev) => ({ ...prev, [linea.productoId]: e.target.value }))}
                     className="w-24 rounded-md border border-slate-300 px-2 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
                   />
+                  {linea.unidadMedida && <span className="text-slate-400">{linea.unidadMedida.nombre}</span>}
                 </div>
                 {linea.producto.controlaVencimiento && Number(cantidades[linea.productoId] ?? 0) > 0 && (
                   <div className="flex items-center gap-2 pl-2 text-xs">

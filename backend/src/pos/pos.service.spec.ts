@@ -568,6 +568,24 @@ describe('PosService', () => {
       });
     });
 
+    it('conversión de unidades (Fase 3): propaga la unidad de la línea original, para mostrarla en la devolución', async () => {
+      facturacionService.buscarPorId.mockResolvedValue({
+        id: 'f1',
+        ncf: 'B0200000001',
+        clienteId: 'c1',
+        estado: 'EMITIDA',
+        tipoFactura: 'CONTADO',
+        lineas: [
+          { productoId: 'p1', cantidad: 2, producto: { nombre: 'Producto 1', codigo: 'P1' }, unidadMedida: { nombre: 'Caja' } },
+        ],
+        notasRelacionadas: [],
+      } as never);
+
+      const resultado = await service.obtenerFacturaParaDevolucion('f1');
+
+      expect(resultado.lineas[0]).toEqual(expect.objectContaining({ unidadMedida: { nombre: 'Caja' } }));
+    });
+
     it('rechaza una factura que no está EMITIDA', async () => {
       facturacionService.buscarPorId.mockResolvedValue({ estado: 'ANULADA', tipoFactura: 'CONTADO', lineas: [] } as never);
 

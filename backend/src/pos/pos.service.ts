@@ -396,6 +396,7 @@ export class PosService {
           productoId: l.productoId as string,
           nombre: l.producto!.nombre,
           codigo: l.producto!.codigo,
+          unidadMedida: l.unidadMedida,
           cantidadOriginal: Number(l.cantidad),
           disponible: disponiblePorProducto.get(l.productoId as string) ?? 0,
         })),

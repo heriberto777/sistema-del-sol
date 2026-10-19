@@ -89,6 +89,7 @@ export class CotizacionesService {
             productoId: null,
             varianteId: null,
             descripcionManual: linea.descripcionManual,
+            unidadMedidaId: null as string | null,
             cantidad: linea.cantidad,
             precioUnitario,
             descuento,
@@ -99,6 +100,15 @@ export class CotizacionesService {
         }
         const varianteId = await this.variantesService.resolverObligatoria(linea.productoId, linea.varianteId);
         const producto = await this.cotizacionesRepository.obtenerProductoConPrecioVigente(linea.productoId, varianteId, listaPrecio);
+        // Conversión de unidades — mismo criterio que FacturacionService:
+        // el precio de lista es siempre en la unidad BASE, nunca por unidad
+        // alternativa. Sin esto, elegir "Caja" y dejar el precio en blanco
+        // cotizaría 1 Caja al precio de 1 Unidad en silencio.
+        if (linea.unidadMedidaId && linea.unidadMedidaId !== producto.unidadMedidaBaseId && linea.precioUnitario === undefined) {
+          throw new BadRequestException(
+            `"${producto.nombre}" usa una unidad distinta a la base en esta línea — indicá el precio para esa unidad, no hay uno automático.`,
+          );
+        }
         const precioUnitario = linea.precioUnitario ?? Number(producto.precios[0]?.precioVenta ?? 0);
         // Toggle de ITBIS por línea, mismo criterio que FacturacionService —
         // `aplicaItbis: false` fuerza 0% sin importar producto.porcentajeItbis.
@@ -113,6 +123,7 @@ export class CotizacionesService {
           productoId: linea.productoId as string | null,
           varianteId: varianteId as string | null,
           descripcionManual: undefined as string | undefined,
+          unidadMedidaId: (linea.unidadMedidaId ?? null) as string | null,
           cantidad: linea.cantidad,
           precioUnitario,
           descuento,
@@ -277,6 +288,10 @@ export class CotizacionesService {
         lineas: cotizacion.lineas.map((linea) => ({
           productoId: linea.productoId ?? undefined,
           varianteId: linea.varianteId ?? undefined,
+          // Conversión de unidades — se propaga tal cual; FacturacionService
+          // resuelve su propio factorConversion fresco al convertir (ver
+          // ARCHITECTURE.md).
+          unidadMedidaId: linea.unidadMedidaId ?? undefined,
           // Ítem B-9 — se propaga tal cual a la factura; el ITBIS de la
           // línea manual se recalcula en FacturacionService.crear() sobre
           // la tasa general vigente (no se snapshotea porcentajeItbis acá,

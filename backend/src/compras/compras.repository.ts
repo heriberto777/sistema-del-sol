@@ -19,7 +19,7 @@ export class ComprasRepository {
       numero: string;
       userId: string;
       total: number;
-      lineas: { productoId: string; varianteId: string; cantidad: number; costoUnitario: number }[];
+      lineas: { productoId: string; varianteId: string; unidadMedidaId?: string; factorConversion: number; cantidad: number; costoUnitario: number }[];
     },
   ) {
     return tx.ordenCompra.create({
@@ -36,7 +36,13 @@ export class ComprasRepository {
   }
 
   /** Reemplaza líneas por completo (delete+recreate) — solo se permite en BORRADOR, ver ComprasService.actualizar. El número asignado al crear no se toca acá. */
-  actualizar(id: string, params: { total: number; lineas: { productoId: string; varianteId: string; cantidad: number; costoUnitario: number }[] }) {
+  actualizar(
+    id: string,
+    params: {
+      total: number;
+      lineas: { productoId: string; varianteId: string; unidadMedidaId?: string; factorConversion: number; cantidad: number; costoUnitario: number }[];
+    },
+  ) {
     return this.db.$transaction(async (tx) => {
       await tx.lineaOc.deleteMany({ where: { ordenCompraId: id } });
       return tx.ordenCompra.update({
@@ -51,8 +57,9 @@ export class ComprasRepository {
     return this.db.ordenCompra.findUniqueOrThrow({
       where: { id },
       // producto: para que ComprasService.recibir() sepa si una línea es
-      // SERVICIO (no mueve stock al recibirse).
-      include: { lineas: { include: { producto: true } }, recepciones: true, devoluciones: { include: { lineas: true } } },
+      // SERVICIO (no mueve stock al recibirse). unidadMedida: para mostrar
+      // "Caja"/"Unidad" junto a cantidad/costoUnitario en el detalle.
+      include: { lineas: { include: { producto: true, unidadMedida: true } }, recepciones: true, devoluciones: { include: { lineas: true } } },
     });
   }
 
@@ -140,8 +147,11 @@ export class ComprasRepository {
       // numeroLote?/fechaVencimiento? también (Fase 5b) — son datos para
       // InventarioService.entradaStockEnTx, no columnas de LineaRecepcion,
       // así que se pickean explícito acá (Prisma rechaza en runtime
-      // cualquier propiedad extra en `create`, no solo TS).
-      lineas: { productoId: string; varianteId: string; cantidadRecibida: number; costoUnitario: number }[];
+      // cualquier propiedad extra en `create`, no solo TS). unidadMedidaId/
+      // factorConversion se heredan de la LineaOc (ver ComprasService.recibir)
+      // — solo para mostrar/auditar, cantidadRecibida/costoUnitario ya
+      // quedan en esa unidad tal cual llegaron del DTO.
+      lineas: { productoId: string; varianteId: string; unidadMedidaId?: string; factorConversion: number; cantidadRecibida: number; costoUnitario: number }[];
     },
   ) {
     return tx.recepcionCompra.create({
@@ -154,6 +164,8 @@ export class ComprasRepository {
           create: params.lineas.map((l) => ({
             productoId: l.productoId,
             varianteId: l.varianteId,
+            unidadMedidaId: l.unidadMedidaId,
+            factorConversion: l.factorConversion,
             cantidadRecibida: l.cantidadRecibida,
             costoUnitario: l.costoUnitario,
           })),

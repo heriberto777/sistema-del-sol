@@ -12,6 +12,15 @@ export class LineaRemisionDto {
   @IsUUID()
   varianteId?: string;
 
+  @ApiProperty({
+    required: false,
+    description:
+      'Unidad en la que se expresa cantidad de esta línea (ej. "Caja") — igual criterio que Facturación. Una Remisión mueve stock ella misma al pasar a ENTREGADA, así que esto afecta inventario, no solo presentación.',
+  })
+  @IsOptional()
+  @IsUUID()
+  unidadMedidaId?: string;
+
   @ApiProperty()
   @IsNumber()
   @IsPositive()

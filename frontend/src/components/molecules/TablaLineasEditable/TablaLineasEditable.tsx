@@ -1,10 +1,13 @@
 import { Plus, X } from 'lucide-react';
 import { SelectorLineaProducto, ProductoOpcion } from '../SelectorLineaProducto/SelectorLineaProducto';
+import { SelectorUnidadLinea } from '../SelectorUnidadLinea/SelectorUnidadLinea';
 import { formatearOferta, type OfertaVisibleProducto } from '../../../lib/formatear-oferta';
 
 export interface LineaEditable {
   productoId: string;
   varianteId: string;
+  /** Unidad elegida para esta línea (ej. "Caja") — '' = unidad base del producto. Ver SelectorUnidadLinea. */
+  unidadMedidaId?: string;
   cantidad: string;
   precioUnitario: string;
   /** Precio de lista GENERAL del producto elegido — solo para el subtotal estimado del panel lateral, nunca se envía al backend. */
@@ -88,7 +91,7 @@ export function TablaLineasEditable<T extends LineaEditable>({
                           productoId={linea.productoId}
                           varianteId={linea.varianteId}
                           onChange={(productoId, varianteId, precioReferencia, itbisReferencia, oferta) =>
-                            onActualizar(i, { productoId, varianteId, precioReferencia, itbisReferencia, oferta } as Partial<T>)
+                            onActualizar(i, { productoId, varianteId, unidadMedidaId: '', precioReferencia, itbisReferencia, oferta } as Partial<T>)
                           }
                         />
                         {linea.oferta && (
@@ -111,15 +114,24 @@ export function TablaLineasEditable<T extends LineaEditable>({
                   </div>
                 </td>
                 <td className="px-3 py-2 align-top">
-                  <input
-                    type="number"
-                    min={1}
-                    step="any"
-                    placeholder="Cant."
-                    value={linea.cantidad}
-                    onChange={(e) => onActualizar(i, { cantidad: e.target.value } as Partial<T>)}
-                    className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-                  />
+                  <div className="flex flex-col gap-1">
+                    <input
+                      type="number"
+                      min={1}
+                      step="any"
+                      placeholder="Cant."
+                      value={linea.cantidad}
+                      onChange={(e) => onActualizar(i, { cantidad: e.target.value } as Partial<T>)}
+                      className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                    />
+                    {!linea.esManual && linea.productoId && (
+                      <SelectorUnidadLinea
+                        productoId={linea.productoId}
+                        value={linea.unidadMedidaId ?? ''}
+                        onChange={(unidadMedidaId) => onActualizar(i, { unidadMedidaId } as Partial<T>)}
+                      />
+                    )}
+                  </div>
                 </td>
                 <td className="px-3 py-2 align-top">
                   <div className="flex flex-col gap-1">

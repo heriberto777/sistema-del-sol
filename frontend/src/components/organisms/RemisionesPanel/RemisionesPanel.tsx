@@ -44,13 +44,13 @@ export interface Remision {
   clienteId: string;
   bodegaId: string;
   cliente: ClienteBasico;
-  lineas: { productoId: string; varianteId: string; cantidad: string }[];
+  lineas: { productoId: string; varianteId: string; unidadMedidaId?: string | null; cantidad: string }[];
 }
 
 export interface RemisionDetalle extends Omit<Remision, 'lineas'> {
   fecha: string;
   bodega: { nombre: string };
-  lineas: { producto: { nombre: string } | null; cantidad: string }[];
+  lineas: { producto: { nombre: string } | null; unidadMedida: { nombre: string } | null; cantidad: string }[];
 }
 
 export const TONO_POR_ESTADO: Record<EstadoRemision, 'exito' | 'advertencia' | 'peligro' | 'neutro'> = {
@@ -60,7 +60,7 @@ export const TONO_POR_ESTADO: Record<EstadoRemision, 'exito' | 'advertencia' | '
   ANULADA: 'peligro',
 };
 
-export type LineaForm = { productoId: string; varianteId: string; cantidad: string };
+export type LineaForm = { productoId: string; varianteId: string; unidadMedidaId?: string; cantidad: string };
 
 export function RemisionesPanel() {
   const queryClient = useQueryClient();

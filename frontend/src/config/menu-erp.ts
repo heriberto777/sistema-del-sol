@@ -160,7 +160,12 @@ export const DOMINIOS_MENU: DominioMenu[] = [
         ],
       },
       { categoria: 'reportes', items: [{ id: 'reportes-inventario', etiqueta: 'Inventario y rotación', ruta: '/reportes', permisos: ['reportes.ver'] }] },
-      { categoria: 'configuracion', items: [] },
+      {
+        categoria: 'configuracion',
+        items: [
+          { id: 'configuracion-inventario', etiqueta: 'Unidades de medida', ruta: '/inventario/configuracion', permisos: ['admin.configuracion'] },
+        ],
+      },
     ],
   },
   {

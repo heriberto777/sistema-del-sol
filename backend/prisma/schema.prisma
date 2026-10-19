@@ -121,6 +121,7 @@ model Tenant {
   turnosCaja                 TurnoCaja[]
   pagos                      Pago[]
   formasPago                 FormaPago[]
+  unidadesMedida             UnidadMedida[]
   listasPrecio               ListaPrecio[]
   cuentasBancarias           CuentaBancaria[]
   gastosMenores              GastoMenor[]
@@ -1427,6 +1428,16 @@ model LineaFactura {
   // Ítem B-9 — texto libre cuando productoId es null (línea sin producto
   // del catálogo, ej. "Instalación", "Servicio no catalogado").
   descripcionManual String?
+  // Unidad elegida para ESTA línea (ej. "Caja") — null = unidad base del
+  // producto, comportamiento histórico. `cantidad`/`precioUnitario`/
+  // `costoUnitario` (abajo) quedan en ESA unidad; `factorConversion` es un
+  // snapshot resuelto por FacturacionService.calcularLineasYTotales al
+  // crear la factura (o heredado de la línea original en una Nota de
+  // Crédito/Débito, nunca re-elegido ahí) — ver ARCHITECTURE.md
+  // "Conversión de unidades de medida". Null/1 para línea manual.
+  unidadMedidaId    String?
+  unidadMedida      UnidadMedida?     @relation("LineaFacturaUnidad", fields: [unidadMedidaId], references: [id])
+  factorConversion  Decimal           @default(1) @db.Decimal(14, 4)
   cantidad          Decimal           @db.Decimal(14, 4)
   precioUnitario    Decimal           @db.Decimal(14, 4)
   porcentajeItbis   Decimal           @db.Decimal(5, 2)
@@ -1518,6 +1529,12 @@ model LineaCotizacion {
   variante          VarianteProducto? @relation(fields: [varianteId], references: [id])
   // Ítem B-9 — ver el comentario equivalente en LineaFactura.
   descripcionManual String?
+  // Unidad elegida para esta línea (ej. "Caja") — una Cotización nunca
+  // toca Stock, así que no necesita `factorConversion` propio; se propaga
+  // tal cual a LineaFacturaDto.unidadMedidaId al convertir en factura
+  // (FacturacionService.calcularLineasYTotales resuelve el factor ahí).
+  unidadMedidaId    String?
+  unidadMedida      UnidadMedida?     @relation("LineaCotizacionUnidad", fields: [unidadMedidaId], references: [id])
   cantidad          Decimal           @db.Decimal(14, 4)
   precioUnitario    Decimal           @db.Decimal(14, 4)
   porcentajeItbis   Decimal           @db.Decimal(5, 2)
@@ -1578,6 +1595,14 @@ model LineaRemision {
   // Ver el comentario equivalente en LineaFactura.varianteId.
   varianteId String
   variante   VarianteProducto @relation(fields: [varianteId], references: [id])
+  // Una Remisión mueve stock ella misma al pasar a ENTREGADA (ver
+  // RemisionesService.cambiarEstado) — necesita su propio snapshot de
+  // factorConversion, igual criterio que LineaOc/LineaRecepcion de
+  // Compras. `cantidad` queda en la unidad elegida; `cantidad *
+  // factorConversion` es lo que se pasa a InventarioService.
+  unidadMedidaId   String?
+  unidadMedida     UnidadMedida?    @relation("LineaRemisionUnidad", fields: [unidadMedidaId], references: [id])
+  factorConversion Decimal          @default(1) @db.Decimal(14, 4)
   cantidad   Decimal          @db.Decimal(14, 4)
 
   @@map("linea_remision")
@@ -2628,6 +2653,12 @@ model VentaAparcadaLinea {
   // Ver el comentario equivalente en LineaFactura.varianteId.
   varianteId      String
   variante        VarianteProducto @relation(fields: [varianteId], references: [id])
+  // Puramente para restaurar el carrito tal cual quedó (F12/⇧F12) — nunca
+  // se usa para mover stock desde acá; al recuperarla, el carrito vuelve a
+  // vivir en el frontend y una venta real se registra vía POST /pos/ventas,
+  // que resuelve su propio factorConversion fresco (ver ARCHITECTURE.md).
+  unidadMedidaId  String?
+  unidadMedida    UnidadMedida?    @relation("VentaAparcadaLineaUnidad", fields: [unidadMedidaId], references: [id])
   cantidad        Decimal          @db.Decimal(14, 4)
   precioUnitario  Decimal          @db.Decimal(14, 4)
   porcentajeItbis Decimal          @db.Decimal(5, 2)
@@ -2692,7 +2723,22 @@ model Producto {
   nombre              String
   categoriaId         String?
   categoria           Categoria?           @relation(fields: [categoriaId], references: [id], onDelete: SetNull)
+  // @deprecated — texto libre, sin conversión real (ver unidadMedidaBaseId
+  // abajo). Se mantiene solo por compatibilidad con Excel import/reportes
+  // viejos; nunca se borra ni se vuelve a escribir desde el formulario
+  // nuevo de producto.
   unidadMedida        String               @default("UND")
+  // Motor de conversión de unidades — opt-in (mismo criterio que
+  // controlaVencimiento): null = el producto sigue funcionando exactamente
+  // como antes de esta columna, sin unidades alternativas de compra/venta.
+  // La unidad BASE es en la que viven Stock/MovimientoInventario/Kardex/
+  // costoPromedio — nunca cambia una vez que el producto tiene movimientos,
+  // ver ARCHITECTURE.md "Conversión de unidades de medida".
+  unidadMedidaBaseId  String?
+  unidadMedidaBase    UnidadMedida?        @relation("ProductoUnidadBase", fields: [unidadMedidaBaseId], references: [id])
+  // Unidades alternativas en las que se puede comprar/vender este producto
+  // (ej. "Caja" = 144 unidades base) — ver ProductoUnidadConversion.
+  unidadesConversion  ProductoUnidadConversion[]
   porcentajeItbis     Decimal              @default(18) @db.Decimal(5, 2)
   // Ley fiscal aplicable (plan de integración Cuadre, ítem B-3) — reduce
   // el ITBIS efectivo de este producto (ej. Norma 07-2007 construcción:
@@ -2788,6 +2834,50 @@ model Producto {
 
   @@unique([tenantId, codigo])
   @@map("productos")
+}
+
+/// Catálogo de unidades de medida del tenant (Unidad, Caja, Docena, Libra,
+/// Kilogramo, Litro — sembrado al provisionar, ver UNIDADES_MEDIDA_BASE),
+/// editable igual que FormaPago/Categoria. Ver ARCHITECTURE.md "Conversión
+/// de unidades de medida".
+model UnidadMedida {
+  id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  codigo    String
+  nombre    String
+  activa    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  productosBase   Producto[]                 @relation("ProductoUnidadBase")
+  conversiones    ProductoUnidadConversion[]
+  lineasOc         LineaOc[]                  @relation("LineaOcUnidad")
+  lineasRecepcion  LineaRecepcion[]           @relation("LineaRecepcionUnidad")
+  lineasFactura    LineaFactura[]             @relation("LineaFacturaUnidad")
+  lineasCotizacion LineaCotizacion[]          @relation("LineaCotizacionUnidad")
+  lineasRemision   LineaRemision[]            @relation("LineaRemisionUnidad")
+  lineasVentaAparcada VentaAparcadaLinea[]     @relation("VentaAparcadaLineaUnidad")
+
+  @@unique([tenantId, codigo])
+  @@map("unidades_medida")
+}
+
+/// Unidad alternativa en la que se puede comprar/vender un Producto puntual
+/// (ej. "Caja" = 144 unidades de la unidad base de ESE producto) — tabla
+/// "hija" sin tenantId propio (mismo patrón que ComponenteCombo), el
+/// aislamiento depende de resolver primero el Producto padre.
+model ProductoUnidadConversion {
+  id               String       @id @default(uuid())
+  productoId       String
+  producto         Producto     @relation(fields: [productoId], references: [id], onDelete: Cascade)
+  unidadMedidaId   String
+  unidadMedida     UnidadMedida @relation(fields: [unidadMedidaId], references: [id])
+  // Cuántas unidades BASE hay en 1 de esta unidad alternativa — ej. 144 si
+  // esta fila es "Caja" y la unidad base del producto es "Unidad".
+  factorConversion Decimal      @db.Decimal(14, 4)
+
+  @@unique([productoId, unidadMedidaId])
+  @@map("producto_unidad_conversion")
 }
 
 /// Galería de fotos adicionales de un Producto para la Tienda Online
@@ -3264,6 +3354,18 @@ model LineaOc {
   // Ver el comentario equivalente en LineaFactura.varianteId.
   varianteId       String
   variante         VarianteProducto @relation(fields: [varianteId], references: [id])
+  // `cantidad`/`costoUnitario`/`cantidadRecibida` están en ESTA unidad (ej.
+  // "Caja") — null = unidad base del producto, comportamiento histórico sin
+  // conversión. `factorConversion` es un SNAPSHOT de
+  // ProductoUnidadConversion.factorConversion tomado al crear la línea — si
+  // el catálogo cambia después, una OC ya emitida no se ve afectada. Al
+  // recibir, ComprasService convierte a unidades base
+  // (cantidad*factorConversion) y costo por unidad base
+  // (costoUnitario/factorConversion) antes de llamar a InventarioService —
+  // ver ARCHITECTURE.md "Conversión de unidades de medida".
+  unidadMedidaId   String?
+  unidadMedida     UnidadMedida?    @relation("LineaOcUnidad", fields: [unidadMedidaId], references: [id])
+  factorConversion Decimal          @default(1) @db.Decimal(14, 4)
   cantidad         Decimal          @db.Decimal(14, 4)
   costoUnitario    Decimal          @db.Decimal(14, 4)
   cantidadRecibida Decimal          @default(0) @db.Decimal(14, 4)
@@ -3472,6 +3574,14 @@ model LineaRecepcion {
   // Ver el comentario equivalente en LineaFactura.varianteId.
   varianteId       String
   variante         VarianteProducto @relation(fields: [varianteId], references: [id])
+  // Heredado de LineaOc.unidadMedidaId/factorConversion al recibir (nunca
+  // se vuelve a pedir en el DTO, mismo criterio que varianteId acá arriba)
+  // — solo para mostrar/auditar en el detalle de la recepción; la
+  // conversión a unidades base ya se aplicó antes de llamar a
+  // InventarioService (ver ComprasService.recibir()).
+  unidadMedidaId   String?
+  unidadMedida     UnidadMedida?    @relation("LineaRecepcionUnidad", fields: [unidadMedidaId], references: [id])
+  factorConversion Decimal          @default(1) @db.Decimal(14, 4)
   cantidadRecibida Decimal          @db.Decimal(14, 4)
   costoUnitario    Decimal          @db.Decimal(14, 4)
 

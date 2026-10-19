@@ -8,6 +8,7 @@ import { CardColapsable } from '../components/molecules/CardColapsable/CardColap
 import { FormField } from '../components/molecules/FormField/FormField';
 import { ComboboxBusqueda } from '../components/molecules/ComboboxBusqueda/ComboboxBusqueda';
 import { SelectorLineaProducto } from '../components/molecules/SelectorLineaProducto/SelectorLineaProducto';
+import { SelectorUnidadLinea } from '../components/molecules/SelectorUnidadLinea/SelectorUnidadLinea';
 import { Button } from '../components/atoms/Button/Button';
 import { PaginaResultado } from '../types/pagina-resultado';
 import { mensajeErrorApi } from '../lib/mensaje-error-api';
@@ -46,6 +47,7 @@ export function CotizacionEditar() {
       lineas: detalle.lineas.map((l) => ({
         productoId: l.productoId ?? '',
         varianteId: l.varianteId ?? '',
+        unidadMedidaId: l.unidadMedidaId ?? '',
         cantidad: l.cantidad,
         esManual: !l.productoId,
         descripcionManual: l.descripcionManual ?? '',
@@ -72,7 +74,13 @@ export function CotizacionEditar() {
                   precioUnitario: Number(l.precioUnitario),
                   aplicaItbis: l.aplicaItbis,
                 }
-              : { productoId: l.productoId, varianteId: l.varianteId || undefined, cantidad: Number(l.cantidad), aplicaItbis: l.aplicaItbis },
+              : {
+                  productoId: l.productoId,
+                  varianteId: l.varianteId || undefined,
+                  unidadMedidaId: l.unidadMedidaId || undefined,
+                  cantidad: Number(l.cantidad),
+                  aplicaItbis: l.aplicaItbis,
+                },
           ),
       }),
     onSuccess: () => {
@@ -225,10 +233,21 @@ export function CotizacionEditar() {
                     onChange={(productoId, varianteId, precioReferencia, itbisReferencia, oferta) =>
                       setValores({
                         ...valores,
-                        lineas: valores.lineas.map((l, idx) => (idx === i ? { ...l, productoId, varianteId, precioReferencia, itbisReferencia, oferta } : l)),
+                        lineas: valores.lineas.map((l, idx) =>
+                          idx === i ? { ...l, productoId, varianteId, unidadMedidaId: '', precioReferencia, itbisReferencia, oferta } : l,
+                        ),
                       })
                     }
                   />
+                  {linea.productoId && (
+                    <SelectorUnidadLinea
+                      productoId={linea.productoId}
+                      value={linea.unidadMedidaId ?? ''}
+                      onChange={(unidadMedidaId) =>
+                        setValores({ ...valores, lineas: valores.lineas.map((l, idx) => (idx === i ? { ...l, unidadMedidaId } : l)) })
+                      }
+                    />
+                  )}
                   <div className="flex flex-wrap items-center gap-1.5">
                     {linea.precioReferencia != null && (
                       <span
@@ -286,7 +305,7 @@ export function CotizacionEditar() {
                   setValores({
                     ...valores,
                     lineas: valores.lineas.map((l, idx) =>
-                      idx === i ? { ...l, esManual: !l.esManual, productoId: '', varianteId: '', descripcionManual: '' } : l,
+                      idx === i ? { ...l, esManual: !l.esManual, productoId: '', varianteId: '', unidadMedidaId: '', descripcionManual: '' } : l,
                     ),
                   })
                 }

@@ -6,9 +6,10 @@ import { FacturacionModule } from '../facturacion/facturacion.module';
 import { VariantesModule } from '../variantes/variantes.module';
 import { InventarioModule } from '../inventario/inventario.module';
 import { CorrelativosModule } from '../correlativos/correlativos.module';
+import { ProductosModule } from '../productos/productos.module';
 
 @Module({
-  imports: [FacturacionModule, VariantesModule, InventarioModule, CorrelativosModule],
+  imports: [FacturacionModule, VariantesModule, InventarioModule, CorrelativosModule, ProductosModule],
   controllers: [RemisionesController],
   providers: [RemisionesService, RemisionesRepository],
 })

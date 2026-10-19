@@ -32,6 +32,15 @@ export class LineaFacturaDto {
   @ApiProperty({
     required: false,
     description:
+      'Unidad en la que se expresan cantidad/precioUnitario de esta línea (ej. "Caja") — debe ser la unidad base o una ProductoUnidadConversion del producto. Sin este campo, quedan en la unidad base (comportamiento histórico). Ignorado en una Nota de Crédito/Débito: ahí se hereda la unidad de la línea de la factura origen, nunca se vuelve a elegir.',
+  })
+  @IsOptional()
+  @IsUUID()
+  unidadMedidaId?: string;
+
+  @ApiProperty({
+    required: false,
+    description:
       'Línea libre sin producto del catálogo (ítem B-9, plan de integración Cuadre, ej. "Instalación") — mutuamente excluyente con productoId. No mueve inventario ni genera comisión, y queda fuera del reporte de rentabilidad.',
   })
   @ValidateIf((o) => !o.productoId)

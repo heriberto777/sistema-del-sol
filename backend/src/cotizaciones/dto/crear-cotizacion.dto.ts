@@ -29,6 +29,15 @@ export class LineaCotizacionDto {
 
   @ApiProperty({
     required: false,
+    description:
+      'Unidad en la que se expresan cantidad/precioUnitario de esta línea (ej. "Caja") — igual criterio que Facturación. Se propaga tal cual al convertir en factura.',
+  })
+  @IsOptional()
+  @IsUUID()
+  unidadMedidaId?: string;
+
+  @ApiProperty({
+    required: false,
     description: 'Línea libre sin producto del catálogo (ítem B-9) — mutuamente excluyente con productoId. Se propaga tal cual al convertir en factura.',
   })
   @ValidateIf((o) => !o.productoId)

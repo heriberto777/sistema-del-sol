@@ -12,6 +12,11 @@ export class LineaVentaAparcadaDto {
   @IsUUID()
   varianteId?: string;
 
+  @ApiProperty({ required: false, description: 'Unidad elegida para esta línea (ej. "Caja") — puramente para restaurar el carrito tal cual al recuperarla; el factor se resuelve recién al vender de verdad.' })
+  @IsOptional()
+  @IsUUID()
+  unidadMedidaId?: string;
+
   @ApiProperty()
   @IsNumber()
   @IsPositive()

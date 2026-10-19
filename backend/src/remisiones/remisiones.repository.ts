@@ -8,7 +8,7 @@ import { CLIENTE_SELECT_BASICO } from '../common/prisma/cliente-select-basico';
 // pueda expandir un COMBO a sus componentes físicos al mover inventario en
 // "Marcar entregada"/anular desde ENTREGADA.
 const INCLUDE_REMISION = {
-  lineas: { include: { producto: { include: { componentes: { include: { componente: true } } } } } },
+  lineas: { include: { producto: { include: { componentes: { include: { componente: true } } } }, unidadMedida: true } },
   cliente: { select: CLIENTE_SELECT_BASICO },
   bodega: true,
 } as const;
@@ -30,7 +30,7 @@ export class RemisionesRepository {
       bodegaId: string;
       vendedorId: string;
       numero: string;
-      lineas: { productoId: string; varianteId: string; cantidad: number }[];
+      lineas: { productoId: string; varianteId: string; unidadMedidaId?: string; factorConversion: number; cantidad: number }[];
     },
   ) {
     return tx.remision.create({
@@ -56,7 +56,7 @@ export class RemisionesRepository {
     params: {
       clienteId: string;
       bodegaId: string;
-      lineas: { productoId: string; varianteId: string; cantidad: number }[];
+      lineas: { productoId: string; varianteId: string; unidadMedidaId?: string; factorConversion: number; cantidad: number }[];
     },
   ) {
     return this.db.$transaction(async (tx) => {

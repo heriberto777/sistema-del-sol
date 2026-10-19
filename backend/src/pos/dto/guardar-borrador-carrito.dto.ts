@@ -18,6 +18,11 @@ export class LineaBorradorCarritoDto {
   @IsUUID()
   varianteId?: string;
 
+  @ApiProperty({ required: false, description: 'Unidad elegida para esta línea (ej. "Caja") — se restaura tal cual, el factor se resuelve recién al vender de verdad.' })
+  @IsOptional()
+  @IsUUID()
+  unidadMedidaId?: string;
+
   @ApiProperty()
   @IsString()
   codigo: string;

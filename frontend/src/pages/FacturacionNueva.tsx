@@ -133,6 +133,7 @@ export function FacturacionNueva() {
               : {
                   productoId: l.productoId,
                   varianteId: l.varianteId || undefined,
+                  unidadMedidaId: l.unidadMedidaId || undefined,
                   cantidad: Number(l.cantidad),
                   precioUnitario: l.precioUnitario ? Number(l.precioUnitario) : undefined,
                   aplicaItbis: l.aplicaItbis,

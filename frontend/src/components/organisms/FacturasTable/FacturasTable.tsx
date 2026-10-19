@@ -42,7 +42,14 @@ interface FacturaDetalle extends Factura {
   descuento: string;
   itbis: string;
   recargos: { concepto: string; monto: string }[];
-  lineas: { producto: { nombre: string } | null; descripcionManual: string | null; cantidad: string; precioUnitario: string; montoTotal: string }[];
+  lineas: {
+    producto: { nombre: string } | null;
+    descripcionManual: string | null;
+    unidadMedida: { nombre: string } | null;
+    cantidad: string;
+    precioUnitario: string;
+    montoTotal: string;
+  }[];
 }
 
 type Pago = PagoBasico;

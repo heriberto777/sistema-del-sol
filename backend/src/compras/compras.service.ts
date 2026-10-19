@@ -2,6 +2,7 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { ComprasRepository } from './compras.repository';
 import { InventarioService } from '../inventario/inventario.service';
 import { VariantesService } from '../variantes/variantes.service';
+import { ProductosService } from '../productos/productos.service';
 import { TenantPrismaService } from '../prisma/tenant-prisma.service';
 import { EventBusService } from '../event-bus/event-bus.service';
 import { EVENTOS } from '../event-bus/events';
@@ -21,6 +22,7 @@ export class ComprasService {
     private readonly comprasRepository: ComprasRepository,
     private readonly inventarioService: InventarioService,
     private readonly variantesService: VariantesService,
+    private readonly productosService: ProductosService,
     private readonly tenantPrisma: TenantPrismaService,
     private readonly eventBus: EventBusService,
     private readonly pagosService: PagosService,
@@ -43,6 +45,10 @@ export class ComprasService {
       dto.lineas.map(async (linea) => ({
         ...linea,
         varianteId: await this.variantesService.resolverObligatoria(linea.productoId, linea.varianteId),
+        // Snapshot al crear la OC (ver ARCHITECTURE.md "Conversión de
+        // unidades de medida") — si el catálogo cambia después, esta orden
+        // ya emitida no se ve afectada.
+        factorConversion: await this.productosService.resolverFactorConversion(linea.productoId, linea.unidadMedidaId),
       })),
     );
     return this.tenantPrisma.client.$transaction(async (tx) => {
@@ -63,6 +69,7 @@ export class ComprasService {
       dto.lineas.map(async (linea) => ({
         ...linea,
         varianteId: await this.variantesService.resolverObligatoria(linea.productoId, linea.varianteId),
+        factorConversion: await this.productosService.resolverFactorConversion(linea.productoId, linea.unidadMedidaId),
       })),
     );
     return this.comprasRepository.actualizar(id, { total, lineas });
@@ -120,11 +127,16 @@ export class ComprasService {
     // Si el producto no pertenece a esta orden (dato mal formado), se
     // resuelve igual que cualquier línea suelta — nunca se manda un
     // varianteId vacío/adivinado a la base.
+    // unidadMedidaId/factorConversion también se heredan de la línea de OC
+    // (nunca se vuelven a pedir en el DTO, mismo criterio que varianteId) —
+    // cantidadRecibida/costoUnitario llegan en ESA unidad; se convierten a
+    // unidades base más abajo, solo para la llamada a InventarioService.
     const lineasConVariante = await Promise.all(
       dto.lineas.map(async (linea) => {
         const lineaOc = orden.lineas.find((l) => l.productoId === linea.productoId);
         const varianteId = lineaOc?.varianteId ?? (await this.variantesService.resolverObligatoria(linea.productoId));
-        return { ...linea, varianteId };
+        const factorConversion = Number(lineaOc?.factorConversion ?? 1);
+        return { ...linea, varianteId, unidadMedidaId: lineaOc?.unidadMedidaId ?? undefined, factorConversion };
       }),
     );
 
@@ -145,25 +157,33 @@ export class ComprasService {
         // Un servicio comprado (ej. una consultoría) no mueve inventario —
         // "recibirlo" solo actualiza la cantidad recibida de la línea.
         if (lineaOc?.producto.tipo !== 'SERVICIO') {
+          // Conversión de unidades — cantidadRecibida/costoUnitario llegan en
+          // la unidad elegida al ordenar (ej. Cajas); Stock/Kardex/costeo
+          // viven en unidades base, así que se convierten acá, en el único
+          // punto de contacto con InventarioService (ver ARCHITECTURE.md).
+          const cantidadBase = linea.cantidadRecibida * linea.factorConversion;
+          const costoUnitarioBase = linea.costoUnitario / linea.factorConversion;
           await this.inventarioService.entradaStockEnTx(tx, {
             tenantId,
             productoId: linea.productoId,
             varianteId: linea.varianteId,
             bodegaId: dto.bodegaId,
-            cantidad: linea.cantidadRecibida,
+            cantidad: cantidadBase,
             userId,
             motivo: `Recepción de OC ${orden.numero}`,
             referenciaTipo: 'RECEPCION_COMPRA',
             referenciaId: recepcion.id,
             // Motor de costeo — recalcula el Promedio Ponderado de la
-            // variante+bodega con el costo real de esta recepción.
-            costoUnitario: linea.costoUnitario,
+            // variante+bodega con el costo real de esta recepción (por
+            // unidad base, ya convertido).
+            costoUnitario: costoUnitarioBase,
             // Fase 5b — si el producto controla vencimiento, InventarioService
             // exige numeroLote/fechaVencimiento (400 si faltan); si no
-            // controla, este arreglo se ignora sin más.
+            // controla, este arreglo se ignora sin más. La cantidad del lote
+            // también va en unidades base — es la que termina en Stock.
             lotes:
               linea.numeroLote && linea.fechaVencimiento
-                ? [{ numeroLote: linea.numeroLote, fechaVencimiento: linea.fechaVencimiento, cantidad: linea.cantidadRecibida }]
+                ? [{ numeroLote: linea.numeroLote, fechaVencimiento: linea.fechaVencimiento, cantidad: cantidadBase }]
                 : undefined,
           });
         }
@@ -223,7 +243,11 @@ export class ComprasService {
       return {
         productoId: linea.productoId,
         varianteId: lineaOc.varianteId,
+        // `cantidad` queda en la unidad elegida al ordenar (igual que
+        // lineaOc.cantidadRecibida, contra el que ya se validó arriba) —
+        // `cantidadBase` es solo para la llamada a InventarioService.
         cantidad: linea.cantidad,
+        cantidadBase: linea.cantidad * Number(lineaOc.factorConversion ?? 1),
         costoUnitario: Number(lineaOc.costoUnitario),
         porcentajeItbis: itbisPorProducto.get(linea.productoId) ?? 0,
         loteId: linea.loteId,
@@ -250,7 +274,10 @@ export class ComprasService {
             productoId: linea.productoId,
             varianteId: linea.varianteId,
             bodegaId: dto.bodegaId,
-            cantidad: linea.cantidad,
+            // Unidades base — `linea.cantidad` queda en la unidad elegida al
+            // ordenar, Stock vive en base (ver el comentario al construir
+            // lineasConCosto arriba).
+            cantidad: linea.cantidadBase,
             userId,
             referencia: `Devolución a proveedor de OC ${orden.numero}`,
             referenciaTipo: 'DEVOLUCION_COMPRA',

@@ -9,6 +9,10 @@ interface LineaCalculada {
   productoId: string | null;
   varianteId: string | null;
   descripcionManual?: string;
+  // Conversión de unidades — ver FacturacionService.calcularLineasYTotales.
+  // null/1 para línea manual (sin productoId).
+  unidadMedidaId?: string | null;
+  factorConversion?: number;
   cantidad: number;
   precioUnitario: number;
   descuento: number;
@@ -236,6 +240,8 @@ export class FacturacionRepository {
             productoId: linea.productoId,
             varianteId: linea.varianteId,
             descripcionManual: linea.descripcionManual,
+            unidadMedidaId: linea.unidadMedidaId,
+            factorConversion: linea.factorConversion,
             cantidad: linea.cantidad,
             precioUnitario: linea.precioUnitario,
             descuento: linea.descuento,
@@ -269,7 +275,7 @@ export class FacturacionRepository {
     return this.db.factura.findUniqueOrThrow({
       where: { id },
       include: {
-        lineas: { include: { producto: { include: { componentes: { include: { componente: true } } } } } },
+        lineas: { include: { producto: { include: { componentes: { include: { componente: true } } } }, unidadMedida: true } },
         recargos: { orderBy: { orden: 'asc' } },
         cliente: { select: CLIENTE_SELECT_BASICO },
         // Necesario para anular(): si ya se emitieron notas de crédito

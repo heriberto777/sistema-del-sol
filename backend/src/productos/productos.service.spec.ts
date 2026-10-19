@@ -8,6 +8,7 @@ import { PreciosRepository } from '../precios/precios.repository';
 import { AnalizadorImagenService } from '../ia/analizador-imagen/analizador-imagen.service';
 import { UsoIaService } from '../ia/uso-ia.service';
 import { OfertasService } from '../ofertas/ofertas.service';
+import { UnidadesMedidaRepository } from '../unidades-medida/unidades-medida.repository';
 
 describe('ProductosService', () => {
   let service: ProductosService;
@@ -19,6 +20,7 @@ describe('ProductosService', () => {
   let analizadorImagenService: jest.Mocked<AnalizadorImagenService>;
   let usoIaService: jest.Mocked<UsoIaService>;
   let ofertasService: jest.Mocked<OfertasService>;
+  let unidadesMedidaRepository: jest.Mocked<UnidadesMedidaRepository>;
 
   beforeEach(() => {
     repository = {
@@ -49,6 +51,7 @@ describe('ProductosService', () => {
     analizadorImagenService = { analizarDesdeDataUri: jest.fn() } as unknown as jest.Mocked<AnalizadorImagenService>;
     usoIaService = { verificarYRegistrar: jest.fn().mockResolvedValue(undefined) } as unknown as jest.Mocked<UsoIaService>;
     ofertasService = { resolverOfertaVisibleProducto: jest.fn().mockResolvedValue(null) } as unknown as jest.Mocked<OfertasService>;
+    unidadesMedidaRepository = { buscarPorId: jest.fn().mockResolvedValue({ id: 'um-1' }) } as unknown as jest.Mocked<UnidadesMedidaRepository>;
     service = new ProductosService(
       repository,
       categoriasRepository,
@@ -58,6 +61,7 @@ describe('ProductosService', () => {
       analizadorImagenService,
       usoIaService,
       ofertasService,
+      unidadesMedidaRepository,
     );
   });
 
@@ -185,6 +189,81 @@ describe('ProductosService', () => {
 
       expect(repository.actualizar).toHaveBeenCalledWith('combo-1', {
         componentes: [{ productoId: 'p2', cantidad: 5 }],
+      });
+    });
+  });
+
+  describe('conversión de unidades de medida', () => {
+    it('crea un producto normal sin unidad base ni conversión sin validar nada', async () => {
+      await service.crear({ codigo: 'P1', nombre: 'Producto 1' }, 'tenant-1');
+      expect(unidadesMedidaRepository.buscarPorId).not.toHaveBeenCalled();
+    });
+
+    it('rechaza unidadesConversion sin haber definido unidadMedidaBaseId', async () => {
+      await expect(
+        service.crear(
+          { codigo: 'P1', nombre: 'Producto 1', unidadesConversion: [{ unidadMedidaId: 'caja', factorConversion: 144 }] },
+          'tenant-1',
+        ),
+      ).rejects.toThrow(BadRequestException);
+      expect(repository.crear).not.toHaveBeenCalled();
+    });
+
+    it('rechaza una unidad de conversión igual a la unidad base', async () => {
+      await expect(
+        service.crear(
+          {
+            codigo: 'P1',
+            nombre: 'Producto 1',
+            unidadMedidaBaseId: 'und',
+            unidadesConversion: [{ unidadMedidaId: 'und', factorConversion: 1 }],
+          },
+          'tenant-1',
+        ),
+      ).rejects.toThrow(BadRequestException);
+      expect(repository.crear).not.toHaveBeenCalled();
+    });
+
+    it('rechaza unidades de conversión repetidas', async () => {
+      await expect(
+        service.crear(
+          {
+            codigo: 'P1',
+            nombre: 'Producto 1',
+            unidadMedidaBaseId: 'und',
+            unidadesConversion: [
+              { unidadMedidaId: 'caja', factorConversion: 144 },
+              { unidadMedidaId: 'caja', factorConversion: 12 },
+            ],
+          },
+          'tenant-1',
+        ),
+      ).rejects.toThrow(BadRequestException);
+      expect(repository.crear).not.toHaveBeenCalled();
+    });
+
+    it('crea un producto con unidad base y conversiones válidas', async () => {
+      const dto = {
+        codigo: 'P1',
+        nombre: 'Producto 1',
+        unidadMedidaBaseId: 'und',
+        unidadesConversion: [{ unidadMedidaId: 'caja', factorConversion: 144 }],
+      };
+      await service.crear(dto, 'tenant-1');
+
+      expect(unidadesMedidaRepository.buscarPorId).toHaveBeenCalledWith('und');
+      expect(unidadesMedidaRepository.buscarPorId).toHaveBeenCalledWith('caja');
+      expect(repository.crear).toHaveBeenCalledWith(dto, 'tenant-1');
+    });
+
+    it('al actualizar, usa la unidad base actual del producto si no se envía una nueva', async () => {
+      repository.buscarPorId.mockResolvedValue({ id: 'p1', unidadMedidaBaseId: 'und' } as never);
+
+      await service.actualizar('p1', { unidadesConversion: [{ unidadMedidaId: 'caja', factorConversion: 144 }] }, 'tenant-1');
+
+      expect(unidadesMedidaRepository.buscarPorId).toHaveBeenCalledWith('und');
+      expect(repository.actualizar).toHaveBeenCalledWith('p1', {
+        unidadesConversion: [{ unidadMedidaId: 'caja', factorConversion: 144 }],
       });
     });
   });

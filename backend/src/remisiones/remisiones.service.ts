@@ -3,6 +3,7 @@ import { RemisionesRepository } from './remisiones.repository';
 import { FacturacionService } from '../facturacion/facturacion.service';
 import { VariantesService } from '../variantes/variantes.service';
 import { InventarioService } from '../inventario/inventario.service';
+import { ProductosService } from '../productos/productos.service';
 import { expandirParaInventario } from '../inventario/expandir-para-inventario';
 import { CorrelativosRepository } from '../correlativos/correlativos.repository';
 import { CrearRemisionDto } from './dto/crear-remision.dto';
@@ -25,6 +26,7 @@ export class RemisionesService {
     private readonly facturacionService: FacturacionService,
     private readonly variantesService: VariantesService,
     private readonly inventarioService: InventarioService,
+    private readonly productosService: ProductosService,
     private readonly correlativosRepository: CorrelativosRepository,
     private readonly prisma: PrismaService,
     private readonly tenantPrisma: TenantPrismaService,
@@ -35,6 +37,11 @@ export class RemisionesService {
       lineas.map(async (linea) => ({
         productoId: linea.productoId,
         varianteId: await this.variantesService.resolverObligatoria(linea.productoId, linea.varianteId),
+        unidadMedidaId: linea.unidadMedidaId,
+        // Snapshot al crear/editar la remisión (ver ARCHITECTURE.md
+        // "Conversión de unidades de medida") — una Remisión mueve stock
+        // ella misma al pasar a ENTREGADA, necesita su propio factor.
+        factorConversion: await this.productosService.resolverFactorConversion(linea.productoId, linea.unidadMedidaId),
         cantidad: linea.cantidad,
       })),
     );
@@ -98,7 +105,10 @@ export class RemisionesService {
       if (estado === 'ENTREGADA') {
         for (const linea of remision.lineas) {
           const producto = { tipoProducto: linea.producto.tipo, componentesCombo: linea.producto.componentes };
-          for (const item of expandirParaInventario(producto, linea.productoId, Number(linea.cantidad), linea.varianteId)) {
+          // Conversión de unidades — `linea.cantidad` queda en la unidad
+          // elegida, Stock vive en base.
+          const cantidadBase = Number(linea.cantidad) * Number(linea.factorConversion ?? 1);
+          for (const item of expandirParaInventario(producto, linea.productoId, cantidadBase, linea.varianteId)) {
             await this.inventarioService.verificarYDescontarStockEnTx(tx, {
               tenantId,
               productoId: item.productoId,
@@ -115,7 +125,8 @@ export class RemisionesService {
       } else if (remision.estado === 'ENTREGADA') {
         for (const linea of remision.lineas) {
           const producto = { tipoProducto: linea.producto.tipo, componentesCombo: linea.producto.componentes };
-          for (const item of expandirParaInventario(producto, linea.productoId, Number(linea.cantidad), linea.varianteId)) {
+          const cantidadBase = Number(linea.cantidad) * Number(linea.factorConversion ?? 1);
+          for (const item of expandirParaInventario(producto, linea.productoId, cantidadBase, linea.varianteId)) {
             await this.inventarioService.entradaStockEnTx(tx, {
               tenantId,
               productoId: item.productoId,
@@ -145,6 +156,9 @@ export class RemisionesService {
         lineas: remision.lineas.map((linea) => ({
           productoId: linea.productoId,
           varianteId: linea.varianteId,
+          // Se propaga tal cual; FacturacionService resuelve su propio
+          // factorConversion fresco al convertir (ver ARCHITECTURE.md).
+          unidadMedidaId: linea.unidadMedidaId ?? undefined,
           cantidad: Number(linea.cantidad),
         })),
       },

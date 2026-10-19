@@ -14,6 +14,7 @@ interface LineaFactura {
   productoId: string | null;
   varianteId: string | null;
   cantidad: string;
+  unidadMedida: { nombre: string } | null;
   producto: { nombre: string; codigo: string } | null;
 }
 
@@ -194,7 +195,8 @@ export function EmitirNotaForm({ onClose }: { onClose: () => void }) {
               .map((linea) => (
                 <div key={linea.productoId} className="flex items-center justify-between gap-3 text-sm">
                   <span className="text-slate-700 dark:text-slate-300">
-                    {linea.producto!.nombre} <span className="text-slate-400">({linea.producto!.codigo})</span> — original: {linea.cantidad}
+                    {linea.producto!.nombre} <span className="text-slate-400">({linea.producto!.codigo})</span> — original: {linea.cantidad}{' '}
+                    {linea.unidadMedida?.nombre ?? ''}
                   </span>
                   <input
                     type="number"

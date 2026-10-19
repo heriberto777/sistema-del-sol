@@ -16,6 +16,7 @@ import { SelectFormaPago, type FormaPago } from '../../molecules/SelectFormaPago
 import { Select } from '../../atoms/Select/Select';
 import { SearchInput } from '../../molecules/SearchInput/SearchInput';
 import { FormularioCliente } from '../../molecules/FormularioCliente/FormularioCliente';
+import { SelectorUnidadLinea } from '../../molecules/SelectorUnidadLinea/SelectorUnidadLinea';
 import { useAuth } from '../../../hooks/useAuth';
 import { useAtajosTeclado } from '../../../hooks/useAtajosTeclado';
 import { useListasPrecio } from '../../../hooks/useListasPrecio';
@@ -55,6 +56,8 @@ interface Vendedor {
 interface LineaCarrito {
   productoId: string;
   varianteId?: string;
+  /** Unidad elegida para esta línea (ej. "Caja") — undefined = unidad base del producto. Ver SelectorUnidadLinea. */
+  unidadMedidaId?: string;
   codigo: string;
   nombre: string;
   cantidad: number;
@@ -88,6 +91,7 @@ interface MovimientoCaja {
 interface VentaAparcadaLinea {
   productoId: string;
   varianteId: string;
+  unidadMedidaId?: string | null;
   cantidad: string;
   precioUnitario: string;
   porcentajeItbis: string;
@@ -390,7 +394,20 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
         lineas: carrito.map((l) => ({
           productoId: l.productoId,
           varianteId: l.varianteId,
+          unidadMedidaId: l.unidadMedidaId || undefined,
           cantidad: l.cantidad,
+          // Se manda el precio tal cual quedó en el carrito cuando: (a) el
+          // producto es precioVariable (ítem E-8 — el cajero lo editó a
+          // mano, ej. artículo pesado/negociado) o (b) la línea usa una
+          // unidad distinta a la base (el precio de lista es siempre por
+          // unidad base, no hay uno automático por Caja/Docena/etc. — ver
+          // ARCHITECTURE.md). Sin esto, el backend resolvía el precio
+          // vigente del catálogo e ignoraba en silencio lo que el cajero
+          // había tipeado (bug real, encontrado en la verificación manual
+          // de esta fase). Cualquier otra línea sigue sin mandar precio —
+          // el backend resuelve el vigente al momento de la venta, no uno
+          // congelado al agregar al carrito.
+          ...(l.precioVariable || l.unidadMedidaId ? { precioUnitario: l.precioUnitario } : {}),
           ...(l.descuento > 0 ? { descuento: l.descuento } : {}),
         })),
       }),
@@ -445,6 +462,7 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
         lineas: carrito.map((l) => ({
           productoId: l.productoId,
           varianteId: l.varianteId,
+          unidadMedidaId: l.unidadMedidaId || undefined,
           cantidad: l.cantidad,
           precioUnitario: l.precioUnitario,
           porcentajeItbis: l.porcentajeItbis,
@@ -509,12 +527,18 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
     setCarrito((prev) => prev.map((l) => (claveLinea(l) === clave ? { ...l, cantidad } : l)));
   }
 
+  function cambiarUnidad(productoId: string, varianteId: string | undefined, unidadMedidaId: string) {
+    const clave = claveLinea({ productoId, varianteId });
+    setCarrito((prev) => prev.map((l) => (claveLinea(l) === clave ? { ...l, unidadMedidaId } : l)));
+  }
+
   /** Recupera una venta aparcada (Guardadas, ⇧F12): repone el carrito/cliente/vendedor y la borra de la lista. */
   function cargarVentaAparcada(venta: VentaAparcada) {
     setCarrito(
       venta.lineas.map((l) => ({
         productoId: l.productoId,
         varianteId: l.varianteId,
+        unidadMedidaId: l.unidadMedidaId ?? undefined,
         codigo: l.producto.codigo,
         nombre: l.producto.nombre,
         cantidad: Number(l.cantidad),
@@ -575,7 +599,12 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
         lineas: carrito.map((l) => ({
           productoId: l.productoId,
           varianteId: l.varianteId,
+          unidadMedidaId: l.unidadMedidaId || undefined,
           cantidad: l.cantidad,
+          // Ver el comentario equivalente en registrarVenta, arriba —
+          // mismo criterio (precioVariable o unidad distinta a la base),
+          // para que el total cotizado coincida con el que se cobra.
+          ...(l.precioVariable || l.unidadMedidaId ? { precioUnitario: l.precioUnitario } : {}),
           ...(l.descuento > 0 ? { descuento: l.descuento } : {}),
         })),
       });
@@ -783,7 +812,7 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
                     <li key={claveLinea(l)} className="flex items-center gap-2 px-3 py-2 text-sm">
                       <div className="min-w-0 flex-1">
                         <p className="truncate font-medium text-slate-800 dark:text-slate-200">{l.nombre}</p>
-                        {l.precioVariable ? (
+                        {l.precioVariable || l.unidadMedidaId ? (
                           <div className="flex items-center gap-1 text-xs text-slate-400">
                             <span>RD$</span>
                             <input
@@ -799,18 +828,31 @@ export function TurnoCajaDetalle({ turnoId, onCerrado, pantallaCompleta }: Turno
                         ) : (
                           <p className="text-xs text-slate-400">{formatoRD(l.precioUnitario)} c/u</p>
                         )}
+                        {l.unidadMedidaId && (
+                          <p className="text-xs text-amber-600 dark:text-amber-400">
+                            Unidad distinta a la base — no hay precio automático, escribilo arriba.
+                          </p>
+                        )}
                         {l.descuento > 0 && (
                           <p className="text-xs text-amber-600 dark:text-amber-400">desc. {formatoRD(l.descuento)}</p>
                         )}
                       </div>
-                      <input
-                        type="number"
-                        min={0.01}
-                        step="any"
-                        value={l.cantidad}
-                        onChange={(e) => cambiarCantidad(l.productoId, l.varianteId, Number(e.target.value))}
-                        className="w-16 rounded-md border border-slate-300 px-2 py-1 text-right text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-                      />
+                      <div className="flex shrink-0 flex-col items-end gap-1">
+                        <input
+                          type="number"
+                          min={0.01}
+                          step="any"
+                          value={l.cantidad}
+                          onChange={(e) => cambiarCantidad(l.productoId, l.varianteId, Number(e.target.value))}
+                          className="w-16 rounded-md border border-slate-300 px-2 py-1 text-right text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                        />
+                        <SelectorUnidadLinea
+                          productoId={l.productoId}
+                          value={l.unidadMedidaId ?? ''}
+                          onChange={(unidadMedidaId) => cambiarUnidad(l.productoId, l.varianteId, unidadMedidaId)}
+                          className="w-16 text-xs"
+                        />
+                      </div>
                       <span className="w-20 shrink-0 text-right font-medium text-slate-700 dark:text-slate-300">
                         {formatoRD(l.cantidad * l.precioUnitario - l.descuento)}
                       </span>
@@ -1201,6 +1243,7 @@ interface LineaFacturaDevolucion {
   productoId: string;
   nombre: string;
   codigo: string;
+  unidadMedida: { nombre: string } | null;
   cantidadOriginal: number;
   disponible: number;
 }
@@ -1362,7 +1405,9 @@ function ModalDevolucion({
               {factura.lineas.map((l) => (
                 <li key={l.productoId} className="flex items-center gap-2 text-sm">
                   <span className="min-w-0 flex-1 truncate text-slate-700 dark:text-slate-300">{l.nombre}</span>
-                  <span className="shrink-0 text-xs text-slate-400">disponible: {l.disponible}</span>
+                  <span className="shrink-0 text-xs text-slate-400">
+                    disponible: {l.disponible} {l.unidadMedida?.nombre ?? ''}
+                  </span>
                   <input
                     type="number"
                     min={0}

@@ -70,6 +70,7 @@ import { TravelModule } from './travel/travel.module';
 import { TravelConfigModule } from './travel-config/travel-config.module';
 import { PublicacionesSocialesModule } from './publicaciones-sociales/publicaciones-sociales.module';
 import { FormasPagoModule } from './formas-pago/formas-pago.module';
+import { UnidadesMedidaModule } from './unidades-medida/unidades-medida.module';
 import { CategoriasModule } from './categorias/categorias.module';
 import { CategoriasClienteModule } from './categorias-cliente/categorias-cliente.module';
 import { ListasPrecioModule } from './listas-precio/listas-precio.module';
@@ -167,6 +168,7 @@ import { TenantMiddleware } from './common/middleware/tenant.middleware';
     IaModule,
     BancosModule,
     FormasPagoModule,
+    UnidadesMedidaModule,
     CategoriasModule,
     CategoriasClienteModule,
     ListasPrecioModule,

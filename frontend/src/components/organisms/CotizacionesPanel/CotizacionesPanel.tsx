@@ -38,6 +38,8 @@ export interface LineaCotizacion {
   productoId: string | null;
   varianteId: string | null;
   descripcionManual?: string | null;
+  unidadMedidaId?: string | null;
+  unidadMedida?: { nombre: string } | null;
   cantidad: string;
   precioUnitario: string;
   montoTotal?: string;
@@ -83,6 +85,8 @@ export function tonoYEtiquetaEstado(cotizacion: Pick<Cotizacion, 'estado' | 'ven
 export type LineaForm = {
   productoId: string;
   varianteId: string;
+  /** Unidad elegida para esta línea (ej. "Caja") — '' = unidad base del producto. Ver SelectorUnidadLinea. */
+  unidadMedidaId?: string;
   cantidad: string;
   // Ítem B-9 — línea manual/libre sin producto del catálogo.
   esManual: boolean;

@@ -9,6 +9,10 @@ interface LineaCalculada {
   productoId: string | null;
   varianteId: string | null;
   descripcionManual?: string;
+  // Conversión de unidades — ver CotizacionesService.calcularLineas. Nunca
+  // factorConversion acá: una Cotización no toca Stock, se resuelve fresco
+  // al convertir en factura (FacturacionService.calcularLineasYTotales).
+  unidadMedidaId?: string | null;
   cantidad: number;
   precioUnitario: number;
   descuento: number;
@@ -17,7 +21,10 @@ interface LineaCalculada {
   montoTotal: number;
 }
 
-const INCLUDE_COTIZACION = { lineas: { include: { producto: true } }, cliente: { select: CLIENTE_SELECT_BASICO } } as const;
+const INCLUDE_COTIZACION = {
+  lineas: { include: { producto: true, unidadMedida: true } },
+  cliente: { select: CLIENTE_SELECT_BASICO },
+} as const;
 
 @Injectable()
 export class CotizacionesRepository {

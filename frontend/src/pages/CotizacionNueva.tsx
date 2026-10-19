@@ -87,7 +87,13 @@ export function CotizacionNueva() {
                   precioUnitario: Number(l.precioUnitario),
                   aplicaItbis: l.aplicaItbis,
                 }
-              : { productoId: l.productoId, varianteId: l.varianteId || undefined, cantidad: Number(l.cantidad), aplicaItbis: l.aplicaItbis },
+              : {
+                  productoId: l.productoId,
+                  varianteId: l.varianteId || undefined,
+                  unidadMedidaId: l.unidadMedidaId || undefined,
+                  cantidad: Number(l.cantidad),
+                  aplicaItbis: l.aplicaItbis,
+                },
           ),
       }),
     onSuccess: () => {

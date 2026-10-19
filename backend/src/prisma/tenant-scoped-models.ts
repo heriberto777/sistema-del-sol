@@ -44,6 +44,7 @@ export const TENANT_SCOPED_MODELS = new Set([
   'CuentaBancaria',
   'GastoMenor',
   'FormaPago',
+  'UnidadMedida',
   'VentaAparcada',
   'Categoria',
   'ListaPrecio',

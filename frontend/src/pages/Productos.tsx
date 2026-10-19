@@ -56,12 +56,27 @@ interface ComponenteComboDetalle {
   componente: { id: string; codigo: string; nombre: string };
 }
 
+interface UnidadMedidaCatalogo {
+  id: string;
+  codigo: string;
+  nombre: string;
+  activa: boolean;
+}
+
+interface UnidadConversionDetalle {
+  unidadMedidaId: string;
+  factorConversion: string;
+  unidadMedida: { id: string; codigo: string; nombre: string };
+}
+
 interface ProductoDetalle extends Producto {
   componentes: ComponenteComboDetalle[];
   imagen: string | null;
   imagenAjuste: AjusteImagen;
   descripcionTienda: string | null;
   imagenesAdicionales: { imagen: string }[];
+  unidadMedidaBaseId: string | null;
+  unidadesConversion: UnidadConversionDetalle[];
 }
 
 interface Precio {
@@ -77,6 +92,7 @@ interface ProductoFormValues {
   nombre: string;
   categoriaId: string;
   unidadMedida: string;
+  unidadMedidaBaseId: string;
   porcentajeItbis: string;
   leyFiscalId: string;
   tipo: TipoProducto;
@@ -112,11 +128,17 @@ interface ComponenteComboForm {
   cantidad: string;
 }
 
+interface UnidadConversionForm {
+  unidadMedidaId: string;
+  factorConversion: string;
+}
+
 const PRODUCTO_VACIO: ProductoFormValues = {
   codigo: '',
   nombre: '',
   categoriaId: '',
   unidadMedida: 'UND',
+  unidadMedidaBaseId: '',
   porcentajeItbis: '18',
   leyFiscalId: '',
   tipo: 'PRODUCTO',
@@ -347,6 +369,7 @@ function FormularioProducto({ producto, onGuardado }: { producto: Producto | nul
           nombre: producto.nombre,
           categoriaId: producto.categoriaId ?? '',
           unidadMedida: producto.unidadMedida,
+          unidadMedidaBaseId: '',
           porcentajeItbis: producto.porcentajeItbis,
           leyFiscalId: producto.leyFiscalId ?? '',
           tipo: producto.tipo,
@@ -365,6 +388,7 @@ function FormularioProducto({ producto, onGuardado }: { producto: Producto | nul
       : PRODUCTO_VACIO,
   );
   const [componentes, setComponentes] = useState<ComponenteComboForm[]>([]);
+  const [conversiones, setConversiones] = useState<UnidadConversionForm[]>([]);
   const [error, setError] = useState<string | null>(null);
   const { tienePermiso } = useAuth();
   const [candidatosIa, setCandidatosIa] = useState<{ nombre: string; descripcion: string }[] | null>(null);
@@ -389,8 +413,21 @@ function FormularioProducto({ producto, onGuardado }: { producto: Producto | nul
       if (data.tipo === 'COMBO') {
         setComponentes(data.componentes.map((c) => ({ productoId: c.componente.id, cantidad: c.cantidad })));
       }
+      setValores((v) => ({ ...v, unidadMedidaBaseId: data.unidadMedidaBaseId ?? '' }));
+      setConversiones(data.unidadesConversion.map((u) => ({ unidadMedidaId: u.unidadMedidaId, factorConversion: u.factorConversion })));
     });
   }, [producto]);
+
+  const { data: unidadesMedida } = useQuery({
+    queryKey: ['unidades-medida-activas'],
+    queryFn: async () => (await apiClient.get<UnidadMedidaCatalogo[]>('/unidades-medida', { params: { activa: 'true' } })).data,
+  });
+  // Una unidad de conversión no puede ser la misma que la unidad base elegida.
+  const opcionesConversion = (unidadesMedida ?? []).filter((u) => u.id !== valores.unidadMedidaBaseId);
+
+  function actualizarConversion(i: number, cambios: Partial<UnidadConversionForm>) {
+    setConversiones((prev) => prev.map((c, idx) => (idx === i ? { ...c, ...cambios } : c)));
+  }
 
   const { data: productosDisponibles } = useQuery({
     queryKey: ['productos-select-combo'],
@@ -410,6 +447,10 @@ function FormularioProducto({ producto, onGuardado }: { producto: Producto | nul
       nombre: valores.nombre,
       categoriaId: valores.categoriaId || null,
       unidadMedida: valores.unidadMedida || undefined,
+      unidadMedidaBaseId: valores.unidadMedidaBaseId || null,
+      unidadesConversion: valores.unidadMedidaBaseId
+        ? conversiones.filter((c) => c.unidadMedidaId).map((c) => ({ unidadMedidaId: c.unidadMedidaId, factorConversion: Number(c.factorConversion) || 1 }))
+        : [],
       porcentajeItbis: valores.porcentajeItbis ? Number(valores.porcentajeItbis) : undefined,
       leyFiscalId: valores.leyFiscalId || null,
       tipo: valores.tipo,
@@ -640,6 +681,82 @@ function FormularioProducto({ producto, onGuardado }: { producto: Producto | nul
           ))}
         </Select>
       </div>
+
+      <div className="space-y-2 rounded-md border border-slate-200 p-3 dark:border-slate-800">
+        <div className="flex flex-col gap-1">
+          <label htmlFor="producto-unidad-base" className="text-sm font-medium text-slate-700 dark:text-slate-300">
+            Unidad base para conversión (opcional)
+          </label>
+          <Select
+            id="producto-unidad-base"
+            value={valores.unidadMedidaBaseId}
+            onChange={(e) => setValores((v) => ({ ...v, unidadMedidaBaseId: e.target.value }))}
+          >
+            <option value="">Sin motor de conversión</option>
+            {(unidadesMedida ?? []).map((u) => (
+              <option key={u.id} value={u.id}>
+                {u.nombre}
+              </option>
+            ))}
+          </Select>
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            Es la unidad en la que vive el stock de este producto. Si no se define, el producto funciona igual que
+            hoy, sin unidades alternativas de compra/venta.
+          </p>
+        </div>
+
+        {valores.unidadMedidaBaseId && (
+          <div className="space-y-2">
+            <p className="text-sm font-medium text-slate-700 dark:text-slate-300">
+              Unidades de conversión (ej. "Caja" = 144 unidades de la base)
+            </p>
+            {conversiones.map((conversion, i) => (
+              <div key={i} className="flex flex-wrap items-center gap-2">
+                <Select
+                  value={conversion.unidadMedidaId}
+                  onChange={(e) => actualizarConversion(i, { unidadMedidaId: e.target.value })}
+                  required
+                  className="min-w-[160px] flex-1"
+                >
+                  <option value="">Unidad…</option>
+                  {opcionesConversion.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.nombre}
+                    </option>
+                  ))}
+                </Select>
+                <span className="text-xs text-slate-500 dark:text-slate-400">=</span>
+                <input
+                  type="number"
+                  min={0.0001}
+                  step="0.0001"
+                  placeholder="Factor"
+                  value={conversion.factorConversion}
+                  onChange={(e) => actualizarConversion(i, { factorConversion: e.target.value })}
+                  className="w-24 rounded-md border border-slate-300 px-2 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                />
+                <span className="text-xs text-slate-500 dark:text-slate-400">unidades base</span>
+                <button
+                  type="button"
+                  onClick={() => setConversiones((prev) => prev.filter((_, idx) => idx !== i))}
+                  className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+                  aria-label="Quitar unidad de conversión"
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+            <button
+              type="button"
+              onClick={() => setConversiones((prev) => [...prev, { unidadMedidaId: '', factorConversion: '1' }])}
+              className="text-sm font-medium text-sol-600 hover:text-sol-700 dark:text-sol-400"
+            >
+              + Agregar unidad de conversión
+            </button>
+          </div>
+        )}
+      </div>
+
       <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
         <input
           type="checkbox"

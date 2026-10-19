@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { PERMISOS_BASE, ROLES_BASE, CONFIGURACIONES_BASE } from './roles-base';
 import { CUENTAS_BASE } from '../contabilidad/cuentas-base';
 import { FORMAS_PAGO_BASE } from './formas-pago-base';
+import { UNIDADES_MEDIDA_BASE } from './unidades-medida-base';
 import { LISTAS_PRECIO_BASE } from './listas-precio-base';
 import { TIPOS_AUSENCIA_CONFIG_BASE } from './tipos-ausencia-config-base';
 import { CORRELATIVOS_BASE } from './correlativos-base';
@@ -137,6 +138,10 @@ export class TenantsRepository {
 
       await tx.formaPago.createMany({
         data: FORMAS_PAGO_BASE.map((f) => ({ tenantId: tenant.id, ...f })),
+      });
+
+      await tx.unidadMedida.createMany({
+        data: UNIDADES_MEDIDA_BASE.map((u) => ({ tenantId: tenant.id, ...u })),
       });
 
       await tx.listaPrecio.createMany({
@@ -367,6 +372,15 @@ export class TenantsRepository {
 
     await tx.formaPago.deleteMany({ where: { tenantId } });
     await tx.formaPago.createMany({ data: FORMAS_PAGO_BASE.map((f) => ({ tenantId, ...f })) });
+
+    // UnidadMedida no se borra en el reseteo (a diferencia de FormaPago/
+    // CuentaContable) — borrar Producto ya cascadeó sus conversiones, pero
+    // el catálogo de unidades en sí no tiene por qué perderse solo porque
+    // se reinició el catálogo de productos. Sembrar de nuevo las que
+    // falten (createMany con skipDuplicates) cubre tanto un tenant que
+    // nunca las tuvo (provisionado antes de esta pieza) como uno que ya
+    // las tiene.
+    await tx.unidadMedida.createMany({ data: UNIDADES_MEDIDA_BASE.map((u) => ({ tenantId, ...u })), skipDuplicates: true });
 
     await tx.listaPrecio.deleteMany({ where: { tenantId } });
     await tx.listaPrecio.createMany({ data: LISTAS_PRECIO_BASE.map((l) => ({ tenantId, ...l })) });

@@ -9,6 +9,7 @@ import { CardColapsable } from '../components/molecules/CardColapsable/CardColap
 import { Select } from '../components/atoms/Select/Select';
 import { ComboboxBusqueda } from '../components/molecules/ComboboxBusqueda/ComboboxBusqueda';
 import { SelectorLineaProducto } from '../components/molecules/SelectorLineaProducto/SelectorLineaProducto';
+import { SelectorUnidadLinea } from '../components/molecules/SelectorUnidadLinea/SelectorUnidadLinea';
 import { Button } from '../components/atoms/Button/Button';
 import { PaginaResultado } from '../types/pagina-resultado';
 import { useHayCambios } from '../hooks/useHayCambios';
@@ -45,7 +46,7 @@ export function RemisionEditar() {
     setCliente({ id: detalle.clienteId, nombre: detalle.cliente.nombre });
     setValores({
       bodegaId: detalle.bodegaId,
-      lineas: detalle.lineas.map((l) => ({ productoId: l.productoId, varianteId: l.varianteId, cantidad: l.cantidad })),
+      lineas: detalle.lineas.map((l) => ({ productoId: l.productoId, varianteId: l.varianteId, unidadMedidaId: l.unidadMedidaId ?? '', cantidad: l.cantidad })),
     });
     setInfoColapsada(true);
   }, [detalle]);
@@ -57,7 +58,12 @@ export function RemisionEditar() {
         bodegaId: valores!.bodegaId,
         lineas: valores!.lineas
           .filter((l) => l.productoId)
-          .map((l) => ({ productoId: l.productoId, varianteId: l.varianteId || undefined, cantidad: Number(l.cantidad) })),
+          .map((l) => ({
+            productoId: l.productoId,
+            varianteId: l.varianteId || undefined,
+            unidadMedidaId: l.unidadMedidaId || undefined,
+            cantidad: Number(l.cantidad),
+          })),
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['remisiones'] });
@@ -178,7 +184,7 @@ export function RemisionEditar() {
                 onChange={(productoId, varianteId) =>
                   setValores({
                     ...valores,
-                    lineas: valores.lineas.map((l, idx) => (idx === i ? { ...l, productoId, varianteId } : l)),
+                    lineas: valores.lineas.map((l, idx) => (idx === i ? { ...l, productoId, varianteId, unidadMedidaId: '' } : l)),
                   })
                 }
                 className="min-w-[160px] flex-1"
@@ -193,6 +199,16 @@ export function RemisionEditar() {
                 }
                 className="w-24 rounded-md border border-slate-300 px-2 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
               />
+              {linea.productoId && (
+                <SelectorUnidadLinea
+                  productoId={linea.productoId}
+                  value={linea.unidadMedidaId ?? ''}
+                  onChange={(unidadMedidaId) =>
+                    setValores({ ...valores, lineas: valores.lineas.map((l, idx) => (idx === i ? { ...l, unidadMedidaId } : l)) })
+                  }
+                  className="w-32"
+                />
+              )}
               {valores.lineas.length > 1 && (
                 <Button
                   type="button"

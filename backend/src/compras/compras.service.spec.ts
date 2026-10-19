@@ -9,6 +9,7 @@ import { EVENTOS } from '../event-bus/events';
 import { RecibirOrdenCompraDto } from './dto/recibir-orden-compra.dto';
 import { PagosService } from '../pagos/pagos.service';
 import { CorrelativosRepository } from '../correlativos/correlativos.repository';
+import { ProductosService } from '../productos/productos.service';
 
 describe('ComprasService', () => {
   let service: ComprasService;
@@ -19,6 +20,7 @@ describe('ComprasService', () => {
   let eventBus: jest.Mocked<EventBusService>;
   let pagosService: jest.Mocked<PagosService>;
   let correlativosRepository: jest.Mocked<CorrelativosRepository>;
+  let productosService: jest.Mocked<ProductosService>;
 
   // Ver el mismo patrón en facturacion.service.spec.ts: un tx opaco pasado
   // por $transaction a los métodos *EnTx — no necesita comportarse como un
@@ -59,10 +61,12 @@ describe('ComprasService', () => {
       resolverObligatoria: jest.fn().mockResolvedValue('variante-1'),
     } as unknown as jest.Mocked<VariantesService>;
     correlativosRepository = { siguienteEnTx: jest.fn().mockResolvedValue('OC-00001') } as unknown as jest.Mocked<CorrelativosRepository>;
+    productosService = { resolverFactorConversion: jest.fn().mockResolvedValue(1) } as unknown as jest.Mocked<ProductosService>;
     service = new ComprasService(
       repository,
       inventarioService,
       variantesService,
+      productosService,
       tenantPrisma as unknown as TenantPrismaService,
       eventBus,
       pagosService,
@@ -309,7 +313,7 @@ describe('ComprasService', () => {
 
       expect(repository.actualizar).toHaveBeenCalledWith('oc-1', {
         total: 30,
-        lineas: [{ productoId: 'p1', cantidad: 3, costoUnitario: 10, varianteId: 'variante-1' }],
+        lineas: [{ productoId: 'p1', cantidad: 3, costoUnitario: 10, varianteId: 'variante-1', factorConversion: 1 }],
       });
     });
   });
@@ -478,6 +482,82 @@ describe('ComprasService', () => {
       );
       const [, payload] = eventBus.emit.mock.calls.find(([evento]) => evento === EVENTOS.ORDEN_COMPRA_DEVUELTA)!;
       expect(Number((payload as { itbis: string }).itbis)).toBeCloseTo(14.4, 5);
+    });
+  });
+
+  describe('conversión de unidades de medida (Fase 2)', () => {
+    it('crear: resuelve factorConversion por línea vía ProductosService y lo persiste junto a la línea', async () => {
+      productosService.resolverFactorConversion.mockResolvedValue(144);
+
+      await service.crear(
+        { proveedorId: 'prov-1', lineas: [{ productoId: 'p1', unidadMedidaId: 'caja-1', cantidad: 10, costoUnitario: 500 }] },
+        'user-1',
+        'tenant-1',
+      );
+
+      expect(productosService.resolverFactorConversion).toHaveBeenCalledWith('p1', 'caja-1');
+      expect(repository.crearOrdenEnTx).toHaveBeenCalledWith(
+        TX,
+        expect.objectContaining({
+          lineas: [{ productoId: 'p1', unidadMedidaId: 'caja-1', cantidad: 10, costoUnitario: 500, varianteId: 'variante-1', factorConversion: 144 }],
+        }),
+      );
+    });
+
+    it('recibir: convierte cantidad/costo a unidades base usando el factorConversion heredado de la LineaOc', async () => {
+      const orden = {
+        numero: 'OC-001',
+        proveedorId: 'prov-1',
+        total: 500,
+        lineas: [
+          {
+            id: 'linea-1',
+            productoId: 'p1',
+            cantidad: 10,
+            cantidadRecibida: 0,
+            unidadMedidaId: 'caja-1',
+            factorConversion: 144,
+            producto: { tipo: 'PRODUCTO' },
+          },
+        ],
+      };
+      repository.buscarPorId.mockResolvedValue(orden as never);
+      repository.buscarPorIdEnTx.mockResolvedValue({ ...orden, lineas: [{ ...orden.lineas[0], cantidadRecibida: 10 }] } as never);
+      repository.crearRecepcion.mockResolvedValue({ id: 'rec-1' } as never);
+
+      // 10 Cajas a 72 (costo por Caja) -> 1440 unidades base a 0.5 por unidad base.
+      await service.recibir('oc-1', { bodegaId: 'bodega-1', lineas: [{ productoId: 'p1', cantidadRecibida: 10, costoUnitario: 72 }] }, 'user-1', 'tenant-1');
+
+      expect(inventarioService.entradaStockEnTx).toHaveBeenCalledWith(
+        TX,
+        expect.objectContaining({ cantidad: 1440, costoUnitario: 0.5 }),
+      );
+      // La recepción en sí se guarda en la unidad elegida (10, no 1440) para auditoría/display.
+      expect(repository.crearRecepcion).toHaveBeenCalledWith(
+        TX,
+        expect.objectContaining({ lineas: [expect.objectContaining({ cantidadRecibida: 10, costoUnitario: 72, unidadMedidaId: 'caja-1', factorConversion: 144 })] }),
+      );
+    });
+
+    it('devolver: descuenta stock en unidades base pero compara/actualiza cantidadRecibida en la unidad elegida', async () => {
+      const orden = {
+        id: 'oc-1',
+        numero: 'OC-001',
+        proveedorId: 'prov-1',
+        lineas: [
+          { id: 'linea-1', productoId: 'p1', cantidad: 10, cantidadRecibida: 10, costoUnitario: 72, factorConversion: 144, producto: { tipo: 'PRODUCTO' } },
+        ],
+      };
+      repository.buscarPorId.mockResolvedValue(orden as never);
+      tenantPrisma.client.producto.findMany.mockResolvedValue([{ id: 'p1', porcentajeItbis: 18 }] as never);
+      repository.crearDevolucionEnTx.mockResolvedValue({ id: 'dev-1' } as never);
+      repository.buscarPorIdEnTx.mockResolvedValue({ lineas: [{ productoId: 'p1', cantidad: 10, cantidadRecibida: 8 }] } as never);
+
+      // Devuelve 2 Cajas -> 288 unidades base de stock, pero cantidadRecibida baja en 2 (Cajas), no 288.
+      await service.devolver('oc-1', { bodegaId: 'bodega-1', lineas: [{ productoId: 'p1', cantidad: 2 }] }, 'user-1', 'tenant-1');
+
+      expect(inventarioService.verificarYDescontarStockEnTx).toHaveBeenCalledWith(TX, expect.objectContaining({ cantidad: 288 }));
+      expect(repository.actualizarCantidadRecibida).toHaveBeenCalledWith(TX, 'linea-1', -2);
     });
   });
 });

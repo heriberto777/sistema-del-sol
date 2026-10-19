@@ -7,12 +7,12 @@ export class LineaRecepcionDto {
   @IsUUID()
   productoId: string;
 
-  @ApiProperty()
+  @ApiProperty({ description: 'En la misma unidad elegida al ordenar esta línea (LineaOc.unidadMedidaId) — no se vuelve a pedir acá, se hereda.' })
   @IsNumber()
   @IsPositive()
   cantidadRecibida: number;
 
-  @ApiProperty()
+  @ApiProperty({ description: 'Costo por unidad elegida al ordenar (ver cantidadRecibida) — ej. costo por Caja, no por unidad suelta.' })
   @IsNumber()
   @IsPositive()
   costoUnitario: number;

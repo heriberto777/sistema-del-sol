@@ -10,6 +10,7 @@ import { CardColapsable } from '../components/molecules/CardColapsable/CardColap
 import { Select } from '../components/atoms/Select/Select';
 import { ComboboxBusqueda } from '../components/molecules/ComboboxBusqueda/ComboboxBusqueda';
 import { SelectorLineaProducto } from '../components/molecules/SelectorLineaProducto/SelectorLineaProducto';
+import { SelectorUnidadLinea } from '../components/molecules/SelectorUnidadLinea/SelectorUnidadLinea';
 import { Button } from '../components/atoms/Button/Button';
 import { PaginaResultado } from '../types/pagina-resultado';
 import { useHayCambios } from '../hooks/useHayCambios';
@@ -48,7 +49,12 @@ export function RemisionNueva() {
         bodegaId,
         lineas: lineas
           .filter((l) => l.productoId)
-          .map((l) => ({ productoId: l.productoId, varianteId: l.varianteId || undefined, cantidad: Number(l.cantidad) })),
+          .map((l) => ({
+            productoId: l.productoId,
+            varianteId: l.varianteId || undefined,
+            unidadMedidaId: l.unidadMedidaId || undefined,
+            cantidad: Number(l.cantidad),
+          })),
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['remisiones'] });
@@ -170,18 +176,27 @@ export function RemisionNueva() {
                           productos={productos ?? []}
                           productoId={linea.productoId}
                           varianteId={linea.varianteId}
-                          onChange={(productoId, varianteId) => actualizarLinea(i, { productoId, varianteId })}
+                          onChange={(productoId, varianteId) => actualizarLinea(i, { productoId, varianteId, unidadMedidaId: '' })}
                         />
                       </td>
                       <td className="px-3 py-2 align-top">
-                        <input
-                          type="number"
-                          min={1}
-                          step="any"
-                          value={linea.cantidad}
-                          onChange={(e) => actualizarLinea(i, { cantidad: e.target.value })}
-                          className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-                        />
+                        <div className="flex flex-col gap-1">
+                          <input
+                            type="number"
+                            min={1}
+                            step="any"
+                            value={linea.cantidad}
+                            onChange={(e) => actualizarLinea(i, { cantidad: e.target.value })}
+                            className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                          />
+                          {linea.productoId && (
+                            <SelectorUnidadLinea
+                              productoId={linea.productoId}
+                              value={linea.unidadMedidaId ?? ''}
+                              onChange={(unidadMedidaId) => actualizarLinea(i, { unidadMedidaId })}
+                            />
+                          )}
+                        </div>
                       </td>
                       <td className="px-3 py-2 align-top">
                         {lineas.length > 1 && (

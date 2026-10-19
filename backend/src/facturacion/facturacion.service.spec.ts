@@ -19,6 +19,7 @@ import { NotificacionesService } from '../notificaciones/notificaciones.service'
 import { AutorizacionesService } from '../autorizaciones/autorizaciones.service';
 import { ConfiguracionesService } from '../configuraciones/configuraciones.service';
 import { CorrelativosService } from '../correlativos/correlativos.service';
+import { ProductosService } from '../productos/productos.service';
 
 describe('FacturacionService', () => {
   let service: FacturacionService;
@@ -39,6 +40,7 @@ describe('FacturacionService', () => {
   let autorizacionesService: jest.Mocked<AutorizacionesService>;
   let configuracionesService: jest.Mocked<ConfiguracionesService>;
   let correlativosService: jest.Mocked<CorrelativosService>;
+  let productosService: jest.Mocked<ProductosService>;
 
   // Un tx opaco: crear()/anular() abren la transacción con tenantPrisma.client.$transaction
   // y pasan este objeto a los métodos *EnTx — para las pruebas basta con que sea el mismo
@@ -140,6 +142,9 @@ describe('FacturacionService', () => {
     correlativosService = {
       siguienteEnTx: jest.fn().mockResolvedValue('00001'),
     } as unknown as jest.Mocked<CorrelativosService>;
+    productosService = {
+      resolverFactorConversion: jest.fn().mockResolvedValue(1),
+    } as unknown as jest.Mocked<ProductosService>;
     service = new FacturacionService(
       repository,
       inventarioService,
@@ -158,6 +163,7 @@ describe('FacturacionService', () => {
       autorizacionesService,
       configuracionesService,
       correlativosService,
+      productosService,
     );
   });
 
@@ -1381,6 +1387,93 @@ describe('FacturacionService', () => {
 
       expect(inventarioService.reconstruirLotesDeVentaEnTx).not.toHaveBeenCalled();
       expect(inventarioService.entradaStockEnTx).toHaveBeenCalledWith(TX, expect.objectContaining({ lotes: undefined }));
+    });
+  });
+
+  describe('conversión de unidades de medida (Fase 3)', () => {
+    it('crear (venta normal): resuelve el factor vía ProductosService y descuenta stock en unidades base', async () => {
+      repository.obtenerProductoConPrecioVigente.mockResolvedValue(producto(18, 100) as never);
+      repository.crearFacturaEnTx.mockResolvedValue(facturaCreada() as never);
+      productosService.resolverFactorConversion.mockResolvedValue(144);
+
+      // 2 Cajas (factor 144) -> 288 unidades base.
+      await service.crear(
+        dto({ lineas: [{ productoId: 'prod-1', cantidad: 2, unidadMedidaId: 'caja-1', precioUnitario: 72 } as never] }),
+        'tenant-1',
+        'vendedor-1',
+      );
+
+      expect(productosService.resolverFactorConversion).toHaveBeenCalledWith('prod-1', 'caja-1');
+      expect(inventarioService.verificarYDescontarStockEnTx).toHaveBeenCalledWith(TX, expect.objectContaining({ cantidad: 288 }));
+      expect(repository.crearFacturaEnTx).toHaveBeenCalledWith(
+        TX,
+        expect.objectContaining({ lineas: [expect.objectContaining({ unidadMedidaId: 'caja-1', factorConversion: 144, cantidad: 2 })] }),
+      );
+    });
+
+    it('NOTA_CREDITO hereda la unidad/factor de la línea de la factura origen — ignora unidadMedidaId del DTO', async () => {
+      repository.obtenerProductoConPrecioVigente.mockResolvedValue(producto(18, 100) as never);
+      repository.crearFacturaEnTx.mockResolvedValue(facturaCreada({ id: 'nc1' }) as never);
+      repository.buscarPorId.mockResolvedValue({
+        id: 'f-original',
+        lineas: [{ productoId: 'prod-1', unidadMedidaId: 'caja-1', factorConversion: 144 }],
+      } as never);
+
+      // La nota pide devolver 1 "Caja" pero manda un unidadMedidaId distinto (ignorado) para probar que se hereda.
+      await service.crear(
+        dto({
+          tipoFactura: 'NOTA_CREDITO',
+          facturaOrigenId: 'f-original',
+          lineas: [{ productoId: 'prod-1', cantidad: 1, unidadMedidaId: 'otra-unidad', precioUnitario: 72 } as never],
+        }),
+        'tenant-1',
+        'vendedor-1',
+      );
+
+      expect(productosService.resolverFactorConversion).not.toHaveBeenCalled();
+      // 1 Caja heredada (factor 144) -> 144 unidades base reintegradas.
+      expect(inventarioService.entradaStockEnTx).toHaveBeenCalledWith(TX, expect.objectContaining({ cantidad: 144 }));
+      expect(repository.crearFacturaEnTx).toHaveBeenCalledWith(
+        TX,
+        expect.objectContaining({ lineas: [expect.objectContaining({ unidadMedidaId: 'caja-1', factorConversion: 144 })] }),
+      );
+    });
+
+    it('rechaza una línea con unidad distinta a la base si no se manda precioUnitario (no hay precio automático por unidad alternativa)', async () => {
+      repository.obtenerProductoConPrecioVigente.mockResolvedValue(producto(18, 100) as never);
+      productosService.resolverFactorConversion.mockResolvedValue(144);
+
+      await expect(
+        service.crear(
+          dto({ lineas: [{ productoId: 'prod-1', cantidad: 2, unidadMedidaId: 'caja-1' } as never] }),
+          'tenant-1',
+          'vendedor-1',
+        ),
+      ).rejects.toThrow(BadRequestException);
+      expect(repository.crearFacturaEnTx).not.toHaveBeenCalled();
+    });
+
+    it('anular (venta normal): reintegra stock en unidades base usando el factorConversion persistido en la línea', async () => {
+      repository.buscarPorId.mockResolvedValue({
+        id: 'f1',
+        clienteId: 'cliente-1',
+        total: 200,
+        subtotal: 200,
+        itbis: 0,
+        estado: 'EMITIDA',
+        tipoFactura: 'CONTADO',
+        bodegaId: 'bodega-1',
+        ncf: 'B0200000001',
+        lineas: [{ productoId: 'prod-1', cantidad: 2, factorConversion: 144, producto: { tipo: 'PRODUCTO', componentes: [] } }],
+        notasRelacionadas: [],
+        recargos: [],
+      } as never);
+      repository.anularEnTx.mockResolvedValue({ id: 'f1', total: 200, subtotal: 200, itbis: 0, recargos: [] } as never);
+
+      await service.anular('f1', 'Motivo de prueba', 'tenant-1', 'user-1', true);
+
+      // 2 Cajas (factor 144) -> 288 unidades base reintegradas.
+      expect(inventarioService.entradaStockEnTx).toHaveBeenCalledWith(TX, expect.objectContaining({ cantidad: 288 }));
     });
   });
 
