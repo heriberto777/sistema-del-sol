@@ -389,6 +389,12 @@ function FormularioProducto({ producto, onGuardado }: { producto: Producto | nul
   );
   const [componentes, setComponentes] = useState<ComponenteComboForm[]>([]);
   const [conversiones, setConversiones] = useState<UnidadConversionForm[]>([]);
+  // Oculto por default a propósito — antes se mostraba siempre junto a
+  // "Unidad de medida" (el campo de texto libre/lista cerrada de siempre),
+  // dos selectores de "unidad" apilados y ambos en "Unidad" por default
+  // confundían (reportado por el usuario). Mostrarlo solo cuando el
+  // producto ya tiene unidadMedidaBaseId, o cuando el usuario lo activa a mano.
+  const [usaConversionUnidades, setUsaConversionUnidades] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { tienePermiso } = useAuth();
   const [candidatosIa, setCandidatosIa] = useState<{ nombre: string; descripcion: string }[] | null>(null);
@@ -415,6 +421,7 @@ function FormularioProducto({ producto, onGuardado }: { producto: Producto | nul
       }
       setValores((v) => ({ ...v, unidadMedidaBaseId: data.unidadMedidaBaseId ?? '' }));
       setConversiones(data.unidadesConversion.map((u) => ({ unidadMedidaId: u.unidadMedidaId, factorConversion: u.factorConversion })));
+      setUsaConversionUnidades(!!data.unidadMedidaBaseId);
     });
   }, [producto]);
 
@@ -682,17 +689,37 @@ function FormularioProducto({ producto, onGuardado }: { producto: Producto | nul
         </Select>
       </div>
 
+      <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
+        <input
+          type="checkbox"
+          checked={usaConversionUnidades}
+          onChange={(e) => {
+            const activar = e.target.checked;
+            setUsaConversionUnidades(activar);
+            if (!activar) {
+              // Apagar el toggle limpia la selección — si quedara un
+              // unidadMedidaBaseId colgado pero oculto, guardar el
+              // producto lo mandaría igual sin que se vea en el formulario.
+              setValores((v) => ({ ...v, unidadMedidaBaseId: '' }));
+              setConversiones([]);
+            }
+          }}
+        />
+        Este producto se compra o vende en más de una unidad (ej. por Caja además de por Unidad)
+      </label>
+
+      {usaConversionUnidades && (
       <div className="space-y-2 rounded-md border border-slate-200 p-3 dark:border-slate-800">
         <div className="flex flex-col gap-1">
           <label htmlFor="producto-unidad-base" className="text-sm font-medium text-slate-700 dark:text-slate-300">
-            Unidad base para conversión (opcional)
+            Unidad base
           </label>
           <Select
             id="producto-unidad-base"
             value={valores.unidadMedidaBaseId}
             onChange={(e) => setValores((v) => ({ ...v, unidadMedidaBaseId: e.target.value }))}
           >
-            <option value="">Sin motor de conversión</option>
+            <option value="">Elegir…</option>
             {(unidadesMedida ?? []).map((u) => (
               <option key={u.id} value={u.id}>
                 {u.nombre}
@@ -700,8 +727,9 @@ function FormularioProducto({ producto, onGuardado }: { producto: Producto | nul
             ))}
           </Select>
           <p className="text-xs text-slate-500 dark:text-slate-400">
-            Es la unidad en la que vive el stock de este producto. Si no se define, el producto funciona igual que
-            hoy, sin unidades alternativas de compra/venta.
+            Es la unidad en la que vive el stock de este producto (distinta del campo "Unidad de medida" de arriba,
+            que es solo texto informativo). Las unidades de conversión de abajo son alternativas para comprar/vender
+            este producto — ej. "Caja" = 144 unidades de esta base.
           </p>
         </div>
 
@@ -756,6 +784,7 @@ function FormularioProducto({ producto, onGuardado }: { producto: Producto | nul
           </div>
         )}
       </div>
+      )}
 
       <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
         <input
