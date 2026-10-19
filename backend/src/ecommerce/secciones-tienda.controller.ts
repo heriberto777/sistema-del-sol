@@ -4,12 +4,20 @@ import { EcommerceService } from './ecommerce.service';
 import { CrearSeccionTiendaDto } from './dto/crear-seccion-tienda.dto';
 import { ReordenarSeccionesTiendaDto } from './dto/reordenar-secciones-tienda.dto';
 import { Permissions } from '../common/decorators/permissions.decorator';
+import { RequiereModulo } from '../common/decorators/requiere-modulo.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtPayloadUser } from '../common/types/authenticated-request';
 
-/** Panel admin "Secciones del Home" de la Tienda Online (Fase 17, "Secciones Dinámicas") — mismo permiso que el resto de la configuración (ver TiendaOnlineConfigPanel/EcommercePedidosController). */
+/**
+ * Panel admin "Secciones del Home" de la Tienda Online (Fase 17,
+ * "Secciones Dinámicas") — mismo permiso que el resto de la
+ * configuración (ver TiendaOnlineConfigPanel/EcommercePedidosController).
+ * `@RequiereModulo('ecommerce')` — ver el comentario equivalente en
+ * EcommercePedidosController sobre por qué faltaba y qué permitía.
+ */
 @ApiBearerAuth()
 @ApiTags('admin-ecommerce')
+@RequiereModulo('ecommerce')
 @Controller('admin/ecommerce/secciones')
 export class SeccionesTiendaController {
   constructor(private readonly ecommerceService: EcommerceService) {}

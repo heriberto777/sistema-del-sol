@@ -64,6 +64,9 @@ del shell que salta devDependencies silenciosamente).
 
 La documentación completa vive en `docs/` — **leerla antes de tocar
 multi-tenancy, RBAC, contabilidad o cualquier flujo multi-paso**:
+`docs/SISTEMA.md` (mapa de arranque: qué hace cada módulo del backend y
+del frontend, cómo está organizado el código), `docs/GUIA_PLUGINS.md`
+(paso a paso para integrar un plugin/módulo activable nuevo),
 `docs/ARCHITECTURE.md` (diseño detallado, con la razón de cada decisión no
 obvia), `docs/DATABASE.md` (modelo de datos y reglas de integridad),
 `docs/API.md` (endpoints), `docs/DEVELOPMENT.md` (flujo de desarrollo).
