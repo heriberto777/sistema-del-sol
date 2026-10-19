@@ -120,6 +120,11 @@ export class AsientosContablesService {
     itbis: number;
     total: number;
     recargos?: number;
+    // Motor de costeo — Débito Costo de Ventas / Crédito Inventario,
+    // además de lo de siempre. Omitido o 0 cuando la factura es
+    // NOTA_DEBITO o está hecha enteramente de SERVICIO/líneas manuales
+    // (nunca tuvieron Costo de Ventas real) — ver ContabilidadEventosService.
+    costoVenta?: number;
   }) {
     const [cuentaCobro, cuentaIngresos, cuentaItbis] = await Promise.all([
       this.cuentasRepository.buscarPorCodigoGlobal(params.tenantId, params.tipoFactura === 'CONTADO' ? CODIGOS_CUENTA.CAJA_BANCOS : CODIGOS_CUENTA.CUENTAS_POR_COBRAR),
@@ -133,6 +138,14 @@ export class AsientosContablesService {
     ];
     if (params.itbis !== 0) {
       lineas.push(this.lineaSegunSigno(cuentaItbis.id, params.itbis, 'credito', `Factura ${params.facturaId}`));
+    }
+    if (params.costoVenta) {
+      const [cuentaCostoVentas, cuentaInventario] = await Promise.all([
+        this.cuentasRepository.buscarPorCodigoGlobal(params.tenantId, CODIGOS_CUENTA.COSTO_DE_VENTAS),
+        this.cuentasRepository.buscarPorCodigoGlobal(params.tenantId, CODIGOS_CUENTA.INVENTARIO),
+      ]);
+      lineas.push(this.lineaSegunSigno(cuentaCostoVentas.id, params.costoVenta, 'debito', `Costo de venta — factura ${params.facturaId}`));
+      lineas.push(this.lineaSegunSigno(cuentaInventario.id, params.costoVenta, 'credito', `Costo de venta — factura ${params.facturaId}`));
     }
 
     return this.crearAsientoAutomatico({
@@ -153,6 +166,7 @@ export class AsientosContablesService {
     itbis: number;
     total: number;
     recargos?: number;
+    costoVenta?: number;
   }) {
     return this.generarDesdeFactura({
       ...params,
@@ -160,6 +174,7 @@ export class AsientosContablesService {
       itbis: -params.itbis,
       total: -params.total,
       recargos: -(params.recargos ?? 0),
+      costoVenta: params.costoVenta ? -params.costoVenta : undefined,
     });
   }
 

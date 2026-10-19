@@ -632,6 +632,128 @@ agregada incluye su `bodega` (`{id, nombre}`) para mostrarla en la
 columna extra que aparece en `KardexView.tsx` solo en este modo
 ("Todas las bodegas").
 
+## Costeo de inventario (Promedio Ponderado) y Costo de Ventas automático
+
+Hasta esta pieza, Inventario llevaba cantidades (Kardex, arriba) pero
+**nunca llevaba valor**: `Precio.costo` era un campo manual para calcular
+margen de venta, no un costo que se recalculara solo con cada compra, y
+la cuenta "Costo de Ventas" (`CODIGOS_CUENTA.COSTO_DE_VENTAS`, código
+5010) existía en el catálogo contable pero ningún servicio la usaba
+nunca — una venta nunca bajaba Inventario ni subía Costo de Ventas, así
+que el Balance General no reflejaba la salida de mercancía vendida y no
+se podía sacar margen bruto real de los libros. Encontrado auditando el
+sistema contra un pedido explícito de motor de costeo real tipo
+Softland/Exactus.
+
+**`Stock.costoPromedio`** (nueva columna, una por variante+bodega, igual
+granularidad que `cantidadActual`) es el costo promedio ponderado
+vigente. Se recalcula **solo en una entrada con costo real asociado**:
+
+- Recepción de compra (`ComprasService.recibir`, usa
+  `LineaRecepcion.costoUnitario`, lo que el proveedor cobró de verdad).
+- Transferencia recibida (`InventarioRepository.transferirEnTx` pasa el
+  `costoPromedio` de la bodega ORIGEN como costo de la entrada en
+  destino — una transferencia traslada valor, no lo revaloriza como si
+  fuera una compra nueva).
+
+Una **salida** (venta, ajuste negativo) consume al costo vigente sin
+tocarlo — vender no cambia cuánto costó lo que queda en el estante. Un
+**ajuste manual positivo sin costo informado** (el único caso de entrada
+que queda sin blindar a propósito, ver "Fuera de alcance" más abajo)
+tampoco lo toca — es indistinguible de "no sé cuánto costó esto",
+preferible a inventar un número.
+
+**Fórmula** (Promedio Ponderado estándar):
+
+```
+nuevoCostoPromedio = (cantidadAnterior × costoAnterior + cantidadEntrante × costoEntrante)
+                      / (cantidadAnterior + cantidadEntrante)
+```
+
+Con stock previo en 0 (primera entrada, o se vendió todo antes), el
+nuevo costo es directamente el de la entrada — sin eso la fórmula
+dividiría por el denominador correcto pero el término `cantidadAnterior
+× costoAnterior` sumaría basura si `costoAnterior` quedó en un valor
+viejo de cuando había stock.
+
+**Todo el cálculo vive en un único `INSERT ... ON CONFLICT DO UPDATE`
+atómico** (`InventarioRepository.ajustarCantidadEnTx`, mismo criterio
+anti-TOCTOU que `descontarStockCondicionalEnTx` con su `UPDATE`
+condicional) — nunca "leer cantidad/costo actuales, calcular en JS,
+escribir": dos entradas concurrentes sobre la misma variante+bodega
+(ej. dos recepciones de compra en paralelo) podrían leer el mismo valor
+"viejo" y promediar mal. Sin `costoUnitario` informado, se usa el
+`upsert` simple de Prisma de siempre — cero cambio de comportamiento
+para quien no participa de esta pieza.
+
+### Costo de Ventas automático
+
+`LineaFactura.costoUnitario` (nueva columna, nullable) es un snapshot
+del `costoPromedio` realmente consumido/devuelto al mover stock para
+esa línea — null para SERVICIO y líneas manuales (ítem B-9, nunca
+mueven stock, nunca tienen Costo de Ventas). Para una línea COMBO,
+`FacturacionService.crear()` acumula `cantidad × costoPromedio` de
+**cada componente físico** (pueden venir de bodegas o historiales de
+compra distintos) y lo guarda como costo unitario del combo entero —
+coherente con lo que de verdad salió de Inventario, aunque ya no se
+pueda desglosar por componente desde la factura.
+
+`ContabilidadEventosService.alFacturarse`/`alAnularFactura` relee
+`Factura.lineas` (mismo patrón que `alRecibirCompra` releyendo
+`LineaRecepcion` — el evento no manda el detalle de líneas, el listener
+lo busca) y suma `cantidad × (costoUnitario ?? 0)` de todas para armar
+`costoVenta`. NOTA_CREDITO aplica el mismo signo que ya usa
+`FacturacionService` para `subtotal`/`itbis`/`total` (sus líneas se
+guardan en positivo, el signo es a nivel de documento) — así
+`lineaSegunSigno` invierte Débito/Crédito automáticamente, sin rama de
+código aparte. `AsientosContablesService.generarDesdeFactura` agrega
+Débito Costo de Ventas / Crédito Inventario solo si `costoVenta` es
+distinto de 0 — una factura toda de servicios nunca toca esas cuentas.
+
+### Nota de Crédito — aproximación deliberada, no el costo exacto de la venta original
+
+Una Nota de Crédito no guarda relación 1:1 con la línea de la venta que
+devuelve (se recalcula independiente, solo atada a `facturaOrigenId` a
+nivel de documento) — reconstruir el costo EXACTO de esa venta
+específica exigiría una trazabilidad que el sistema no tiene. Se usa en
+cambio el **costoPromedio vigente al momento de la devolución**: la
+entrada de stock (`entradaStockEnTx`) no recibe `costoUnitario` (no
+revaloriza el promedio como si la devolución fuera una compra nueva) y
+el costo que se persiste en la línea de la nota es el que ya tenía el
+stock en ese instante. Para la inmensa mayoría de las devoluciones
+(cercanas en el tiempo a la venta) esto coincide con el costo real; el
+error crece solo si pasó mucho tiempo y hubo compras intermedias a otro
+precio. Mismo criterio aplicado a `anular()` reintegrando una venta
+CONTADO/CREDITO: tampoco revaloriza el promedio al reintegrar — a
+diferencia de la Nota de Crédito, ahí la reversa contable SÍ es exacta
+(lee `costoUnitario` de la propia factura que se anula, no una
+aproximación).
+
+### Backfill y fuera de alcance (decisiones explícitas del usuario)
+
+- **Stock existente antes de esta columna**: `costoPromedio` arranca en
+  0 (default de schema) — correr
+  `pnpm --filter ./backend costo-promedio:backfill` una vez por entorno
+  para sembrarlo desde `Precio.costo` (lista GENERAL vigente) donde
+  exista, la mejor aproximación disponible sin inventar un número.
+  Idempotente (solo toca filas en `costoPromedio: 0` con
+  `cantidadActual > 0`); loguea cuántas filas quedaron sin precio del
+  cual aproximar.
+- **Ajuste manual de inventario sin costo**: no pide costo en el
+  formulario — una corrección de conteo no es una compra, y no hay
+  dato confiable de qué costó. `costoPromedio` queda intacto.
+- **Devolución a proveedor** (`LineaDevolucionCompra`, ya existía):
+  saca stock sin revalorizar el promedio hacia abajo — decisión
+  explícita de dejarlo fuera de esta entrega, caso más raro que el
+  resto.
+- **FIFO/Último Costo**: no se construyó una interfaz polimórfica para
+  métodos de costeo alternativos — Promedio Ponderado es el único
+  método real hoy, YAGNI hasta que alguien necesite de verdad otro.
+- **"Solicitud de Compra" con límite de presupuesto** y **conversión de
+  unidades de medida** (comprar por Caja, vender por Unidad): otros dos
+  gaps encontrados en la misma auditoría, explícitamente fuera de
+  alcance de esta entrega.
+
 ## Vencimientos — lotes con consumo FEFO (Fase 5b de adopción de Cuadre)
 
 Control de vencimientos por lote, **opt-in por producto**

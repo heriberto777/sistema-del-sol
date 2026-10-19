@@ -156,6 +156,50 @@ describe('AsientosContablesService', () => {
       const totalCredito = lineas.reduce((acc: number, l: { credito: number }) => acc + l.credito, 0);
       expect(totalDebito).toBeCloseTo(totalCredito, 5);
     });
+
+    describe('motor de costeo (Costo de Ventas)', () => {
+      it('con costoVenta, agrega Débito Costo de Ventas / Crédito Inventario y sigue balanceando', async () => {
+        asientosRepository.crearGlobal.mockResolvedValue({ id: 'a1' } as never);
+
+        await service.generarDesdeFactura({ tenantId: 't1', facturaId: 'f1', tipoFactura: 'CONTADO', subtotal: 300, itbis: 54, total: 354, costoVenta: 180 });
+
+        const [llamada] = asientosRepository.crearGlobal.mock.calls[0];
+        const lineas = llamada.lineas;
+        expect(lineas).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({ cuentaContableId: `cuenta-${CODIGOS_CUENTA.COSTO_DE_VENTAS}`, debito: 180 }),
+            expect.objectContaining({ cuentaContableId: `cuenta-${CODIGOS_CUENTA.INVENTARIO}`, credito: 180 }),
+          ]),
+        );
+        const totalDebito = lineas.reduce((acc: number, l: { debito: number }) => acc + l.debito, 0);
+        const totalCredito = lineas.reduce((acc: number, l: { credito: number }) => acc + l.credito, 0);
+        expect(totalDebito).toBeCloseTo(totalCredito, 5);
+      });
+
+      it('sin costoVenta (0/undefined — SERVICIO, línea manual, NOTA_DEBITO), no agrega ninguna línea de Costo de Ventas', async () => {
+        asientosRepository.crearGlobal.mockResolvedValue({ id: 'a1' } as never);
+
+        await service.generarDesdeFactura({ tenantId: 't1', facturaId: 'f1', tipoFactura: 'CONTADO', subtotal: 300, itbis: 54, total: 354 });
+
+        const [llamada] = asientosRepository.crearGlobal.mock.calls[0];
+        expect(llamada.lineas).toHaveLength(3);
+        expect(cuentasRepository.buscarPorCodigoGlobal).not.toHaveBeenCalledWith('t1', CODIGOS_CUENTA.COSTO_DE_VENTAS);
+      });
+
+      it('NOTA_CREDITO con costoVenta negativo invierte Costo de Ventas/Inventario también', async () => {
+        asientosRepository.crearGlobal.mockResolvedValue({ id: 'a1' } as never);
+
+        await service.generarDesdeFactura({ tenantId: 't1', facturaId: 'nc1', tipoFactura: 'NOTA_CREDITO', subtotal: -300, itbis: -54, total: -354, costoVenta: -180 });
+
+        const [llamada] = asientosRepository.crearGlobal.mock.calls[0];
+        expect(llamada.lineas).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({ cuentaContableId: `cuenta-${CODIGOS_CUENTA.COSTO_DE_VENTAS}`, credito: 180 }),
+            expect.objectContaining({ cuentaContableId: `cuenta-${CODIGOS_CUENTA.INVENTARIO}`, debito: 180 }),
+          ]),
+        );
+      });
+    });
   });
 
   describe('generarReversaFactura', () => {
@@ -182,6 +226,20 @@ describe('AsientosContablesService', () => {
       const totalDebito = lineas.reduce((acc: number, l: { debito: number }) => acc + l.debito, 0);
       const totalCredito = lineas.reduce((acc: number, l: { credito: number }) => acc + l.credito, 0);
       expect(totalDebito).toBeCloseTo(totalCredito, 5);
+    });
+
+    it('niega también costoVenta — la reversa de Costo de Ventas/Inventario sale invertida', async () => {
+      asientosRepository.crearGlobal.mockResolvedValue({ id: 'a1' } as never);
+
+      await service.generarReversaFactura({ tenantId: 't1', facturaId: 'f1', tipoFactura: 'CONTADO', subtotal: 300, itbis: 54, total: 354, costoVenta: 180 });
+
+      const [llamada] = asientosRepository.crearGlobal.mock.calls[0];
+      expect(llamada.lineas).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ cuentaContableId: `cuenta-${CODIGOS_CUENTA.COSTO_DE_VENTAS}`, credito: 180 }),
+          expect.objectContaining({ cuentaContableId: `cuenta-${CODIGOS_CUENTA.INVENTARIO}`, debito: 180 }),
+        ]),
+      );
     });
   });
 

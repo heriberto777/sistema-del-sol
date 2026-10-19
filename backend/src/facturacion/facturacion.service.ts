@@ -174,6 +174,9 @@ export class FacturacionService {
             tipoProducto: undefined,
             componentesCombo: [],
             controlaVencimiento: false,
+            // Motor de costeo — una línea manual nunca mueve stock, nunca
+            // tiene Costo de Ventas (ver ContabilidadEventosService).
+            costoUnitario: undefined as number | undefined,
           };
         }
         // La variante se resuelve UNA vez por línea y se reusa tanto para el
@@ -260,6 +263,11 @@ export class FacturacionService {
           // Fase 5b — solo se usa en la línea directa (no en componentes de
           // combo, ver expandirParaInventario/NOTA_CREDITO en crear()).
           controlaVencimiento: producto.controlaVencimiento,
+          // Motor de costeo — se completa más abajo, dentro de la
+          // transacción, con el costoPromedio real que devuelve el
+          // movimiento de inventario (venta: el que se consumió; nota de
+          // crédito: el vigente al devolver — ver ARCHITECTURE.md).
+          costoUnitario: undefined as number | undefined,
         };
       }),
     );
@@ -551,6 +559,14 @@ export class FacturacionService {
           // Ítem B-9 — una línea manual nunca tuvo contrapartida física que
           // reintegrar (nunca movió stock al facturarse).
           if (!linea.productoId) continue;
+          // Motor de costeo — no hay forma barata de reconstruir el costo
+          // EXACTO de la venta original línea por línea (una nota de
+          // crédito no guarda esa relación 1:1), así que se usa el
+          // costoPromedio VIGENTE al momento de devolver — aproximación
+          // explícita, documentada en ARCHITECTURE.md. No se le pasa
+          // `costoUnitario` a `entradaStockEnTx`: una devolución no
+          // revaloriza el promedio como si fuera una compra nueva.
+          let costoTotalLinea = 0;
           for (const item of expandirParaInventario(linea, linea.productoId, linea.cantidad, linea.varianteId ?? undefined)) {
             // Fase 5b — solo la línea directa (no un componente de combo,
             // ver expandirParaInventario) reconstruye sola de qué lote(s)
@@ -561,7 +577,7 @@ export class FacturacionService {
               item.varianteId && linea.controlaVencimiento && dto.facturaOrigenId
                 ? await this.inventarioService.reconstruirLotesDeVentaEnTx(tx, dto.facturaOrigenId, item.varianteId, item.cantidad)
                 : undefined;
-            await this.inventarioService.entradaStockEnTx(tx, {
+            const stock = await this.inventarioService.entradaStockEnTx(tx, {
               tenantId,
               productoId: item.productoId,
               varianteId: item.varianteId,
@@ -573,15 +589,23 @@ export class FacturacionService {
               referenciaId: facturaId,
               lotes,
             });
+            costoTotalLinea += item.cantidad * Number(stock.costoPromedio ?? 0);
           }
+          linea.costoUnitario = costoTotalLinea / linea.cantidad;
         }
       } else if (dto.tipoFactura !== 'NOTA_DEBITO' && !opciones?.sinMovimientoInventario) {
         for (const linea of lineasCalculadas) {
           // Ítem B-9 — línea manual sin producto del catálogo: nunca mueve
           // inventario, mismo criterio que un Producto.tipo === 'SERVICIO'.
           if (!linea.productoId) continue;
+          // Motor de costeo — acumula el costo REALMENTE consumido de cada
+          // componente físico (un COMBO expande a varios, cada uno puede
+          // venir de un costoPromedio distinto) para dejar un costo
+          // unitario de línea consistente con lo que de verdad salió de
+          // Inventario — ver ContabilidadEventosService (Costo de Ventas).
+          let costoTotalLinea = 0;
           for (const item of expandirParaInventario(linea, linea.productoId, linea.cantidad, linea.varianteId ?? undefined)) {
-            await this.inventarioService.verificarYDescontarStockEnTx(tx, {
+            const stock = await this.inventarioService.verificarYDescontarStockEnTx(tx, {
               tenantId,
               productoId: item.productoId,
               varianteId: item.varianteId,
@@ -592,7 +616,12 @@ export class FacturacionService {
               referenciaTipo: 'FACTURA',
               referenciaId: facturaId,
             });
+            // `stock` nunca es null acá — si no había suficiente,
+            // verificarYDescontarStockEnTx ya lanzó antes de devolver nada
+            // (ver el comentario equivalente en InventarioService).
+            costoTotalLinea += item.cantidad * Number(stock!.costoPromedio ?? 0);
           }
+          linea.costoUnitario = costoTotalLinea / linea.cantidad;
         }
       }
 

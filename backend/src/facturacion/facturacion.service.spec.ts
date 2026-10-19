@@ -79,8 +79,11 @@ describe('FacturacionService', () => {
       anularEnTx: jest.fn(),
     } as unknown as jest.Mocked<FacturacionRepository>;
     inventarioService = {
-      verificarYDescontarStockEnTx: jest.fn().mockResolvedValue(undefined),
-      entradaStockEnTx: jest.fn().mockResolvedValue(undefined),
+      // Motor de costeo — el default `costoPromedio: 0` alcanza para los
+      // tests que no verifican el valor exacto del costo; los que sí lo
+      // necesitan (describe('motor de costeo')) lo sobreescriben puntual.
+      verificarYDescontarStockEnTx: jest.fn().mockResolvedValue({ costoPromedio: 0 }),
+      entradaStockEnTx: jest.fn().mockResolvedValue({ costoPromedio: 0 }),
       reconstruirLotesDeVentaEnTx: jest.fn().mockResolvedValue([]),
       validarAccesoBodega: jest.fn().mockResolvedValue({ id: 'bodega-1', sucursalId: 's1' }),
     } as unknown as jest.Mocked<InventarioService>;

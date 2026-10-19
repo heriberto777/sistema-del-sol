@@ -17,6 +17,10 @@ interface LineaCalculada {
   montoTotal: number;
   // Ítem A-1 — ver FacturacionService.calcularLineasYTotales.
   pagaComision: boolean;
+  // Motor de costeo — snapshot del costo al momento de vender/devolver.
+  // Undefined para SERVICIO/línea manual (nunca mueven stock) — ver
+  // FacturacionService.crear().
+  costoUnitario?: number;
 }
 
 @Injectable()
@@ -239,6 +243,7 @@ export class FacturacionRepository {
             montoItbis: linea.montoItbis,
             montoTotal: linea.montoTotal,
             pagaComision: linea.pagaComision,
+            costoUnitario: linea.costoUnitario,
           })),
         },
         ...(params.pagos?.length

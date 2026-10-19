@@ -34,6 +34,7 @@
     "platform-roles:seed": "dotenv -e ../.env -- ts-node scripts/seed-platform-roles.ts",
     "suscripciones:backfill": "dotenv -e ../.env -- ts-node scripts/backfill-suscripciones.ts",
     "consumidor-final:backfill": "dotenv -e ../.env -- ts-node scripts/backfill-consumidor-final.ts",
+    "costo-promedio:backfill": "dotenv -e ../.env -- ts-node scripts/backfill-costo-promedio.ts",
     "correlativos:backfill": "dotenv -e ../.env -- ts-node scripts/backfill-correlativos.ts",
     "facturas:backfill-numero": "dotenv -e ../.env -- ts-node scripts/backfill-numero-facturas.ts",
     "ajustar-permisos-vendedor:migrar": "dotenv -e ../.env -- ts-node scripts/ajustar-permisos-vendedor-pos.ts",

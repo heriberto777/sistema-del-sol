@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { TenantPrismaService } from '../prisma/tenant-prisma.service';
 import { FormatoImpresion, MetodoAperturaCaja, MotivoAjusteInventario, PlantillaDocumento, Prisma, TipoMovimientoInventario } from '@prisma/client';
@@ -36,6 +37,12 @@ interface ParamsAjuste {
   lotesEntrada?: LoteEntrada[];
   // `delta < 0` (ajuste negativo manual): lote explícito del que sale — nunca FEFO acá, es una corrección manual.
   loteIdSalida?: string;
+  // Motor de costeo — SOLO tiene efecto con `delta > 0` y un costo real
+  // asociado (recepción de compra, nota de crédito, transferencia
+  // recibida). Sin esto (ajuste manual sin costo informado), el costo
+  // promedio queda intacto — comportamiento idéntico al de antes de esta
+  // columna. Ver `ajustarCantidadEnTx`.
+  costoUnitario?: number;
 }
 
 interface ParamsDescuento {
@@ -62,6 +69,7 @@ interface StockRow {
   cantidadActual: Prisma.Decimal;
   cantidadReservada: Prisma.Decimal;
   stockMinimo: Prisma.Decimal;
+  costoPromedio: Prisma.Decimal;
   updatedAt: Date;
 }
 
@@ -373,14 +381,40 @@ export class InventarioRepository {
    * la factura compartan una sola transacción).
    */
   async ajustarCantidadEnTx(tx: Prisma.TransactionClient, params: ParamsAjuste) {
-    const { tenantId, productoId, varianteId, bodegaId, delta, tipo, userId, motivo, motivoAjuste, referenciaTipo, referenciaId, controlaVencimiento, lotesEntrada, loteIdSalida } = params;
+    const { tenantId, productoId, varianteId, bodegaId, delta, tipo, userId, motivo, motivoAjuste, referenciaTipo, referenciaId, controlaVencimiento, lotesEntrada, loteIdSalida, costoUnitario } = params;
     const direccion = delta >= 0 ? 'ENTRADA' : 'SALIDA';
 
-    const stock = await tx.stock.upsert({
-      where: { varianteId_bodegaId: { varianteId, bodegaId } },
-      create: { varianteId, bodegaId, cantidadActual: Math.max(delta, 0) },
-      update: { cantidadActual: { increment: delta } },
-    });
+    // Motor de costeo (Promedio Ponderado) — solo entra en juego en una
+    // entrada (`delta > 0`) con costo real asociado (recepción de compra,
+    // nota de crédito, transferencia recibida — ver ParamsAjuste.costoUnitario).
+    // Todo el cálculo vive en UN SOLO `UPDATE`/`INSERT` atómico (igual
+    // criterio anti-TOCTOU que `descontarStockCondicionalEnTx`): sin esto,
+    // dos entradas concurrentes sobre la misma variante+bodega podrían leer
+    // el mismo `cantidadActual`/`costoPromedio` "viejo" y promediar mal. Sin
+    // costo informado (ajuste manual sin costo, el caso de siempre antes de
+    // esta columna), se usa el `upsert` simple de Prisma — cero cambio de
+    // comportamiento.
+    const stock =
+      costoUnitario !== undefined && delta > 0
+        ? (
+            await tx.$queryRaw<StockRow[]>`
+              INSERT INTO stock (id, "varianteId", "bodegaId", "cantidadActual", "costoPromedio", "updatedAt")
+              VALUES (${randomUUID()}, ${varianteId}, ${bodegaId}, GREATEST(${delta}::numeric, 0), ${costoUnitario}::numeric, now())
+              ON CONFLICT ("varianteId", "bodegaId") DO UPDATE SET
+                "costoPromedio" = CASE
+                  WHEN stock."cantidadActual" <= 0 THEN ${costoUnitario}::numeric
+                  ELSE (stock."cantidadActual" * stock."costoPromedio" + ${delta}::numeric * ${costoUnitario}::numeric) / (stock."cantidadActual" + ${delta}::numeric)
+                END,
+                "cantidadActual" = stock."cantidadActual" + ${delta}::numeric,
+                "updatedAt" = now()
+              RETURNING *
+            `
+          )[0]
+        : await tx.stock.upsert({
+            where: { varianteId_bodegaId: { varianteId, bodegaId } },
+            create: { varianteId, bodegaId, cantidadActual: Math.max(delta, 0) },
+            update: { cantidadActual: { increment: delta } },
+          });
 
     if (!controlaVencimiento) {
       await tx.movimientoInventario.create({
@@ -559,7 +593,9 @@ export class InventarioRepository {
     }
     // El lote (número + vencimiento) viaja intacto a la bodega destino —
     // FEFO ya decidió en origen de cuál(es) sale, acá solo se preserva su
-    // identidad (Fase 5b).
+    // identidad (Fase 5b). El costo promedio de origen viaja igual —
+    // una transferencia traslada valor, no lo revaloriza como si fuera
+    // una compra nueva (ver ARCHITECTURE.md, motor de costeo).
     return this.ajustarCantidadEnTx(tx, {
       tenantId: params.tenantId,
       productoId: params.productoId,
@@ -571,6 +607,10 @@ export class InventarioRepository {
       motivo: `Transferencia desde bodega ${params.bodegaOrigenId}`,
       controlaVencimiento: params.controlaVencimiento,
       lotesEntrada: origen.consumos.map((c) => ({ numeroLote: c.numeroLote, fechaVencimiento: c.fechaVencimiento, cantidad: c.cantidad })),
+      // `?? 0` defensivo — `Stock.costoPromedio` tiene @default(0) así que
+      // en producción nunca llega null/undefined, pero sin este fallback
+      // un NaN se metería al cálculo y corrompería el promedio para siempre.
+      costoUnitario: Number(origen.costoPromedio ?? 0),
     });
   }
 

@@ -155,6 +155,9 @@ export class ComprasService {
             motivo: `Recepción de OC ${orden.numero}`,
             referenciaTipo: 'RECEPCION_COMPRA',
             referenciaId: recepcion.id,
+            // Motor de costeo — recalcula el Promedio Ponderado de la
+            // variante+bodega con el costo real de esta recepción.
+            costoUnitario: linea.costoUnitario,
             // Fase 5b — si el producto controla vencimiento, InventarioService
             // exige numeroLote/fechaVencimiento (400 si faltan); si no
             // controla, este arreglo se ignora sin más.

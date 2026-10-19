@@ -5,7 +5,11 @@ import { PrismaService } from '../prisma/prisma.service';
 describe('ContabilidadEventosService', () => {
   let service: ContabilidadEventosService;
   let asientosContablesService: jest.Mocked<AsientosContablesService>;
-  let prisma: { recepcionCompra: { findUniqueOrThrow: jest.Mock }; gastoMenor: { findUniqueOrThrow: jest.Mock } };
+  let prisma: {
+    recepcionCompra: { findUniqueOrThrow: jest.Mock };
+    gastoMenor: { findUniqueOrThrow: jest.Mock };
+    factura: { findUniqueOrThrow: jest.Mock };
+  };
 
   beforeEach(() => {
     asientosContablesService = {
@@ -18,7 +22,13 @@ describe('ContabilidadEventosService', () => {
       generarDesdePagoOrdenCompra: jest.fn(),
       generarReversaCompra: jest.fn(),
     } as unknown as jest.Mocked<AsientosContablesService>;
-    prisma = { recepcionCompra: { findUniqueOrThrow: jest.fn() }, gastoMenor: { findUniqueOrThrow: jest.fn() } };
+    prisma = {
+      recepcionCompra: { findUniqueOrThrow: jest.fn() },
+      gastoMenor: { findUniqueOrThrow: jest.fn() },
+      // Motor de costeo — default sin líneas (costoVenta: 0); los tests
+      // que sí verifican el Costo de Ventas lo sobreescriben puntual.
+      factura: { findUniqueOrThrow: jest.fn().mockResolvedValue({ lineas: [] }) },
+    };
     service = new ContabilidadEventosService(asientosContablesService, prisma as unknown as PrismaService);
   });
 
@@ -34,6 +44,7 @@ describe('ContabilidadEventosService', () => {
         itbis: 54,
         total: 354,
         recargos: 0,
+        costoVenta: 0,
       });
     });
 
@@ -59,6 +70,30 @@ describe('ContabilidadEventosService', () => {
         service.alFacturarse({ tenantId: 't1', facturaId: 'f1', clienteId: 'c1', total: '354', subtotal: '300', itbis: '54', tipoFactura: 'CONTADO' }),
       ).resolves.not.toThrow();
     });
+
+    describe('motor de costeo (Costo de Ventas)', () => {
+      it('suma cantidad×costoUnitario de las líneas con producto, y lo manda como costoVenta', async () => {
+        prisma.factura.findUniqueOrThrow.mockResolvedValue({
+          lineas: [
+            { cantidad: 2, costoUnitario: 100 },
+            { cantidad: 1, costoUnitario: 50 },
+            { cantidad: 3, costoUnitario: null }, // SERVICIO/línea manual — no suma nada
+          ],
+        });
+
+        await service.alFacturarse({ tenantId: 't1', facturaId: 'f1', clienteId: 'c1', total: '354', subtotal: '300', itbis: '54', tipoFactura: 'CONTADO' });
+
+        expect(asientosContablesService.generarDesdeFactura).toHaveBeenCalledWith(expect.objectContaining({ costoVenta: 250 }));
+      });
+
+      it('NOTA_CREDITO: el costoVenta sale en negativo (mismo signo que subtotal/itbis/total)', async () => {
+        prisma.factura.findUniqueOrThrow.mockResolvedValue({ lineas: [{ cantidad: 2, costoUnitario: 100 }] });
+
+        await service.alFacturarse({ tenantId: 't1', facturaId: 'f1', clienteId: 'c1', total: '-354', subtotal: '-300', itbis: '-54', tipoFactura: 'NOTA_CREDITO' });
+
+        expect(asientosContablesService.generarDesdeFactura).toHaveBeenCalledWith(expect.objectContaining({ costoVenta: -200 }));
+      });
+    });
   });
 
   describe('alAnularFactura', () => {
@@ -73,6 +108,7 @@ describe('ContabilidadEventosService', () => {
         itbis: 54,
         total: 354,
         recargos: 0,
+        costoVenta: 0,
       });
     });
   });

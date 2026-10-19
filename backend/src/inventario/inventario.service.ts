@@ -251,6 +251,8 @@ export class InventarioService {
       referenciaId?: string;
       /** Obligatorio si el producto controla vencimiento (salvo Nota de Crédito, que los reconstruye sola — ver FacturacionService.crear). */
       lotes?: LoteEntrada[];
+      /** Motor de costeo — ver InventarioRepository.ajustarCantidadEnTx. Sin esto, el costoPromedio no se toca. */
+      costoUnitario?: number;
     },
   ) {
     const { producto } = await this.validarPertenencia(
@@ -271,6 +273,7 @@ export class InventarioService {
       referenciaId: params.referenciaId,
       controlaVencimiento: producto!.controlaVencimiento,
       lotesEntrada: params.lotes,
+      costoUnitario: params.costoUnitario,
     });
   }
 

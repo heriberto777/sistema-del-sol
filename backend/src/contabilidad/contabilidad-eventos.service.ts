@@ -40,6 +40,7 @@ export class ContabilidadEventosService {
         itbis: Number(payload.itbis),
         total: Number(payload.total),
         recargos: Number(payload.recargos ?? '0'),
+        costoVenta: await this.calcularCostoVenta(payload.facturaId, payload.tipoFactura),
       });
     } catch (error) {
       // Un fallo contable nunca debe tumbar la venta — ya se facturó y
@@ -59,10 +60,31 @@ export class ContabilidadEventosService {
         itbis: Number(payload.itbis),
         total: Number(payload.total),
         recargos: Number(payload.recargos ?? '0'),
+        costoVenta: await this.calcularCostoVenta(payload.facturaId, payload.tipoFactura),
       });
     } catch (error) {
       this.logger.error(`No se pudo generar la reversa contable de la factura ${payload.facturaId}`, error as Error);
     }
+  }
+
+  /**
+   * Motor de costeo — releída de `LineaFactura.costoUnitario` (snapshot
+   * tomado por FacturacionService.crear() al mover el stock), igual
+   * patrón que `alRecibirCompra` releyendo `LineaRecepcion`. NOTA_CREDITO
+   * aplica el mismo signo que ya usa `FacturacionService` para
+   * subtotal/itbis/total (sus líneas se guardan en positivo, el signo es
+   * a nivel de documento) — así `lineaSegunSigno` invierte Débito/Crédito
+   * automáticamente, sin una rama de código aparte. NOTA_DEBITO y líneas
+   * de SERVICIO/manuales nunca tienen `costoUnitario`, dan 0 (sin efecto,
+   * ver el `if (params.costoVenta)` en `generarDesdeFactura`).
+   */
+  private async calcularCostoVenta(facturaId: string, tipoFactura: string): Promise<number> {
+    const factura = await this.prisma.factura.findUniqueOrThrow({
+      where: { id: facturaId },
+      select: { lineas: { select: { cantidad: true, costoUnitario: true } } },
+    });
+    const costoBruto = factura.lineas.reduce((acc, l) => acc + Number(l.cantidad) * Number(l.costoUnitario ?? 0), 0);
+    return tipoFactura === 'NOTA_CREDITO' ? -costoBruto : costoBruto;
   }
 
   @OnEvent(EVENTOS.ORDEN_COMPRA_RECIBIDA)

@@ -1440,6 +1440,14 @@ model LineaFactura {
   // línea sí genera comisión normalmente. Ver
   // OfertasService.resolverDescuentoLineaConComision.
   pagaComision      Boolean           @default(true)
+  // Motor de costeo — snapshot del Stock.costoPromedio AL MOMENTO de
+  // vender/devolver esta línea (venta: costo consumido; nota de crédito:
+  // costo promedio vigente al devolver, no se reconstruye el histórico
+  // exacto de la venta original — ver ARCHITECTURE.md). Null para
+  // SERVICIO/línea manual (nunca mueven stock, sin Costo de Ventas) y
+  // para facturas creadas antes de este campo. Es la base del Débito
+  // Costo de Ventas/Crédito Inventario que arma ContabilidadEventosService.
+  costoUnitario     Decimal?          @db.Decimal(14, 4)
 
   @@map("linea_factura")
 }
@@ -3073,6 +3081,13 @@ model Stock {
   cantidadActual    Decimal          @default(0) @db.Decimal(14, 4)
   cantidadReservada Decimal          @default(0) @db.Decimal(14, 4)
   stockMinimo       Decimal          @default(10) @db.Decimal(14, 4)
+  // Motor de costeo (Promedio Ponderado) — se recalcula SOLO en entradas
+  // con costo real asociado (recepción de compra, ajuste positivo con
+  // costo informado, transferencia recibida con el costo de origen); una
+  // salida (venta, ajuste negativo) consume sin tocarlo. Ver
+  // InventarioRepository.ajustarCantidadEnTx y ARCHITECTURE.md → "Costeo
+  // de inventario (Promedio Ponderado) y Costo de Ventas automático".
+  costoPromedio     Decimal          @default(0) @db.Decimal(14, 4)
   updatedAt         DateTime         @updatedAt
 
   @@unique([varianteId, bodegaId])

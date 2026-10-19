@@ -164,6 +164,58 @@ describe('InventarioRepository — lotes/FEFO (Fase 5b)', () => {
     });
   });
 
+  describe('ajustarCantidadEnTx — motor de costeo (Promedio Ponderado)', () => {
+    const baseAjusteSinVencimiento = {
+      tenantId: 't1',
+      productoId: 'p1',
+      varianteId: 'v1',
+      bodegaId: 'b1',
+      delta: 10,
+      tipo: 'ENTRADA' as const,
+      userId: 'u1',
+      motivo: 'Recepción',
+      controlaVencimiento: false,
+    };
+
+    it('sin costoUnitario, usa el upsert simple de Prisma — cero cambio de comportamiento', async () => {
+      await repository.ajustarCantidadEnTx(tx, baseAjusteSinVencimiento);
+
+      expect(tx.stock.upsert).toHaveBeenCalledTimes(1);
+      expect(tx.$queryRaw).not.toHaveBeenCalled();
+    });
+
+    it('con costoUnitario y delta>0, usa el UPDATE/INSERT atómico en vez del upsert simple', async () => {
+      tx.$queryRaw.mockResolvedValue([{ id: 's1', cantidadActual: 15, cantidadReservada: 0, stockMinimo: 5, costoPromedio: 120 }]);
+
+      const resultado = await repository.ajustarCantidadEnTx(tx, { ...baseAjusteSinVencimiento, costoUnitario: 150 });
+
+      expect(tx.stock.upsert).not.toHaveBeenCalled();
+      expect(tx.$queryRaw).toHaveBeenCalledTimes(1);
+      expect(resultado.costoPromedio).toBe(120);
+    });
+
+    it('con costoUnitario pero delta<0 (nunca pasa en la práctica), igual usa el upsert simple — el costeo solo aplica a entradas', async () => {
+      await repository.ajustarCantidadEnTx(tx, { ...baseAjusteSinVencimiento, delta: -5, tipo: 'AJUSTE', costoUnitario: 150 });
+
+      expect(tx.stock.upsert).toHaveBeenCalledTimes(1);
+      expect(tx.$queryRaw).not.toHaveBeenCalled();
+    });
+
+    it('el costoPromedio resultante también queda disponible cuando el producto controla vencimiento (misma fila de Stock)', async () => {
+      tx.$queryRaw.mockResolvedValue([{ id: 's1', cantidadActual: 15, cantidadReservada: 0, stockMinimo: 5, costoPromedio: 120 }]);
+      tx.lote.upsert.mockResolvedValue(lote({ id: 'lote-nuevo' }));
+
+      const resultado = await repository.ajustarCantidadEnTx(tx, {
+        ...baseAjusteSinVencimiento,
+        controlaVencimiento: true,
+        costoUnitario: 150,
+        lotesEntrada: [{ numeroLote: 'L1', fechaVencimiento: new Date('2026-12-01'), cantidad: 10 }],
+      });
+
+      expect(resultado.costoPromedio).toBe(120);
+    });
+  });
+
   describe('reconstruirLotesDeVentaEnTx — Nota de Crédito reconstruye sola', () => {
     it('reparte la cantidad devuelta proporcionalmente a como se consumió en la venta original', async () => {
       tx.movimientoInventario.findMany.mockResolvedValue([
