@@ -28,7 +28,8 @@ import { InventarioAlertas } from './pages/InventarioAlertas';
 import { ConfiguracionInventario } from './pages/ConfiguracionInventario';
 import { Sucursales } from './pages/Sucursales';
 import { Compras } from './pages/Compras';
-import { Contactos } from './pages/Contactos';
+import { Clientes } from './pages/Clientes';
+import { Proveedores } from './pages/Proveedores';
 import { Productos } from './pages/Productos';
 import { EtiquetasCodigoBarras } from './pages/EtiquetasCodigoBarras';
 import { Categorias } from './pages/Categorias';
@@ -249,8 +250,9 @@ const RUTAS_ADMIN = [
           { path: '/inventario/configuracion', element: <ConfiguracionInventario /> },
           { path: '/sucursales', element: <Sucursales /> },
           { path: '/compras', element: <Compras /> },
-          { path: '/contactos', element: <Contactos /> },
-          { path: '/clientes', element: <Navigate to="/contactos" replace /> },
+          { path: '/clientes', element: <Clientes /> },
+          { path: '/proveedores', element: <Proveedores /> },
+          { path: '/contactos', element: <Navigate to="/clientes" replace /> },
           { path: '/productos', element: <Productos /> },
           { path: '/productos/etiquetas', element: <EtiquetasCodigoBarras /> },
           { path: '/categorias', element: <Categorias /> },

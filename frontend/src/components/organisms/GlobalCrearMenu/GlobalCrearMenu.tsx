@@ -10,8 +10,8 @@ interface Opcion {
 
 const OPCIONES: Opcion[] = [
   { etiqueta: 'Nueva factura', ruta: '/facturacion/nueva', permiso: 'facturacion.crear' },
-  { etiqueta: 'Nuevo cliente', ruta: '/contactos?crear=cliente', permiso: 'clientes.crear' },
-  { etiqueta: 'Nuevo proveedor', ruta: '/contactos?crear=proveedor', permiso: 'compras.crear' },
+  { etiqueta: 'Nuevo cliente', ruta: '/clientes?crear=cliente', permiso: 'clientes.crear' },
+  { etiqueta: 'Nuevo proveedor', ruta: '/proveedores?crear=proveedor', permiso: 'compras.crear' },
   { etiqueta: 'Nuevo producto', ruta: '/productos?crear=1', permiso: 'precios.editar' },
   { etiqueta: 'Nueva orden de compra', ruta: '/compras?crear=1', permiso: 'compras.crear' },
   { etiqueta: 'Nueva bodega', ruta: '/inventario?crear=1', permiso: 'admin.configuracion' },
@@ -23,7 +23,7 @@ const OPCIONES: Opcion[] = [
  * factura" navega directo a su propia ruta (`/facturacion/nueva`, Modelo B
  * de la exploración "modal o página"); el resto sigue el patrón anterior —
  * navega a la página dueña del formulario con `?crear=…`, que la página lee
- * al montar para abrir su modal (ver Contactos/Productos/Compras/Inventario).
+ * al montar para abrir su modal (ver Clientes/Proveedores/Productos/Compras/Inventario).
  */
 export function GlobalCrearMenu() {
   const { tienePermiso } = useAuth();

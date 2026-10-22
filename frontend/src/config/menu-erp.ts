@@ -64,7 +64,7 @@ export const DOMINIOS_MENU: DominioMenu[] = [
           { id: 'bonos', etiqueta: 'Bonos', ruta: '/bonos', permisos: ['bonos.ver'] },
           { id: 'formas-pago', etiqueta: 'Formas de pago', ruta: '/formas-pago', permisos: ['admin.configuracion'] },
           { id: 'cajas', etiqueta: 'Cajas', ruta: '/cajas', permisos: ['pos.ver'] },
-          { id: 'clientes', etiqueta: 'Clientes', ruta: '/contactos', permisos: ['clientes.ver', 'compras.ver'] },
+          { id: 'clientes', etiqueta: 'Clientes', ruta: '/clientes', permisos: ['clientes.ver', 'compras.ver'] },
           // Antes vivía en Seguridad y Administración — no tiene nada que
           // ver con seguridad, es dato de Ventas/CRM igual que Clientes.
           { id: 'categorias-cliente', etiqueta: 'Categorías de cliente', ruta: '/categorias-cliente', permisos: ['clientes.ver'] },
@@ -109,12 +109,14 @@ export const DOMINIOS_MENU: DominioMenu[] = [
     etiqueta: 'Compras',
     icono: ShoppingBag,
     categorias: [
-      { categoria: 'catalogos', items: [{ id: 'proveedores', etiqueta: 'Proveedores', ruta: '/contactos', permisos: ['compras.ver'] }] },
+      { categoria: 'catalogos', items: [] },
       { categoria: 'transacciones', items: [{ id: 'compra-nueva', etiqueta: 'Nueva orden de compra', ruta: '/compras', permisos: ['compras.crear'], modulo: 'compras' }] },
       {
         categoria: 'consultas',
         items: [
           { id: 'compras', etiqueta: 'Buscar órdenes de compra', ruta: '/compras', permisos: ['compras.ver'], modulo: 'compras' },
+          // Vive junto a Cuentas por pagar: es el mismo "ambiente" de la relación con proveedores.
+          { id: 'proveedores', etiqueta: 'Proveedores', ruta: '/proveedores', permisos: ['compras.ver'] },
           { id: 'cxp', etiqueta: 'Cuentas por pagar', ruta: '/cuentas-por-pagar', permisos: ['cuentasporpagar.ver'], modulo: 'compras' },
         ],
       },

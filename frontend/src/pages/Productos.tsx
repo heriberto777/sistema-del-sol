@@ -1109,6 +1109,21 @@ function FormularioPrecio({
     guardar.mutate();
   }
 
+  function calcularPrecio() {
+    const c = Number(costo);
+    const m = Number(margenPct);
+    if (!costo || isNaN(c) || c <= 0) {
+      setError('Indicá un costo válido para calcular el precio.');
+      return;
+    }
+    if (!margenPct || isNaN(m)) {
+      setError('Indicá un margen % válido para calcular el precio.');
+      return;
+    }
+    setError(null);
+    setPrecioVenta((c * (1 + m / 100)).toFixed(2));
+  }
+
   return (
     <form onSubmit={onSubmit} className="space-y-3">
       {onVolver && (
@@ -1147,6 +1162,14 @@ function FormularioPrecio({
         value={margenPct}
         onChange={(e) => setMargenPct(e.target.value)}
       />
+      <Button type="button" variante="secundario" onClick={calcularPrecio} className="w-full">
+        Calcular precio de venta
+      </Button>
+      <p className="text-xs text-slate-500 dark:text-slate-400">
+        Calcula el precio a partir de costo + margen y lo deja abajo para revisar — podés guardarlo tal cual o
+        cambiarlo a mano. Si después editás costo o margen, el precio no se recalcula solo: hay que volver a tocar
+        "Calcular".
+      </p>
       <FormField
         id="precio-venta"
         label="Precio de venta (opcional si indicás margen %)"

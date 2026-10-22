@@ -1,14 +1,12 @@
-import { FormEvent, useMemo, useRef, useState } from 'react';
+import { Fragment, FormEvent, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../../lib/api-client';
 import { mensajeErrorApi } from '../../../lib/mensaje-error-api';
-import { Badge } from '../../atoms/Badge/Badge';
 import { Button } from '../../atoms/Button/Button';
 import { Card } from '../../atoms/Card/Card';
 import { Select } from '../../atoms/Select/Select';
 import { Switch } from '../../atoms/Switch/Switch';
 import { Modal } from '../../molecules/Modal/Modal';
-import { RowActionsMenu } from '../../molecules/RowActionsMenu/RowActionsMenu';
 
 type CanalNotificacion = 'EMAIL' | 'WHATSAPP' | 'IN_APP' | 'WEBHOOK';
 
@@ -18,6 +16,9 @@ const ETIQUETA_CANAL: Record<CanalNotificacion, string> = {
   IN_APP: 'Dentro de la app',
   WEBHOOK: 'Webhook',
 };
+
+/** Únicos canales con envío real implementado hoy — ver notificaciones.service.ts. IN_APP/WEBHOOK existen en el enum pero no tienen canal detrás todavía. */
+const CANALES_MATRIZ: CanalNotificacion[] = ['EMAIL', 'WHATSAPP'];
 
 interface Plantilla {
   id: string;
@@ -41,6 +42,7 @@ export function PlantillasNotificacionPanel() {
   const queryClient = useQueryClient();
   const [modalAbierto, setModalAbierto] = useState(false);
   const [plantillaEditando, setPlantillaEditando] = useState<Plantilla | null>(null);
+  const [creandoPara, setCreandoPara] = useState<{ clave: string; canal: CanalNotificacion } | null>(null);
 
   const { data: plantillas } = useQuery({
     queryKey: ['notificacion-plantillas'],
@@ -52,9 +54,23 @@ export function PlantillasNotificacionPanel() {
     queryFn: async () => (await apiClient.get<EventoNotificacion[]>('/notificaciones/eventos-disponibles')).data,
   });
 
-  const eventoPorClave = useMemo(() => new Map(eventos?.map((e) => [e.clave, e])), [eventos]);
+  const plantillaPorEventoCanal = useMemo(() => {
+    const mapa = new Map<string, Plantilla>();
+    for (const p of plantillas ?? []) mapa.set(`${p.clave}::${p.canal}`, p);
+    return mapa;
+  }, [plantillas]);
 
-  const guardarActiva = useMutation({
+  const eventosPorModulo = useMemo(() => {
+    const grupos = new Map<string, EventoNotificacion[]>();
+    for (const evento of eventos ?? []) {
+      const lista = grupos.get(evento.modulo) ?? [];
+      lista.push(evento);
+      grupos.set(evento.modulo, lista);
+    }
+    return grupos;
+  }, [eventos]);
+
+  const toggleActiva = useMutation({
     mutationFn: async (p: Plantilla) =>
       apiClient.post('/notificaciones/plantillas', { canal: p.canal, clave: p.clave, asunto: p.asunto ?? undefined, cuerpo: p.cuerpo, activa: !p.activa }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notificacion-plantillas'] }),
@@ -62,11 +78,19 @@ export function PlantillasNotificacionPanel() {
 
   function abrirNueva() {
     setPlantillaEditando(null);
+    setCreandoPara(null);
     setModalAbierto(true);
   }
 
   function abrirEditar(p: Plantilla) {
     setPlantillaEditando(p);
+    setCreandoPara(null);
+    setModalAbierto(true);
+  }
+
+  function abrirCrearPara(clave: string, canal: CanalNotificacion) {
+    setPlantillaEditando(null);
+    setCreandoPara({ clave, canal });
     setModalAbierto(true);
   }
 
@@ -74,44 +98,83 @@ export function PlantillasNotificacionPanel() {
     <div className="space-y-4">
       <Card
         sinPadding
-        titulo="Plantillas"
-        descripcion="Las variables como {{cliente_nombre}} se reemplazan automáticamente al enviar."
+        titulo="Plantillas por evento y canal"
+        descripcion="Por cada evento, activá o desactivá el envío para cada canal por separado. Las variables como {{cliente_nombre}} se reemplazan automáticamente al enviar."
         acciones={<Button onClick={abrirNueva}>Nueva plantilla</Button>}
       >
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead className="bg-slate-50 text-slate-500 dark:bg-slate-900/60 dark:text-slate-400">
               <tr>
-                <th className="px-5 py-3 font-medium">Canal</th>
                 <th className="px-5 py-3 font-medium">Evento</th>
-                <th className="px-5 py-3 font-medium">Asunto</th>
-                <th className="px-5 py-3 font-medium">Activa</th>
-                <th className="px-5 py-3" />
+                {CANALES_MATRIZ.map((canal) => (
+                  <th key={canal} className="px-5 py-3 font-medium">
+                    {ETIQUETA_CANAL[canal]}
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {plantillas?.map((p) => (
-                <tr key={p.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                  <td className="px-5 py-3">
-                    <Badge>{ETIQUETA_CANAL[p.canal]}</Badge>
-                  </td>
-                  <td className="px-5 py-3 text-slate-700 dark:text-slate-300">
-                    <p>{eventoPorClave.get(p.clave)?.etiqueta ?? p.clave}</p>
-                    <p className="font-mono text-xs text-slate-400">{p.clave}</p>
-                  </td>
-                  <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{p.asunto ?? '—'}</td>
-                  <td className="px-5 py-3">
-                    <Switch activo={p.activa} onChange={() => guardarActiva.mutate(p)} disabled={guardarActiva.isPending} />
-                  </td>
-                  <td className="px-5 py-3 text-right">
-                    <RowActionsMenu acciones={[{ etiqueta: 'Editar', onClick: () => abrirEditar(p) }]} />
-                  </td>
-                </tr>
+              {[...eventosPorModulo.entries()].map(([modulo, lista]) => (
+                <Fragment key={modulo}>
+                  <tr className="bg-slate-50/60 dark:bg-slate-900/30">
+                    <td colSpan={CANALES_MATRIZ.length + 1} className="px-5 py-1.5 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                      {modulo}
+                    </td>
+                  </tr>
+                  {lista.map((evento) => (
+                    <tr key={evento.clave} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                      <td className="px-5 py-3 text-slate-700 dark:text-slate-300">
+                        <p>{evento.etiqueta}</p>
+                        <p className="font-mono text-xs text-slate-400">{evento.clave}</p>
+                      </td>
+                      {CANALES_MATRIZ.map((canal) => {
+                        const plantilla = plantillaPorEventoCanal.get(`${evento.clave}::${canal}`);
+                        if (!evento.canales.includes(canal)) {
+                          return (
+                            <td key={canal} className="px-5 py-3 text-slate-300 dark:text-slate-600">
+                              —
+                            </td>
+                          );
+                        }
+                        return (
+                          <td key={canal} className="px-5 py-3">
+                            {plantilla ? (
+                              <div className="flex items-center gap-2">
+                                <Switch
+                                  activo={plantilla.activa}
+                                  onChange={() => toggleActiva.mutate(plantilla)}
+                                  disabled={toggleActiva.isPending}
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => abrirEditar(plantilla)}
+                                  className="text-xs text-slate-400 hover:text-sol-600 dark:hover:text-sol-400"
+                                  title="Editar contenido del mensaje"
+                                >
+                                  Editar
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => abrirCrearPara(evento.clave, canal)}
+                                className="rounded-md border border-dashed border-slate-300 px-2 py-1 text-xs text-slate-500 hover:border-sol-400 hover:text-sol-600 dark:border-slate-700 dark:text-slate-400 dark:hover:border-sol-700 dark:hover:text-sol-400"
+                              >
+                                Configurar
+                              </button>
+                            )}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </Fragment>
               ))}
-              {plantillas?.length === 0 && (
+              {eventos?.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-5 py-6 text-center text-slate-400">
-                    Todavía no hay plantillas configuradas.
+                  <td colSpan={CANALES_MATRIZ.length + 1} className="px-5 py-6 text-center text-slate-400">
+                    No hay eventos disponibles.
                   </td>
                 </tr>
               )}
@@ -120,20 +183,40 @@ export function PlantillasNotificacionPanel() {
         </div>
       </Card>
 
-      {modalAbierto && <ModalPlantilla plantilla={plantillaEditando} onClose={() => setModalAbierto(false)} />}
+      {modalAbierto && (
+        <ModalPlantilla
+          plantilla={plantillaEditando}
+          claveInicial={creandoPara?.clave}
+          canalInicial={creandoPara?.canal}
+          onClose={() => setModalAbierto(false)}
+        />
+      )}
     </div>
   );
 }
 
-function ModalPlantilla({ plantilla, onClose }: { plantilla: Plantilla | null; onClose: () => void }) {
+function ModalPlantilla({
+  plantilla,
+  claveInicial,
+  canalInicial,
+  onClose,
+}: {
+  plantilla: Plantilla | null;
+  /** Evento+canal preseleccionados al crear desde una celda vacía de la matriz — quedan fijos, no editables. */
+  claveInicial?: string;
+  canalInicial?: CanalNotificacion;
+  onClose: () => void;
+}) {
   const queryClient = useQueryClient();
   const { data: eventos } = useQuery({
     queryKey: ['notificacion-eventos-disponibles'],
     queryFn: async () => (await apiClient.get<EventoNotificacion[]>('/notificaciones/eventos-disponibles')).data,
   });
 
-  const [clave, setClave] = useState(plantilla?.clave ?? '');
-  const [canal, setCanal] = useState<CanalNotificacion>(plantilla?.canal ?? 'EMAIL');
+  const eventoFijo = !!plantilla || !!claveInicial;
+  const canalFijo = !!plantilla || !!canalInicial;
+  const [clave, setClave] = useState(plantilla?.clave ?? claveInicial ?? '');
+  const [canal, setCanal] = useState<CanalNotificacion>(plantilla?.canal ?? canalInicial ?? 'EMAIL');
   const [asunto, setAsunto] = useState(plantilla?.asunto ?? '');
   const [cuerpo, setCuerpo] = useState(plantilla?.cuerpo ?? '');
   const [activa, setActiva] = useState(plantilla?.activa ?? true);
@@ -202,13 +285,22 @@ function ModalPlantilla({ plantilla, onClose }: { plantilla: Plantilla | null; o
   const canalesDisponibles = eventoSeleccionado?.canales ?? (['EMAIL', 'WHATSAPP', 'IN_APP', 'WEBHOOK'] as const);
 
   return (
-    <Modal titulo={plantilla ? `Editar plantilla — ${eventoSeleccionado?.etiqueta ?? plantilla.clave}` : 'Nueva plantilla'} onClose={onClose}>
+    <Modal
+      titulo={
+        plantilla
+          ? `Editar plantilla — ${eventoSeleccionado?.etiqueta ?? plantilla.clave}`
+          : claveInicial
+            ? `Configurar ${ETIQUETA_CANAL[canal]} — ${eventoSeleccionado?.etiqueta ?? claveInicial}`
+            : 'Nueva plantilla'
+      }
+      onClose={onClose}
+    >
       <form onSubmit={onSubmit} className="space-y-3">
-        {plantilla ? (
+        {eventoFijo ? (
           <div className="flex flex-col gap-1">
             <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Evento</label>
             <p className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
-              {eventoSeleccionado?.etiqueta ?? plantilla.clave}
+              {eventoSeleccionado?.etiqueta ?? plantilla?.clave ?? claveInicial}
             </p>
           </div>
         ) : (
@@ -237,7 +329,7 @@ function ModalPlantilla({ plantilla, onClose }: { plantilla: Plantilla | null; o
 
         <div className="flex flex-col gap-1">
           <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Canal</label>
-          <Select value={canal} onChange={(e) => setCanal(e.target.value as CanalNotificacion)} disabled={!!plantilla}>
+          <Select value={canal} onChange={(e) => setCanal(e.target.value as CanalNotificacion)} disabled={canalFijo}>
             {canalesDisponibles.map((c) => (
               <option key={c} value={c}>
                 {ETIQUETA_CANAL[c]}
