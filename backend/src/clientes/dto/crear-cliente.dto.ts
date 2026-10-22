@@ -88,9 +88,18 @@ export class CrearClienteDto {
   @ApiProperty({
     required: false,
     default: true,
-    description: 'Si recibe los avisos automáticos de Factura/Nota de Crédito/Nota de Débito/Cotización por email/WhatsApp.',
+    description: 'Si recibe por Email los avisos automáticos de Factura/Nota de Crédito/Nota de Débito/Cotización.',
   })
   @IsOptional()
   @IsBoolean()
-  notificacionesHabilitadas?: boolean;
+  notificacionesEmailHabilitadas?: boolean;
+
+  @ApiProperty({
+    required: false,
+    default: true,
+    description: 'Si recibe por WhatsApp los avisos automáticos de Factura/Nota de Crédito/Nota de Débito/Cotización.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  notificacionesWhatsappHabilitadas?: boolean;
 }

@@ -34,7 +34,8 @@ export interface ClienteFormValues {
   comprobanteFiscalPorDefecto: TipoComprobanteFiscal | '';
   condicionPagoPorDefecto: CondicionPago | '';
   plazoPagoDias: string;
-  notificacionesHabilitadas: boolean;
+  notificacionesEmailHabilitadas: boolean;
+  notificacionesWhatsappHabilitadas: boolean;
 }
 
 export const CLIENTE_VACIO: ClienteFormValues = {
@@ -52,7 +53,8 @@ export const CLIENTE_VACIO: ClienteFormValues = {
   comprobanteFiscalPorDefecto: '',
   condicionPagoPorDefecto: '',
   plazoPagoDias: '30',
-  notificacionesHabilitadas: true,
+  notificacionesEmailHabilitadas: true,
+  notificacionesWhatsappHabilitadas: true,
 };
 
 /**
@@ -83,7 +85,8 @@ export function FormularioCliente({ cliente, onGuardado }: { cliente: Cliente | 
           comprobanteFiscalPorDefecto: cliente.comprobanteFiscalPorDefecto ?? '',
           condicionPagoPorDefecto: cliente.condicionPagoPorDefecto ?? '',
           plazoPagoDias: String(cliente.plazoPagoDias),
-          notificacionesHabilitadas: cliente.notificacionesHabilitadas ?? true,
+          notificacionesEmailHabilitadas: cliente.notificacionesEmailHabilitadas ?? true,
+          notificacionesWhatsappHabilitadas: cliente.notificacionesWhatsappHabilitadas ?? true,
         }
       : CLIENTE_VACIO,
   );
@@ -105,7 +108,8 @@ export function FormularioCliente({ cliente, onGuardado }: { cliente: Cliente | 
       comprobanteFiscalPorDefecto: valores.comprobanteFiscalPorDefecto || null,
       condicionPagoPorDefecto: valores.condicionPagoPorDefecto || null,
       plazoPagoDias: valores.plazoPagoDias ? Number(valores.plazoPagoDias) : undefined,
-      notificacionesHabilitadas: valores.notificacionesHabilitadas,
+      notificacionesEmailHabilitadas: valores.notificacionesEmailHabilitadas,
+      notificacionesWhatsappHabilitadas: valores.notificacionesWhatsappHabilitadas,
     };
   }
 
@@ -255,14 +259,25 @@ export function FormularioCliente({ cliente, onGuardado }: { cliente: Cliente | 
           value={valores.plazoPagoDias}
           onChange={(e) => setValores((v) => ({ ...v, plazoPagoDias: e.target.value }))}
         />
-        <div className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 px-3 py-2 dark:border-slate-700 sm:col-span-2">
-          <div>
-            <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Notificar automáticamente</p>
-            <p className="text-xs text-slate-500 dark:text-slate-400">
-              Email/WhatsApp al crear una Factura, Nota de Crédito/Débito o enviar una Cotización.
-            </p>
+        <div className="flex flex-col gap-2 rounded-lg border border-slate-200 px-3 py-2 dark:border-slate-700 sm:col-span-2">
+          <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Notificar automáticamente</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            Al crear una Factura, Nota de Crédito/Débito o enviar una Cotización — por canal, activá solo los que este cliente quiera.
+          </p>
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-sm text-slate-600 dark:text-slate-300">Email</span>
+            <Switch
+              activo={valores.notificacionesEmailHabilitadas}
+              onChange={(valor) => setValores((v) => ({ ...v, notificacionesEmailHabilitadas: valor }))}
+            />
           </div>
-          <Switch activo={valores.notificacionesHabilitadas} onChange={(valor) => setValores((v) => ({ ...v, notificacionesHabilitadas: valor }))} />
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-sm text-slate-600 dark:text-slate-300">WhatsApp</span>
+            <Switch
+              activo={valores.notificacionesWhatsappHabilitadas}
+              onChange={(valor) => setValores((v) => ({ ...v, notificacionesWhatsappHabilitadas: valor }))}
+            />
+          </div>
         </div>
       </div>
 
