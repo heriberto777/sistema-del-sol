@@ -2,6 +2,7 @@ import { TipoDocumentoImpreso } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { EmisorDocumentoPdf, FirmaDocumentoPdf, QrDocumentoPdf } from '../pdf/documento-pdf';
 import { LayoutDocumento } from '../pdf/documento-pdf-layout';
+import { LayoutTermico } from '../pdf/documento-ticket';
 import { generarQrDataUri } from '../qr/generar-qr';
 
 export const CLAVE_DOCUMENTO_NOTA_PIE = 'DOCUMENTO_NOTA_PIE';
@@ -19,6 +20,14 @@ function validarLayoutDocumento(valor: unknown): LayoutDocumento | null {
   const bloques = (valor as { bloques?: unknown }).bloques;
   if (!Array.isArray(bloques) || bloques.length === 0) return null;
   return { bloques: bloques as LayoutDocumento['bloques'] };
+}
+
+/** Mismo criterio defensivo que `validarLayoutDocumento`, para el layout del ticket térmico (Fase G). */
+function validarLayoutTermico(valor: unknown): LayoutTermico | null {
+  if (!valor || typeof valor !== 'object') return null;
+  const bloques = (valor as { bloques?: unknown }).bloques;
+  if (!Array.isArray(bloques) || bloques.length === 0) return null;
+  return { bloques: bloques as LayoutTermico['bloques'] };
 }
 
 /**
@@ -56,6 +65,7 @@ export async function resolverPersonalizacionDocumento(
   qr?: QrDocumentoPdf;
   firma?: FirmaDocumentoPdf;
   layoutPersonalizado?: LayoutDocumento | null;
+  layoutTermico?: LayoutTermico | null;
   observacionesVisibles: boolean;
 }> {
   const [tenant, notaPieFila, configTipo] = await Promise.all([
@@ -91,6 +101,7 @@ export async function resolverPersonalizacionDocumento(
     qr,
     firma,
     layoutPersonalizado: configTipo ? validarLayoutDocumento(configTipo.layoutPersonalizado) : null,
+    layoutTermico: configTipo ? validarLayoutTermico(configTipo.layoutTermico) : null,
     // Sin fila de PersonalizacionDocumentoTipo, mismo criterio que el resto
     // de este objeto: "no hay configuración todavía" = comportamiento de
     // siempre, que acá es mostrar las observaciones si el documento las trae.

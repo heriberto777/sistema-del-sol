@@ -1,7 +1,7 @@
 import { BadRequestException, Body, Controller, Get, Param, Put, Query, Res } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
-import { TipoDocumentoImpreso } from '@prisma/client';
+import { FormatoImpresion, TipoDocumentoImpreso } from '@prisma/client';
 import { PersonalizacionDocumentosService } from './personalizacion-documentos.service';
 import { CAMPOS_DOCUMENTO } from '../common/pdf/campos-documento';
 import { ActualizarPersonalizacionTipoDto } from './dto/actualizar-personalizacion-tipo.dto';
@@ -66,11 +66,20 @@ export class PersonalizacionDocumentosController {
     return this.service.actualizarLayout(user.tenantId, validarTipo(tipo), dto.bloques);
   }
 
+  // Fase G — editor básico del ticket térmico (lista ordenada, sin posición libre). Mismo DTO que
+  // el layout de Carta/A4 (misma forma `{ bloques: [...] }`, misma validación defensiva al leer).
+  @Put(':tipo/layout-termico')
+  @Permissions('admin.configuracion')
+  actualizarLayoutTermico(@Param('tipo') tipo: string, @Body() dto: ActualizarLayoutDocumentoDto, @CurrentUser() user: JwtPayloadUser) {
+    return this.service.actualizarLayoutTermico(user.tenantId, validarTipo(tipo), dto.bloques);
+  }
+
+  /** Con `?formato=TERMICA_80MM/58MM`, devuelve el HTML del ticket en vez del PDF — para previsualizar el editor de ticket (Fase G). */
   @Get(':tipo/preview')
   @Permissions('admin.configuracion')
-  async preview(@Param('tipo') tipo: string, @CurrentUser() user: JwtPayloadUser, @Res() res: Response) {
-    const buffer = await this.service.generarPreview(user.tenantId, validarTipo(tipo));
-    res.set({ 'Content-Type': 'application/pdf', 'Content-Disposition': 'inline; filename="vista-previa.pdf"' });
+  async preview(@Param('tipo') tipo: string, @Query('formato') formato: FormatoImpresion | undefined, @CurrentUser() user: JwtPayloadUser, @Res() res: Response) {
+    const { buffer, contentType } = await this.service.generarPreview(user.tenantId, validarTipo(tipo), formato);
+    res.set({ 'Content-Type': contentType, 'Content-Disposition': 'inline; filename="vista-previa"' });
     res.send(buffer);
   }
 }

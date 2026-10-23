@@ -776,10 +776,10 @@ export class FacturacionService {
       plantillaSolicitada ?? resolverPlantillaDocumento(this.prisma, tenantId, factura.bodegaId),
       resolverPersonalizacionDocumento(this.prisma, tenantId, 'FACTURA'),
     ]);
-    const { layoutPersonalizado, observacionesVisibles, ...resto } = personalizacion;
+    const { layoutPersonalizado, layoutTermico, observacionesVisibles, ...resto } = personalizacion;
     const base = mapearFacturaAParams(factura);
     const params = { ...base, ...resto, notas: observacionesVisibles ? base.notas : undefined };
-    return generarDocumentoImpreso(params, formato, plantilla, layoutPersonalizado);
+    return generarDocumentoImpreso(params, formato, plantilla, layoutPersonalizado, layoutTermico);
   }
 
   async listar(query: ListarFacturasQueryDto) {

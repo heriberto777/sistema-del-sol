@@ -1,5 +1,6 @@
-import { DocumentoPdfParams } from './documento-pdf';
+import { DocumentoPdfParams, datosClienteExtra } from './documento-pdf';
 import { formatearMontoDop } from './formato-monto';
+import { ClaveCampoDocumento, valorCampoDocumento } from './campos-documento';
 
 export type AnchoTicket = 'TERMICA_80MM' | 'TERMICA_58MM';
 
@@ -7,6 +8,28 @@ const DIMENSIONES: Record<AnchoTicket, { pageSize: string; margin: string; fontS
   TERMICA_80MM: { pageSize: '80mm auto', margin: '3mm', fontSize: '11px' },
   TERMICA_58MM: { pageSize: '58mm auto', margin: '2mm', fontSize: '9.5px' },
 };
+
+/**
+ * "Formato de Documentos" Fase G — editor básico para el ticket térmico:
+ * a diferencia del canvas de Carta/A4 (posición libre x/y, que no tiene
+ * sentido en un rollo continuo sin alto fijo y demasiado angosto para
+ * columnas lado a lado), acá el layout es una lista ORDENADA de bloques
+ * que se apilan verticalmente — el orden del array ES el orden de
+ * impresión, y un bloque ausente simplemente no se imprime.
+ */
+export type TipoBloqueTermico = 'logo' | 'encabezado' | 'cliente' | 'tabla_lineas' | 'totales' | 'campo' | 'observaciones' | 'texto_legal';
+
+export interface BloqueTermico {
+  tipo: TipoBloqueTermico;
+  /** Solo para tipo "campo" — ver ClaveCampoDocumento. */
+  campo?: ClaveCampoDocumento;
+  /** Solo para tipo "campo" — prefijo opcional, ej. "Mesa:". */
+  etiqueta?: string;
+}
+
+export interface LayoutTermico {
+  bloques: BloqueTermico[];
+}
 
 /**
  * A diferencia de PDFKit (que nunca interpreta su texto como markup),
@@ -30,8 +53,13 @@ function escaparHtml(valor: string): string {
  * la lógica de negocio que ya arma cada servicio (Facturación/
  * Cotizaciones/Remisiones). Layout apilado (no tabla de columnas fija):
  * el ancho angosto no alcanza para columnas alineadas de forma legible.
+ *
+ * Sin `layoutTermico` (el caso de todo tenant que nunca abrió el editor
+ * de ticket), el cuerpo es EXACTAMENTE el de siempre — ningún cambio de
+ * comportamiento. Con `layoutTermico`, el cuerpo se arma bloque por
+ * bloque en el orden configurado.
  */
-export function generarDocumentoTicketHtml(params: DocumentoPdfParams, ancho: AnchoTicket): string {
+export function generarDocumentoTicketHtml(params: DocumentoPdfParams, ancho: AnchoTicket, layoutTermico?: LayoutTermico | null): string {
   const mostrarPrecios = params.mostrarPrecios ?? true;
   const { pageSize, margin, fontSize } = DIMENSIONES[ancho];
   const e = escaparHtml;
@@ -56,6 +84,21 @@ export function generarDocumentoTicketHtml(params: DocumentoPdfParams, ancho: An
       </div>`
     : '';
 
+  const cuerpo = layoutTermico
+    ? layoutTermico.bloques.map((bloque) => renderBloqueTermico(bloque, params, e, lineasHtml, totalesHtml)).join('')
+    : `<div class="encabezado">
+    ${params.logo?.startsWith('data:image/') ? `<img class="logo" src="${e(params.logo)}" alt="">` : ''}
+    <h1>${e(params.tipoDocumento)}</h1>
+    <p>Número: ${e(params.numero)}</p>
+    <p>Fecha: ${e(params.fecha.toLocaleDateString('es-DO'))}</p>
+    <p>Cliente: ${e(params.cliente)}</p>
+  </div>
+  <hr>
+  ${lineasHtml}
+  ${totalesHtml ? `<hr>${totalesHtml}` : ''}
+  ${params.notas ? `<div class="notas">Notas: ${e(params.notas)}</div>` : ''}
+  ${params.notaPie ? `<div class="nota-pie">${e(params.notaPie)}</div>` : ''}`;
+
   return `<!DOCTYPE html>
 <html lang="es-DO">
 <head>
@@ -77,22 +120,61 @@ export function generarDocumentoTicketHtml(params: DocumentoPdfParams, ancho: An
   .notas { margin-top: 8px; }
   .nota-pie { margin-top: 8px; text-align: center; }
   .logo { max-width: 60%; max-height: 60px; margin-bottom: 4px; }
+  .campo { margin: 0 0 4px; }
+  .cliente p { margin: 0; }
 </style>
 </head>
 <body>
-  <div class="encabezado">
-    ${params.logo?.startsWith('data:image/') ? `<img class="logo" src="${e(params.logo)}" alt="">` : ''}
-    <h1>${e(params.tipoDocumento)}</h1>
-    <p>Número: ${e(params.numero)}</p>
-    <p>Fecha: ${e(params.fecha.toLocaleDateString('es-DO'))}</p>
-    <p>Cliente: ${e(params.cliente)}</p>
-  </div>
-  <hr>
-  ${lineasHtml}
-  ${totalesHtml ? `<hr>${totalesHtml}` : ''}
-  ${params.notas ? `<div class="notas">Notas: ${e(params.notas)}</div>` : ''}
-  ${params.notaPie ? `<div class="nota-pie">${e(params.notaPie)}</div>` : ''}
+  ${cuerpo}
   <script>window.onload = () => window.print();</script>
 </body>
 </html>`;
+}
+
+function renderBloqueTermico(
+  bloque: BloqueTermico,
+  params: DocumentoPdfParams,
+  e: (v: string) => string,
+  lineasHtml: string,
+  totalesHtml: string,
+): string {
+  switch (bloque.tipo) {
+    case 'logo':
+      return params.logo?.startsWith('data:image/') ? `<div class="encabezado"><img class="logo" src="${e(params.logo)}" alt=""></div>` : '';
+
+    case 'encabezado':
+      return `<div class="encabezado">
+        <h1>${e(params.tipoDocumento)}</h1>
+        <p>Número: ${e(params.numero)}</p>
+        <p>Fecha: ${e(params.fecha.toLocaleDateString('es-DO'))}</p>
+      </div>`;
+
+    case 'cliente': {
+      const extra = datosClienteExtra(params);
+      return `<div class="cliente">
+        <p>Cliente: ${e(params.cliente)}</p>
+        ${extra.map((linea) => `<p>${e(linea)}</p>`).join('')}
+      </div>`;
+    }
+
+    case 'tabla_lineas':
+      return lineasHtml ? `<hr>${lineasHtml}` : '';
+
+    case 'totales':
+      return totalesHtml ? `<hr>${totalesHtml}` : '';
+
+    case 'campo': {
+      if (!bloque.campo) return '';
+      const valor = valorCampoDocumento(params, bloque.campo);
+      if (!valor) return '';
+      const prefijo = bloque.etiqueta ? `${e(bloque.etiqueta)} ` : '';
+      return `<p class="campo">${prefijo}${e(valor)}</p>`;
+    }
+
+    case 'observaciones':
+      return params.notas ? `<div class="notas">Notas: ${e(params.notas)}</div>` : '';
+
+    case 'texto_legal':
+      return params.notaPie ? `<div class="nota-pie">${e(params.notaPie)}</div>` : '';
+  }
 }

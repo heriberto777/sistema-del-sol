@@ -9,7 +9,8 @@ import { Button } from '../../atoms/Button/Button';
 import { Select } from '../../atoms/Select/Select';
 import { CampoImagen } from '../../molecules/CampoImagen/CampoImagen';
 import { EditorLayoutDocumento } from '../EditorLayoutDocumento/EditorLayoutDocumento';
-import { BloqueLayout } from '../../../types/layout-documento';
+import { EditorLayoutTermico } from '../EditorLayoutTermico/EditorLayoutTermico';
+import { BloqueLayout, BloqueTermico } from '../../../types/layout-documento';
 
 type TipoDocumento = 'FACTURA' | 'COTIZACION' | 'REMISION' | 'ORDEN_COMPRA';
 type QrContenido = 'LINK_PAGO' | 'TEXTO_LIBRE';
@@ -30,6 +31,7 @@ interface TipoPersonalizacion {
   firmaImagen: string;
   observacionesVisibles: boolean;
   layoutPersonalizado: BloqueLayout[] | null;
+  layoutTermico: BloqueTermico[] | null;
 }
 
 interface PersonalizacionDocumentos {
@@ -158,26 +160,43 @@ export function FormatoDocumentosPanel() {
 }
 
 function FormularioTipo({ tipo }: { tipo: TipoPersonalizacion }) {
-  const [modoEditor, setModoEditor] = useState(tipo.layoutPersonalizado !== null);
+  const [modoEditor, setModoEditor] = useState<'simple' | 'canvas' | 'termico'>(tipo.layoutPersonalizado !== null ? 'canvas' : 'simple');
 
-  if (modoEditor) {
-    return <EditorLayoutDocumento tipoDocumento={tipo.tipoDocumento} bloquesGuardados={tipo.layoutPersonalizado} onCerrar={() => setModoEditor(false)} />;
+  if (modoEditor === 'canvas') {
+    return <EditorLayoutDocumento tipoDocumento={tipo.tipoDocumento} bloquesGuardados={tipo.layoutPersonalizado} onCerrar={() => setModoEditor('simple')} />;
+  }
+
+  if (modoEditor === 'termico') {
+    return <EditorLayoutTermico tipoDocumento={tipo.tipoDocumento} bloquesGuardados={tipo.layoutTermico} onCerrar={() => setModoEditor('simple')} />;
   }
 
   return (
     <div className="space-y-4">
       {tipo.layoutPersonalizado !== null && (
         <div className="flex items-center justify-between gap-3 rounded-lg border border-sol-300 bg-sol-50 px-4 py-2.5 text-sm text-sol-800 dark:border-sol-800 dark:bg-sol-900/30 dark:text-sol-200">
-          <span>Este documento ya tiene un editor visual personalizado activo — los campos de abajo no se usan mientras esté activo.</span>
-          <Button type="button" variante="secundario" onClick={() => setModoEditor(true)}>
+          <span>Este documento ya tiene un editor visual personalizado activo (Carta/A4) — los campos de abajo no se usan mientras esté activo.</span>
+          <Button type="button" variante="secundario" onClick={() => setModoEditor('canvas')}>
             Editar layout
           </Button>
         </div>
       )}
+      {tipo.layoutTermico !== null && (
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-sol-300 bg-sol-50 px-4 py-2.5 text-sm text-sol-800 dark:border-sol-800 dark:bg-sol-900/30 dark:text-sol-200">
+          <span>Este documento ya tiene un diseño de ticket térmico personalizado activo.</span>
+          <Button type="button" variante="secundario" onClick={() => setModoEditor('termico')}>
+            Editar ticket
+          </Button>
+        </div>
+      )}
       <FormularioSimple tipo={tipo} />
-      <button type="button" onClick={() => setModoEditor(true)} className="text-xs text-sol-600 hover:underline dark:text-sol-400">
-        Usar editor visual (mover y redimensionar bloques libremente) →
-      </button>
+      <div className="flex flex-col gap-1 sm:flex-row sm:gap-4">
+        <button type="button" onClick={() => setModoEditor('canvas')} className="text-xs text-sol-600 hover:underline dark:text-sol-400">
+          Usar editor visual para Carta/A4 (mover y redimensionar bloques libremente) →
+        </button>
+        <button type="button" onClick={() => setModoEditor('termico')} className="text-xs text-sol-600 hover:underline dark:text-sol-400">
+          Diseñar el ticket térmico (80mm/58mm) →
+        </button>
+      </div>
     </div>
   );
 }

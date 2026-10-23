@@ -45,10 +45,10 @@ export class ComprasService {
       plantillaSolicitada ?? resolverPlantillaDocumento(this.prisma, tenantId, null),
       resolverPersonalizacionDocumento(this.prisma, tenantId, 'ORDEN_COMPRA'),
     ]);
-    const { layoutPersonalizado, observacionesVisibles, ...resto } = personalizacion;
+    const { layoutPersonalizado, layoutTermico, observacionesVisibles, ...resto } = personalizacion;
     const base = mapearOrdenCompraAParams(orden);
     const params = { ...base, ...resto, notas: observacionesVisibles ? base.notas : undefined };
-    return generarDocumentoImpreso(params, formato, plantilla, layoutPersonalizado);
+    return generarDocumentoImpreso(params, formato, plantilla, layoutPersonalizado, layoutTermico);
   }
 
   async crear(dto: CrearOrdenCompraDto, userId: string, tenantId: string) {

@@ -63,4 +63,22 @@ export class PersonalizacionDocumentosRepository {
       update: { layoutPersonalizado },
     });
   }
+
+  /** Mismo criterio que `actualizarLayout`, para el layout del ticket térmico (Fase G) — columna separada, no se pisan entre sí. */
+  actualizarLayoutTermico(tenantId: string, tipoDocumento: TipoDocumentoImpreso, bloques: Record<string, unknown>[] | null) {
+    const layoutTermico = bloques && bloques.length > 0 ? ({ bloques } as Prisma.InputJsonValue) : Prisma.DbNull;
+    return this.db.personalizacionDocumentoTipo.upsert({
+      where: { tenantId_tipoDocumento: { tenantId, tipoDocumento } },
+      create: {
+        tenantId,
+        tipoDocumento,
+        camposEmisorVisibles: [],
+        camposClienteVisibles: [],
+        columnasLinea: [],
+        totalesVisibles: [],
+        layoutTermico,
+      },
+      update: { layoutTermico },
+    });
+  }
 }

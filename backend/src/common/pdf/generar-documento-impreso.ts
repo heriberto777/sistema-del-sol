@@ -2,28 +2,29 @@ import { FormatoImpresion, PlantillaDocumento, TipoDocumentoImpreso } from '@pri
 import { PrismaService } from '../../prisma/prisma.service';
 import { DocumentoPdfParams, generarDocumentoPdf } from './documento-pdf';
 import { LayoutDocumento, generarDocumentoPdfLayout } from './documento-pdf-layout';
-import { generarDocumentoTicketHtml } from './documento-ticket';
+import { LayoutTermico, generarDocumentoTicketHtml } from './documento-ticket';
 import { resolverPlantillaDocumento } from '../impresion/resolver-plantilla-documento';
 import { resolverPersonalizacionDocumento } from '../impresion/resolver-personalizacion-documento';
 
 /**
- * Punto único donde Facturación/Cotizaciones/Remisiones deciden CÓMO
- * imprimir — antes repetido 3 veces en cada `generarImpreso()`. "Formato
- * de Documentos" Fase C agrega una tercera rama (layout de bloques
- * libres) a las dos que ya existían (térmico vs. una de las 5
- * `PlantillaDocumento` fijas); `layoutPersonalizado` SIEMPRE gana sobre
- * `plantilla` cuando está presente, salvo en térmico — los tickets
- * angostos siguen con su único layout fijo a propósito (ver
- * documento-ticket.ts).
+ * Punto único donde Facturación/Cotizaciones/Remisiones/Compras deciden
+ * CÓMO imprimir — antes repetido en cada `generarImpreso()`. "Formato de
+ * Documentos" Fase C agrega una rama de layout de bloques libres para
+ * Carta/A4 (`layoutPersonalizado`, SIEMPRE gana sobre `plantilla` cuando
+ * está presente); Fase G agrega el equivalente para térmico
+ * (`layoutTermico`, lista ordenada de bloques apilados — ver
+ * documento-ticket.ts, un paradigma distinto del canvas x/y porque un
+ * ticket es un rollo continuo sin alto fijo).
  */
 export async function generarDocumentoImpreso(
   params: DocumentoPdfParams,
   formato: FormatoImpresion,
   plantilla: PlantillaDocumento,
   layoutPersonalizado?: LayoutDocumento | null,
+  layoutTermico?: LayoutTermico | null,
 ): Promise<{ buffer: Buffer; contentType: string }> {
   if (formato === 'TERMICA_80MM' || formato === 'TERMICA_58MM') {
-    return { buffer: Buffer.from(generarDocumentoTicketHtml(params, formato), 'utf-8'), contentType: 'text/html; charset=utf-8' };
+    return { buffer: Buffer.from(generarDocumentoTicketHtml(params, formato, layoutTermico), 'utf-8'), contentType: 'text/html; charset=utf-8' };
   }
 
   const tamanoPagina = formato === 'A4' ? 'a4' : 'letter';

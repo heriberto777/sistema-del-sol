@@ -222,10 +222,10 @@ export class RemisionesService {
       plantillaSolicitada ?? resolverPlantillaDocumento(this.prisma, tenantId, remision.bodegaId),
       resolverPersonalizacionDocumento(this.prisma, tenantId, 'REMISION'),
     ]);
-    const { layoutPersonalizado, observacionesVisibles, ...resto } = personalizacion;
+    const { layoutPersonalizado, layoutTermico, observacionesVisibles, ...resto } = personalizacion;
     const base = this.mapearRemisionAParams(remision);
     const params = { ...base, ...resto, notas: observacionesVisibles ? base.notas : undefined };
-    return generarDocumentoImpreso(params, formato, plantilla, layoutPersonalizado);
+    return generarDocumentoImpreso(params, formato, plantilla, layoutPersonalizado, layoutTermico);
   }
 
   private validarQueSigaAbierta(remision: { estado: string; facturaId: string | null }) {

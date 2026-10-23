@@ -134,14 +134,15 @@ describe('PersonalizacionDocumentosService', () => {
       resolverPlantillaDocumentoMock.mockResolvedValue('EDITORIAL');
       resolverPersonalizacionDocumentoMock.mockResolvedValue({ colorAcento: '#c7922f' });
 
-      const buffer = await service.generarPreview('tenant-1', 'FACTURA');
+      const resultado = await service.generarPreview('tenant-1', 'FACTURA');
 
       expect(resolverPersonalizacionDocumentoMock).toHaveBeenCalledWith(expect.anything(), 'tenant-1', 'FACTURA');
       expect(generarDocumentoPdfMock).toHaveBeenCalledWith(
         expect.objectContaining({ tipoDocumento: 'Factura de venta', colorAcento: '#c7922f', mostrarPrecios: true }),
         { plantilla: 'EDITORIAL' },
       );
-      expect(buffer.toString('latin1').startsWith('%PDF-')).toBe(true);
+      expect(resultado.buffer.toString('latin1').startsWith('%PDF-')).toBe(true);
+      expect(resultado.contentType).toBe('application/pdf');
     });
 
     it('la vista previa de Remisión no muestra precios (mismo criterio que el documento real)', async () => {
@@ -154,11 +155,11 @@ describe('PersonalizacionDocumentosService', () => {
       const layout = { bloques: [{ tipo: 'tabla_lineas', x: 5, y: 10, w: 90, h: 40 }] };
       resolverPersonalizacionDocumentoMock.mockResolvedValue({ colorAcento: '#c7922f', layoutPersonalizado: layout });
 
-      const buffer = await service.generarPreview('tenant-1', 'FACTURA');
+      const resultado = await service.generarPreview('tenant-1', 'FACTURA');
 
       expect(generarDocumentoPdfLayoutMock).toHaveBeenCalledWith(expect.objectContaining({ tipoDocumento: 'Factura de venta', colorAcento: '#c7922f' }), layout);
       expect(generarDocumentoPdfMock).not.toHaveBeenCalled();
-      expect(buffer.toString('latin1')).toBe('%PDF-layout');
+      expect(resultado.buffer.toString('latin1')).toBe('%PDF-layout');
     });
   });
 });

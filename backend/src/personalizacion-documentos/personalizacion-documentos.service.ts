@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { TipoDocumentoImpreso } from '@prisma/client';
+import { FormatoImpresion, TipoDocumentoImpreso } from '@prisma/client';
 import { PersonalizacionDocumentosRepository } from './personalizacion-documentos.repository';
 import { ActualizarPersonalizacionTipoDto } from './dto/actualizar-personalizacion-tipo.dto';
 import { ActualizarMarcaDocumentosDto } from './dto/actualizar-marca-documentos.dto';
@@ -8,6 +8,7 @@ import { resolverPlantillaDocumento } from '../common/impresion/resolver-plantil
 import { resolverPersonalizacionDocumento } from '../common/impresion/resolver-personalizacion-documento';
 import { generarDocumentoPdf } from '../common/pdf/documento-pdf';
 import { generarDocumentoPdfLayout } from '../common/pdf/documento-pdf-layout';
+import { generarDocumentoTicketHtml } from '../common/pdf/documento-ticket';
 
 const TIPOS: TipoDocumentoImpreso[] = ['FACTURA', 'COTIZACION', 'REMISION', 'ORDEN_COMPRA'];
 
@@ -77,6 +78,7 @@ export class PersonalizacionDocumentosService {
           firmaImagen: fila?.firmaImagen ?? '',
           observacionesVisibles: fila?.observacionesVisibles ?? true,
           layoutPersonalizado: (fila?.layoutPersonalizado as { bloques?: unknown[] } | null)?.bloques ?? null,
+          layoutTermico: (fila?.layoutTermico as { bloques?: unknown[] } | null)?.bloques ?? null,
         };
       }),
     };
@@ -94,14 +96,24 @@ export class PersonalizacionDocumentosService {
     return this.repository.actualizarLayout(tenantId, tipoDocumento, bloques ?? null);
   }
 
-  /** Vista previa — genera un PDF con datos de ejemplo y la configuración YA GUARDADA para ese tipo (no la del formulario sin guardar: guardar primero, previsualizar después, mismo criterio simple que el resto del sistema). */
-  async generarPreview(tenantId: string, tipoDocumento: TipoDocumentoImpreso): Promise<Buffer> {
+  actualizarLayoutTermico(tenantId: string, tipoDocumento: TipoDocumentoImpreso, bloques: Record<string, unknown>[] | null | undefined) {
+    return this.repository.actualizarLayoutTermico(tenantId, tipoDocumento, bloques ?? null);
+  }
+
+  /**
+   * Vista previa — genera un documento con datos de ejemplo y la
+   * configuración YA GUARDADA para ese tipo (no la del formulario sin
+   * guardar: guardar primero, previsualizar después, mismo criterio
+   * simple que el resto del sistema). Con `formato` térmico, devuelve el
+   * HTML del ticket (con su propio `layoutTermico`) en vez de un PDF.
+   */
+  async generarPreview(tenantId: string, tipoDocumento: TipoDocumentoImpreso, formato?: FormatoImpresion): Promise<{ buffer: Buffer; contentType: string }> {
     const [plantilla, personalizacion] = await Promise.all([
       resolverPlantillaDocumento(this.prisma, tenantId, null),
       resolverPersonalizacionDocumento(this.prisma, tenantId, tipoDocumento),
     ]);
 
-    const { layoutPersonalizado, ...resto } = personalizacion;
+    const { layoutPersonalizado, layoutTermico, ...resto } = personalizacion;
     const params = {
       tipoDocumento: ETIQUETA_TIPO[tipoDocumento],
       numero: 'B0200000001',
@@ -139,6 +151,10 @@ export class PersonalizacionDocumentosService {
       ...resto,
     };
 
-    return layoutPersonalizado ? generarDocumentoPdfLayout(params, layoutPersonalizado) : generarDocumentoPdf(params, { plantilla });
+    if (formato === 'TERMICA_80MM' || formato === 'TERMICA_58MM') {
+      return { buffer: Buffer.from(generarDocumentoTicketHtml(params, formato, layoutTermico), 'utf-8'), contentType: 'text/html; charset=utf-8' };
+    }
+    const buffer = layoutPersonalizado ? await generarDocumentoPdfLayout(params, layoutPersonalizado) : await generarDocumentoPdf(params, { plantilla });
+    return { buffer, contentType: 'application/pdf' };
   }
 }

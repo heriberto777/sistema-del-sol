@@ -273,10 +273,10 @@ export class CotizacionesService {
       plantillaSolicitada ?? resolverPlantillaDocumento(this.prisma, tenantId, null),
       resolverPersonalizacionDocumento(this.prisma, tenantId, 'COTIZACION'),
     ]);
-    const { layoutPersonalizado, observacionesVisibles, ...resto } = personalizacion;
+    const { layoutPersonalizado, layoutTermico, observacionesVisibles, ...resto } = personalizacion;
     const base = mapearCotizacionAParams(cotizacion);
     const params = { ...base, ...resto, notas: observacionesVisibles ? base.notas : undefined };
-    return generarDocumentoImpreso(params, formato, plantilla, layoutPersonalizado);
+    return generarDocumentoImpreso(params, formato, plantilla, layoutPersonalizado, layoutTermico);
   }
 
   async convertirEnFactura(id: string, dto: ConvertirCotizacionDto, tenantId: string, vendedorId: string) {

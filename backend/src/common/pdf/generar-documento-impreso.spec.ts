@@ -33,10 +33,11 @@ describe('generarDocumentoImpreso', () => {
     generarDocumentoTicketHtmlMock.mockReset().mockReturnValue('<html>ticket</html>');
   });
 
-  it('usa el HTML de ticket para formatos térmicos, ignorando plantilla/layout', async () => {
-    const resultado = await generarDocumentoImpreso(PARAMS, 'TERMICA_80MM', 'EDITORIAL', { bloques: [] });
+  it('usa el HTML de ticket para formatos térmicos, ignorando plantilla/layout de Carta/A4 (pero pasando el layoutTermico propio)', async () => {
+    const layoutTermico = { bloques: [{ tipo: 'encabezado' as const }] };
+    const resultado = await generarDocumentoImpreso(PARAMS, 'TERMICA_80MM', 'EDITORIAL', { bloques: [] }, layoutTermico);
 
-    expect(generarDocumentoTicketHtmlMock).toHaveBeenCalledWith(PARAMS, 'TERMICA_80MM');
+    expect(generarDocumentoTicketHtmlMock).toHaveBeenCalledWith(PARAMS, 'TERMICA_80MM', layoutTermico);
     expect(resultado.contentType).toBe('text/html; charset=utf-8');
     expect(generarDocumentoPdfMock).not.toHaveBeenCalled();
     expect(generarDocumentoPdfLayoutMock).not.toHaveBeenCalled();

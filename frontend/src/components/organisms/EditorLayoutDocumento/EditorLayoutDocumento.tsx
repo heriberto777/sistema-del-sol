@@ -26,6 +26,7 @@ const BLOQUE_POR_DEFECTO: Record<TipoBloque, Omit<BloqueLayout, 'tipo'>> = {
   texto_legal: { x: 5, y: 92, w: 90, h: 6 },
   imagen_libre: { x: 5, y: 50, w: 20, h: 20, imagen: '' },
   campo: { x: 5, y: 60, w: 40, h: 6, campo: 'numero', etiqueta: '' },
+  badge: { x: 70, y: 20, w: 25, h: 7, campo: 'estado' },
 };
 
 interface EditorLayoutDocumentoProps {
@@ -54,7 +55,7 @@ export function EditorLayoutDocumento({ tipoDocumento, bloquesGuardados, onCerra
   });
 
   const tiposDisponibles = (Object.keys(ETIQUETA_BLOQUE) as TipoBloque[]).filter(
-    (t) => t === 'imagen_libre' || t === 'campo' || !bloques.some((b) => b.tipo === t),
+    (t) => t === 'imagen_libre' || t === 'campo' || t === 'badge' || !bloques.some((b) => b.tipo === t),
   );
 
   function agregarBloque(tipo: TipoBloque) {
@@ -194,8 +195,8 @@ export function EditorLayoutDocumento({ tipoDocumento, bloquesGuardados, onCerra
                 }}
               >
                 <span className="rounded bg-white/90 px-1.5 py-0.5 text-[10px] font-medium text-slate-600 shadow-sm dark:bg-slate-900/90 dark:text-slate-300">
-                  {bloque.tipo === 'campo'
-                    ? (camposDisponibles?.find((c) => c.clave === bloque.campo)?.etiqueta ?? ETIQUETA_BLOQUE.campo)
+                  {bloque.tipo === 'campo' || bloque.tipo === 'badge'
+                    ? (camposDisponibles?.find((c) => c.clave === bloque.campo)?.etiqueta ?? ETIQUETA_BLOQUE[bloque.tipo])
                     : ETIQUETA_BLOQUE[bloque.tipo]}
                 </span>
                 <button
@@ -342,6 +343,19 @@ function PropiedadesBloque({
               {c.label}
             </label>
           ))}
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            <CampoColor
+              label="Fondo del encabezado"
+              valor={bloque.colorEncabezado}
+              onChange={(v) => onChange({ colorEncabezado: v })}
+            />
+            <CampoColor
+              label="Texto del encabezado"
+              valor={bloque.colorTextoEncabezado}
+              onChange={(v) => onChange({ colorTextoEncabezado: v })}
+              placeholderColor="#ffffff"
+            />
+          </div>
         </div>
       )}
 
@@ -390,6 +404,22 @@ function PropiedadesBloque({
         </div>
       )}
 
+      {bloque.tipo === 'badge' && (
+        <div className="space-y-2">
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Dato a mostrar dentro de la pastilla</label>
+            <Select value={bloque.campo ?? 'estado'} onChange={(e) => onChange({ campo: e.target.value as ClaveCampoDocumento })}>
+              {camposDisponibles.map((c) => (
+                <option key={c.clave} value={c.clave}>
+                  {c.etiqueta}
+                </option>
+              ))}
+            </Select>
+          </div>
+          <p className="text-xs text-slate-400">Sin color de fondo propio, usa el color de acento del tenant. Sin color de texto propio, blanco.</p>
+        </div>
+      )}
+
       {(bloque.tipo === 'logo' || bloque.tipo === 'encabezado' || bloque.tipo === 'qr' || bloque.tipo === 'firma' || bloque.tipo === 'texto_legal') && (
         <p className="text-xs text-slate-400">
           {bloque.tipo === 'qr' && 'Usa el QR configurado en la pestaña del formulario simple de este tipo de documento.'}
@@ -398,6 +428,43 @@ function PropiedadesBloque({
           {(bloque.tipo === 'logo' || bloque.tipo === 'encabezado') && 'Solo posición y tamaño — sin opciones adicionales.'}
         </p>
       )}
+
+      {bloque.tipo !== 'tabla_lineas' && (
+        <div className="space-y-1 border-t border-slate-100 pt-2 dark:border-slate-800">
+          <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Color</p>
+          <div className="grid grid-cols-2 gap-2">
+            <CampoColor label="Fondo" valor={bloque.colorFondo} onChange={(v) => onChange({ colorFondo: v })} />
+            <CampoColor label="Texto" valor={bloque.colorTexto} onChange={(v) => onChange({ colorTexto: v })} />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Selector de color opcional — "Quitar" vuelve al comportamiento de siempre (sin color propio). */
+function CampoColor({
+  label,
+  valor,
+  onChange,
+  placeholderColor = '#1f2937',
+}: {
+  label: string;
+  valor: string | undefined;
+  onChange: (valor: string | undefined) => void;
+  placeholderColor?: string;
+}) {
+  return (
+    <div className="flex flex-col gap-1">
+      <label className="text-xs font-medium text-slate-500 dark:text-slate-400">{label}</label>
+      <div className="flex items-center gap-1.5">
+        <input type="color" value={valor ?? placeholderColor} onChange={(e) => onChange(e.target.value)} className="h-7 w-10 cursor-pointer rounded border border-slate-300 dark:border-slate-700" />
+        {valor && (
+          <button type="button" onClick={() => onChange(undefined)} className="text-xs text-slate-400 hover:text-red-600 dark:hover:text-red-400">
+            Quitar
+          </button>
+        )}
+      </div>
     </div>
   );
 }

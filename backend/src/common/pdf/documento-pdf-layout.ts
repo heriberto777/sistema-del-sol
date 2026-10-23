@@ -9,7 +9,7 @@ const ESPACIO_ENTRE_BLOQUES = 10;
 /** Dos bloques "de abajo" se consideran del mismo renglón (van lado a lado) si su `y` original difiere en menos de esto, en % de la página. */
 const TOLERANCIA_RENGLON_PCT = 3;
 
-type TipoBloque = 'logo' | 'datos_empresa' | 'datos_cliente' | 'encabezado' | 'tabla_lineas' | 'totales' | 'qr' | 'firma' | 'texto_legal' | 'imagen_libre' | 'campo';
+type TipoBloque = 'logo' | 'datos_empresa' | 'datos_cliente' | 'encabezado' | 'tabla_lineas' | 'totales' | 'qr' | 'firma' | 'texto_legal' | 'imagen_libre' | 'campo' | 'badge';
 
 interface BloqueBase {
   tipo: TipoBloque;
@@ -18,6 +18,16 @@ interface BloqueBase {
   y: number;
   w: number;
   h: number;
+  /**
+   * "Formato de Documentos" Fase F — color de fondo propio del bloque
+   * (hex), independiente de `colorAcento`. Sin esto, el bloque no pinta
+   * fondo (comportamiento de siempre). Aplica a CUALQUIER tipo de bloque,
+   * no solo a los pensados para esto — ej. ponerle un fondo a un
+   * `texto_legal` para que se vea como una franja de color.
+   */
+  colorFondo?: string;
+  /** Color de texto propio del bloque — sin esto, usa el color por defecto de ese tipo de bloque (comportamiento de siempre). */
+  colorTexto?: string;
 }
 
 export interface BloqueLogo extends BloqueBase {
@@ -37,6 +47,10 @@ export interface BloqueEncabezado extends BloqueBase {
 export interface BloqueTablaLineas extends BloqueBase {
   tipo: 'tabla_lineas';
   columnas?: ColumnaLinea[];
+  /** Fondo del renglón de encabezado de la tabla (ej. el azul del encabezado en una factura) — sin esto, sin fondo (de siempre). */
+  colorEncabezado?: string;
+  /** Color del texto del encabezado de la tabla — sin esto, blanco si hay `colorEncabezado`, o el color de texto normal si no. */
+  colorTextoEncabezado?: string;
 }
 export interface BloqueTotales extends BloqueBase {
   tipo: 'totales';
@@ -68,6 +82,18 @@ export interface BloqueCampo extends BloqueBase {
   /** Prefijo opcional, ej. "Factura No." — sin esto, se imprime solo el valor. */
   etiqueta?: string;
 }
+/**
+ * "Formato de Documentos" Fase F — pastilla de color (ej. "Pendiente" en
+ * un rectángulo azul con esquinas redondeadas y texto blanco), igual
+ * técnica que ya usaba la plantilla EDITORIAL de documento-pdf.ts para su
+ * rótulo de tipo de documento — acá se expone como bloque posicionable y
+ * con cualquier campo del catálogo (normalmente `estado`). Sin
+ * `colorFondo`, usa `colorAcento` del tenant; sin `colorTexto`, blanco.
+ */
+export interface BloqueBadge extends BloqueBase {
+  tipo: 'badge';
+  campo: ClaveCampoDocumento;
+}
 
 export type BloqueLayout =
   | BloqueLogo
@@ -80,7 +106,8 @@ export type BloqueLayout =
   | BloqueFirma
   | BloqueTextoLegal
   | BloqueImagenLibre
-  | BloqueCampo;
+  | BloqueCampo
+  | BloqueBadge;
 
 export interface LayoutDocumento {
   bloques: BloqueLayout[];
@@ -142,7 +169,7 @@ export function generarDocumentoPdfLayout(params: DocumentoPdfParams, layout: La
     let yActual = tabla ? MARGEN + pct(tabla.y, altoUtil) : MARGEN + pct(10, altoUtil);
     if (tabla) {
       doc.y = yActual;
-      yActual = dibujarTabla(doc, params, mostrarPrecios, tabla.columnas, colorTexto);
+      yActual = dibujarTabla(doc, params, mostrarPrecios, tabla.columnas, colorTexto, tabla.colorEncabezado, tabla.colorTextoEncabezado);
     }
 
     // Bloques que fluyen después de la tabla, agrupados en renglones por `y` original.
@@ -159,6 +186,9 @@ export function generarDocumentoPdfLayout(params: DocumentoPdfParams, layout: La
           x: MARGEN + pct(bloque.x, anchoUtil),
           y: yActual,
           w: pct(bloque.w, anchoUtil),
+          // Alto DECLARADO del bloque (el que el usuario fijó en el editor) — para el fondo de color
+          // (Fase F). El contenido en sí sigue sin alto fijo (fluye según lo que ocupe).
+          h: pct(bloque.h, altoUtil),
           params,
           colorAcento,
           colorTexto,
@@ -204,13 +234,21 @@ function dibujarBloqueFijo(doc: PDFKit.PDFDocument, bloque: BloqueLayout, ctx: C
 }
 
 /** Bloques "de abajo" (después de la tabla) — devuelven el `y` donde terminó su contenido, para calcular el siguiente renglón. */
-function dibujarBloqueFluido(doc: PDFKit.PDFDocument, bloque: BloqueLayout, ctx: Omit<ContextoDibujo, 'h'>): number {
+function dibujarBloqueFluido(doc: PDFKit.PDFDocument, bloque: BloqueLayout, ctx: ContextoDibujo): number {
   dibujarBloque(doc, bloque, ctx);
   return doc.y;
 }
 
 function dibujarBloque(doc: PDFKit.PDFDocument, bloque: BloqueLayout, ctx: ContextoDibujo) {
-  const { x, y, w, params, colorAcento, colorTexto, colorGris } = ctx;
+  const { x, y, w, params, colorAcento } = ctx;
+  // El color propio del bloque (Fase F) pisa el genérico del contexto — sin esto, cero cambio de comportamiento.
+  const colorTexto = bloque.colorTexto || ctx.colorTexto;
+  const colorGris = bloque.colorTexto || ctx.colorGris;
+
+  // Fondo del bloque — aplica a cualquier tipo salvo "badge" (dibuja su propia forma redondeada, no un rectángulo recto).
+  if (bloque.colorFondo && bloque.tipo !== 'badge' && ctx.h !== undefined) {
+    doc.rect(x, y, w, ctx.h).fillColor(bloque.colorFondo).fill();
+  }
 
   switch (bloque.tipo) {
     case 'logo':
@@ -324,10 +362,32 @@ function dibujarBloque(doc: PDFKit.PDFDocument, bloque: BloqueLayout, ctx: Conte
       }
       break;
     }
+
+    case 'badge': {
+      const valor = valorCampoDocumento(params, bloque.campo);
+      doc.y = y;
+      if (valor) {
+        const alto = ctx.h ?? 18;
+        const fondo = bloque.colorFondo || colorAcento;
+        const texto = bloque.colorTexto || '#ffffff';
+        doc.roundedRect(x, y, w, alto, alto / 2).fillColor(fondo).fill();
+        doc.font('Helvetica-Bold').fontSize(9).fillColor(texto).text(valor, x, y + alto / 2 - 5, { width: w, align: 'center' });
+        doc.y = y + alto;
+      }
+      break;
+    }
   }
 }
 
-function dibujarTabla(doc: PDFKit.PDFDocument, params: DocumentoPdfParams, mostrarPrecios: boolean, columnasConfig: ColumnaLinea[] | undefined, colorTexto: string): number {
+function dibujarTabla(
+  doc: PDFKit.PDFDocument,
+  params: DocumentoPdfParams,
+  mostrarPrecios: boolean,
+  columnasConfig: ColumnaLinea[] | undefined,
+  colorTexto: string,
+  colorEncabezado?: string,
+  colorTextoEncabezado?: string,
+): number {
   const anchoUtil = doc.page.width - MARGEN * 2;
   const activas = columnasActivas(mostrarPrecios, columnasConfig);
   const pesos: Record<ColumnaLinea, number> = {
@@ -354,15 +414,20 @@ function dibujarTabla(doc: PDFKit.PDFDocument, params: DocumentoPdfParams, mostr
   const columnas = [{ header: 'Concepto', width: anchoUtil * (1 - anchoActivas) }, ...activas.map((c) => ({ header: etiquetas[c], width: anchoUtil * pesos[c] }))];
 
   function dibujarEncabezado() {
-    doc.font('Helvetica-Bold').fontSize(9).fillColor(colorTexto);
-    let x = MARGEN;
+    const colorTextoCab = colorEncabezado ? colorTextoEncabezado || '#ffffff' : colorTexto;
     const y = doc.y;
+    if (colorEncabezado) {
+      doc.rect(MARGEN, y - 3, anchoUtil, ALTO_FILA).fillColor(colorEncabezado).fill();
+    }
+    doc.font('Helvetica-Bold').fontSize(9).fillColor(colorTextoCab);
+    let x = MARGEN;
     for (const columna of columnas) {
       doc.text(columna.header, x, y, { width: columna.width, ellipsis: true });
       x += columna.width;
     }
+    doc.y = y;
     doc.moveDown(0.7);
-    doc.moveTo(MARGEN, doc.y).lineTo(MARGEN + anchoUtil, doc.y).lineWidth(1).strokeColor(colorTexto).stroke();
+    if (!colorEncabezado) doc.moveTo(MARGEN, doc.y).lineTo(MARGEN + anchoUtil, doc.y).lineWidth(1).strokeColor(colorTexto).stroke();
     doc.moveDown(0.4);
     doc.font('Helvetica').fontSize(9).fillColor(colorTexto);
   }

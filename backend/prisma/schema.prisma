@@ -2442,6 +2442,13 @@ model PersonalizacionDocumentoTipo {
   // con posición/tamaño en PORCENTAJE de la página (no puntos), para que
   // el mismo layout sirva tanto en Carta como en A4.
   layoutPersonalizado   Json?
+  // "Formato de Documentos" Fase G — editor básico del ticket térmico
+  // (80mm/58mm): a diferencia de `layoutPersonalizado` (posición libre
+  // x/y, pensado para Carta/A4), esto es una lista ORDENADA de bloques
+  // que se apilan verticalmente — ver LayoutTermico en
+  // backend/src/common/pdf/documento-ticket.ts. null = el ticket sigue
+  // con su diseño fijo de siempre.
+  layoutTermico         Json?
   createdAt             DateTime             @default(now())
   updatedAt             DateTime             @updatedAt
 
