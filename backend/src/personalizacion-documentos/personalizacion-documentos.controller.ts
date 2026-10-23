@@ -3,6 +3,7 @@ import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
 import { TipoDocumentoImpreso } from '@prisma/client';
 import { PersonalizacionDocumentosService } from './personalizacion-documentos.service';
+import { CAMPOS_DOCUMENTO } from '../common/pdf/campos-documento';
 import { ActualizarPersonalizacionTipoDto } from './dto/actualizar-personalizacion-tipo.dto';
 import { ActualizarMarcaDocumentosDto } from './dto/actualizar-marca-documentos.dto';
 import { ActualizarLayoutDocumentoDto } from './dto/actualizar-layout-documento.dto';
@@ -27,6 +28,13 @@ export class PersonalizacionDocumentosController {
   @Permissions('admin.configuracion')
   listar(@CurrentUser() user: JwtPayloadUser) {
     return this.service.listar(user.tenantId);
+  }
+
+  /** "Formato de Documentos" Fase D — catálogo de campos individuales insertables en el editor de canvas (bloque "campo"), ver campos-documento.ts. Sin tenantId: es el mismo catálogo fijo para todos. */
+  @Get('campos-disponibles')
+  @Permissions('admin.configuracion')
+  camposDisponibles() {
+    return CAMPOS_DOCUMENTO;
   }
 
   @Put('marca')

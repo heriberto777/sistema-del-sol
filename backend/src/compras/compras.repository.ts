@@ -59,7 +59,13 @@ export class ComprasRepository {
       // producto: para que ComprasService.recibir() sepa si una línea es
       // SERVICIO (no mueve stock al recibirse). unidadMedida: para mostrar
       // "Caja"/"Unidad" junto a cantidad/costoUnitario en el detalle.
-      include: { lineas: { include: { producto: true, unidadMedida: true } }, recepciones: true, devoluciones: { include: { lineas: true } } },
+      // proveedor: para el detalle y para generarImpreso() (mapearOrdenCompraAParams).
+      include: {
+        lineas: { include: { producto: true, unidadMedida: true } },
+        recepciones: true,
+        devoluciones: { include: { lineas: true } },
+        proveedor: true,
+      },
     });
   }
 

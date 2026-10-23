@@ -71,6 +71,7 @@ describe('ComprasService', () => {
       eventBus,
       pagosService,
       correlativosRepository,
+      {} as never,
     );
   });
 

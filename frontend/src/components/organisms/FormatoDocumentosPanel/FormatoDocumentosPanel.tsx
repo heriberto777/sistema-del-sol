@@ -11,7 +11,7 @@ import { CampoImagen } from '../../molecules/CampoImagen/CampoImagen';
 import { EditorLayoutDocumento } from '../EditorLayoutDocumento/EditorLayoutDocumento';
 import { BloqueLayout } from '../../../types/layout-documento';
 
-type TipoDocumento = 'FACTURA' | 'COTIZACION' | 'REMISION';
+type TipoDocumento = 'FACTURA' | 'COTIZACION' | 'REMISION' | 'ORDEN_COMPRA';
 type QrContenido = 'LINK_PAGO' | 'TEXTO_LIBRE';
 
 interface TipoPersonalizacion {

@@ -1,6 +1,7 @@
 import PDFDocument from 'pdfkit';
 import { formatearMontoDop } from './formato-monto';
 import { ColumnaLinea, DocumentoPdfParams, FilaTotal, MARGEN, columnasActivas, insertarLogo, valorColumna } from './documento-pdf';
+import { ClaveCampoDocumento, valorCampoDocumento } from './campos-documento';
 
 const ALTO_FILA = 20;
 /** Separación entre el final de la tabla (o de un "renglón" de bloques que fluyen) y lo siguiente. */
@@ -8,7 +9,7 @@ const ESPACIO_ENTRE_BLOQUES = 10;
 /** Dos bloques "de abajo" se consideran del mismo renglón (van lado a lado) si su `y` original difiere en menos de esto, en % de la página. */
 const TOLERANCIA_RENGLON_PCT = 3;
 
-type TipoBloque = 'logo' | 'datos_empresa' | 'datos_cliente' | 'encabezado' | 'tabla_lineas' | 'totales' | 'qr' | 'firma' | 'texto_legal' | 'imagen_libre';
+type TipoBloque = 'logo' | 'datos_empresa' | 'datos_cliente' | 'encabezado' | 'tabla_lineas' | 'totales' | 'qr' | 'firma' | 'texto_legal' | 'imagen_libre' | 'campo';
 
 interface BloqueBase {
   tipo: TipoBloque;
@@ -54,6 +55,19 @@ export interface BloqueImagenLibre extends BloqueBase {
   tipo: 'imagen_libre';
   imagen: string;
 }
+/**
+ * "Formato de Documentos" Fase D — bloque de un solo dato suelto (ver
+ * campos-documento.ts), a diferencia de los grupos fijos de arriba
+ * (`encabezado`, `datos_cliente`, etc.). Puede repetirse (no es un
+ * BLOQUE_UNICO en el frontend) para poner, por ejemplo, el número de
+ * documento en una esquina y la fecha en otra.
+ */
+export interface BloqueCampo extends BloqueBase {
+  tipo: 'campo';
+  campo: ClaveCampoDocumento;
+  /** Prefijo opcional, ej. "Factura No." — sin esto, se imprime solo el valor. */
+  etiqueta?: string;
+}
 
 export type BloqueLayout =
   | BloqueLogo
@@ -65,7 +79,8 @@ export type BloqueLayout =
   | BloqueQr
   | BloqueFirma
   | BloqueTextoLegal
-  | BloqueImagenLibre;
+  | BloqueImagenLibre
+  | BloqueCampo;
 
 export interface LayoutDocumento {
   bloques: BloqueLayout[];
@@ -299,6 +314,16 @@ function dibujarBloque(doc: PDFKit.PDFDocument, bloque: BloqueLayout, ctx: Conte
     case 'tabla_lineas':
       // Se maneja aparte en generarDocumentoPdfLayout (necesita paginación) — nunca llega hasta acá.
       break;
+
+    case 'campo': {
+      const valor = valorCampoDocumento(params, bloque.campo);
+      doc.y = y;
+      if (valor) {
+        const prefijo = bloque.etiqueta ? `${bloque.etiqueta} ` : '';
+        doc.font('Helvetica').fontSize(9.5).fillColor(colorTexto).text(`${prefijo}${valor}`, x, y, { width: w });
+      }
+      break;
+    }
   }
 }
 
@@ -342,10 +367,11 @@ function dibujarTabla(doc: PDFKit.PDFDocument, params: DocumentoPdfParams, mostr
     doc.moveDown(0.7);
   }
 
-  if (params.notas) {
-    doc.moveDown(0.5);
-    doc.font('Helvetica').fontSize(9).fillColor(colorTexto).text(`Notas: ${params.notas}`, MARGEN, doc.y, { width: anchoUtil });
-  }
+  // A diferencia de las 5 plantillas fijas de documento-pdf.ts (que SÍ
+  // imprimen `notas` automáticamente acá), en el layout de bloques libres
+  // esto requiere un bloque `campo` explícito (clave 'observaciones') —
+  // es justo el punto de la Fase D: que el usuario elija dónde va, en vez
+  // de quedar pegado siempre después de la tabla.
 
   return doc.y;
 }

@@ -2395,6 +2395,7 @@ enum TipoDocumentoImpreso {
   FACTURA
   COTIZACION
   REMISION
+  ORDEN_COMPRA
 }
 
 /// A qué apunta el bloque de QR genérico (Fase B1) — el QR real de la

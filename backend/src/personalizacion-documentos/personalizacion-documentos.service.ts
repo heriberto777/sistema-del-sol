@@ -9,12 +9,13 @@ import { resolverPersonalizacionDocumento } from '../common/impresion/resolver-p
 import { generarDocumentoPdf } from '../common/pdf/documento-pdf';
 import { generarDocumentoPdfLayout } from '../common/pdf/documento-pdf-layout';
 
-const TIPOS: TipoDocumentoImpreso[] = ['FACTURA', 'COTIZACION', 'REMISION'];
+const TIPOS: TipoDocumentoImpreso[] = ['FACTURA', 'COTIZACION', 'REMISION', 'ORDEN_COMPRA'];
 
 const ETIQUETA_TIPO: Record<TipoDocumentoImpreso, string> = {
   FACTURA: 'Factura de venta',
   COTIZACION: 'Cotización',
   REMISION: 'Remisión',
+  ORDEN_COMPRA: 'Orden de compra',
 };
 
 /** Datos de muestra para la vista previa — nunca los de un documento real del tenant. */

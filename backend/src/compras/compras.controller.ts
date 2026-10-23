@@ -1,5 +1,6 @@
-import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, Res } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { Response } from 'express';
 import { ComprasService } from './compras.service';
 import { CrearOrdenCompraDto } from './dto/crear-orden-compra.dto';
 import { EditarOrdenCompraDto } from './dto/editar-orden-compra.dto';
@@ -12,6 +13,7 @@ import { RequiereModulo } from '../common/decorators/requiere-modulo.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtPayloadUser } from '../common/types/authenticated-request';
 import { ListadoQueryDto } from '../common/dto/listado-query.dto';
+import { ImprimirDocumentoQueryDto } from '../common/impresion/dto/imprimir-documento-query.dto';
 
 @ApiBearerAuth()
 @ApiTags('compras')
@@ -73,5 +75,16 @@ export class ComprasController {
   async listarPagos(@Param('id') id: string) {
     await this.comprasService.buscarPorId(id);
     return this.comprasService.listarPagos(id);
+  }
+
+  // compras.ver (no un permiso propio de impresión, a diferencia de
+  // Facturación) — acá no hay un caso de rol-sin-ver que necesite
+  // imprimir sin más acceso, así que no se justifica el permiso aparte.
+  @Get(':id/imprimir')
+  @Permissions('compras.ver')
+  async imprimir(@Param('id') id: string, @Query() query: ImprimirDocumentoQueryDto, @CurrentUser() user: JwtPayloadUser, @Res() res: Response) {
+    const { buffer, contentType } = await this.comprasService.generarImpreso(id, query.formato, user.tenantId, query.plantilla);
+    res.set({ 'Content-Type': contentType, 'Content-Disposition': 'inline; filename="orden-compra"' });
+    res.send(buffer);
   }
 }

@@ -36,14 +36,14 @@ describe('PersonalizacionDocumentosService', () => {
   });
 
   describe('listar', () => {
-    it('devuelve los 3 tipos siempre, con defaults vacíos para los que no tienen fila guardada', async () => {
+    it('devuelve los 4 tipos siempre, con defaults vacíos para los que no tienen fila guardada', async () => {
       repository.obtenerMarca.mockResolvedValue({ colorAcentoDocumentos: '#c7922f', logo: null });
       repository.listarTipos.mockResolvedValue([]);
 
       const resultado = await service.listar('tenant-1');
 
       expect(resultado.colorAcentoDocumentos).toBe('#c7922f');
-      expect(resultado.tipos.map((t) => t.tipoDocumento)).toEqual(['FACTURA', 'COTIZACION', 'REMISION']);
+      expect(resultado.tipos.map((t) => t.tipoDocumento)).toEqual(['FACTURA', 'COTIZACION', 'REMISION', 'ORDEN_COMPRA']);
       expect(resultado.tipos.every((t) => t.camposEmisorVisibles.length === 0 && !t.qrHabilitado && !t.firmaHabilitada)).toBe(true);
     });
 

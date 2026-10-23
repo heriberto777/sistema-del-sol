@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { Rnd } from 'react-rnd';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Trash2 } from 'lucide-react';
 import { apiClient } from '../../../lib/api-client';
 import { mensajeErrorApi } from '../../../lib/mensaje-error-api';
@@ -8,7 +8,7 @@ import { abrirBlob } from '../../../lib/descargar-archivo';
 import { Button } from '../../atoms/Button/Button';
 import { Select } from '../../atoms/Select/Select';
 import { CampoImagen } from '../../molecules/CampoImagen/CampoImagen';
-import { BloqueLayout, CampoEmisorCliente, ColumnaLinea, ETIQUETA_BLOQUE, FilaTotal, TipoBloque } from '../../../types/layout-documento';
+import { BloqueLayout, CampoEmisorCliente, ClaveCampoDocumento, ColumnaLinea, ETIQUETA_BLOQUE, FilaTotal, TipoBloque } from '../../../types/layout-documento';
 import { LAYOUTS_PRESET } from '../../../constants/layouts-documento-presets';
 
 const ANCHO_CANVAS = 480;
@@ -25,10 +25,11 @@ const BLOQUE_POR_DEFECTO: Record<TipoBloque, Omit<BloqueLayout, 'tipo'>> = {
   firma: { x: 25, y: 70, w: 28, h: 14 },
   texto_legal: { x: 5, y: 92, w: 90, h: 6 },
   imagen_libre: { x: 5, y: 50, w: 20, h: 20, imagen: '' },
+  campo: { x: 5, y: 60, w: 40, h: 6, campo: 'numero', etiqueta: '' },
 };
 
 interface EditorLayoutDocumentoProps {
-  tipoDocumento: 'FACTURA' | 'COTIZACION' | 'REMISION';
+  tipoDocumento: 'FACTURA' | 'COTIZACION' | 'REMISION' | 'ORDEN_COMPRA';
   bloquesGuardados: BloqueLayout[] | null;
   onCerrar: () => void;
 }
@@ -41,7 +42,14 @@ export function EditorLayoutDocumento({ tipoDocumento, bloquesGuardados, onCerra
   const [previsualizando, setPrevisualizando] = useState(false);
   const canvasRef = useRef<HTMLDivElement>(null);
 
-  const tiposDisponibles = (Object.keys(ETIQUETA_BLOQUE) as TipoBloque[]).filter((t) => t === 'imagen_libre' || !bloques.some((b) => b.tipo === t));
+  const { data: camposDisponibles } = useQuery({
+    queryKey: ['campos-documento'],
+    queryFn: async () => (await apiClient.get<{ clave: ClaveCampoDocumento; etiqueta: string }[]>('/admin/personalizacion-documentos/campos-disponibles')).data,
+  });
+
+  const tiposDisponibles = (Object.keys(ETIQUETA_BLOQUE) as TipoBloque[]).filter(
+    (t) => t === 'imagen_libre' || t === 'campo' || !bloques.some((b) => b.tipo === t),
+  );
 
   function agregarBloque(tipo: TipoBloque) {
     setBloques((prev) => [...prev, { tipo, ...BLOQUE_POR_DEFECTO[tipo] }]);
@@ -180,7 +188,9 @@ export function EditorLayoutDocumento({ tipoDocumento, bloquesGuardados, onCerra
                 }}
               >
                 <span className="rounded bg-white/90 px-1.5 py-0.5 text-[10px] font-medium text-slate-600 shadow-sm dark:bg-slate-900/90 dark:text-slate-300">
-                  {ETIQUETA_BLOQUE[bloque.tipo]}
+                  {bloque.tipo === 'campo'
+                    ? (camposDisponibles?.find((c) => c.clave === bloque.campo)?.etiqueta ?? ETIQUETA_BLOQUE.campo)
+                    : ETIQUETA_BLOQUE[bloque.tipo]}
                 </span>
                 <button
                   type="button"
@@ -200,7 +210,7 @@ export function EditorLayoutDocumento({ tipoDocumento, bloquesGuardados, onCerra
 
         <div className="min-w-[220px] flex-1 space-y-3">
           {bloqueSeleccionado ? (
-            <PropiedadesBloque bloque={bloqueSeleccionado} onChange={(cambios) => actualizarBloque(seleccionado!, cambios)} />
+            <PropiedadesBloque bloque={bloqueSeleccionado} onChange={(cambios) => actualizarBloque(seleccionado!, cambios)} camposDisponibles={camposDisponibles ?? []} />
           ) : (
             <p className="text-sm text-slate-400">Hacé clic en un bloque para ver sus opciones.</p>
           )}
@@ -259,7 +269,15 @@ const FILAS: { value: FilaTotal; label: string }[] = [
   { value: 'total', label: 'Total' },
 ];
 
-function PropiedadesBloque({ bloque, onChange }: { bloque: BloqueLayout; onChange: (cambios: Partial<BloqueLayout>) => void }) {
+function PropiedadesBloque({
+  bloque,
+  onChange,
+  camposDisponibles,
+}: {
+  bloque: BloqueLayout;
+  onChange: (cambios: Partial<BloqueLayout>) => void;
+  camposDisponibles: { clave: ClaveCampoDocumento; etiqueta: string }[];
+}) {
   function alternar<T extends string>(lista: T[] | undefined, valor: T, todas: T[]): T[] {
     const actual = lista ?? todas;
     return actual.includes(valor) ? actual.filter((v) => v !== valor) : [...actual, valor];
@@ -321,6 +339,33 @@ function PropiedadesBloque({ bloque, onChange }: { bloque: BloqueLayout; onChang
       )}
 
       {bloque.tipo === 'imagen_libre' && <CampoImagen valor={bloque.imagen || null} onChange={(valor) => onChange({ imagen: valor ?? '' })} label="Imagen" />}
+
+      {bloque.tipo === 'campo' && (
+        <div className="space-y-2">
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Dato a mostrar</label>
+            <Select value={bloque.campo ?? 'numero'} onChange={(e) => onChange({ campo: e.target.value as ClaveCampoDocumento })}>
+              {camposDisponibles.map((c) => (
+                <option key={c.clave} value={c.clave}>
+                  {c.etiqueta}
+                </option>
+              ))}
+            </Select>
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Prefijo (opcional)</label>
+            <input
+              value={bloque.etiqueta ?? ''}
+              onChange={(e) => onChange({ etiqueta: e.target.value })}
+              placeholder='Ej: "Factura No."'
+              className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+            />
+          </div>
+          <p className="text-xs text-slate-400">
+            Si el documento no trae este dato (ej. Subtotal en una Remisión), el bloque queda vacío sin romper el diseño.
+          </p>
+        </div>
+      )}
 
       {(bloque.tipo === 'logo' || bloque.tipo === 'encabezado' || bloque.tipo === 'qr' || bloque.tipo === 'firma' || bloque.tipo === 'texto_legal') && (
         <p className="text-xs text-slate-400">

@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
+import { FormatoImpresion, PlantillaDocumento } from '@prisma/client';
 import { ComprasRepository } from './compras.repository';
 import { InventarioService } from '../inventario/inventario.service';
 import { VariantesService } from '../variantes/variantes.service';
@@ -15,6 +16,12 @@ import { PagosService } from '../pagos/pagos.service';
 import { CorrelativosRepository } from '../correlativos/correlativos.repository';
 import { ListadoQueryDto } from '../common/dto/listado-query.dto';
 import { paginar } from '../common/types/pagina-resultado';
+import { PrismaService } from '../prisma/prisma.service';
+import { resolverFormatoImpresion } from '../common/impresion/resolver-formato-impresion';
+import { resolverPlantillaDocumento } from '../common/impresion/resolver-plantilla-documento';
+import { resolverPersonalizacionDocumento } from '../common/impresion/resolver-personalizacion-documento';
+import { generarDocumentoImpreso } from '../common/pdf/generar-documento-impreso';
+import { mapearOrdenCompraAParams } from './mapear-orden-compra-pdf';
 
 @Injectable()
 export class ComprasService {
@@ -27,7 +34,22 @@ export class ComprasService {
     private readonly eventBus: EventBusService,
     private readonly pagosService: PagosService,
     private readonly correlativosRepository: CorrelativosRepository,
+    private readonly prisma: PrismaService,
   ) {}
+
+  /** Orden de Compra no tiene bodegaId propio (mismo caso que Cotización) — solo aplica el default de tenant para formato/plantilla. */
+  async generarImpreso(id: string, formatoSolicitado: FormatoImpresion | undefined, tenantId: string, plantillaSolicitada?: PlantillaDocumento) {
+    const orden = await this.comprasRepository.buscarPorId(id);
+    const [formato, plantilla, personalizacion] = await Promise.all([
+      formatoSolicitado ?? resolverFormatoImpresion(this.prisma, tenantId, null),
+      plantillaSolicitada ?? resolverPlantillaDocumento(this.prisma, tenantId, null),
+      resolverPersonalizacionDocumento(this.prisma, tenantId, 'ORDEN_COMPRA'),
+    ]);
+    const { layoutPersonalizado, observacionesVisibles, ...resto } = personalizacion;
+    const base = mapearOrdenCompraAParams(orden);
+    const params = { ...base, ...resto, notas: observacionesVisibles ? base.notas : undefined };
+    return generarDocumentoImpreso(params, formato, plantilla, layoutPersonalizado);
+  }
 
   async crear(dto: CrearOrdenCompraDto, userId: string, tenantId: string) {
     // Un combo es un bundle armado para el cliente al vender, no algo que

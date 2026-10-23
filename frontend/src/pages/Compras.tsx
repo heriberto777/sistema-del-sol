@@ -13,6 +13,7 @@ import { FormField } from '../components/molecules/FormField/FormField';
 import { Modal } from '../components/molecules/Modal/Modal';
 import { ConfirmModal } from '../components/molecules/ConfirmModal/ConfirmModal';
 import { ModalRegistrarPagoOrdenCompra } from '../components/molecules/ModalRegistrarPagoOrdenCompra/ModalRegistrarPagoOrdenCompra';
+import { ModalImprimir } from '../components/molecules/ModalImprimir/ModalImprimir';
 import { SearchInput } from '../components/molecules/SearchInput/SearchInput';
 import { Paginacion } from '../components/molecules/Paginacion/Paginacion';
 import { EstadoVacio } from '../components/molecules/EstadoVacio/EstadoVacio';
@@ -107,6 +108,7 @@ export function Compras() {
   const [ordenViendo, setOrdenViendo] = useState<OrdenCompra | null>(null);
   const [ordenEditando, setOrdenEditando] = useState<OrdenCompra | null>(null);
   const [ordenACancelar, setOrdenACancelar] = useState<OrdenCompra | null>(null);
+  const [ordenImprimiendo, setOrdenImprimiendo] = useState<OrdenCompra | null>(null);
   const queryClient = useQueryClient();
 
   const cambiarEstado = useMutation({
@@ -185,6 +187,7 @@ export function Compras() {
                   {data?.datos.map((oc) => {
                     const acciones = [
                       { etiqueta: 'Ver detalle', onClick: () => setOrdenViendo(oc) },
+                      { etiqueta: 'Imprimir', onClick: () => setOrdenImprimiendo(oc) },
                       ...(oc.estado === 'BORRADOR' && tienePermiso('compras.editar')
                         ? [{ etiqueta: 'Editar', onClick: () => setOrdenEditando(oc) }]
                         : []),
@@ -244,6 +247,9 @@ export function Compras() {
       {ordenPagando && <ModalRegistrarPagoOrdenCompra orden={ordenPagando} onClose={() => setOrdenPagando(null)} />}
       {ordenDevolviendo && <ModalDevolverOrden orden={ordenDevolviendo} onClose={() => setOrdenDevolviendo(null)} />}
       {ordenViendo && <ModalVerOrden orden={ordenViendo} onClose={() => setOrdenViendo(null)} />}
+      {ordenImprimiendo && (
+        <ModalImprimir urlBase={`/compras/${ordenImprimiendo.id}`} titulo={`Imprimir — ${ordenImprimiendo.numero}`} onClose={() => setOrdenImprimiendo(null)} />
+      )}
       {ordenACancelar && (
         <ConfirmModal
           titulo="¿Cancelar esta orden de compra?"
