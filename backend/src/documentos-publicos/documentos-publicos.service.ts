@@ -28,7 +28,14 @@ export class DocumentosPublicosService {
   private async buscarFactura(id: string) {
     const factura = await this.prisma.factura.findUnique({
       where: { id },
-      include: { cliente: { select: CLIENTE_SELECT_BASICO }, lineas: { include: { producto: true } }, recargos: { orderBy: { orden: 'asc' } } },
+      include: {
+        cliente: { select: CLIENTE_SELECT_BASICO },
+        lineas: { include: { producto: { include: { categoria: { select: { nombre: true } } } }, unidadMedida: true } },
+        recargos: { orderBy: { orden: 'asc' } },
+        vendedor: { select: { nombre: true } },
+        formaPago: { select: { nombre: true } },
+        bodega: { select: { nombre: true } },
+      },
     });
     if (!factura) throw new NotFoundException('Factura no encontrada');
     return factura;
@@ -37,7 +44,11 @@ export class DocumentosPublicosService {
   private async buscarCotizacion(id: string) {
     const cotizacion = await this.prisma.cotizacion.findUnique({
       where: { id },
-      include: { cliente: { select: CLIENTE_SELECT_BASICO }, lineas: { include: { producto: true } } },
+      include: {
+        cliente: { select: CLIENTE_SELECT_BASICO },
+        lineas: { include: { producto: { include: { categoria: { select: { nombre: true } } } }, unidadMedida: true } },
+        vendedor: { select: { nombre: true } },
+      },
     });
     if (!cotizacion) throw new NotFoundException('Cotización no encontrada');
     return cotizacion;

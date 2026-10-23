@@ -1811,7 +1811,7 @@ describe('FacturacionService', () => {
 
       expect(prisma.tenant.findUnique).toHaveBeenCalledWith({
         where: { id: 'tenant-1' },
-        select: { logo: true, nombre: true, rnc: true, direccion: true, telefono: true, colorAcentoDocumentos: true },
+        select: { logo: true, nombre: true, rnc: true, direccion: true, telefono: true, email: true, colorAcentoDocumentos: true },
       });
     });
   });
@@ -1841,7 +1841,7 @@ describe('FacturacionService', () => {
       expect(buffer.subarray(0, 5).toString('latin1')).toBe('%PDF-');
       expect(prisma.tenant.findUnique).toHaveBeenCalledWith({
         where: { id: 'tenant-1' },
-        select: { logo: true, nombre: true, rnc: true, direccion: true, telefono: true, colorAcentoDocumentos: true },
+        select: { logo: true, nombre: true, rnc: true, direccion: true, telefono: true, email: true, colorAcentoDocumentos: true },
       });
     });
   });

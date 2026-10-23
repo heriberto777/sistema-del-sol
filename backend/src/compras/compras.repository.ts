@@ -61,10 +61,12 @@ export class ComprasRepository {
       // "Caja"/"Unidad" junto a cantidad/costoUnitario en el detalle.
       // proveedor: para el detalle y para generarImpreso() (mapearOrdenCompraAParams).
       include: {
-        lineas: { include: { producto: true, unidadMedida: true } },
+        lineas: { include: { producto: { include: { categoria: { select: { nombre: true } } } }, unidadMedida: true } },
         recepciones: true,
         devoluciones: { include: { lineas: true } },
         proveedor: true,
+        // "Formato de Documentos" Fase E — campo "Creado por" del catálogo de campos.
+        user: { select: { nombre: true } },
       },
     });
   }

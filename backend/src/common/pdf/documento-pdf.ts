@@ -11,6 +11,12 @@ export interface LineaDocumentoPdf {
   cantidad: string;
   precioUnitario?: string;
   total?: string;
+  /** "Formato de Documentos" Fase E — ver campos-documento.ts. Todos opcionales y aditivos. */
+  codigo?: string;
+  categoria?: string;
+  unidadMedida?: string;
+  porcentajeItbis?: string;
+  descuentoLinea?: string;
 }
 
 export interface EmisorDocumentoPdf {
@@ -18,13 +24,23 @@ export interface EmisorDocumentoPdf {
   rnc?: string;
   direccion?: string;
   telefono?: string;
+  email?: string;
 }
 
-/** Datos del cliente más allá del nombre (que sigue viajando en `DocumentoPdfParams.cliente`, sin cambios) — opcionales y aditivos, ver Fase A de "Formato de Documentos". */
+/**
+ * Datos del cliente más allá del nombre (que sigue viajando en
+ * `DocumentoPdfParams.cliente`, sin cambios) — opcionales y aditivos, ver
+ * Fase A de "Formato de Documentos". También lo usa Orden de Compra para
+ * los datos del PROVEEDOR (mismo slot, ver mapear-orden-compra-pdf.ts) —
+ * `plazoPagoDias` ahí es el crédito del proveedor, no el de un cliente.
+ */
 export interface ClienteDatosExtraPdf {
   rnc?: string;
   direccion?: string;
   telefono?: string;
+  email?: string;
+  nombreContacto?: string;
+  plazoPagoDias?: number;
 }
 
 /** Imagen PNG ya generada por el caller (ver `backend/src/common/qr/generar-qr.ts`) — este módulo no sabe nada de códigos QR, solo la dibuja. */
@@ -38,7 +54,7 @@ export interface FirmaDocumentoPdf {
   imagen?: string;
 }
 
-export type ColumnaLinea = 'cantidad' | 'precioUnitario' | 'total';
+export type ColumnaLinea = 'cantidad' | 'precioUnitario' | 'total' | 'codigo' | 'categoria' | 'unidadMedida' | 'porcentajeItbis' | 'descuentoLinea';
 export type FilaTotal = 'subtotal' | 'descuento' | 'itbis' | 'total';
 
 export interface DocumentoPdfParams {
@@ -79,6 +95,41 @@ export interface DocumentoPdfParams {
   qr?: QrDocumentoPdf;
   /** "Formato de Documentos" Fase B1 — firma visual (línea + imagen opcional). En ECF_OFICIAL reemplaza la línea fija "Elaborado por"; en el resto es puramente aditivo. */
   firma?: FirmaDocumentoPdf;
+
+  // "Formato de Documentos" Fase E — campos de cabecera adicionales, todos
+  // opcionales y aditivos (ver campos-documento.ts). Ninguno cambia el
+  // comportamiento de un mapper que no los llene.
+  /** NCF (comprobante fiscal) — separado de `numero` a propósito: antes `numero` mezclaba NCF y número interno en un solo slot (bug real, ver mapear-factura-pdf.ts). Solo Factura. */
+  ncf?: string;
+  /** Número interno de empresa, SIEMPRE el interno aunque haya NCF (a diferencia de `numero`, que prioriza NCF — ver el comentario de arriba) — para quien quiera mostrar ambos a la vez o forzar el interno. */
+  numeroInterno?: string;
+  /** Tipo de NCF (ej. "B01") — solo Factura. */
+  tipoNcf?: string;
+  /** Fecha límite: vencimiento de crédito en Factura (fecha + plazoPagoDias), o fechaVigenciaHasta en Cotización. */
+  fechaVencimiento?: Date;
+  /** Días de crédito del documento — Factura.plazoPagoDias. */
+  plazoPagoDias?: number;
+  /** Vendedor (Factura/Cotización/Remisión) o quien creó el documento (Orden de Compra) — mismo slot, distinto rol según el tipo. */
+  responsableNombre?: string;
+  /** Solo Factura — nombre de la forma de pago usada. */
+  formaPagoNombre?: string;
+  /** Solo Factura — referencia del pago (cheque/transferencia). */
+  referenciaPago?: string;
+  /** Solo Nota de Crédito/Débito. */
+  motivoNota?: string;
+  /** Solo Factura anulada. */
+  motivoAnulacion?: string;
+  /** Solo Cotización rechazada. */
+  motivoRechazo?: string;
+  /** Factura/Remisión — nombre de la bodega de origen. */
+  bodegaNombre?: string;
+  /** Solo Factura con moneda extranjera — snapshot de la tasa usada (ver totalEnMoneda). */
+  tasaCambio?: number;
+  /** Estado del documento (ej. "BORRADOR", "RECIBIDA_TOTAL") — valor crudo del enum, pensado para una copia interna/de archivo, no necesariamente para el cliente. */
+  estado?: string;
+  /** Factura u Orden de Compra — si ya se saldó, y cuándo. */
+  pagada?: boolean;
+  fechaPago?: Date;
 }
 
 /**
@@ -140,17 +191,35 @@ export function insertarLogo(doc: PDFKit.PDFDocument, logo: string | undefined, 
   }
 }
 
+/** Orden fijo de render cuando se eligen columnas explícitas — las 5 nuevas (Fase E) son opt-in, nunca aparecen sin que el usuario las pida. */
+const TODAS_LAS_COLUMNAS: ColumnaLinea[] = ['codigo', 'categoria', 'cantidad', 'unidadMedida', 'precioUnitario', 'descuentoLinea', 'porcentajeItbis', 'total'];
+
 /** Qué columnas de la tabla de líneas van activas, en orden fijo (concepto siempre va primero y no se puede ocultar). Exportado para documento-pdf-layout.ts. */
 export function columnasActivas(mostrarPrecios: boolean, columnasLinea?: ColumnaLinea[]): ColumnaLinea[] {
   if (!mostrarPrecios) return ['cantidad'];
-  if (columnasLinea && columnasLinea.length > 0) return (['cantidad', 'precioUnitario', 'total'] as ColumnaLinea[]).filter((c) => columnasLinea.includes(c));
+  if (columnasLinea && columnasLinea.length > 0) return TODAS_LAS_COLUMNAS.filter((c) => columnasLinea.includes(c));
   return ['cantidad', 'precioUnitario', 'total'];
 }
 
 export function valorColumna(linea: LineaDocumentoPdf, columna: ColumnaLinea): string {
-  if (columna === 'cantidad') return linea.cantidad;
-  if (columna === 'precioUnitario') return linea.precioUnitario ?? '—';
-  return linea.total ?? '—';
+  switch (columna) {
+    case 'cantidad':
+      return linea.cantidad;
+    case 'precioUnitario':
+      return linea.precioUnitario ?? '—';
+    case 'total':
+      return linea.total ?? '—';
+    case 'codigo':
+      return linea.codigo ?? '—';
+    case 'categoria':
+      return linea.categoria ?? '—';
+    case 'unidadMedida':
+      return linea.unidadMedida ?? '—';
+    case 'porcentajeItbis':
+      return linea.porcentajeItbis ?? '—';
+    case 'descuentoLinea':
+      return linea.descuentoLinea ?? '—';
+  }
 }
 
 /**
@@ -271,8 +340,26 @@ function dibujarClasico(doc: PDFKit.PDFDocument, params: DocumentoPdfParams, mos
   doc.moveDown();
 
   const activas = columnasActivas(mostrarPrecios, params.columnasLinea);
-  const pesos: Record<ColumnaLinea, number> = { cantidad: mostrarPrecios ? 0.15 : 0.3, precioUnitario: 0.2, total: 0.2 };
-  const etiquetas: Record<ColumnaLinea, string> = { cantidad: 'Cantidad', precioUnitario: 'Precio unit.', total: 'Total' };
+  const pesos: Record<ColumnaLinea, number> = {
+    cantidad: mostrarPrecios ? 0.15 : 0.3,
+    precioUnitario: 0.2,
+    total: 0.2,
+    codigo: 0.12,
+    categoria: 0.15,
+    unidadMedida: 0.12,
+    porcentajeItbis: 0.1,
+    descuentoLinea: 0.12,
+  };
+  const etiquetas: Record<ColumnaLinea, string> = {
+    cantidad: 'Cantidad',
+    precioUnitario: 'Precio unit.',
+    total: 'Total',
+    codigo: 'Código',
+    categoria: 'Categoría',
+    unidadMedida: 'Unidad',
+    porcentajeItbis: 'ITBIS %',
+    descuentoLinea: 'Descuento',
+  };
   const anchoColumnas = activas.reduce((suma, c) => suma + pesos[c], 0);
   const columnas = [{ header: 'Concepto', width: anchoUtil * (1 - anchoColumnas) }, ...activas.map((c) => ({ header: etiquetas[c], width: anchoUtil * pesos[c] }))];
 
@@ -386,8 +473,26 @@ function dibujarEcfOficial(doc: PDFKit.PDFDocument, params: DocumentoPdfParams, 
   doc.y = yCaja + altoCaja + 18;
 
   const activas = columnasActivas(mostrarPrecios, params.columnasLinea);
-  const pesos: Record<ColumnaLinea, number> = { cantidad: 0.12, precioUnitario: 0.16, total: 0.16 };
-  const etiquetas: Record<ColumnaLinea, string> = { cantidad: 'Cant.', precioUnitario: 'Precio', total: 'Total' };
+  const pesos: Record<ColumnaLinea, number> = {
+    cantidad: 0.12,
+    precioUnitario: 0.16,
+    total: 0.16,
+    codigo: 0.1,
+    categoria: 0.13,
+    unidadMedida: 0.1,
+    porcentajeItbis: 0.09,
+    descuentoLinea: 0.1,
+  };
+  const etiquetas: Record<ColumnaLinea, string> = {
+    cantidad: 'Cant.',
+    precioUnitario: 'Precio',
+    total: 'Total',
+    codigo: 'Cód.',
+    categoria: 'Categoría',
+    unidadMedida: 'Unidad',
+    porcentajeItbis: 'ITBIS %',
+    descuentoLinea: 'Descuento',
+  };
   const anchoActivas = activas.reduce((s, c) => s + pesos[c], 0);
   const columnas = [
     { header: 'Descripción', width: anchoUtil * (1 - anchoActivas), align: undefined as 'right' | undefined },
@@ -505,8 +610,26 @@ function dibujarMinimalista(doc: PDFKit.PDFDocument, params: DocumentoPdfParams,
   doc.moveDown(1);
 
   const activas = columnasActivas(mostrarPrecios, params.columnasLinea);
-  const pesos: Record<ColumnaLinea, number> = { cantidad: 0.14, precioUnitario: 0.23, total: 0.23 };
-  const etiquetas: Record<ColumnaLinea, string> = { cantidad: 'Cant.', precioUnitario: 'Precio', total: 'Total' };
+  const pesos: Record<ColumnaLinea, number> = {
+    cantidad: 0.14,
+    precioUnitario: 0.23,
+    total: 0.23,
+    codigo: 0.12,
+    categoria: 0.15,
+    unidadMedida: 0.12,
+    porcentajeItbis: 0.1,
+    descuentoLinea: 0.12,
+  };
+  const etiquetas: Record<ColumnaLinea, string> = {
+    cantidad: 'Cant.',
+    precioUnitario: 'Precio',
+    total: 'Total',
+    codigo: 'Cód.',
+    categoria: 'Categoría',
+    unidadMedida: 'Unidad',
+    porcentajeItbis: 'ITBIS %',
+    descuentoLinea: 'Descuento',
+  };
   const anchoActivas = activas.reduce((s, c) => s + pesos[c], 0);
   const columnas = [
     { header: 'Concepto', width: anchoUtil * (1 - anchoActivas), align: undefined as 'right' | undefined },
@@ -633,8 +756,26 @@ function dibujarCompacto(doc: PDFKit.PDFDocument, params: DocumentoPdfParams, mo
   doc.moveDown(0.6);
 
   const activas = columnasActivas(mostrarPrecios, params.columnasLinea);
-  const pesos: Record<ColumnaLinea, number> = { cantidad: 0.13, precioUnitario: 0.22, total: 0.23 };
-  const etiquetas: Record<ColumnaLinea, string> = { cantidad: 'Cant.', precioUnitario: 'Valor Unit.', total: 'Valor' };
+  const pesos: Record<ColumnaLinea, number> = {
+    cantidad: 0.13,
+    precioUnitario: 0.22,
+    total: 0.23,
+    codigo: 0.11,
+    categoria: 0.14,
+    unidadMedida: 0.11,
+    porcentajeItbis: 0.1,
+    descuentoLinea: 0.11,
+  };
+  const etiquetas: Record<ColumnaLinea, string> = {
+    cantidad: 'Cant.',
+    precioUnitario: 'Valor Unit.',
+    total: 'Valor',
+    codigo: 'Cód.',
+    categoria: 'Categoría',
+    unidadMedida: 'Unidad',
+    porcentajeItbis: 'ITBIS %',
+    descuentoLinea: 'Descuento',
+  };
   const anchoActivas = activas.reduce((s, c) => s + pesos[c], 0);
   const columnas = [
     { header: 'Descripción', width: anchoUtil * (1 - anchoActivas), align: undefined as 'right' | undefined },
@@ -768,8 +909,26 @@ function dibujarEditorial(doc: PDFKit.PDFDocument, params: DocumentoPdfParams, m
   doc.moveDown(1);
 
   const activas = columnasActivas(mostrarPrecios, params.columnasLinea);
-  const pesos: Record<ColumnaLinea, number> = { cantidad: 0.14, precioUnitario: 0.21, total: 0.21 };
-  const etiquetas: Record<ColumnaLinea, string> = { cantidad: 'Cant.', precioUnitario: 'Precio', total: 'Total' };
+  const pesos: Record<ColumnaLinea, number> = {
+    cantidad: 0.14,
+    precioUnitario: 0.21,
+    total: 0.21,
+    codigo: 0.11,
+    categoria: 0.14,
+    unidadMedida: 0.11,
+    porcentajeItbis: 0.1,
+    descuentoLinea: 0.11,
+  };
+  const etiquetas: Record<ColumnaLinea, string> = {
+    cantidad: 'Cant.',
+    precioUnitario: 'Precio',
+    total: 'Total',
+    codigo: 'Cód.',
+    categoria: 'Categoría',
+    unidadMedida: 'Unidad',
+    porcentajeItbis: 'ITBIS %',
+    descuentoLinea: 'Descuento',
+  };
   const anchoActivas = activas.reduce((s, c) => s + pesos[c], 0);
   const columnas = [
     { header: 'Descripción', width: anchoUtil * (1 - anchoActivas), align: undefined as 'right' | undefined },

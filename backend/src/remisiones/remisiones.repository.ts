@@ -8,9 +8,16 @@ import { CLIENTE_SELECT_BASICO } from '../common/prisma/cliente-select-basico';
 // pueda expandir un COMBO a sus componentes físicos al mover inventario en
 // "Marcar entregada"/anular desde ENTREGADA.
 const INCLUDE_REMISION = {
-  lineas: { include: { producto: { include: { componentes: { include: { componente: true } } } }, unidadMedida: true } },
+  lineas: {
+    include: {
+      producto: { include: { componentes: { include: { componente: true } }, categoria: { select: { nombre: true } } } },
+      unidadMedida: true,
+    },
+  },
   cliente: { select: CLIENTE_SELECT_BASICO },
   bodega: true,
+  // "Formato de Documentos" Fase E — campo "Vendedor / responsable".
+  vendedor: { select: { nombre: true } },
 } as const;
 
 @Injectable()

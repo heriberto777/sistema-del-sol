@@ -21,8 +21,28 @@ const ETIQUETA_TIPO: Record<TipoDocumentoImpreso, string> = {
 /** Datos de muestra para la vista previa — nunca los de un documento real del tenant. */
 function lineasDeMuestra() {
   return [
-    { concepto: 'Producto o servicio de ejemplo', cantidad: '2', precioUnitario: '850.00', total: '1,700.00' },
-    { concepto: 'Otro producto de ejemplo', cantidad: '1', precioUnitario: '450.00', total: '450.00' },
+    {
+      concepto: 'Producto o servicio de ejemplo',
+      cantidad: '2',
+      precioUnitario: '850.00',
+      total: '1,700.00',
+      codigo: 'PROD-001',
+      categoria: 'Categoría de ejemplo',
+      unidadMedida: 'Unidad',
+      porcentajeItbis: '18%',
+      descuentoLinea: 'RD$ 0.00',
+    },
+    {
+      concepto: 'Otro producto de ejemplo',
+      cantidad: '1',
+      precioUnitario: '450.00',
+      total: '450.00',
+      codigo: 'PROD-002',
+      categoria: 'Otra categoría',
+      unidadMedida: 'Caja',
+      porcentajeItbis: '18%',
+      descuentoLinea: 'RD$ 0.00',
+    },
   ];
 }
 
@@ -87,13 +107,31 @@ export class PersonalizacionDocumentosService {
       numero: 'B0200000001',
       fecha: new Date(),
       cliente: 'Cliente de ejemplo, SRL',
-      clienteDatosExtra: { rnc: '130-00000-1', direccion: 'Calle Ejemplo #1, Santo Domingo', telefono: '809-000-0000' },
+      clienteDatosExtra: {
+        rnc: '130-00000-1',
+        direccion: 'Calle Ejemplo #1, Santo Domingo',
+        telefono: '809-000-0000',
+        email: 'cliente@ejemplo.com',
+        nombreContacto: 'Juan Pérez',
+        plazoPagoDias: 30,
+      },
       lineas: lineasDeMuestra(),
       mostrarPrecios: tipoDocumento !== 'REMISION',
       subtotal: 2150,
       descuento: 0,
       itbis: 387,
       total: 2537,
+      estado: 'EMITIDA',
+      plazoPagoDias: 30,
+      fechaVencimiento: new Date(Date.now() + 30 * 86400000),
+      responsableNombre: 'Vendedor de ejemplo',
+      formaPagoNombre: 'Transferencia',
+      referenciaPago: 'REF-000123',
+      bodegaNombre: 'Bodega principal',
+      ncf: 'B0100000001',
+      numeroInterno: 'FAC-000001',
+      tipoNcf: 'B01',
+      pagada: false,
       ...resto,
     };
 

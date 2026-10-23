@@ -330,8 +330,26 @@ function dibujarBloque(doc: PDFKit.PDFDocument, bloque: BloqueLayout, ctx: Conte
 function dibujarTabla(doc: PDFKit.PDFDocument, params: DocumentoPdfParams, mostrarPrecios: boolean, columnasConfig: ColumnaLinea[] | undefined, colorTexto: string): number {
   const anchoUtil = doc.page.width - MARGEN * 2;
   const activas = columnasActivas(mostrarPrecios, columnasConfig);
-  const pesos: Record<ColumnaLinea, number> = { cantidad: 0.15, precioUnitario: 0.2, total: 0.2 };
-  const etiquetas: Record<ColumnaLinea, string> = { cantidad: 'Cantidad', precioUnitario: 'Precio unit.', total: 'Total' };
+  const pesos: Record<ColumnaLinea, number> = {
+    cantidad: 0.15,
+    precioUnitario: 0.2,
+    total: 0.2,
+    codigo: 0.12,
+    categoria: 0.15,
+    unidadMedida: 0.12,
+    porcentajeItbis: 0.1,
+    descuentoLinea: 0.12,
+  };
+  const etiquetas: Record<ColumnaLinea, string> = {
+    cantidad: 'Cantidad',
+    precioUnitario: 'Precio unit.',
+    total: 'Total',
+    codigo: 'Código',
+    categoria: 'Categoría',
+    unidadMedida: 'Unidad',
+    porcentajeItbis: 'ITBIS %',
+    descuentoLinea: 'Descuento',
+  };
   const anchoActivas = activas.reduce((s, c) => s + pesos[c], 0);
   const columnas = [{ header: 'Concepto', width: anchoUtil * (1 - anchoActivas) }, ...activas.map((c) => ({ header: etiquetas[c], width: anchoUtil * pesos[c] }))];
 

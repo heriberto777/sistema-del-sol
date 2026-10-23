@@ -348,7 +348,10 @@ describe('RemisionesService', () => {
       repository.buscarPorId.mockResolvedValue({
         id: 'r1',
         numero: 'REM-001',
+        estado: 'BORRADOR',
         fecha: new Date('2026-01-15'),
+        bodega: { nombre: 'Bodega principal' },
+        vendedor: { nombre: 'Vendedor Demo' },
         cliente: { nombre: 'Cliente Demo' },
         lineas: [{ producto: { nombre: 'Producto A' }, cantidad: 2 }],
       } as never);

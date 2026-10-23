@@ -185,17 +185,25 @@ export class RemisionesService {
     return {
       tipoDocumento: 'Remisión',
       numero: remision.numero,
+      estado: remision.estado,
       fecha: remision.fecha,
+      bodegaNombre: remision.bodega.nombre,
+      responsableNombre: remision.vendedor?.nombre,
       cliente: remision.cliente.nombre,
       clienteDatosExtra: {
         rnc: remision.cliente.rncCedula ?? undefined,
         direccion: remision.cliente.direccion ?? undefined,
         telefono: remision.cliente.telefono ?? undefined,
+        email: remision.cliente.email ?? undefined,
+        nombreContacto: remision.cliente.nombreContacto ?? undefined,
       },
       mostrarPrecios: false,
       lineas: remision.lineas.map((linea) => ({
         concepto: linea.producto.nombre,
         cantidad: linea.cantidad.toString(),
+        codigo: linea.producto.codigo,
+        categoria: linea.producto.categoria?.nombre,
+        unidadMedida: linea.unidadMedida?.nombre,
       })),
       notas: remision.observaciones ?? undefined,
     };

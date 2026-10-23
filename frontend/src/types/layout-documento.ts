@@ -12,21 +12,41 @@ export type TipoBloque =
   | 'campo';
 
 export type CampoEmisorCliente = 'rnc' | 'direccion' | 'telefono';
-export type ColumnaLinea = 'cantidad' | 'precioUnitario' | 'total';
+export type ColumnaLinea = 'cantidad' | 'precioUnitario' | 'total' | 'codigo' | 'categoria' | 'unidadMedida' | 'porcentajeItbis' | 'descuentoLinea';
 export type FilaTotal = 'subtotal' | 'descuento' | 'itbis' | 'total';
-/** Ver backend/src/common/pdf/campos-documento.ts — misma lista de claves. */
+/** Ver backend/src/common/pdf/campos-documento.ts — misma lista de claves. Las etiquetas vienen del backend (GET campos-disponibles), este tipo solo acota qué puede guardarse. */
 export type ClaveCampoDocumento =
   | 'numero'
+  | 'numero_interno'
+  | 'ncf'
+  | 'tipo_ncf'
   | 'fecha'
+  | 'fecha_vencimiento'
   | 'tipoDocumento'
+  | 'estado'
+  | 'plazo_pago_dias'
+  | 'responsable_nombre'
+  | 'forma_pago_nombre'
+  | 'referencia_pago'
+  | 'motivo_nota'
+  | 'motivo_anulacion'
+  | 'motivo_rechazo'
+  | 'bodega_nombre'
+  | 'tasa_cambio'
+  | 'pagada'
+  | 'fecha_pago'
   | 'cliente_nombre'
   | 'cliente_rnc'
   | 'cliente_direccion'
   | 'cliente_telefono'
+  | 'cliente_email'
+  | 'cliente_nombre_contacto'
+  | 'cliente_plazo_pago_dias'
   | 'emisor_nombre'
   | 'emisor_rnc'
   | 'emisor_direccion'
   | 'emisor_telefono'
+  | 'emisor_email'
   | 'subtotal'
   | 'descuento'
   | 'itbis'

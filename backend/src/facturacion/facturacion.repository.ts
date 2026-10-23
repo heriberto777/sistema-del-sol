@@ -277,7 +277,12 @@ export class FacturacionRepository {
     return this.db.factura.findUniqueOrThrow({
       where: { id },
       include: {
-        lineas: { include: { producto: { include: { componentes: { include: { componente: true } } } }, unidadMedida: true } },
+        lineas: {
+          include: {
+            producto: { include: { componentes: { include: { componente: true } }, categoria: { select: { nombre: true } } } },
+            unidadMedida: true,
+          },
+        },
         recargos: { orderBy: { orden: 'asc' } },
         cliente: { select: CLIENTE_SELECT_BASICO },
         // Necesario para anular(): si ya se emitieron notas de crédito
@@ -287,6 +292,10 @@ export class FacturacionRepository {
         // Necesario para anular(): un Cajero (sin pos.supervisar) solo puede
         // anular ventas de SU propio turno mientras sigue abierto.
         turnoCaja: { select: { cajeroId: true, estado: true } },
+        // "Formato de Documentos" Fase E — campos de cabecera nuevos del catálogo de campos (vendedor/forma de pago/bodega).
+        vendedor: { select: { nombre: true } },
+        formaPago: { select: { nombre: true } },
+        bodega: { select: { nombre: true } },
       },
     });
   }

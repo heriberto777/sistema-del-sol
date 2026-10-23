@@ -129,7 +129,14 @@ export class NotificacionesService {
     try {
       const factura = await this.prisma.factura.findUnique({
         where: { id: facturaId },
-        include: { cliente: { select: CLIENTE_SELECT_BASICO }, lineas: { include: { producto: true } }, recargos: { orderBy: { orden: 'asc' } } },
+        include: {
+          cliente: { select: CLIENTE_SELECT_BASICO },
+          lineas: { include: { producto: { include: { categoria: { select: { nombre: true } } } }, unidadMedida: true } },
+          recargos: { orderBy: { orden: 'asc' } },
+          vendedor: { select: { nombre: true } },
+          formaPago: { select: { nombre: true } },
+          bodega: { select: { nombre: true } },
+        },
       });
       if (!factura) return undefined;
       return { filename: 'factura.pdf', content: await generarPdfPersonalizado(this.prisma, factura.tenantId, 'FACTURA', mapearFacturaAParams(factura), factura.bodegaId) };
@@ -143,7 +150,11 @@ export class NotificacionesService {
     try {
       const cotizacion = await this.prisma.cotizacion.findUnique({
         where: { id: cotizacionId },
-        include: { cliente: { select: CLIENTE_SELECT_BASICO }, lineas: { include: { producto: true } } },
+        include: {
+          cliente: { select: CLIENTE_SELECT_BASICO },
+          lineas: { include: { producto: { include: { categoria: { select: { nombre: true } } } }, unidadMedida: true } },
+          vendedor: { select: { nombre: true } },
+        },
       });
       if (!cotizacion) return undefined;
       return { filename: 'cotizacion.pdf', content: await generarPdfPersonalizado(this.prisma, cotizacion.tenantId, 'COTIZACION', mapearCotizacionAParams(cotizacion)) };

@@ -54,6 +54,11 @@ const COLUMNAS = [
   { value: 'cantidad', label: 'Cantidad' },
   { value: 'precioUnitario', label: 'Precio unitario' },
   { value: 'total', label: 'Total' },
+  { value: 'codigo', label: 'Código de producto' },
+  { value: 'categoria', label: 'Categoría' },
+  { value: 'unidadMedida', label: 'Unidad de medida' },
+  { value: 'porcentajeItbis', label: '% ITBIS' },
+  { value: 'descuentoLinea', label: 'Descuento' },
 ] as const;
 
 const TOTALES = [

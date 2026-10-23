@@ -61,7 +61,7 @@ export async function resolverPersonalizacionDocumento(
   const [tenant, notaPieFila, configTipo] = await Promise.all([
     prisma.tenant.findUnique({
       where: { id: tenantId },
-      select: { logo: true, nombre: true, rnc: true, direccion: true, telefono: true, colorAcentoDocumentos: true },
+      select: { logo: true, nombre: true, rnc: true, direccion: true, telefono: true, email: true, colorAcentoDocumentos: true },
     }),
     prisma.configuracion.findUnique({ where: { tenantId_clave: { tenantId, clave: CLAVE_DOCUMENTO_NOTA_PIE } } }),
     tipoDocumento ? prisma.personalizacionDocumentoTipo.findUnique({ where: { tenantId_tipoDocumento: { tenantId, tipoDocumento } } }) : null,
@@ -80,7 +80,9 @@ export async function resolverPersonalizacionDocumento(
   return {
     logo: tenant?.logo || undefined,
     notaPie: configTipo?.textoLegal || notaPieFila?.valor || undefined,
-    emisor: tenant ? { nombre: tenant.nombre, rnc: tenant.rnc || undefined, direccion: tenant.direccion || undefined, telefono: tenant.telefono || undefined } : undefined,
+    emisor: tenant
+      ? { nombre: tenant.nombre, rnc: tenant.rnc || undefined, direccion: tenant.direccion || undefined, telefono: tenant.telefono || undefined, email: tenant.email || undefined }
+      : undefined,
     colorAcento: tenant?.colorAcentoDocumentos || undefined,
     camposEmisorVisibles: configTipo ? (configTipo.camposEmisorVisibles as ('rnc' | 'direccion' | 'telefono')[]) : undefined,
     camposClienteVisibles: configTipo ? (configTipo.camposClienteVisibles as ('rnc' | 'direccion' | 'telefono')[]) : undefined,

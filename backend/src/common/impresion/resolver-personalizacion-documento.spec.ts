@@ -50,7 +50,7 @@ describe('resolverPersonalizacionDocumento', () => {
     expect(resultado.notaPie).toBe('Gracias por su compra');
     expect((prisma.tenant.findUnique as jest.Mock)).toHaveBeenCalledWith({
       where: { id: 'tenant-1' },
-      select: { logo: true, nombre: true, rnc: true, direccion: true, telefono: true, colorAcentoDocumentos: true },
+      select: { logo: true, nombre: true, rnc: true, direccion: true, telefono: true, email: true, colorAcentoDocumentos: true },
     });
   });
 

@@ -26,6 +26,8 @@ export const CLIENTE_SELECT_BASICO = {
   // cliente en el documento impreso cuando el tenant lo configure (ver
   // documento-pdf.ts `clienteDatosExtra`/`camposClienteVisibles`).
   direccion: true,
+  // "Formato de Documentos" Fase E — campo "Nombre de contacto" del catálogo de campos.
+  nombreContacto: true,
 } satisfies Prisma.ClienteSelect;
 
 export type ClienteBasico = SerializadoHttp<Prisma.ClienteGetPayload<{ select: typeof CLIENTE_SELECT_BASICO }>>;

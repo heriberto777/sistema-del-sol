@@ -261,7 +261,14 @@ const COLUMNAS: { value: ColumnaLinea; label: string }[] = [
   { value: 'cantidad', label: 'Cantidad' },
   { value: 'precioUnitario', label: 'Precio unitario' },
   { value: 'total', label: 'Total' },
+  { value: 'codigo', label: 'Código de producto' },
+  { value: 'categoria', label: 'Categoría' },
+  { value: 'unidadMedida', label: 'Unidad de medida' },
+  { value: 'porcentajeItbis', label: '% ITBIS' },
+  { value: 'descuentoLinea', label: 'Descuento' },
 ];
+/** Default cuando `bloque.columnas` todavía no se tocó — las 3 de siempre, NO las 8 (las 5 nuevas son opt-in, ver columnasActivas() en el backend). */
+const COLUMNAS_DEFAULT: ColumnaLinea[] = ['cantidad', 'precioUnitario', 'total'];
 const FILAS: { value: FilaTotal; label: string }[] = [
   { value: 'subtotal', label: 'Subtotal' },
   { value: 'descuento', label: 'Descuento' },
@@ -313,8 +320,8 @@ function PropiedadesBloque({
             <label key={c.value} className="flex items-center gap-1.5 text-sm text-slate-600 dark:text-slate-300">
               <input
                 type="checkbox"
-                checked={(bloque.columnas ?? COLUMNAS.map((x) => x.value)).includes(c.value)}
-                onChange={() => onChange({ columnas: alternar(bloque.columnas, c.value, COLUMNAS.map((x) => x.value)) })}
+                checked={(bloque.columnas ?? COLUMNAS_DEFAULT).includes(c.value)}
+                onChange={() => onChange({ columnas: alternar(bloque.columnas, c.value, COLUMNAS_DEFAULT) })}
               />
               {c.label}
             </label>

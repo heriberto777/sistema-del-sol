@@ -22,8 +22,10 @@ interface LineaCalculada {
 }
 
 const INCLUDE_COTIZACION = {
-  lineas: { include: { producto: true, unidadMedida: true } },
+  lineas: { include: { producto: { include: { categoria: { select: { nombre: true } } } }, unidadMedida: true } },
   cliente: { select: CLIENTE_SELECT_BASICO },
+  // "Formato de Documentos" Fase E — campo "Vendedor / responsable" del catálogo de campos.
+  vendedor: { select: { nombre: true } },
 } as const;
 
 @Injectable()
