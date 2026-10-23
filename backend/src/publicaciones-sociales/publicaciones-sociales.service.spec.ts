@@ -63,7 +63,7 @@ describe('PublicacionesSocialesService', () => {
     };
     service = new PublicacionesSocialesService(repo, prisma as unknown as PrismaService, whatsappConfigRepository, generadorFondoService, ofertasService, eventBus);
 
-    jest.mocked(resolverPersonalizacionDocumento).mockResolvedValue({ logo: undefined, notaPie: undefined });
+    jest.mocked(resolverPersonalizacionDocumento).mockResolvedValue({ logo: undefined, notaPie: undefined, observacionesVisibles: true });
     jest.mocked(generarImagenPublicacionSocial).mockResolvedValue('data:image/png;base64,BANNER');
     repo.buscarProductoParaGenerar.mockResolvedValue(PRODUCTO_CON_PRECIO as never);
     repo.buscarPlantillaPorId.mockResolvedValue(PLANTILLA_ACTIVA as never);

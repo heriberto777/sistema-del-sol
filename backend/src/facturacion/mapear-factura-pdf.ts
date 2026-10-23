@@ -43,6 +43,7 @@ export interface FacturaParaPdf {
   descuento: Prisma.Decimal;
   itbis: Prisma.Decimal;
   total: Prisma.Decimal;
+  observaciones?: string | null;
 }
 
 export function mapearFacturaAParams(factura: FacturaParaPdf): DocumentoPdfParams {
@@ -68,5 +69,6 @@ export function mapearFacturaAParams(factura: FacturaParaPdf): DocumentoPdfParam
     itbis: Number(factura.itbis),
     total: Number(factura.total),
     totalEnMoneda: factura.totalMoneda != null ? { moneda: factura.moneda, monto: Number(factura.totalMoneda) } : undefined,
+    notas: factura.observaciones ?? undefined,
   };
 }

@@ -56,7 +56,7 @@ export async function generarPdfPersonalizado(
     resolverPlantillaDocumento(prisma, tenantId, bodegaId ?? null),
     resolverPersonalizacionDocumento(prisma, tenantId, tipoDocumento),
   ]);
-  const { layoutPersonalizado, ...resto } = personalizacion;
-  const params = { ...paramsBase, ...resto };
+  const { layoutPersonalizado, observacionesVisibles, ...resto } = personalizacion;
+  const params = { ...paramsBase, ...resto, notas: observacionesVisibles ? paramsBase.notas : undefined };
   return layoutPersonalizado ? generarDocumentoPdfLayout(params, layoutPersonalizado) : generarDocumentoPdf(params, { plantilla });
 }

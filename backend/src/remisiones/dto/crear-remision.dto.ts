@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { ArrayMinSize, IsArray, IsNumber, IsOptional, IsPositive, IsUUID, ValidateNested } from 'class-validator';
+import { ArrayMinSize, IsArray, IsNumber, IsOptional, IsPositive, IsString, IsUUID, ValidateNested } from 'class-validator';
 
 export class LineaRemisionDto {
   @ApiProperty()
@@ -42,4 +42,13 @@ export class CrearRemisionDto {
   @ValidateNested({ each: true })
   @Type(() => LineaRemisionDto)
   lineas: LineaRemisionDto[];
+
+  @ApiProperty({
+    required: false,
+    description:
+      'Texto libre, impreso en el documento si el tenant tiene activo "Observaciones" en Formato de Documentos (PersonalizacionDocumentoTipo.observacionesVisibles).',
+  })
+  @IsOptional()
+  @IsString()
+  observaciones?: string;
 }

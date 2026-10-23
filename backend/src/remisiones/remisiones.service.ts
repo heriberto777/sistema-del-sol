@@ -58,6 +58,7 @@ export class RemisionesService {
         vendedorId,
         numero,
         lineas,
+        observaciones: dto.observaciones,
       });
     });
   }
@@ -75,6 +76,7 @@ export class RemisionesService {
       clienteId: dto.clienteId,
       bodegaId: dto.bodegaId,
       lineas: await this.resolverLineas(dto.lineas),
+      observaciones: dto.observaciones,
     });
   }
 
@@ -195,6 +197,7 @@ export class RemisionesService {
         concepto: linea.producto.nombre,
         cantidad: linea.cantidad.toString(),
       })),
+      notas: remision.observaciones ?? undefined,
     };
   }
 
@@ -211,8 +214,9 @@ export class RemisionesService {
       plantillaSolicitada ?? resolverPlantillaDocumento(this.prisma, tenantId, remision.bodegaId),
       resolverPersonalizacionDocumento(this.prisma, tenantId, 'REMISION'),
     ]);
-    const { layoutPersonalizado, ...resto } = personalizacion;
-    const params = { ...this.mapearRemisionAParams(remision), ...resto };
+    const { layoutPersonalizado, observacionesVisibles, ...resto } = personalizacion;
+    const base = this.mapearRemisionAParams(remision);
+    const params = { ...base, ...resto, notas: observacionesVisibles ? base.notas : undefined };
     return generarDocumentoImpreso(params, formato, plantilla, layoutPersonalizado);
   }
 

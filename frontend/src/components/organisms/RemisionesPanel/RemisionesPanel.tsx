@@ -45,6 +45,7 @@ export interface Remision {
   bodegaId: string;
   cliente: ClienteBasico;
   lineas: { productoId: string; varianteId: string; unidadMedidaId?: string | null; cantidad: string }[];
+  observaciones?: string | null;
 }
 
 export interface RemisionDetalle extends Omit<Remision, 'lineas'> {

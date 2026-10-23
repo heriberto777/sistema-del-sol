@@ -21,7 +21,7 @@ export function RemisionEditar() {
   const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
   const [cliente, setCliente] = useState<Cliente | null>(null);
-  const [valores, setValores] = useState<{ bodegaId: string; lineas: LineaForm[] } | null>(null);
+  const [valores, setValores] = useState<{ bodegaId: string; observaciones: string; lineas: LineaForm[] } | null>(null);
   // Modelo A de "más espacio para líneas" — arranca colapsada apenas
   // carga el detalle (ver el comentario equivalente en FacturacionNueva.tsx).
   const [infoColapsada, setInfoColapsada] = useState(false);
@@ -46,6 +46,7 @@ export function RemisionEditar() {
     setCliente({ id: detalle.clienteId, nombre: detalle.cliente.nombre });
     setValores({
       bodegaId: detalle.bodegaId,
+      observaciones: detalle.observaciones ?? '',
       lineas: detalle.lineas.map((l) => ({ productoId: l.productoId, varianteId: l.varianteId, unidadMedidaId: l.unidadMedidaId ?? '', cantidad: l.cantidad })),
     });
     setInfoColapsada(true);
@@ -56,6 +57,7 @@ export function RemisionEditar() {
       apiClient.patch(`/remisiones/${id}`, {
         clienteId: cliente?.id,
         bodegaId: valores!.bodegaId,
+        observaciones: valores!.observaciones.trim() || undefined,
         lineas: valores!.lineas
           .filter((l) => l.productoId)
           .map((l) => ({
@@ -170,6 +172,19 @@ export function RemisionEditar() {
                 </option>
               ))}
             </Select>
+          </div>
+          <div className="sm:col-span-2">
+            <label htmlFor="editar-observaciones" className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+              Observaciones (opcional)
+            </label>
+            <textarea
+              id="editar-observaciones"
+              value={valores.observaciones}
+              onChange={(e) => setValores({ ...valores, observaciones: e.target.value })}
+              rows={2}
+              placeholder="Notas puntuales de esta remisión…"
+              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-sol-500 focus:ring-1 focus:ring-sol-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+            />
           </div>
         </CardColapsable>
 

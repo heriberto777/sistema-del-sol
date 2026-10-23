@@ -56,6 +56,7 @@ export async function resolverPersonalizacionDocumento(
   qr?: QrDocumentoPdf;
   firma?: FirmaDocumentoPdf;
   layoutPersonalizado?: LayoutDocumento | null;
+  observacionesVisibles: boolean;
 }> {
   const [tenant, notaPieFila, configTipo] = await Promise.all([
     prisma.tenant.findUnique({
@@ -88,5 +89,9 @@ export async function resolverPersonalizacionDocumento(
     qr,
     firma,
     layoutPersonalizado: configTipo ? validarLayoutDocumento(configTipo.layoutPersonalizado) : null,
+    // Sin fila de PersonalizacionDocumentoTipo, mismo criterio que el resto
+    // de este objeto: "no hay configuración todavía" = comportamiento de
+    // siempre, que acá es mostrar las observaciones si el documento las trae.
+    observacionesVisibles: configTipo ? configTipo.observacionesVisibles : true,
   };
 }

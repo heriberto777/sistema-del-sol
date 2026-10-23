@@ -63,6 +63,7 @@ export class CotizacionesRepository {
       itbis: number;
       total: number;
       lineas: LineaCalculada[];
+      observaciones?: string;
     },
   ) {
     return tx.cotizacion.create({
@@ -76,6 +77,7 @@ export class CotizacionesRepository {
         descuento: params.descuento,
         itbis: params.itbis,
         total: params.total,
+        observaciones: params.observaciones,
         lineas: { create: params.lineas },
       },
       include: INCLUDE_COTIZACION,
@@ -93,6 +95,7 @@ export class CotizacionesRepository {
       itbis: number;
       total: number;
       lineas: LineaCalculada[];
+      observaciones?: string;
     },
   ) {
     return this.db.$transaction(async (tx) => {
@@ -106,6 +109,7 @@ export class CotizacionesRepository {
           descuento: params.descuento,
           itbis: params.itbis,
           total: params.total,
+          observaciones: params.observaciones,
           lineas: { create: params.lineas },
         },
         include: INCLUDE_COTIZACION,

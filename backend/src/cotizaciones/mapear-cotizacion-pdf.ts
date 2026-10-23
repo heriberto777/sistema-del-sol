@@ -24,6 +24,7 @@ export interface CotizacionParaPdf {
   descuento: Prisma.Decimal;
   itbis: Prisma.Decimal;
   total: Prisma.Decimal;
+  observaciones?: string | null;
 }
 
 export function mapearCotizacionAParams(cotizacion: CotizacionParaPdf): DocumentoPdfParams {
@@ -47,5 +48,6 @@ export function mapearCotizacionAParams(cotizacion: CotizacionParaPdf): Document
     descuento: Number(cotizacion.descuento),
     itbis: Number(cotizacion.itbis),
     total: Number(cotizacion.total),
+    notas: cotizacion.observaciones ?? undefined,
   };
 }

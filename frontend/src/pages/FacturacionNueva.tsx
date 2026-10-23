@@ -63,6 +63,7 @@ export function FacturacionNueva() {
   const [descuentoGeneralValor, setDescuentoGeneralValor] = useState('');
   const [recargos, setRecargos] = useState<{ concepto: string; monto: string; gravado: boolean }[]>([]);
   const [moneda, setMoneda] = useState('DOP');
+  const [observaciones, setObservaciones] = useState('');
   const [error, setError] = useState<string | null>(null);
   // Modelo A de "más espacio para líneas" — Información arranca abierta y
   // se contrae sola en cuanto se elige un cliente, para que las líneas
@@ -117,6 +118,7 @@ export function FacturacionNueva() {
         descuentoGeneralPct: descuentoGeneralTipo === 'PCT' && descuentoGeneralValor ? Number(descuentoGeneralValor) : undefined,
         descuentoGeneralMonto: descuentoGeneralTipo === 'MONTO' && descuentoGeneralValor ? Number(descuentoGeneralValor) : undefined,
         moneda: moneda !== 'DOP' ? moneda : undefined,
+        observaciones: observaciones.trim() || undefined,
         recargos: recargos
           .filter((r) => r.concepto.trim() && r.monto)
           .map((r) => ({ concepto: r.concepto.trim(), monto: Number(r.monto), gravado: r.gravado })),
@@ -231,6 +233,7 @@ export function FacturacionNueva() {
       recargos,
       formaPagoId,
       montoRecibido,
+      observaciones,
     },
     !bodegasCargando,
   );
@@ -540,6 +543,20 @@ export function FacturacionNueva() {
               </Select>
             </div>
           )}
+
+          <div className="flex flex-col gap-1 sm:col-span-2">
+            <label htmlFor="observaciones" className="text-sm font-medium text-slate-700 dark:text-slate-300">
+              Observaciones (opcional)
+            </label>
+            <textarea
+              id="observaciones"
+              value={observaciones}
+              onChange={(e) => setObservaciones(e.target.value)}
+              rows={2}
+              placeholder="Notas puntuales de esta factura…"
+              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-sol-500 focus:ring-1 focus:ring-sol-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+            />
+          </div>
         </CardColapsable>
 
         <Card titulo="Líneas">

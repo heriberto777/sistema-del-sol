@@ -54,6 +54,7 @@ export class PersonalizacionDocumentosService {
           firmaHabilitada: fila?.firmaHabilitada ?? false,
           firmaEtiqueta: fila?.firmaEtiqueta ?? '',
           firmaImagen: fila?.firmaImagen ?? '',
+          observacionesVisibles: fila?.observacionesVisibles ?? true,
           layoutPersonalizado: (fila?.layoutPersonalizado as { bloques?: unknown[] } | null)?.bloques ?? null,
         };
       }),

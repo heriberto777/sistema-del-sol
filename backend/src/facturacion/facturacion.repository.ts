@@ -204,6 +204,7 @@ export class FacturacionRepository {
       // Ítem B-4 — ya incluidos en `itbis`/`total` de arriba, calculados
       // por FacturacionService.crear() antes de llamar acá.
       recargos?: { concepto: string; monto: number; gravado: boolean }[];
+      observaciones?: string;
     },
   ) {
     return tx.factura.create({
@@ -235,6 +236,7 @@ export class FacturacionRepository {
         subtotalMoneda: params.subtotalMoneda,
         itbisMoneda: params.itbisMoneda,
         totalMoneda: params.totalMoneda,
+        observaciones: params.observaciones,
         lineas: {
           create: params.lineas.map((linea) => ({
             productoId: linea.productoId,

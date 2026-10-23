@@ -55,6 +55,7 @@ interface DocumentoPublico {
   total?: number;
   totalEnMoneda?: { moneda: string; monto: number };
   logo?: string;
+  notas?: string;
   notaPie?: string;
   emisor?: EmisorPublico;
   colorAcento?: string;
@@ -351,6 +352,13 @@ function VerDocumentoPublico({ tipo }: { tipo: 'factura' | 'cotizacion' }) {
                   </div>
                 )}
               </div>
+            )}
+
+            {documento.notas && (
+              <p className="border-t border-slate-100 pt-3 text-sm text-slate-600 dark:border-slate-800 dark:text-slate-300">
+                <span className="font-medium">Observaciones: </span>
+                {documento.notas}
+              </p>
             )}
 
             {documento.notaPie && <p className="border-t border-slate-100 pt-3 text-xs text-slate-500 dark:border-slate-800 dark:text-slate-400">{documento.notaPie}</p>}

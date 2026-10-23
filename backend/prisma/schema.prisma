@@ -1365,6 +1365,11 @@ model Factura {
   // ventas de POS que eligen un vendedor (F2) — ver PosService.registrarVenta.
   vendedorEmpleadoId String?
   vendedorEmpleado   Empleado?     @relation(fields: [vendedorEmpleadoId], references: [id], onDelete: SetNull)
+  // Texto libre opcional, impreso en el documento si el tenant tiene
+  // `PersonalizacionDocumentoTipo.observacionesVisibles` activo — ver
+  // DocumentoPdfParams.notas en common/pdf/documento-pdf.ts, que ya
+  // sabía pintar esto antes de que ningún mapper lo llenara.
+  observaciones      String?       @db.Text
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
 
@@ -1498,6 +1503,8 @@ model Cotizacion {
   // desde el link público (ver DocumentosPublicosService.responderCotizacion).
   // null mientras no la rechazó, o si la aprobó directamente.
   motivoRechazo      String?          @db.Text
+  // Mismo criterio que Factura.observaciones — ver el comentario ahí.
+  observaciones      String?          @db.Text
   createdAt          DateTime         @default(now())
   updatedAt          DateTime         @updatedAt
 
@@ -1577,6 +1584,8 @@ model Remision {
   fecha      DateTime       @default(now())
   facturaId  String?        @unique
   factura    Factura?       @relation(fields: [facturaId], references: [id])
+  // Mismo criterio que Factura.observaciones — ver el comentario ahí.
+  observaciones String?     @db.Text
   createdAt  DateTime       @default(now())
 
   lineas LineaRemision[]
@@ -2419,6 +2428,11 @@ model PersonalizacionDocumentoTipo {
   firmaHabilitada       Boolean              @default(false)
   firmaEtiqueta         String?
   firmaImagen           String?              @db.Text
+  // Igual patrón que firmaHabilitada/qrHabilitado — sí/no simple, no una
+  // lista de opciones: si el documento trae texto en `observaciones` y
+  // esto está en true, se imprime; si está en false, nunca se imprime
+  // aunque el documento sí tenga el campo lleno.
+  observacionesVisibles Boolean              @default(true)
   // "Formato de Documentos" Fase C — layout de bloques libres (editor de
   // canvas). null = sigue usando una de las 5 PlantillaDocumento fijas
   // (ver resolver-plantilla-documento.ts), exactamente el comportamiento

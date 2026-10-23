@@ -726,6 +726,7 @@ export class FacturacionService {
         totalMoneda: montoMoneda(totalConRecargos),
         lineas: lineasCalculadas,
         recargos: recargosDto.length ? recargosDto.map((r) => ({ concepto: r.concepto, monto: r.monto, gravado: r.gravado ?? false })) : undefined,
+        observaciones: dto.observaciones,
       });
     });
 
@@ -775,8 +776,9 @@ export class FacturacionService {
       plantillaSolicitada ?? resolverPlantillaDocumento(this.prisma, tenantId, factura.bodegaId),
       resolverPersonalizacionDocumento(this.prisma, tenantId, 'FACTURA'),
     ]);
-    const { layoutPersonalizado, ...resto } = personalizacion;
-    const params = { ...mapearFacturaAParams(factura), ...resto };
+    const { layoutPersonalizado, observacionesVisibles, ...resto } = personalizacion;
+    const base = mapearFacturaAParams(factura);
+    const params = { ...base, ...resto, notas: observacionesVisibles ? base.notas : undefined };
     return generarDocumentoImpreso(params, formato, plantilla, layoutPersonalizado);
   }
 

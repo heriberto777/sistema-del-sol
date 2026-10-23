@@ -31,6 +31,7 @@ export class RemisionesRepository {
       vendedorId: string;
       numero: string;
       lineas: { productoId: string; varianteId: string; unidadMedidaId?: string; factorConversion: number; cantidad: number }[];
+      observaciones?: string;
     },
   ) {
     return tx.remision.create({
@@ -40,6 +41,7 @@ export class RemisionesRepository {
         bodegaId: params.bodegaId,
         vendedorId: params.vendedorId,
         numero: params.numero,
+        observaciones: params.observaciones,
         lineas: { create: params.lineas },
       },
       include: INCLUDE_REMISION,
@@ -57,6 +59,7 @@ export class RemisionesRepository {
       clienteId: string;
       bodegaId: string;
       lineas: { productoId: string; varianteId: string; unidadMedidaId?: string; factorConversion: number; cantidad: number }[];
+      observaciones?: string;
     },
   ) {
     return this.db.$transaction(async (tx) => {
@@ -66,6 +69,7 @@ export class RemisionesRepository {
         data: {
           clienteId: params.clienteId,
           bodegaId: params.bodegaId,
+          observaciones: params.observaciones,
           lineas: { create: params.lineas },
         },
         include: INCLUDE_REMISION,

@@ -184,6 +184,7 @@ export class CotizacionesService {
         itbis,
         total,
         lineas: lineasCalculadas,
+        observaciones: dto.observaciones,
       });
     });
   }
@@ -203,6 +204,7 @@ export class CotizacionesService {
       itbis,
       total,
       lineas: lineasCalculadas,
+      observaciones: dto.observaciones,
     });
   }
 
@@ -271,8 +273,9 @@ export class CotizacionesService {
       plantillaSolicitada ?? resolverPlantillaDocumento(this.prisma, tenantId, null),
       resolverPersonalizacionDocumento(this.prisma, tenantId, 'COTIZACION'),
     ]);
-    const { layoutPersonalizado, ...resto } = personalizacion;
-    const params = { ...mapearCotizacionAParams(cotizacion), ...resto };
+    const { layoutPersonalizado, observacionesVisibles, ...resto } = personalizacion;
+    const base = mapearCotizacionAParams(cotizacion);
+    const params = { ...base, ...resto, notas: observacionesVisibles ? base.notas : undefined };
     return generarDocumentoImpreso(params, formato, plantilla, layoutPersonalizado);
   }
 

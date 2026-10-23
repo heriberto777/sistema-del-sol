@@ -37,6 +37,7 @@ export class PersonalizacionDocumentosRepository {
       firmaHabilitada: dto.firmaHabilitada ?? false,
       firmaEtiqueta: dto.firmaEtiqueta || null,
       firmaImagen: dto.firmaImagen || null,
+      observacionesVisibles: dto.observacionesVisibles ?? true,
     };
     return this.db.personalizacionDocumentoTipo.upsert({
       where: { tenantId_tipoDocumento: { tenantId, tipoDocumento } },

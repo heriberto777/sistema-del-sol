@@ -44,6 +44,7 @@ export function CotizacionNueva() {
   const estadoInicial = location.state as CotizacionNuevaState | null;
   const [cliente, setCliente] = useState<Cliente | null>(null);
   const [fechaVigenciaHasta, setFechaVigenciaHasta] = useState('');
+  const [observaciones, setObservaciones] = useState('');
   const [lineas, setLineas] = useState<LineaForm[]>(estadoInicial?.lineasSugeridas?.length ? estadoInicial.lineasSugeridas.map(lineaDesdeSugerida) : [LINEA_VACIA]);
   const [error, setError] = useState<string | null>(null);
   // Modelo A de "más espacio para líneas" — ver el comentario equivalente en FacturacionNueva.tsx.
@@ -77,6 +78,7 @@ export function CotizacionNueva() {
       apiClient.post('/cotizaciones', {
         clienteId: cliente?.id,
         fechaVigenciaHasta,
+        observaciones: observaciones.trim() || undefined,
         lineas: lineas
           .filter((l) => l.productoId || (l.esManual && l.descripcionManual.trim()))
           .map((l) =>
@@ -129,7 +131,7 @@ export function CotizacionNueva() {
   const cantidadLineas = lineas.filter((l) => l.productoId || (l.esManual && l.descripcionManual.trim())).length;
   const { subtotal, itbis } = estimarLineas(lineas);
   const total = subtotal + itbis;
-  const [haycambios, confirmarGuardado] = useHayCambios({ cliente, fechaVigenciaHasta, lineas });
+  const [haycambios, confirmarGuardado] = useHayCambios({ cliente, fechaVigenciaHasta, observaciones, lineas });
 
   return (
     <PaginaDocumento
@@ -213,6 +215,19 @@ export function CotizacionNueva() {
             onChange={(e) => setFechaVigenciaHasta(e.target.value)}
             required
           />
+          <div className="sm:col-span-2">
+            <label htmlFor="observaciones" className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+              Observaciones (opcional)
+            </label>
+            <textarea
+              id="observaciones"
+              value={observaciones}
+              onChange={(e) => setObservaciones(e.target.value)}
+              rows={2}
+              placeholder="Notas puntuales de esta cotización, ej. condiciones de entrega…"
+              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-sol-500 focus:ring-1 focus:ring-sol-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+            />
+          </div>
         </CardColapsable>
 
         <Card titulo="Líneas">

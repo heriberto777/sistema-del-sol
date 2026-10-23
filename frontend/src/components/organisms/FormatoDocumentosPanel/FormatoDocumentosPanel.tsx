@@ -28,6 +28,7 @@ interface TipoPersonalizacion {
   firmaHabilitada: boolean;
   firmaEtiqueta: string;
   firmaImagen: string;
+  observacionesVisibles: boolean;
   layoutPersonalizado: BloqueLayout[] | null;
 }
 
@@ -191,6 +192,7 @@ function FormularioSimple({ tipo }: { tipo: TipoPersonalizacion }) {
   const [firmaHabilitada, setFirmaHabilitada] = useState(tipo.firmaHabilitada);
   const [firmaEtiqueta, setFirmaEtiqueta] = useState(tipo.firmaEtiqueta);
   const [firmaImagen, setFirmaImagen] = useState<string | null>(tipo.firmaImagen || null);
+  const [observacionesVisibles, setObservacionesVisibles] = useState(tipo.observacionesVisibles);
   const [error, setError] = useState<string | null>(null);
   const [previsualizando, setPrevisualizando] = useState(false);
 
@@ -208,6 +210,7 @@ function FormularioSimple({ tipo }: { tipo: TipoPersonalizacion }) {
         firmaHabilitada,
         firmaEtiqueta,
         firmaImagen: firmaImagen ?? '',
+        observacionesVisibles,
       }),
     onSuccess: () => {
       setError(null);
@@ -306,6 +309,17 @@ function FormularioSimple({ tipo }: { tipo: TipoPersonalizacion }) {
             <CampoImagen valor={firmaImagen} onChange={setFirmaImagen} label="Imagen de firma/sello (opcional)" />
           </div>
         )}
+      </div>
+
+      <div className="rounded-lg border border-slate-200 p-4 dark:border-slate-800">
+        <label className="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-300">
+          <input type="checkbox" checked={observacionesVisibles} onChange={(e) => setObservacionesVisibles(e.target.checked)} />
+          Observaciones del documento
+        </label>
+        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+          Imprime el campo de Observaciones que se escribe al crear cada {tipo.etiqueta.toLowerCase()}, cuando lo trae lleno. Desactivado, nunca se
+          imprime aunque el documento sí lo tenga.
+        </p>
       </div>
 
       {error && <p className="text-sm text-red-600">{error}</p>}

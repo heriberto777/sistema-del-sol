@@ -24,6 +24,7 @@ export function RemisionNueva() {
   const [cliente, setCliente] = useState<Cliente | null>(null);
   const [bodegaId, setBodegaId] = useState('');
   const [lineas, setLineas] = useState<LineaForm[]>([LINEA_VACIA]);
+  const [observaciones, setObservaciones] = useState('');
   const [error, setError] = useState<string | null>(null);
   // Modelo A de "más espacio para líneas" — ver el comentario equivalente en FacturacionNueva.tsx.
   const [infoColapsada, setInfoColapsada] = useState(false);
@@ -47,6 +48,7 @@ export function RemisionNueva() {
       apiClient.post('/remisiones', {
         clienteId: cliente?.id,
         bodegaId,
+        observaciones: observaciones.trim() || undefined,
         lineas: lineas
           .filter((l) => l.productoId)
           .map((l) => ({
@@ -84,7 +86,7 @@ export function RemisionNueva() {
 
   const cantidadLineas = lineas.filter((l) => l.productoId).length;
   const bodegaSeleccionada = (bodegas ?? []).find((b) => b.id === bodegaId);
-  const [haycambios, confirmarGuardado] = useHayCambios({ cliente, bodegaId, lineas });
+  const [haycambios, confirmarGuardado] = useHayCambios({ cliente, bodegaId, lineas, observaciones });
 
   return (
     <PaginaDocumento
@@ -154,6 +156,19 @@ export function RemisionNueva() {
                 </option>
               ))}
             </Select>
+          </div>
+          <div className="sm:col-span-2">
+            <label htmlFor="observaciones" className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+              Observaciones (opcional)
+            </label>
+            <textarea
+              id="observaciones"
+              value={observaciones}
+              onChange={(e) => setObservaciones(e.target.value)}
+              rows={2}
+              placeholder="Notas puntuales de esta remisión…"
+              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-sol-500 focus:ring-1 focus:ring-sol-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+            />
           </div>
         </CardColapsable>
 

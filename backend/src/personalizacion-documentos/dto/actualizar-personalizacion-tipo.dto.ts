@@ -67,4 +67,9 @@ export class ActualizarPersonalizacionTipoDto {
   @IsOptional()
   @IsString()
   firmaImagen?: string;
+
+  @ApiProperty({ required: false, description: 'Si el campo de Observaciones del documento se imprime, cuando el documento lo trae lleno.' })
+  @IsOptional()
+  @IsBoolean()
+  observacionesVisibles?: boolean;
 }

@@ -96,4 +96,13 @@ export class CrearCotizacionDto {
   @IsOptional()
   @IsString()
   listaPrecio?: string;
+
+  @ApiProperty({
+    required: false,
+    description:
+      'Texto libre, impreso en el documento si el tenant tiene activo "Observaciones" en Formato de Documentos (PersonalizacionDocumentoTipo.observacionesVisibles).',
+  })
+  @IsOptional()
+  @IsString()
+  observaciones?: string;
 }

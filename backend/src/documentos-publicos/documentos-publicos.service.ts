@@ -45,9 +45,10 @@ export class DocumentosPublicosService {
 
   async obtenerFactura(id: string) {
     const factura = await this.buscarFactura(id);
-    const personalizacion = await resolverPersonalizacionDocumento(this.prisma, factura.tenantId, 'FACTURA');
+    const { observacionesVisibles, ...personalizacion } = await resolverPersonalizacionDocumento(this.prisma, factura.tenantId, 'FACTURA');
+    const base = mapearFacturaAParams(factura);
     // El layout de bloques de la Fase C es interno del motor de PDF — esta vista pública no lo necesita (ver comentario en VerDocumentoPublico.tsx). `undefined` se cae solo al serializar a JSON.
-    return { ...mapearFacturaAParams(factura), ...personalizacion, layoutPersonalizado: undefined };
+    return { ...base, ...personalizacion, layoutPersonalizado: undefined, notas: observacionesVisibles ? base.notas : undefined };
   }
 
   async obtenerFacturaPdf(id: string) {
@@ -57,14 +58,16 @@ export class DocumentosPublicosService {
 
   async obtenerCotizacion(id: string) {
     const cotizacion = await this.buscarCotizacion(id);
-    const personalizacion = await resolverPersonalizacionDocumento(this.prisma, cotizacion.tenantId, 'COTIZACION');
+    const { observacionesVisibles, ...personalizacion } = await resolverPersonalizacionDocumento(this.prisma, cotizacion.tenantId, 'COTIZACION');
+    const base = mapearCotizacionAParams(cotizacion);
     // CRM "Cotización conectada" — estado/motivoRechazo viajan acá para que
     // VerDocumentoPublico.tsx sepa si mostrar los botones Aprobar/Rechazar
     // o el aviso de que ya se respondió.
     return {
-      ...mapearCotizacionAParams(cotizacion),
+      ...base,
       ...personalizacion,
       layoutPersonalizado: undefined,
+      notas: observacionesVisibles ? base.notas : undefined,
       estado: cotizacion.estado,
       motivoRechazo: cotizacion.motivoRechazo ?? undefined,
     };

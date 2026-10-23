@@ -67,6 +67,7 @@ export interface Cotizacion {
   clienteId: string;
   cliente: ClienteBasico;
   lineas: LineaCotizacion[];
+  observaciones?: string | null;
 }
 
 export const TONO_POR_ESTADO: Record<EstadoCotizacion, 'exito' | 'advertencia' | 'peligro' | 'neutro'> = {
