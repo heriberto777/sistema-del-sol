@@ -18,6 +18,9 @@ export interface OrdenCompraParaPdf {
   fechaPago: Date | null;
   proveedor: { nombre: string; rnc: string | null; telefono: string | null; email: string | null; plazoPagoDias: number };
   user: { nombre: string } | null;
+  // Una orden puede tener varias recepciones parciales — se muestra la más
+  // reciente (por fecha), igual criterio que "el último dato disponible".
+  recepciones: { fecha: Date; facturaProveedorNumero: string | null; montoFacturaProveedor: Prisma.Decimal | null }[];
   lineas: {
     producto: { nombre: string; codigo: string; categoria: { nombre: string } | null } | null;
     cantidad: Prisma.Decimal;
@@ -28,6 +31,7 @@ export interface OrdenCompraParaPdf {
 }
 
 export function mapearOrdenCompraAParams(orden: OrdenCompraParaPdf): DocumentoPdfParams {
+  const ultimaRecepcion = [...orden.recepciones].sort((a, b) => b.fecha.getTime() - a.fecha.getTime())[0];
   return {
     tipoDocumento: 'Orden de compra',
     numero: orden.numero,
@@ -36,6 +40,9 @@ export function mapearOrdenCompraAParams(orden: OrdenCompraParaPdf): DocumentoPd
     pagada: orden.pagada,
     fechaPago: orden.fechaPago ?? undefined,
     responsableNombre: orden.user?.nombre,
+    facturaProveedorNumero: ultimaRecepcion?.facturaProveedorNumero ?? undefined,
+    facturaProveedorMonto: ultimaRecepcion?.montoFacturaProveedor != null ? Number(ultimaRecepcion.montoFacturaProveedor) : undefined,
+    fechaRecepcion: ultimaRecepcion?.fecha,
     cliente: orden.proveedor.nombre,
     clienteDatosExtra: {
       rnc: orden.proveedor.rnc ?? undefined,

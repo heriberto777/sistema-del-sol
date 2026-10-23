@@ -43,8 +43,14 @@ export function EditorLayoutDocumento({ tipoDocumento, bloquesGuardados, onCerra
   const canvasRef = useRef<HTMLDivElement>(null);
 
   const { data: camposDisponibles } = useQuery({
-    queryKey: ['campos-documento'],
-    queryFn: async () => (await apiClient.get<{ clave: ClaveCampoDocumento; etiqueta: string }[]>('/admin/personalizacion-documentos/campos-disponibles')).data,
+    // Fase F — filtrado por tipo de documento, para no ofrecer en Cotización/Remisión/Orden de Compra campos exclusivos de Factura (NCF, forma de pago, etc.).
+    queryKey: ['campos-documento', tipoDocumento],
+    queryFn: async () =>
+      (
+        await apiClient.get<{ clave: ClaveCampoDocumento; etiqueta: string }[]>('/admin/personalizacion-documentos/campos-disponibles', {
+          params: { tipo: tipoDocumento },
+        })
+      ).data,
   });
 
   const tiposDisponibles = (Object.keys(ETIQUETA_BLOQUE) as TipoBloque[]).filter(
@@ -210,7 +216,12 @@ export function EditorLayoutDocumento({ tipoDocumento, bloquesGuardados, onCerra
 
         <div className="min-w-[220px] flex-1 space-y-3">
           {bloqueSeleccionado ? (
-            <PropiedadesBloque bloque={bloqueSeleccionado} onChange={(cambios) => actualizarBloque(seleccionado!, cambios)} camposDisponibles={camposDisponibles ?? []} />
+            <PropiedadesBloque
+              bloque={bloqueSeleccionado}
+              onChange={(cambios) => actualizarBloque(seleccionado!, cambios)}
+              camposDisponibles={camposDisponibles ?? []}
+              tipoDocumento={tipoDocumento}
+            />
           ) : (
             <p className="text-sm text-slate-400">Hacé clic en un bloque para ver sus opciones.</p>
           )}
@@ -280,15 +291,20 @@ function PropiedadesBloque({
   bloque,
   onChange,
   camposDisponibles,
+  tipoDocumento,
 }: {
   bloque: BloqueLayout;
   onChange: (cambios: Partial<BloqueLayout>) => void;
   camposDisponibles: { clave: ClaveCampoDocumento; etiqueta: string }[];
+  tipoDocumento: 'FACTURA' | 'COTIZACION' | 'REMISION' | 'ORDEN_COMPRA';
 }) {
   function alternar<T extends string>(lista: T[] | undefined, valor: T, todas: T[]): T[] {
     const actual = lista ?? todas;
     return actual.includes(valor) ? actual.filter((v) => v !== valor) : [...actual, valor];
   }
+
+  // Remisión nunca muestra precios (mostrarPrecios:false en el backend) — ofrecer precio/ITBIS/descuento ahí sería un checkbox que no hace nada.
+  const columnasDisponibles = tipoDocumento === 'REMISION' ? COLUMNAS.filter((c) => c.value === 'cantidad' || c.value === 'codigo' || c.value === 'categoria' || c.value === 'unidadMedida') : COLUMNAS;
 
   return (
     <div className="space-y-3 rounded-lg border border-slate-200 p-3 dark:border-slate-800">
@@ -316,7 +332,7 @@ function PropiedadesBloque({
       {bloque.tipo === 'tabla_lineas' && (
         <div className="space-y-1">
           <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Columnas</p>
-          {COLUMNAS.map((c) => (
+          {columnasDisponibles.map((c) => (
             <label key={c.value} className="flex items-center gap-1.5 text-sm text-slate-600 dark:text-slate-300">
               <input
                 type="checkbox"

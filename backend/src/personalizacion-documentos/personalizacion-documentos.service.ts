@@ -132,6 +132,10 @@ export class PersonalizacionDocumentosService {
       numeroInterno: 'FAC-000001',
       tipoNcf: 'B01',
       pagada: false,
+      fechaPago: undefined,
+      facturaProveedorNumero: 'FACT-PROV-00045',
+      facturaProveedorMonto: 2537,
+      fechaRecepcion: new Date(),
       ...resto,
     };
 

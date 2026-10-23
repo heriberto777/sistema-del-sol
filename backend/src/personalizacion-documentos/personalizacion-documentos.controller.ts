@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Get, Param, Put, Res } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Param, Put, Query, Res } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
 import { TipoDocumentoImpreso } from '@prisma/client';
@@ -30,11 +30,20 @@ export class PersonalizacionDocumentosController {
     return this.service.listar(user.tenantId);
   }
 
-  /** "Formato de Documentos" Fase D — catálogo de campos individuales insertables en el editor de canvas (bloque "campo"), ver campos-documento.ts. Sin tenantId: es el mismo catálogo fijo para todos. */
+  /**
+   * "Formato de Documentos" Fase D/E — catálogo de campos individuales
+   * insertables en el editor de canvas (bloque "campo"), ver
+   * campos-documento.ts. Sin tenantId: es el mismo catálogo fijo para
+   * todos. Con `?tipo=`, filtra a los campos que aplican a ESE tipo de
+   * documento (Fase F) — sin el query param, devuelve el catálogo
+   * completo sin filtrar (compatibilidad).
+   */
   @Get('campos-disponibles')
   @Permissions('admin.configuracion')
-  camposDisponibles() {
-    return CAMPOS_DOCUMENTO;
+  camposDisponibles(@Query('tipo') tipo?: string) {
+    if (!tipo) return CAMPOS_DOCUMENTO;
+    const tipoValido = validarTipo(tipo);
+    return CAMPOS_DOCUMENTO.filter((c) => c.tiposDocumento.includes(tipoValido));
   }
 
   @Put('marca')

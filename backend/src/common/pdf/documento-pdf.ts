@@ -130,6 +130,10 @@ export interface DocumentoPdfParams {
   /** Factura u Orden de Compra — si ya se saldó, y cuándo. */
   pagada?: boolean;
   fechaPago?: Date;
+  /** Solo Orden de Compra — de la recepción más reciente, si ya hubo alguna. */
+  facturaProveedorNumero?: string;
+  facturaProveedorMonto?: number;
+  fechaRecepcion?: Date;
 }
 
 /**
