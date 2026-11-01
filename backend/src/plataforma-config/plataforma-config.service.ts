@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, OnModuleInit } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { Prisma, PlataformaConfiguracion } from '@prisma/client';
 import { PlataformaConfigRepository } from './plataforma-config.repository';
 import { ActualizarPlataformaConfigDto } from './dto/actualizar-plataforma-config.dto';
@@ -14,6 +14,8 @@ import { cifrar, descifrar } from '../common/utils/encriptado.util';
  */
 @Injectable()
 export class PlataformaConfigService implements OnModuleInit {
+  private readonly logger = new Logger(PlataformaConfigService.name);
+
   constructor(private readonly repository: PlataformaConfigRepository) {}
 
   async onModuleInit() {
@@ -111,29 +113,49 @@ export class PlataformaConfigService implements OnModuleInit {
     }
   }
 
+  /**
+   * Bug real (hallado vía CI, e2e flakey): `descifrar()` lanza si el
+   * ciphertext no fue cifrado con el `ENCRYPTION_KEY` actual (clave
+   * rotada, o — en e2e — la fila singleton de `PlataformaConfiguracion`
+   * contaminada por un test que usó una clave de prueba distinta). Sin
+   * este try/catch, esa excepción escapaba de `onModuleInit()` y tumbaba
+   * el arranque de TODA la aplicación por un solo secreto ilegible —
+   * mismo criterio que `generarAdjuntoFacturaPdf` (degradar sin romper
+   * el flujo principal): se loguea y se trata como "no configurado".
+   */
+  private descifrarSeguro(campo: string, cifrado: string | null): string | null {
+    if (!cifrado) return null;
+    try {
+      return descifrar(cifrado);
+    } catch (error) {
+      this.logger.error(`No se pudo descifrar "${campo}" — se trata como no configurado. ¿Cambió ENCRYPTION_KEY?`, error as Error);
+      return null;
+    }
+  }
+
   private sincronizarEnv(config: PlataformaConfiguracion) {
     this.setEnv('EMAIL_HABILITADO', config.emailHabilitado !== null ? String(config.emailHabilitado) : null);
     this.setEnv('SMTP_HOST', config.smtpHost);
     this.setEnv('SMTP_PORT', config.smtpPort !== null ? String(config.smtpPort) : null);
     this.setEnv('SMTP_USER', config.smtpUser);
-    this.setEnv('SMTP_PASSWORD', config.smtpPasswordCifrado ? descifrar(config.smtpPasswordCifrado) : null);
+    this.setEnv('SMTP_PASSWORD', this.descifrarSeguro('smtpPasswordCifrado', config.smtpPasswordCifrado));
     this.setEnv('SMTP_FROM', config.smtpFrom);
 
     this.setEnv('TWILIO_ACCOUNT_SID', config.twilioAccountSid);
-    this.setEnv('TWILIO_AUTH_TOKEN', config.twilioAuthTokenCifrado ? descifrar(config.twilioAuthTokenCifrado) : null);
+    this.setEnv('TWILIO_AUTH_TOKEN', this.descifrarSeguro('twilioAuthTokenCifrado', config.twilioAuthTokenCifrado));
     this.setEnv('TWILIO_WHATSAPP_FROM', config.twilioWhatsappFrom);
 
     this.setEnv('PASARELA_PAGO_ACTIVA', config.pasarelaActiva);
-    this.setEnv('STRIPE_SECRET_KEY', config.stripeSecretKeyCifrado ? descifrar(config.stripeSecretKeyCifrado) : null);
-    this.setEnv('STRIPE_WEBHOOK_SECRET', config.stripeWebhookSecretCifrado ? descifrar(config.stripeWebhookSecretCifrado) : null);
+    this.setEnv('STRIPE_SECRET_KEY', this.descifrarSeguro('stripeSecretKeyCifrado', config.stripeSecretKeyCifrado));
+    this.setEnv('STRIPE_WEBHOOK_SECRET', this.descifrarSeguro('stripeWebhookSecretCifrado', config.stripeWebhookSecretCifrado));
     this.setEnv('STRIPE_CURRENCY', config.stripeCurrency);
 
     this.setEnv('IA_IMAGEN_PROVEEDOR_ACTIVO', config.iaImagenProveedorActivo);
     // `ANTHROPIC_API_KEY` es la MISMA variable que ya lee IaClientService
     // (bot de WhatsApp) — configurarla acá no crea una credencial nueva.
-    this.setEnv('ANTHROPIC_API_KEY', config.iaClaudeApiKeyCifrado ? descifrar(config.iaClaudeApiKeyCifrado) : null);
-    this.setEnv('OPENAI_API_KEY', config.iaOpenaiApiKeyCifrado ? descifrar(config.iaOpenaiApiKeyCifrado) : null);
-    this.setEnv('GEMINI_API_KEY', config.iaGeminiApiKeyCifrado ? descifrar(config.iaGeminiApiKeyCifrado) : null);
+    this.setEnv('ANTHROPIC_API_KEY', this.descifrarSeguro('iaClaudeApiKeyCifrado', config.iaClaudeApiKeyCifrado));
+    this.setEnv('OPENAI_API_KEY', this.descifrarSeguro('iaOpenaiApiKeyCifrado', config.iaOpenaiApiKeyCifrado));
+    this.setEnv('GEMINI_API_KEY', this.descifrarSeguro('iaGeminiApiKeyCifrado', config.iaGeminiApiKeyCifrado));
     this.setEnv('ANTHROPIC_MODEL', config.iaClaudeModelo);
     this.setEnv('OPENAI_MODEL', config.iaOpenaiModelo);
     this.setEnv('GEMINI_MODEL', config.iaGeminiModelo);

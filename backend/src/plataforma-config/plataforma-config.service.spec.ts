@@ -141,6 +141,24 @@ describe('PlataformaConfigService', () => {
       expect((data as { iaClaudeModelo?: string }).iaClaudeModelo).toBe('claude-haiku-4-5');
       expect(process.env.ANTHROPIC_MODEL).toBe('claude-haiku-4-5');
     });
+
+    it('bug real: un ciphertext ilegible (ENCRYPTION_KEY rotada, dato corrupto) no tumba onModuleInit — se trata como no configurado y sigue con el resto', async () => {
+      delete process.env.STRIPE_SECRET_KEY;
+      delete process.env.PASARELA_PAGO_ACTIVA;
+      // Cifrado con una clave distinta a la que lee descifrar() ahora — simula una ENCRYPTION_KEY rotada.
+      const cifradoConOtraClave = cifrar('sk_viejo_con_otra_clave');
+      process.env.ENCRYPTION_KEY = 'otra-clave-completamente-distinta';
+      repo.obtenerOCrear.mockResolvedValue({
+        ...CONFIG_VACIA,
+        stripeSecretKeyCifrado: cifradoConOtraClave,
+        pasarelaActiva: 'stripe',
+      } as never);
+
+      await expect(service.onModuleInit()).resolves.not.toThrow();
+
+      expect(process.env.STRIPE_SECRET_KEY).toBeUndefined();
+      expect(process.env.PASARELA_PAGO_ACTIVA).toBe('stripe');
+    });
   });
 
   describe('obtener — iaImagen', () => {
