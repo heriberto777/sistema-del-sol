@@ -2,6 +2,7 @@ import { Body, Controller, Get, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { NotificacionesService } from './notificaciones.service';
 import { CrearPlantillaDto } from './dto/crear-plantilla.dto';
+import { VistaPreviaPlantillaDto } from './dto/vista-previa-plantilla.dto';
 import { Permissions } from '../common/decorators/permissions.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtPayloadUser } from '../common/types/authenticated-request';
@@ -35,5 +36,11 @@ export class NotificacionesController {
   @Permissions('admin.configuracion')
   guardarPlantilla(@Body() dto: CrearPlantillaDto, @CurrentUser() user: JwtPayloadUser) {
     return this.notificacionesService.guardarPlantilla(user.tenantId, dto);
+  }
+
+  @Post('plantillas/vista-previa')
+  @Permissions('admin.configuracion')
+  vistaPreviaPlantilla(@Body() dto: VistaPreviaPlantillaDto, @CurrentUser() user: JwtPayloadUser) {
+    return this.notificacionesService.vistaPreviaPlantilla(user.tenantId, dto);
   }
 }

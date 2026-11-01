@@ -37,6 +37,8 @@ import { descifrar } from '../common/utils/encriptado.util';
 import { enviarWhatsappTwilio } from '../common/utils/twilio-whatsapp.util';
 import { CATALOGO_EVENTOS_NOTIFICACION } from './catalogo-eventos-notificacion';
 import { construirEmailNotificacionHtml } from './construir-email-notificacion-html';
+import { generarValoresEjemplo, generarValoresEjemploDesdeTexto } from './valores-ejemplo-variables';
+import { VistaPreviaPlantillaDto } from './dto/vista-previa-plantilla.dto';
 
 @Injectable()
 export class NotificacionesService {
@@ -100,6 +102,28 @@ export class NotificacionesService {
 
   listarEventosDisponibles() {
     return CATALOGO_EVENTOS_NOTIFICACION;
+  }
+
+  /**
+   * Vista previa — el admin edita texto con variables en un <textarea>
+   * plano y no tiene forma de ver cómo queda el email real (con el sobre
+   * HTML de marca aplicado) sin mandar un envío de verdad. Renderiza el
+   * cuerpo/asunto TAL CUAL están en el formulario (sin guardar) con
+   * valores de muestra, y para EMAIL aplica el mismo
+   * construirEmailNotificacionHtml que usa un envío real.
+   */
+  async vistaPreviaPlantilla(tenantId: string, dto: VistaPreviaPlantillaDto) {
+    const evento = CATALOGO_EVENTOS_NOTIFICACION.find((e) => e.clave === dto.clave);
+    const valores = evento ? generarValoresEjemplo(evento.variables.map((v) => v.nombre)) : generarValoresEjemploDesdeTexto(dto.asunto, dto.cuerpo);
+
+    const asunto = dto.asunto ? renderizarPlantilla(dto.asunto, valores) : undefined;
+    const cuerpo = renderizarPlantilla(dto.cuerpo, valores);
+
+    if (dto.canal === 'EMAIL') {
+      const branding = await this.resolverBrandingTenant(tenantId);
+      return { canal: 'EMAIL' as const, asunto, html: construirEmailNotificacionHtml({ tenantNombre: branding.nombre, tenantLogo: branding.logo, asunto, cuerpo }) };
+    }
+    return { canal: dto.canal, asunto, texto: cuerpo };
   }
 
   async listar(tenantId: string, query: ListadoQueryDto) {

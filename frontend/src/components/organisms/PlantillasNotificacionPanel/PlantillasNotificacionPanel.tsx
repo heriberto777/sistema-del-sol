@@ -238,6 +238,20 @@ function ModalPlantilla({
 
   const eventoSeleccionado = eventos?.find((e) => e.clave === clave);
 
+  const [previsualizando, setPrevisualizando] = useState(false);
+  const vistaPrevia = useMutation({
+    mutationFn: async () =>
+      (
+        await apiClient.post<{ canal: CanalNotificacion; asunto?: string; html?: string; texto?: string }>('/notificaciones/plantillas/vista-previa', {
+          canal,
+          clave,
+          asunto: asunto || undefined,
+          cuerpo,
+        })
+      ).data,
+    onSuccess: () => setPrevisualizando(true),
+  });
+
   const guardar = useMutation({
     mutationFn: async () => apiClient.post('/notificaciones/plantillas', { canal, clave, asunto: asunto || undefined, cuerpo, activa }),
     onSuccess: () => {
@@ -329,7 +343,14 @@ function ModalPlantilla({
 
         <div className="flex flex-col gap-1">
           <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Canal</label>
-          <Select value={canal} onChange={(e) => setCanal(e.target.value as CanalNotificacion)} disabled={canalFijo}>
+          <Select
+            value={canal}
+            onChange={(e) => {
+              setCanal(e.target.value as CanalNotificacion);
+              setPrevisualizando(false);
+            }}
+            disabled={canalFijo}
+          >
             {canalesDisponibles.map((c) => (
               <option key={c} value={c}>
                 {ETIQUETA_CANAL[c]}
@@ -346,7 +367,10 @@ function ModalPlantilla({
             id="plantilla-asunto"
             ref={asuntoRef}
             value={asunto}
-            onChange={(e) => setAsunto(e.target.value)}
+            onChange={(e) => {
+              setAsunto(e.target.value);
+              setPrevisualizando(false);
+            }}
             onFocus={() => setCampoActivo('asunto')}
             className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-sol-500 focus:ring-1 focus:ring-sol-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
           />
@@ -359,7 +383,10 @@ function ModalPlantilla({
             id="plantilla-cuerpo"
             ref={cuerpoRef}
             value={cuerpo}
-            onChange={(e) => setCuerpo(e.target.value)}
+            onChange={(e) => {
+              setCuerpo(e.target.value);
+              setPrevisualizando(false);
+            }}
             onFocus={() => setCampoActivo('cuerpo')}
             required
             rows={5}
@@ -388,6 +415,13 @@ function ModalPlantilla({
           </div>
         )}
 
+        <div className="flex flex-col gap-2">
+          <Button type="button" variante="secundario" disabled={vistaPrevia.isPending || !clave || !cuerpo} onClick={() => vistaPrevia.mutate()}>
+            {vistaPrevia.isPending ? 'Generando vista previa…' : 'Vista previa'}
+          </Button>
+          {previsualizando && vistaPrevia.data && <VistaPreviaPlantilla resultado={vistaPrevia.data} />}
+        </div>
+
         <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
           <input type="checkbox" checked={activa} onChange={(e) => setActiva(e.target.checked)} />
           Plantilla activa
@@ -399,5 +433,28 @@ function ModalPlantilla({
         </Button>
       </form>
     </Modal>
+  );
+}
+
+function VistaPreviaPlantilla({ resultado }: { resultado: { canal: CanalNotificacion; asunto?: string; html?: string; texto?: string } }) {
+  if (resultado.canal === 'EMAIL') {
+    return (
+      <div className="overflow-hidden rounded-md border border-slate-200 dark:border-slate-700">
+        {resultado.asunto && (
+          <div className="border-b border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400">
+            <span className="font-medium text-slate-700 dark:text-slate-300">Asunto: </span>
+            {resultado.asunto}
+          </div>
+        )}
+        <iframe title="Vista previa del email" srcDoc={resultado.html} sandbox="" className="h-80 w-full bg-white" />
+      </div>
+    );
+  }
+  return (
+    <div className="rounded-md border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-700 dark:bg-slate-900">
+      <div className="inline-block max-w-[85%] rounded-lg rounded-bl-none bg-emerald-100 px-3 py-2 text-slate-800 dark:bg-emerald-900/40 dark:text-emerald-100">
+        {resultado.texto}
+      </div>
+    </div>
   );
 }
