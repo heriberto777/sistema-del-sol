@@ -36,6 +36,7 @@ import { mapearCotizacionAParams } from '../cotizaciones/mapear-cotizacion-pdf';
 import { descifrar } from '../common/utils/encriptado.util';
 import { enviarWhatsappTwilio } from '../common/utils/twilio-whatsapp.util';
 import { CATALOGO_EVENTOS_NOTIFICACION } from './catalogo-eventos-notificacion';
+import { construirEmailNotificacionHtml } from './construir-email-notificacion-html';
 
 @Injectable()
 export class NotificacionesService {
@@ -78,7 +79,9 @@ export class NotificacionesService {
 
     let enviada = true;
     if (params.canal === 'EMAIL') {
-      enviada = await this.emailChannel.enviar(params.destinatario, asunto ?? '', cuerpo, params.adjuntoPdf ? [params.adjuntoPdf] : undefined, params.tenantId);
+      const branding = await this.resolverBrandingTenant(params.tenantId);
+      const cuerpoHtml = construirEmailNotificacionHtml({ tenantNombre: branding.nombre, tenantLogo: branding.logo, asunto, cuerpo });
+      enviada = await this.emailChannel.enviar(params.destinatario, asunto ?? '', cuerpoHtml, params.adjuntoPdf ? [params.adjuntoPdf] : undefined, params.tenantId);
     } else if (params.canal === 'WHATSAPP') {
       enviada = await this.whatsAppChannel.enviar(params.destinatario, asunto ?? '', cuerpo, params.tenantId);
     }
@@ -117,6 +120,22 @@ export class NotificacionesService {
    */
   private enlacePublico(tipo: 'facturas' | 'cotizaciones', id: string): string {
     return `${process.env.FRONTEND_URL ?? 'http://localhost:5173'}/ver-${tipo === 'facturas' ? 'factura' : 'cotizacion'}/${id}`;
+  }
+
+  /**
+   * Marca (nombre + logo) con la que se envuelve el email — ver
+   * construirEmailNotificacionHtml. Nunca bloquea el envío: si el tenant no
+   * existe o falla la consulta, se usa un default genérico y se manda igual
+   * (mismo criterio que generarAdjuntoFacturaPdf de abajo).
+   */
+  private async resolverBrandingTenant(tenantId: string): Promise<{ nombre: string; logo: string | null }> {
+    try {
+      const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId }, select: { nombre: true, logo: true } });
+      return { nombre: tenant?.nombre ?? 'El Sistema del Sol', logo: tenant?.logo ?? null };
+    } catch (error) {
+      this.logger.warn(`No se pudo resolver la marca del tenant ${tenantId} para el email: ${(error as Error).message}`);
+      return { nombre: 'El Sistema del Sol', logo: null };
+    }
   }
 
   /**

@@ -2741,6 +2741,22 @@ positivo ante una falla real de SMTP/Twilio. Ahora `enviar()` devuelve
 activa" (400) de "plantilla activa pero falló el envío" (503, mismo
 patrón que `ClientesService.enviarEstadoCuenta`).
 
+**Bug real corregido (emails sin formato)**: el `cuerpo` de una
+`NotificacionPlantilla` se mandaba tal cual como `html:` del email — un
+fragmento simple (texto + algún `<strong>` suelto, lo que el tenant
+escribe en el `<textarea>` de Admin → Notificaciones), sin tipografía,
+margen ni marca: se veía como texto plano en Gmail. `NotificacionesService.enviar()`
+ahora envuelve el `cuerpo` ya renderizado en un sobre HTML Outlook-safe
+(`construirEmailNotificacionHtml`, mismo criterio tablas+estilos en
+línea que `construirEmailEstadoCuentaHtml`/`construirEmailIncentivoHtml`)
+con el nombre y logo del tenant (`Tenant.nombre`/`Tenant.logo`) — solo
+para el canal EMAIL, nunca para WhatsApp (sin HTML ahí). El `cuerpo` que
+el admin edita y el que queda guardado en `Notificacion` (historial) NO
+cambian — se siguen viendo como texto simple; el sobre se arma recién al
+momento de enviar. Si no se puede resolver el tenant (debería ser
+imposible en producción), degrada a una marca genérica ("El Sistema del
+Sol") en vez de romper el envío.
+
 ## Recordatorios automáticos de cobro
 
 `RecordatoriosService` (`backend/src/recordatorios/`) corre un

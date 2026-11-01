@@ -50,9 +50,25 @@ describe('NotificacionesService', () => {
 
       await service.enviar({ tenantId: 't1', canal: 'EMAIL', clave: 'x', destinatario: 'a@b.com', variables: {} });
 
-      expect(emailChannel.enviar).toHaveBeenCalledWith('a@b.com', 'Hola', 'Cuerpo', undefined, 't1');
+      expect(emailChannel.enviar).toHaveBeenCalledWith('a@b.com', 'Hola', expect.stringContaining('Cuerpo'), undefined, 't1');
       expect(whatsAppChannel.enviar).not.toHaveBeenCalled();
       expect(repository.marcarEstado).toHaveBeenCalledWith('n1', 'ENVIADA');
+    });
+
+    it('envuelve el cuerpo del email en el sobre HTML con marca del tenant — bug real: se mandaba como texto plano, sin formato', async () => {
+      repository.buscarPlantilla.mockResolvedValue({ activa: true, asunto: 'Hola', cuerpo: 'Cuerpo' } as never);
+      repository.crearNotificacion.mockResolvedValue({ id: 'n1' } as never);
+      emailChannel.enviar.mockResolvedValue(true);
+
+      await service.enviar({ tenantId: 't1', canal: 'EMAIL', clave: 'x', destinatario: 'a@b.com', variables: {} });
+
+      const [, , cuerpoEnviado] = emailChannel.enviar.mock.calls[0];
+      expect(cuerpoEnviado).toContain('<!DOCTYPE html>');
+      expect(cuerpoEnviado).toContain('Cuerpo');
+      // Sin prisma.tenant mockeado en este spec, resolverBrandingTenant degrada al nombre genérico (no debe romper el envío).
+      expect(cuerpoEnviado).toContain('El Sistema del Sol');
+      // El registro guardado (lo que ve el admin en el historial) sigue siendo el cuerpo SIN envolver.
+      expect(repository.crearNotificacion).toHaveBeenCalledWith('t1', 'EMAIL', 'a@b.com', 'Hola', 'Cuerpo');
     });
 
     it('ítem H-4: reenvía adjuntoPdf a EmailChannel como un array de un elemento', async () => {
@@ -63,7 +79,7 @@ describe('NotificacionesService', () => {
 
       await service.enviar({ tenantId: 't1', canal: 'EMAIL', clave: 'x', destinatario: 'a@b.com', variables: {}, adjuntoPdf });
 
-      expect(emailChannel.enviar).toHaveBeenCalledWith('a@b.com', 'Hola', 'Cuerpo', [adjuntoPdf], 't1');
+      expect(emailChannel.enviar).toHaveBeenCalledWith('a@b.com', 'Hola', expect.stringContaining('Cuerpo'), [adjuntoPdf], 't1');
     });
 
     it('canal WHATSAPP despacha por WhatsAppChannel, no por Email', async () => {
@@ -105,7 +121,7 @@ describe('NotificacionesService', () => {
 
       await service.enviar({ tenantId: 't1', canal: 'EMAIL', clave: 'x', destinatario: 'a@b.com', variables: { nombre: 'Ana', total: '100' } });
 
-      expect(emailChannel.enviar).toHaveBeenCalledWith('a@b.com', 'Hola Ana', 'Total: 100', undefined, 't1');
+      expect(emailChannel.enviar).toHaveBeenCalledWith('a@b.com', 'Hola Ana', expect.stringContaining('Total: 100'), undefined, 't1');
     });
   });
 
@@ -329,7 +345,7 @@ describe('NotificacionesService', () => {
       await service.alResponderCotizacionCrm({ tenantId: 't1', cotizacionId: 'c1', vendedorId: 'v1', clienteNombre: 'Ana', numero: 'COT-1', decision: 'ACEPTADA' });
 
       expect(repository.buscarPlantilla).toHaveBeenCalledWith('t1', 'EMAIL', 'cotizacion_aprobada_vendedor');
-      expect(emailChannel.enviar).toHaveBeenCalledWith('vendedor@x.com', 'x', 'x', undefined, 't1');
+      expect(emailChannel.enviar).toHaveBeenCalledWith('vendedor@x.com', 'x', expect.stringContaining('x'), undefined, 't1');
     });
 
     it('RECHAZADA: usa la clave "cotizacion_rechazada_vendedor" y formatea el motivo con ": " adelante', async () => {
@@ -349,7 +365,7 @@ describe('NotificacionesService', () => {
       });
 
       expect(repository.buscarPlantilla).toHaveBeenCalledWith('t1', 'EMAIL', 'cotizacion_rechazada_vendedor');
-      expect(emailChannel.enviar).toHaveBeenCalledWith('vendedor@x.com', '', 'Motivo: Precio alto', undefined, 't1');
+      expect(emailChannel.enviar).toHaveBeenCalledWith('vendedor@x.com', '', expect.stringContaining('Motivo: Precio alto'), undefined, 't1');
     });
   });
 
@@ -390,7 +406,7 @@ describe('NotificacionesService', () => {
         where: { tenantId: 't1', roles: { some: { role: { nombre: 'Admin Total' } } } },
       });
       expect(repository.buscarPlantilla).toHaveBeenCalledWith('t1', 'EMAIL', 'whatsapp_requiere_atencion');
-      expect(emailChannel.enviar).toHaveBeenCalledWith('admin@x.com', '', 'Atender WhatsApp whatsapp:+18095551234', undefined, 't1');
+      expect(emailChannel.enviar).toHaveBeenCalledWith('admin@x.com', '', expect.stringContaining('Atender WhatsApp whatsapp:+18095551234'), undefined, 't1');
     });
   });
 
@@ -681,7 +697,7 @@ describe('NotificacionesService', () => {
         comentario: 'cambiale el color a azul',
       });
 
-      expect(emailChannel.enviar).toHaveBeenCalledWith('creador@x.com', '', 'Te pidieron: cambiale el color a azul', undefined, 't1');
+      expect(emailChannel.enviar).toHaveBeenCalledWith('creador@x.com', '', expect.stringContaining('Te pidieron: cambiale el color a azul'), undefined, 't1');
     });
 
     it('no falla si el creador ya no existe', async () => {
@@ -720,7 +736,7 @@ describe('NotificacionesService', () => {
         motivoRechazo: 'La foto sale borrosa',
       });
 
-      expect(emailChannel.enviar).toHaveBeenCalledWith('creador@x.com', '', 'Motivo: La foto sale borrosa', undefined, 't1');
+      expect(emailChannel.enviar).toHaveBeenCalledWith('creador@x.com', '', expect.stringContaining('Motivo: La foto sale borrosa'), undefined, 't1');
     });
   });
 });
