@@ -2720,11 +2720,26 @@ poder personalizar cada mensaje por separado). Integrado en
 Remisiones/POS) como una sección extra "Enviar recibo", visible solo
 cuando `urlBase` apunta a `/facturas/:id` — Cotizaciones/Remisiones ya
 tienen su propio flujo de envío (`COTIZACION_ENVIADA`) y no necesitan
-esta opción. **Limitación conocida, deliberada**: el recibo se manda
-como texto de plantilla (igual que el resto de `NotificacionesService`),
-sin adjuntar el PDF — adjuntar PDFs no es algo que `EmailChannel`
-soporte hoy, y agregarlo solo para este flujo sería una asimetría rara
-frente al resto de eventos que usan el mismo canal.
+esta opción. Por EMAIL adjunta el PDF de la factura (`generarPdfPersonalizado`,
+mismo criterio que `alFacturarse`); por WhatsApp solo el link, ese canal
+no soporta adjuntos.
+
+**Bug real corregido (auditoría de integración de notificaciones)**: la
+clave `factura_recibo` nunca estuvo en `CATALOGO_EVENTOS_NOTIFICACION` ni
+en `PLANTILLAS_VENTAS_BASE` — era imposible de configurar desde la UI
+para cualquier tenant, así que "Enviar recibo" fallaba siempre con "no
+hay plantilla activa". Mismo motivo rompía `factura_vencida` (ver
+"Recordatorios automáticos de cobro" abajo) — ningún tenant recibió
+nunca un recordatorio de cobro automático. Ambas claves ya están en el
+catálogo y sembradas por defecto; tenants existentes necesitan correr
+`pnpm --filter ./backend notificaciones:plantillas-ventas:backfill` una
+vez. De paso se corrigió que `NotificacionesService.enviar()` devolvía
+el registro de `Notificacion` (siempre truthy) sin importar si el envío
+real al canal había fallado — `enviarRecibo` quedaba con un falso
+positivo ante una falla real de SMTP/Twilio. Ahora `enviar()` devuelve
+`{ notificacion, enviada }` y `enviarRecibo` distingue "sin plantilla
+activa" (400) de "plantilla activa pero falló el envío" (503, mismo
+patrón que `ClientesService.enviarEstadoCuenta`).
 
 ## Recordatorios automáticos de cobro
 
@@ -2738,7 +2753,10 @@ un cron) y filtra en memoria las que ya pasaron `fecha + plazoPagoDias`
 al volumen esperado, traer las facturas a crédito sin pagar y filtrar en
 JS es más simple que la alternativa en SQL crudo). Reusa el mismo
 `NotificacionesService.enviar()` con la clave `factura_vencida` — por
-email si el cliente tiene correo, por WhatsApp si tiene teléfono.
+email si el cliente tiene correo y no desactivó ese canal
+(`Cliente.notificacionesEmailHabilitadas !== false`), por WhatsApp si
+tiene teléfono y no desactivó WhatsApp — mismo criterio que
+`alFacturarse`/`alEnviarCotizacion` (ver arriba).
 
 `Factura.pagada`/`fechaPago` se marcan vía
 `POST /facturas/:id/registrar-pago` (permiso `facturacion.cobrar`) — sin

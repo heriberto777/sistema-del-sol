@@ -62,10 +62,8 @@ export function ModalImprimir({ urlBase, titulo, onClose }: ModalImprimirProps) 
     setEnviando(true);
     setMensajeEnvio(null);
     try {
-      const { data } = await apiClient.post<{ enviado: boolean }>(`${urlBase}/enviar-recibo`, { canal, destinatario });
-      setMensajeEnvio(
-        data.enviado ? 'Recibo enviado.' : 'No hay una plantilla de notificación activa para este canal — configurala en Admin → Notificaciones.',
-      );
+      await apiClient.post<{ enviado: boolean }>(`${urlBase}/enviar-recibo`, { canal, destinatario });
+      setMensajeEnvio('Recibo enviado.');
     } catch (err) {
       setMensajeEnvio(mensajeErrorApi(err, 'No se pudo enviar el recibo.'));
     } finally {

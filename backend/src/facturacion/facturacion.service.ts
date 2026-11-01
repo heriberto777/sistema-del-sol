@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { FormatoImpresion, PlantillaDocumento, Prisma, TipoFactura, TipoNcf } from '@prisma/client';
 import { FacturacionRepository } from './facturacion.repository';
 import { InventarioService } from '../inventario/inventario.service';
@@ -1008,7 +1008,7 @@ export class FacturacionService {
       dto.canal === 'EMAIL'
         ? { filename: 'factura.pdf', content: await generarPdfPersonalizado(this.prisma, tenantId, 'FACTURA', mapearFacturaAParams(factura), factura.bodegaId) }
         : undefined;
-    const enviado = await this.notificacionesService.enviar({
+    const resultado = await this.notificacionesService.enviar({
       tenantId,
       canal: dto.canal,
       clave: 'factura_recibo',
@@ -1022,6 +1022,21 @@ export class FacturacionService {
       },
       adjuntoPdf,
     });
-    return { enviado: !!enviado };
+    // Mismo criterio que ClientesService.enviarEstadoCuenta: distinguir
+    // "no hay plantilla activa" de "había plantilla pero falló el envío
+    // real" — antes acá se devolvía `{ enviado: !!enviado }` con el
+    // registro de Notificacion (siempre truthy), así que un fallo real de
+    // SMTP/Twilio quedaba oculto como "enviado: true" (bug real).
+    if (!resultado) {
+      throw new BadRequestException('No hay una plantilla de notificación activa para este canal — configurala en Admin → Notificaciones.');
+    }
+    if (!resultado.enviada) {
+      throw new ServiceUnavailableException(
+        dto.canal === 'EMAIL'
+          ? 'No se pudo enviar el email — revisá la configuración SMTP en Plataforma.'
+          : 'No se pudo enviar el WhatsApp — revisá la configuración de Twilio en Integraciones o en Plataforma.',
+      );
+    }
+    return { enviado: true };
   }
 }

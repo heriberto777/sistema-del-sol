@@ -84,4 +84,32 @@ export const PLANTILLAS_VENTAS_BASE: { canal: CanalNotificacion; clave: string; 
     asunto: '{{cliente_nombre}} rechazó la cotización {{cotizacion_numero}}',
     cuerpo: 'Hola, {{cliente_nombre}} rechazó la cotización <strong>{{cotizacion_numero}}</strong>{{motivo}}',
   },
+  // "Enviar recibo" (botón manual en Imprimir) y el recordatorio de cobro
+  // (cron diario) usaban claves ("factura_recibo"/"factura_vencida") que
+  // nunca estuvieron en este archivo ni en el catálogo de eventos — nunca
+  // hubo una plantilla activa para ninguna, en ningún tenant, así que
+  // ambos envíos fallaban siempre en silencio (bug real reportado: "No
+  // hay una plantilla de notificación activa para este canal").
+  {
+    canal: 'EMAIL',
+    clave: 'factura_recibo',
+    asunto: 'Tu factura {{factura_ncf}} por RD$ {{factura_total}}',
+    cuerpo: 'Hola {{cliente_nombre}}, adjuntamos tu factura <strong>{{factura_ncf}}</strong> del {{factura_fecha}} por <strong>RD$ {{factura_total}}</strong>. También podés verla acá: {{link}}',
+  },
+  {
+    canal: 'WHATSAPP',
+    clave: 'factura_recibo',
+    cuerpo: 'Hola {{cliente_nombre}}, tu factura {{factura_ncf}} del {{factura_fecha}} por RD$ {{factura_total}} está lista: {{link}}',
+  },
+  {
+    canal: 'EMAIL',
+    clave: 'factura_vencida',
+    asunto: 'Factura {{factura_ncf}} vencida',
+    cuerpo: 'Hola {{cliente_nombre}}, tu factura <strong>{{factura_ncf}}</strong> por <strong>RD$ {{factura_total}}</strong> ya venció. Por favor regularizá el pago a la brevedad.',
+  },
+  {
+    canal: 'WHATSAPP',
+    clave: 'factura_vencida',
+    cuerpo: 'Hola {{cliente_nombre}}, tu factura {{factura_ncf}} por RD$ {{factura_total}} ya venció. Por favor regularizá el pago a la brevedad.',
+  },
 ];

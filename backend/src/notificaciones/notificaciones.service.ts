@@ -84,7 +84,7 @@ export class NotificacionesService {
     }
 
     await this.notificacionesRepository.marcarEstado(notificacion.id, enviada ? 'ENVIADA' : 'FALLIDA');
-    return notificacion;
+    return { notificacion, enviada };
   }
 
   listarPlantillas(tenantId: string) {

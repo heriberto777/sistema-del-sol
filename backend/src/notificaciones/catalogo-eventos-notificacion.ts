@@ -250,4 +250,30 @@ export const CATALOGO_EVENTOS_NOTIFICACION: EventoNotificacion[] = [
       { nombre: 'motivo_rechazo', descripcion: 'Motivo del rechazo' },
     ],
   },
+  {
+    clave: 'factura_recibo',
+    etiqueta: 'Enviar recibo de factura',
+    modulo: 'Ventas',
+    canales: ['EMAIL', 'WHATSAPP'],
+    descripcion: 'Al apretar "Enviar recibo" desde Imprimir en una factura (envío manual, a cualquier destinatario que escriba el usuario).',
+    variables: [
+      { nombre: 'cliente_nombre', descripcion: 'Nombre del cliente' },
+      { nombre: 'factura_ncf', descripcion: 'NCF de la factura' },
+      { nombre: 'factura_total', descripcion: 'Total de la factura' },
+      { nombre: 'factura_fecha', descripcion: 'Fecha de la factura' },
+      { nombre: 'link', descripcion: 'Link público para ver la factura' },
+    ],
+  },
+  {
+    clave: 'factura_vencida',
+    etiqueta: 'Factura vencida (recordatorio de cobro)',
+    modulo: 'Cuentas por Cobrar',
+    canales: ['EMAIL', 'WHATSAPP'],
+    descripcion: 'Cron diario: factura a crédito sin pagar que ya superó su plazo de pago, si el cliente tiene email/teléfono cargado.',
+    variables: [
+      { nombre: 'cliente_nombre', descripcion: 'Nombre del cliente' },
+      { nombre: 'factura_ncf', descripcion: 'NCF de la factura' },
+      { nombre: 'factura_total', descripcion: 'Total de la factura' },
+    ],
+  },
 ];

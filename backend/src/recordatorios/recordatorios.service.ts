@@ -24,7 +24,10 @@ export class RecordatoriosService {
   async enviarRecordatoriosDeCobro() {
     const facturasCredito = await this.prisma.factura.findMany({
       where: { estado: 'EMITIDA', tipoFactura: 'CREDITO', pagada: false },
-      include: { cliente: { select: CLIENTE_SELECT_BASICO } },
+      // CLIENTE_SELECT_BASICO no trae notificaciones*Habilitadas (solo
+      // CLIENTE_SELECT_COMPLETO) — se extiende acá en vez de tocar el
+      // select compartido, que usan endpoints que no necesitan ese dato.
+      include: { cliente: { select: { ...CLIENTE_SELECT_BASICO, notificacionesEmailHabilitadas: true, notificacionesWhatsappHabilitadas: true } } },
     });
 
     const ahora = Date.now();
@@ -41,7 +44,10 @@ export class RecordatoriosService {
         factura_total: factura.total.toString(),
       };
 
-      if (factura.cliente.email) {
+      // === false explícito, no `!cliente.notificaciones*Habilitadas` —
+      // mismo criterio que NotificacionesService.alFacturarse/alEnviarCotizacion,
+      // ver el comentario ahí.
+      if (factura.cliente.email && factura.cliente.notificacionesEmailHabilitadas !== false) {
         await this.notificacionesService.enviar({
           tenantId: factura.tenantId,
           canal: 'EMAIL',
@@ -50,7 +56,7 @@ export class RecordatoriosService {
           variables,
         });
       }
-      if (factura.cliente.telefono) {
+      if (factura.cliente.telefono && factura.cliente.notificacionesWhatsappHabilitadas !== false) {
         await this.notificacionesService.enviar({
           tenantId: factura.tenantId,
           canal: 'WHATSAPP',

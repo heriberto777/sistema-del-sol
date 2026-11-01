@@ -73,6 +73,17 @@ describe('RecordatoriosService', () => {
     expect(notificacionesService.enviar).toHaveBeenCalledWith(expect.objectContaining({ canal: 'EMAIL' }));
   });
 
+  it('respeta el opt-out de canal del cliente (notificaciones*Habilitadas === false)', async () => {
+    prisma.factura.findMany.mockResolvedValue([
+      factura({ cliente: { nombre: 'X', email: 'x@y.com', telefono: '+18095551234', notificacionesEmailHabilitadas: false } }),
+    ]);
+
+    await service.enviarRecordatoriosDeCobro();
+
+    expect(notificacionesService.enviar).toHaveBeenCalledTimes(1);
+    expect(notificacionesService.enviar).toHaveBeenCalledWith(expect.objectContaining({ canal: 'WHATSAPP' }));
+  });
+
   it('solo consulta facturas EMITIDA, CREDITO y no pagadas', async () => {
     prisma.factura.findMany.mockResolvedValue([]);
 

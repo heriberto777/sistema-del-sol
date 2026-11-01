@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, ServiceUnavailableException } from '@nestjs/common';
 import { FacturacionService } from './facturacion.service';
 import { FacturacionRepository } from './facturacion.repository';
 import { InventarioService } from '../inventario/inventario.service';
@@ -129,7 +129,7 @@ describe('FacturacionService', () => {
       verificarPin: jest.fn().mockResolvedValue(undefined),
     } as unknown as jest.Mocked<AuthService>;
     notificacionesService = {
-      enviar: jest.fn().mockResolvedValue({ id: 'n1' }),
+      enviar: jest.fn().mockResolvedValue({ notificacion: { id: 'n1' }, enviada: true }),
     } as unknown as jest.Mocked<NotificacionesService>;
     autorizacionesService = {
       estaHabilitada: jest.fn().mockResolvedValue(false),
@@ -1897,13 +1897,18 @@ describe('FacturacionService', () => {
       expect(args.adjuntoPdf?.content).toBeInstanceOf(Buffer);
     });
 
-    it('devuelve enviado:false si el tenant no tiene una plantilla activa para ese canal', async () => {
+    it('lanza BadRequestException si el tenant no tiene una plantilla activa para ese canal', async () => {
       repository.buscarPorId.mockResolvedValue(facturaParaEnviar() as never);
       notificacionesService.enviar.mockResolvedValue(null as never);
 
-      const resultado = await service.enviarRecibo('f1', { canal: 'EMAIL', destinatario: 'x@x.com' }, 'tenant-1');
+      await expect(service.enviarRecibo('f1', { canal: 'EMAIL', destinatario: 'x@x.com' }, 'tenant-1')).rejects.toThrow(BadRequestException);
+    });
 
-      expect(resultado).toEqual({ enviado: false });
+    it('lanza ServiceUnavailableException si había plantilla activa pero el envío real falló (bug real: antes devolvía enviado:true)', async () => {
+      repository.buscarPorId.mockResolvedValue(facturaParaEnviar() as never);
+      notificacionesService.enviar.mockResolvedValue({ notificacion: { id: 'n1' }, enviada: false } as never);
+
+      await expect(service.enviarRecibo('f1', { canal: 'EMAIL', destinatario: 'x@x.com' }, 'tenant-1')).rejects.toThrow(ServiceUnavailableException);
     });
   });
 
