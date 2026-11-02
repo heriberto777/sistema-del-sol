@@ -14,6 +14,11 @@ export interface CuentaBase {
 export const CUENTAS_BASE: CuentaBase[] = [
   { codigo: '1010', nombre: 'Caja y Bancos', tipo: 'ACTIVO', naturaleza: 'DEUDORA' },
   { codigo: '1020', nombre: 'Cuentas por Cobrar', tipo: 'ACTIVO', naturaleza: 'DEUDORA' },
+  // Contra-activo (Fase 4, CxC — provisión de incobrables): naturaleza
+  // ACREEDORA aunque tipo sea ACTIVO, a propósito — reduce el valor neto
+  // realizable de Cuentas por Cobrar en el balance, mismo criterio que
+  // cualquier cuenta "de menos" (ej. depreciación acumulada).
+  { codigo: '1025', nombre: 'Provisión para Cuentas Incobrables', tipo: 'ACTIVO', naturaleza: 'ACREEDORA' },
   { codigo: '1030', nombre: 'Inventario', tipo: 'ACTIVO', naturaleza: 'DEUDORA' },
   { codigo: '1040', nombre: 'ITBIS Adelantado (por Cobrar)', tipo: 'ACTIVO', naturaleza: 'DEUDORA' },
   { codigo: '2010', nombre: 'Cuentas por Pagar', tipo: 'PASIVO', naturaleza: 'ACREEDORA' },
@@ -27,12 +32,14 @@ export const CUENTAS_BASE: CuentaBase[] = [
   { codigo: '5010', nombre: 'Costo de Ventas', tipo: 'GASTO', naturaleza: 'DEUDORA' },
   { codigo: '5020', nombre: 'Gastos Operativos', tipo: 'GASTO', naturaleza: 'DEUDORA' },
   { codigo: '5030', nombre: 'Gastos de Nómina', tipo: 'GASTO', naturaleza: 'DEUDORA' },
+  { codigo: '5040', nombre: 'Gasto por Cuentas Incobrables', tipo: 'GASTO', naturaleza: 'DEUDORA' },
 ];
 
 /** Códigos que los asientos automáticos necesitan resolver por nombre conocido — ver AsientosContablesService. */
 export const CODIGOS_CUENTA = {
   CAJA_BANCOS: '1010',
   CUENTAS_POR_COBRAR: '1020',
+  PROVISION_CUENTAS_INCOBRABLES: '1025',
   INVENTARIO: '1030',
   ITBIS_ADELANTADO: '1040',
   CUENTAS_POR_PAGAR: '2010',
@@ -43,5 +50,6 @@ export const CODIGOS_CUENTA = {
   INGRESOS_POR_VENTAS: '4010',
   COSTO_DE_VENTAS: '5010',
   GASTOS_DE_NOMINA: '5030',
+  GASTO_CUENTAS_INCOBRABLES: '5040',
   UTILIDADES_RETENIDAS: '3020',
 } as const;

@@ -11,6 +11,7 @@ describe('ReportesFiscalesService', () => {
       anuladasEnRango: jest.fn(),
       comprasRecibidasEnRango: jest.fn(),
       gastosMenoresEnRango: jest.fn().mockResolvedValue([]),
+      facturasProveedorEnRango: jest.fn().mockResolvedValue([]),
       retencionesNominaEnRango: jest.fn(),
       retencionesProveedoresEnRango: jest.fn().mockResolvedValue([]),
     } as unknown as jest.Mocked<ReportesFiscalesRepository>;
@@ -124,6 +125,25 @@ describe('ReportesFiscalesService', () => {
       );
       expect(resumen).toEqual({ cantidad: 2, montoFacturado: 500, itbisFacturado: 90 });
     });
+
+    it('Fase 5 — incluye FacturaProveedor (sin orden de compra) y resta la NOTA_CREDITO', async () => {
+      repository.comprasRecibidasEnRango.mockResolvedValue([]);
+      repository.facturasProveedorEnRango.mockResolvedValue([
+        { tipo: 'FACTURA', fecha: new Date('2026-01-05'), ncfProveedor: 'B0100000001', subtotal: 1000, itbis: 180, proveedor: { rnc: '13100000050' } },
+        { tipo: 'NOTA_CREDITO', fecha: new Date('2026-01-06'), ncfProveedor: 'B0400000001', subtotal: 200, itbis: 36, proveedor: { rnc: '13100000050' } },
+      ] as never);
+
+      const { filas, resumen } = await service.formato606();
+
+      expect(filas).toHaveLength(2);
+      expect(filas.find((f) => f.numeroComprobante === 'B0100000001')).toEqual(
+        expect.objectContaining({ rncProveedor: '13100000050', montoFacturado: 1000, itbisFacturado: 180 }),
+      );
+      expect(filas.find((f) => f.numeroComprobante === 'B0400000001')).toEqual(
+        expect.objectContaining({ montoFacturado: -200, itbisFacturado: -36 }),
+      );
+      expect(resumen).toEqual({ cantidad: 2, montoFacturado: 800, itbisFacturado: 144 });
+    });
   });
 
   describe('resumenItbis', () => {
@@ -207,7 +227,7 @@ describe('ReportesFiscalesService', () => {
           monto: 1000,
           retencionIsr: 150,
           retencionItbis: 300,
-          ordenCompra: { proveedor: { nombre: 'Juan Pérez', rnc: '00112223334' } },
+          proveedor: { nombre: 'Juan Pérez', rnc: '00112223334' },
         },
       ] as never);
 

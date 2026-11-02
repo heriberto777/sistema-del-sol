@@ -6,5 +6,6 @@ import { CuentasPorPagarRepository } from './cuentas-por-pagar.repository';
 @Module({
   controllers: [CuentasPorPagarController],
   providers: [CuentasPorPagarService, CuentasPorPagarRepository],
+  exports: [CuentasPorPagarService, CuentasPorPagarRepository],
 })
 export class CuentasPorPagarModule {}

@@ -35,7 +35,7 @@ const SESION_BASE: SesionCobroFactura = {
   monto: 100 as unknown as SesionCobroFactura['monto'],
   datosVerificacion: null,
   estado: 'PENDIENTE',
-  pagoId: null,
+  reciboIngresoId: null,
   createdAt: new Date(),
   updatedAt: new Date(),
 };

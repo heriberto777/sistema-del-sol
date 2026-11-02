@@ -12,18 +12,24 @@ describe('CuentasPorPagarService', () => {
     repository = {
       listar: jest.fn().mockResolvedValue([[], 0]),
       listarTodasPendientes: jest.fn().mockResolvedValue([]),
-      sumaPagosPorOrdenes: jest.fn().mockResolvedValue([]),
     } as unknown as jest.Mocked<CuentasPorPagarRepository>;
     service = new CuentasPorPagarService(repository);
   });
 
   describe('listar', () => {
-    it('resta los pagos parciales del total y calcula días vencidos contra fecha + proveedor.plazoPagoDias', async () => {
+    it('CxP como ledger real (Fase 2): lee saldo/fechaVencimiento directo de CuentaPorPagar, sin recalcular Pago', async () => {
       repository.listar.mockResolvedValue([
-        [{ id: 'o1', numero: '00010', fecha: hace(45), total: 1000, proveedor: { nombre: 'Proveedor X', plazoPagoDias: 30 } }],
+        [
+          {
+            id: 'o1',
+            numero: '00010',
+            fecha: hace(45),
+            proveedor: { nombre: 'Proveedor X' },
+            cuentasPorPagar: [{ monto: 1000, saldo: 600, fechaVencimiento: hace(15) }],
+          },
+        ],
         1,
       ] as never);
-      repository.sumaPagosPorOrdenes.mockResolvedValue([{ ordenCompraId: 'o1', _sum: { monto: 400 } }] as never);
 
       const resultado = await service.listar({});
 
@@ -42,26 +48,47 @@ describe('CuentasPorPagarService', () => {
       expect(resultado.total).toBe(1);
     });
 
-    it('sin pagos registrados, pendiente es igual al total', async () => {
+    it('una orden con varias recepciones abiertas suma sus CuentaPorPagar y usa el vencimiento más antiguo (el más urgente)', async () => {
       repository.listar.mockResolvedValue([
-        [{ id: 'o1', numero: '00011', fecha: hace(5), total: 500, proveedor: { nombre: 'Proveedor Y', plazoPagoDias: 30 } }],
+        [
+          {
+            id: 'o1',
+            numero: '00013',
+            fecha: hace(50),
+            proveedor: { nombre: 'Proveedor W' },
+            cuentasPorPagar: [
+              { monto: 500, saldo: 500, fechaVencimiento: hace(15) }, // más urgente
+              { monto: 300, saldo: 300, fechaVencimiento: hace(5) },
+            ],
+          },
+        ],
+        1,
+      ] as never);
+
+      const resultado = await service.listar({});
+
+      expect(resultado.datos[0]).toEqual(
+        expect.objectContaining({ total: 800, pendiente: 800, diasVencido: 15, bucket: 'D1_30' }),
+      );
+    });
+
+    it('sin pagos registrados, pendiente es igual al monto', async () => {
+      repository.listar.mockResolvedValue([
+        [
+          {
+            id: 'o1',
+            numero: '00011',
+            fecha: hace(5),
+            proveedor: { nombre: 'Proveedor Y' },
+            cuentasPorPagar: [{ monto: 500, saldo: 500, fechaVencimiento: hace(-25) }],
+          },
+        ],
         1,
       ] as never);
 
       const resultado = await service.listar({});
 
       expect(resultado.datos[0]).toEqual(expect.objectContaining({ pagado: 0, pendiente: 500, bucket: 'CORRIENTE' }));
-    });
-
-    it('un plazo de pago por proveedor más largo empuja el vencimiento y baja el bucket', async () => {
-      repository.listar.mockResolvedValue([
-        [{ id: 'o1', numero: '00012', fecha: hace(45), total: 1000, proveedor: { nombre: 'Proveedor Z', plazoPagoDias: 60 } }],
-        1,
-      ] as never);
-
-      const resultado = await service.listar({});
-
-      expect(resultado.datos[0]).toEqual(expect.objectContaining({ bucket: 'CORRIENTE', diasVencido: -15 }));
     });
 
     it('pasa busqueda/paginación al repositorio', async () => {
@@ -72,13 +99,12 @@ describe('CuentasPorPagarService', () => {
   });
 
   describe('resumen', () => {
-    it('agrupa en buckets de antigüedad y separa vencido de por-vencer', async () => {
+    it('agrupa en buckets de antigüedad y separa vencido de por-vencer, usando el saldo ya almacenado', async () => {
       repository.listarTodasPendientes.mockResolvedValue([
-        { id: 'o1', fecha: hace(45), total: 1000, proveedor: { plazoPagoDias: 30 } }, // 15 días vencida -> D1_30
-        { id: 'o2', fecha: hace(5), total: 500, proveedor: { plazoPagoDias: 30 } }, // por vencer -> CORRIENTE
-        { id: 'o3', fecha: hace(100), total: 300, proveedor: { plazoPagoDias: 30 } }, // 70 días vencida -> D61_90
+        { id: 'c1', saldo: 800, fechaVencimiento: hace(15) }, // 15 días vencida -> D1_30
+        { id: 'c2', saldo: 500, fechaVencimiento: hace(-25) }, // por vencer -> CORRIENTE
+        { id: 'c3', saldo: 300, fechaVencimiento: hace(70) }, // 70 días vencida -> D61_90
       ] as never);
-      repository.sumaPagosPorOrdenes.mockResolvedValue([{ ordenCompraId: 'o1', _sum: { monto: 200 } }] as never);
 
       const resumen = await service.resumen();
 
@@ -88,10 +114,22 @@ describe('CuentasPorPagarService', () => {
       expect(resumen.totalPorVencer).toBe(500);
     });
 
-    it('sin ninguna orden pendiente, todo queda en cero', async () => {
+    it('sin ninguna CuentaPorPagar pendiente, todo queda en cero', async () => {
       const resumen = await service.resumen();
 
       expect(resumen).toEqual({ totalCxP: 0, totalVencido: 0, totalPorVencer: 0, buckets: { CORRIENTE: 0, D1_30: 0, D31_60: 0, D61_90: 0, D90_MAS: 0 } });
+    });
+
+    it('Fase 5 — una CuentaPorPagar de origen FacturaProveedor (sin ordenCompraId) suma igual que una de Compras: listarTodasPendientes ya es genérico', async () => {
+      repository.listarTodasPendientes.mockResolvedValue([
+        { id: 'c1', saldo: 500, fechaVencimiento: hace(15) }, // origen OrdenCompra
+        { id: 'c2', saldo: 300, fechaVencimiento: hace(5) }, // origen FacturaProveedor — mismo shape, sin distinción
+      ] as never);
+
+      const resumen = await service.resumen();
+
+      expect(resumen.totalCxP).toBe(800);
+      expect(resumen.totalVencido).toBe(800);
     });
   });
 });

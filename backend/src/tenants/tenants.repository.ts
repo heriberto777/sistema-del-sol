@@ -276,10 +276,11 @@ export class TenantsRepository {
     await tx.ajusteInventario.deleteMany({ where: { tenantId } });
     await tx.transferenciaInventario.deleteMany({ where: { tenantId } });
     await tx.movimientoInventario.deleteMany({ where: { tenantId } });
-    // Cascada: LineaOc, RecepcionCompra(+LineaRecepcion), DevolucionCompra(+LineaDevolucionCompra).
+    // Cascada: LineaOc, RecepcionCompra(+LineaRecepcion), DevolucionCompra
+    // (+LineaDevolucionCompra), CuentaPorPagar(+AplicacionPago, Fase 2/3).
     await tx.ordenCompra.deleteMany({ where: { tenantId } });
-    await tx.pago.deleteMany({ where: { tenantId } });
-    // Cascada: LineaFactura, FacturaRecargo, PagoVenta.
+    // Cascada: LineaFactura, FacturaRecargo, PagoVenta, CuentaPorCobrar
+    // (+AplicacionCobro, Fase 1/3).
     await tx.factura.deleteMany({ where: { tenantId } });
     // Cascada: LineaAsiento, PeriodoContableCerrado.
     await tx.asientoContable.deleteMany({ where: { tenantId } });

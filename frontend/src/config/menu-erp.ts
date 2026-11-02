@@ -118,6 +118,8 @@ export const DOMINIOS_MENU: DominioMenu[] = [
           // Vive junto a Cuentas por pagar: es el mismo "ambiente" de la relación con proveedores.
           { id: 'proveedores', etiqueta: 'Proveedores', ruta: '/proveedores', permisos: ['compras.ver'] },
           { id: 'cxp', etiqueta: 'Cuentas por pagar', ruta: '/cuentas-por-pagar', permisos: ['cuentasporpagar.ver'], modulo: 'compras' },
+          // Gasto a crédito sin orden de compra (luz, alquiler, servicios) — mismo "ambiente" de CxP.
+          { id: 'facturas-proveedor', etiqueta: 'Facturas de proveedor', ruta: '/facturas-proveedor', permisos: ['facturasproveedor.ver'], modulo: 'compras' },
         ],
       },
       { categoria: 'reportes', items: [{ id: 'reportes-compras', etiqueta: 'Compras', ruta: '/reportes', permisos: ['reportes.ver'] }] },

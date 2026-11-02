@@ -58,15 +58,23 @@ export class ReportesFiscalesRepository {
     });
   }
 
-  /** Pagos a proveedores con retención de ISR y/o ITBIS practicada (ver PagosService.registrarPagoOrdenCompra). */
+  /** Facturas de proveedor sin orden de compra (Fase 5) — también van al 606, con RNC real del proveedor. Excluye ANULADA; incluye NOTA_CREDITO (el service le resta signo). */
+  facturasProveedorEnRango(desde: Date, hasta: Date) {
+    return this.db.facturaProveedor.findMany({
+      where: { fecha: { gte: desde, lte: finDelDia(hasta) }, estado: { not: 'ANULADA' } },
+      orderBy: { fecha: 'asc' },
+      include: { proveedor: { select: { rnc: true } } },
+    });
+  }
+
+  /** Pagos a proveedores con retención de ISR y/o ITBIS practicada — Fase 3: `OrdenPago` reemplaza `Pago.ordenCompraId`, la retención sigue viviendo en la cabecera, no por línea de aplicación. */
   retencionesProveedoresEnRango(desde: Date, hasta: Date) {
-    return this.db.pago.findMany({
+    return this.db.ordenPago.findMany({
       where: {
-        ordenCompraId: { not: null },
         fecha: { gte: desde, lte: finDelDia(hasta) },
         OR: [{ retencionIsr: { gt: 0 } }, { retencionItbis: { gt: 0 } }],
       },
-      include: { ordenCompra: { include: { proveedor: true } } },
+      include: { proveedor: true },
       orderBy: { fecha: 'asc' },
     });
   }

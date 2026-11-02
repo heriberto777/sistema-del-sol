@@ -10,6 +10,7 @@ import { RecibirOrdenCompraDto } from './dto/recibir-orden-compra.dto';
 import { PagosService } from '../pagos/pagos.service';
 import { CorrelativosRepository } from '../correlativos/correlativos.repository';
 import { ProductosService } from '../productos/productos.service';
+import { CuentasPorPagarRepository } from '../cuentas-por-pagar/cuentas-por-pagar.repository';
 
 describe('ComprasService', () => {
   let service: ComprasService;
@@ -21,6 +22,7 @@ describe('ComprasService', () => {
   let pagosService: jest.Mocked<PagosService>;
   let correlativosRepository: jest.Mocked<CorrelativosRepository>;
   let productosService: jest.Mocked<ProductosService>;
+  let cuentasPorPagarRepository: jest.Mocked<CuentasPorPagarRepository>;
 
   // Ver el mismo patrón en facturacion.service.spec.ts: un tx opaco pasado
   // por $transaction a los métodos *EnTx — no necesita comportarse como un
@@ -62,6 +64,11 @@ describe('ComprasService', () => {
     } as unknown as jest.Mocked<VariantesService>;
     correlativosRepository = { siguienteEnTx: jest.fn().mockResolvedValue('OC-00001') } as unknown as jest.Mocked<CorrelativosRepository>;
     productosService = { resolverFactorConversion: jest.fn().mockResolvedValue(1) } as unknown as jest.Mocked<ProductosService>;
+    cuentasPorPagarRepository = {
+      crearEnTx: jest.fn().mockResolvedValue(undefined),
+      reducirPorDevolucionEnTx: jest.fn().mockResolvedValue(undefined),
+      tieneCuentaDeOrdenCompletaEnTx: jest.fn().mockResolvedValue(false),
+    } as unknown as jest.Mocked<CuentasPorPagarRepository>;
     service = new ComprasService(
       repository,
       inventarioService,
@@ -72,6 +79,7 @@ describe('ComprasService', () => {
       pagosService,
       correlativosRepository,
       {} as never,
+      cuentasPorPagarRepository,
     );
   });
 
@@ -115,6 +123,7 @@ describe('ComprasService', () => {
       return {
         numero: 'OC-001',
         proveedorId: 'prov-1',
+        proveedor: { plazoPagoDias: 30 },
         total: 500,
         lineas: [{ id: 'linea-1', productoId: 'p1', cantidad: 10, cantidadRecibida: cantidadRecibidaLinea, producto: { tipo: 'PRODUCTO' } }],
       };
@@ -143,7 +152,7 @@ describe('ComprasService', () => {
     it('marca RECIBIDA_TOTAL cuando la cantidad recibida acumulada cubre lo pedido', async () => {
       repository.buscarPorId.mockResolvedValue(ordenBase(0) as never); // antes de recibir
       repository.buscarPorIdEnTx.mockResolvedValue(ordenBase(10) as never); // después de actualizar, dentro de la tx
-      repository.crearRecepcion.mockResolvedValue({ id: 'rec-1' } as never);
+      repository.crearRecepcion.mockResolvedValue({ id: 'rec-1', fecha: new Date('2026-01-01') } as never);
 
       await service.recibir('oc-1', dtoRecepcion, 'user-1', 'tenant-1');
 
@@ -153,7 +162,7 @@ describe('ComprasService', () => {
     it('marca RECIBIDA_PARCIAL cuando aún falta cantidad por recibir', async () => {
       repository.buscarPorId.mockResolvedValue(ordenBase(0) as never);
       repository.buscarPorIdEnTx.mockResolvedValue(ordenBase(4) as never); // solo 4 de 10 recibidos
-      repository.crearRecepcion.mockResolvedValue({ id: 'rec-1' } as never);
+      repository.crearRecepcion.mockResolvedValue({ id: 'rec-1', fecha: new Date('2026-01-01') } as never);
 
       await service.recibir(
         'oc-1',
@@ -168,7 +177,7 @@ describe('ComprasService', () => {
     it('actualiza la entrada de inventario por cada línea recibida, dentro de la misma transacción', async () => {
       repository.buscarPorId.mockResolvedValue(ordenBase(0) as never);
       repository.buscarPorIdEnTx.mockResolvedValue(ordenBase(10) as never);
-      repository.crearRecepcion.mockResolvedValue({ id: 'rec-1' } as never);
+      repository.crearRecepcion.mockResolvedValue({ id: 'rec-1', fecha: new Date('2026-01-01') } as never);
 
       await service.recibir('oc-1', dtoRecepcion, 'user-1', 'tenant-1');
 
@@ -183,7 +192,7 @@ describe('ComprasService', () => {
     it('Fase 5b: propaga numeroLote/fechaVencimiento y referenciaTipo/referenciaId a entradaStockEnTx', async () => {
       repository.buscarPorId.mockResolvedValue(ordenBase(0) as never);
       repository.buscarPorIdEnTx.mockResolvedValue(ordenBase(10) as never);
-      repository.crearRecepcion.mockResolvedValue({ id: 'rec-1' } as never);
+      repository.crearRecepcion.mockResolvedValue({ id: 'rec-1', fecha: new Date('2026-01-01') } as never);
       const fechaVencimiento = new Date('2026-12-01');
 
       await service.recibir(
@@ -207,12 +216,13 @@ describe('ComprasService', () => {
       const ordenConServicio = {
         numero: 'OC-001',
         proveedorId: 'prov-1',
+        proveedor: { plazoPagoDias: 30 },
         total: 500,
         lineas: [{ id: 'linea-1', productoId: 'p1', cantidad: 10, cantidadRecibida: 0, producto: { tipo: 'SERVICIO' } }],
       };
       repository.buscarPorId.mockResolvedValue(ordenConServicio as never);
       repository.buscarPorIdEnTx.mockResolvedValue(ordenConServicio as never);
-      repository.crearRecepcion.mockResolvedValue({ id: 'rec-1' } as never);
+      repository.crearRecepcion.mockResolvedValue({ id: 'rec-1', fecha: new Date('2026-01-01') } as never);
 
       await service.recibir('oc-1', dtoRecepcion, 'user-1', 'tenant-1');
 
@@ -223,7 +233,7 @@ describe('ComprasService', () => {
     it('no rompe si una línea recibida no corresponde a ninguna línea de la OC original (igual descuenta stock)', async () => {
       repository.buscarPorId.mockResolvedValue(ordenBase(0) as never);
       repository.buscarPorIdEnTx.mockResolvedValue(ordenBase(0) as never);
-      repository.crearRecepcion.mockResolvedValue({ id: 'rec-1' } as never);
+      repository.crearRecepcion.mockResolvedValue({ id: 'rec-1', fecha: new Date('2026-01-01') } as never);
 
       await service.recibir(
         'oc-1',
@@ -239,7 +249,7 @@ describe('ComprasService', () => {
     it('calcula diferenciaVsFactura contra el monto de ESTA recepción (recepción única = orden completa)', async () => {
       repository.buscarPorId.mockResolvedValue(ordenBase(0) as never);
       repository.buscarPorIdEnTx.mockResolvedValue(ordenBase(10) as never);
-      repository.crearRecepcion.mockResolvedValue({ id: 'rec-1' } as never);
+      repository.crearRecepcion.mockResolvedValue({ id: 'rec-1', fecha: new Date('2026-01-01') } as never);
 
       const resultado = await service.recibir(
         'oc-1',
@@ -256,7 +266,7 @@ describe('ComprasService', () => {
       // orden.total = 500 (la orden completa, p. ej. 100 unidades pedidas en total)
       repository.buscarPorId.mockResolvedValue(ordenBase(0) as never);
       repository.buscarPorIdEnTx.mockResolvedValue(ordenBase(10) as never);
-      repository.crearRecepcion.mockResolvedValue({ id: 'rec-1' } as never);
+      repository.crearRecepcion.mockResolvedValue({ id: 'rec-1', fecha: new Date('2026-01-01') } as never);
 
       // Esta recepción es solo una FRACCIÓN de la orden: 10 unidades a 5 c/u = 50.
       const resultado = await service.recibir(
@@ -275,17 +285,47 @@ describe('ComprasService', () => {
     it('diferenciaVsFactura es null cuando no se envía montoFacturaProveedor', async () => {
       repository.buscarPorId.mockResolvedValue(ordenBase(0) as never);
       repository.buscarPorIdEnTx.mockResolvedValue(ordenBase(10) as never);
-      repository.crearRecepcion.mockResolvedValue({ id: 'rec-1' } as never);
+      repository.crearRecepcion.mockResolvedValue({ id: 'rec-1', fecha: new Date('2026-01-01') } as never);
 
       const resultado = await service.recibir('oc-1', dtoRecepcion, 'user-1', 'tenant-1');
 
       expect(resultado.diferenciaVsFactura).toBeNull();
     });
 
+    it('CxP como ledger real (Fase 2): crea la CuentaPorPagar dentro de la misma transacción, por esta recepción', async () => {
+      repository.buscarPorId.mockResolvedValue(ordenBase(0) as never);
+      repository.buscarPorIdEnTx.mockResolvedValue(ordenBase(10) as never);
+      repository.crearRecepcion.mockResolvedValue({ id: 'rec-1', fecha: new Date('2026-01-01') } as never);
+
+      await service.recibir('oc-1', dtoRecepcion, 'user-1', 'tenant-1');
+
+      expect(cuentasPorPagarRepository.crearEnTx).toHaveBeenCalledWith(
+        TX,
+        expect.objectContaining({
+          tenantId: 'tenant-1',
+          proveedorId: 'prov-1',
+          ordenCompraId: 'oc-1',
+          recepcionCompraId: 'rec-1',
+          monto: 50, // dtoRecepcion: 10 unidades * 5
+        }),
+      );
+    });
+
+    it('Fase 3 (bug real, anticipo a proveedor): no crea una CuentaPorPagar por recepción si la orden ya tiene una "de orden completa"', async () => {
+      repository.buscarPorId.mockResolvedValue(ordenBase(0) as never);
+      repository.buscarPorIdEnTx.mockResolvedValue(ordenBase(10) as never);
+      repository.crearRecepcion.mockResolvedValue({ id: 'rec-1', fecha: new Date('2026-01-01') } as never);
+      cuentasPorPagarRepository.tieneCuentaDeOrdenCompletaEnTx.mockResolvedValue(true);
+
+      await service.recibir('oc-1', dtoRecepcion, 'user-1', 'tenant-1');
+
+      expect(cuentasPorPagarRepository.crearEnTx).not.toHaveBeenCalled();
+    });
+
     it('emite ORDEN_COMPRA_RECIBIDA con el proveedor y total de la orden original', async () => {
       repository.buscarPorId.mockResolvedValue(ordenBase(0) as never);
       repository.buscarPorIdEnTx.mockResolvedValue(ordenBase(10) as never);
-      repository.crearRecepcion.mockResolvedValue({ id: 'rec-1' } as never);
+      repository.crearRecepcion.mockResolvedValue({ id: 'rec-1', fecha: new Date('2026-01-01') } as never);
 
       await service.recibir('oc-1', dtoRecepcion, 'user-1', 'tenant-1');
 
@@ -466,6 +506,20 @@ describe('ComprasService', () => {
       expect(repository.crearDevolucionEnTx).not.toHaveBeenCalled();
     });
 
+    it('CxP como ledger real (Fase 2): reduce la deuda original en la misma transacción por el monto devuelto', async () => {
+      repository.buscarPorId.mockResolvedValue(ordenRecibida() as never);
+      tenantPrisma.client.producto.findMany.mockResolvedValue([{ id: 'p1', porcentajeItbis: 18 }] as never);
+      repository.crearDevolucionEnTx.mockResolvedValue({ id: 'dev-1' } as never);
+      repository.buscarPorIdEnTx.mockResolvedValue({
+        lineas: [{ productoId: 'p1', cantidad: 10, cantidadRecibida: 6 }],
+      } as never);
+
+      await service.devolver('oc-1', dtoDevolucion, 'user-1', 'tenant-1');
+
+      // 4 unidades devueltas * 20 costo = 80
+      expect(cuentasPorPagarRepository.reducirPorDevolucionEnTx).toHaveBeenCalledWith(TX, 'oc-1', 80);
+    });
+
     it('emite ORDEN_COMPRA_DEVUELTA con el monto e itbis de las líneas devueltas', async () => {
       repository.buscarPorId.mockResolvedValue(ordenRecibida() as never);
       tenantPrisma.client.producto.findMany.mockResolvedValue([{ id: 'p1', porcentajeItbis: 18 }] as never);
@@ -509,6 +563,7 @@ describe('ComprasService', () => {
       const orden = {
         numero: 'OC-001',
         proveedorId: 'prov-1',
+        proveedor: { plazoPagoDias: 30 },
         total: 500,
         lineas: [
           {
@@ -524,7 +579,7 @@ describe('ComprasService', () => {
       };
       repository.buscarPorId.mockResolvedValue(orden as never);
       repository.buscarPorIdEnTx.mockResolvedValue({ ...orden, lineas: [{ ...orden.lineas[0], cantidadRecibida: 10 }] } as never);
-      repository.crearRecepcion.mockResolvedValue({ id: 'rec-1' } as never);
+      repository.crearRecepcion.mockResolvedValue({ id: 'rec-1', fecha: new Date('2026-01-01') } as never);
 
       // 10 Cajas a 72 (costo por Caja) -> 1440 unidades base a 0.5 por unidad base.
       await service.recibir('oc-1', { bodegaId: 'bodega-1', lineas: [{ productoId: 'p1', cantidadRecibida: 10, costoUnitario: 72 }] }, 'user-1', 'tenant-1');

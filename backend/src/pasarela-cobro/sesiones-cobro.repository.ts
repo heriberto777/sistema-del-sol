@@ -45,7 +45,7 @@ export class SesionesCobroRepository {
     return this.prisma.sesionCobroFactura.update({ where: { id: sesionId }, data: { estado: 'RECHAZADO' } });
   }
 
-  vincularPago(sesionId: string, pagoId: string) {
-    return this.prisma.sesionCobroFactura.update({ where: { id: sesionId }, data: { pagoId } });
+  vincularRecibo(sesionId: string, reciboIngresoId: string) {
+    return this.prisma.sesionCobroFactura.update({ where: { id: sesionId }, data: { reciboIngresoId } });
   }
 }

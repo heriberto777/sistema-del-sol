@@ -20,6 +20,7 @@ import { AutorizacionesService } from '../autorizaciones/autorizaciones.service'
 import { ConfiguracionesService } from '../configuraciones/configuraciones.service';
 import { CorrelativosService } from '../correlativos/correlativos.service';
 import { ProductosService } from '../productos/productos.service';
+import { CuentasPorCobrarRepository } from '../cuentas-por-cobrar/cuentas-por-cobrar.repository';
 
 describe('FacturacionService', () => {
   let service: FacturacionService;
@@ -41,6 +42,7 @@ describe('FacturacionService', () => {
   let configuracionesService: jest.Mocked<ConfiguracionesService>;
   let correlativosService: jest.Mocked<CorrelativosService>;
   let productosService: jest.Mocked<ProductosService>;
+  let cuentasPorCobrarRepository: jest.Mocked<CuentasPorCobrarRepository>;
 
   // Un tx opaco: crear()/anular() abren la transacción con tenantPrisma.client.$transaction
   // y pasan este objeto a los métodos *EnTx — para las pruebas basta con que sea el mismo
@@ -59,11 +61,14 @@ describe('FacturacionService', () => {
   function facturaCreada(overrides: Record<string, unknown> = {}) {
     return {
       id: 'f1',
+      numero: 'F-0001',
       clienteId: 'cliente-1',
       total: 0,
       subtotal: 0,
       itbis: 0,
       tipoFactura: 'CONTADO',
+      fecha: new Date('2026-01-01'),
+      plazoPagoDias: 30,
       ...overrides,
     };
   }
@@ -145,6 +150,11 @@ describe('FacturacionService', () => {
     productosService = {
       resolverFactorConversion: jest.fn().mockResolvedValue(1),
     } as unknown as jest.Mocked<ProductosService>;
+    cuentasPorCobrarRepository = {
+      listarAbiertasDeCliente: jest.fn().mockResolvedValue([]),
+      crearEnTx: jest.fn().mockResolvedValue(undefined),
+      anularPorFacturaEnTx: jest.fn().mockResolvedValue(undefined),
+    } as unknown as jest.Mocked<CuentasPorCobrarRepository>;
     service = new FacturacionService(
       repository,
       inventarioService,
@@ -164,6 +174,7 @@ describe('FacturacionService', () => {
       configuracionesService,
       correlativosService,
       productosService,
+      cuentasPorCobrarRepository,
     );
   });
 
@@ -1501,6 +1512,98 @@ describe('FacturacionService', () => {
     });
   });
 
+  describe('CxC como ledger real (Fase 1) — bloqueo síncrono de crédito', () => {
+    beforeEach(() => {
+      repository.obtenerProductoConPrecioVigente.mockResolvedValue(producto(18, 100) as never);
+      repository.crearFacturaEnTx.mockResolvedValue(facturaCreada({ tipoFactura: 'CREDITO', total: 236 }) as never);
+    });
+
+    it('CONTADO nunca bloquea ni consulta CuentaPorCobrar, aunque el cliente esté vencido/sobre el límite', async () => {
+      clientesService.buscarPorId.mockResolvedValue({ id: 'cliente-1', listaPrecio: null, limiteCredito: 1 } as never);
+      cuentasPorCobrarRepository.listarAbiertasDeCliente.mockResolvedValue([
+        { saldo: 999, fechaVencimiento: new Date('2000-01-01') },
+      ] as never);
+      repository.crearFacturaEnTx.mockResolvedValue(facturaCreada({ tipoFactura: 'CONTADO', total: 236 }) as never);
+
+      await service.crear(dto({ tipoFactura: 'CONTADO' }), 'tenant-1', 'vendedor-1');
+
+      expect(cuentasPorCobrarRepository.listarAbiertasDeCliente).not.toHaveBeenCalled();
+      expect(cuentasPorCobrarRepository.crearEnTx).not.toHaveBeenCalled();
+    });
+
+    it('rechaza con 400 si el cliente tiene una CuentaPorCobrar vencida por encima del umbral configurado', async () => {
+      configuracionesService.buscarValor.mockResolvedValue('5');
+      cuentasPorCobrarRepository.listarAbiertasDeCliente.mockResolvedValue([
+        { saldo: 100, fechaVencimiento: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000) },
+      ] as never);
+
+      await expect(service.crear(dto({ tipoFactura: 'CREDITO' }), 'tenant-1', 'vendedor-1')).rejects.toThrow(BadRequestException);
+      expect(repository.crearFacturaEnTx).not.toHaveBeenCalled();
+    });
+
+    it('no bloquea por mora si los días vencidos están dentro del umbral configurado', async () => {
+      configuracionesService.buscarValor.mockResolvedValue('30');
+      cuentasPorCobrarRepository.listarAbiertasDeCliente.mockResolvedValue([
+        { saldo: 100, fechaVencimiento: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000) },
+      ] as never);
+
+      await service.crear(dto({ tipoFactura: 'CREDITO' }), 'tenant-1', 'vendedor-1');
+
+      expect(repository.crearFacturaEnTx).toHaveBeenCalled();
+    });
+
+    it('rechaza con 400 si la venta sumada al saldo abierto supera el límite de crédito del cliente', async () => {
+      clientesService.buscarPorId.mockResolvedValue({ id: 'cliente-1', listaPrecio: null, limiteCredito: 300 } as never);
+      cuentasPorCobrarRepository.listarAbiertasDeCliente.mockResolvedValue([
+        { saldo: 100, fechaVencimiento: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000) },
+      ] as never);
+
+      await expect(service.crear(dto({ tipoFactura: 'CREDITO' }), 'tenant-1', 'vendedor-1')).rejects.toThrow(BadRequestException);
+      expect(repository.crearFacturaEnTx).not.toHaveBeenCalled();
+    });
+
+    it('limiteCredito en 0 significa "sin límite" — nunca bloquea por monto', async () => {
+      clientesService.buscarPorId.mockResolvedValue({ id: 'cliente-1', listaPrecio: null, limiteCredito: 0 } as never);
+      cuentasPorCobrarRepository.listarAbiertasDeCliente.mockResolvedValue([
+        { saldo: 999999, fechaVencimiento: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000) },
+      ] as never);
+
+      await service.crear(dto({ tipoFactura: 'CREDITO' }), 'tenant-1', 'vendedor-1');
+
+      expect(repository.crearFacturaEnTx).toHaveBeenCalled();
+    });
+
+    it('forzarCreditoBloqueado (permiso facturacion.forzarcredito) salta ambos chequeos', async () => {
+      clientesService.buscarPorId.mockResolvedValue({ id: 'cliente-1', listaPrecio: null, limiteCredito: 1 } as never);
+      configuracionesService.buscarValor.mockResolvedValue('0');
+      cuentasPorCobrarRepository.listarAbiertasDeCliente.mockResolvedValue([
+        { saldo: 999999, fechaVencimiento: new Date('2000-01-01') },
+      ] as never);
+
+      await service.crear(dto({ tipoFactura: 'CREDITO' }), 'tenant-1', 'vendedor-1', { forzarCreditoBloqueado: true });
+
+      expect(cuentasPorCobrarRepository.listarAbiertasDeCliente).not.toHaveBeenCalled();
+      expect(repository.crearFacturaEnTx).toHaveBeenCalled();
+    });
+
+    it('crea la CuentaPorCobrar dentro de la misma transacción, solo para CREDITO', async () => {
+      await service.crear(dto({ tipoFactura: 'CREDITO', plazoPagoDias: 45 }), 'tenant-1', 'vendedor-1');
+
+      expect(cuentasPorCobrarRepository.crearEnTx).toHaveBeenCalledWith(
+        TX,
+        expect.objectContaining({ tenantId: 'tenant-1', clienteId: 'cliente-1', facturaId: 'f1', monto: 236 }),
+      );
+    });
+
+    it('CONTADO nunca crea una CuentaPorCobrar', async () => {
+      repository.crearFacturaEnTx.mockResolvedValue(facturaCreada({ tipoFactura: 'CONTADO', total: 236 }) as never);
+
+      await service.crear(dto({ tipoFactura: 'CONTADO' }), 'tenant-1', 'vendedor-1');
+
+      expect(cuentasPorCobrarRepository.crearEnTx).not.toHaveBeenCalled();
+    });
+  });
+
   describe('anular', () => {
     function facturaExistente(overrides: Record<string, unknown> = {}) {
       return {
@@ -1532,6 +1635,15 @@ describe('FacturacionService', () => {
         expect.objectContaining({ tenantId: 'tenant-1', facturaId: 'f1', clienteId: 'cliente-1', total: '200' }),
       );
       expect(resultado).toEqual(expect.objectContaining({ id: 'f1' }));
+    });
+
+    it('CxC como ledger real (Fase 1): cierra la CuentaPorCobrar asociada dentro de la misma transacción', async () => {
+      repository.buscarPorId.mockResolvedValue(facturaExistente({ tipoFactura: 'CREDITO' }) as never);
+      repository.anularEnTx.mockResolvedValue(facturaCreada({ total: 200, subtotal: 200 }) as never);
+
+      await service.anular('f1', 'Motivo de prueba', 'tenant-1', 'user-1', true);
+
+      expect(cuentasPorCobrarRepository.anularPorFacturaEnTx).toHaveBeenCalledWith(TX, 'f1');
     });
 
     it('ítem B-4: suma los recargos de la factura original en el evento FACTURA_ANULADA (sin esto, la reversa contable queda desbalanceada)', async () => {

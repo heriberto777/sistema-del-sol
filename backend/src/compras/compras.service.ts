@@ -22,6 +22,8 @@ import { resolverPlantillaDocumento } from '../common/impresion/resolver-plantil
 import { resolverPersonalizacionDocumento } from '../common/impresion/resolver-personalizacion-documento';
 import { generarDocumentoImpreso } from '../common/pdf/generar-documento-impreso';
 import { mapearOrdenCompraAParams } from './mapear-orden-compra-pdf';
+import { CuentasPorPagarRepository } from '../cuentas-por-pagar/cuentas-por-pagar.repository';
+import { calcularFechaVencimiento } from '../common/fecha/dias-vencido.util';
 
 @Injectable()
 export class ComprasService {
@@ -35,6 +37,7 @@ export class ComprasService {
     private readonly pagosService: PagosService,
     private readonly correlativosRepository: CorrelativosRepository,
     private readonly prisma: PrismaService,
+    private readonly cuentasPorPagarRepository: CuentasPorPagarRepository,
   ) {}
 
   /** Orden de Compra no tiene bodegaId propio (mismo caso que Cotización) — solo aplica el default de tenant para formato/plantilla. */
@@ -162,6 +165,15 @@ export class ComprasService {
       }),
     );
 
+    // CxP como ledger real (Fase 2) — comparar contra `orden.total` (el
+    // total de TODA la orden) es incorrecto en una recepción parcial o
+    // cuando una orden se recibe en varios envíos: lo que se debe por ESTA
+    // recepción es solo lo que se recibió en ESTA recepción (ver también
+    // `diferenciaVsFactura` más abajo, mismo criterio). Se calcula antes de
+    // abrir la transacción porque la `CuentaPorPagar` nace síncrona, dentro
+    // de la misma tx que la `RecepcionCompra`.
+    const montoEstaRecepcion = dto.lineas.reduce((acc, l) => acc + l.cantidadRecibida * l.costoUnitario, 0);
+
     const { recepcion } = await this.tenantPrisma.client.$transaction(async (tx) => {
       const recepcion = await this.comprasRepository.crearRecepcion(tx, {
         tenantId,
@@ -170,6 +182,28 @@ export class ComprasService {
         montoFacturaProveedor: dto.montoFacturaProveedor,
         lineas: lineasConVariante,
       });
+
+      // CxP como ledger real (Fase 2) — nace SÍNCRONA, en la misma
+      // transacción que la RecepcionCompra que la origina (nunca por
+      // evento, mismo criterio que CuentaPorCobrar en Facturación). Una
+      // fila por RECEPCIÓN, no por orden completa: una OC puede recibirse
+      // en varias partes, cada una con su propio vencimiento. Excepción
+      // (Fase 3, bug real): si la orden ya se pagó como anticipo ANTES de
+      // recibirse, ya tiene una CuentaPorPagar "de orden completa" — no se
+      // crea una segunda acá, para no duplicar la deuda ya cargada.
+      const yaTieneAnticipo = await this.cuentasPorPagarRepository.tieneCuentaDeOrdenCompletaEnTx(tx, ordenCompraId);
+      if (!yaTieneAnticipo) {
+        await this.cuentasPorPagarRepository.crearEnTx(tx, {
+          tenantId,
+          proveedorId: orden.proveedorId,
+          ordenCompraId,
+          recepcionCompraId: recepcion.id,
+          concepto: `Recepción de OC ${orden.numero}`,
+          monto: montoEstaRecepcion,
+          fecha: recepcion.fecha,
+          fechaVencimiento: calcularFechaVencimiento(recepcion.fecha, orden.proveedor.plazoPagoDias),
+        });
+      }
 
       for (const linea of lineasConVariante) {
         const lineaOc = orden.lineas.find((l) => l.productoId === linea.productoId);
@@ -218,13 +252,6 @@ export class ComprasService {
       return { recepcion, totalmenteRecibida };
     });
 
-    // Comparar contra `orden.total` (el total de TODA la orden) es incorrecto
-    // en una recepción parcial o cuando una orden se recibe en varios envíos:
-    // la factura del proveedor que llega en ESTA recepción corresponde solo a
-    // lo que se recibió en ESTA recepción, no al total pedido originalmente.
-    // La comparación correcta es contra el monto de las líneas de ESTA
-    // recepción específica.
-    const montoEstaRecepcion = dto.lineas.reduce((acc, l) => acc + l.cantidadRecibida * l.costoUnitario, 0);
     const diferenciaVsFactura =
       dto.montoFacturaProveedor !== undefined ? montoEstaRecepcion - dto.montoFacturaProveedor : null;
 
@@ -314,6 +341,14 @@ export class ComprasService {
       const ordenActualizada = await this.comprasRepository.buscarPorIdEnTx(tx, ordenCompraId);
       const totalmenteRecibida = ordenActualizada.lineas.every((l) => Number(l.cantidadRecibida) >= Number(l.cantidad));
       await this.comprasRepository.actualizarEstado(tx, ordenCompraId, totalmenteRecibida ? 'RECIBIDA_TOTAL' : 'RECIBIDA_PARCIAL');
+
+      // CxP como ledger real (Fase 2) — una devolución reduce la deuda
+      // ORIGINAL con el proveedor (no solo lo que falta cobrar), a
+      // diferencia de un pago. Reparte el monto devuelto entre las
+      // CuentaPorPagar abiertas de la orden, de la más antigua a la más
+      // nueva (mismo criterio que `PagosService` usa para un pago).
+      const montoDevuelto = lineasConCosto.reduce((acc, l) => acc + l.cantidad * l.costoUnitario, 0);
+      await this.cuentasPorPagarRepository.reducirPorDevolucionEnTx(tx, ordenCompraId, montoDevuelto);
 
       return { devolucion };
     });

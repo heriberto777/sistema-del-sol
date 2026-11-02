@@ -31,6 +31,7 @@ export class FacturacionController {
     return this.facturacionService.crear(dto, user.tenantId, user.userId, {
       formaPagoId: dto.formaPagoId,
       referenciaPago: dto.referenciaPago,
+      forzarCreditoBloqueado: user.permisos.includes('facturacion.forzarcredito'),
     });
   }
 

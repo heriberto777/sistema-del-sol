@@ -4,7 +4,10 @@ import { AsientosContablesService } from './asientos-contables.service';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   EVENTOS,
+  CuentaPorCobrarCastigadaPayload,
+  CuentaPorCobrarProvisionadaPayload,
   FacturaCreadaPayload,
+  FacturaProveedorCreadaPayload,
   GastoMenorCreadoPayload,
   NominaPeriodoPagadoPayload,
   OrdenCompraDevueltaPayload,
@@ -154,6 +157,32 @@ export class ContabilidadEventosService {
     }
   }
 
+  @OnEvent(EVENTOS.CUENTA_POR_COBRAR_PROVISIONADA)
+  async alProvisionarIncobrable(payload: CuentaPorCobrarProvisionadaPayload) {
+    try {
+      await this.asientosContablesService.generarDesdeProvisionIncobrable({
+        tenantId: payload.tenantId,
+        provisionId: payload.provisionId,
+        monto: Number(payload.monto),
+      });
+    } catch (error) {
+      this.logger.error(`No se pudo generar el asiento de provisión de incobrable ${payload.provisionId}`, error as Error);
+    }
+  }
+
+  @OnEvent(EVENTOS.CUENTA_POR_COBRAR_CASTIGADA)
+  async alCastigarIncobrable(payload: CuentaPorCobrarCastigadaPayload) {
+    try {
+      await this.asientosContablesService.generarDesdeCastigoIncobrable({
+        tenantId: payload.tenantId,
+        provisionId: payload.provisionId,
+        monto: Number(payload.monto),
+      });
+    } catch (error) {
+      this.logger.error(`No se pudo generar el asiento de castigo de incobrable ${payload.provisionId}`, error as Error);
+    }
+  }
+
   @OnEvent(EVENTOS.GASTO_MENOR_CREADO)
   async alCrearGastoMenor(payload: GastoMenorCreadoPayload) {
     try {
@@ -174,6 +203,35 @@ export class ContabilidadEventosService {
       });
     } catch (error) {
       this.logger.error(`No se pudo generar el asiento del gasto menor ${payload.gastoMenorId}`, error as Error);
+    }
+  }
+
+  /**
+   * Fase 5 (CxP) — una NOTA_CREDITO reutiliza el mismo generador que una
+   * FACTURA, con los montos negados (ver AsientosContablesService.
+   * generarDesdeFacturaProveedor) — así el asiento sale invertido sin
+   * duplicar el generador.
+   */
+  @OnEvent(EVENTOS.FACTURA_PROVEEDOR_CREADA)
+  async alCrearFacturaProveedor(payload: FacturaProveedorCreadaPayload) {
+    try {
+      const facturaProveedor = await this.prisma.facturaProveedor.findUniqueOrThrow({
+        where: { id: payload.facturaProveedorId },
+        include: { lineas: true },
+      });
+      const factor = facturaProveedor.tipo === 'NOTA_CREDITO' ? -1 : 1;
+
+      await this.asientosContablesService.generarDesdeFacturaProveedor({
+        tenantId: payload.tenantId,
+        facturaProveedorId: payload.facturaProveedorId,
+        itbis: Number(facturaProveedor.itbis) * factor,
+        lineas: facturaProveedor.lineas.map((l) => ({
+          cuentaContableId: l.cuentaContableId,
+          monto: Number(l.valor) * Number(l.cantidad) * factor,
+        })),
+      });
+    } catch (error) {
+      this.logger.error(`No se pudo generar el asiento de la factura de proveedor ${payload.facturaProveedorId}`, error as Error);
     }
   }
 

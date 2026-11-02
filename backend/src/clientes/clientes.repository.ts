@@ -79,9 +79,9 @@ export class ClientesRepository {
     });
   }
 
-  /** Pagos parciales ya registrados contra cada factura — mismo patrón que CuentasPorCobrarRepository.sumaPagosPorFacturas. */
+  /** Cobros ya aplicados contra cada factura — Fase 3: `AplicacionCobro` reemplaza `Pago.facturaId`. */
   sumaPagosPorFacturas(facturaIds: string[]) {
     if (!facturaIds.length) return Promise.resolve([]);
-    return this.db.pago.groupBy({ by: ['facturaId'], where: { facturaId: { in: facturaIds } }, _sum: { monto: true } });
+    return this.db.aplicacionCobro.groupBy({ by: ['facturaId'], where: { facturaId: { in: facturaIds } }, _sum: { monto: true } });
   }
 }

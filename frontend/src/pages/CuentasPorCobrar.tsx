@@ -9,6 +9,7 @@ import { StatCard } from '../components/molecules/StatCard/StatCard';
 import { SearchInput } from '../components/molecules/SearchInput/SearchInput';
 import { Paginacion } from '../components/molecules/Paginacion/Paginacion';
 import { ModalRegistrarCobro } from '../components/molecules/ModalRegistrarCobro/ModalRegistrarCobro';
+import { ModalGestionCobro } from '../components/molecules/ModalGestionCobro/ModalGestionCobro';
 import { RequierePermiso } from '../components/organisms/RequierePermiso/RequierePermiso';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { PaginaResultado } from '../types/pagina-resultado';
@@ -47,6 +48,7 @@ export function CuentasPorCobrar() {
   const [pagina, setPagina] = useState(1);
   const busquedaDebounced = useDebouncedValue(busqueda);
   const [facturaCobrando, setFacturaCobrando] = useState<FilaCxC | null>(null);
+  const [facturaGestionando, setFacturaGestionando] = useState<FilaCxC | null>(null);
 
   const { data: resumen, isLoading: cargandoResumen } = useQuery({
     queryKey: ['cuentas-por-cobrar-resumen'],
@@ -125,9 +127,14 @@ export function CuentasPorCobrar() {
                         <Badge tono={TONO_BUCKET[fila.bucket]}>{ETIQUETA_BUCKET[fila.bucket]}</Badge>
                       </td>
                       <td className="px-5 py-3 text-right">
-                        <Button variante="secundario" onClick={() => setFacturaCobrando(fila)}>
-                          Registrar cobro
-                        </Button>
+                        <div className="flex justify-end gap-2">
+                          <Button variante="secundario" onClick={() => setFacturaGestionando(fila)}>
+                            Gestión
+                          </Button>
+                          <Button variante="secundario" onClick={() => setFacturaCobrando(fila)}>
+                            Registrar cobro
+                          </Button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -147,6 +154,13 @@ export function CuentasPorCobrar() {
         <ModalRegistrarCobro
           factura={{ id: facturaCobrando.id, numero: facturaCobrando.numero, ncf: facturaCobrando.ncf, total: String(facturaCobrando.total) }}
           onClose={() => setFacturaCobrando(null)}
+        />
+      )}
+
+      {facturaGestionando && (
+        <ModalGestionCobro
+          factura={{ id: facturaGestionando.id, numero: facturaGestionando.numero, ncf: facturaGestionando.ncf }}
+          onClose={() => setFacturaGestionando(null)}
         />
       )}
     </div>

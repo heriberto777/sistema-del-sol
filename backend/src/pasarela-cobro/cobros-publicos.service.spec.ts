@@ -33,14 +33,14 @@ const SESION_BASE = {
   referenciaExterna: 'orden-1',
   monto: 500 as unknown,
   estado: 'PENDIENTE',
-  pagoId: null,
+  reciboIngresoId: null,
 };
 
 describe('CobrosPublicosService', () => {
   let service: CobrosPublicosService;
   let prisma: {
     factura: { findUnique: jest.Mock };
-    pago: { aggregate: jest.Mock };
+    cuentaPorCobrar: { findUnique: jest.Mock };
     pasarelaConfigTenant: { findUnique: jest.Mock };
     formaPago: { findFirst: jest.Mock };
     pedidoTienda: { findUnique: jest.Mock };
@@ -53,7 +53,7 @@ describe('CobrosPublicosService', () => {
   beforeEach(() => {
     prisma = {
       factura: { findUnique: jest.fn().mockResolvedValue(FACTURA_BASE) },
-      pago: { aggregate: jest.fn().mockResolvedValue({ _sum: { monto: 0 } }) },
+      cuentaPorCobrar: { findUnique: jest.fn().mockResolvedValue(null) },
       pasarelaConfigTenant: { findUnique: jest.fn().mockResolvedValue(CONFIG_BASE) },
       formaPago: { findFirst: jest.fn().mockResolvedValue({ id: 'fp-tarjeta' }) },
       pedidoTienda: { findUnique: jest.fn().mockResolvedValue(null) },
@@ -63,7 +63,7 @@ describe('CobrosPublicosService', () => {
       buscarPorReferencia: jest.fn().mockResolvedValue(SESION_BASE),
       intentarResolver: jest.fn().mockResolvedValue(true),
       marcarRechazada: jest.fn(),
-      vincularPago: jest.fn(),
+      vincularRecibo: jest.fn(),
     } as unknown as jest.Mocked<SesionesCobroRepository>;
     facturacionService = {
       registrarPago: jest.fn().mockResolvedValue({ id: 'pago-1' }),
@@ -88,8 +88,8 @@ describe('CobrosPublicosService', () => {
       await expect(service.obtenerFacturaPublica('inexistente')).rejects.toThrow(NotFoundException);
     });
 
-    it('calcula el pendiente contra los pagos ya registrados', async () => {
-      prisma.pago.aggregate.mockResolvedValue({ _sum: { monto: 300 } });
+    it('calcula el pendiente contra el saldo real de la CuentaPorCobrar', async () => {
+      prisma.cuentaPorCobrar.findUnique.mockResolvedValue({ saldo: 700 });
       const resultado = await service.obtenerFacturaPublica('f1');
       expect(resultado.pendiente).toBe(700);
       expect(resultado.pasarelaDisponible).toBe('AZUL');
@@ -203,7 +203,7 @@ describe('CobrosPublicosService', () => {
         null,
         't1',
       );
-      expect(sesionesCobroRepository.vincularPago).toHaveBeenCalledWith('s1', 'pago-1');
+      expect(sesionesCobroRepository.vincularRecibo).toHaveBeenCalledWith('s1', 'pago-1');
     });
 
     it('no duplica el Pago si otra llamada concurrente ya ganó la transición', async () => {

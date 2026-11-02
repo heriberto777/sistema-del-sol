@@ -6,9 +6,9 @@ import { Modal } from '../Modal/Modal';
 import { FormField } from '../FormField/FormField';
 import { SelectFormaPago } from '../SelectFormaPago/SelectFormaPago';
 import { Button } from '../../atoms/Button/Button';
-import type { PagoBasico } from '@backend-src/common/prisma/pago-select-basico';
+import type { PagoHistoricoBasico } from '@backend-src/common/prisma/pago-historico-basico';
 
-type Pago = PagoBasico;
+type Pago = PagoHistoricoBasico;
 
 /**
  * Extraído de FacturasTable (era privado ahí) para reusarlo también desde

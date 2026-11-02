@@ -32,7 +32,7 @@ const SESION_BASE: SesionCobroFactura = {
   monto: 100 as unknown as SesionCobroFactura['monto'],
   datosVerificacion: cifrar(JSON.stringify({ session: 'SESSION-1', sk: 'sk-1' })),
   estado: 'PENDIENTE',
-  pagoId: null,
+  reciboIngresoId: null,
   createdAt: new Date(),
   updatedAt: new Date(),
 };

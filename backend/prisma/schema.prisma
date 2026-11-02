@@ -18,23 +18,23 @@ enum EstadoTenant {
 }
 
 model Tenant {
-  id                    String               @id @default(uuid())
-  nombre                String
-  rnc                   String?
+  id                        String               @id @default(uuid())
+  nombre                    String
+  rnc                       String?
   // Ítem "e-CF real" — datos del emisor que el propio tenant edita
   // self-service (ver TenantEmpresaController), obligatorios para
   // `sender` en el payload de Alanube. Antes de esto Tenant solo tenía
   // `rnc` (editable únicamente por el super admin de plataforma).
-  direccion             String?
-  telefono              String?
-  email                 String?
+  direccion                 String?
+  telefono                  String?
+  email                     String?
   // Antes vivía escondido en Configuracion[DOCUMENTO_LOGO] (tenant-scoped,
   // solo el propio tenant lo veía/editaba) — promovido a campo propio
   // para que Plataforma también pueda asignarlo/verlo desde
   // /plataforma/tenants (PrismaService global, sin pasar por RLS de
   // Configuracion). `resolverPersonalizacionDocumento` sigue siendo el
   // único punto que lo resuelve para documentos/IA.
-  logo                  String?              @db.Text
+  logo                      String?              @db.Text
   // "Formato de Documentos" Fase A — color de marca aplicado a las 5
   // PlantillaDocumento existentes (ver documento-pdf.ts: `colorAcento`
   // reemplaza el color fijo de cada plantilla cuando está presente; sin
@@ -42,28 +42,28 @@ model Tenant {
   // esta fase a propósito — cada plantilla lo dibuja en su propio layout
   // fijo (badge inline en EDITORIAL, esquina en las demás) y hacerlo
   // configurable implica tocar la geometría de cada una, no solo un color.
-  colorAcentoDocumentos String?
-  subdominio            String               @unique
-  estado                EstadoTenant         @default(ACTIVO)
+  colorAcentoDocumentos     String?
+  subdominio                String               @unique
+  estado                    EstadoTenant         @default(ACTIVO)
   // Qué módulos tiene disponibles este tenant — ver ModuloActivoGuard.
   // Nullable a propósito: un tenant recién creado sin plan asignado cae
   // al fallback "denegar" del guard hasta que plataforma le asigne uno
   // (los tenants ya existentes se backfillean a un plan al migrar).
-  planId                String?
-  plan                  Plan?                @relation(fields: [planId], references: [id])
+  planId                    String?
+  plan                      Plan?                @relation(fields: [planId], references: [id])
   // Ver ModalidadFacturacion — vive acá (no en TenantSettings) porque a
   // diferencia de esa tabla, Tenant siempre tiene una fila garantizada
   // desde su creación (TenantSettings hoy no se crea en ningún flujo).
-  modalidadFacturacion  ModalidadFacturacion @default(NCF)
+  modalidadFacturacion      ModalidadFacturacion @default(NCF)
   // Negocio que no es contribuyente de la DGII (o no quiere emitir
   // comprobante fiscal) — con esto en false, FacturacionService.crear()
   // nunca resuelve tipoNcf/consume una secuencia (ver siguienteNcfEnTx),
   // la factura queda con ncf/tipoNcf null y nunca aparece en los reportes
   // 607/608 (ver ReportesFiscalesRepository). Default true: cero cambio
   // de comportamiento para tenants existentes.
-  requiereComprobanteFiscal Boolean          @default(true)
-  createdAt             DateTime             @default(now())
-  updatedAt             DateTime             @updatedAt
+  requiereComprobanteFiscal Boolean              @default(true)
+  createdAt                 DateTime             @default(now())
+  updatedAt                 DateTime             @updatedAt
 
   settings                   TenantSettings?
   configuraciones            Configuracion[]
@@ -119,7 +119,10 @@ model Tenant {
   empleados                  Empleado[]
   periodosNomina             PeriodoNomina[]
   turnosCaja                 TurnoCaja[]
-  pagos                      Pago[]
+  recibosIngreso             ReciboIngreso[]
+  ordenesPago                OrdenPago[]
+  gestionesCobro             GestionCobro[]
+  provisionesIncobrables     ProvisionIncobrable[]
   formasPago                 FormaPago[]
   unidadesMedida             UnidadMedida[]
   listasPrecio               ListaPrecio[]
@@ -158,6 +161,10 @@ model Tenant {
   reglasMarkupTravel         TravelReglaMarkup[]
   usosIa                     UsoIaTenant[]
   personalizacionesDocumento PersonalizacionDocumentoTipo[]
+  terminosPago               TerminoPago[]
+  cuentasPorCobrar           CuentaPorCobrar[]
+  cuentasPorPagar            CuentaPorPagar[]
+  facturasProveedor          FacturaProveedor[]
 
   @@map("tenants")
 }
@@ -786,7 +793,11 @@ model User {
   turnosCaja                            TurnoCaja[]
   turnosCajaCerrados                    TurnoCaja[]                @relation("TurnoCajaCerradoPor")
   turnosCajaRevisados                   TurnoCaja[]                @relation("TurnoCajaRevisadoPor")
-  pagos                                 Pago[]
+  recibosIngreso                        ReciboIngreso[]
+  ordenesPago                           OrdenPago[]
+  gestionesCobroRegistradas             GestionCobro[]
+  provisionesIncobrablesRegistradas     ProvisionIncobrable[]
+  facturasProveedorRegistradas          FacturaProveedor[]
   // Nullable: no todo User de sistema tiene un Empleado de nómina asociado
   // (ej. un Admin Total que no está en planilla).
   empleado                              Empleado?
@@ -1186,7 +1197,7 @@ model TravelConfigTenant {
   tenantId String @unique
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  duffelApiTokenCifrado String?
+  duffelApiTokenCifrado      String?
   // Verifica la firma (X-Duffel-Signature) del webhook entrante de ESTE
   // tenant — el tenant se resuelve ANTES, cruzando `object_id` del evento
   // contra `TravelReserva.proveedorOrdenId` (ver TravelWebhookController),
@@ -1195,8 +1206,8 @@ model TravelConfigTenant {
   hotelbedsApiKeyCifrado     String?
   hotelbedsSecretCifrado     String?
   // Hotelbeds siempre cotiza en EUR — null/"EUR" = sin conversión.
-  hotelbedsMoneda     String?
-  hotelbedsTasaCambio Decimal? @db.Decimal(12, 6)
+  hotelbedsMoneda            String?
+  hotelbedsTasaCambio        Decimal? @db.Decimal(12, 6)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1222,7 +1233,11 @@ model SesionCobroFactura {
   monto             Decimal  @db.Decimal(14, 2)
   datosVerificacion String? // ej. sk de CardNet, cifrado — null para Azul
   estado            String   @default("PENDIENTE") // PENDIENTE | CONFIRMADO | RECHAZADO
-  pagoId            String?
+  // Fase 3 — apuntaba a `Pago.id` (modelo ya eliminado); ahora apunta a
+  // `ReciboIngreso.id`. Sin `@relation` declarada a propósito (ver el
+  // comentario de arriba sobre `facturaId`) — evita tocar un modelo más
+  // solo por esta referencia cruzada.
+  reciboIngresoId   String?
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
@@ -1381,10 +1396,16 @@ model Factura {
   hitosProyectoOrigen HitoProyecto[]
   cobroAlquilerOrigen CobroAlquiler?
   travelReservaOrigen TravelReserva?
-  pagos               Pago[]
   pagosVenta          PagoVenta[]
   comisiones          ComisionVenta[]
   movimientosLealtad  MovimientoLealtad[]
+  // Ledger real de Cuentas por Cobrar (ver CuentaPorCobrar) — solo existe
+  // si tipoFactura===CREDITO, nace síncrona dentro de FacturacionService.crear().
+  cuentaPorCobrar     CuentaPorCobrar?
+  // Fase 3 — denormalizado en AplicacionCobro (vía CuentaPorCobrar.facturaId)
+  // para poder agrupar pagos por factura sin un groupBy a través de dos
+  // relaciones (Prisma no lo soporta) — ver ClientesRepository.sumaPagosPorFacturas.
+  aplicacionesCobro   AplicacionCobro[]
 
   @@unique([tenantId, ncf])
   @@unique([tenantId, numero])
@@ -1570,23 +1591,23 @@ enum EstadoRemision {
 /// (evita descontar dos veces) — convertir directo desde BORRADOR sigue
 /// descontando en crear(), como siempre.
 model Remision {
-  id         String         @id @default(uuid())
-  tenantId   String
-  tenant     Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  numero     String
-  clienteId  String
-  cliente    Cliente        @relation(fields: [clienteId], references: [id])
-  bodegaId   String
-  bodega     Bodega         @relation(fields: [bodegaId], references: [id])
-  vendedorId String
-  vendedor   User           @relation(fields: [vendedorId], references: [id])
-  estado     EstadoRemision @default(BORRADOR)
-  fecha      DateTime       @default(now())
-  facturaId  String?        @unique
-  factura    Factura?       @relation(fields: [facturaId], references: [id])
+  id            String         @id @default(uuid())
+  tenantId      String
+  tenant        Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  numero        String
+  clienteId     String
+  cliente       Cliente        @relation(fields: [clienteId], references: [id])
+  bodegaId      String
+  bodega        Bodega         @relation(fields: [bodegaId], references: [id])
+  vendedorId    String
+  vendedor      User           @relation(fields: [vendedorId], references: [id])
+  estado        EstadoRemision @default(BORRADOR)
+  fecha         DateTime       @default(now())
+  facturaId     String?        @unique
+  factura       Factura?       @relation(fields: [facturaId], references: [id])
   // Mismo criterio que Factura.observaciones — ver el comentario ahí.
-  observaciones String?     @db.Text
-  createdAt  DateTime       @default(now())
+  observaciones String?        @db.Text
+  createdAt     DateTime       @default(now())
 
   lineas LineaRemision[]
 
@@ -1595,15 +1616,15 @@ model Remision {
 }
 
 model LineaRemision {
-  id         String           @id @default(uuid())
-  remisionId String
-  remision   Remision         @relation(fields: [remisionId], references: [id], onDelete: Cascade)
-  productoId String
+  id               String           @id @default(uuid())
+  remisionId       String
+  remision         Remision         @relation(fields: [remisionId], references: [id], onDelete: Cascade)
+  productoId       String
   // Ver comentario equivalente en LineaCotizacion.producto.
-  producto   Producto         @relation(fields: [productoId], references: [id], onDelete: Cascade)
+  producto         Producto         @relation(fields: [productoId], references: [id], onDelete: Cascade)
   // Ver el comentario equivalente en LineaFactura.varianteId.
-  varianteId String
-  variante   VarianteProducto @relation(fields: [varianteId], references: [id])
+  varianteId       String
+  variante         VarianteProducto @relation(fields: [varianteId], references: [id])
   // Una Remisión mueve stock ella misma al pasar a ENTREGADA (ver
   // RemisionesService.cambiarEstado) — necesita su propio snapshot de
   // factorConversion, igual criterio que LineaOc/LineaRecepcion de
@@ -1612,7 +1633,7 @@ model LineaRemision {
   unidadMedidaId   String?
   unidadMedida     UnidadMedida?    @relation("LineaRemisionUnidad", fields: [unidadMedidaId], references: [id])
   factorConversion Decimal          @default(1) @db.Decimal(14, 4)
-  cantidad   Decimal          @db.Decimal(14, 4)
+  cantidad         Decimal          @db.Decimal(14, 4)
 
   @@map("linea_remision")
 }
@@ -1653,9 +1674,10 @@ model CuentaContable {
   activa        Boolean            @default(true)
   createdAt     DateTime           @default(now())
 
-  lineasAsiento    LineaAsiento[]
-  cuentasBancarias CuentaBancaria[]
-  lineasGastoMenor LineaGastoMenor[]
+  lineasAsiento          LineaAsiento[]
+  cuentasBancarias       CuentaBancaria[]
+  lineasGastoMenor       LineaGastoMenor[]
+  lineasFacturaProveedor FacturaProveedorLinea[]
 
   @@unique([tenantId, codigo])
   @@map("cuentas_contables")
@@ -1671,6 +1693,12 @@ enum OrigenAsiento {
   GASTO_MENOR
   CIERRE
   ANULACION
+  // Fase 4 (CxC) — provisión y castigo de cuentas incobrables, ver
+  // ProvisionIncobrable/AsientosContablesService.generarDesdeProvisionIncobrable.
+  INCOBRABLE
+  // Fase 5 (CxP) — FacturaProveedor (gasto a crédito sin orden de compra) y
+  // su NotaCreditoProveedor, ver AsientosContablesService.generarDesdeFacturaProveedor.
+  FACTURA_PROVEEDOR
 }
 
 enum TipoCuentaBancaria {
@@ -2250,9 +2278,10 @@ model FormaPago {
   activa             Boolean        @default(true)
   createdAt          DateTime       @default(now())
 
-  facturas   Factura[]
-  pagos      Pago[]
-  pagosVenta PagoVenta[]
+  facturas       Factura[]
+  pagosVenta     PagoVenta[]
+  recibosIngreso ReciboIngreso[]
+  ordenesPago    OrdenPago[]
 
   @@unique([tenantId, nombre])
   @@map("formas_pago")
@@ -2346,9 +2375,10 @@ model TasaCambio {
 }
 
 /// Ledger de "con qué se pagó" una venta de POS — permite pagos divididos
-/// (parte efectivo + parte tarjeta en la misma factura). Distinto de `Pago`
-/// (abonos POSTERIORES de AR/AP, ej. una factura a crédito) — acá el pago
-/// es simultáneo a la creación de la factura. `Factura.formaPagoId`/
+/// (parte efectivo + parte tarjeta en la misma factura). Distinto de
+/// `ReciboIngreso`/`OrdenPago` (abonos POSTERIORES de AR/AP, ej. una
+/// factura a crédito) — acá el pago es simultáneo a la creación de la
+/// factura. `Factura.formaPagoId`/
 /// `referenciaPago` se conservan como "forma de pago principal" (la de
 /// mayor monto) para lectura rápida/reportes, pero la fuente de verdad
 /// para el arqueo de caja es esta tabla — ver PosRepository.
@@ -2738,18 +2768,18 @@ model Categoria {
 }
 
 model Producto {
-  id                  String               @id @default(uuid())
+  id                  String                     @id @default(uuid())
   tenantId            String
-  tenant              Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant              Tenant                     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   codigo              String
   nombre              String
   categoriaId         String?
-  categoria           Categoria?           @relation(fields: [categoriaId], references: [id], onDelete: SetNull)
+  categoria           Categoria?                 @relation(fields: [categoriaId], references: [id], onDelete: SetNull)
   // @deprecated — texto libre, sin conversión real (ver unidadMedidaBaseId
   // abajo). Se mantiene solo por compatibilidad con Excel import/reportes
   // viejos; nunca se borra ni se vuelve a escribir desde el formulario
   // nuevo de producto.
-  unidadMedida        String               @default("UND")
+  unidadMedida        String                     @default("UND")
   // Motor de conversión de unidades — opt-in (mismo criterio que
   // controlaVencimiento): null = el producto sigue funcionando exactamente
   // como antes de esta columna, sin unidades alternativas de compra/venta.
@@ -2757,11 +2787,11 @@ model Producto {
   // costoPromedio — nunca cambia una vez que el producto tiene movimientos,
   // ver ARCHITECTURE.md "Conversión de unidades de medida".
   unidadMedidaBaseId  String?
-  unidadMedidaBase    UnidadMedida?        @relation("ProductoUnidadBase", fields: [unidadMedidaBaseId], references: [id])
+  unidadMedidaBase    UnidadMedida?              @relation("ProductoUnidadBase", fields: [unidadMedidaBaseId], references: [id])
   // Unidades alternativas en las que se puede comprar/vender este producto
   // (ej. "Caja" = 144 unidades base) — ver ProductoUnidadConversion.
   unidadesConversion  ProductoUnidadConversion[]
-  porcentajeItbis     Decimal              @default(18) @db.Decimal(5, 2)
+  porcentajeItbis     Decimal                    @default(18) @db.Decimal(5, 2)
   // Ley fiscal aplicable (plan de integración Cuadre, ítem B-3) — reduce
   // el ITBIS efectivo de este producto (ej. Norma 07-2007 construcción:
   // solo se paga 10% del ITBIS normal → 18%→1.8% efectivo). Se ata al
@@ -2769,17 +2799,17 @@ model Producto {
   // vende, no de quién compra) — ver FacturacionService.
   // calcularLineasYTotales.
   leyFiscalId         String?
-  leyFiscal           LeyFiscal?           @relation(fields: [leyFiscalId], references: [id], onDelete: SetNull)
+  leyFiscal           LeyFiscal?                 @relation(fields: [leyFiscalId], references: [id], onDelete: SetNull)
   // PRODUCTO mueve inventario normal; SERVICIO nunca toca Stock; COMBO
   // expande a sus `componentes` al facturarse (ver FacturacionService.
   // expandirParaInventario) — nunca tiene fila propia en Stock.
-  tipo                TipoProducto         @default(PRODUCTO)
-  activo              Boolean              @default(true)
-  origenMssql         Boolean              @default(false)
+  tipo                TipoProducto               @default(PRODUCTO)
+  activo              Boolean                    @default(true)
+  origenMssql         Boolean                    @default(false)
   // Opt-in (Fase 5b de adopción de Cuadre, mismo patrón que esEfectivo/
   // esBono) — si está apagado, este producto sigue funcionando exactamente
   // igual que hoy, sin exigir lote nunca. Ver ARCHITECTURE.md, "Vencimientos".
-  controlaVencimiento Boolean              @default(false)
+  controlaVencimiento Boolean                    @default(false)
   // Campos avanzados de producto (plan de integración Cuadre, ítem E-8).
   // `precioVariable`: habilita un precio editable por línea en el carrito
   // del POS (ej. artículos pesados o de precio negociado) — sin esto, el
@@ -2788,20 +2818,20 @@ model Producto {
   // `Categoria.color`. `permiteDevolucion`: si es false,
   // `FacturacionService.crear()` rechaza una NOTA_CREDITO que incluya
   // este producto.
-  precioVariable      Boolean              @default(false)
-  esIngrediente       Boolean              @default(false)
-  permiteDevolucion   Boolean              @default(true)
+  precioVariable      Boolean                    @default(false)
+  esIngrediente       Boolean                    @default(false)
+  permiteDevolucion   Boolean                    @default(true)
   // Opt-out (plan "Tienda Online", plugin e-commerce v1) — catálogo
   // existente visible por defecto en la tienda pública para no exigirle
   // a un tenant marcar producto por producto; se apaga puntualmente para
   // ocultar algo del storefront sin tocar Producto.activo (que también
   // afecta Facturación/POS/Compras).
-  visibleEnTienda     Boolean              @default(true)
+  visibleEnTienda     Boolean                    @default(true)
   // Opt-in manual (Fase 11, plugin e-commerce) — sección "Destacados" del
   // storefront público; a diferencia de `visibleEnTienda` (opt-out), nadie
   // aparece destacado automáticamente por ventas/fecha, lo marca el admin
   // producto por producto.
-  destacado           Boolean              @default(false)
+  destacado           Boolean                    @default(false)
   // Comisión de venta (plan de integración Cuadre, ítem A-1) — mutuamente
   // excluyentes (validado en ProductosService, no en el schema, mismo
   // criterio que Oferta.valor/comprarCantidad): `porcentajeComision` (%
@@ -2809,21 +2839,21 @@ model Producto {
   // `montoComisionFijo` (RD$ fijos por unidad vendida). Sin ninguno de
   // los dos, el producto simplemente no genera comisión — ver
   // ComisionesService.generarDesdeFactura.
-  porcentajeComision  Decimal?             @db.Decimal(5, 2)
-  montoComisionFijo   Decimal?             @db.Decimal(14, 2)
+  porcentajeComision  Decimal?                   @db.Decimal(5, 2)
+  montoComisionFijo   Decimal?                   @db.Decimal(14, 2)
   // Data URI completa (data:image/jpeg;base64,...), comprimida en el
   // cliente antes de subir. `listar()` (el listado general de
   // Productos.tsx) NO la selecciona a propósito — solo `catalogo()`
   // (pensado para el catálogo del POS) y `buscarPorId()` la incluyen,
   // para no inflar la página normal con blobs — ver ProductosRepository.
-  imagen              String?              @db.Text
-  imagenAjuste        AjusteImagenProducto @default(COVER)
+  imagen              String?                    @db.Text
+  imagenAjuste        AjusteImagenProducto       @default(COVER)
   // Copy de marketing para la Tienda Online (Fase 5, plugin e-commerce)
   // — el resto del sistema (Facturación/POS/Compras) nunca tuvo ni
   // necesita esto, es puramente para el storefront público.
   descripcionTienda   String?
-  createdAt           DateTime             @default(now())
-  updatedAt           DateTime             @updatedAt
+  createdAt           DateTime                   @default(now())
+  updatedAt           DateTime                   @updatedAt
 
   // Precio/Stock ya no cuelgan directo de Producto (Fase 3c — ver
   // VarianteProducto): todo producto tiene siempre al menos una variante
@@ -2871,14 +2901,14 @@ model UnidadMedida {
   activa    Boolean  @default(true)
   createdAt DateTime @default(now())
 
-  productosBase   Producto[]                 @relation("ProductoUnidadBase")
-  conversiones    ProductoUnidadConversion[]
-  lineasOc         LineaOc[]                  @relation("LineaOcUnidad")
-  lineasRecepcion  LineaRecepcion[]           @relation("LineaRecepcionUnidad")
-  lineasFactura    LineaFactura[]             @relation("LineaFacturaUnidad")
-  lineasCotizacion LineaCotizacion[]          @relation("LineaCotizacionUnidad")
-  lineasRemision   LineaRemision[]            @relation("LineaRemisionUnidad")
-  lineasVentaAparcada VentaAparcadaLinea[]     @relation("VentaAparcadaLineaUnidad")
+  productosBase       Producto[]                 @relation("ProductoUnidadBase")
+  conversiones        ProductoUnidadConversion[]
+  lineasOc            LineaOc[]                  @relation("LineaOcUnidad")
+  lineasRecepcion     LineaRecepcion[]           @relation("LineaRecepcionUnidad")
+  lineasFactura       LineaFactura[]             @relation("LineaFacturaUnidad")
+  lineasCotizacion    LineaCotizacion[]          @relation("LineaCotizacionUnidad")
+  lineasRemision      LineaRemision[]            @relation("LineaRemisionUnidad")
+  lineasVentaAparcada VentaAparcadaLinea[]       @relation("VentaAparcadaLineaUnidad")
 
   @@unique([tenantId, codigo])
   @@map("unidades_medida")
@@ -3323,7 +3353,10 @@ model Proveedor {
   // del usuario, ver CuentasPorPagarService).
   plazoPagoDias Int     @default(30)
 
-  ordenesCompra OrdenCompra[]
+  ordenesCompra     OrdenCompra[]
+  cuentasPorPagar   CuentaPorPagar[]
+  ordenesPago       OrdenPago[]
+  facturasProveedor FacturaProveedor[]
 
   @@map("proveedores")
 }
@@ -3354,10 +3387,10 @@ model OrdenCompra {
   user        User              @relation(fields: [userId], references: [id])
   createdAt   DateTime          @default(now())
 
-  lineas       LineaOc[]
-  recepciones  RecepcionCompra[]
-  pagos        Pago[]
-  devoluciones DevolucionCompra[]
+  lineas          LineaOc[]
+  recepciones     RecepcionCompra[]
+  devoluciones    DevolucionCompra[]
+  cuentasPorPagar CuentaPorPagar[]
 
   @@unique([tenantId, numero])
   @@map("orden_compra")
@@ -3581,7 +3614,8 @@ model RecepcionCompra {
   montoFacturaProveedor  Decimal?    @db.Decimal(14, 2)
   createdAt              DateTime    @default(now())
 
-  lineas LineaRecepcion[]
+  lineas         LineaRecepcion[]
+  cuentaPorPagar CuentaPorPagar?
 
   @@map("recepcion_compra")
 }
@@ -3655,38 +3689,6 @@ model LineaDevolucionCompra {
 /// por cada abono, permitiendo pagos parciales con su método y fecha.
 /// Exactamente uno de facturaId/ordenCompraId debe estar presente — no hay
 /// forma declarativa de exigirlo en Prisma, se valida en PagosService.
-model Pago {
-  id             String       @id @default(uuid())
-  tenantId       String
-  tenant         Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  facturaId      String?
-  factura        Factura?     @relation(fields: [facturaId], references: [id], onDelete: Cascade)
-  ordenCompraId  String?
-  ordenCompra    OrdenCompra? @relation(fields: [ordenCompraId], references: [id], onDelete: Cascade)
-  monto          Decimal      @db.Decimal(14, 2)
-  // Retención de ISR/ITBIS practicada al proveedor (Art. 309/349) — solo
-  // aplica a pagos de OrdenCompra, ingresada a mano por quien registra el
-  // pago (ver AsientosContablesService.generarDesdePagoOrdenCompra). Nunca
-  // se usa en pagos de Factura; queda en 0 por defecto para no romper la
-  // suma existente contra `orden.total` (ver PagosRepository.sumaPagosOrdenCompra).
-  retencionIsr   Decimal      @default(0) @db.Decimal(14, 2)
-  retencionItbis Decimal      @default(0) @db.Decimal(14, 2)
-  formaPagoId    String
-  formaPago      FormaPago    @relation(fields: [formaPagoId], references: [id])
-  referencia     String?
-  fecha          DateTime     @default(now())
-  // Nullable (ítem C-1, Payment Link AZUL/CardNet) — un pago de gateway
-  // público no tiene operador humano, mismo criterio ya usado por
-  // PagoPlataforma.registradoPorId.
-  userId         String?
-  user           User?        @relation(fields: [userId], references: [id])
-  createdAt      DateTime     @default(now())
-
-  @@index([facturaId])
-  @@index([ordenCompraId])
-  @@map("pagos")
-}
-
 // ============================================================
 // CLIENTES
 // ============================================================
@@ -3697,26 +3699,26 @@ enum TipoCliente {
 }
 
 model Cliente {
-  id                          String                 @id @default(uuid())
-  tenantId                    String
-  tenant                      Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  nombre                      String
-  tipo                        TipoCliente            @default(PERSONA_FISICA)
-  rncCedula                   String?
-  email                       String?
-  telefono                    String?
+  id                                String                 @id @default(uuid())
+  tenantId                          String
+  tenant                            Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  nombre                            String
+  tipo                              TipoCliente            @default(PERSONA_FISICA)
+  rncCedula                         String?
+  email                             String?
+  telefono                          String?
   // Dirección física del cliente (facturación/correspondencia) — distinta
   // de DireccionCliente (direcciones de ENTREGA de la Tienda Online,
   // varias por cliente, con esPrincipal). Esta es un único dato plano,
   // mismo criterio que Tenant.direccion/Proveedor, no una lista.
-  direccion                   String?
+  direccion                         String?
   // Persona de contacto dentro de la empresa (relevante sobre todo para
   // PERSONA_JURIDICA, donde "el cliente" y "con quién hablás" no son la
   // misma persona) + un segundo teléfono — ambos puramente informativos.
-  nombreContacto              String?
-  telefonoSecundario          String?
-  limiteCredito               Decimal                @default(0) @db.Decimal(14, 2)
-  activo                      Boolean                @default(true)
+  nombreContacto                    String?
+  telefonoSecundario                String?
+  limiteCredito                     Decimal                @default(0) @db.Decimal(14, 2)
+  activo                            Boolean                @default(true)
   // Preferencia del cliente para recibir los avisos automáticos de
   // Factura/Nota de Crédito/Nota de Débito/Cotización, por canal —
   // antes un solo `notificacionesHabilitadas` que apagaba Email y
@@ -3728,13 +3730,13 @@ model Cliente {
   // Plantillas) — ambos tienen que dar "sí" para que salga el mensaje,
   // este es el filtro fino por cliente y canal, aquel sigue siendo el
   // apagado general del negocio.
-  notificacionesEmailHabilitadas    Boolean          @default(true)
-  notificacionesWhatsappHabilitadas Boolean          @default(true)
+  notificacionesEmailHabilitadas    Boolean                @default(true)
+  notificacionesWhatsappHabilitadas Boolean                @default(true)
   // Contacto genérico sembrado al provisionar el tenant (ver
   // TenantsRepository.crearConProvisioning) — lo usa POS como cliente
   // por defecto en la venta rápida, para no exigir elegir un cliente
   // real en cada venta de mostrador.
-  esConsumidorFinal           Boolean                @default(false)
+  esConsumidorFinal                 Boolean                @default(false)
   // Cuenta de comprador de la Tienda Online (Fase 6, plugin
   // e-commerce) — null significa "no es una cuenta de tienda" (el caso
   // de siempre: Consumidor Final y clientes cargados a mano desde el
@@ -3744,17 +3746,17 @@ model Cliente {
   // "email con contraseña" se valida a nivel de servicio
   // (ClienteTiendaAuthService.registro), no con un constraint de DB
   // que podría chocar con datos viejos.
-  passwordHash                String?
+  passwordHash                      String?
   // Nivel de precio por defecto de este cliente (Fase 3b de adopción de
   // Cuadre) — null resuelve a "GENERAL" (ver FacturacionService.crear).
   // Se puede sobreescribir puntualmente al facturar/cotizar/vender en POS.
-  listaPrecioId               String?
-  listaPrecio                 ListaPrecio?           @relation(fields: [listaPrecioId], references: [id], onDelete: SetNull)
+  listaPrecioId                     String?
+  listaPrecio                       ListaPrecio?           @relation(fields: [listaPrecioId], references: [id], onDelete: SetNull)
   // Categoría/segmentación de cliente (plan de integración Cuadre, ítem
   // E-5) — catálogo propio, puramente informativo/de reporte (sin ningún
   // efecto en precios/permisos, a diferencia de listaPrecioId).
-  categoriaId                 String?
-  categoria                   CategoriaCliente?      @relation(fields: [categoriaId], references: [id], onDelete: SetNull)
+  categoriaId                       String?
+  categoria                         CategoriaCliente?      @relation(fields: [categoriaId], references: [id], onDelete: SetNull)
   // Comprobante fiscal y condición de pago por defecto (ítem E-5,
   // separados a propósito — ver TipoComprobanteFiscal/CondicionPago):
   // autoseleccionan, cada uno por su lado, el comprobante fiscal y el
@@ -3762,19 +3764,19 @@ model Cliente {
   // puede cambiar cualquiera de los dos antes de guardar, no es una
   // restricción, solo un valor inicial. Ver ModalNuevaFactura
   // (frontend) para el mapeo exacto.
-  comprobanteFiscalPorDefecto TipoComprobanteFiscal?
-  condicionPagoPorDefecto     CondicionPago?
+  comprobanteFiscalPorDefecto       TipoComprobanteFiscal?
+  condicionPagoPorDefecto           CondicionPago?
   // Crédito general con este cliente (mismo criterio que
   // Proveedor.plazoPagoDias de Cuentas por Pagar) — precarga "Condición
   // de pago" (días de crédito) al facturarle a este cliente cuando la
   // condición de pago es CREDITO.
-  plazoPagoDias               Int                    @default(30)
-  createdAt                   DateTime               @default(now())
+  plazoPagoDias                     Int                    @default(30)
+  createdAt                         DateTime               @default(now())
   // Ítem A-3 (Lealtad/puntos) — saldo denormalizado, mismo criterio que
   // `Stock.cantidadActual`: la fuente de verdad es la suma de
   // `MovimientoLealtad`, esto es una caché mantenida por
   // `LealtadService` para no tener que agregar en cada lectura.
-  puntosLealtad               Int                    @default(0)
+  puntosLealtad                     Int                    @default(0)
 
   direcciones                 DireccionCliente[]
   facturas                    Factura[]
@@ -3790,6 +3792,9 @@ model Cliente {
   crmLead                     Lead?
   crmOportunidades            Oportunidad[]
   crmActividades              ActividadCrm[]
+  cuentasPorCobrar            CuentaPorCobrar[]
+  recibosIngreso              ReciboIngreso[]
+  gestionesCobro              GestionCobro[]
 
   @@map("clientes")
 }
@@ -3833,6 +3838,414 @@ enum TipoComprobanteFiscal {
 enum CondicionPago {
   CONTADO
   CREDITO
+}
+
+/// Catálogo real de términos de pago (ítem CxC/CxP) — "Contado", "30 días",
+/// "60 días con 2% pronto pago", etc. Distinto del enum `CondicionPago` de
+/// arriba (que solo distingue CONTADO/CREDITO como opción de pago de una
+/// factura puntual): esto es el catálogo configurable de PLAZOS reales,
+/// usado por `CuentaPorCobrar`/`CuentaPorPagar` para fijar vencimiento y,
+/// a futuro, descuento por pronto pago — nunca reemplaza `Factura.plazoPagoDias`
+/// (snapshot por documento) ni `Proveedor.plazoPagoDias`, solo les da una
+/// fuente catalogada opcional en vez de un entero suelto.
+enum AplicaTerminoPago {
+  CLIENTE
+  PROVEEDOR
+  AMBOS
+}
+
+model TerminoPago {
+  id                     String            @id @default(uuid())
+  tenantId               String
+  tenant                 Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  nombre                 String
+  dias                   Int
+  descuentoProntoPagoPct Decimal?          @db.Decimal(5, 2)
+  diasProntoPago         Int?
+  aplicaA                AplicaTerminoPago @default(AMBOS)
+  activo                 Boolean           @default(true)
+  createdAt              DateTime          @default(now())
+
+  cuentasPorCobrar  CuentaPorCobrar[]
+  cuentasPorPagar   CuentaPorPagar[]
+  facturasProveedor FacturaProveedor[]
+
+  @@unique([tenantId, nombre])
+  @@map("terminos_pago")
+}
+
+enum EstadoCxC {
+  ABIERTA
+  PARCIAL
+  PAGADA
+  ANULADA
+  // Fase 4 — se castigó como incobrable (ver ProvisionIncobrable). Distinto
+  // de ANULADA: la factura sigue siendo válida, se da por perdida la
+  // cobranza. Excluida de WHERE_PENDIENTE igual que ANULADA/PAGADA.
+  CASTIGADA
+}
+
+/// Ledger real de Cuentas por Cobrar — nace SÍNCRONO, dentro de la misma
+/// transacción que la Factura CREDITO que la origina (ver
+/// FacturacionService.crear()), nunca por evento (el bloqueo de crédito
+/// necesita leer un saldo siempre consistente, sin ventana de carrera).
+/// Reemplaza el cálculo en caliente que hacía CuentasPorCobrarRepository
+/// sobre Factura+Pago — CONTADO nunca genera fila acá (se cobra al crear,
+/// ver Factura.pagada).
+model CuentaPorCobrar {
+  id               String       @id @default(uuid())
+  tenantId         String
+  tenant           Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  clienteId        String
+  cliente          Cliente      @relation(fields: [clienteId], references: [id])
+  facturaId        String       @unique
+  factura          Factura      @relation(fields: [facturaId], references: [id], onDelete: Cascade)
+  terminoPagoId    String?
+  terminoPago      TerminoPago? @relation(fields: [terminoPagoId], references: [id])
+  concepto         String
+  // Ítem C-2 (multi-moneda) — mismo criterio que Factura: monto/saldo
+  // SIEMPRE en DOP (lo único que usan el bloqueo de crédito/aging/
+  // contabilidad); moneda/tasaCambio/montoMoneda son puramente de
+  // presentación (estado de cuenta en la moneda que vio el cliente).
+  moneda           String       @default("DOP")
+  tasaCambio       Decimal?     @db.Decimal(14, 6)
+  monto            Decimal      @db.Decimal(14, 2)
+  montoMoneda      Decimal?     @db.Decimal(14, 2)
+  saldo            Decimal      @db.Decimal(14, 2)
+  fecha            DateTime
+  fechaVencimiento DateTime
+  estado           EstadoCxC    @default(ABIERTA)
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  aplicaciones        AplicacionCobro[]
+  gestiones           GestionCobro[]
+  provisionIncobrable ProvisionIncobrable?
+
+  @@index([tenantId, clienteId])
+  @@index([tenantId, estado])
+  @@map("cuentas_por_cobrar")
+}
+
+/// Cabecera de un cobro real a un cliente (Fase 3 — reemplaza `Pago` del
+/// lado de ventas). Nace 100% aplicada: el monto completo se reparte entre
+/// `aplicaciones` al crearse, sin remanente "a cuenta" sin aplicar
+/// (decisión explícita — evita inventar una cuenta contable de anticipos
+/// por ahora). El primer corte solo crea UNA aplicación por recibo (cobrar
+/// "esta factura", mismo flujo visible que el `Pago` que reemplaza);
+/// repartir un cobro entre varias facturas desde la UI es una mejora de
+/// interfaz futura, el modelo ya lo admite.
+model ReciboIngreso {
+  id          String    @id @default(uuid())
+  tenantId    String
+  tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  clienteId   String
+  cliente     Cliente   @relation(fields: [clienteId], references: [id])
+  monto       Decimal   @db.Decimal(14, 2)
+  formaPagoId String
+  formaPago   FormaPago @relation(fields: [formaPagoId], references: [id])
+  referencia  String?
+  fecha       DateTime  @default(now())
+  // Nullable — un cobro de la pasarela pública no tiene operador humano,
+  // mismo criterio que Pago.userId/PagoPlataforma.registradoPorId.
+  userId      String?
+  user        User?     @relation(fields: [userId], references: [id])
+  createdAt   DateTime  @default(now())
+
+  aplicaciones AplicacionCobro[]
+
+  @@index([tenantId, clienteId])
+  @@map("recibos_ingreso")
+}
+
+/// Línea de aplicación de un ReciboIngreso contra una CuentaPorCobrar
+/// puntual — el "open item" real. `facturaId` está denormalizado (siempre
+/// igual a `cuentaPorCobrar.facturaId`) porque Prisma no soporta agrupar
+/// (`groupBy`) a través de dos relaciones — ver
+/// ClientesRepository.sumaPagosPorFacturas.
+model AplicacionCobro {
+  id                String          @id @default(uuid())
+  reciboIngresoId   String
+  reciboIngreso     ReciboIngreso   @relation(fields: [reciboIngresoId], references: [id], onDelete: Cascade)
+  cuentaPorCobrarId String
+  cuentaPorCobrar   CuentaPorCobrar @relation(fields: [cuentaPorCobrarId], references: [id], onDelete: Cascade)
+  facturaId         String
+  factura           Factura         @relation(fields: [facturaId], references: [id], onDelete: Cascade)
+  monto             Decimal         @db.Decimal(14, 2)
+  createdAt         DateTime        @default(now())
+
+  @@index([facturaId])
+  @@map("aplicaciones_cobro")
+}
+
+/// Fase 4 — bitácora de gestión de cobro ("CRM de cobros"): llamadas,
+/// promesas de pago, próxima acción. `cuentaPorCobrarId` nullable a
+/// propósito — una gestión puede ser sobre una factura puntual o una
+/// llamada general al cliente sobre su saldo total (la UI de esta entrega
+/// solo crea del primer tipo; el modelo ya admite el segundo).
+enum TipoGestionCobro {
+  LLAMADA
+  EMAIL
+  WHATSAPP
+  VISITA
+  PROMESA_PAGO
+  OTRO
+}
+
+model GestionCobro {
+  id                String           @id @default(uuid())
+  tenantId          String
+  tenant            Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  clienteId         String
+  cliente           Cliente          @relation(fields: [clienteId], references: [id])
+  cuentaPorCobrarId String?
+  cuentaPorCobrar   CuentaPorCobrar? @relation(fields: [cuentaPorCobrarId], references: [id], onDelete: Cascade)
+  tipo              TipoGestionCobro
+  resultado         String           @db.Text
+  promesaFecha      DateTime?
+  promesaMonto      Decimal?         @db.Decimal(14, 2)
+  proximaAccion     DateTime?
+  userId            String
+  user              User             @relation(fields: [userId], references: [id])
+  createdAt         DateTime         @default(now())
+
+  @@index([tenantId, clienteId])
+  @@index([cuentaPorCobrarId])
+  @@map("gestiones_cobro")
+}
+
+/// Fase 4 — provisión/castigo de cuentas incobrables, método de reserva en
+/// dos pasos (decisión explícita del usuario): PROVISIONADA debita "Gasto
+/// por Incobrables" y acredita "Provisión para Cuentas Incobrables"
+/// (contra-activo) SIN tocar `CuentaPorCobrar.estado` — la cuenta sigue
+/// como adeudada en el aging hasta que se castiga de verdad. CASTIGADA
+/// recién ahí debita la provisión y acredita Cuentas por Cobrar, y marca
+/// `CuentaPorCobrar.estado = CASTIGADA` (sale del aging). Sin flujo de
+/// "recuperación" en esta entrega (alcance acotado a pedido del usuario).
+enum EstadoProvisionIncobrable {
+  PROVISIONADA
+  CASTIGADA
+}
+
+model ProvisionIncobrable {
+  id                String                    @id @default(uuid())
+  tenantId          String
+  tenant            Tenant                    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  cuentaPorCobrarId String                    @unique
+  cuentaPorCobrar   CuentaPorCobrar           @relation(fields: [cuentaPorCobrarId], references: [id], onDelete: Cascade)
+  // Snapshot del saldo al momento de provisionar — no se recalcula si
+  // llegan más pagos después (caso borde raro: provisionar y después
+  // cobrar algo de todos modos; queda fuera de alcance reconciliar eso
+  // automáticamente, se revierte a mano vía un asiento MANUAL si pasa).
+  monto             Decimal                   @db.Decimal(14, 2)
+  motivo            String                    @db.Text
+  estado            EstadoProvisionIncobrable @default(PROVISIONADA)
+  userId            String
+  user              User                      @relation(fields: [userId], references: [id])
+  fecha             DateTime                  @default(now())
+  fechaCastigo      DateTime?
+
+  @@map("provisiones_incobrables")
+}
+
+enum EstadoCxP {
+  ABIERTA
+  PARCIAL
+  PAGADA
+  ANULADA
+}
+
+/// Ledger real de Cuentas por Pagar — simétrico a CuentaPorCobrar (ver ese
+/// modelo). Nace SÍNCRONA, dentro de la misma transacción que la
+/// RecepcionCompra que la origina (ComprasService.recibir()) — granularidad
+/// por RECEPCIÓN, no por OrdenCompra completa a propósito: una OC puede
+/// recibirse en varias partes (EstadoOrdenCompra.RECIBIDA_PARCIAL), cada
+/// una con su propia factura de proveedor/vencimiento.
+///
+/// `recepcionCompraId` es NULLABLE (Fase 3, bug real encontrado en e2e):
+/// `ComprasService.registrarPago` siempre permitió pagar una orden ANTES
+/// de recibirla (anticipo a proveedor) — con la granularidad por recepción
+/// a secas, esa orden no tenía ninguna CuentaPorPagar todavía y el pago
+/// quedaba sin dónde aplicarse. `PagosRepository.registrarCobroOrdenCompra`
+/// crea una fila "de orden completa" (`recepcionCompraId: null`,
+/// `monto: orden.total`) la primera vez que se paga una orden sin ninguna
+/// CuentaPorPagar — y `ComprasService.recibir()` NO crea una nueva por
+/// recepción si la orden ya tiene esa fila de anticipo (se sigue llevando
+/// a nivel de orden completa para esa orden en particular, en vez de
+/// mezclar los dos criterios).
+///
+/// `ordenCompraId` es NULLABLE desde Fase 5: una `CuentaPorPagar` también
+/// puede nacer de una `FacturaProveedor` (gasto a crédito sin orden de
+/// compra — luz, alquiler, servicios) vía `facturaProveedorId`, mutuamente
+/// excluyente con `ordenCompraId` (CHECK en la migración). `listar()` (el
+/// agrupado por orden que alimenta `/cuentas-por-pagar`) sigue exclusivo de
+/// `OrdenCompra` a propósito — `FacturaProveedor` tiene su propia página; el
+/// aging/resumen (`listarTodasPendientes`) ya es genérico y las recoge solo.
+model CuentaPorPagar {
+  id                 String            @id @default(uuid())
+  tenantId           String
+  tenant             Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  proveedorId        String
+  proveedor          Proveedor         @relation(fields: [proveedorId], references: [id])
+  // Nullable desde Fase 5: origen A (compra) u origen B (gasto a crédito sin
+  // orden de compra) — ver comentario de FacturaProveedor. Exactamente uno de
+  // ordenCompraId/facturaProveedorId debe estar presente (CHECK agregado a
+  // mano en la migración, Prisma no lo expresa desde el schema).
+  ordenCompraId      String?
+  ordenCompra        OrdenCompra?      @relation(fields: [ordenCompraId], references: [id], onDelete: Cascade)
+  recepcionCompraId  String?           @unique
+  recepcionCompra    RecepcionCompra?  @relation(fields: [recepcionCompraId], references: [id], onDelete: Cascade)
+  facturaProveedorId String?           @unique
+  facturaProveedor   FacturaProveedor? @relation(fields: [facturaProveedorId], references: [id], onDelete: Cascade)
+  terminoPagoId      String?
+  terminoPago        TerminoPago?      @relation(fields: [terminoPagoId], references: [id])
+  concepto           String
+  // Compras no maneja multi-moneda hoy (OrdenCompra no tiene moneda/
+  // tasaCambio propios, a diferencia de Factura) — sin columnas de
+  // presentación acá por ahora, nada que mostrar en otra moneda.
+  monto              Decimal           @db.Decimal(14, 2)
+  saldo              Decimal           @db.Decimal(14, 2)
+  fecha              DateTime
+  fechaVencimiento   DateTime
+  estado             EstadoCxP         @default(ABIERTA)
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  aplicaciones AplicacionPago[]
+
+  @@index([tenantId, proveedorId])
+  @@index([tenantId, estado])
+  @@index([tenantId, ordenCompraId])
+  @@map("cuentas_por_pagar")
+}
+
+/// Cabecera de un pago real a un proveedor (Fase 3 — reemplaza `Pago` del
+/// lado de compras). Mismo criterio que ReciboIngreso: nace 100% aplicada,
+/// el primer corte solo crea UNA aplicación (paga "esta orden completa",
+/// que internamente ya se reparte FIFO entre sus CuentaPorPagar vía
+/// `aplicarPagoFifo` — ver ARCHITECTURE.md). Retención ISR/ITBIS vive acá
+/// (cabecera), no por línea — se retiene sobre el pago completo al
+/// proveedor, igual que `Pago.retencionIsr/retencionItbis` antes.
+model OrdenPago {
+  id             String    @id @default(uuid())
+  tenantId       String
+  tenant         Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  proveedorId    String
+  proveedor      Proveedor @relation(fields: [proveedorId], references: [id])
+  monto          Decimal   @db.Decimal(14, 2)
+  retencionIsr   Decimal   @default(0) @db.Decimal(14, 2)
+  retencionItbis Decimal   @default(0) @db.Decimal(14, 2)
+  formaPagoId    String
+  formaPago      FormaPago @relation(fields: [formaPagoId], references: [id])
+  referencia     String?
+  fecha          DateTime  @default(now())
+  userId         String?
+  user           User?     @relation(fields: [userId], references: [id])
+  createdAt      DateTime  @default(now())
+
+  aplicaciones AplicacionPago[]
+
+  @@index([tenantId, proveedorId])
+  @@map("ordenes_pago")
+}
+
+/// Línea de aplicación de un OrdenPago contra una CuentaPorPagar puntual
+/// (una recepción). Igual que AplicacionCobro, sin denormalizar
+/// `ordenCompraId` acá — nada hoy necesita agrupar AplicacionPago por
+/// orden directo (`CuentasPorPagarRepository` ya opera a nivel de
+/// CuentaPorPagar.ordenCompraId).
+model AplicacionPago {
+  id               String         @id @default(uuid())
+  ordenPagoId      String
+  ordenPago        OrdenPago      @relation(fields: [ordenPagoId], references: [id], onDelete: Cascade)
+  cuentaPorPagarId String
+  cuentaPorPagar   CuentaPorPagar @relation(fields: [cuentaPorPagarId], references: [id], onDelete: Cascade)
+  monto            Decimal        @db.Decimal(14, 2)
+  createdAt        DateTime       @default(now())
+
+  @@map("aplicaciones_pago")
+}
+
+enum TipoFacturaProveedor {
+  FACTURA
+  NOTA_CREDITO
+}
+
+enum EstadoFacturaProveedor {
+  EMITIDA
+  ANULADA
+}
+
+/// Fase 5 (CxP) — factura de un proveedor a crédito que NO pasó por una
+/// orden de compra (luz, alquiler, servicios profesionales, etc.). Genera su
+/// propia `CuentaPorPagar` síncrona (igual que `ComprasService.recibir()`),
+/// con líneas multi-cuenta igual que `GastoMenor` (acá el crédito del
+/// asiento va a Cuentas por Pagar, no a una cuenta bancaria — ver
+/// AsientosContablesService.generarDesdeFacturaProveedor).
+///
+/// `NOTA_CREDITO` es un ajuste financiero puro sobre una `FACTURA` ya
+/// registrada (`facturaOrigenId`) — NO tiene su propia `CuentaPorPagar`, en
+/// vez de eso reduce el saldo/monto reales de la `CuentaPorPagar` de la
+/// factura origen (`CuentasPorPagarRepository.reducirPorNotaCreditoEnTx`).
+/// Nunca se puede anular una vez creada (mismo precedente que
+/// `DevolucionCompra`, que tampoco se puede anular hoy).
+model FacturaProveedor {
+  id                String                 @id @default(uuid())
+  tenantId          String
+  tenant            Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  proveedorId       String
+  proveedor         Proveedor              @relation(fields: [proveedorId], references: [id])
+  tipo              TipoFacturaProveedor   @default(FACTURA)
+  // Solo para tipo NOTA_CREDITO — la FACTURA que ajusta.
+  facturaOrigenId   String?
+  facturaOrigen     FacturaProveedor?      @relation("FacturaProveedorOrigenNota", fields: [facturaOrigenId], references: [id])
+  notasRelacionadas FacturaProveedor[]     @relation("FacturaProveedorOrigenNota")
+  // NCF que el PROVEEDOR emitió (comprobante real que entregó), no uno que
+  // el tenant genere — a diferencia de GastoMenor.ncf (B11/E43, emitido por
+  // el propio tenant para mercado informal). Reutiliza el enum TipoNcf ya
+  // existente (B01/B02/B04/etc.).
+  ncfProveedor      String
+  tipoNcfProveedor  TipoNcf
+  concepto          String?
+  subtotal          Decimal                @db.Decimal(14, 2)
+  itbis             Decimal                @db.Decimal(14, 2)
+  total             Decimal                @db.Decimal(14, 2)
+  fecha             DateTime               @default(now())
+  fechaVencimiento  DateTime?
+  terminoPagoId     String?
+  terminoPago       TerminoPago?           @relation(fields: [terminoPagoId], references: [id])
+  estado            EstadoFacturaProveedor @default(EMITIDA)
+  pagada            Boolean                @default(false)
+  fechaPago         DateTime?
+  userId            String?
+  user              User?                  @relation(fields: [userId], references: [id])
+  createdAt         DateTime               @default(now())
+
+  lineas         FacturaProveedorLinea[]
+  cuentaPorPagar CuentaPorPagar?
+
+  @@unique([tenantId, proveedorId, ncfProveedor])
+  @@index([tenantId, estado])
+  @@map("facturas_proveedor")
+}
+
+/// Tabla hija sin tenantId propio (mismo patrón que LineaGastoMenor): su
+/// aislamiento depende de llegar siempre vía una FacturaProveedor ya
+/// resuelta contra el tenant.
+model FacturaProveedorLinea {
+  id                 String           @id @default(uuid())
+  facturaProveedorId String
+  facturaProveedor   FacturaProveedor @relation(fields: [facturaProveedorId], references: [id], onDelete: Cascade)
+  cuentaContableId   String
+  cuentaContable     CuentaContable   @relation(fields: [cuentaContableId], references: [id], onDelete: Cascade)
+  concepto           String?
+  valor              Decimal          @db.Decimal(14, 2)
+  porcentajeItbis    Decimal          @default(0) @db.Decimal(5, 2)
+  montoItbis         Decimal          @db.Decimal(14, 2)
+  cantidad           Decimal          @default(1) @db.Decimal(14, 4)
+  montoTotal         Decimal          @db.Decimal(14, 2)
+
+  @@map("lineas_factura_proveedor")
 }
 
 model DireccionCliente {

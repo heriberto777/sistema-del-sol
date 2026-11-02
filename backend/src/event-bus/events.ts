@@ -30,6 +30,12 @@ export const EVENTOS = {
   COTIZACION_CONVERTIDA_FACTURA: 'cotizaciones.convertida_factura',
   CONSULTA_PRODUCTO_DESCONOCIDO: 'crm.consulta_producto_desconocido',
   WHATSAPP_PEDIDO_SUGERIDO: 'crm.whatsapp_pedido_sugerido',
+  // Fase 4 (CxC) — provisión/castigo de cuentas incobrables.
+  CUENTA_POR_COBRAR_PROVISIONADA: 'cuentasporcobrar.provisionada',
+  CUENTA_POR_COBRAR_CASTIGADA: 'cuentasporcobrar.castigada',
+  // Fase 5 (CxP) — FacturaProveedor (gasto a crédito sin orden de compra).
+  FACTURA_PROVEEDOR_CREADA: 'facturasproveedor.creada',
+  PAGO_FACTURA_PROVEEDOR_REGISTRADO: 'pagos.factura_proveedor_registrado',
 } as const;
 
 export type NombreEvento = (typeof EVENTOS)[keyof typeof EVENTOS];
@@ -107,6 +113,32 @@ export interface PagoOrdenCompraRegistradoPayload {
   tenantId: string;
   pagoId: string;
   ordenCompraId: string;
+  monto: string;
+  retencionIsr: string;
+  retencionItbis: string;
+}
+
+export interface CuentaPorCobrarProvisionadaPayload {
+  tenantId: string;
+  provisionId: string;
+  monto: string;
+}
+
+export interface CuentaPorCobrarCastigadaPayload {
+  tenantId: string;
+  provisionId: string;
+  monto: string;
+}
+
+export interface FacturaProveedorCreadaPayload {
+  tenantId: string;
+  facturaProveedorId: string;
+}
+
+export interface PagoFacturaProveedorRegistradoPayload {
+  tenantId: string;
+  pagoId: string;
+  facturaProveedorId: string;
   monto: string;
   retencionIsr: string;
   retencionItbis: string;

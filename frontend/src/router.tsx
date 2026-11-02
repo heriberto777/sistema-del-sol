@@ -21,6 +21,7 @@ import { RemisionEditar } from './pages/RemisionEditar';
 import { NotasCredito } from './pages/NotasCredito';
 import { CuentasPorCobrar } from './pages/CuentasPorCobrar';
 import { CuentasPorPagar } from './pages/CuentasPorPagar';
+import { FacturasProveedor } from './pages/FacturasProveedor';
 import { Inventario } from './pages/Inventario';
 import { Conteos } from './pages/Conteos';
 import { ConteoDetalle } from './pages/ConteoDetalle';
@@ -243,6 +244,7 @@ const RUTAS_ADMIN = [
           { path: '/formas-pago', element: <FormasPago /> },
           { path: '/cuentas-por-cobrar', element: <CuentasPorCobrar /> },
           { path: '/cuentas-por-pagar', element: <CuentasPorPagar /> },
+          { path: '/facturas-proveedor', element: <FacturasProveedor /> },
           { path: '/inventario', element: <Inventario /> },
           { path: '/inventario/conteos', element: <Conteos /> },
           { path: '/inventario/conteos/:id', element: <ConteoDetalle /> },

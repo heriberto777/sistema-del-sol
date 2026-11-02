@@ -112,7 +112,7 @@ export class DocumentosPublicosService {
     });
     const pendientes = facturas.filter((f) => !f.pagada);
     const pagos = pendientes.length
-      ? await this.prisma.pago.groupBy({ by: ['facturaId'], where: { facturaId: { in: pendientes.map((f) => f.id) } }, _sum: { monto: true } })
+      ? await this.prisma.aplicacionCobro.groupBy({ by: ['facturaId'], where: { facturaId: { in: pendientes.map((f) => f.id) } }, _sum: { monto: true } })
       : [];
     const pagadoPorFactura = new Map(pagos.map((p) => [p.facturaId, Number(p._sum.monto ?? 0)]));
 

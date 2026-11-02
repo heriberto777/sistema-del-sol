@@ -401,6 +401,47 @@ export class AsientosContablesService {
   }
 
   /**
+   * FacturaProveedor (Fase 5, CxP) -> un débito por cada línea de gasto a su
+   * propia cuenta contable, un débito agregado a ITBIS Adelantado (si
+   * aplica), y un crédito a Cuentas por Pagar por el total — mismo shape
+   * que `generarDesdeGastoMenor`, pero el crédito va a la cuenta de control
+   * de CxP en vez de a la cuenta bancaria (acá la compra es A CRÉDITO).
+   *
+   * Una NotaCreditoProveedor reutiliza esta MISMA función con `itbis` y
+   * cada `lineas[].monto` ya negados por el caller
+   * (`ContabilidadEventosService.alCrearFacturaProveedor`) — `lineaSegunSigno`
+   * refleja un monto negativo en la columna contraria (mismo truco que
+   * `generarReversaCompra`), así el asiento queda invertido sin duplicar
+   * código.
+   */
+  async generarDesdeFacturaProveedor(params: {
+    tenantId: string;
+    facturaProveedorId: string;
+    itbis: number;
+    lineas: { cuentaContableId: string; monto: number }[];
+  }) {
+    const descripcion = `Factura de proveedor — ${params.facturaProveedorId}`;
+    const lineas = params.lineas.map((l) => this.lineaSegunSigno(l.cuentaContableId, l.monto, 'debito', descripcion));
+
+    if (params.itbis !== 0) {
+      const cuentaItbis = await this.cuentasRepository.buscarPorCodigoGlobal(params.tenantId, CODIGOS_CUENTA.ITBIS_ADELANTADO);
+      lineas.push(this.lineaSegunSigno(cuentaItbis.id, params.itbis, 'debito', descripcion));
+    }
+
+    const cuentaPorPagar = await this.cuentasRepository.buscarPorCodigoGlobal(params.tenantId, CODIGOS_CUENTA.CUENTAS_POR_PAGAR);
+    const total = params.lineas.reduce((acc, l) => acc + l.monto, 0) + params.itbis;
+    lineas.push(this.lineaSegunSigno(cuentaPorPagar.id, total, 'credito', descripcion));
+
+    return this.crearAsientoAutomatico({
+      tenantId: params.tenantId,
+      concepto: descripcion,
+      origen: 'FACTURA_PROVEEDOR',
+      origenId: params.facturaProveedorId,
+      lineas,
+    });
+  }
+
+  /**
    * "Gasto rápido": envoltorio amigable sobre `crear()` para quien no
    * conoce partida doble — el usuario solo elige la cuenta de gasto y de
    * dónde sale el dinero (Caja/Bancos si es al contado, Cuentas por Pagar
@@ -424,7 +465,49 @@ export class AsientosContablesService {
     });
   }
 
-  private async crearAsientoAutomatico(params: { tenantId: string; concepto: string; origen: 'FACTURA' | 'COMPRA' | 'NOMINA' | 'PAGO' | 'GASTO_MENOR'; origenId: string; lineas: LineaCalculada[] }) {
+  /**
+   * Provisión de incobrable (Fase 4, método de reserva) — Debita Gasto por
+   * Incobrables, acredita la provisión (contra-activo). NO toca Cuentas
+   * por Cobrar: la cuenta sigue en el aging hasta que se castigue de
+   * verdad (ver generarDesdeCastigoIncobrable).
+   */
+  async generarDesdeProvisionIncobrable(params: { tenantId: string; provisionId: string; monto: number }) {
+    const [cuentaGasto, cuentaProvision] = await Promise.all([
+      this.cuentasRepository.buscarPorCodigoGlobal(params.tenantId, CODIGOS_CUENTA.GASTO_CUENTAS_INCOBRABLES),
+      this.cuentasRepository.buscarPorCodigoGlobal(params.tenantId, CODIGOS_CUENTA.PROVISION_CUENTAS_INCOBRABLES),
+    ]);
+    const descripcion = `Provisión de incobrable — ${params.provisionId}`;
+    const lineas = [
+      this.lineaSegunSigno(cuentaGasto.id, params.monto, 'debito', descripcion),
+      this.lineaSegunSigno(cuentaProvision.id, params.monto, 'credito', descripcion),
+    ];
+    return this.crearAsientoAutomatico({ tenantId: params.tenantId, concepto: descripcion, origen: 'INCOBRABLE', origenId: params.provisionId, lineas });
+  }
+
+  /**
+   * Castigo de incobrable (Fase 4) — Debita la provisión (la cancela),
+   * acredita Cuentas por Cobrar — recién acá la cuenta sale del activo.
+   */
+  async generarDesdeCastigoIncobrable(params: { tenantId: string; provisionId: string; monto: number }) {
+    const [cuentaProvision, cuentaCobrar] = await Promise.all([
+      this.cuentasRepository.buscarPorCodigoGlobal(params.tenantId, CODIGOS_CUENTA.PROVISION_CUENTAS_INCOBRABLES),
+      this.cuentasRepository.buscarPorCodigoGlobal(params.tenantId, CODIGOS_CUENTA.CUENTAS_POR_COBRAR),
+    ]);
+    const descripcion = `Castigo de incobrable — ${params.provisionId}`;
+    const lineas = [
+      this.lineaSegunSigno(cuentaProvision.id, params.monto, 'debito', descripcion),
+      this.lineaSegunSigno(cuentaCobrar.id, params.monto, 'credito', descripcion),
+    ];
+    return this.crearAsientoAutomatico({ tenantId: params.tenantId, concepto: descripcion, origen: 'INCOBRABLE', origenId: params.provisionId, lineas });
+  }
+
+  private async crearAsientoAutomatico(params: {
+    tenantId: string;
+    concepto: string;
+    origen: 'FACTURA' | 'COMPRA' | 'NOMINA' | 'PAGO' | 'GASTO_MENOR' | 'INCOBRABLE' | 'FACTURA_PROVEEDOR';
+    origenId: string;
+    lineas: LineaCalculada[];
+  }) {
     this.validarBalance(params.lineas);
     return this.asientosRepository.crearGlobal(params);
   }

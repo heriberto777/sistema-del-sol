@@ -22,7 +22,7 @@ import { useDebouncedValue } from '../../../hooks/useDebouncedValue';
 import { useAuth } from '../../../hooks/useAuth';
 import { PaginaResultado } from '../../../types/pagina-resultado';
 import type { ClienteBasico } from '@backend-src/common/prisma/cliente-select-basico';
-import type { PagoBasico } from '@backend-src/common/prisma/pago-select-basico';
+import type { PagoHistoricoBasico } from '@backend-src/common/prisma/pago-historico-basico';
 
 interface Factura {
   id: string;
@@ -52,7 +52,7 @@ interface FacturaDetalle extends Factura {
   }[];
 }
 
-type Pago = PagoBasico;
+type Pago = PagoHistoricoBasico;
 
 const TONO_POR_ESTADO: Record<Factura['estado'], 'exito' | 'neutro' | 'peligro'> = {
   EMITIDA: 'exito',

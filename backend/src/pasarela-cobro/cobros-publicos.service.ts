@@ -26,9 +26,10 @@ export class CobrosPublicosService {
     throw new ServiceUnavailableException(`Pasarela "${clave}" no soportada todavía`);
   }
 
-  private async sumaPagos(facturaId: string): Promise<number> {
-    const { _sum } = await this.prisma.pago.aggregate({ where: { facturaId }, _sum: { monto: true } });
-    return Number(_sum.monto ?? 0);
+  /** Fase 3 — lee el saldo real de `CuentaPorCobrar` en vez de sumar `Pago`. `null` solo si la factura nunca tuvo una (CONTADO, pagada al crear). */
+  private async pendienteDeFactura(facturaId: string, total: number): Promise<number> {
+    const cuenta = await this.prisma.cuentaPorCobrar.findUnique({ where: { facturaId }, select: { saldo: true } });
+    return cuenta ? Math.max(0, Number(cuenta.saldo)) : total;
   }
 
   async obtenerFacturaPublica(facturaId: string) {
@@ -47,15 +48,14 @@ export class CobrosPublicosService {
     });
     if (!factura) throw new NotFoundException('Factura no encontrada');
 
-    const [totalPagado, config, pedidoTienda] = await Promise.all([
-      this.sumaPagos(facturaId),
+    const [pendiente, config, pedidoTienda] = await Promise.all([
+      this.pendienteDeFactura(facturaId, Number(factura.total)),
       this.prisma.pasarelaConfigTenant.findUnique({ where: { tenantId: factura.tenantId } }),
       // Sin `@relation` a propósito en el schema (ver PedidoTienda) — se
       // resuelve por el `facturaId` único. `null` para cualquier Factura
       // que no vino de la tienda (el resto de este método no cambia).
       this.prisma.pedidoTienda.findUnique({ where: { facturaId } }),
     ]);
-    const pendiente = Math.max(0, Number(factura.total) - totalPagado);
 
     return {
       tenantNombre: factura.tenant.nombre,
@@ -87,8 +87,7 @@ export class CobrosPublicosService {
       throw new BadRequestException('Esta factura no admite pagos en línea (no está emitida o ya fue pagada)');
     }
 
-    const totalPagado = await this.sumaPagos(facturaId);
-    const pendiente = Number(factura.total) - totalPagado;
+    const pendiente = await this.pendienteDeFactura(facturaId, Number(factura.total));
     if (monto <= 0 || monto > pendiente + EPSILON) {
       throw new BadRequestException(`El monto debe ser mayor a cero y no exceder el saldo pendiente (RD$ ${pendiente.toFixed(2)})`);
     }
@@ -172,13 +171,13 @@ export class CobrosPublicosService {
 
       request.user = { tenantId: sesion.tenantId, userId: 'pasarela-cobro', email: '', roles: [], permisos: [] } as JwtPayloadUser;
 
-      const pago = await this.facturacionService.registrarPago(
+      const reciboIngreso = await this.facturacionService.registrarPago(
         sesion.facturaId,
         { monto: Number(sesion.monto), formaPagoId: formaPagoTarjeta.id, referencia: `${pasarela}:${referenciaExterna}` } as CrearPagoDto,
         null,
         sesion.tenantId,
       );
-      await this.sesionesCobroRepository.vincularPago(sesion.id, pago.id);
+      await this.sesionesCobroRepository.vincularRecibo(sesion.id, reciboIngreso.id);
       return { facturaId: sesion.facturaId, aprobado: true };
     } catch (error) {
       await this.sesionesCobroRepository.marcarRechazada(sesion.id);

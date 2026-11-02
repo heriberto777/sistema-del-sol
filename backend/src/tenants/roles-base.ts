@@ -3,7 +3,25 @@
 // TenantsService.crear). Vive en un solo lugar para que ambos no diverjan.
 export const PERMISOS_BASE = [
   'facturacion.crear', 'facturacion.anular', 'facturacion.cobrar', 'facturacion.ver', 'facturacion.imprimir',
+  // CxC como ledger real (Fase 1) — saltar el bloqueo síncrono de crédito
+  // es una acción sensible (permite facturar a un cliente moroso o por
+  // encima de su límite), separada a propósito de `facturacion.crear`:
+  // ningún rol base lo trae de fábrica salvo Admin Total (vía
+  // PERMISOS_BASE), igual criterio que `productos.ia_generar`.
+  'facturacion.forzarcredito',
   'cuentasporcobrar.ver',
+  // Catálogo de Términos de Pago (Fase 0) — separado de `.ver` porque
+  // definir plazos/descuentos es configuración, no una consulta más.
+  'cuentasporcobrar.terminospago.ver', 'cuentasporcobrar.terminospago.editar',
+  // Fase 4 — bitácora de gestión de cobro: `.ver`/`.crear` separados del
+  // permiso general `cuentasporcobrar.ver`, mismo criterio que
+  // `inventario.contar` separado de `inventario.ajustar` (quien registra
+  // gestiones no necesariamente administra el catálogo de CxC).
+  // `.incobrables.gestionar` es más sensible (provisionar/castigar mueve
+  // asientos contables reales) — permiso aparte, un solo gate para ambos
+  // pasos del flujo (mismo criterio que `contabilidad.cerrarperiodo`).
+  'cuentasporcobrar.gestion.ver', 'cuentasporcobrar.gestion.crear',
+  'cuentasporcobrar.incobrables.gestionar',
   'cotizaciones.crear', 'cotizaciones.editar', 'cotizaciones.ver',
   'remisiones.crear', 'remisiones.editar', 'remisiones.ver',
   'contabilidad.ver', 'contabilidad.editar', 'contabilidad.anular', 'contabilidad.cerrarperiodo', 'contabilidad.conciliar',
@@ -33,6 +51,8 @@ export const PERMISOS_BASE = [
   'bonos.ver', 'bonos.editar',
   'compras.crear', 'compras.editar', 'compras.recibir', 'compras.pagar', 'compras.ver',
   'cuentasporpagar.ver',
+  // Fase 5 (CxP) — FacturaProveedor (gasto a crédito sin orden de compra).
+  'facturasproveedor.ver', 'facturasproveedor.crear', 'facturasproveedor.anular', 'facturasproveedor.pagar',
   'clientes.crear', 'clientes.editar', 'clientes.ver',
   'reportes.ver',
   'admin.configuracion', 'admin.usuarios',
@@ -173,8 +193,8 @@ export const ROLES_BASE: Record<string, string[]> = {
     'pos.ver', 'pos.editar', 'pos.supervisar', 'ia.usar', 'notificaciones.ver', 'whatsapp.bandeja.usar',
   ],
   Almacenero: ['inventario.ver', 'inventario.ajustar', 'inventario.transferir', 'inventario.contar', 'compras.recibir', 'remisiones.ver'],
-  Contador: ['facturacion.ver', 'facturacion.cobrar', 'facturacion.imprimir', 'cuentasporcobrar.ver', 'compras.ver', 'compras.pagar', 'cuentasporpagar.ver', 'reportes.ver', 'comisiones.ver', 'precios.ver', 'contabilidad.ver', 'contabilidad.editar', 'contabilidad.anular', 'contabilidad.cerrarperiodo', 'contabilidad.conciliar', 'bancos.ver', 'bancos.editar', 'gastosmenores.ver', 'gastosmenores.crear', 'nomina.ver', 'nomina.editar', 'rrhh.ver', 'ia.usar', 'notificaciones.ver'],
-  Auditor: ['auditoria.ver', 'facturacion.ver', 'facturacion.imprimir', 'inventario.ver', 'compras.ver', 'reportes.ver', 'cotizaciones.ver', 'remisiones.ver', 'contabilidad.ver', 'bancos.ver', 'gastosmenores.ver', 'nomina.ver', 'rrhh.ver', 'sucursales.ver', 'notificaciones.ver'],
+  Contador: ['facturacion.ver', 'facturacion.cobrar', 'facturacion.imprimir', 'cuentasporcobrar.ver', 'cuentasporcobrar.terminospago.ver', 'cuentasporcobrar.terminospago.editar', 'cuentasporcobrar.gestion.ver', 'cuentasporcobrar.gestion.crear', 'cuentasporcobrar.incobrables.gestionar', 'compras.ver', 'compras.pagar', 'cuentasporpagar.ver', 'facturasproveedor.ver', 'facturasproveedor.crear', 'facturasproveedor.anular', 'facturasproveedor.pagar', 'reportes.ver', 'comisiones.ver', 'precios.ver', 'contabilidad.ver', 'contabilidad.editar', 'contabilidad.anular', 'contabilidad.cerrarperiodo', 'contabilidad.conciliar', 'bancos.ver', 'bancos.editar', 'gastosmenores.ver', 'gastosmenores.crear', 'nomina.ver', 'nomina.editar', 'rrhh.ver', 'ia.usar', 'notificaciones.ver'],
+  Auditor: ['auditoria.ver', 'facturacion.ver', 'facturacion.imprimir', 'inventario.ver', 'compras.ver', 'facturasproveedor.ver', 'reportes.ver', 'cotizaciones.ver', 'remisiones.ver', 'contabilidad.ver', 'bancos.ver', 'gastosmenores.ver', 'nomina.ver', 'rrhh.ver', 'sucursales.ver', 'notificaciones.ver'],
 };
 
 export const CONFIGURACIONES_BASE: Record<string, string> = {
@@ -237,4 +257,10 @@ export const CONFIGURACIONES_BASE: Record<string, string> = {
   // (ver HitosProyectoCronService). Configurable por tenant, mismo criterio
   // que PROYECTOS_HORAS_LABORABLES_MES arriba.
   PROYECTOS_DIAS_ALERTA_HITO: '3',
+  // CxC como ledger real (Fase 1) — días vencidos tolerados antes de
+  // bloquear una venta a CRÉDITO nueva a ese cliente (ver
+  // FacturacionService.crear()). '0' = sin tolerancia, bloquea con
+  // cualquier CuentaPorCobrar vencida. Se puede saltar puntualmente con
+  // el permiso `facturacion.forzarcredito`.
+  CREDITO_DIAS_MORA_MAXIMO: '0',
 };

@@ -13,7 +13,10 @@ import { PluginsModule } from './plugins/plugins.module';
 import { AuthModule } from './auth/auth.module';
 import { FacturacionModule } from './facturacion/facturacion.module';
 import { CuentasPorCobrarModule } from './cuentas-por-cobrar/cuentas-por-cobrar.module';
+import { TerminosPagoModule } from './terminos-pago/terminos-pago.module';
+import { GestionCobroModule } from './gestion-cobro/gestion-cobro.module';
 import { CuentasPorPagarModule } from './cuentas-por-pagar/cuentas-por-pagar.module';
+import { FacturasProveedorModule } from './facturas-proveedor/facturas-proveedor.module';
 import { InventarioModule } from './inventario/inventario.module';
 import { AjustesInventarioModule } from './inventario/ajustes-inventario/ajustes-inventario.module';
 import { TransferenciasInventarioModule } from './inventario/transferencias-inventario/transferencias-inventario.module';
@@ -119,6 +122,8 @@ import { TenantMiddleware } from './common/middleware/tenant.middleware';
     AuthModule,
     FacturacionModule,
     CuentasPorCobrarModule,
+    TerminosPagoModule,
+    GestionCobroModule,
     SucursalesModule,
     InventarioModule,
     AjustesInventarioModule,
@@ -128,6 +133,7 @@ import { TenantMiddleware } from './common/middleware/tenant.middleware';
     PreciosModule,
     ComprasModule,
     CuentasPorPagarModule,
+    FacturasProveedorModule,
     ClientesModule,
     ProveedoresModule,
     NotificacionesModule,

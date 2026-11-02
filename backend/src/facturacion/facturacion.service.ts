@@ -34,6 +34,8 @@ import { CONFIGURACIONES_BASE } from '../tenants/roles-base';
 import { mapearFacturaAParams } from './mapear-factura-pdf';
 import { CorrelativosService } from '../correlativos/correlativos.service';
 import { ProductosService } from '../productos/productos.service';
+import { CuentasPorCobrarRepository } from '../cuentas-por-cobrar/cuentas-por-cobrar.repository';
+import { calcularFechaVencimiento, diasVencidoDesde } from '../common/fecha/dias-vencido.util';
 
 const NCF_POR_TIPO: Record<TipoFactura, TipoNcf> = {
   CREDITO: 'B01',
@@ -90,6 +92,7 @@ export class FacturacionService {
     private readonly configuracionesService: ConfiguracionesService,
     private readonly correlativosService: CorrelativosService,
     private readonly productosService: ProductosService,
+    private readonly cuentasPorCobrarRepository: CuentasPorCobrarRepository,
   ) {}
 
   /**
@@ -453,18 +456,24 @@ export class FacturacionService {
       // resto de los que llaman a `crear()` (POS, Facturación directa,
       // Cotización, Remisión sin pasar por ENTREGADA).
       sinMovimientoInventario?: boolean;
+      // CxC como ledger real (Fase 1) — resuelto por el controller a partir
+      // del permiso `facturacion.forzarcredito` (mismo patrón que
+      // `puedeSupervisarCaja` en `anular()`). Salta el bloqueo síncrono de
+      // crédito de abajo; nunca afecta a CONTADO/notas, que no lo tienen.
+      forzarCreditoBloqueado?: boolean;
     },
   ) {
     // Mejora "Emitir nota" — antes `facturaOrigenId` se usaba a ciegas
     // (ni se validaba que existiera/perteneciera al tenant, ni si la
     // factura ya tenía un cobro registrado). "Tiene cobro" = al menos una
-    // fila en `Pago` (cobro post-hoc de CRÉDITO vía Cuentas por Cobrar) —
-    // deliberadamente NO `Factura.pagada`/`PagoVenta`: una venta CONTADO/
-    // POS siempre queda pagada al crearse y aun así debe poder notarse
-    // (ver PosService.registrarDevolucion, que emite una NOTA_CREDITO
-    // contra una factura CONTADO y maneja el reembolso ahí mismo) — con
-    // este criterio la regla es pareja en todo el sistema sin romper esa
-    // devolución, que nunca deja fila en `Pago`.
+    // `AplicacionCobro` (cobro post-hoc de CRÉDITO vía Cuentas por
+    // Cobrar, Fase 3 — antes una fila en `Pago`) — deliberadamente NO
+    // `Factura.pagada`/`PagoVenta`: una venta CONTADO/POS siempre queda
+    // pagada al crearse y aun así debe poder notarse (ver
+    // PosService.registrarDevolucion, que emite una NOTA_CREDITO contra
+    // una factura CONTADO y maneja el reembolso ahí mismo) — con este
+    // criterio la regla es pareja en todo el sistema sin romper esa
+    // devolución, que nunca deja una AplicacionCobro.
     let facturaOrigen: Awaited<ReturnType<FacturacionRepository['buscarPorId']>> | undefined;
     if (dto.tipoFactura === 'NOTA_CREDITO' || dto.tipoFactura === 'NOTA_DEBITO') {
       if (!dto.facturaOrigenId) {
@@ -513,6 +522,39 @@ export class FacturacionService {
     }
     const itbisConRecargos = itbis + itbisRecargos;
     const totalConRecargos = total + totalRecargos + itbisRecargos;
+
+    // CxC como ledger real (Fase 1) — bloqueo SÍNCRONO de crédito, solo
+    // para CREDITO (CONTADO/notas nunca generan CuentaPorCobrar, nada que
+    // bloquear). Lee `CuentaPorCobrar` directo (nace/se cierra en la misma
+    // transacción que cada Factura, nunca por evento) para no tener una
+    // ventana de carrera entre dos ventas casi simultáneas al mismo
+    // cliente. `forzarCreditoBloqueado` (gateado por el permiso
+    // `facturacion.forzarcredito` en el controller) salta ambos chequeos.
+    if (dto.tipoFactura === 'CREDITO' && !opciones?.forzarCreditoBloqueado) {
+      const cuentasAbiertas = await this.cuentasPorCobrarRepository.listarAbiertasDeCliente(dto.clienteId);
+      const diasMoraMaximo = Number(
+        await this.configuracionesService.buscarValor(
+          'CREDITO_DIAS_MORA_MAXIMO',
+          tenantId,
+          CONFIGURACIONES_BASE.CREDITO_DIAS_MORA_MAXIMO,
+        ),
+      );
+      const maxDiasVencido = cuentasAbiertas.reduce((max, c) => Math.max(max, diasVencidoDesde(c.fechaVencimiento)), -Infinity);
+      if (cuentasAbiertas.length && maxDiasVencido > diasMoraMaximo) {
+        throw new BadRequestException(
+          `El cliente tiene facturas vencidas hace ${maxDiasVencido} día(s) (máximo permitido: ${diasMoraMaximo}) — regularizá el cobro antes de venderle más a crédito, o forzá la venta si tenés el permiso.`,
+        );
+      }
+      const limiteCredito = Number(cliente.limiteCredito);
+      if (limiteCredito > 0) {
+        const saldoActual = cuentasAbiertas.reduce((acc, c) => acc + Number(c.saldo), 0);
+        if (saldoActual + totalConRecargos > limiteCredito) {
+          throw new BadRequestException(
+            `Esta venta (RD$ ${totalConRecargos.toFixed(2)}) sumada al saldo pendiente del cliente (RD$ ${saldoActual.toFixed(2)}) supera su límite de crédito (RD$ ${limiteCredito.toFixed(2)}) — forzá la venta si tenés el permiso, o ajustá el límite del cliente.`,
+          );
+        }
+      }
+    }
     // Ítem C-2 (multi-moneda) — subtotal/itbis/total de arriba siguen
     // siendo SIEMPRE DOP (stock/NCF/contabilidad/pagos operan sobre
     // ellos sin cambios); esto solo agrega el equivalente en la moneda
@@ -696,7 +738,7 @@ export class FacturacionService {
       // interno legible para el cliente/vendedor.
       const numero = await this.correlativosService.siguienteEnTx(tx, tenantId, 'FACTURA');
 
-      return this.facturacionRepository.crearFacturaEnTx(tx, {
+      const facturaCreada = await this.facturacionRepository.crearFacturaEnTx(tx, {
         id: facturaId,
         tenantId,
         numero,
@@ -728,6 +770,26 @@ export class FacturacionService {
         recargos: recargosDto.length ? recargosDto.map((r) => ({ concepto: r.concepto, monto: r.monto, gravado: r.gravado ?? false })) : undefined,
         observaciones: dto.observaciones,
       });
+
+      // CxC como ledger real (Fase 1) — nace SÍNCRONO, en la misma
+      // transacción que la Factura (nunca por evento, ver el comentario
+      // del bloqueo más arriba). Solo CREDITO: CONTADO se cobra al crear.
+      if (dto.tipoFactura === 'CREDITO') {
+        await this.cuentasPorCobrarRepository.crearEnTx(tx, {
+          tenantId,
+          clienteId: dto.clienteId,
+          facturaId: facturaCreada.id,
+          concepto: `Factura ${facturaCreada.numero ?? facturaCreada.ncf ?? facturaCreada.id}`,
+          moneda,
+          tasaCambio: tasaCambio ?? undefined,
+          monto: totalConRecargos,
+          montoMoneda: montoMoneda(totalConRecargos),
+          fecha: facturaCreada.fecha,
+          fechaVencimiento: calcularFechaVencimiento(facturaCreada.fecha, facturaCreada.plazoPagoDias),
+        });
+      }
+
+      return facturaCreada;
     });
 
     this.eventBus.emit(EVENTOS.FACTURA_CREADA, {
@@ -950,6 +1012,11 @@ export class FacturacionService {
           }
         }
       }
+
+      // CxC como ledger real (Fase 1) — cierra la CuentaPorCobrar asociada
+      // (si la había, CONTADO nunca tiene) para no dejar un saldo por
+      // cobrar fantasma de una factura ya anulada.
+      await this.cuentasPorCobrarRepository.anularPorFacturaEnTx(tx, id);
 
       return this.facturacionRepository.anularEnTx(tx, id, motivo);
     });

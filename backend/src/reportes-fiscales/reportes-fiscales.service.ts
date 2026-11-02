@@ -68,9 +68,10 @@ export class ReportesFiscalesService {
 
   async formato606(desde?: string, hasta?: string) {
     const rango = rangoPorDefecto(desde, hasta);
-    const [recepciones, gastosMenores] = await Promise.all([
+    const [recepciones, gastosMenores, facturasProveedor] = await Promise.all([
       this.repository.comprasRecibidasEnRango(rango.desde, rango.hasta),
       this.repository.gastosMenoresEnRango(rango.desde, rango.hasta),
+      this.repository.facturasProveedorEnRango(rango.desde, rango.hasta),
     ]);
 
     const filasCompras = recepciones.map((r) => {
@@ -97,7 +98,22 @@ export class ReportesFiscalesService {
       itbisFacturado: Number(g.itbis),
     }));
 
-    const filas = [...filasCompras, ...filasGastosMenores].sort((a, b) => a.fecha.getTime() - b.fecha.getTime());
+    // Fase 5 — FacturaProveedor sin orden de compra. NOTA_CREDITO aporta
+    // montos NEGADOS (tratamiento DGII correcto: reduce el total de
+    // compras/crédito fiscal del período, mismo criterio que una devolución
+    // a proveedor reduciría una recepción si el 606 ya las restara).
+    const filasFacturasProveedor = facturasProveedor.map((f) => {
+      const factor = f.tipo === 'NOTA_CREDITO' ? -1 : 1;
+      return {
+        rncProveedor: f.proveedor.rnc ?? '',
+        numeroComprobante: f.ncfProveedor,
+        fecha: f.fecha,
+        montoFacturado: Number(f.subtotal) * factor,
+        itbisFacturado: Number(f.itbis) * factor,
+      };
+    });
+
+    const filas = [...filasCompras, ...filasGastosMenores, ...filasFacturasProveedor].sort((a, b) => a.fecha.getTime() - b.fecha.getTime());
 
     const resumen = filas.reduce(
       (acc, f) => ({ cantidad: acc.cantidad + 1, montoFacturado: acc.montoFacturado + f.montoFacturado, itbisFacturado: acc.itbisFacturado + f.itbisFacturado }),
@@ -165,8 +181,8 @@ export class ReportesFiscalesService {
     const pagos = await this.repository.retencionesProveedoresEnRango(rango.desde, rango.hasta);
 
     const filas = pagos.map((p) => ({
-      proveedorNombre: p.ordenCompra?.proveedor.nombre ?? '',
-      proveedorRnc: p.ordenCompra?.proveedor.rnc ?? '',
+      proveedorNombre: p.proveedor.nombre,
+      proveedorRnc: p.proveedor.rnc ?? '',
       fecha: p.fecha,
       montoBruto: Number(p.monto),
       retencionIsr: Number(p.retencionIsr),

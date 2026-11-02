@@ -39,7 +39,6 @@ export const TENANT_SCOPED_MODELS = new Set([
   'Empleado',
   'PeriodoNomina',
   'TurnoCaja',
-  'Pago',
   'DevolucionCompra',
   'CuentaBancaria',
   'GastoMenor',
@@ -130,4 +129,20 @@ export const TENANT_SCOPED_MODELS = new Set([
   'MetaVentaCrm',
   // "Formato de Documentos" Fase A/B1 — config por tipo de documento.
   'PersonalizacionDocumentoTipo',
+  // CxC/CxP como ledger real (Fase 0/1/2/3) — ver docs/ARCHITECTURE.md.
+  // `AplicacionCobro`/`AplicacionPago` quedan AFUERA a propósito, mismo
+  // criterio que LineaFactura/LineaGastoMenor: no tienen tenantId propio,
+  // su aislamiento depende de llegar siempre vía un ReciboIngreso/
+  // OrdenPago ya resuelto contra el tenant.
+  'TerminoPago',
+  'CuentaPorCobrar',
+  'CuentaPorPagar',
+  'ReciboIngreso',
+  'OrdenPago',
+  'GestionCobro',
+  'ProvisionIncobrable',
+  // Fase 5 (CxP) — `FacturaProveedorLinea` queda AFUERA a propósito, mismo
+  // criterio que LineaGastoMenor: no tiene tenantId propio, su aislamiento
+  // depende de llegar siempre vía una FacturaProveedor ya resuelta.
+  'FacturaProveedor',
 ]);

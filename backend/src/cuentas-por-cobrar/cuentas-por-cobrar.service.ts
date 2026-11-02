@@ -2,16 +2,9 @@ import { Injectable } from '@nestjs/common';
 import { CuentasPorCobrarRepository } from './cuentas-por-cobrar.repository';
 import { ListadoQueryDto } from '../common/dto/listado-query.dto';
 import { paginar } from '../common/types/pagina-resultado';
-
-const MS_POR_DIA = 24 * 60 * 60 * 1000;
+import { diasVencidoDesde } from '../common/fecha/dias-vencido.util';
 
 export type BucketAntiguedad = 'CORRIENTE' | 'D1_30' | 'D31_60' | 'D61_90' | 'D90_MAS';
-
-/** Mismo cálculo de vencimiento que RecordatoriosService (fecha + plazoPagoDias) — una sola fórmula para no divergir. */
-function diasVencido(fecha: Date, plazoPagoDias: number): number {
-  const vencimiento = fecha.getTime() + plazoPagoDias * MS_POR_DIA;
-  return Math.floor((Date.now() - vencimiento) / MS_POR_DIA);
-}
 
 function bucketDe(dias: number): BucketAntiguedad {
   if (dias <= 0) return 'CORRIENTE';
@@ -27,22 +20,20 @@ export class CuentasPorCobrarService {
 
   async listar(query: ListadoQueryDto) {
     const { pagina, tamanoPagina, skip, take } = paginar(query.pagina, query.tamanoPagina);
-    const [facturas, total] = await this.cuentasPorCobrarRepository.listar({ skip, take, busqueda: query.busqueda });
-    const pagadoPorFactura = await this.mapaPagadoPorFactura(facturas.map((f) => f.id));
+    const [cuentas, total] = await this.cuentasPorCobrarRepository.listar({ skip, take, busqueda: query.busqueda });
 
-    const datos = facturas.map((f) => {
-      const pagado = pagadoPorFactura.get(f.id) ?? 0;
-      const dias = diasVencido(f.fecha, f.plazoPagoDias);
+    const datos = cuentas.map((c) => {
+      const dias = diasVencidoDesde(c.fechaVencimiento);
       return {
-        id: f.id,
-        numero: f.numero,
-        ncf: f.ncf,
-        cliente: f.cliente.nombre,
-        fecha: f.fecha,
-        vencimiento: new Date(f.fecha.getTime() + f.plazoPagoDias * MS_POR_DIA),
-        total: Number(f.total),
-        pagado,
-        pendiente: Number(f.total) - pagado,
+        id: c.facturaId,
+        numero: c.factura.numero,
+        ncf: c.factura.ncf,
+        cliente: c.cliente.nombre,
+        fecha: c.fecha,
+        vencimiento: c.fechaVencimiento,
+        total: Number(c.monto),
+        pagado: Number(c.monto) - Number(c.saldo),
+        pendiente: Number(c.saldo),
         diasVencido: dias,
         bucket: bucketDe(dias),
       };
@@ -52,17 +43,16 @@ export class CuentasPorCobrarService {
   }
 
   async resumen() {
-    const facturas = await this.cuentasPorCobrarRepository.listarTodasPendientes();
-    const pagadoPorFactura = await this.mapaPagadoPorFactura(facturas.map((f) => f.id));
+    const cuentas = await this.cuentasPorCobrarRepository.listarTodasPendientes();
 
     const buckets: Record<BucketAntiguedad, number> = { CORRIENTE: 0, D1_30: 0, D31_60: 0, D61_90: 0, D90_MAS: 0 };
     let totalCxC = 0;
     let totalVencido = 0;
     let totalPorVencer = 0;
 
-    for (const f of facturas) {
-      const pendiente = Number(f.total) - (pagadoPorFactura.get(f.id) ?? 0);
-      const dias = diasVencido(f.fecha, f.plazoPagoDias);
+    for (const c of cuentas) {
+      const pendiente = Number(c.saldo);
+      const dias = diasVencidoDesde(c.fechaVencimiento);
       buckets[bucketDe(dias)] += pendiente;
       totalCxC += pendiente;
       if (dias > 0) totalVencido += pendiente;
@@ -70,10 +60,5 @@ export class CuentasPorCobrarService {
     }
 
     return { totalCxC, totalVencido, totalPorVencer, buckets };
-  }
-
-  private async mapaPagadoPorFactura(facturaIds: string[]): Promise<Map<string | null, number>> {
-    const pagos = await this.cuentasPorCobrarRepository.sumaPagosPorFacturas(facturaIds);
-    return new Map(pagos.map((p) => [p.facturaId, Number(p._sum.monto ?? 0)]));
   }
 }

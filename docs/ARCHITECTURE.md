@@ -2935,6 +2935,218 @@ contra un cierre de período (no lo necesitan — ver arriba); y granularidad
 de permisos más allá de `contabilidad.ver/editar/anular/cerrarperiodo/conciliar`
 (por ejemplo, un permiso de auditoría separado de `contabilidad.ver`).
 
+## Cuentas por Cobrar como ledger real (Fase 0/1 — ERP, no reporte)
+
+Hasta esta fase, `CuentasPorCobrarService`/`CuentasPorCobrarRepository`
+(`backend/src/cuentas-por-cobrar/`) no eran un módulo financiero: eran una
+vista calculada en caliente sobre `Factura`+`Pago` en cada request, sin
+tabla propia. Eso impedía un bloqueo de crédito confiable (no había un
+saldo persistido contra el cual validar de forma atómica) y cualquier
+funcionalidad real de cobranza (bitácora, provisión de incobrables,
+reparto de un cobro entre varias facturas). `CuentaPorCobrar`
+(`schema.prisma`) reemplaza ese cálculo por un ledger real: nace
+**síncrono**, dentro de la misma transacción Prisma que la `Factura`
+CREDITO que la origina (`FacturacionService.crear()`, justo después de
+`facturacionRepository.crearFacturaEnTx`), nunca por evento — un chequeo
+de crédito basado en una creación asíncrona tendría una ventana de carrera
+entre dos ventas casi simultáneas al mismo cliente. CONTADO/notas nunca
+generan fila (se cobran al crear, igual criterio que
+`CuentasPorCobrarRepository.WHERE_PENDIENTE` ya usaba).
+
+**Bloqueo síncrono de crédito**: en `FacturacionService.crear()`, justo
+después de calcular `totalConRecargos` y antes de abrir la transacción
+(fail-fast, sin gastar cómputo de más), y solo para `tipoFactura ===
+'CREDITO'`. Dos chequeos independientes, cualquiera de los dos rechaza con
+400: (1) el cliente tiene alguna `CuentaPorCobrar` abierta vencida más
+allá de `CREDITO_DIAS_MORA_MAXIMO` (configuración por tenant, default
+`'0'` = sin tolerancia); (2) `saldoActual + totalConRecargos >
+cliente.limiteCredito` (solo si `limiteCredito > 0` — en `0` significa
+"sin límite", nunca bloquea por monto). El permiso `facturacion.forzarcredito`
+(resuelto en el controller, mismo patrón que `puedeSupervisarCaja` en
+`anular()`) salta ambos chequeos sin tocar la configuración del tenant. Al
+anular una factura CREDITO, su `CuentaPorCobrar` se cierra (`estado:
+'ANULADA'`) dentro de la misma transacción de `anular()`, para no dejar un
+saldo por cobrar fantasma.
+
+**Fase 3 completa el ledger**: `Pago` se eliminó por completo —
+`PagosRepository.registrarCobroFactura` (`backend/src/pagos/`) descuenta
+`CuentaPorCobrar.saldo` directo, en la misma transacción que crea el
+`ReciboIngreso`/`AplicacionCobro` (ver la sección "Cuentas por Cobrar como
+ledger real — Fase 3" más abajo para el detalle completo).
+
+**Catálogo `TerminoPago`** (`backend/src/terminos-pago/`, nombre elegido a
+propósito distinto de `CondicionPago`): ya existía un enum `CondicionPago`
+(`CONTADO`/`CREDITO`, usado en `Cliente.condicionPagoPorDefecto` — la
+opción de pago por defecto al elegir ese cliente en Facturación/POS).
+`TerminoPago` es un catálogo distinto y más rico (nombre, días, descuento
+por pronto pago) para plazos reales tipo "30 días", "60 días con 2% pronto
+pago" — nombrarlo igual que el enum existente habría sido una colisión de
+símbolos en el mismo schema de Prisma. Por ahora es CRUD puro
+(`cuentasporcobrar.terminospago.ver/.editar`), sin wiring todavía hacia
+`Cliente`/`Factura` (queda para cuando se use desde la UI de clientes).
+
+**Roadmap documentado, no implementado todavía**: bitácora de gestión de
+cobro (`GestionCobro`), provisión/castigo de incobrables, y
+`FacturaProveedor` (gasto operativo a crédito sin pasar por una orden de
+compra).
+
+## Cuentas por Pagar como ledger real (Fase 2 — simétrico a CxC)
+
+`CuentaPorPagar` replica el mismo cambio de fondo que `CuentaPorCobrar`
+(ver arriba), con una diferencia de granularidad real: nace **por
+`RecepcionCompra`, no por `OrdenCompra` completa** — una orden puede
+recibirse en varias partes (`EstadoOrdenCompra.RECIBIDA_PARCIAL`), cada
+recepción con su propia fecha y, por lo tanto, su propio vencimiento. Nace
+síncrona dentro de la misma transacción que `ComprasService.recibir()`
+(justo después de `comprasRepository.crearRecepcion`), usando
+`montoEstaRecepcion` (el valor de ESTA recepción, no el total de la orden
+— mismo criterio que ya usaba `diferenciaVsFactura` para comparar contra
+la factura del proveedor) y `orden.proveedor.plazoPagoDias` para calcular
+el vencimiento.
+
+**`OrdenPago` (Fase 3) paga la ORDEN completa**, no una recepción puntual
+— una orden puede tener varias `CuentaPorPagar` abiertas (una por
+recepción). `CuentasPorPagarRepository.aplicarPagoFifoEnTx` reparte el
+monto pagado entre ellas, de la más antigua a la más nueva, dentro de la
+misma transacción que crea el `OrdenPago` — un solo pago de orden puede,
+de forma transparente, terminar generando varias `AplicacionPago`.
+`ComprasService.devolver()` usa el mismo criterio FIFO
+(`reducirPorDevolucionEnTx`) pero reduce la deuda **original** (`monto` y
+`saldo`, no solo el saldo pendiente) — una devolución significa que nunca
+se debió esa plata de entrada.
+
+**Anticipo a proveedor (bug real encontrado en e2e)**:
+`ComprasService.registrarPago` siempre permitió pagar una orden **antes**
+de recibirla (depósito/anticipo) — con `CuentaPorPagar` naciendo solo por
+recepción, una orden sin recibir no tenía ninguna fila y el pago quedaba
+sin dónde aplicarse (la API empezó a responder 400 a un flujo que antes
+funcionaba). Se resolvió haciendo `CuentaPorPagar.recepcionCompraId`
+**nullable**: `PagosRepository.registrarCobroOrdenCompra` crea una fila
+"de orden completa" (`recepcionCompraId: null`, `monto: orden.total`) la
+primera vez que se paga una orden sin ninguna `CuentaPorPagar` todavía; y
+`ComprasService.recibir()` no crea una nueva por recepción si la orden ya
+tiene esa fila de anticipo (para no duplicar la deuda ya cargada) — esa
+orden en particular sigue llevándose a nivel de orden completa de ahí en
+más, en vez de mezclar los dos criterios.
+
+**Listado `/cuentas-por-pagar`**: para no romper el botón "Registrar pago"
+del frontend (que sigue apuntando al id de la `OrdenCompra`, no a una
+`CuentaPorPagar` puntual), `CuentasPorPagarRepository.listar()` agrupa por
+`OrdenCompra` — pagina/busca a ese nivel y el service suma las
+`CuentaPorPagar` abiertas de cada orden (vencimiento mostrado = el más
+antiguo, el más urgente). El `resumen()`/aging sí lee cada
+`CuentaPorPagar` individual (la suma da igual en cualquier orden de
+agrupación).
+
+**Catálogo `TerminoPago`** y las columnas de presentación en otra moneda
+NO aplican acá: `OrdenCompra` no maneja multi-moneda hoy (a diferencia de
+`Factura`), así que `CuentaPorPagar` no tiene columnas `moneda`/
+`tasaCambio`/`montoMoneda` — nada que mostrar en otra moneda todavía.
+
+## `Pago` reemplazado por completo (Fase 3)
+
+El ledger `Pago` (un solo modelo para cobros de Factura y pagos de
+OrdenCompra, `facturaId`/`ordenCompraId` mutuamente excluyentes) se
+eliminó del todo, reemplazado por `ReciboIngreso`/`AplicacionCobro`
+(ventas) y `OrdenPago`/`AplicacionPago` (compras) —
+`backend/src/pagos/pagos.repository.ts` quedó reescrito: cada cobro/pago
+es ahora una transacción Prisma real (antes podía quedar una fila de
+`Pago` sin que nada más se actualizara atómicamente con ella).
+
+- **`registrarCobroFactura`**: resuelve (o crea, caso degenerado — una
+  factura CONTADO creada sin forma de pago, ver
+  `FacturacionService.crear`/`pagadaAlCrear`, queda `pagada:false` sin
+  `CuentaPorCobrar` propia) la cuenta de la factura, descuenta su saldo, y
+  crea el `ReciboIngreso` con su única `AplicacionCobro` — todo en una
+  transacción.
+- **`registrarCobroOrdenCompra`**: crea la `CuentaPorPagar` de anticipo si
+  hace falta (ver arriba), reparte FIFO vía
+  `CuentasPorPagarRepository.aplicarPagoFifoEnTx`, y crea el `OrdenPago`
+  con una `AplicacionPago` por cada `CuentaPorPagar` tocada.
+- **Primer corte, a propósito**: cada `ReciboIngreso`/`OrdenPago` nace
+  100% aplicado (nunca con remanente "a cuenta" sin aplicar — evita
+  inventar una cuenta contable de anticipos nueva) y el modal del frontend
+  sigue siendo "cobrar/pagar ESTE documento" (mismo flujo visible que el
+  `Pago` que reemplaza). Repartir un cobro entre varias facturas desde la
+  UI queda como mejora de interfaz futura — el modelo ya lo admite
+  (`AplicacionCobro`/`AplicacionPago` son líneas, no 1:1).
+- **Contabilidad sin cambios**: `AsientosContablesService`/
+  `ContabilidadEventosService` siguen igual — el `pagoId` del payload del
+  evento ahora lleva el id del `ReciboIngreso`/`OrdenPago`, pero es solo
+  una cadena de correlación para el `concepto`/`origenId` del asiento, no
+  una FK real.
+- **Otros puntos migrados**: `ClientesRepository`/
+  `documentos-publicos.service.ts` (estado de cuenta), `cobros-publicos.service.ts`
+  (pasarela pública — `SesionCobroFactura.reciboIngresoId` reemplaza
+  `pagoId`), `reportes-fiscales.repository.ts` (retenciones DGII, ahora
+  lee `OrdenPago` directo en vez de `Pago.ordenCompraId`).
+- **Frontend**: cero cambios de UI — `PagoHistoricoBasico`
+  (`backend/src/common/prisma/pago-historico-basico.ts`) reemplaza
+  `PagoBasico`/`pago-select-basico.ts` (eliminado) con la MISMA forma
+  plana (`id`, `monto`, `fecha`, `referencia`, `formaPago.nombre`),
+  construida a mano en el repositorio combinando `AplicacionCobro`/
+  `AplicacionPago` con su `ReciboIngreso`/`OrdenPago` — ya no hay un solo
+  modelo de Prisma del que derivarla.
+- **Backfill histórico** (`backend/scripts/backfill-pagos-historicos.ts`,
+  ya corrido y **eliminado** del repo — un script de corte único, no
+  idempotente en el sentido de poder repetirse después de dropear `Pago`):
+  reconstruyó el historial de `Pago` como `ReciboIngreso`/`OrdenPago` para
+  auditoría, sin tocar `CuentaPorCobrar`/`CuentaPorPagar.saldo` (los
+  backfills de Fase 1/2 ya los habían dejado correctos). **Importante para
+  un deploy con datos históricos reales**: este script (y
+  `cuentasporpagar:backfill` de la Fase 2, también eliminado tras correr)
+  necesitan que `Pago` exista todavía — en un ambiente que nunca tuvo
+  Fase 1/2/3, hay que desplegar hasta la migración que AGREGA
+  `ReciboIngreso`/`OrdenPago` primero, correr los backfills contra ESE
+  commit, y recién después desplegar la migración de limpieza que dropea
+  `pagos` (commit/release separado) — una vez que el modelo `Pago` sale
+  de `schema.prisma`, ningún script puede volver a leerlo, sin importar
+  qué migraciones estén aplicadas en la base.
+
+## Gestión de cobro y provisión de incobrables (Fase 4, CxC)
+
+`backend/src/gestion-cobro/` agrega dos piezas sobre el ledger de CxC (ver
+arriba), ambas operando siempre sobre la `CuentaPorCobrar` de una factura
+puntual (resuelta por `facturaId`, mismo criterio que
+`/facturas/:id/pagos` — `GestionCobroRepository.buscarCuentaPorFacturaOrThrow`
+devuelve 404 si la factura no tiene una, ej. CONTADO):
+
+- **Bitácora de gestión de cobro** (`GestionCobro`): llamadas, emails,
+  promesas de pago, con `tipo`/`resultado`/`promesaFecha`/`promesaMonto`.
+  `cuentaPorCobrarId` es nullable en el modelo (admite una gestión general
+  de cliente sin factura puntual), pero esta entrega solo expone el flujo
+  por factura desde la UI (`ModalGestionCobro`, botón "Gestión" en
+  `/cuentas-por-cobrar`). Permisos separados de `cuentasporcobrar.ver`:
+  `.gestion.ver`/`.gestion.crear`.
+- **Provisión y castigo de incobrables** (`ProvisionIncobrable`), método de
+  reserva en dos pasos (decisión explícita del usuario, no castigo
+  directo):
+  - **Provisionar**: debita `5040 Gasto por Cuentas Incobrables`, acredita
+    `1025 Provisión para Cuentas Incobrables` (contra-activo, `tipo:
+    ACTIVO` pero `naturaleza: ACREEDORA` a propósito — reduce el valor neto
+    realizable de Cuentas por Cobrar sin tocarla todavía). La
+    `CuentaPorCobrar` sigue `ABIERTA`/`PARCIAL` y aparece en el aging
+    normal — solo se registró la pérdida esperada, no se dio de baja nada.
+  - **Castigar**: debita la provisión (la cancela), acredita
+    `1020 Cuentas por Cobrar` — recién acá `CuentaPorCobrar.estado` pasa a
+    `CASTIGADA` (nuevo valor del enum, excluido de `WHERE_PENDIENTE` igual
+    que `PAGADA`/`ANULADA`) y la cuenta sale del aging para siempre.
+  - Sin flujo de "recuperación" (cliente paga después de castigada) en
+    esta entrega — alcance acotado a pedido del usuario; se resolvería a
+    mano con un asiento `MANUAL` si llegara a pasar.
+  - `GestionCobroService` valida que no se pueda provisionar una cuenta ya
+    `PAGADA`/`ANULADA`/`CASTIGADA`, ni dos veces la misma cuenta, ni
+    castigar sin una provisión `PROVISIONADA` activa. Permiso único
+    `cuentasporcobrar.incobrables.gestionar` para ambos pasos (mismo
+    criterio que `contabilidad.cerrarperiodo`: una acción sensible, un
+    solo gate).
+  - `AsientosContablesService.generarDesdeProvisionIncobrable`/
+    `generarDesdeCastigoIncobrable`, origen `INCOBRABLE` (nuevo valor de
+    `OrigenAsiento`) — disparados vía Event Bus
+    (`CUENTA_POR_COBRAR_PROVISIONADA`/`CASTIGADA`), mismo patrón
+    fire-and-forget que el resto de asientos automáticos (un fallo nunca
+    bloquea la acción que lo originó).
+
 ## Nómina
 
 `backend/src/nomina/` cubre el ciclo de nómina de un empleado: catálogo de

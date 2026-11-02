@@ -28,7 +28,7 @@ BEGIN
       'cotizaciones', 'remisiones',
       'cuentas_contables', 'asientos_contables', 'periodos_contables_cerrados',
       'empleados', 'periodos_nomina', 'turnos_caja',
-      'pagos', 'devolucion_compra',
+      'devolucion_compra',
       'cuentas_bancarias', 'gastos_menores',
       'formas_pago', 'ventas_aparcadas', 'categorias', 'listas_precio',
       'variantes_producto', 'atributos',
@@ -51,7 +51,11 @@ BEGIN
       'travel_reservas', 'travel_ledger_movimientos', 'travel_reglas_markup',
       'usos_ia_tenant',
       'crm_leads', 'crm_etapas_pipeline', 'crm_oportunidades', 'crm_actividades', 'crm_metas_venta',
-      'personalizaciones_documento_tipo'
+      'personalizaciones_documento_tipo',
+      'terminos_pago', 'cuentas_por_cobrar', 'cuentas_por_pagar',
+      'recibos_ingreso', 'ordenes_pago',
+      'gestiones_cobro', 'provisiones_incobrables',
+      'facturas_proveedor'
     ])
   LOOP
     EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY;', tabla);

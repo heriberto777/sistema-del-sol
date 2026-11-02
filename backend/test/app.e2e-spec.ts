@@ -266,7 +266,14 @@ describe('App (e2e)', () => {
     app.useGlobalFilters(new HttpExceptionFilter());
     app.setGlobalPrefix('api');
     await app.init();
-  }, 30_000);
+    // 60s, no 30s como el resto de los e2e — este archivo es por lejos el
+    // más grande (más fixtures que crea, y el mismo costo de compilar
+    // AppModule completo que todos, pero sin margen): a medida que crecen
+    // los módulos de la app, este beforeAll quedó al borde del timeout de
+    // 30s y empezó a fallar de forma intermitente (bug real, encontrado al
+    // sumar los módulos de Fase 0-4 de CxC/CxP) — no es una corrida más
+    // lenta por una query puntual, es el acumulado de TODO lo que hace acá.
+  }, 60_000);
 
   afterAll(async () => {
     await app.close();
