@@ -1,83 +1,29 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../lib/api-client';
 import { Badge } from '../components/atoms/Badge/Badge';
 import { Button } from '../components/atoms/Button/Button';
 import { Card } from '../components/atoms/Card/Card';
 import { Select } from '../components/atoms/Select/Select';
-import { CampoImagen } from '../components/molecules/CampoImagen/CampoImagen';
-import { GaleriaImagenes } from '../components/molecules/GaleriaImagenes/GaleriaImagenes';
 import { FormField } from '../components/molecules/FormField/FormField';
 import { Modal } from '../components/molecules/Modal/Modal';
-import { Tabs } from '../components/molecules/Tabs/Tabs';
 import { SearchInput } from '../components/molecules/SearchInput/SearchInput';
 import { Paginacion } from '../components/molecules/Paginacion/Paginacion';
 import { EstadoVacio } from '../components/molecules/EstadoVacio/EstadoVacio';
 import { RowActionsMenu } from '../components/molecules/RowActionsMenu/RowActionsMenu';
 import { RequierePermiso } from '../components/organisms/RequierePermiso/RequierePermiso';
 import { SelectCategoria } from '../components/molecules/SelectCategoria/SelectCategoria';
-import { SelectLeyFiscal } from '../components/molecules/SelectLeyFiscal/SelectLeyFiscal';
-import { VariantesProductoPanel } from '../components/organisms/VariantesProductoPanel/VariantesProductoPanel';
 import { ImportarProductosModal } from '../components/organisms/ImportarProductosModal/ImportarProductosModal';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { useListasPrecio } from '../hooks/useListasPrecio';
 import { useVariantesProducto, etiquetaVariante } from '../hooks/useVariantesProducto';
 import { descargarBlob } from '../lib/descargar-archivo';
-import type { AjusteImagen } from '../constants/ajuste-imagen';
 import { PaginaResultado } from '../types/pagina-resultado';
 import { mensajeErrorApi } from '../lib/mensaje-error-api';
-import { useAuth } from '../hooks/useAuth';
-import { Sparkles } from 'lucide-react';
+import type { Producto, TipoProducto } from './ProductoFormulario';
 
-type TipoProducto = 'PRODUCTO' | 'SERVICIO' | 'COMBO';
-
-interface Producto {
-  id: string;
-  codigo: string;
-  nombre: string;
-  categoriaId: string | null;
-  categoria: { id: string; nombre: string } | null;
-  unidadMedida: string;
-  porcentajeItbis: string;
-  leyFiscalId: string | null;
-  tipo: TipoProducto;
-  controlaVencimiento: boolean;
-  precioVariable: boolean;
-  esIngrediente: boolean;
-  permiteDevolucion: boolean;
-  porcentajeComision: string | null;
-  montoComisionFijo: string | null;
-  destacado: boolean;
-}
-
-interface ComponenteComboDetalle {
-  cantidad: string;
-  componente: { id: string; codigo: string; nombre: string };
-}
-
-interface UnidadMedidaCatalogo {
-  id: string;
-  codigo: string;
-  nombre: string;
-  activa: boolean;
-}
-
-interface UnidadConversionDetalle {
-  unidadMedidaId: string;
-  factorConversion: string;
-  unidadMedida: { id: string; codigo: string; nombre: string };
-}
-
-interface ProductoDetalle extends Producto {
-  componentes: ComponenteComboDetalle[];
-  imagen: string | null;
-  imagenAjuste: AjusteImagen;
-  descripcionTienda: string | null;
-  imagenesAdicionales: { imagen: string }[];
-  unidadMedidaBaseId: string | null;
-  unidadesConversion: UnidadConversionDetalle[];
-}
+export type { Producto, TipoProducto };
 
 interface Precio {
   id: string;
@@ -87,98 +33,19 @@ interface Precio {
   precioVenta: string;
 }
 
-interface ProductoFormValues {
-  codigo: string;
-  nombre: string;
-  categoriaId: string;
-  unidadMedida: string;
-  unidadMedidaBaseId: string;
-  porcentajeItbis: string;
-  leyFiscalId: string;
-  tipo: TipoProducto;
-  imagen: string | null;
-  imagenAjuste: AjusteImagen;
-  descripcionTienda: string;
-  imagenesAdicionales: string[];
-  controlaVencimiento: boolean;
-  precioVariable: boolean;
-  esIngrediente: boolean;
-  permiteDevolucion: boolean;
-  porcentajeComision: string;
-  montoComisionFijo: string;
-  destacado: boolean;
-}
-
-/** Plan de integración Cuadre, ítem E-8 — lista cerrada (antes texto libre sin validar), igual orden que UNIDADES_MEDIDA en el backend. */
-const UNIDADES_MEDIDA: { value: string; label: string }[] = [
-  { value: 'UND', label: 'Unidad' },
-  { value: 'KILOGRAMO', label: 'Kilogramo' },
-  { value: 'GRAMO', label: 'Gramo' },
-  { value: 'LIBRA', label: 'Libra' },
-  { value: 'ONZA', label: 'Onza' },
-  { value: 'LITRO', label: 'Litro' },
-  { value: 'MILILITRO', label: 'Mililitro' },
-  { value: 'GALON', label: 'Galón' },
-  { value: 'PORCION', label: 'Porción' },
-  { value: 'DOCENA', label: 'Docena' },
-];
-
-interface ComponenteComboForm {
-  productoId: string;
-  cantidad: string;
-}
-
-interface UnidadConversionForm {
-  unidadMedidaId: string;
-  factorConversion: string;
-}
-
-const PRODUCTO_VACIO: ProductoFormValues = {
-  codigo: '',
-  nombre: '',
-  categoriaId: '',
-  unidadMedida: 'UND',
-  unidadMedidaBaseId: '',
-  porcentajeItbis: '18',
-  leyFiscalId: '',
-  tipo: 'PRODUCTO',
-  imagen: null,
-  imagenAjuste: 'COVER',
-  descripcionTienda: '',
-  imagenesAdicionales: [],
-  controlaVencimiento: false,
-  precioVariable: false,
-  esIngrediente: false,
-  permiteDevolucion: true,
-  porcentajeComision: '',
-  montoComisionFijo: '',
-  destacado: false,
-};
-
 const ETIQUETA_TIPO: Record<TipoProducto, string> = { PRODUCTO: 'Producto', SERVICIO: 'Servicio', COMBO: 'Combo' };
 const TONO_TIPO: Record<TipoProducto, 'neutro' | 'exito'> = { PRODUCTO: 'neutro', SERVICIO: 'exito', COMBO: 'exito' };
 
 export function Productos() {
-  const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   const [busqueda, setBusqueda] = useState('');
   const [categoriaId, setCategoriaId] = useState('');
   const [pagina, setPagina] = useState(1);
   const busquedaDebounced = useDebouncedValue(busqueda);
-  const [productoEditando, setProductoEditando] = useState<Producto | null>(null);
-  const [modalProductoAbierto, setModalProductoAbierto] = useState(false);
   const [productoPrecio, setProductoPrecio] = useState<Producto | null>(null);
   const [modalImportarAbierto, setModalImportarAbierto] = useState(false);
   const [exportando, setExportando] = useState(false);
   const queryClient = useQueryClient();
-
-  useEffect(() => {
-    if (searchParams.get('crear') === '1') {
-      setProductoEditando(null);
-      setModalProductoAbierto(true);
-      setSearchParams({}, { replace: true });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const { data } = useQuery({
     queryKey: ['productos', pagina, busquedaDebounced, categoriaId],
@@ -189,21 +56,6 @@ export function Productos() {
         })
       ).data,
   });
-
-  function abrirNuevo() {
-    setProductoEditando(null);
-    setModalProductoAbierto(true);
-  }
-
-  function abrirEditar(p: Producto) {
-    setProductoEditando(p);
-    setModalProductoAbierto(true);
-  }
-
-  function cerrarModalProducto() {
-    setModalProductoAbierto(false);
-    setProductoEditando(null);
-  }
 
   async function exportarExcel() {
     setExportando(true);
@@ -229,7 +81,7 @@ export function Productos() {
           <Button variante="secundario" onClick={() => setModalImportarAbierto(true)}>
             Importar Excel
           </Button>
-          <Button onClick={abrirNuevo}>Nuevo producto</Button>
+          <Button onClick={() => navigate('/productos/nuevo')}>Nuevo producto</Button>
         </div>
       </div>
 
@@ -266,7 +118,7 @@ export function Productos() {
                 titulo="Todavía no hay productos"
                 descripcion="Creá el primero para poder facturarlo o comprarlo."
                 etiquetaAccion="Nuevo producto"
-                onAccion={abrirNuevo}
+                onAccion={() => navigate('/productos/nuevo')}
               />
             </div>
           ) : (
@@ -301,8 +153,9 @@ export function Productos() {
                       <td className="px-5 py-3 text-right">
                         <RowActionsMenu
                           acciones={[
+                            { etiqueta: 'Ver', onClick: () => navigate(`/productos/${producto.id}`) },
+                            { etiqueta: 'Editar', onClick: () => navigate(`/productos/${producto.id}/editar`) },
                             { etiqueta: 'Cambiar precio', onClick: () => setProductoPrecio(producto) },
-                            { etiqueta: 'Editar', onClick: () => abrirEditar(producto) },
                           ]}
                         />
                       </td>
@@ -320,11 +173,6 @@ export function Productos() {
         </Card>
       </RequierePermiso>
 
-      {modalProductoAbierto && (
-        <Modal titulo={productoEditando ? 'Editar producto' : 'Nuevo producto'} onClose={cerrarModalProducto} ancho="xl">
-          <FormularioProducto producto={productoEditando} onGuardado={cerrarModalProducto} />
-        </Modal>
-      )}
       {productoPrecio && <ModalCambiarPrecio producto={productoPrecio} onClose={() => setProductoPrecio(null)} />}
       {modalImportarAbierto && (
         <Modal titulo="Importar productos" ancho="xl" onClose={() => setModalImportarAbierto(false)}>
@@ -358,628 +206,6 @@ function PrecioVigente({ productoId }: { productoId: string }) {
   if (varias) return <span className="text-xs text-slate-400">Varias variantes</span>;
   if (!data) return <span className="text-slate-400">—</span>;
   return <span>RD$ {Number(data.precioVenta).toLocaleString('es-DO')}</span>;
-}
-
-function FormularioProducto({ producto, onGuardado }: { producto: Producto | null; onGuardado: () => void }) {
-  const queryClient = useQueryClient();
-  const [valores, setValores] = useState<ProductoFormValues>(
-    producto
-      ? {
-          codigo: producto.codigo,
-          nombre: producto.nombre,
-          categoriaId: producto.categoriaId ?? '',
-          unidadMedida: producto.unidadMedida,
-          unidadMedidaBaseId: '',
-          porcentajeItbis: producto.porcentajeItbis,
-          leyFiscalId: producto.leyFiscalId ?? '',
-          tipo: producto.tipo,
-          imagen: null,
-          imagenAjuste: 'COVER',
-          descripcionTienda: '',
-          imagenesAdicionales: [],
-          controlaVencimiento: producto.controlaVencimiento,
-          precioVariable: producto.precioVariable,
-          esIngrediente: producto.esIngrediente,
-          permiteDevolucion: producto.permiteDevolucion,
-          porcentajeComision: producto.porcentajeComision ?? '',
-          montoComisionFijo: producto.montoComisionFijo ?? '',
-          destacado: producto.destacado,
-        }
-      : PRODUCTO_VACIO,
-  );
-  const [componentes, setComponentes] = useState<ComponenteComboForm[]>([]);
-  const [conversiones, setConversiones] = useState<UnidadConversionForm[]>([]);
-  // Oculto por default a propósito — antes se mostraba siempre junto a
-  // "Unidad de medida" (el campo de texto libre/lista cerrada de siempre),
-  // dos selectores de "unidad" apilados y ambos en "Unidad" por default
-  // confundían (reportado por el usuario). Mostrarlo solo cuando el
-  // producto ya tiene unidadMedidaBaseId, o cuando el usuario lo activa a mano.
-  const [usaConversionUnidades, setUsaConversionUnidades] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const { tienePermiso } = useAuth();
-  const [candidatosIa, setCandidatosIa] = useState<{ nombre: string; descripcion: string }[] | null>(null);
-  const [errorIa, setErrorIa] = useState<string | null>(null);
-  const [detalleIa, setDetalleIa] = useState('');
-  // 15+ campos repartidos en secciones bien distintas — antes todo apilado en un modal `lg` sin ancho de sobra.
-  const [pestana, setPestana] = useState<'general' | 'tienda' | 'ventas'>('general');
-
-  // Editar un producto existente: la lista (GET /productos) no trae ni la
-  // imagen ni (si es combo) los componentes — hay que pedir el detalle
-  // completo para precargarlos.
-  useEffect(() => {
-    if (!producto) return;
-    apiClient.get<ProductoDetalle>(`/productos/${producto.id}`).then(({ data }) => {
-      setValores((v) => ({
-        ...v,
-        imagen: data.imagen,
-        imagenAjuste: data.imagenAjuste,
-        descripcionTienda: data.descripcionTienda ?? '',
-        imagenesAdicionales: data.imagenesAdicionales.map((i) => i.imagen),
-      }));
-      if (data.tipo === 'COMBO') {
-        setComponentes(data.componentes.map((c) => ({ productoId: c.componente.id, cantidad: c.cantidad })));
-      }
-      setValores((v) => ({ ...v, unidadMedidaBaseId: data.unidadMedidaBaseId ?? '' }));
-      setConversiones(data.unidadesConversion.map((u) => ({ unidadMedidaId: u.unidadMedidaId, factorConversion: u.factorConversion })));
-      setUsaConversionUnidades(!!data.unidadMedidaBaseId);
-    });
-  }, [producto]);
-
-  const { data: unidadesMedida } = useQuery({
-    queryKey: ['unidades-medida-activas'],
-    queryFn: async () => (await apiClient.get<UnidadMedidaCatalogo[]>('/unidades-medida', { params: { activa: 'true' } })).data,
-  });
-  // Una unidad de conversión no puede ser la misma que la unidad base elegida.
-  const opcionesConversion = (unidadesMedida ?? []).filter((u) => u.id !== valores.unidadMedidaBaseId);
-
-  function actualizarConversion(i: number, cambios: Partial<UnidadConversionForm>) {
-    setConversiones((prev) => prev.map((c, idx) => (idx === i ? { ...c, ...cambios } : c)));
-  }
-
-  const { data: productosDisponibles } = useQuery({
-    queryKey: ['productos-select-combo'],
-    queryFn: async () => (await apiClient.get<PaginaResultado<Producto>>('/productos', { params: { tamanoPagina: 200 } })).data.datos,
-    enabled: valores.tipo === 'COMBO',
-  });
-  // Un combo no puede componerse de otro combo ni de sí mismo.
-  const opcionesComponente = (productosDisponibles ?? []).filter((p) => p.tipo !== 'COMBO' && p.id !== producto?.id);
-
-  function actualizarComponente(i: number, cambios: Partial<ComponenteComboForm>) {
-    setComponentes((prev) => prev.map((c, idx) => (idx === i ? { ...c, ...cambios } : c)));
-  }
-
-  function payload() {
-    return {
-      codigo: valores.codigo,
-      nombre: valores.nombre,
-      categoriaId: valores.categoriaId || null,
-      unidadMedida: valores.unidadMedida || undefined,
-      unidadMedidaBaseId: valores.unidadMedidaBaseId || null,
-      unidadesConversion: valores.unidadMedidaBaseId
-        ? conversiones.filter((c) => c.unidadMedidaId).map((c) => ({ unidadMedidaId: c.unidadMedidaId, factorConversion: Number(c.factorConversion) || 1 }))
-        : [],
-      porcentajeItbis: valores.porcentajeItbis ? Number(valores.porcentajeItbis) : undefined,
-      leyFiscalId: valores.leyFiscalId || null,
-      tipo: valores.tipo,
-      imagen: valores.imagen,
-      imagenAjuste: valores.imagenAjuste,
-      descripcionTienda: valores.descripcionTienda || null,
-      imagenesAdicionales: valores.imagenesAdicionales.map((imagen) => ({ imagen })),
-      controlaVencimiento: valores.tipo === 'PRODUCTO' ? valores.controlaVencimiento : false,
-      precioVariable: valores.precioVariable,
-      esIngrediente: valores.esIngrediente,
-      permiteDevolucion: valores.permiteDevolucion,
-      porcentajeComision: valores.porcentajeComision ? Number(valores.porcentajeComision) : null,
-      montoComisionFijo: valores.montoComisionFijo ? Number(valores.montoComisionFijo) : null,
-      destacado: valores.destacado,
-      componentes:
-        valores.tipo === 'COMBO'
-          ? componentes.filter((c) => c.productoId).map((c) => ({ productoId: c.productoId, cantidad: Number(c.cantidad) || 1 }))
-          : undefined,
-    };
-  }
-
-  const guardar = useMutation({
-    mutationFn: async () =>
-      producto ? apiClient.patch(`/productos/${producto.id}`, payload()) : apiClient.post('/productos', payload()),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['productos'] });
-      onGuardado();
-    },
-    onError: (err) =>
-      setError(
-        mensajeErrorApi(
-          err,
-          'No se pudo guardar el producto. Revisa los datos (un combo necesita al menos un componente, y no puede incluirse a sí mismo ni a otro combo).',
-        ),
-      ),
-  });
-
-  // Adicional opt-in (permiso productos.ia_generar) — analiza la foto ya
-  // cargada y sugiere 3 opciones de nombre/descripción; el admin elige
-  // cuál usar, nunca se aplica sola (ver modal más abajo).
-  const analizarConIa = useMutation({
-    mutationFn: async () =>
-      (
-        await apiClient.post<{ opciones: { nombre: string; descripcion: string }[] }>('/productos/analizar-imagen', {
-          imagen: valores.imagen,
-          detalle: detalleIa.trim() || undefined,
-        })
-      ).data,
-    onSuccess: (data) => {
-      setCandidatosIa(data.opciones);
-      queryClient.invalidateQueries({ queryKey: ['ia-uso-mensual'] });
-    },
-    onError: (err) => setErrorIa(mensajeErrorApi(err, 'No se pudo generar con IA — probá de nuevo.')),
-  });
-
-  // Auditoría de integraciones (2026-09), H-4 — "te quedan N de M" antes de
-  // gastar el intento, en vez de enterarse recién al chocar el límite.
-  const { data: usoIa } = useQuery({
-    queryKey: ['ia-uso-mensual'],
-    queryFn: async () => (await apiClient.get<{ imagenProducto: { usados: number; limite: number } }>('/ia/uso-mensual')).data,
-    enabled: tienePermiso('productos.ia_generar'),
-    staleTime: 60 * 1000,
-  });
-
-  function onSubmit(e: FormEvent) {
-    e.preventDefault();
-    setError(null);
-    if (valores.tipo === 'COMBO' && componentes.filter((c) => c.productoId).length === 0) {
-      setError('Un combo necesita al menos un componente.');
-      return;
-    }
-    if (valores.porcentajeComision && valores.montoComisionFijo) {
-      setError('Elegí % de comisión o monto fijo, no ambos.');
-      return;
-    }
-    guardar.mutate();
-  }
-
-  return (
-    <>
-    <form onSubmit={onSubmit} className="space-y-4">
-      <Tabs
-        pestanas={[
-          { id: 'general', etiqueta: 'General' },
-          { id: 'tienda', etiqueta: 'Tienda online' },
-          { id: 'ventas', etiqueta: 'Comisión y combo' },
-        ]}
-        activa={pestana}
-        onCambiar={setPestana}
-      />
-      {pestana === 'tienda' && (
-      <div className="space-y-3">
-      <CampoImagen
-        valor={valores.imagen}
-        onChange={(imagen) => setValores((v) => ({ ...v, imagen }))}
-        ajuste={valores.imagenAjuste}
-        onChangeAjuste={(imagenAjuste) => setValores((v) => ({ ...v, imagenAjuste }))}
-      />
-      {tienePermiso('productos.ia_generar') && valores.imagen && (
-        <div className="flex flex-col gap-1.5">
-          <input
-            type="text"
-            value={detalleIa}
-            onChange={(e) => setDetalleIa(e.target.value)}
-            maxLength={300}
-            placeholder="Detalle breve del producto (opcional) — marca, material, talla, uso… ayuda a la IA a acertar mejor"
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-          />
-          <div className="flex items-center gap-2">
-            <Button
-              type="button"
-              variante="secundario"
-              onClick={() => {
-                setErrorIa(null);
-                analizarConIa.mutate();
-              }}
-              disabled={analizarConIa.isPending || (usoIa ? usoIa.imagenProducto.usados >= usoIa.imagenProducto.limite : false)}
-              className="flex items-center gap-1.5 self-start"
-            >
-              <Sparkles size={14} />
-              {analizarConIa.isPending ? 'Analizando imagen…' : 'Generar con IA'}
-            </Button>
-            {usoIa && (
-              <span className="text-xs text-slate-400">
-                Te quedan {Math.max(0, usoIa.imagenProducto.limite - usoIa.imagenProducto.usados)} de {usoIa.imagenProducto.limite} este mes
-              </span>
-            )}
-          </div>
-          {errorIa && <p className="text-xs text-red-600 dark:text-red-400">{errorIa}</p>}
-        </div>
-      )}
-      <GaleriaImagenes
-        valores={valores.imagenesAdicionales}
-        onChange={(imagenesAdicionales) => setValores((v) => ({ ...v, imagenesAdicionales }))}
-      />
-      <div className="flex flex-col gap-1">
-        <label htmlFor="producto-descripcion-tienda" className="text-sm font-medium text-slate-700 dark:text-slate-300">
-          Descripción para la Tienda Online
-        </label>
-        <textarea
-          id="producto-descripcion-tienda"
-          value={valores.descripcionTienda}
-          onChange={(e) => setValores((v) => ({ ...v, descripcionTienda: e.target.value }))}
-          rows={5}
-          placeholder="Detalle del producto que ve el comprador en el storefront público (opcional)"
-          className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-        />
-      </div>
-      <label className="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-300">
-        <input
-          type="checkbox"
-          checked={valores.destacado}
-          onChange={(e) => setValores((v) => ({ ...v, destacado: e.target.checked }))}
-          className="h-4 w-4 rounded"
-        />
-        Destacar en la Tienda Online
-      </label>
-      </div>
-      )}
-
-      {pestana === 'general' && (
-      <div className="space-y-3">
-      <div className="flex flex-col gap-1">
-        <label htmlFor="producto-tipo" className="text-sm font-medium text-slate-700 dark:text-slate-300">
-          Tipo
-        </label>
-        <Select
-          id="producto-tipo"
-          value={valores.tipo}
-          onChange={(e) => setValores((v) => ({ ...v, tipo: e.target.value as TipoProducto }))}
-        >
-          <option value="PRODUCTO">Producto (mueve inventario)</option>
-          <option value="SERVICIO">Servicio (no mueve inventario)</option>
-          <option value="COMBO">Combo (bundle de otros productos)</option>
-        </Select>
-      </div>
-      <div className="flex items-end gap-2">
-        <div className="flex-1">
-          <FormField
-            id="producto-codigo"
-            label="Código"
-            value={valores.codigo}
-            onChange={(e) => setValores((v) => ({ ...v, codigo: e.target.value }))}
-            required
-          />
-        </div>
-        <Button
-          type="button"
-          variante="secundario"
-          onClick={async () => {
-            const { data } = await apiClient.post<{ valor: string }>('/admin/correlativos/PRODUCTO/siguiente');
-            setValores((v) => ({ ...v, codigo: data.valor }));
-          }}
-        >
-          Asignar
-        </Button>
-      </div>
-      <FormField
-        id="producto-nombre"
-        label="Nombre"
-        value={valores.nombre}
-        onChange={(e) => setValores((v) => ({ ...v, nombre: e.target.value }))}
-        required
-      />
-      <div className="flex flex-col gap-1">
-        <label htmlFor="producto-categoria" className="text-sm font-medium text-slate-700 dark:text-slate-300">
-          Categoría
-        </label>
-        <SelectCategoria
-          id="producto-categoria"
-          value={valores.categoriaId}
-          onChange={(id) => setValores((v) => ({ ...v, categoriaId: id }))}
-        />
-      </div>
-      <div className="flex flex-col gap-1">
-        <label htmlFor="producto-unidad" className="text-sm font-medium text-slate-700 dark:text-slate-300">
-          Unidad de medida
-        </label>
-        <Select
-          id="producto-unidad"
-          value={valores.unidadMedida}
-          onChange={(e) => setValores((v) => ({ ...v, unidadMedida: e.target.value }))}
-        >
-          {UNIDADES_MEDIDA.map((u) => (
-            <option key={u.value} value={u.value}>
-              {u.label}
-            </option>
-          ))}
-        </Select>
-      </div>
-
-      <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
-        <input
-          type="checkbox"
-          checked={usaConversionUnidades}
-          onChange={(e) => {
-            const activar = e.target.checked;
-            setUsaConversionUnidades(activar);
-            if (!activar) {
-              // Apagar el toggle limpia la selección — si quedara un
-              // unidadMedidaBaseId colgado pero oculto, guardar el
-              // producto lo mandaría igual sin que se vea en el formulario.
-              setValores((v) => ({ ...v, unidadMedidaBaseId: '' }));
-              setConversiones([]);
-            }
-          }}
-        />
-        Este producto se compra o vende en más de una unidad (ej. por Caja además de por Unidad)
-      </label>
-
-      {usaConversionUnidades && (
-      <div className="space-y-2 rounded-md border border-slate-200 p-3 dark:border-slate-800">
-        <div className="flex flex-col gap-1">
-          <label htmlFor="producto-unidad-base" className="text-sm font-medium text-slate-700 dark:text-slate-300">
-            Unidad base
-          </label>
-          <Select
-            id="producto-unidad-base"
-            value={valores.unidadMedidaBaseId}
-            onChange={(e) => setValores((v) => ({ ...v, unidadMedidaBaseId: e.target.value }))}
-          >
-            <option value="">Elegir…</option>
-            {(unidadesMedida ?? []).map((u) => (
-              <option key={u.id} value={u.id}>
-                {u.nombre}
-              </option>
-            ))}
-          </Select>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
-            Es la unidad en la que vive el stock de este producto (distinta del campo "Unidad de medida" de arriba,
-            que es solo texto informativo). Las unidades de conversión de abajo son alternativas para comprar/vender
-            este producto — ej. "Caja" = 144 unidades de esta base.
-          </p>
-        </div>
-
-        {valores.unidadMedidaBaseId && (
-          <div className="space-y-2">
-            <p className="text-sm font-medium text-slate-700 dark:text-slate-300">
-              Unidades de conversión (ej. "Caja" = 144 unidades de la base)
-            </p>
-            {conversiones.map((conversion, i) => (
-              <div key={i} className="flex flex-wrap items-center gap-2">
-                <Select
-                  value={conversion.unidadMedidaId}
-                  onChange={(e) => actualizarConversion(i, { unidadMedidaId: e.target.value })}
-                  required
-                  className="min-w-[160px] flex-1"
-                >
-                  <option value="">Unidad…</option>
-                  {opcionesConversion.map((u) => (
-                    <option key={u.id} value={u.id}>
-                      {u.nombre}
-                    </option>
-                  ))}
-                </Select>
-                <span className="text-xs text-slate-500 dark:text-slate-400">=</span>
-                <input
-                  type="number"
-                  min={0.0001}
-                  step="0.0001"
-                  placeholder="Factor"
-                  value={conversion.factorConversion}
-                  onChange={(e) => actualizarConversion(i, { factorConversion: e.target.value })}
-                  className="w-24 rounded-md border border-slate-300 px-2 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-                />
-                <span className="text-xs text-slate-500 dark:text-slate-400">unidades base</span>
-                <button
-                  type="button"
-                  onClick={() => setConversiones((prev) => prev.filter((_, idx) => idx !== i))}
-                  className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
-                  aria-label="Quitar unidad de conversión"
-                >
-                  ×
-                </button>
-              </div>
-            ))}
-            <button
-              type="button"
-              onClick={() => setConversiones((prev) => [...prev, { unidadMedidaId: '', factorConversion: '1' }])}
-              className="text-sm font-medium text-sol-600 hover:text-sol-700 dark:text-sol-400"
-            >
-              + Agregar unidad de conversión
-            </button>
-          </div>
-        )}
-      </div>
-      )}
-
-      <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
-        <input
-          type="checkbox"
-          checked={valores.porcentajeItbis === '0'}
-          onChange={(e) => setValores((v) => ({ ...v, porcentajeItbis: e.target.checked ? '0' : '18' }))}
-        />
-        Exento de impuesto (ITBIS)
-      </label>
-      {valores.porcentajeItbis === '0' ? (
-        <p className="-mt-2 text-xs text-slate-500 dark:text-slate-400">
-          Este producto no lleva ITBIS — el precio que le asignes es exactamente lo que paga el cliente, sin ningún cargo adicional.
-        </p>
-      ) : (
-        <FormField
-          id="producto-itbis"
-          label="ITBIS %"
-          type="number"
-          min={0}
-          max={100}
-          value={valores.porcentajeItbis}
-          onChange={(e) => setValores((v) => ({ ...v, porcentajeItbis: e.target.value }))}
-        />
-      )}
-      <div className="flex flex-col gap-1">
-        <label htmlFor="producto-ley-fiscal" className="text-sm font-medium text-slate-700 dark:text-slate-300">
-          Ley fiscal (opcional, plan de integración Cuadre, ítem B-3)
-        </label>
-        <SelectLeyFiscal
-          id="producto-ley-fiscal"
-          value={valores.leyFiscalId}
-          onChange={(id) => setValores((v) => ({ ...v, leyFiscalId: id }))}
-        />
-      </div>
-
-      {valores.tipo === 'PRODUCTO' && (
-        <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
-          <input
-            type="checkbox"
-            checked={valores.controlaVencimiento}
-            onChange={(e) => setValores((v) => ({ ...v, controlaVencimiento: e.target.checked }))}
-          />
-          Controla vencimiento (lotes con fecha de vencimiento, consumo FEFO en ventas)
-        </label>
-      )}
-
-      <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
-        <input
-          type="checkbox"
-          checked={valores.precioVariable}
-          onChange={(e) => setValores((v) => ({ ...v, precioVariable: e.target.checked }))}
-        />
-        Precio variable (habilita un precio editable por línea en el carrito del POS)
-      </label>
-      <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
-        <input
-          type="checkbox"
-          checked={valores.esIngrediente}
-          onChange={(e) => setValores((v) => ({ ...v, esIngrediente: e.target.checked }))}
-        />
-        Es ingrediente (informativo)
-      </label>
-      <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
-        <input
-          type="checkbox"
-          checked={valores.permiteDevolucion}
-          onChange={(e) => setValores((v) => ({ ...v, permiteDevolucion: e.target.checked }))}
-        />
-        Permite devolución (Nota de Crédito)
-      </label>
-      </div>
-      )}
-
-      {pestana === 'ventas' && (
-      <div className="space-y-3">
-      <div className="space-y-2 rounded-md border border-slate-200 p-3 dark:border-slate-800">
-        <p className="text-sm font-medium text-slate-700 dark:text-slate-300">
-          Comisión de venta (ítem A-1) — elegí % o monto fijo, no ambos
-        </p>
-        <div className="grid grid-cols-2 gap-2">
-          <FormField
-            id="producto-comision-pct"
-            label="% de comisión"
-            type="number"
-            min={0}
-            max={100}
-            step="0.01"
-            value={valores.porcentajeComision}
-            onChange={(e) => setValores((v) => ({ ...v, porcentajeComision: e.target.value, montoComisionFijo: e.target.value ? '' : v.montoComisionFijo }))}
-          />
-          <FormField
-            id="producto-comision-fija"
-            label="Monto fijo (RD$)"
-            type="number"
-            min={0}
-            step="0.01"
-            value={valores.montoComisionFijo}
-            onChange={(e) => setValores((v) => ({ ...v, montoComisionFijo: e.target.value, porcentajeComision: e.target.value ? '' : v.porcentajeComision }))}
-          />
-        </div>
-      </div>
-
-      {valores.tipo === 'COMBO' && (
-        <div className="space-y-2 rounded-md border border-slate-200 p-3 dark:border-slate-800">
-          <p className="text-sm font-medium text-slate-700 dark:text-slate-300">
-            Componentes (se descuentan del inventario al facturar el combo)
-          </p>
-          {componentes.map((componente, i) => (
-            <div key={i} className="flex flex-wrap gap-2">
-              <Select
-                value={componente.productoId}
-                onChange={(e) => actualizarComponente(i, { productoId: e.target.value })}
-                required
-                className="min-w-[160px] flex-1"
-              >
-                <option value="">Producto…</option>
-                {opcionesComponente.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.codigo} — {p.nombre} {p.tipo === 'SERVICIO' ? '(servicio)' : ''}
-                  </option>
-                ))}
-              </Select>
-              <input
-                type="number"
-                min={1}
-                step="0.01"
-                placeholder="Cant."
-                value={componente.cantidad}
-                onChange={(e) => actualizarComponente(i, { cantidad: e.target.value })}
-                className="w-20 rounded-md border border-slate-300 px-2 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-              />
-              <button
-                type="button"
-                onClick={() => setComponentes((prev) => prev.filter((_, idx) => idx !== i))}
-                className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
-                aria-label="Quitar componente"
-              >
-                ×
-              </button>
-            </div>
-          ))}
-          <button
-            type="button"
-            onClick={() => setComponentes((prev) => [...prev, { productoId: '', cantidad: '1' }])}
-            className="text-sm font-medium text-sol-600 hover:text-sol-700 dark:text-sol-400"
-          >
-            + Agregar componente
-          </button>
-        </div>
-      )}
-
-      {valores.tipo === 'PRODUCTO' && producto && (
-        <VariantesProductoPanel productoId={producto.id} nombreProducto={producto.nombre} />
-      )}
-      {valores.tipo === 'PRODUCTO' && !producto && (
-        <p className="text-xs text-slate-400">Guardá el producto primero para poder armarle variantes (Talla, Color, etc.).</p>
-      )}
-      </div>
-      )}
-
-      {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
-      <Button type="submit" disabled={guardar.isPending} className="w-full">
-        {guardar.isPending ? 'Guardando…' : 'Guardar'}
-      </Button>
-    </form>
-
-    {candidatosIa && (
-      <Modal titulo="Elegí la opción que mejor describa el producto" onClose={() => setCandidatosIa(null)}>
-        <div className="space-y-3">
-          {candidatosIa.map((candidato, i) => (
-            <button
-              key={i}
-              type="button"
-              onClick={() => {
-                setValores((v) => ({ ...v, nombre: candidato.nombre, descripcionTienda: candidato.descripcion }));
-                setCandidatosIa(null);
-              }}
-              className="w-full rounded-lg border border-slate-200 p-3 text-left hover:border-sol-500 hover:bg-sol-50 dark:border-slate-700 dark:hover:bg-sol-900/30"
-            >
-              <p className="font-medium text-slate-900 dark:text-slate-100">{candidato.nombre}</p>
-              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{candidato.descripcion}</p>
-            </button>
-          ))}
-          <button
-            type="button"
-            onClick={() => setCandidatosIa(null)}
-            className="w-full text-center text-sm text-slate-500 hover:underline dark:text-slate-400"
-          >
-            Ninguna de estas — cancelar
-          </button>
-        </div>
-      </Modal>
-    )}
-    </>
-  );
 }
 
 /**

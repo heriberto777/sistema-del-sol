@@ -10,11 +10,9 @@ interface Opcion {
 
 const OPCIONES: Opcion[] = [
   { etiqueta: 'Nueva factura', ruta: '/facturacion/nueva', permiso: 'facturacion.crear' },
-  { etiqueta: 'Nuevo cliente', ruta: '/clientes?crear=cliente', permiso: 'clientes.crear' },
-  { etiqueta: 'Nuevo proveedor', ruta: '/proveedores?crear=proveedor', permiso: 'compras.crear' },
-  { etiqueta: 'Nuevo producto', ruta: '/productos?crear=1', permiso: 'precios.editar' },
-  { etiqueta: 'Nueva orden de compra', ruta: '/compras?crear=1', permiso: 'compras.crear' },
-  { etiqueta: 'Nueva bodega', ruta: '/inventario?crear=1', permiso: 'admin.configuracion' },
+  { etiqueta: 'Nuevo producto', ruta: '/productos/nuevo', permiso: 'precios.editar' },
+  { etiqueta: 'Nueva orden de compra', ruta: '/compras/nueva', permiso: 'compras.crear' },
+  { etiqueta: 'Nueva bodega', ruta: '/inventario/stock?crear=1', permiso: 'admin.configuracion' },
 ];
 
 /**
@@ -31,7 +29,16 @@ export function GlobalCrearMenu() {
   const [abierto, setAbierto] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
-  const opcionesVisibles = OPCIONES.filter((o) => tienePermiso(o.permiso));
+  // "Nuevo contacto" (benchmark 2026-11-09, Fase 2) reemplaza las antiguas
+  // entradas separadas "Nuevo cliente"/"Nuevo proveedor" — un permiso OR
+  // porque puede crear cualquiera de los dos según los checkboxes del
+  // formulario unificado (ver FormularioContacto).
+  const opcionesVisibles = [
+    ...(tienePermiso('clientes.crear') || tienePermiso('compras.crear')
+      ? [{ etiqueta: 'Nuevo contacto', ruta: '/clientes/nuevo', permiso: '' }]
+      : []),
+    ...OPCIONES.filter((o) => tienePermiso(o.permiso)),
+  ];
 
   useEffect(() => {
     function onClickFuera(e: MouseEvent) {

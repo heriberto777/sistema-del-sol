@@ -3,6 +3,7 @@ import { apiClient } from '../../../lib/api-client';
 import { PaginaResultado } from '../../../types/pagina-resultado';
 import { Select } from '../../atoms/Select/Select';
 import { ComboboxBusqueda } from '../ComboboxBusqueda/ComboboxBusqueda';
+import { ModalCrearProductoRapido } from '../ModalCrearProductoRapido/ModalCrearProductoRapido';
 import { useVariantesProducto, etiquetaVariante } from '../../../hooks/useVariantesProducto';
 import type { OfertaVisibleProducto } from '../../../lib/formatear-oferta';
 
@@ -63,6 +64,7 @@ export function SelectorLineaProducto({ productos, productoId, varianteId, onCha
   const [productoElegido, setProductoElegido] = useState<ProductoOpcion | null>(
     () => productos.find((p) => p.id === productoId) ?? null,
   );
+  const [modalCrearAbierto, setModalCrearAbierto] = useState(false);
 
   // Mantiene `productoElegido` en sincronía si `productoId` cambia desde
   // afuera (ej. al cargar una línea ya existente al editar, o si React
@@ -103,7 +105,19 @@ export function SelectorLineaProducto({ productos, productoId, varianteId, onCha
           (await apiClient.get<PaginaResultado<ProductoOpcion>>('/productos', { params: { busqueda: texto, tamanoPagina: 10 } })).data
             .datos
         }
+        onCrearNuevo={() => setModalCrearAbierto(true)}
+        etiquetaCrearNuevo="Crear nuevo producto o servicio"
       />
+      {modalCrearAbierto && (
+        <ModalCrearProductoRapido
+          onClose={() => setModalCrearAbierto(false)}
+          onCreado={(producto) => {
+            setModalCrearAbierto(false);
+            setProductoElegido(producto);
+            onChange(producto.id, '', undefined, producto.porcentajeItbis);
+          }}
+        />
+      )}
       {variantes && variantes.length > 1 && (
         <Select value={varianteId} onChange={(e) => onChange(productoId, e.target.value)} required className="mt-1.5">
           <option value="">Variante…</option>

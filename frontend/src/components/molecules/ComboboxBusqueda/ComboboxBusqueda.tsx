@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { List } from 'lucide-react';
+import { List, Plus } from 'lucide-react';
 import { useDebouncedValue } from '../../../hooks/useDebouncedValue';
 import { Modal } from '../Modal/Modal';
 
@@ -20,6 +20,15 @@ interface ComboboxBusquedaProps<T> {
    * placeholder no alcanza para identificar qué se está por elegir.
    */
   tituloExplorar?: string;
+  /**
+   * Benchmark 2026-11-09 (Fase 7.4) — si se pasa, agrega "+ {etiquetaCrearNuevo}"
+   * como primera fila del desplegable Y del modal "Explorar" (mismo lugar
+   * donde Alegra lo pone), sin importar el texto buscado. Quien use este
+   * componente decide qué hacer al tocarlo (típicamente abrir un modal corto
+   * de alta rápida) — este componente no sabe nada de Cliente/Producto.
+   */
+  onCrearNuevo?: () => void;
+  etiquetaCrearNuevo?: string;
 }
 
 /**
@@ -47,6 +56,8 @@ export function ComboboxBusqueda<T>({
   placeholder,
   icono,
   tituloExplorar,
+  onCrearNuevo,
+  etiquetaCrearNuevo,
 }: ComboboxBusquedaProps<T>) {
   const [texto, setTexto] = useState('');
   const [abierto, setAbierto] = useState(false);
@@ -232,6 +243,20 @@ export function ComboboxBusqueda<T>({
             style={{ position: 'fixed', top: posicion.top + 4, left: posicion.left, width: posicion.width }}
             className="z-50 max-h-56 overflow-auto rounded-md border border-slate-200 bg-white py-1 shadow-lg dark:border-slate-800 dark:bg-slate-900"
           >
+            {onCrearNuevo && (
+              <button
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => {
+                  setAbierto(false);
+                  setTexto('');
+                  onCrearNuevo();
+                }}
+                className="flex w-full items-center gap-1.5 border-b border-slate-100 px-3 py-2 text-left text-sm font-medium text-sol-600 hover:bg-sol-50 dark:border-slate-800 dark:text-sol-400 dark:hover:bg-sol-900/20"
+              >
+                <Plus size={14} /> {etiquetaCrearNuevo ?? 'Crear nuevo'}
+              </button>
+            )}
             {cargando && <p className="px-3 py-2 text-sm text-slate-400">Buscando…</p>}
             {!cargando && opciones.length === 0 && <p className="px-3 py-2 text-sm text-slate-400">Sin resultados</p>}
             {!cargando &&
@@ -266,6 +291,18 @@ export function ComboboxBusqueda<T>({
               className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
             />
             <div className="max-h-[24rem] overflow-y-auto rounded-md border border-slate-200 dark:border-slate-800">
+              {onCrearNuevo && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setModalAbierto(false);
+                    onCrearNuevo();
+                  }}
+                  className="flex w-full items-center gap-1.5 border-b border-slate-100 px-3 py-2.5 text-left text-sm font-medium text-sol-600 hover:bg-sol-50 dark:border-slate-800 dark:text-sol-400 dark:hover:bg-sol-900/20"
+                >
+                  <Plus size={14} /> {etiquetaCrearNuevo ?? 'Crear nuevo'}
+                </button>
+              )}
               {cargandoModal && <p className="px-3 py-3 text-sm text-slate-400">Buscando…</p>}
               {!cargandoModal && opcionesModal.length === 0 && (
                 <p className="px-3 py-3 text-sm text-slate-400">Sin resultados.</p>

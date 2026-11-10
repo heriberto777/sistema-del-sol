@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../lib/api-client';
 import { mensajeErrorApi } from '../lib/mensaje-error-api';
 import { Button } from '../components/atoms/Button/Button';
@@ -14,46 +14,20 @@ import { EstadoVacio } from '../components/molecules/EstadoVacio/EstadoVacio';
 import { RowActionsMenu } from '../components/molecules/RowActionsMenu/RowActionsMenu';
 import { RequierePermiso } from '../components/organisms/RequierePermiso/RequierePermiso';
 import { ModalTimelineCliente } from '../components/organisms/ModalTimelineCliente/ModalTimelineCliente';
-import { FormularioCliente, type Cliente } from '../components/molecules/FormularioCliente/FormularioCliente';
+import type { Cliente } from '../components/molecules/FormularioCliente/FormularioCliente';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { useAuth } from '../hooks/useAuth';
 import { PaginaResultado } from '../types/pagina-resultado';
 import { abrirBlob } from '../lib/descargar-archivo';
 
 export function Clientes() {
-  const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   const [busqueda, setBusqueda] = useState('');
   const [pagina, setPagina] = useState(1);
   const busquedaDebounced = useDebouncedValue(busqueda);
-  const [clienteEditando, setClienteEditando] = useState<Cliente | null>(null);
-  const [modalAbierto, setModalAbierto] = useState(false);
   const [clientePuntos, setClientePuntos] = useState<Cliente | null>(null);
   const [clienteEstadoCuenta, setClienteEstadoCuenta] = useState<Cliente | null>(null);
   const [clienteTimeline, setClienteTimeline] = useState<Cliente | null>(null);
-
-  useEffect(() => {
-    if (searchParams.get('crear') === 'cliente') {
-      setClienteEditando(null);
-      setModalAbierto(true);
-      setSearchParams({}, { replace: true });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  function abrirNuevo() {
-    setClienteEditando(null);
-    setModalAbierto(true);
-  }
-
-  function abrirEditar(c: Cliente) {
-    setClienteEditando(c);
-    setModalAbierto(true);
-  }
-
-  function cerrarModal() {
-    setModalAbierto(false);
-    setClienteEditando(null);
-  }
 
   return (
     <div className="space-y-6">
@@ -62,7 +36,7 @@ export function Clientes() {
           <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Clientes</h1>
           <p className="text-sm text-slate-500 dark:text-slate-400">Clientes a los que facturás.</p>
         </div>
-        <Button onClick={abrirNuevo}>Nuevo cliente</Button>
+        <Button onClick={() => navigate('/clientes/nuevo')}>Nuevo contacto</Button>
       </div>
 
       <RequierePermiso permiso="clientes.ver">
@@ -72,19 +46,15 @@ export function Clientes() {
           pagina={pagina}
           setPagina={setPagina}
           busquedaDebounced={busquedaDebounced}
-          onEditar={abrirEditar}
-          onNuevo={abrirNuevo}
+          onVer={(c) => navigate(`/clientes/${c.id}`)}
+          onEditar={(c) => navigate(`/clientes/${c.id}/editar`)}
+          onNuevo={() => navigate('/clientes/nuevo')}
           onVerPuntos={setClientePuntos}
           onVerEstadoCuenta={setClienteEstadoCuenta}
           onVerTimeline={setClienteTimeline}
         />
       </RequierePermiso>
 
-      {modalAbierto && (
-        <Modal titulo={clienteEditando ? 'Editar cliente' : 'Nuevo cliente'} onClose={cerrarModal} ancho="xl">
-          <FormularioCliente cliente={clienteEditando} onGuardado={cerrarModal} />
-        </Modal>
-      )}
       {clientePuntos && (
         <Modal titulo={`Historial de puntos — ${clientePuntos.nombre}`} onClose={() => setClientePuntos(null)}>
           <HistorialLealtadModal cliente={clientePuntos} />
@@ -355,6 +325,7 @@ interface ListaProps<T> {
   pagina: number;
   setPagina: (v: number) => void;
   busquedaDebounced: string;
+  onVer: (item: T) => void;
   onEditar: (item: T) => void;
   onNuevo: () => void;
 }
@@ -365,6 +336,7 @@ function ListaClientes({
   pagina,
   setPagina,
   busquedaDebounced,
+  onVer,
   onEditar,
   onNuevo,
   onVerPuntos,
@@ -398,7 +370,7 @@ function ListaClientes({
           <EstadoVacio
             titulo="Todavía no hay clientes"
             descripcion="Creá el primero para empezar a facturarle."
-            etiquetaAccion="Nuevo cliente"
+            etiquetaAccion="Nuevo contacto"
             onAccion={onNuevo}
           />
         </>
@@ -441,6 +413,7 @@ function ListaClientes({
                     <td className="px-5 py-3 text-right">
                       <RowActionsMenu
                         acciones={[
+                          { etiqueta: 'Ver', onClick: () => onVer(cliente) },
                           { etiqueta: 'Editar', onClick: () => onEditar(cliente) },
                           { etiqueta: 'Ver historial de puntos', onClick: () => onVerPuntos(cliente) },
                           { etiqueta: 'Estado de cuenta', onClick: () => onVerEstadoCuenta(cliente) },

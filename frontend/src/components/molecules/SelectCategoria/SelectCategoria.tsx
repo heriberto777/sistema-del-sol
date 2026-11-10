@@ -9,10 +9,11 @@ interface SelectCategoriaProps {
   id?: string;
   /** Excluye esta categoría (y no filtra a sus descendientes) — usar al editar, para no poder asignarse a sí misma como padre. */
   excluirId?: string;
+  disabled?: boolean;
 }
 
 /** Select nativo con indentación por nivel — reemplaza el `categoria` de texto libre. El árbol se arma en el cliente a partir del listado plano (ver aplanarArbolCategorias). */
-export function SelectCategoria({ value, onChange, id, excluirId }: SelectCategoriaProps) {
+export function SelectCategoria({ value, onChange, id, excluirId, disabled }: SelectCategoriaProps) {
   const { data: categorias } = useQuery({
     queryKey: ['categorias'],
     queryFn: async () => (await apiClient.get<CategoriaPlana[]>('/categorias')).data,
@@ -21,7 +22,7 @@ export function SelectCategoria({ value, onChange, id, excluirId }: SelectCatego
   const plano = aplanarArbolCategorias((categorias ?? []).filter((c) => c.id !== excluirId));
 
   return (
-    <Select id={id} value={value} onChange={(e) => onChange(e.target.value)}>
+    <Select id={id} value={value} onChange={(e) => onChange(e.target.value)} disabled={disabled}>
       <option value="">Sin categoría</option>
       {plano.map((c) => (
         <option key={c.id} value={c.id}>
