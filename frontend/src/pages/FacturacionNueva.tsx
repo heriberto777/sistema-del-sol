@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useState } from 'react';
-import { User } from 'lucide-react';
+import { Settings, User } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { apiClient } from '../lib/api-client';
 import { mensajeErrorApi } from '../lib/mensaje-error-api';
 import { Button } from '../components/atoms/Button/Button';
@@ -9,7 +9,7 @@ import { Card } from '../components/atoms/Card/Card';
 import { CardColapsable } from '../components/molecules/CardColapsable/CardColapsable';
 import { Select } from '../components/atoms/Select/Select';
 import { ComboboxBusqueda } from '../components/molecules/ComboboxBusqueda/ComboboxBusqueda';
-import { FormField } from '../components/molecules/FormField/FormField';
+import { ModalCrearClienteRapido } from '../components/molecules/ModalCrearClienteRapido/ModalCrearClienteRapido';
 import { PaginaDocumento } from '../components/molecules/PaginaDocumento/PaginaDocumento';
 import { TablaLineasEditable, LineaEditable } from '../components/molecules/TablaLineasEditable/TablaLineasEditable';
 import { SelectorBodega } from '../components/molecules/SelectorBodega/SelectorBodega';
@@ -30,7 +30,7 @@ interface Producto {
   nombre: string;
 }
 
-const LINEA_VACIA: LineaEditable = { productoId: '', varianteId: '', descripcionManual: '', esManual: false, cantidad: '1', precioUnitario: '', aplicaItbis: true };
+const LINEA_VACIA: LineaEditable = { productoId: '', varianteId: '', descripcionManual: '', esManual: false, cantidad: '1', precioUnitario: '', aplicaItbis: true, descuento: '' };
 
 const ETIQUETA_COMPROBANTE: Record<'CONSUMO' | 'CREDITO_FISCAL' | 'REGIMEN_ESPECIAL' | 'GUBERNAMENTAL', string> = {
   CONSUMO: 'Consumo (B02)',
@@ -57,7 +57,7 @@ export function FacturacionNueva() {
   // siempre por el monto exacto de la factura).
   const [montoRecibido, setMontoRecibido] = useState('');
   const [lineas, setLineas] = useState<LineaEditable[]>([LINEA_VACIA]);
-  const [mostrarNuevoCliente, setMostrarNuevoCliente] = useState(false);
+  const [modalCrearClienteAbierto, setModalCrearClienteAbierto] = useState(false);
   const [listaPrecioOverride, setListaPrecioOverride] = useState('');
   const [descuentoGeneralTipo, setDescuentoGeneralTipo] = useState<'' | 'PCT' | 'MONTO'>('');
   const [descuentoGeneralValor, setDescuentoGeneralValor] = useState('');
@@ -82,6 +82,25 @@ export function FacturacionNueva() {
   const { data: listasPrecio } = useListasPrecio();
   const listaPrecioResuelta = cliente?.listaPrecio?.nombre ?? 'GENERAL';
   const requiereComprobanteFiscal = useRequiereComprobanteFiscal();
+
+  // Benchmark 2026-11-09 — encabezado estilo Alegra: emisor + NCF que se
+  // va a usar, visibles ANTES de guardar (antes invisible hasta crear la
+  // factura). `tenant-empresa` ya lo pide TenantEmpresaPanel — cache
+  // compartida, no es una consulta nueva de verdad.
+  const { data: empresa } = useQuery({
+    queryKey: ['tenant-empresa'],
+    queryFn: async () => (await apiClient.get<{ nombre: string; rnc: string | null }>('/admin/empresa')).data,
+  });
+  const { data: ncfPreview } = useQuery({
+    queryKey: ['ncf-preview', comprobanteFiscal, tipoFactura],
+    queryFn: async () =>
+      (
+        await apiClient.get<{ requiereComprobanteFiscal: boolean; ncf: string | null }>('/facturas/ncf-preview', {
+          params: { comprobanteFiscal, tipoFactura },
+        })
+      ).data,
+    enabled: requiereComprobanteFiscal,
+  });
 
   // Comprobante fiscal y opción de pago por defecto del cliente (ítem
   // "separar Comprobante Fiscal de Opción de Pago") — autoseleccionan,
@@ -131,6 +150,10 @@ export function FacturacionNueva() {
                   cantidad: Number(l.cantidad),
                   precioUnitario: Number(l.precioUnitario),
                   aplicaItbis: l.aplicaItbis,
+                  // Si se omite, el backend resuelve solo el descuento automático de
+                  // Ofertas — mandar un valor (aunque sea 0) lo desactiva para esta
+                  // línea, por eso NUNCA se manda '' como 0 (ver TablaLineasEditable).
+                  descuento: l.descuento ? Number(l.descuento) : undefined,
                 }
               : {
                   productoId: l.productoId,
@@ -139,6 +162,7 @@ export function FacturacionNueva() {
                   cantidad: Number(l.cantidad),
                   precioUnitario: l.precioUnitario ? Number(l.precioUnitario) : undefined,
                   aplicaItbis: l.aplicaItbis,
+                  descuento: l.descuento ? Number(l.descuento) : undefined,
                 },
           ),
       }),
@@ -422,6 +446,30 @@ export function FacturacionNueva() {
         </>
       }
     >
+      <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <p className="font-semibold text-slate-900 dark:text-slate-100">{empresa?.nombre ?? 'Mi empresa'}</p>
+          {empresa?.rnc && <p className="text-sm text-slate-500 dark:text-slate-400">RNC: {empresa.rnc}</p>}
+        </div>
+        {requiereComprobanteFiscal && (
+          <div className="flex items-center gap-2">
+            <div className="text-right">
+              <span className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">NCF</span>
+              <p className="font-mono text-sm font-semibold text-slate-900 dark:text-slate-100">{ncfPreview?.ncf ?? '—'}</p>
+            </div>
+            <Link
+              to="/ncf"
+              target="_blank"
+              rel="noreferrer"
+              title="Configurar numeración de NCF"
+              className="text-slate-400 hover:text-sol-600 dark:hover:text-sol-400"
+            >
+              <Settings size={16} />
+            </Link>
+          </div>
+        )}
+      </div>
+
       <form id="form-nueva-factura" onSubmit={onSubmit} className="space-y-4">
         <CardColapsable
           titulo="Información de la factura"
@@ -445,19 +493,15 @@ export function FacturacionNueva() {
               buscar={async (texto) =>
                 (await apiClient.get<PaginaResultado<Cliente>>('/clientes', { params: { busqueda: texto, tamanoPagina: 10 } })).data.datos
               }
+              onCrearNuevo={() => setModalCrearClienteAbierto(true)}
+              etiquetaCrearNuevo="Crear nuevo cliente"
             />
-            <button
-              type="button"
-              onClick={() => setMostrarNuevoCliente((v) => !v)}
-              className="self-start text-xs font-medium text-sol-600 hover:text-sol-700 dark:text-sol-400"
-            >
-              + Nuevo cliente
-            </button>
-            {mostrarNuevoCliente && (
-              <NuevoClienteInline
+            {modalCrearClienteAbierto && (
+              <ModalCrearClienteRapido
+                onClose={() => setModalCrearClienteAbierto(false)}
                 onCreado={(c) => {
+                  setModalCrearClienteAbierto(false);
                   setCliente(c);
-                  setMostrarNuevoCliente(false);
                 }}
               />
             )}
@@ -568,6 +612,7 @@ export function FacturacionNueva() {
             onQuitar={(i) => setLineas((prev) => prev.filter((_, idx) => idx !== i))}
             onAgregar={(vacia) => setLineas((prev) => [...prev, vacia])}
             mostrarItbis
+            mostrarDescuento
           />
         </Card>
       </form>
@@ -575,25 +620,3 @@ export function FacturacionNueva() {
   );
 }
 
-function NuevoClienteInline({ onCreado }: { onCreado: (c: Cliente) => void }) {
-  const [nombre, setNombre] = useState('');
-  const [error, setError] = useState<string | null>(null);
-
-  const crear = useMutation({
-    mutationFn: async () => (await apiClient.post<Cliente>('/clientes', { nombre, tipo: 'PERSONA_FISICA' })).data,
-    onSuccess: (cliente) => onCreado(cliente),
-    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo crear el cliente.')),
-  });
-
-  return (
-    <div className="mt-1 flex items-end gap-2 rounded-md border border-slate-200 p-2 dark:border-slate-800">
-      <div className="flex-1">
-        <FormField id="nuevo-cliente-nombre" label="Nombre del cliente" value={nombre} onChange={(e) => setNombre(e.target.value)} />
-        {error && <p className="text-xs text-red-600 dark:text-red-400">{error}</p>}
-      </div>
-      <Button type="button" variante="secundario" disabled={!nombre || crear.isPending} onClick={() => crear.mutate()}>
-        Crear
-      </Button>
-    </div>
-  );
-}

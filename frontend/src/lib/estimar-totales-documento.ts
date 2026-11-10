@@ -21,6 +21,8 @@ interface LineaParaEstimar {
   itbisReferencia?: string | number | null;
   /** Toggle de ITBIS por línea — solo existe en Facturación; ausente (Cotización) equivale a "sí aplica". */
   aplicaItbis?: boolean;
+  /** Descuento en RD$ de esta línea puntual (ver TablaLineasEditable) — ausente equivale a 0 para esta estimación (el real puede diferir si el backend resuelve un descuento automático de Ofertas, igual que ya advierte el resto de este estimado). */
+  descuento?: string;
 }
 
 /**
@@ -36,15 +38,16 @@ export function estimarLineas(lineas: LineaParaEstimar[]) {
   let itbis = 0;
   for (const l of lineas) {
     const cantidad = Number(l.cantidad) || 0;
+    const descuento = Number(l.descuento) || 0;
     if (l.esManual) {
       if (!l.descripcionManual.trim()) continue;
-      const importe = cantidad * (Number(l.precioUnitario) || 0);
+      const importe = Math.max(0, cantidad * (Number(l.precioUnitario) || 0) - descuento);
       subtotal += importe;
       itbis += importe * ((l.aplicaItbis === false ? 0 : ITBIS_GENERAL_ESTIMADO) / 100);
     } else {
       if (!l.productoId) continue;
       const precio = l.precioUnitario ? Number(l.precioUnitario) : Number(l.precioReferencia ?? 0);
-      const importe = cantidad * precio;
+      const importe = Math.max(0, cantidad * precio - descuento);
       subtotal += importe;
       const tasa = l.aplicaItbis === false ? 0 : Number(l.itbisReferencia ?? ITBIS_GENERAL_ESTIMADO);
       itbis += importe * (tasa / 100);

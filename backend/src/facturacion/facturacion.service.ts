@@ -844,6 +844,31 @@ export class FacturacionService {
     return generarDocumentoImpreso(params, formato, plantilla, layoutPersonalizado, layoutTermico);
   }
 
+  /**
+   * Benchmark 2026-11-09 — previsualización del próximo NCF para el
+   * encabezado de Nueva Factura (estilo Alegra). Mismo criterio de
+   * resolución de `tipoNcf` que `crear()` (ver ahí), pero de solo lectura
+   * — nunca incrementa `secuenciaActual`. Solo cubre ventas normales
+   * (CONTADO/CREDITO); no aplica a Notas de Crédito/Débito, que no se
+   * crean desde esta pantalla.
+   */
+  async previsualizarNcf(
+    tenantId: string,
+    comprobanteFiscal?: 'CONSUMO' | 'CREDITO_FISCAL' | 'REGIMEN_ESPECIAL' | 'GUBERNAMENTAL',
+    tipoFactura: 'CONTADO' | 'CREDITO' = 'CONTADO',
+  ): Promise<{ requiereComprobanteFiscal: boolean; ncf: string | null }> {
+    const requiereComprobanteFiscal = await this.facturacionRepository.obtenerRequiereComprobanteFiscal(tenantId);
+    if (!requiereComprobanteFiscal) return { requiereComprobanteFiscal: false, ncf: null };
+
+    const modalidad = await this.facturacionRepository.obtenerModalidadFacturacion(tenantId);
+    const comprobante = comprobanteFiscal ?? (tipoFactura === 'CONTADO' ? 'CONSUMO' : 'CREDITO_FISCAL');
+    const mapa = TIPO_NCF_COMPLETO[comprobante];
+    const tipoNcf = modalidad === 'ECF' ? mapa.ecf : mapa.ncf;
+
+    const vigente = await this.facturacionRepository.buscarNcfVigente(tipoNcf);
+    return { requiereComprobanteFiscal: true, ncf: vigente?.ncf ?? null };
+  }
+
   async listar(query: ListarFacturasQueryDto) {
     const { pagina, tamanoPagina, skip, take } = paginar(query.pagina, query.tamanoPagina);
     const [datos, total] = await this.facturacionRepository.listar({

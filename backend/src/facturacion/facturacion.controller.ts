@@ -14,6 +14,7 @@ import { ListadoQueryDto } from '../common/dto/listado-query.dto';
 import { ImprimirDocumentoQueryDto } from '../common/impresion/dto/imprimir-documento-query.dto';
 import { EnviarReciboDto } from './dto/enviar-recibo.dto';
 import { EmisionECfService } from '../emision-ecf/emision-ecf.service';
+import { PrevisualizarNcfQueryDto } from './dto/previsualizar-ncf-query.dto';
 
 @ApiBearerAuth()
 @ApiTags('facturacion')
@@ -48,6 +49,14 @@ export class FacturacionController {
   @Permissions('facturacion.crear')
   buscarParaNota(@Query() query: ListadoQueryDto) {
     return this.facturacionService.buscarParaNota(query);
+  }
+
+  // Benchmark 2026-11-09 — encabezado de Nueva Factura (estilo Alegra).
+  // Antes de ':id', mismo cuidado de orden que 'buscar-para-nota'.
+  @Get('ncf-preview')
+  @Permissions('facturacion.crear')
+  previsualizarNcf(@Query() query: PrevisualizarNcfQueryDto, @CurrentUser() user: JwtPayloadUser) {
+    return this.facturacionService.previsualizarNcf(user.tenantId, query.comprobanteFiscal, query.tipoFactura);
   }
 
   @Get(':id')

@@ -19,10 +19,20 @@ export interface LineaEditable {
   esManual: boolean;
   descripcionManual: string;
   aplicaItbis?: boolean;
+  /** Descuento en RD$ de esta línea puntual (plan de integración Cuadre, ítem B-8 ya lo soporta el backend — `LineaFacturaDto.descuento`) — mutuamente independiente del descuento automático de Ofertas: si se omite (string vacío), el backend sigue resolviendo el descuento automático solo; mandar un valor explícito (aunque sea 0) lo desactiva para esa línea. */
+  descuento?: string;
 }
 
 function formatearPrecio(precio: string | number) {
   return Number(precio).toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+/** Subtotal estimado de una línea (cantidad × precio − descuento) — solo vista previa, igual criterio que estimar-totales-documento.ts. */
+function subtotalLinea(linea: LineaEditable): number {
+  const cantidad = Number(linea.cantidad) || 0;
+  const precio = Number(linea.precioUnitario) || Number(linea.precioReferencia ?? 0) || 0;
+  const descuento = Number(linea.descuento) || 0;
+  return Math.max(0, cantidad * precio - descuento);
 }
 
 /**
@@ -47,6 +57,7 @@ export function TablaLineasEditable<T extends LineaEditable>({
   onAgregar,
   mostrarItbis = false,
   precioSoloManual = false,
+  mostrarDescuento = false,
 }: {
   lineas: T[];
   productos: ProductoOpcion[];
@@ -57,6 +68,8 @@ export function TablaLineasEditable<T extends LineaEditable>({
   mostrarItbis?: boolean;
   /** Si es true, el precio solo se edita en una línea manual — una línea de catálogo usa el precio vigente del producto sin override (comportamiento previo de Cotizaciones, a diferencia de Facturación). */
   precioSoloManual?: boolean;
+  /** Benchmark 2026-11-09 — columnas "Descuento" y "Subtotal" por línea, estilo Alegra. Opt-in: el backend de Cotización también soporta `descuento` por línea, pero esto solo se habilitó para Facturación (pedido puntual del usuario); otros llamadores quedan igual que antes. */
+  mostrarDescuento?: boolean;
 }) {
   return (
     <div className="space-y-2">
@@ -67,7 +80,9 @@ export function TablaLineasEditable<T extends LineaEditable>({
               <th className="px-3 py-2 font-medium">Descripción</th>
               <th className="w-20 px-3 py-2 font-medium">Cant</th>
               <th className="w-32 px-3 py-2 font-medium">Precio</th>
+              {mostrarDescuento && <th className="w-28 px-3 py-2 font-medium">Descuento</th>}
               {mostrarItbis && <th className="w-16 px-3 py-2 text-center font-medium">ITBIS</th>}
+              {mostrarDescuento && <th className="w-28 px-3 py-2 text-right font-medium">Subtotal</th>}
               <th className="w-px px-3 py-2" />
             </tr>
           </thead>
@@ -156,6 +171,19 @@ export function TablaLineasEditable<T extends LineaEditable>({
                     )}
                   </div>
                 </td>
+                {mostrarDescuento && (
+                  <td className="px-3 py-2 align-top">
+                    <input
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      placeholder="0.00"
+                      value={linea.descuento ?? ''}
+                      onChange={(e) => onActualizar(i, { descuento: e.target.value } as Partial<T>)}
+                      className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                    />
+                  </td>
+                )}
                 {mostrarItbis && (
                   <td className="px-3 py-2 text-center align-top">
                     <input
@@ -164,6 +192,13 @@ export function TablaLineasEditable<T extends LineaEditable>({
                       checked={linea.aplicaItbis ?? true}
                       onChange={(e) => onActualizar(i, { aplicaItbis: e.target.checked } as Partial<T>)}
                     />
+                  </td>
+                )}
+                {mostrarDescuento && (
+                  <td className="px-3 py-2 text-right align-top font-mono text-sm text-slate-700 dark:text-slate-300">
+                    {(!linea.esManual && !linea.productoId) || (linea.esManual && !linea.descripcionManual.trim())
+                      ? '—'
+                      : `RD$ ${formatearPrecio(subtotalLinea(linea))}`}
                   </td>
                 )}
                 <td className="px-3 py-2 align-top">

@@ -95,6 +95,26 @@ export class FacturacionRepository {
    * leer el mismo valor y escribir el mismo resultado: NCF duplicado, una
    * violación real de la norma DGII de unicidad/secuencialidad.
    */
+  /**
+   * Benchmark 2026-11-09 — previsualización del próximo NCF para el
+   * encabezado de Nueva Factura (estilo Alegra), SIN incrementar
+   * `secuenciaActual` (a diferencia de `siguienteNcfEnTx`) — es solo una
+   * vista previa, el número real se toma recién al guardar. Devuelve
+   * `null` si no hay ninguna secuencia activa para este tipo (ej. tenant
+   * recién creado sin configurar NCF todavía) en vez de lanzar, porque
+   * acá un "no hay" es un estado normal a mostrar, no un error.
+   */
+  async buscarNcfVigente(tipoNcf: TipoNcf, sucursalId?: string | null): Promise<{ ncf: string; restantes: number } | null> {
+    const secuencia =
+      (sucursalId ? await this.db.ncfAsignado.findFirst({ where: { tipoNcf, activo: true, sucursalId } }) : null) ??
+      (await this.db.ncfAsignado.findFirst({ where: { tipoNcf, activo: true, sucursalId: null } }));
+    if (!secuencia) return null;
+    return {
+      ncf: `${tipoNcf}${String(secuencia.secuenciaActual).padStart(8, '0')}`,
+      restantes: secuencia.secuenciaFinal - secuencia.secuenciaActual,
+    };
+  }
+
   async siguienteNcf(tipoNcf: TipoNcf): Promise<string> {
     const { ncf } = await this.db.$transaction((tx) => this.siguienteNcfEnTx(tx, tipoNcf));
     return ncf;
