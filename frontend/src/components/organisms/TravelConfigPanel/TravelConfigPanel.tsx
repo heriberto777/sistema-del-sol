@@ -20,9 +20,10 @@ interface TravelConfig {
 
 /**
  * Cuenta de Duffel/Hotelbeds PROPIA de este tenant — hasta que no se
- * cargue acá, las pestañas "Buscar vuelo"/"Buscar hotel" de
- * TravelReservas.tsx quedan bloqueadas (sin fallback a ninguna cuenta
- * compartida, decisión explícita del usuario). Mismo criterio de
+ * cargue acá, las páginas "Buscar vuelo"/"Buscar hotel" (ver
+ * TravelBuscarVueloPanel/TravelBuscarHotelPanel) quedan bloqueadas (sin
+ * fallback a ninguna cuenta compartida, decisión explícita del usuario).
+ * Mismo criterio de
  * secretos que WhatsappConfigPanel: nunca se muestran en claro, dejar el
  * campo vacío al guardar no borra el secreto ya guardado.
  */

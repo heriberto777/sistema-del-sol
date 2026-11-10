@@ -44,6 +44,13 @@ export class PublicacionesSocialesController {
     return this.publicacionesSocialesService.consultarUsoIaMensual(user.tenantId);
   }
 
+  // Auditoría UX Fase 8 — reporte propio del dominio.
+  @Get('resumen')
+  @Permissions('publicacionessociales.ver')
+  resumen() {
+    return this.publicacionesSocialesService.resumen();
+  }
+
   @Get(':id')
   @Permissions('publicacionessociales.ver')
   buscarPorId(@Param('id') id: string) {

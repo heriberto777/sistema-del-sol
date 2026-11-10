@@ -22,11 +22,18 @@ export class InmobiliariaController {
     return this.inmobiliariaService.crear(dto, user.tenantId);
   }
 
-  // Ruta literal antes de ':id' a propósito (mismo cuidado de orden que ProyectosController).
+  // Rutas literales antes de ':id' a propósito (mismo cuidado de orden que ProyectosController).
   @Get('agentes')
   @Permissions('inmobiliaria.propiedades.ver')
   listarAgentesDisponibles() {
     return this.inmobiliariaService.listarAgentesDisponibles();
+  }
+
+  // Auditoría UX Fase 8 — reporte propio del dominio.
+  @Get('resumen')
+  @Permissions('inmobiliaria.propiedades.ver')
+  resumen() {
+    return this.inmobiliariaService.resumen();
   }
 
   @Get()

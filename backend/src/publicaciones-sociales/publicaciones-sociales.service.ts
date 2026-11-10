@@ -88,6 +88,10 @@ export class PublicacionesSocialesService {
    *   la IA ES la imagen final, nunca se le superpone Canvas encima
    *   (evita el bug real de dos precios distintos en la misma imagen).
    */
+  resumen() {
+    return this.publicacionesSocialesRepository.resumen();
+  }
+
   async crear(dto: CrearPublicacionSocialDto, tenantId: string, creadoPorId: string) {
     if (dto.formato === 'VERTICAL' && !dto.promptIa?.trim()) {
       throw new BadRequestException(

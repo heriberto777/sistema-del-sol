@@ -304,7 +304,10 @@ export function Dashboard() {
   const puedeVerProyectos = tieneModulo('proyectos') && tienePermiso('proyectos.ver');
   const puedeVerRentabilidadProyectos = puedeVerProyectos && tienePermiso('proyectos.rentabilidad.ver');
   const puedeVerTravel = tieneModulo('travel') && tienePermiso('travel.ver');
-  const puedeVerPedidosTienda = tieneModulo('ecommerce') && tienePermiso('admin.configuracion');
+  // Antes admin.configuracion — ecommerce.ver es el permiso propio nuevo
+  // que ahora gatea el mismo endpoint en el backend (auditoría de
+  // organización, "100% ERP").
+  const puedeVerPedidosTienda = tieneModulo('ecommerce') && tienePermiso('ecommerce.ver');
 
   const { data, isLoading } = useQuery({
     queryKey: ['reportes-dashboard', sucursalFiltro],
@@ -623,7 +626,7 @@ export function Dashboard() {
                       {pedidosPendientes ? pedidosPendientes.pendientes : '…'}
                     </p>
                   </div>
-                  <Link to="/tienda-online" className="mt-3 flex items-center gap-1 text-xs font-medium text-sol-600 hover:text-sol-700 dark:text-sol-400">
+                  <Link to="/tienda-online/pedidos" className="mt-3 flex items-center gap-1 text-xs font-medium text-sol-600 hover:text-sol-700 dark:text-sol-400">
                     Ver pedidos <ArrowRight size={12} />
                   </Link>
                 </Card>

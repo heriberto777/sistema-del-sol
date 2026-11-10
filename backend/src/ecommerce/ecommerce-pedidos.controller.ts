@@ -6,10 +6,14 @@ import { RequiereModulo } from '../common/decorators/requiere-modulo.decorator';
 import { ListadoQueryDto } from '../common/dto/listado-query.dto';
 
 /**
- * Panel "Pedidos de mi tienda" del admin del tenant — mismo permiso que
- * el resto de la configuración de Tienda Online (ver
- * TiendaOnlineConfigPanel). `@RequiereModulo('ecommerce')` (a diferencia
- * del storefront público, que ya lo valida a mano en
+ * Panel "Pedidos de mi tienda" del admin del tenant. Permiso propio
+ * `ecommerce.ver` (auditoría de organización, "100% ERP") — antes todo el
+ * dominio compartía `admin.configuracion` sin ninguna granularidad propia,
+ * a diferencia de CRM/Travel/Inmobiliaria/Publicaciones Sociales.
+ * `listarDominios` sigue en `admin.configuracion` a propósito — lo
+ * consume exclusivamente TiendaOnlineConfigPanel ("Dominio propio y
+ * branding"), no este panel de pedidos. `@RequiereModulo('ecommerce')` (a
+ * diferencia del storefront público, que ya lo valida a mano en
  * `resolverTiendaPublica` porque no tiene `request.user`) — sin esto, un
  * tenant sin el módulo en su plan podía gestionar pedidos igual con solo
  * `admin.configuracion`, que cualquier Admin Total/Gerente ya tiene
@@ -23,20 +27,27 @@ export class EcommercePedidosController {
   constructor(private readonly ecommerceService: EcommerceService) {}
 
   @Get('pedidos')
-  @Permissions('admin.configuracion')
+  @Permissions('ecommerce.ver')
   listarPedidos(@Query() query: ListadoQueryDto) {
     return this.ecommerceService.listarPedidos(query);
   }
 
-  // Ruta literal antes de ':facturaId' — si no, la captura como si fuera un id.
+  // Rutas literales antes de ':facturaId' — si no, las captura como si fueran un id.
   @Get('pedidos/resumen-pendientes')
-  @Permissions('admin.configuracion')
+  @Permissions('ecommerce.ver')
   resumenPendientes() {
     return this.ecommerceService.resumenPendientes();
   }
 
+  // Auditoría UX Fase 8 — reporte propio del dominio.
+  @Get('pedidos/resumen')
+  @Permissions('ecommerce.ver')
+  resumen() {
+    return this.ecommerceService.resumen();
+  }
+
   @Get('pedidos/:facturaId')
-  @Permissions('admin.configuracion')
+  @Permissions('ecommerce.ver')
   detallePedido(@Param('facturaId') facturaId: string) {
     return this.ecommerceService.detallePedidoAdmin(facturaId);
   }

@@ -45,6 +45,21 @@ export class PublicacionesSocialesRepository {
     return this.tenantPrisma.client;
   }
 
+  /** Auditoría UX Fase 8 — reporte propio del dominio (antes `reportes: []` en menu-erp.ts). */
+  async resumen() {
+    const inicioMes = new Date();
+    inicioMes.setDate(1);
+    inicioMes.setHours(0, 0, 0, 0);
+    const [porEstado, totalMes] = await Promise.all([
+      this.db.publicacionSocial.groupBy({ by: ['estado'], _count: { _all: true } }),
+      this.db.publicacionSocial.count({ where: { createdAt: { gte: inicioMes } } }),
+    ]);
+    return {
+      porEstado: Object.fromEntries(porEstado.map((p) => [p.estado, p._count._all])),
+      totalMes,
+    };
+  }
+
   /** Fase 5 — inserta también la versión 1 en la misma escritura (nested create de Prisma) — es la primera fila del historial. */
   crear(data: {
     tenantId: string;

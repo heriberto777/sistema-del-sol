@@ -46,6 +46,10 @@ export class InmobiliariaService {
     private readonly prisma: PrismaService,
   ) {}
 
+  resumen() {
+    return this.inmobiliariaRepository.resumen();
+  }
+
   async crear(dto: CrearPropiedadDto, tenantId: string) {
     // findUniqueOrThrow tenant-scoped: si agenteId/propietarioId es de otro
     // tenant, 404 — mismo patrón de prevención de IDOR que ProyectosService.crear.

@@ -33,6 +33,33 @@ export class PedidosTiendaRepository {
     });
   }
 
+  /** Auditoría UX Fase 8 — reporte propio del dominio (antes `reportes: []` en menu-erp.ts). Mismo join manual que contarPendientes/facturasPorIds — PedidoTienda no tiene campos económicos propios. */
+  async resumen() {
+    const pedidos = await this.db.pedidoTienda.findMany({ select: { facturaId: true, createdAt: true } });
+    if (pedidos.length === 0) {
+      return { totalPedidos: 0, pedidosMes: 0, pendientesDePago: 0, ventasMes: 0, porEstado: {} as Record<string, number> };
+    }
+    const inicioMes = new Date();
+    inicioMes.setDate(1);
+    inicioMes.setHours(0, 0, 0, 0);
+    const pedidosMes = pedidos.filter((p) => p.createdAt >= inicioMes).length;
+    const facturas = await this.db.factura.findMany({
+      where: { id: { in: pedidos.map((p) => p.facturaId) } },
+      select: { estado: true, pagada: true, total: true, fecha: true },
+    });
+    const porEstado: Record<string, number> = {};
+    let pendientesDePago = 0;
+    let ventasMes = 0;
+    for (const f of facturas) {
+      // Mismo criterio de etiqueta que FacturasProveedor: EMITIDA se desglosa en Pagada/Pendiente, el resto queda tal cual.
+      const clave = f.estado === 'EMITIDA' ? (f.pagada ? 'PAGADA' : 'PENDIENTE') : f.estado;
+      porEstado[clave] = (porEstado[clave] ?? 0) + 1;
+      if (f.estado === 'EMITIDA' && !f.pagada) pendientesDePago++;
+      if (f.estado === 'EMITIDA' && f.fecha >= inicioMes) ventasMes += Number(f.total);
+    }
+    return { totalPedidos: pedidos.length, pedidosMes, pendientesDePago, ventasMes, porEstado };
+  }
+
   /**
    * Detalle de UN pedido para el admin del tenant (Fase 14) — mismo shape
    * que `EcommerceRepository.detallePedido` (cliente final, Fase 10), sin

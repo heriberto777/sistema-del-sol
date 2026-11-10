@@ -38,6 +38,28 @@ export class InmobiliariaRepository {
     return this.tenantPrisma.client;
   }
 
+  /** Auditoría UX Fase 8 — reporte propio del dominio (antes `reportes: []` en menu-erp.ts). Agregados simples, mismo criterio que TravelService.resumen/EcommerceService.resumenPendientes. */
+  async resumen() {
+    const mesActual = new Date().toISOString().slice(0, 7); // 'AAAA-MM', mismo formato que CobroAlquiler.periodo
+    const [porEstado, contratosActivos, comisionPendiente, alquileresPendientes, alquileresCobradosMes] = await Promise.all([
+      this.db.propiedad.groupBy({ by: ['estado'], _count: { _all: true } }),
+      this.db.contratoPropiedad.count({ where: { estado: 'ACTIVO' } }),
+      this.db.contratoPropiedad.aggregate({ where: { estado: 'ACTIVO', comisionPagada: false }, _sum: { montoComision: true } }),
+      this.db.cobroAlquiler.aggregate({ where: { estado: 'PENDIENTE' }, _sum: { montoAlquiler: true } }),
+      this.db.cobroAlquiler.aggregate({
+        where: { estado: { in: ['COBRADO', 'LIQUIDADO'] }, periodo: mesActual },
+        _sum: { montoAlquiler: true },
+      }),
+    ]);
+    return {
+      propiedadesPorEstado: Object.fromEntries(porEstado.map((p) => [p.estado, p._count._all])),
+      contratosActivos,
+      comisionPendiente: Number(comisionPendiente._sum.montoComision ?? 0),
+      alquileresPendientes: Number(alquileresPendientes._sum.montoAlquiler ?? 0),
+      alquileresCobradosMes: Number(alquileresCobradosMes._sum.montoAlquiler ?? 0),
+    };
+  }
+
   crearPropiedad(dto: CrearPropiedadDto, tenantId: string) {
     const { imagenes, ...datos } = dto;
     return this.db.$transaction(async (tx) => {

@@ -1,5 +1,6 @@
 import { CSSProperties, useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { NavLink, useParams } from 'react-router-dom';
 import clsx from 'clsx';
 import {
   ExternalLink,
@@ -108,6 +109,8 @@ const GRUPOS_SECCIONES: { grupo: string; items: { id: SeccionConfig; etiqueta: s
   },
 ];
 
+const SECCIONES_VALIDAS: SeccionConfig[] = GRUPOS_SECCIONES.flatMap((g) => g.items.map((i) => i.id));
+
 const PLANTILLAS = [
   { value: 'DIRECTO', label: 'Directo' },
   { value: 'MERCADO', label: 'Mercado' },
@@ -203,10 +206,12 @@ const PREVIEW_SIN_STOCK: ProductoTienda = {
  * El storefront público (`/tienda/:subdominio`, Fase 2) lee estos mismos
  * valores vía `EcommerceService.obtenerConfig`.
  */
+/** Auditoría UX Fase 7 — antes `useState(seccion)` sin leer la URL (mismo bug ya arreglado en los demás hubs). Cada sección es ahora su propia ruta (`/tienda-online/configuracion/:seccion`); el botón "Guardar" sigue guardando TODO de una vez (nunca fue por sección), así que el formulario se queda en un solo componente montado — cambiar de sección no reinicia los campos sin guardar. */
 export function TiendaOnlineConfigPanel() {
   const { usuario } = useAuth();
   const queryClient = useQueryClient();
-  const [seccion, setSeccion] = useState<SeccionConfig>('identidad');
+  const { seccion: seccionParam } = useParams<{ seccion: string }>();
+  const seccion: SeccionConfig = (SECCIONES_VALIDAS as string[]).includes(seccionParam ?? '') ? (seccionParam as SeccionConfig) : 'identidad';
   const [activa, setActiva] = useState(false);
   const [nombre, setNombre] = useState('');
   const [plantilla, setPlantilla] = useState('DIRECTO');
@@ -312,20 +317,21 @@ export function TiendaOnlineConfigPanel() {
                 {grupo.items.map((item) => {
                   const Icono = item.icono;
                   return (
-                    <button
+                    <NavLink
                       key={item.id}
-                      type="button"
-                      onClick={() => setSeccion(item.id)}
-                      className={clsx(
-                        'flex items-center gap-2 rounded-lg border-l-2 px-2.5 py-2 text-left text-sm font-medium transition-colors',
-                        seccion === item.id
-                          ? 'border-sol-500 bg-sol-50 text-sol-700 dark:bg-sol-500/10 dark:text-sol-300'
-                          : 'border-transparent text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800/60',
-                      )}
+                      to={`/tienda-online/configuracion/${item.id}`}
+                      className={({ isActive }) =>
+                        clsx(
+                          'flex items-center gap-2 rounded-lg border-l-2 px-2.5 py-2 text-left text-sm font-medium transition-colors',
+                          isActive
+                            ? 'border-sol-500 bg-sol-50 text-sol-700 dark:bg-sol-500/10 dark:text-sol-300'
+                            : 'border-transparent text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800/60',
+                        )
+                      }
                     >
                       <Icono size={16} />
                       {item.etiqueta}
-                    </button>
+                    </NavLink>
                   );
                 })}
               </div>

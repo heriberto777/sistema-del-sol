@@ -303,6 +303,11 @@ export class EcommerceService {
     return { pendientes: await this.pedidosTiendaRepository.contarPendientes() };
   }
 
+  /** Auditoría UX Fase 8 — reporte propio del dominio (antes `reportes: []` en menu-erp.ts). */
+  resumen() {
+    return this.pedidosTiendaRepository.resumen();
+  }
+
   /** Fase 14 — "Ver detalle" de un pedido puntual en el panel admin (líneas de factura + datos de contacto del pedido). */
   async detallePedidoAdmin(facturaId: string) {
     const detalle = await this.pedidosTiendaRepository.detalle(facturaId);
