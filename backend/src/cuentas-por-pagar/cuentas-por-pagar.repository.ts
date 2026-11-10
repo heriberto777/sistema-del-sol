@@ -39,32 +39,66 @@ export class CuentasPorPagarRepository {
    * (mismo criterio/forma que el viejo ledger `Pago`, el botón "Registrar
    * pago" del frontend sigue apuntando al id de la orden sin cambios) y el
    * service suma las CuentaPorPagar abiertas de cada una.
+   *
+   * Fix 2026-11 (auditoría UX Fase 1): esto SOLO trae cuentas con origen
+   * OrdenCompra — una `CuentaPorPagar` de `FacturaProveedor` (gasto a
+   * crédito sin orden, Fase 5) nunca aparecía acá aunque sí se sumaba en
+   * `listarTodasPendientes()`/resumen. Sin paginar (igual criterio que
+   * `listarTodasPendientes` — "pendiente" es por naturaleza un conjunto
+   * acotado, se achica solo al pagarse): el merge con
+   * `listarFacturasProveedorPendientes` y la paginación final viven en el
+   * service, porque son dos orígenes distintos que no se pueden paginar
+   * juntos en una sola query de Prisma.
    */
-  listar(params: { skip?: number; take?: number; busqueda?: string }) {
+  listarOrdenesPendientes(busqueda?: string) {
     const where: Prisma.OrdenCompraWhereInput = {
       cuentasPorPagar: { some: WHERE_PENDIENTE },
-      ...(params.busqueda
+      ...(busqueda
         ? {
             OR: [
-              { numero: { contains: params.busqueda, mode: 'insensitive' as const } },
-              { proveedor: { nombre: { contains: params.busqueda, mode: 'insensitive' as const } } },
+              { numero: { contains: busqueda, mode: 'insensitive' as const } },
+              { proveedor: { nombre: { contains: busqueda, mode: 'insensitive' as const } } },
             ],
           }
         : {}),
     };
-    return Promise.all([
-      this.db.ordenCompra.findMany({
-        where,
-        skip: params.skip,
-        take: params.take,
-        orderBy: { fecha: 'asc' },
-        include: {
-          proveedor: { select: { nombre: true } },
-          cuentasPorPagar: { where: WHERE_PENDIENTE, select: { monto: true, saldo: true, fechaVencimiento: true } },
-        },
-      }),
-      this.db.ordenCompra.count({ where }),
-    ]);
+    return this.db.ordenCompra.findMany({
+      where,
+      orderBy: { fecha: 'asc' },
+      include: {
+        proveedor: { select: { nombre: true } },
+        cuentasPorPagar: { where: WHERE_PENDIENTE, select: { monto: true, saldo: true, fechaVencimiento: true } },
+      },
+    });
+  }
+
+  /** Contraparte de `listarOrdenesPendientes` para el origen FacturaProveedor — una FacturaProveedor tiene exactamente una CuentaPorPagar, sin agrupar. */
+  listarFacturasProveedorPendientes(busqueda?: string) {
+    const where: Prisma.CuentaPorPagarWhereInput = {
+      ...WHERE_PENDIENTE,
+      facturaProveedorId: { not: null },
+      ...(busqueda
+        ? {
+            OR: [
+              { facturaProveedor: { ncfProveedor: { contains: busqueda, mode: 'insensitive' as const } } },
+              { proveedor: { nombre: { contains: busqueda, mode: 'insensitive' as const } } },
+            ],
+          }
+        : {}),
+    };
+    return this.db.cuentaPorPagar.findMany({
+      where,
+      orderBy: { fecha: 'asc' },
+      select: {
+        facturaProveedorId: true,
+        monto: true,
+        saldo: true,
+        fecha: true,
+        fechaVencimiento: true,
+        proveedor: { select: { nombre: true } },
+        facturaProveedor: { select: { ncfProveedor: true } },
+      },
+    });
   }
 
   /** Sin paginar — usado por el resumen/aging, mismo criterio que antes. */

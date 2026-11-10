@@ -9,13 +9,17 @@ import { StatCard } from '../components/molecules/StatCard/StatCard';
 import { SearchInput } from '../components/molecules/SearchInput/SearchInput';
 import { Paginacion } from '../components/molecules/Paginacion/Paginacion';
 import { ModalRegistrarPagoOrdenCompra } from '../components/molecules/ModalRegistrarPagoOrdenCompra/ModalRegistrarPagoOrdenCompra';
+import { ModalRegistrarPagoFacturaProveedor } from '../components/molecules/ModalRegistrarPagoFacturaProveedor/ModalRegistrarPagoFacturaProveedor';
 import { RequierePermiso } from '../components/organisms/RequierePermiso/RequierePermiso';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { PaginaResultado } from '../types/pagina-resultado';
 import { Bucket, ETIQUETA_BUCKET, TONO_BUCKET, fmtRD } from '../lib/cuentas-aging';
 
+type OrigenCxP = 'ORDEN_COMPRA' | 'FACTURA_PROVEEDOR';
+
 interface FilaCxP {
   id: string;
+  origen: OrigenCxP;
   numero: string;
   proveedor: string;
   fecha: string;
@@ -44,7 +48,7 @@ export function CuentasPorPagar() {
   const [busqueda, setBusqueda] = useState('');
   const [pagina, setPagina] = useState(1);
   const busquedaDebounced = useDebouncedValue(busqueda);
-  const [ordenPagando, setOrdenPagando] = useState<FilaCxP | null>(null);
+  const [pagando, setPagando] = useState<FilaCxP | null>(null);
 
   const { data: resumen, isLoading: cargandoResumen } = useQuery({
     queryKey: ['cuentas-por-pagar-resumen'],
@@ -65,7 +69,7 @@ export function CuentasPorPagar() {
     <div className="space-y-6">
       <div>
         <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Cuentas por pagar</h1>
-        <p className="text-sm text-slate-500 dark:text-slate-400">Órdenes de compra pendientes de pago a proveedores, por antigüedad.</p>
+        <p className="text-sm text-slate-500 dark:text-slate-400">Órdenes de compra y facturas de proveedor pendientes de pago, por antigüedad.</p>
       </div>
 
       <RequierePermiso permiso="cuentasporpagar.ver">
@@ -79,8 +83,8 @@ export function CuentasPorPagar() {
 
         <Card
           sinPadding
-          titulo="Órdenes pendientes"
-          descripcion={data ? `${data.total} orden(es)` : undefined}
+          titulo="Documentos pendientes"
+          descripcion={data ? `${data.total} documento(s)` : undefined}
           acciones={
             <SearchInput
               value={busqueda}
@@ -98,6 +102,7 @@ export function CuentasPorPagar() {
               <table className="w-full text-left text-sm">
                 <thead className="bg-slate-50 text-slate-500 dark:bg-slate-900/60 dark:text-slate-400">
                   <tr>
+                    <th className="px-5 py-3 font-medium">Tipo</th>
                     <th className="px-5 py-3 font-medium">Número</th>
                     <th className="px-5 py-3 font-medium">Proveedor</th>
                     <th className="px-5 py-3 font-medium">Fecha</th>
@@ -110,7 +115,12 @@ export function CuentasPorPagar() {
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                   {data.datos.map((fila) => (
-                    <tr key={fila.id}>
+                    <tr key={`${fila.origen}-${fila.id}`}>
+                      <td className="px-5 py-3">
+                        <Badge tono={fila.origen === 'ORDEN_COMPRA' ? 'neutro' : 'advertencia'}>
+                          {fila.origen === 'ORDEN_COMPRA' ? 'Orden' : 'Factura'}
+                        </Badge>
+                      </td>
                       <td className="px-5 py-3 font-mono text-xs font-medium text-slate-900 dark:text-slate-100">{fila.numero}</td>
                       <td className="px-5 py-3">{fila.proveedor}</td>
                       <td className="px-5 py-3">{new Date(fila.fecha).toLocaleDateString('es-DO')}</td>
@@ -121,7 +131,7 @@ export function CuentasPorPagar() {
                         <Badge tono={TONO_BUCKET[fila.bucket]}>{ETIQUETA_BUCKET[fila.bucket]}</Badge>
                       </td>
                       <td className="px-5 py-3 text-right">
-                        <Button variante="secundario" onClick={() => setOrdenPagando(fila)}>
+                        <Button variante="secundario" onClick={() => setPagando(fila)}>
                           Registrar pago
                         </Button>
                       </td>
@@ -139,10 +149,16 @@ export function CuentasPorPagar() {
         </Card>
       </RequierePermiso>
 
-      {ordenPagando && (
+      {pagando?.origen === 'ORDEN_COMPRA' && (
         <ModalRegistrarPagoOrdenCompra
-          orden={{ id: ordenPagando.id, numero: ordenPagando.numero, total: String(ordenPagando.total) }}
-          onClose={() => setOrdenPagando(null)}
+          orden={{ id: pagando.id, numero: pagando.numero, total: String(pagando.total) }}
+          onClose={() => setPagando(null)}
+        />
+      )}
+      {pagando?.origen === 'FACTURA_PROVEEDOR' && (
+        <ModalRegistrarPagoFacturaProveedor
+          factura={{ id: pagando.id, ncfProveedor: pagando.numero, total: String(pagando.total) }}
+          onClose={() => setPagando(null)}
         />
       )}
     </div>

@@ -10,7 +10,8 @@ describe('CuentasPorPagarService', () => {
 
   beforeEach(() => {
     repository = {
-      listar: jest.fn().mockResolvedValue([[], 0]),
+      listarOrdenesPendientes: jest.fn().mockResolvedValue([]),
+      listarFacturasProveedorPendientes: jest.fn().mockResolvedValue([]),
       listarTodasPendientes: jest.fn().mockResolvedValue([]),
     } as unknown as jest.Mocked<CuentasPorPagarRepository>;
     service = new CuentasPorPagarService(repository);
@@ -18,17 +19,14 @@ describe('CuentasPorPagarService', () => {
 
   describe('listar', () => {
     it('CxP como ledger real (Fase 2): lee saldo/fechaVencimiento directo de CuentaPorPagar, sin recalcular Pago', async () => {
-      repository.listar.mockResolvedValue([
-        [
-          {
-            id: 'o1',
-            numero: '00010',
-            fecha: hace(45),
-            proveedor: { nombre: 'Proveedor X' },
-            cuentasPorPagar: [{ monto: 1000, saldo: 600, fechaVencimiento: hace(15) }],
-          },
-        ],
-        1,
+      repository.listarOrdenesPendientes.mockResolvedValue([
+        {
+          id: 'o1',
+          numero: '00010',
+          fecha: hace(45),
+          proveedor: { nombre: 'Proveedor X' },
+          cuentasPorPagar: [{ monto: 1000, saldo: 600, fechaVencimiento: hace(15) }],
+        },
       ] as never);
 
       const resultado = await service.listar({});
@@ -36,6 +34,7 @@ describe('CuentasPorPagarService', () => {
       expect(resultado.datos).toEqual([
         expect.objectContaining({
           id: 'o1',
+          origen: 'ORDEN_COMPRA',
           numero: '00010',
           proveedor: 'Proveedor X',
           total: 1000,
@@ -49,20 +48,17 @@ describe('CuentasPorPagarService', () => {
     });
 
     it('una orden con varias recepciones abiertas suma sus CuentaPorPagar y usa el vencimiento más antiguo (el más urgente)', async () => {
-      repository.listar.mockResolvedValue([
-        [
-          {
-            id: 'o1',
-            numero: '00013',
-            fecha: hace(50),
-            proveedor: { nombre: 'Proveedor W' },
-            cuentasPorPagar: [
-              { monto: 500, saldo: 500, fechaVencimiento: hace(15) }, // más urgente
-              { monto: 300, saldo: 300, fechaVencimiento: hace(5) },
-            ],
-          },
-        ],
-        1,
+      repository.listarOrdenesPendientes.mockResolvedValue([
+        {
+          id: 'o1',
+          numero: '00013',
+          fecha: hace(50),
+          proveedor: { nombre: 'Proveedor W' },
+          cuentasPorPagar: [
+            { monto: 500, saldo: 500, fechaVencimiento: hace(15) }, // más urgente
+            { monto: 300, saldo: 300, fechaVencimiento: hace(5) },
+          ],
+        },
       ] as never);
 
       const resultado = await service.listar({});
@@ -73,17 +69,14 @@ describe('CuentasPorPagarService', () => {
     });
 
     it('sin pagos registrados, pendiente es igual al monto', async () => {
-      repository.listar.mockResolvedValue([
-        [
-          {
-            id: 'o1',
-            numero: '00011',
-            fecha: hace(5),
-            proveedor: { nombre: 'Proveedor Y' },
-            cuentasPorPagar: [{ monto: 500, saldo: 500, fechaVencimiento: hace(-25) }],
-          },
-        ],
-        1,
+      repository.listarOrdenesPendientes.mockResolvedValue([
+        {
+          id: 'o1',
+          numero: '00011',
+          fecha: hace(5),
+          proveedor: { nombre: 'Proveedor Y' },
+          cuentasPorPagar: [{ monto: 500, saldo: 500, fechaVencimiento: hace(-25) }],
+        },
       ] as never);
 
       const resultado = await service.listar({});
@@ -91,10 +84,53 @@ describe('CuentasPorPagarService', () => {
       expect(resultado.datos[0]).toEqual(expect.objectContaining({ pagado: 0, pendiente: 500, bucket: 'CORRIENTE' }));
     });
 
-    it('pasa busqueda/paginación al repositorio', async () => {
+    it('fix auditoría UX Fase 1: una FacturaProveedor pendiente aparece en el listado, con su propio origen', async () => {
+      repository.listarFacturasProveedorPendientes.mockResolvedValue([
+        {
+          facturaProveedorId: 'fp1',
+          monto: 2000,
+          saldo: 2000,
+          fecha: hace(10),
+          fechaVencimiento: hace(2),
+          proveedor: { nombre: 'Proveedor Z' },
+          facturaProveedor: { ncfProveedor: 'B0100000099' },
+        },
+      ] as never);
+
+      const resultado = await service.listar({});
+
+      expect(resultado.datos).toEqual([
+        expect.objectContaining({
+          id: 'fp1',
+          origen: 'FACTURA_PROVEEDOR',
+          numero: 'B0100000099',
+          proveedor: 'Proveedor Z',
+          total: 2000,
+          pendiente: 2000,
+        }),
+      ]);
+      expect(resultado.total).toBe(1);
+    });
+
+    it('mezcla ambos orígenes, ordenados por vencimiento, y pagina sobre el conjunto combinado', async () => {
+      repository.listarOrdenesPendientes.mockResolvedValue([
+        { id: 'o1', numero: '00020', fecha: hace(10), proveedor: { nombre: 'A' }, cuentasPorPagar: [{ monto: 100, saldo: 100, fechaVencimiento: hace(1) }] },
+      ] as never);
+      repository.listarFacturasProveedorPendientes.mockResolvedValue([
+        { facturaProveedorId: 'fp1', monto: 200, saldo: 200, fecha: hace(20), fechaVencimiento: hace(20), proveedor: { nombre: 'B' }, facturaProveedor: { ncfProveedor: 'B01' } },
+      ] as never);
+
+      const resultado = await service.listar({});
+
+      expect(resultado.total).toBe(2);
+      expect(resultado.datos.map((d) => d.origen)).toEqual(['FACTURA_PROVEEDOR', 'ORDEN_COMPRA']);
+    });
+
+    it('pasa busqueda a ambos orígenes del repositorio', async () => {
       await service.listar({ busqueda: 'ACME', pagina: 2, tamanoPagina: 10 });
 
-      expect(repository.listar).toHaveBeenCalledWith({ skip: 10, take: 10, busqueda: 'ACME' });
+      expect(repository.listarOrdenesPendientes).toHaveBeenCalledWith('ACME');
+      expect(repository.listarFacturasProveedorPendientes).toHaveBeenCalledWith('ACME');
     });
   });
 

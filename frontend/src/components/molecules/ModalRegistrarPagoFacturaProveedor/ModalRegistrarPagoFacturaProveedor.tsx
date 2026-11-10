@@ -47,6 +47,10 @@ export function ModalRegistrarPagoFacturaProveedor({
       queryClient.invalidateQueries({ queryKey: ['pagos-factura-proveedor', factura.id] });
       queryClient.invalidateQueries({ queryKey: ['facturas-proveedor'] });
       queryClient.invalidateQueries({ queryKey: ['cuentas-por-pagar-resumen'] });
+      // Fix auditoría UX Fase 1: este modal ahora también se abre desde
+      // Cuentas por Pagar (antes solo desde /facturas-proveedor) — sin esto
+      // la tabla de ahí quedaba desactualizada tras pagar.
+      queryClient.invalidateQueries({ queryKey: ['cuentas-por-pagar'] });
       setMonto('');
       setAplicaRetencion(false);
       setRetencionIsr('');

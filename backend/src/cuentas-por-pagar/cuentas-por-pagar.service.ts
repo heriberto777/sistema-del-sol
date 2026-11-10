@@ -20,13 +20,16 @@ export class CuentasPorPagarService {
 
   async listar(query: ListadoQueryDto) {
     const { pagina, tamanoPagina, skip, take } = paginar(query.pagina, query.tamanoPagina);
-    const [ordenes, total] = await this.cuentasPorPagarRepository.listar({ skip, take, busqueda: query.busqueda });
+    const [ordenes, facturas] = await Promise.all([
+      this.cuentasPorPagarRepository.listarOrdenesPendientes(query.busqueda),
+      this.cuentasPorPagarRepository.listarFacturasProveedorPendientes(query.busqueda),
+    ]);
 
     // Una orden puede tener varias CuentaPorPagar abiertas (una por cada
     // recepción parcial todavía no pagada) — se suman acá porque `Pago`
     // sigue pagando la orden completa (Fase 3 lo separa); la fecha de
     // vencimiento mostrada es la más antigua (la más urgente).
-    const datos = ordenes.map((o) => {
+    const filasOrdenes = ordenes.map((o) => {
       const monto = o.cuentasPorPagar.reduce((acc, c) => acc + Number(c.monto), 0);
       const saldo = o.cuentasPorPagar.reduce((acc, c) => acc + Number(c.saldo), 0);
       const fechaVencimiento = o.cuentasPorPagar.reduce(
@@ -36,6 +39,7 @@ export class CuentasPorPagarService {
       const dias = diasVencidoDesde(fechaVencimiento);
       return {
         id: o.id,
+        origen: 'ORDEN_COMPRA' as const,
         numero: o.numero,
         proveedor: o.proveedor.nombre,
         fecha: o.fecha,
@@ -47,6 +51,33 @@ export class CuentasPorPagarService {
         bucket: bucketDe(dias),
       };
     });
+
+    // FacturaProveedor tiene exactamente una CuentaPorPagar — sin reparto/agrupación.
+    const filasFacturas = facturas.map((f) => {
+      const monto = Number(f.monto);
+      const saldo = Number(f.saldo);
+      const dias = diasVencidoDesde(f.fechaVencimiento);
+      return {
+        id: f.facturaProveedorId!,
+        origen: 'FACTURA_PROVEEDOR' as const,
+        numero: f.facturaProveedor!.ncfProveedor,
+        proveedor: f.proveedor.nombre,
+        fecha: f.fecha,
+        vencimiento: f.fechaVencimiento,
+        total: monto,
+        pagado: monto - saldo,
+        pendiente: saldo,
+        diasVencido: dias,
+        bucket: bucketDe(dias),
+      };
+    });
+
+    // Dos orígenes que no se pueden paginar juntos en una sola query — se
+    // ordena y pagina acá, sobre el conjunto combinado de PENDIENTES (por
+    // definición acotado, no una tabla histórica sin límite).
+    const todas = [...filasOrdenes, ...filasFacturas].sort((a, b) => a.vencimiento.getTime() - b.vencimiento.getTime());
+    const total = todas.length;
+    const datos = todas.slice(skip, skip + take);
 
     return { datos, total, pagina, tamanoPagina };
   }
