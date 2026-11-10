@@ -1,6 +1,5 @@
 import { ModuloPestanas } from '../../components/templates/ModuloPestanas/ModuloPestanas';
 import { ConciliacionBancariaView } from '../../components/organisms/ConciliacionBancariaView/ConciliacionBancariaView';
-import { TABS_CONTABILIDAD } from './tabs';
 
 /**
  * Antes vivía en /bancos (bug real de ruteo, ver docs/ARCHITECTURE.md) — el
@@ -10,12 +9,7 @@ import { TABS_CONTABILIDAD } from './tabs';
  */
 export function ContabilidadConciliacion() {
   return (
-    <ModuloPestanas
-      titulo="Contabilidad"
-      descripcion="Catálogo de cuentas, asientos y reportes financieros."
-      tabs={TABS_CONTABILIDAD}
-      permiso="contabilidad.conciliar"
-    >
+    <ModuloPestanas titulo="Conciliación bancaria" descripcion="Cruzá tus movimientos contables contra el estado de cuenta del banco." permiso="contabilidad.conciliar">
       <ConciliacionBancariaView />
     </ModuloPestanas>
   );

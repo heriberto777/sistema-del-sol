@@ -1,15 +1,9 @@
 import { ModuloPestanas } from '../../components/templates/ModuloPestanas/ModuloPestanas';
 import { LibroMayorView } from '../../components/organisms/LibroMayorView/LibroMayorView';
-import { TABS_CONTABILIDAD } from './tabs';
 
 export function ContabilidadLibroMayor() {
   return (
-    <ModuloPestanas
-      titulo="Contabilidad"
-      descripcion="Catálogo de cuentas, asientos y reportes financieros."
-      tabs={TABS_CONTABILIDAD}
-      permiso="contabilidad.ver"
-    >
+    <ModuloPestanas titulo="Libro diario / mayor" descripcion="Movimientos contables detallados por cuenta, en orden cronológico." permiso="contabilidad.ver">
       <LibroMayorView />
     </ModuloPestanas>
   );

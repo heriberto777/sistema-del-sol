@@ -1,15 +1,9 @@
 import { ModuloPestanas } from '../../components/templates/ModuloPestanas/ModuloPestanas';
 import { CierrePeriodoView } from '../../components/organisms/CierrePeriodoView/CierrePeriodoView';
-import { TABS_CONTABILIDAD } from './tabs';
 
 export function ContabilidadCierre() {
   return (
-    <ModuloPestanas
-      titulo="Contabilidad"
-      descripcion="Catálogo de cuentas, asientos y reportes financieros."
-      tabs={TABS_CONTABILIDAD}
-      permiso="contabilidad.cerrarperiodo"
-    >
+    <ModuloPestanas titulo="Cierre de período" descripcion="Cerrá un período contable para dejarlo firme." permiso="contabilidad.cerrarperiodo">
       <CierrePeriodoView />
     </ModuloPestanas>
   );
