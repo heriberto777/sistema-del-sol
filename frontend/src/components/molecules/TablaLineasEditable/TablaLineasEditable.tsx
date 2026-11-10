@@ -93,6 +93,7 @@ export function TablaLineasEditable<T extends LineaEditable>({
                   <div className="flex flex-col gap-1">
                     {linea.esManual ? (
                       <input
+                        id={`linea-manual-${i}`}
                         type="text"
                         placeholder="Descripción — ej. Instalación"
                         value={linea.descripcionManual}
@@ -102,6 +103,7 @@ export function TablaLineasEditable<T extends LineaEditable>({
                     ) : (
                       <>
                         <SelectorLineaProducto
+                          id={`linea-producto-${i}`}
                           productos={productos}
                           productoId={linea.productoId}
                           varianteId={linea.varianteId}

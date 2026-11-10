@@ -50,7 +50,11 @@ export function Modal({ titulo, onClose, children, ancho = 'lg' }: ModalProps) {
   }, [onClose]);
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-[1px]">
+    // `data-modal-abierto` — marca genérica para que atajos de teclado a
+    // nivel de documento (ej. F3/F4/F6 de Nueva Factura) puedan chequear en
+    // el momento si hay CUALQUIER modal abierto (este u otro, montado desde
+    // donde sea) y no enfocar un campo que quedó tapado detrás.
+    <div data-modal-abierto="true" className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-[1px]">
       <div
         className={`flex ${ALTOS[ancho]} w-full ${ANCHOS[ancho]} flex-col rounded-xl border border-slate-200 bg-white shadow-xl dark:border-slate-800 dark:bg-slate-900`}
       >

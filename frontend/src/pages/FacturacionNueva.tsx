@@ -17,6 +17,7 @@ import { SelectFormaPago, type FormaPago } from '../components/molecules/SelectF
 import { useListasPrecio } from '../hooks/useListasPrecio';
 import { useRequiereComprobanteFiscal } from '../hooks/useRequiereComprobanteFiscal';
 import { useHayCambios } from '../hooks/useHayCambios';
+import { useAtajosTeclado } from '../hooks/useAtajosTeclado';
 import { estimarLineas, ITBIS_GENERAL_ESTIMADO } from '../lib/estimar-totales-documento';
 import { PaginaResultado } from '../types/pagina-resultado';
 import type { ClienteCompleto } from '@backend-src/common/prisma/cliente-select-basico';
@@ -123,6 +124,58 @@ export function FacturacionNueva() {
   function actualizarLinea(i: number, cambios: Partial<(typeof lineas)[number]>) {
     setLineas((prev) => prev.map((l, idx) => (idx === i ? { ...l, ...cambios } : l)));
   }
+
+  // Atajos de teclado F3/F4/F6 (benchmark 2026-11-10, Fase 11 — Cuadre los
+  // anuncia en el header de su formulario de factura). Enfocar un campo
+  // concreto que puede no existir todavía (ej. agregar línea nueva) necesita
+  // esperar al próximo render — `focoPendiente` se consume en el efecto de
+  // abajo, que corre después de que `lineas` ya incluye la fila nueva.
+  const [focoPendiente, setFocoPendiente] = useState<{ indice: number; tipo: 'producto' | 'manual' } | null>(null);
+  function lineaEstaVacia(l: LineaEditable) {
+    return !l.productoId && !(l.esManual && l.descripcionManual.trim());
+  }
+  function irABuscarProducto() {
+    // Si cualquier modal está abierto (alta rápida de cliente/producto, el
+    // "Explorar" del propio combobox…) no tiene sentido enfocar algo detrás.
+    if (document.querySelector('[data-modal-abierto]')) return;
+    const ultimoIndice = lineas.length - 1;
+    const ultima = lineas[ultimoIndice];
+    if (!ultima.esManual && lineaEstaVacia(ultima)) {
+      setFocoPendiente({ indice: ultimoIndice, tipo: 'producto' });
+    } else {
+      setLineas((prev) => [...prev, LINEA_VACIA]);
+      setFocoPendiente({ indice: lineas.length, tipo: 'producto' });
+    }
+  }
+  function irALineaManual() {
+    if (document.querySelector('[data-modal-abierto]')) return;
+    const ultimoIndice = lineas.length - 1;
+    const ultima = lineas[ultimoIndice];
+    if (lineaEstaVacia(ultima)) {
+      // Fila vacía (catálogo sin producto elegido, o manual sin texto
+      // todavía): no se pierde nada al convertirla/reusarla, mismo botón
+      // "Producto libre" que ya existe por fila. Si ya ES manual y vacía,
+      // no hace falta tocar `esManual` — ya está en el estado correcto.
+      if (!ultima.esManual) actualizarLinea(ultimoIndice, { esManual: true, productoId: '', varianteId: '' });
+      setFocoPendiente({ indice: ultimoIndice, tipo: 'manual' });
+    } else {
+      setLineas((prev) => [...prev, { ...LINEA_VACIA, esManual: true }]);
+      setFocoPendiente({ indice: lineas.length, tipo: 'manual' });
+    }
+  }
+  useEffect(() => {
+    if (!focoPendiente) return;
+    const id = focoPendiente.tipo === 'producto' ? `linea-producto-${focoPendiente.indice}` : `linea-manual-${focoPendiente.indice}`;
+    document.getElementById(id)?.focus();
+    setFocoPendiente(null);
+  }, [lineas, focoPendiente]);
+  useAtajosTeclado({
+    F3: () => {
+      if (!document.querySelector('[data-modal-abierto]')) document.getElementById('combobox-cliente')?.focus();
+    },
+    F4: irABuscarProducto,
+    F6: irALineaManual,
+  });
 
   const crear = useMutation({
     mutationFn: async () =>
@@ -446,6 +499,28 @@ export function FacturacionNueva() {
         </>
       }
     >
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
+        <span className="font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">Atajos</span>
+        <span className="inline-flex items-center gap-1.5">
+          <kbd className="rounded border border-slate-300 bg-slate-100 px-1.5 py-0.5 font-mono text-[11px] text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+            F3
+          </kbd>
+          Cliente
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <kbd className="rounded border border-slate-300 bg-slate-100 px-1.5 py-0.5 font-mono text-[11px] text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+            F4
+          </kbd>
+          Buscar producto
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <kbd className="rounded border border-slate-300 bg-slate-100 px-1.5 py-0.5 font-mono text-[11px] text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+            F6
+          </kbd>
+          Línea manual
+        </span>
+      </div>
+
       <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <p className="font-semibold text-slate-900 dark:text-slate-100">{empresa?.nombre ?? 'Mi empresa'}</p>
@@ -484,6 +559,7 @@ export function FacturacionNueva() {
           <div className="flex flex-col gap-1 sm:col-span-2">
             <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Cliente</label>
             <ComboboxBusqueda<Cliente>
+              id="combobox-cliente"
               valor={cliente}
               onSeleccionar={setCliente}
               obtenerId={(c) => c.id}

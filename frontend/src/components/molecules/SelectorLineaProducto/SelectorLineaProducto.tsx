@@ -24,6 +24,8 @@ interface SelectorLineaProductoProps {
   productos: ProductoOpcion[];
   productoId: string;
   varianteId: string;
+  /** Id del input de búsqueda — para enfocarlo por `document.getElementById` (ej. atajo de teclado F4 en Nueva Factura). */
+  id?: string;
   /**
    * `precioReferencia` solo se pasa cuando se elige un producto NUEVO
    * (no al resolver la variante por defecto) — precio de lista GENERAL,
@@ -59,7 +61,7 @@ interface SelectorLineaProductoProps {
  * en el backend, solo que resuelto en el cliente para no obligar a
  * elegir nada que no aplica.
  */
-export function SelectorLineaProducto({ productos, productoId, varianteId, onChange, className }: SelectorLineaProductoProps) {
+export function SelectorLineaProducto({ productos, productoId, varianteId, onChange, className, id }: SelectorLineaProductoProps) {
   const { data: variantes } = useVariantesProducto(productoId);
   const [productoElegido, setProductoElegido] = useState<ProductoOpcion | null>(
     () => productos.find((p) => p.id === productoId) ?? null,
@@ -93,6 +95,7 @@ export function SelectorLineaProducto({ productos, productoId, varianteId, onCha
   return (
     <div className={className}>
       <ComboboxBusqueda<ProductoOpcion>
+        id={id}
         valor={productoElegido}
         onSeleccionar={(p) => {
           setProductoElegido(p);
