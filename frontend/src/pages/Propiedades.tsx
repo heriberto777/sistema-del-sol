@@ -623,7 +623,7 @@ export function Propiedades() {
       setPropiedadAPreventa(null);
       setError(null);
       invalidar();
-      navigate(`/proyectos/${respuesta.data.id}`);
+      navigate(`/proyectos/${respuesta.data.id}/resumen`);
     },
     onError: (err) => setError(mensajeErrorApi(err, 'No se pudo iniciar la preventa.')),
   });
@@ -749,7 +749,7 @@ export function Propiedades() {
                       <td className="px-5 py-3">
                         <Badge tono={TONO_ESTADO[p.estado] ?? 'neutro'}>{ETIQUETA_ESTADO_PROPIEDAD[p.estado] ?? p.estado}</Badge>
                         {p.proyectoPreventa && (
-                          <Link to={`/proyectos/${p.proyectoPreventa.id}`} className="mt-1 block text-xs text-teal-700 hover:underline dark:text-teal-400">
+                          <Link to={`/proyectos/${p.proyectoPreventa.id}/resumen`} className="mt-1 block text-xs text-teal-700 hover:underline dark:text-teal-400">
                             Preventa: {p.proyectoPreventa.nombre}
                           </Link>
                         )}

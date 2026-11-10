@@ -160,7 +160,7 @@ export function Proyectos() {
                 {proyectos.map((p) => (
                   <tr
                     key={p.id}
-                    onClick={() => navigate(`/proyectos/${p.id}`)}
+                    onClick={() => navigate(`/proyectos/${p.id}/resumen`)}
                     className="cursor-pointer border-b border-slate-50 hover:bg-slate-50 dark:border-slate-800/60 dark:hover:bg-slate-800/40"
                   >
                     <td className="px-4 py-3 font-medium text-slate-900 dark:text-slate-100">{p.nombre}</td>

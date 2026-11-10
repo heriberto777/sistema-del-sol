@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { apiClient } from '../lib/api-client';
 import { Card } from '../components/atoms/Card/Card';
 import { SearchInput } from '../components/molecules/SearchInput/SearchInput';
@@ -8,13 +9,14 @@ import { Paginacion } from '../components/molecules/Paginacion/Paginacion';
 import { EstadoVacio } from '../components/molecules/EstadoVacio/EstadoVacio';
 import { Modal } from '../components/molecules/Modal/Modal';
 import { RequierePermiso } from '../components/organisms/RequierePermiso/RequierePermiso';
-import { Tabs, type Pestana } from '../components/molecules/Tabs/Tabs';
+import { SubNavTabs, type SubNavTab } from '../components/molecules/SubNavTabs/SubNavTabs';
+import { useAuth } from '../hooks/useAuth';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { PaginaResultado } from '../types/pagina-resultado';
 
 type PestanaAuditoria = 'actividad' | 'errores';
 
-const PESTANAS: readonly Pestana<PestanaAuditoria>[] = [
+const PESTANAS: readonly { id: PestanaAuditoria; etiqueta: string }[] = [
   { id: 'actividad', etiqueta: 'Actividad' },
   { id: 'errores', etiqueta: 'Errores del sistema' },
 ];
@@ -25,6 +27,8 @@ interface RegistroActividad {
   accion: string;
   entidad: string;
   entidadId: string | null;
+  antes: unknown;
+  despues: unknown;
   ip: string | null;
   user: { id: string; nombre: string; email: string } | null;
 }
@@ -50,8 +54,12 @@ interface UsuarioConActividad {
  * (global) — esta pantalla es la primera que lo expone. Los errores 500 sí
  * son nuevos (antes solo iban a console.error, ver HttpExceptionFilter).
  */
+/** Auditoría UX Fase 6 — antes `useState(pestana)` sin leer la URL (mismo bug ya arreglado en los demás hubs). Bajo impacto: un solo punto de entrada en el menú. */
 export function Auditoria() {
-  const [pestana, setPestana] = useState<PestanaAuditoria>('actividad');
+  const { tienePermiso } = useAuth();
+  const { tab } = useParams<{ tab: string }>();
+  const pestana: PestanaAuditoria = tab === 'errores' ? 'errores' : 'actividad';
+  const tabs: SubNavTab[] = PESTANAS.map((p) => ({ to: `/auditoria/${p.id}`, etiqueta: p.etiqueta }));
 
   return (
     <RequierePermiso permiso="auditoria.ver">
@@ -63,7 +71,7 @@ export function Auditoria() {
           </p>
         </div>
 
-        <Tabs pestanas={PESTANAS} activa={pestana} onCambiar={setPestana} />
+        <SubNavTabs tabs={tabs} tienePermiso={tienePermiso} />
 
         {pestana === 'actividad' ? <PestanaActividad /> : <PestanaErrores />}
       </div>
@@ -72,11 +80,17 @@ export function Auditoria() {
 }
 
 function PestanaActividad() {
-  const [busqueda, setBusqueda] = useState('');
+  const [searchParams] = useSearchParams();
+  // Deep-link desde otras pantallas (ej. "Ver historial de importaciones"
+  // en Productos) — benchmark 2026-11-09, Fase 5: el historial de corridas
+  // de la importación masiva ya se graba solo vía AuditLogInterceptor
+  // (global), esto solo lo hace visible con un filtro precargado.
+  const [busqueda, setBusqueda] = useState(searchParams.get('q') ?? '');
   const [usuarioId, setUsuarioId] = useState('');
   const [desde, setDesde] = useState('');
   const [hasta, setHasta] = useState('');
   const [pagina, setPagina] = useState(1);
+  const [actividadViendo, setActividadViendo] = useState<RegistroActividad | null>(null);
   const busquedaDebounced = useDebouncedValue(busqueda);
 
   const { data: usuarios } = useQuery({
@@ -163,6 +177,7 @@ function PestanaActividad() {
                 <th className="px-5 py-3 font-medium">Acción</th>
                 <th className="px-5 py-3 font-medium">Entidad</th>
                 <th className="px-5 py-3 font-medium">IP</th>
+                <th className="px-5 py-3" />
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -176,6 +191,17 @@ function PestanaActividad() {
                     {r.entidadId && <span className="ml-1 text-xs text-slate-400">#{r.entidadId.slice(0, 8)}</span>}
                   </td>
                   <td className="px-5 py-3 text-xs text-slate-400">{r.ip ?? '—'}</td>
+                  <td className="px-5 py-3 text-right">
+                    {(r.antes != null || r.despues != null) && (
+                      <button
+                        type="button"
+                        onClick={() => setActividadViendo(r)}
+                        className="text-sm font-medium text-sol-600 hover:text-sol-700 dark:text-sol-400"
+                      >
+                        Ver detalle
+                      </button>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -186,6 +212,33 @@ function PestanaActividad() {
         <div className="px-5 py-3">
           <Paginacion pagina={data.pagina} tamanoPagina={data.tamanoPagina} total={data.total} onCambiarPagina={setPagina} />
         </div>
+      )}
+
+      {actividadViendo && (
+        <Modal titulo={`${actividadViendo.accion} — ${new Date(actividadViendo.createdAt).toLocaleString('es-DO')}`} onClose={() => setActividadViendo(null)} ancho="xl">
+          <div className="space-y-3 text-sm">
+            <p>
+              <span className="font-medium text-slate-700 dark:text-slate-300">Usuario: </span>
+              {actividadViendo.user?.nombre ?? 'Sistema'}
+            </p>
+            {actividadViendo.antes != null && (
+              <div>
+                <p className="mb-1 font-medium text-slate-700 dark:text-slate-300">Antes</p>
+                <pre className="max-h-64 overflow-auto rounded-lg bg-slate-900 p-3 text-xs text-slate-200">
+                  {JSON.stringify(actividadViendo.antes, null, 2)}
+                </pre>
+              </div>
+            )}
+            {actividadViendo.despues != null && (
+              <div>
+                <p className="mb-1 font-medium text-slate-700 dark:text-slate-300">Después</p>
+                <pre className="max-h-64 overflow-auto rounded-lg bg-slate-900 p-3 text-xs text-slate-200">
+                  {JSON.stringify(actividadViendo.despues, null, 2)}
+                </pre>
+              </div>
+            )}
+          </div>
+        </Modal>
       )}
     </Card>
   );

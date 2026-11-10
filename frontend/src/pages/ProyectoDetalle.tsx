@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useParams } from 'react-router-dom';
-import clsx from 'clsx';
 import { ArrowLeft } from 'lucide-react';
 import { apiClient } from '../lib/api-client';
 import { mensajeErrorApi } from '../lib/mensaje-error-api';
@@ -9,10 +8,11 @@ import { Button } from '../components/atoms/Button/Button';
 import { Card } from '../components/atoms/Card/Card';
 import { Select } from '../components/atoms/Select/Select';
 import { RequierePermiso } from '../components/organisms/RequierePermiso/RequierePermiso';
+import { SubNavTabs, type SubNavTab } from '../components/molecules/SubNavTabs/SubNavTabs';
+import { useAuth } from '../hooks/useAuth';
 import { EditarProyectoModal } from '../components/organisms/EditarProyectoModal/EditarProyectoModal';
 import { ProyectoHitosTab } from '../components/organisms/ProyectoHitosTab/ProyectoHitosTab';
 import { KanbanTareas } from '../components/organisms/KanbanTareas/KanbanTareas';
-import { useAuth } from '../hooks/useAuth';
 import {
   ESTADOS_PROYECTO,
   ESTADOS_TAREA,
@@ -40,11 +40,22 @@ const PESTANAS = [
 type PestanaId = (typeof PESTANAS)[number]['id'];
 
 export function ProyectoDetalle() {
-  const { id } = useParams<{ id: string }>();
+  const { id, tab } = useParams<{ id: string; tab: string }>();
   const queryClient = useQueryClient();
   const { tienePermiso } = useAuth();
   const puedeVerRentabilidad = tienePermiso('proyectos.rentabilidad.ver');
-  const [pestana, setPestana] = useState<PestanaId>('resumen');
+  // Auditoría UX Fase 6 — antes `useState(pestana)` sin leer la URL (mismo
+  // bug ya arreglado en Inventario/Contabilidad/Nómina/Reportes/Tienda
+  // Online/Travel): el link de Proyectos siempre abría "Resumen" sin
+  // importar cuál pestaña prometía. Ahora cada pestaña es su propia ruta
+  // (`/proyectos/:id/:tab`) — bajo impacto porque es un solo punto de
+  // entrada (el detalle de un proyecto puntual), pero el bug era real.
+  const pestana: PestanaId = PESTANAS.some((p) => p.id === tab) ? (tab as PestanaId) : 'resumen';
+  const tabs: SubNavTab[] = PESTANAS.map((p) => ({
+    to: `/proyectos/${id}/${p.id}`,
+    etiqueta: p.etiqueta,
+    ...(p.id === 'rentabilidad' ? { permiso: 'proyectos.rentabilidad.ver' } : {}),
+  }));
   const [modalEditarAbierto, setModalEditarAbierto] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [mensajeFactura, setMensajeFactura] = useState<string | null>(null);
@@ -116,22 +127,7 @@ export function ProyectoDetalle() {
         {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
         {mensajeFactura && <p className="text-sm text-emerald-600 dark:text-emerald-400">{mensajeFactura}</p>}
 
-        <div className="flex gap-1 overflow-x-auto border-b border-slate-200 dark:border-slate-800">
-          {PESTANAS.map((p) => (
-            <button
-              key={p.id}
-              onClick={() => setPestana(p.id)}
-              className={clsx(
-                'shrink-0 whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium',
-                pestana === p.id
-                  ? 'border-sol-500 text-sol-600 dark:text-sol-400'
-                  : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400',
-              )}
-            >
-              {p.etiqueta}
-            </button>
-          ))}
-        </div>
+        <SubNavTabs tabs={tabs} tienePermiso={tienePermiso} />
 
         {pestana === 'resumen' && (
           <div className="space-y-4">

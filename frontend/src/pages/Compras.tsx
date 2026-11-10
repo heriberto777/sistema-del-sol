@@ -1,14 +1,12 @@
 import { FormEvent, useEffect, useState } from 'react';
-import { Truck } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../lib/api-client';
 import { mensajeErrorApi } from '../lib/mensaje-error-api';
 import { Badge } from '../components/atoms/Badge/Badge';
 import { Button } from '../components/atoms/Button/Button';
 import { Card } from '../components/atoms/Card/Card';
 import { Select } from '../components/atoms/Select/Select';
-import { ComboboxBusqueda } from '../components/molecules/ComboboxBusqueda/ComboboxBusqueda';
 import { FormField } from '../components/molecules/FormField/FormField';
 import { Modal } from '../components/molecules/Modal/Modal';
 import { ConfirmModal } from '../components/molecules/ConfirmModal/ConfirmModal';
@@ -33,11 +31,6 @@ interface OrdenCompra {
   total: string;
   pagada: boolean;
   proveedor: { nombre: string };
-}
-
-interface Proveedor {
-  id: string;
-  nombre: string;
 }
 
 interface Producto {
@@ -97,11 +90,10 @@ const ESTADOS_CANCELABLES = ['BORRADOR', 'ENVIADA'];
 
 export function Compras() {
   const { tienePermiso } = useAuth();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   const [busqueda, setBusqueda] = useState('');
   const [pagina, setPagina] = useState(1);
   const busquedaDebounced = useDebouncedValue(busqueda);
-  const [modalNuevaOc, setModalNuevaOc] = useState(false);
   const [ordenRecibiendo, setOrdenRecibiendo] = useState<OrdenCompra | null>(null);
   const [ordenPagando, setOrdenPagando] = useState<OrdenCompra | null>(null);
   const [ordenDevolviendo, setOrdenDevolviendo] = useState<OrdenCompra | null>(null);
@@ -116,14 +108,6 @@ export function Compras() {
       apiClient.patch(`/compras/${id}/estado`, { estado }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['ordenes-compra'] }),
   });
-
-  useEffect(() => {
-    if (searchParams.get('crear') === '1') {
-      setModalNuevaOc(true);
-      setSearchParams({}, { replace: true });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const { data } = useQuery({
     queryKey: ['ordenes-compra', pagina, busquedaDebounced],
@@ -143,7 +127,7 @@ export function Compras() {
           <p className="text-sm text-slate-500 dark:text-slate-400">Órdenes de compra a tus proveedores.</p>
         </div>
         <RequierePermiso permiso="compras.crear">
-          <Button onClick={() => setModalNuevaOc(true)}>Nueva orden de compra</Button>
+          <Button onClick={() => navigate('/compras/nueva')}>Nueva orden de compra</Button>
         </RequierePermiso>
       </div>
       <RequierePermiso permiso="compras.ver">
@@ -168,7 +152,7 @@ export function Compras() {
                 titulo="Todavía no hay órdenes de compra"
                 descripcion="Creá la primera para empezar a recibir mercancía de tus proveedores."
                 etiquetaAccion="Nueva orden de compra"
-                onAccion={() => setModalNuevaOc(true)}
+                onAccion={() => navigate('/compras/nueva')}
               />
             </div>
           ) : (
@@ -239,7 +223,6 @@ export function Compras() {
         </Card>
       </RequierePermiso>
 
-      {modalNuevaOc && <ModalNuevaOrdenCompra onClose={() => setModalNuevaOc(false)} />}
       {ordenEditando && <ModalEditarOrdenCompra orden={ordenEditando} onClose={() => setOrdenEditando(null)} />}
       {ordenRecibiendo && (
         <ModalRecibirOrden orden={ordenRecibiendo} onClose={() => setOrdenRecibiendo(null)} />
@@ -344,161 +327,6 @@ function ModalVerOrden({ orden, onClose }: { orden: OrdenCompra; onClose: () => 
           )}
         </div>
       )}
-    </Modal>
-  );
-}
-
-function ModalNuevaOrdenCompra({ onClose }: { onClose: () => void }) {
-  const queryClient = useQueryClient();
-  const [proveedor, setProveedor] = useState<Proveedor | null>(null);
-  const [lineas, setLineas] = useState([{ productoId: '', varianteId: '', unidadMedidaId: '', cantidad: '1', costoUnitario: '' }]);
-  const [mostrarNuevoProveedor, setMostrarNuevoProveedor] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const { data: productos } = useQuery({
-    queryKey: ['productos-select'],
-    queryFn: async () => (await apiClient.get<PaginaResultado<Producto>>('/productos', { params: { tamanoPagina: 100 } })).data.datos,
-  });
-
-  const total = lineas.reduce((acc, l) => acc + Number(l.cantidad || 0) * Number(l.costoUnitario || 0), 0);
-
-  function actualizarLinea(i: number, cambios: Partial<(typeof lineas)[number]>) {
-    setLineas((prev) => prev.map((l, idx) => (idx === i ? { ...l, ...cambios } : l)));
-  }
-
-  const crear = useMutation({
-    mutationFn: async () =>
-      apiClient.post('/compras', {
-        proveedorId: proveedor?.id,
-        lineas: lineas
-          .filter((l) => l.productoId)
-          .map((l) => ({
-            productoId: l.productoId,
-            varianteId: l.varianteId || undefined,
-            unidadMedidaId: l.unidadMedidaId || undefined,
-            cantidad: Number(l.cantidad),
-            costoUnitario: Number(l.costoUnitario),
-          })),
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ordenes-compra'] });
-      onClose();
-    },
-    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo crear la orden de compra. Revisa los datos.')),
-  });
-
-  function onSubmit(e: FormEvent) {
-    e.preventDefault();
-    setError(null);
-    if (!proveedor) {
-      setError('Seleccioná un proveedor.');
-      return;
-    }
-    if (lineas.filter((l) => l.productoId).length === 0) {
-      setError('Agregá al menos una línea con producto.');
-      return;
-    }
-    crear.mutate();
-  }
-
-  return (
-    <Modal titulo="Nueva orden de compra" onClose={onClose} ancho="xl">
-      <form onSubmit={onSubmit} className="space-y-3">
-        <div className="flex flex-col gap-1">
-          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Proveedor</label>
-          <ComboboxBusqueda<Proveedor>
-            valor={proveedor}
-            onSeleccionar={setProveedor}
-            obtenerId={(p) => p.id}
-            obtenerEtiqueta={(p) => p.nombre}
-            placeholder="Buscar proveedor…"
-            icono={<Truck size={15} />}
-            buscar={async (texto) =>
-              (await apiClient.get<PaginaResultado<Proveedor>>('/proveedores', { params: { busqueda: texto, tamanoPagina: 10 } })).data
-                .datos
-            }
-          />
-          <button
-            type="button"
-            onClick={() => setMostrarNuevoProveedor((v) => !v)}
-            className="self-start text-xs font-medium text-sol-600 hover:text-sol-700 dark:text-sol-400"
-          >
-            + Nuevo proveedor
-          </button>
-          {mostrarNuevoProveedor && (
-            <NuevoProveedorInline
-              onCreado={(p) => {
-                setProveedor(p);
-                setMostrarNuevoProveedor(false);
-              }}
-            />
-          )}
-        </div>
-
-        <div className="space-y-2">
-          <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Líneas</p>
-          {lineas.map((linea, i) => (
-            <div key={i} className="flex flex-wrap gap-2">
-              <SelectorLineaProducto
-                productos={productos ?? []}
-                productoId={linea.productoId}
-                varianteId={linea.varianteId}
-                onChange={(productoId, varianteId) => actualizarLinea(i, { productoId, varianteId, unidadMedidaId: '' })}
-                className="flex-1"
-              />
-              <SelectorUnidadLinea
-                productoId={linea.productoId}
-                value={linea.unidadMedidaId}
-                onChange={(unidadMedidaId) => actualizarLinea(i, { unidadMedidaId })}
-                className="w-32"
-              />
-              <input
-                type="number"
-                min={1}
-                placeholder="Cant."
-                value={linea.cantidad}
-                onChange={(e) => actualizarLinea(i, { cantidad: e.target.value })}
-                className="w-20 rounded-md border border-slate-300 px-2 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-              />
-              <input
-                type="number"
-                min={0}
-                step="0.01"
-                placeholder="Costo"
-                value={linea.costoUnitario}
-                onChange={(e) => actualizarLinea(i, { costoUnitario: e.target.value })}
-                className="w-24 rounded-md border border-slate-300 px-2 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-              />
-              {lineas.length > 1 && (
-                <button
-                  type="button"
-                  onClick={() => setLineas((prev) => prev.filter((_, idx) => idx !== i))}
-                  className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
-                  aria-label="Quitar línea"
-                >
-                  ×
-                </button>
-              )}
-            </div>
-          ))}
-          <button
-            type="button"
-            onClick={() => setLineas((prev) => [...prev, { productoId: '', varianteId: '', unidadMedidaId: '', cantidad: '1', costoUnitario: '' }])}
-            className="text-sm font-medium text-sol-600 hover:text-sol-700 dark:text-sol-400"
-          >
-            + Agregar línea
-          </button>
-        </div>
-
-        <p className="text-right text-sm font-medium text-slate-700 dark:text-slate-300">
-          Total: RD$ {total.toLocaleString('es-DO')}
-        </p>
-
-        {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
-        <Button type="submit" disabled={crear.isPending} className="w-full">
-          {crear.isPending ? 'Creando…' : 'Crear orden de compra'}
-        </Button>
-      </form>
     </Modal>
   );
 }
@@ -646,39 +474,6 @@ function ModalEditarOrdenCompra({ orden, onClose }: { orden: OrdenCompra; onClos
         </form>
       )}
     </Modal>
-  );
-}
-
-function NuevoProveedorInline({ onCreado }: { onCreado: (p: Proveedor) => void }) {
-  const [nombre, setNombre] = useState('');
-  const [error, setError] = useState<string | null>(null);
-
-  const crear = useMutation({
-    mutationFn: async () => (await apiClient.post<Proveedor>('/proveedores', { nombre })).data,
-    onSuccess: (proveedor) => onCreado(proveedor),
-    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo crear el proveedor.')),
-  });
-
-  return (
-    <div className="mt-1 flex items-end gap-2 rounded-md border border-slate-200 p-2 dark:border-slate-800">
-      <div className="flex-1">
-        <FormField
-          id="nuevo-proveedor-nombre"
-          label="Nombre del proveedor"
-          value={nombre}
-          onChange={(e) => setNombre(e.target.value)}
-        />
-        {error && <p className="text-xs text-red-600 dark:text-red-400">{error}</p>}
-      </div>
-      <Button
-        type="button"
-        variante="secundario"
-        disabled={!nombre || crear.isPending}
-        onClick={() => crear.mutate()}
-      >
-        Crear
-      </Button>
-    </div>
   );
 }
 
