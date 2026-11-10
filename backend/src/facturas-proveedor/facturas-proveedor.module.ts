@@ -7,9 +7,10 @@ import { ProveedoresModule } from '../proveedores/proveedores.module';
 import { TerminosPagoModule } from '../terminos-pago/terminos-pago.module';
 import { PagosModule } from '../pagos/pagos.module';
 import { ContabilidadModule } from '../contabilidad/contabilidad.module';
+import { IaModule } from '../ia/ia.module';
 
 @Module({
-  imports: [CuentasPorPagarModule, ProveedoresModule, TerminosPagoModule, PagosModule, ContabilidadModule],
+  imports: [CuentasPorPagarModule, ProveedoresModule, TerminosPagoModule, PagosModule, ContabilidadModule, IaModule],
   controllers: [FacturasProveedorController],
   providers: [FacturasProveedorService, FacturasProveedorRepository],
   exports: [FacturasProveedorService],

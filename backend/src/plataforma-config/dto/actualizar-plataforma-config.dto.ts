@@ -252,4 +252,11 @@ export class ActualizarPlataformaConfigDto {
   @Min(0)
   iaAsistenteLimiteMensual?: number;
 
+  // Benchmark 2026-11-09 (Fase 10) — "crear desde imagen/PDF" (Factura de Proveedor).
+  @ApiProperty({ required: false, description: 'Tope de "Crear desde imagen/PDF" (extraer factura de proveedor) por tenant por mes' })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  iaExtraccionFacturaLimiteMensual?: number;
+
 }

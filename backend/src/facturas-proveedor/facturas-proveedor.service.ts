@@ -13,6 +13,8 @@ import { ListadoQueryDto } from '../common/dto/listado-query.dto';
 import { paginar } from '../common/types/pagina-resultado';
 import { calcularFechaVencimiento } from '../common/fecha/dias-vencido.util';
 import { PagosService } from '../pagos/pagos.service';
+import { ExtractorFacturaService } from '../ia/extractor-factura/extractor-factura.service';
+import { UsoIaService } from '../ia/uso-ia.service';
 
 const EPSILON = 0.005; // tolerancia de redondeo en centavos, igual que PagosService/AsientosContablesService
 
@@ -27,7 +29,22 @@ export class FacturasProveedorService {
     private readonly eventBus: EventBusService,
     private readonly cierrePeriodoService: CierrePeriodoService,
     private readonly pagosService: PagosService,
+    private readonly extractorFacturaService: ExtractorFacturaService,
+    private readonly usoIaService: UsoIaService,
   ) {}
+
+  /**
+   * Benchmark 2026-11-09 (Fase 10) — "crear desde imagen/PDF". Nunca crea
+   * nada solo: devuelve los campos leídos para que `FacturaProveedorNueva`
+   * los muestre en el formulario de siempre, editables, antes de guardar
+   * — la clasificación contable por línea (`cuentaContableId`) no se puede
+   * leer de la imagen (es un criterio interno del negocio), así que esto
+   * nunca intenta armar las líneas solo.
+   */
+  async extraerDesdeArchivo(archivo: string, tenantId: string) {
+    await this.usoIaService.verificarYRegistrar(tenantId, 'EXTRACCION_FACTURA');
+    return this.extractorFacturaService.extraerDesdeDataUri(archivo);
+  }
 
   /**
    * Fase 5 (CxP) — FacturaProveedor nace síncrona con su CuentaPorPagar,

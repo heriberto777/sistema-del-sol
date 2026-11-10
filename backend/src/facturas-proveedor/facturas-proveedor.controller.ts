@@ -2,6 +2,7 @@ import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { FacturasProveedorService } from './facturas-proveedor.service';
 import { CrearFacturaProveedorDto } from './dto/crear-factura-proveedor.dto';
+import { ExtraerFacturaProveedorDto } from './dto/extraer-factura-proveedor.dto';
 import { CrearPagoOrdenCompraDto } from '../compras/dto/crear-pago-orden-compra.dto';
 import { Permissions } from '../common/decorators/permissions.decorator';
 import { RequiereModulo } from '../common/decorators/requiere-modulo.decorator';
@@ -20,6 +21,15 @@ export class FacturasProveedorController {
   @Permissions('facturasproveedor.crear')
   crear(@Body() dto: CrearFacturaProveedorDto, @CurrentUser() user: JwtPayloadUser) {
     return this.facturasProveedorService.crear(dto, user.tenantId, user.userId);
+  }
+
+  // Benchmark 2026-11-09 (Fase 10) — "crear desde imagen/PDF", antes de
+  // ':id' a propósito (mismo cuidado de orden que el resto de rutas
+  // literales de este tipo de controller).
+  @Post('extraer-desde-archivo')
+  @Permissions('facturasproveedor.crear')
+  extraerDesdeArchivo(@Body() dto: ExtraerFacturaProveedorDto, @CurrentUser() user: JwtPayloadUser) {
+    return this.facturasProveedorService.extraerDesdeArchivo(dto.archivo, user.tenantId);
   }
 
   @Get()

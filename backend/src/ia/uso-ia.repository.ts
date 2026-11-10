@@ -29,13 +29,14 @@ export class UsoIaRepository {
   }
 
   /** `PlataformaConfiguracion` es fila única, NO tenant-scoped — `PrismaService` global, mismo criterio que `PublicacionesSocialesRepository.buscarLimiteIaFondo`. */
-  async buscarLimites(): Promise<{ imagen: number; asistente: number }> {
+  async buscarLimites(): Promise<{ imagen: number; asistente: number; extraccionFactura: number }> {
     const config = await this.prisma.plataformaConfiguracion.findFirst({
-      select: { iaImagenLimiteMensual: true, iaAsistenteLimiteMensual: true },
+      select: { iaImagenLimiteMensual: true, iaAsistenteLimiteMensual: true, iaExtraccionFacturaLimiteMensual: true },
     });
     return {
       imagen: config?.iaImagenLimiteMensual ?? 20,
       asistente: config?.iaAsistenteLimiteMensual ?? 50,
+      extraccionFactura: config?.iaExtraccionFacturaLimiteMensual ?? 10,
     };
   }
 }

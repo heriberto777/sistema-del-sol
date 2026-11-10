@@ -5,6 +5,14 @@ import { UsoIaRepository } from './uso-ia.repository';
 const ETIQUETA_TIPO: Record<TipoUsoIa, string> = {
   IMAGEN_PRODUCTO: 'análisis de imagen',
   ASISTENTE: 'asistente de IA',
+  EXTRACCION_FACTURA: 'extracción de factura desde imagen/PDF',
+};
+
+/** Qué clave de `buscarLimites()` corresponde a cada tipo — evita repetir el ternario en cada método de abajo. */
+const CLAVE_LIMITE: Record<TipoUsoIa, 'imagen' | 'asistente' | 'extraccionFactura'> = {
+  IMAGEN_PRODUCTO: 'imagen',
+  ASISTENTE: 'asistente',
+  EXTRACCION_FACTURA: 'extraccionFactura',
 };
 
 /**
@@ -29,7 +37,7 @@ export class UsoIaService {
   async verificarYRegistrar(tenantId: string, tipo: TipoUsoIa): Promise<void> {
     const permitido = await this.intentarRegistrar(tenantId, tipo);
     if (!permitido) {
-      const limite = (await this.usoIaRepository.buscarLimites())[tipo === 'IMAGEN_PRODUCTO' ? 'imagen' : 'asistente'];
+      const limite = (await this.usoIaRepository.buscarLimites())[CLAVE_LIMITE[tipo]];
       throw new BadRequestException(`Alcanzaste el límite de ${limite} uso(s) de ${ETIQUETA_TIPO[tipo]} este mes`);
     }
   }
@@ -43,7 +51,7 @@ export class UsoIaService {
    */
   async intentarRegistrar(tenantId: string, tipo: TipoUsoIa): Promise<boolean> {
     const [usados, limites] = await Promise.all([this.usoIaRepository.contarDelMes(tipo), this.usoIaRepository.buscarLimites()]);
-    const limite = tipo === 'IMAGEN_PRODUCTO' ? limites.imagen : limites.asistente;
+    const limite = limites[CLAVE_LIMITE[tipo]];
     if (usados >= limite) return false;
     await this.usoIaRepository.registrar(tenantId, tipo);
     return true;
@@ -52,6 +60,6 @@ export class UsoIaService {
   /** Para mostrar "te quedan N de M" en el frontend antes de intentar generar — no registra nada. */
   async consultar(tipo: TipoUsoIa): Promise<{ usados: number; limite: number }> {
     const [usados, limites] = await Promise.all([this.usoIaRepository.contarDelMes(tipo), this.usoIaRepository.buscarLimites()]);
-    return { usados, limite: tipo === 'IMAGEN_PRODUCTO' ? limites.imagen : limites.asistente };
+    return { usados, limite: limites[CLAVE_LIMITE[tipo]] };
   }
 }

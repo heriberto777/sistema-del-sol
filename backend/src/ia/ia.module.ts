@@ -17,6 +17,8 @@ import { OpenAiFondoAdapter } from './generador-fondo/openai-fondo.adapter';
 import { GeminiFondoAdapter } from './generador-fondo/gemini-fondo.adapter';
 import { UsoIaService } from './uso-ia.service';
 import { UsoIaRepository } from './uso-ia.repository';
+import { ExtractorFacturaService } from './extractor-factura/extractor-factura.service';
+import { ClaudeFacturaAdapter } from './extractor-factura/claude-factura.adapter';
 
 @Module({
   imports: [ReportesModule, ContabilidadModule],
@@ -37,7 +39,9 @@ import { UsoIaRepository } from './uso-ia.repository';
     GeminiFondoAdapter,
     UsoIaService,
     UsoIaRepository,
+    ExtractorFacturaService,
+    ClaudeFacturaAdapter,
   ],
-  exports: [IaClientService, AnalizadorImagenService, ConversacionIaService, GeneradorFondoService, UsoIaService],
+  exports: [IaClientService, AnalizadorImagenService, ConversacionIaService, GeneradorFondoService, UsoIaService, ExtractorFacturaService],
 })
 export class IaModule {}

@@ -9,6 +9,8 @@ import { EventBusService } from '../event-bus/event-bus.service';
 import { EVENTOS } from '../event-bus/events';
 import { CierrePeriodoService } from '../contabilidad/cierre-periodo.service';
 import { PagosService } from '../pagos/pagos.service';
+import { ExtractorFacturaService } from '../ia/extractor-factura/extractor-factura.service';
+import { UsoIaService } from '../ia/uso-ia.service';
 
 describe('FacturasProveedorService', () => {
   let service: FacturasProveedorService;
@@ -20,6 +22,8 @@ describe('FacturasProveedorService', () => {
   let eventBus: jest.Mocked<EventBusService>;
   let cierrePeriodoService: jest.Mocked<CierrePeriodoService>;
   let pagosService: jest.Mocked<PagosService>;
+  let extractorFacturaService: jest.Mocked<ExtractorFacturaService>;
+  let usoIaService: jest.Mocked<UsoIaService>;
 
   const TX = { esTransaccion: true };
 
@@ -45,6 +49,8 @@ describe('FacturasProveedorService', () => {
       registrarPagoFacturaProveedor: jest.fn(),
       listarPorFacturaProveedor: jest.fn(),
     } as unknown as jest.Mocked<PagosService>;
+    extractorFacturaService = { extraerDesdeDataUri: jest.fn() } as unknown as jest.Mocked<ExtractorFacturaService>;
+    usoIaService = { verificarYRegistrar: jest.fn().mockResolvedValue(undefined) } as unknown as jest.Mocked<UsoIaService>;
 
     service = new FacturasProveedorService(
       repository,
@@ -55,6 +61,8 @@ describe('FacturasProveedorService', () => {
       eventBus,
       cierrePeriodoService,
       pagosService,
+      extractorFacturaService,
+      usoIaService,
     );
   });
 

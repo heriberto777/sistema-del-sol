@@ -1,4 +1,4 @@
-import { NavLink } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import clsx from 'clsx';
 import {
@@ -21,6 +21,8 @@ interface Enlace {
   etiqueta: string;
   icono: LucideIcon;
   permiso?: string;
+  /** Para ítems con sub-rutas (ej. Configuración, Fase 7) — se resalta si la URL actual empieza con esto, no solo si coincide exacto con `ruta`. */
+  prefijoActivo?: string;
 }
 
 const ENLACES: Enlace[] = [
@@ -32,7 +34,13 @@ const ENLACES: Enlace[] = [
   { ruta: '/plataforma/admins', etiqueta: 'Admins', icono: UserCog, permiso: 'platform.admins.ver' },
   { ruta: '/plataforma/roles', etiqueta: 'Roles', icono: ShieldCheck, permiso: 'platform.roles.ver' },
   { ruta: '/plataforma/actividad', etiqueta: 'Actividad', icono: Activity, permiso: 'platform.auditoria.ver' },
-  { ruta: '/plataforma/configuracion', etiqueta: 'Configuración', icono: Settings, permiso: 'platform.configuracion.ver' },
+  {
+    ruta: '/plataforma/configuracion/general',
+    etiqueta: 'Configuración',
+    icono: Settings,
+    permiso: 'platform.configuracion.ver',
+    prefijoActivo: '/plataforma/configuracion',
+  },
 ];
 
 /**
@@ -44,6 +52,7 @@ const ENLACES: Enlace[] = [
  */
 export function PlatformSidebar({ onNavegar }: { onNavegar?: () => void } = {}) {
   const { tienePermiso } = usePlatformAuth();
+  const location = useLocation();
   const enlacesVisibles = ENLACES.filter((enlace) => !enlace.permiso || tienePermiso(enlace.permiso));
 
   // Mismo endpoint público que Login.tsx (GET /platform/branding) — acá
@@ -78,12 +87,26 @@ export function PlatformSidebar({ onNavegar }: { onNavegar?: () => void } = {}) 
         </div>
       </div>
 
-      {enlacesVisibles.map((enlace) => (
-        <NavLink key={enlace.ruta} to={enlace.ruta} className={enlaceClase} onClick={onNavegar}>
-          <enlace.icono size={17} className="shrink-0" />
-          {enlace.etiqueta}
-        </NavLink>
-      ))}
+      {enlacesVisibles.map((enlace) => {
+        if (!enlace.prefijoActivo) {
+          return (
+            <NavLink key={enlace.ruta} to={enlace.ruta} className={enlaceClase} onClick={onNavegar}>
+              <enlace.icono size={17} className="shrink-0" />
+              {enlace.etiqueta}
+            </NavLink>
+          );
+        }
+        // Ítem con sub-rutas (Configuración, Fase 7): NavLink por defecto solo
+        // resalta si la URL coincide con `ruta` (la pestaña "general"), no con
+        // sus hermanas — se calcula manualmente contra `prefijoActivo`.
+        const activo = location.pathname.startsWith(enlace.prefijoActivo);
+        return (
+          <NavLink key={enlace.ruta} to={enlace.ruta} className={() => enlaceClase({ isActive: activo })} onClick={onNavegar}>
+            <enlace.icono size={17} className="shrink-0" />
+            {enlace.etiqueta}
+          </NavLink>
+        );
+      })}
     </nav>
   );
 }

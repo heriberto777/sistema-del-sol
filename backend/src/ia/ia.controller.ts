@@ -25,11 +25,12 @@ export class IaController {
   @Get('uso-mensual')
   @Permissions('ia.usar')
   async usoMensual() {
-    const [imagenProducto, asistente] = await Promise.all([
+    const [imagenProducto, asistente, extraccionFactura] = await Promise.all([
       this.usoIaService.consultar('IMAGEN_PRODUCTO'),
       this.usoIaService.consultar('ASISTENTE'),
+      this.usoIaService.consultar('EXTRACCION_FACTURA'),
     ]);
-    return { imagenProducto, asistente };
+    return { imagenProducto, asistente, extraccionFactura };
   }
 
   @Post('asistente')

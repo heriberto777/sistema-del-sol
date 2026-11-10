@@ -74,6 +74,7 @@ export class PlataformaConfigService implements OnModuleInit {
     if (dto.iaFondoLimiteMensual !== undefined) data.iaFondoLimiteMensual = dto.iaFondoLimiteMensual;
     if (dto.iaImagenLimiteMensual !== undefined) data.iaImagenLimiteMensual = dto.iaImagenLimiteMensual;
     if (dto.iaAsistenteLimiteMensual !== undefined) data.iaAsistenteLimiteMensual = dto.iaAsistenteLimiteMensual;
+    if (dto.iaExtraccionFacturaLimiteMensual !== undefined) data.iaExtraccionFacturaLimiteMensual = dto.iaExtraccionFacturaLimiteMensual;
 
     this.aplicarCampoSecreto(data, 'smtpPasswordCifrado', dto.smtpPassword);
     this.aplicarCampoSecreto(data, 'twilioAuthTokenCifrado', dto.twilioAuthToken);
@@ -237,6 +238,9 @@ export class PlataformaConfigService implements OnModuleInit {
       },
       iaAsistente: {
         limiteMensual: config.iaAsistenteLimiteMensual,
+      },
+      iaExtraccionFactura: {
+        limiteMensual: config.iaExtraccionFacturaLimiteMensual,
       },
     };
   }

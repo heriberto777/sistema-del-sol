@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../lib/api-client';
 import { mensajeErrorApi } from '../lib/mensaje-error-api';
 import { Button } from '../components/atoms/Button/Button';
@@ -9,7 +10,6 @@ import { SearchInput } from '../components/molecules/SearchInput/SearchInput';
 import { Paginacion } from '../components/molecules/Paginacion/Paginacion';
 import { EstadoVacio } from '../components/molecules/EstadoVacio/EstadoVacio';
 import { ConfirmModal } from '../components/molecules/ConfirmModal/ConfirmModal';
-import { ModalCrearFacturaProveedor } from '../components/molecules/ModalCrearFacturaProveedor/ModalCrearFacturaProveedor';
 import { ModalNotaCreditoProveedor } from '../components/molecules/ModalNotaCreditoProveedor/ModalNotaCreditoProveedor';
 import { ModalRegistrarPagoFacturaProveedor } from '../components/molecules/ModalRegistrarPagoFacturaProveedor/ModalRegistrarPagoFacturaProveedor';
 import { RequierePermiso } from '../components/organisms/RequierePermiso/RequierePermiso';
@@ -39,10 +39,10 @@ interface FacturaProveedor {
  */
 export function FacturasProveedor() {
   const { tienePermiso } = useAuth();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [pagina, setPagina] = useState(1);
   const [busqueda, setBusqueda] = useState('');
-  const [modalAbierto, setModalAbierto] = useState(false);
   const [facturaPagando, setFacturaPagando] = useState<FacturaProveedor | null>(null);
   const [facturaNotaCredito, setFacturaNotaCredito] = useState<FacturaProveedor | null>(null);
   const [facturaAnulando, setFacturaAnulando] = useState<FacturaProveedor | null>(null);
@@ -79,7 +79,7 @@ export function FacturasProveedor() {
             Gastos a crédito de un proveedor sin orden de compra (luz, alquiler, servicios) — entran al mismo aging de Cuentas por pagar.
           </p>
         </div>
-        {tienePermiso('facturasproveedor.crear') && <Button onClick={() => setModalAbierto(true)}>Nueva factura</Button>}
+        {tienePermiso('facturasproveedor.crear') && <Button onClick={() => navigate('/facturas-proveedor/nueva')}>Nueva factura</Button>}
       </div>
 
       <RequierePermiso permiso="facturasproveedor.ver">
@@ -88,7 +88,7 @@ export function FacturasProveedor() {
             titulo="Todavía no has registrado facturas de proveedor"
             descripcion="Registrá la primera factura de un proveedor sin orden de compra."
             etiquetaAccion="Nueva factura"
-            onAccion={() => setModalAbierto(true)}
+            onAccion={() => navigate('/facturas-proveedor/nueva')}
           />
         ) : (
           <Card
@@ -175,7 +175,6 @@ export function FacturasProveedor() {
         )}
       </RequierePermiso>
 
-      {modalAbierto && <ModalCrearFacturaProveedor onClose={() => setModalAbierto(false)} />}
       {facturaPagando && (
         <ModalRegistrarPagoFacturaProveedor
           factura={{ id: facturaPagando.id, ncfProveedor: facturaPagando.ncfProveedor, total: facturaPagando.total }}

@@ -1,7 +1,9 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import clsx from 'clsx';
+import { useParams } from 'react-router-dom';
 import { platformApiClient } from '../lib/platform-api-client';
+import { SubNavTabs, type SubNavTab } from '../components/molecules/SubNavTabs/SubNavTabs';
+import { usePlatformAuth } from '../hooks/usePlatformAuth';
 import { FormField } from '../components/molecules/FormField/FormField';
 import { Button } from '../components/atoms/Button/Button';
 import { Card } from '../components/atoms/Card/Card';
@@ -92,6 +94,9 @@ export interface ConfiguracionPlataforma {
   iaAsistente: {
     limiteMensual: number;
   };
+  iaExtraccionFactura: {
+    limiteMensual: number;
+  };
 }
 
 // Fase 4 — reglas de notificación de vencimiento configurables.
@@ -105,19 +110,28 @@ interface ReglaNotificacion {
 const PLACEHOLDER_CONFIGURADO = '•••••••• (configurado)';
 
 const TABS = [
-  'General',
-  'NCF / e-CF',
-  'Notificaciones',
-  'Pasarela de pago',
-  'IA para productos',
-  'Webhook',
-  'Vencimientos',
-  'Dominio propio',
+  { slug: 'general', etiqueta: 'General' },
+  { slug: 'ncf', etiqueta: 'NCF / e-CF' },
+  { slug: 'notificaciones', etiqueta: 'Notificaciones' },
+  { slug: 'pasarela', etiqueta: 'Pasarela de pago' },
+  { slug: 'ia', etiqueta: 'IA para productos' },
+  { slug: 'webhook', etiqueta: 'Webhook' },
+  { slug: 'vencimientos', etiqueta: 'Vencimientos' },
+  { slug: 'dominio-propio', etiqueta: 'Dominio propio' },
 ] as const;
-type Tab = (typeof TABS)[number];
+type TabSlug = (typeof TABS)[number]['slug'];
 
+/**
+ * Auditoría UX Fase 7 — antes `useState(tab)` sin leer la URL (mismo bug ya
+ * arreglado en los demás hubs de la app, acá en la pantalla de Configuración
+ * de Plataforma). Cada sección es ahora su propia ruta
+ * (`/plataforma/configuracion/:tab`).
+ */
 export function PlatformConfiguracion() {
-  const [tab, setTab] = useState<Tab>('General');
+  const { tienePermiso } = usePlatformAuth();
+  const { tab: tabParam } = useParams<{ tab: string }>();
+  const tab: TabSlug = TABS.some((t) => t.slug === tabParam) ? (tabParam as TabSlug) : 'general';
+  const tabs: SubNavTab[] = TABS.map((t) => ({ to: `/plataforma/configuracion/${t.slug}`, etiqueta: t.etiqueta }));
   const [error, setError] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
@@ -140,41 +154,25 @@ export function PlatformConfiguracion() {
       <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Configuración</h1>
       {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
 
-      <div className="mb-6 flex gap-1 overflow-x-auto border-b border-slate-200 dark:border-slate-800">
-        {TABS.map((t) => (
-          <button
-            key={t}
-            type="button"
-            onClick={() => setTab(t)}
-            className={clsx(
-              'shrink-0 whitespace-nowrap border-b-2 px-4 py-2 text-sm font-medium transition-colors',
-              tab === t
-                ? 'border-sol-500 text-sol-600 dark:text-sol-400'
-                : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200',
-            )}
-          >
-            {t}
-          </button>
-        ))}
-      </div>
+      <SubNavTabs tabs={tabs} tienePermiso={tienePermiso} />
 
       {!config ? (
         <p className="text-sm text-slate-400">Cargando…</p>
       ) : (
         <>
-          {tab === 'General' && <SeccionGeneral config={config} guardar={guardar} />}
-          {tab === 'NCF / e-CF' && <NcfPlataformaPanel config={config} guardar={guardar} />}
-          {tab === 'Notificaciones' && <SeccionNotificaciones config={config} guardar={guardar} />}
-          {tab === 'Pasarela de pago' && <SeccionPasarela config={config} guardar={guardar} />}
-          {tab === 'IA para productos' && (
+          {tab === 'general' && <SeccionGeneral config={config} guardar={guardar} />}
+          {tab === 'ncf' && <NcfPlataformaPanel config={config} guardar={guardar} />}
+          {tab === 'notificaciones' && <SeccionNotificaciones config={config} guardar={guardar} />}
+          {tab === 'pasarela' && <SeccionPasarela config={config} guardar={guardar} />}
+          {tab === 'ia' && (
             <div className="space-y-6">
               <SeccionIaImagen config={config} guardar={guardar} />
               <SeccionIaFondo config={config} guardar={guardar} />
             </div>
           )}
-          {tab === 'Webhook' && <SeccionWebhook config={config} guardar={guardar} />}
-          {tab === 'Vencimientos' && <SeccionVencimientos config={config} guardar={guardar} />}
-          {tab === 'Dominio propio' && <SeccionDominioPropio config={config} guardar={guardar} />}
+          {tab === 'webhook' && <SeccionWebhook config={config} guardar={guardar} />}
+          {tab === 'vencimientos' && <SeccionVencimientos config={config} guardar={guardar} />}
+          {tab === 'dominio-propio' && <SeccionDominioPropio config={config} guardar={guardar} />}
         </>
       )}
     </div>
@@ -446,6 +444,7 @@ function SeccionIaImagen({ config, guardar }: SeccionProps) {
   // diferencia del fondo de banner de abajo que sí lo tiene desde el día uno.
   const [limiteMensual, setLimiteMensual] = useState(String(iaImagen.limiteMensual));
   const [limiteAsistente, setLimiteAsistente] = useState(String(config.iaAsistente.limiteMensual));
+  const [limiteExtraccionFactura, setLimiteExtraccionFactura] = useState(String(config.iaExtraccionFactura.limiteMensual));
 
   useEffect(() => {
     setProveedorActivo(iaImagen.proveedorActivo ?? 'claude');
@@ -454,8 +453,17 @@ function SeccionIaImagen({ config, guardar }: SeccionProps) {
     setGeminiModelo(iaImagen.geminiModelo ?? '');
     setLimiteMensual(String(iaImagen.limiteMensual));
     setLimiteAsistente(String(config.iaAsistente.limiteMensual));
+    setLimiteExtraccionFactura(String(config.iaExtraccionFactura.limiteMensual));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [iaImagen.proveedorActivo, iaImagen.claudeModelo, iaImagen.openaiModelo, iaImagen.geminiModelo, iaImagen.limiteMensual, config.iaAsistente.limiteMensual]);
+  }, [
+    iaImagen.proveedorActivo,
+    iaImagen.claudeModelo,
+    iaImagen.openaiModelo,
+    iaImagen.geminiModelo,
+    iaImagen.limiteMensual,
+    config.iaAsistente.limiteMensual,
+    config.iaExtraccionFactura.limiteMensual,
+  ]);
 
   function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -466,6 +474,7 @@ function SeccionIaImagen({ config, guardar }: SeccionProps) {
       iaGeminiModelo: geminiModelo,
       iaImagenLimiteMensual: limiteMensual ? Number(limiteMensual) : undefined,
       iaAsistenteLimiteMensual: limiteAsistente ? Number(limiteAsistente) : undefined,
+      iaExtraccionFacturaLimiteMensual: limiteExtraccionFactura ? Number(limiteExtraccionFactura) : undefined,
       ...(claudeApiKey !== '' ? { iaClaudeApiKey: claudeApiKey } : {}),
       ...(openaiApiKey !== '' ? { iaOpenaiApiKey: openaiApiKey } : {}),
       ...(geminiApiKey !== '' ? { iaGeminiApiKey: geminiApiKey } : {}),
@@ -554,6 +563,14 @@ function SeccionIaImagen({ config, guardar }: SeccionProps) {
           min={0}
           value={limiteAsistente}
           onChange={(e) => setLimiteAsistente(e.target.value)}
+        />
+        <FormField
+          id="iaExtraccionFacturaLimiteMensual"
+          label='Límite de "Crear desde imagen/PDF" (extraer factura de proveedor) por tenant por mes'
+          type="number"
+          min={0}
+          value={limiteExtraccionFactura}
+          onChange={(e) => setLimiteExtraccionFactura(e.target.value)}
         />
 
         <Button type="submit" disabled={guardar.isPending}>
