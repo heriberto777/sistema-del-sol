@@ -27,13 +27,19 @@ export class ProveedoresRepository {
         : {}),
     };
     return Promise.all([
-      this.db.proveedor.findMany({ where, orderBy: { nombre: 'asc' }, skip: params.skip, take: params.take }),
+      this.db.proveedor.findMany({
+        where,
+        orderBy: { nombre: 'asc' },
+        skip: params.skip,
+        take: params.take,
+        include: { categoria: { select: { id: true, nombre: true } } },
+      }),
       this.db.proveedor.count({ where }),
     ]);
   }
 
   buscarPorId(id: string) {
-    return this.db.proveedor.findUniqueOrThrow({ where: { id } });
+    return this.db.proveedor.findUniqueOrThrow({ where: { id }, include: { categoria: { select: { id: true, nombre: true } } } });
   }
 
   actualizar(id: string, dto: Partial<CrearProveedorDto>) {

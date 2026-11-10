@@ -1,10 +1,16 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEmail, IsInt, IsOptional, IsString, Min } from 'class-validator';
+import { IsEmail, IsInt, IsOptional, IsString, IsUUID, Min } from 'class-validator';
 
 export class CrearProveedorDto {
   @ApiProperty()
   @IsString()
   nombre: string;
+
+  // Paridad con Cliente.categoriaId (auditoría de organización, "100% ERP").
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsUUID()
+  categoriaId?: string;
 
   @ApiProperty({ required: false })
   @IsOptional()
