@@ -273,7 +273,16 @@ export const DOMINIOS_MENU: DominioMenu[] = [
           { id: 'cierre-periodo', etiqueta: 'Cierre de período', ruta: '/contabilidad/cierre', permisos: ['contabilidad.cerrarperiodo'] },
         ],
       },
-      { categoria: 'consultas', items: [{ id: 'libro-mayor', etiqueta: 'Libro diario / mayor', ruta: '/contabilidad/libro-mayor', permisos: ['contabilidad.ver'] }] },
+      {
+        categoria: 'consultas',
+        items: [
+          { id: 'libro-mayor', etiqueta: 'Libro diario / mayor', ruta: '/contabilidad/libro-mayor', permisos: ['contabilidad.ver'] },
+          // Antes solo se llegaba acá por la barra de tabs redundante del
+          // hub viejo — "Asiento contable" en Transacciones solo lleva a
+          // /nuevo, nunca al listado (auditoría de navegación duplicada).
+          { id: 'historial-asientos', etiqueta: 'Historial de asientos', ruta: '/contabilidad/asientos', permisos: ['contabilidad.ver'] },
+        ],
+      },
       {
         // Antes un solo ítem apuntando al hub mixto /reportes — Balance
         // general/Estado de resultados/Balance de comprobación no tenían
@@ -544,7 +553,10 @@ export const GRUPO_MI_ESPACIO: GrupoUtilidades = {
   etiqueta: 'Mi espacio',
   icono: LayoutGrid,
   items: [
-    { id: 'reportes', etiqueta: 'Reportes', ruta: '/reportes/ventas', permisos: ['reportes.ver'] },
+    // "Reportes" se sacó de acá (2026-11-10) — ya está suelto arriba,
+    // apuntando al hub /reportes (auditoría de navegación duplicada:
+    // aparecía DOS veces en el sidebar al mismo tiempo, y esta versión
+    // apuntaba además a /reportes/ventas, la ruta vieja de antes del hub).
     { id: 'mis-tareas', etiqueta: 'Mis tareas', ruta: '/mis-tareas', modulo: 'mistareas' },
     { id: 'notificaciones', etiqueta: 'Notificaciones', ruta: '/notificaciones', permisos: ['notificaciones.ver'] },
     { id: 'mensajes', etiqueta: 'Mensajes', ruta: '/mensajes', permisos: ['whatsapp.mensajes.ver'] },
