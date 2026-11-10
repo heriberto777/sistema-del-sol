@@ -218,6 +218,18 @@ export const DOMINIOS_MENU: DominioMenu[] = [
         items: [
           { id: 'stock', etiqueta: 'Stock actual', ruta: '/inventario/stock', permisos: ['inventario.ver'], modulo: 'inventario' },
           { id: 'alertas', etiqueta: 'Alertas de inventario', ruta: '/inventario/alertas', permisos: ['inventario.ver'], modulo: 'inventario' },
+          // Antes solo se llegaba acá por la barra de tabs redundante del
+          // hub viejo — "Ajuste de inventario"/"Transferencia entre
+          // bodegas" en Transacciones solo llevan a /nuevo, nunca al
+          // listado (auditoría de navegación duplicada).
+          { id: 'historial-ajustes', etiqueta: 'Historial de ajustes', ruta: '/inventario/ajustes', permisos: ['inventario.ver'], modulo: 'inventario' },
+          {
+            id: 'historial-transferencias',
+            etiqueta: 'Historial de transferencias',
+            ruta: '/inventario/transferencias',
+            permisos: ['inventario.ver'],
+            modulo: 'inventario',
+          },
         ],
       },
       { categoria: 'reportes', items: [{ id: 'reportes-inventario', etiqueta: 'Inventario y rotación', ruta: '/reportes/inventario', permisos: ['reportes.ver'] }] },
