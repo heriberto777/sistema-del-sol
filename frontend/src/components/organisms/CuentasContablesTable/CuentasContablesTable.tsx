@@ -32,12 +32,27 @@ const TONO_POR_TIPO: Record<TipoCuenta, 'neutro' | 'exito' | 'advertencia' | 'pe
  */
 export function CuentasContablesTable() {
   const { tienePermiso } = useAuth();
+  const queryClient = useQueryClient();
   const [modalNuevaCuenta, setModalNuevaCuenta] = useState(false);
   const [colapsadas, setColapsadas] = useState<Set<string>>(new Set());
+  const [mensajeCompletar, setMensajeCompletar] = useState<string | null>(null);
 
   const { data, isLoading, error: errorCarga } = useQuery({
     queryKey: ['contabilidad-cuentas'],
     queryFn: async () => (await apiClient.get<CuentaContablePlana[]>('/contabilidad/cuentas')).data,
+  });
+
+  // Fase 11.3 del benchmark (Cuadre tiene un botón de un clic equivalente)
+  // — completa el catálogo mínimo con el plan de cuentas estándar de PYME
+  // dominicana (ver CUENTAS_CATALOGO_COMPLETO en el backend). Idempotente:
+  // el mensaje distingue "no había nada que agregar" de cuántas se crearon.
+  const completarCatalogo = useMutation({
+    mutationFn: async () => (await apiClient.post<{ creadas: number; total: number }>('/contabilidad/cuentas/completar-catalogo')).data,
+    onSuccess: ({ creadas }) => {
+      queryClient.invalidateQueries({ queryKey: ['contabilidad-cuentas'] });
+      setMensajeCompletar(creadas === 0 ? 'El catálogo ya estaba completo — no había nada que agregar.' : `Se agregaron ${creadas} cuenta(s) nueva(s).`);
+    },
+    onError: (err) => setMensajeCompletar(mensajeErrorApi(err, 'No se pudo completar el catálogo.')),
   });
 
   function toggleColapsada(id: string) {
@@ -54,12 +69,27 @@ export function CuentasContablesTable() {
   return (
     <div className="space-y-4">
       {errorCarga && <p className="text-sm text-red-600">No se pudo cargar el catálogo de cuentas.</p>}
+      {mensajeCompletar && <p className="text-sm text-sol-700 dark:text-sol-400">{mensajeCompletar}</p>}
 
       <Card
         sinPadding
         titulo="Catálogo de cuentas"
         descripcion={data ? `${data.length} cuenta(s)` : undefined}
-        acciones={tienePermiso('contabilidad.editar') ? <Button onClick={() => setModalNuevaCuenta(true)}>Nueva cuenta</Button> : undefined}
+        acciones={
+          tienePermiso('contabilidad.editar') ? (
+            <div className="flex items-center gap-2">
+              <Button
+                variante="secundario"
+                onClick={() => completarCatalogo.mutate()}
+                disabled={completarCatalogo.isPending}
+                title="Agrega las cuentas del plan contable estándar que todavía no tengas — no duplica las que ya existen"
+              >
+                {completarCatalogo.isPending ? 'Completando…' : 'Completar catálogo'}
+              </Button>
+              <Button onClick={() => setModalNuevaCuenta(true)}>Nueva cuenta</Button>
+            </div>
+          ) : undefined
+        }
       >
         {isLoading && <p className="p-5 text-sm text-slate-500 dark:text-slate-400">Cargando catálogo de cuentas…</p>}
         {data && (

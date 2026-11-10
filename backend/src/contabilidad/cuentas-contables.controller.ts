@@ -23,4 +23,10 @@ export class CuentasContablesController {
   crear(@Body() dto: CrearCuentaContableDto, @CurrentUser() user: JwtPayloadUser) {
     return this.cuentasContablesService.crear(dto, user.tenantId);
   }
+
+  @Post('completar-catalogo')
+  @Permissions('contabilidad.editar')
+  completarCatalogo(@CurrentUser() user: JwtPayloadUser) {
+    return this.cuentasContablesService.completarCatalogo(user.tenantId);
+  }
 }

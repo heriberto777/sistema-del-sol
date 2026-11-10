@@ -18,6 +18,11 @@ export class CuentasContablesRepository {
     return this.db.cuentaContable.findMany({ where: { activa: true }, orderBy: { codigo: 'asc' } });
   }
 
+  /** Sin filtrar por `activa` — para completarCatalogo(), que necesita saber qué códigos ya existen (el unique de (tenantId, codigo) no distingue activas de inactivas). */
+  listarTodasLasCuentas() {
+    return this.db.cuentaContable.findMany({ select: { id: true, codigo: true } });
+  }
+
   buscarPorCodigo(codigo: string) {
     return this.db.cuentaContable.findFirstOrThrow({ where: { codigo } });
   }
