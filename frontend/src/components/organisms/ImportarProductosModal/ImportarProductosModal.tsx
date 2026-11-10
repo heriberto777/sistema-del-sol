@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
 import { apiClient } from '../../../lib/api-client';
 import { Button } from '../../atoms/Button/Button';
 import { Badge } from '../../atoms/Badge/Badge';
@@ -80,12 +81,24 @@ export function ImportarProductosModal({ onImportado }: { onImportado: () => voi
         Talla/Color ni stock — para stock inicial, cargalo con Conteo Físico después de importar el catálogo.
       </p>
 
-      <input
-        type="file"
-        accept=".xlsx"
-        onChange={elegirArchivo}
-        className="block w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-sol-50 file:px-3 file:py-2 file:text-sm file:font-medium file:text-sol-700 hover:file:bg-sol-100 dark:text-slate-300 dark:file:bg-sol-900/30 dark:file:text-sol-300"
-      />
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <input
+          type="file"
+          accept=".xlsx"
+          onChange={elegirArchivo}
+          className="block flex-1 text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-sol-50 file:px-3 file:py-2 file:text-sm file:font-medium file:text-sol-700 hover:file:bg-sol-100 dark:text-slate-300 dark:file:bg-sol-900/30 dark:file:text-sol-300"
+        />
+        {/* Benchmark 2026-11-09, Fase 5 — "historial de corridas": cada
+            importación ya se graba sola en AuditLog (interceptor global);
+            esto solo la hace encontrable sin tener que adivinar el filtro. */}
+        <Link
+          to="/auditoria/actividad?q=productos%2Fimportar"
+          target="_blank"
+          className="whitespace-nowrap text-sm font-medium text-sol-600 hover:text-sol-700 dark:text-sol-400"
+        >
+          Ver importaciones anteriores →
+        </Link>
+      </div>
 
       {errorArchivo && <p className="text-sm text-red-600">{errorArchivo}</p>}
 
