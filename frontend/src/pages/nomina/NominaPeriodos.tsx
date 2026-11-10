@@ -1,10 +1,9 @@
 import { ModuloPestanas } from '../../components/templates/ModuloPestanas/ModuloPestanas';
 import { PeriodosNominaTable } from '../../components/organisms/PeriodosNominaTable/PeriodosNominaTable';
-import { TABS_NOMINA } from './tabs';
 
 export function NominaPeriodos() {
   return (
-    <ModuloPestanas titulo="Nómina" descripcion="Empleados, períodos y recibos de pago." tabs={TABS_NOMINA} permiso="nomina.ver">
+    <ModuloPestanas titulo="Períodos de nómina" descripcion="Procesá y consultá el historial de períodos de nómina." permiso="nomina.ver">
       <PeriodosNominaTable />
     </ModuloPestanas>
   );
