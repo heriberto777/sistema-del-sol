@@ -81,6 +81,18 @@ export class ReportesFiscalesController {
     return this.reportesFiscalesService.formatoIT1(query.desde, query.hasta);
   }
 
+  @Get('it-1/exportar')
+  @Permissions('reportes.ver')
+  async exportarIT1(@Query() query: ReporteFiscalQueryDto, @Res() res: Response) {
+    const buffer = await this.reportesFiscalesService.exportarIT1Pdf(query.desde, query.hasta);
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': 'attachment; filename="IT-1.pdf"',
+      'Content-Length': buffer.length,
+    });
+    res.send(buffer);
+  }
+
   @Get('retenciones-nomina')
   @Permissions('reportes.ver')
   retencionesNomina(@Query() query: ReporteFiscalQueryDto, @CurrentUser() user: JwtPayloadUser) {

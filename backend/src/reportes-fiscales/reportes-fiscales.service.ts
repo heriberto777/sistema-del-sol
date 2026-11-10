@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ReportesFiscalesRepository } from './reportes-fiscales.repository';
 import { generarTxtFiscal, formatoFechaDgii, formatoMontoDgii } from './exportador-fiscal';
+import { generarPdf } from '../reportes/exportadores/pdf-exportador';
 
 function rangoPorDefecto(desde?: string, hasta?: string): { desde: Date; hasta: Date } {
   const hastaFecha = hasta ? new Date(hasta) : new Date();
@@ -166,6 +167,26 @@ export class ReportesFiscalesService {
       itbisAPagar: neto > 0 ? neto : 0,
       itbisSaldoAFavor: neto < 0 ? -neto : 0,
     };
+  }
+
+  /** Benchmark 2026-11-09 (Fase 4) — el cálculo de IT-1 ya existía (`formatoIT1`), solo faltaba exportarlo a PDF. */
+  async exportarIT1Pdf(desde?: string, hasta?: string): Promise<Buffer> {
+    const it1 = await this.formatoIT1(desde, hasta);
+    const filas: string[][] = [
+      ['Período', `${it1.rango.desde.toLocaleDateString('es-DO')} — ${it1.rango.hasta.toLocaleDateString('es-DO')}`],
+      ['ITBIS en ventas (607)', it1.itbisEnVentas.toFixed(2)],
+      ['ITBIS en compras (606)', it1.itbisEnCompras.toFixed(2)],
+      ['ITBIS a pagar', it1.itbisAPagar.toFixed(2)],
+      ['Saldo a favor', it1.itbisSaldoAFavor.toFixed(2)],
+    ];
+    return generarPdf(
+      'Declaración Jurada de ITBIS (IT-1)',
+      [
+        { header: 'Concepto', width: 300 },
+        { header: 'Monto (RD$)', width: 150 },
+      ],
+      filas,
+    );
   }
 
   /**
