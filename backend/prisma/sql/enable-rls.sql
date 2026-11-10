@@ -34,7 +34,7 @@ BEGIN
       'variantes_producto', 'atributos',
       'ofertas', 'bonos', 'lotes',
       'horarios_empleado', 'registros_asistencia', 'ausencias',
-      'sucursales', 'categorias_cliente', 'feriados', 'puestos',
+      'sucursales', 'categorias_cliente', 'categorias_proveedor', 'feriados', 'puestos',
       'leyes_fiscales', 'plantillas_horario', 'tipos_ausencia_config',
       'codigos_autorizacion', 'comisiones_venta',
       'configuraciones_lealtad', 'movimientos_lealtad',

@@ -99,6 +99,12 @@ export const PERMISOS_BASE = [
   // la acción que habilita la entrega (descarga/WhatsApp) de un diseño,
   // no una edición más.
   'publicacionessociales.ver', 'publicacionessociales.crear', 'publicacionessociales.editar', 'publicacionessociales.aprobar',
+  // Tienda Online — antes compartía admin.configuracion sin ninguna
+  // granularidad propia, a diferencia de los demás plugins de esta lista
+  // (auditoría de organización, "100% ERP"). "Dominio propio y branding"
+  // sigue en admin.configuracion a propósito — escribe en el catálogo
+  // genérico de Configuracion, compartido con módulos no relacionados.
+  'ecommerce.ver', 'ecommerce.secciones.editar',
   // Plugin de Inmobiliaria (Fase 1) — mismo criterio opt-in que Proyectos/
   // Publicaciones Sociales: ninguno empieza con 'admin.', así que Admin
   // Total y Gerente los heredan automático vía PERMISOS_BASE; el resto de

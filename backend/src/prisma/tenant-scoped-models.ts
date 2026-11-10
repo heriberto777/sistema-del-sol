@@ -62,6 +62,8 @@ export const TENANT_SCOPED_MODELS = new Set([
   'Ausencia',
   'Sucursal',
   'CategoriaCliente',
+  // Paridad con CategoriaCliente (auditoría de organización, "100% ERP").
+  'CategoriaProveedor',
   'Feriado',
   'Puesto',
   'LeyFiscal',

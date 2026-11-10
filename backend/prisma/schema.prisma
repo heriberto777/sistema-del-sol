@@ -89,6 +89,7 @@ model Tenant {
   movimientosInventario      MovimientoInventario[]
   clientes                   Cliente[]
   categoriasCliente          CategoriaCliente[]
+  categoriasProveedor        CategoriaProveedor[]
   feriados                   Feriado[]
   puestos                    Puesto[]
   leyesFiscales              LeyFiscal[]
@@ -699,6 +700,8 @@ model PlataformaConfiguracion {
   // (cuenta el uso real) y UsoIaService (compara contra estos límites).
   iaImagenLimiteMensual    Int @default(20)
   iaAsistenteLimiteMensual Int @default(50)
+  // Benchmark 2026-11-09 (Fase 10) — "crear desde imagen/PDF".
+  iaExtraccionFacturaLimiteMensual Int @default(10)
 
   @@map("plataforma_configuracion")
 }
@@ -3338,20 +3341,25 @@ model Lote {
 // ============================================================
 
 model Proveedor {
-  id            String  @id @default(uuid())
+  id            String              @id @default(uuid())
   tenantId      String
-  tenant        Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant        Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   nombre        String
   rnc           String?
   email         String?
   telefono      String?
-  activo        Boolean @default(true)
+  activo        Boolean             @default(true)
   // Crédito general con este proveedor (ítem Cuentas por Pagar) — a
   // diferencia de Factura.plazoPagoDias (snapshot por documento),
   // OrdenCompra no tiene plazo propio: todas sus órdenes heredan este
   // valor en vivo al calcular vencimiento/antigüedad (decisión explícita
   // del usuario, ver CuentasPorPagarService).
-  plazoPagoDias Int     @default(30)
+  plazoPagoDias Int                 @default(30)
+  // Paridad con Cliente.categoriaId (auditoría de organización, "100%
+  // ERP") — segmentación de proveedores, mismo criterio que
+  // CategoriaCliente: puramente informativa, sin efecto en precios/permisos.
+  categoriaId   String?
+  categoria     CategoriaProveedor? @relation(fields: [categoriaId], references: [id], onDelete: SetNull)
 
   ordenesCompra     OrdenCompra[]
   cuentasPorPagar   CuentaPorPagar[]
@@ -3359,6 +3367,22 @@ model Proveedor {
   facturasProveedor FacturaProveedor[]
 
   @@map("proveedores")
+}
+
+/// Paridad con CategoriaCliente (auditoría de organización, "100% ERP") —
+/// ver docs/ARCHITECTURE.md.
+model CategoriaProveedor {
+  id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  nombre    String
+  activa    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  proveedores Proveedor[]
+
+  @@unique([tenantId, nombre])
+  @@map("categorias_proveedor")
 }
 
 enum EstadoOrdenCompra {
@@ -5291,6 +5315,9 @@ model CategoriaIncentivo {
 enum TipoUsoIa {
   IMAGEN_PRODUCTO
   ASISTENTE
+  // Benchmark 2026-11-09 (Fase 10) — "crear desde imagen/PDF" (Factura de
+  // Proveedor), mismo criterio de tope mensual que IMAGEN_PRODUCTO.
+  EXTRACCION_FACTURA
 }
 
 /// Auditoría de integraciones (2026-09) — registra cada llamada real (pagada)

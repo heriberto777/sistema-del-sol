@@ -2533,6 +2533,23 @@ compartido entre todos — `TravelService.saldoLedger()` sigue siendo la
 misma suma `CREDITO - DEBITO` agrupada por moneda, el cambio es
 puramente conceptual (a qué cuenta real corresponde ese saldo).
 
+**Limitación conocida — el lado del costo no llega a Contabilidad**: el
+lado del ingreso de Travel SÍ está integrado (`TravelReserva.facturaId`
+→ `Factura` real, mismo patrón que `CobroAlquiler.facturaId` en
+Inmobiliaria). El lado del costo, no — reservar un vuelo/hotel genera un
+`TravelLedgerMovimiento` DEBITO (consumo del balance con Duffel/
+Hotelbeds) pero ningún asiento contable, a diferencia de Compras, donde
+recibir mercancía sí reconoce el costo de inventario. Resultado: el
+Estado de Resultados muestra el ingreso de Travel pero no su costo
+asociado, inflando el margen que reporta esa vertical. Evaluado y
+dejado así a propósito (auditoría de organización del menú, 2026-11):
+Travel es un plugin opt-in, no un dominio central, y el costo de
+construir el asiento automático (cuenta contable nueva + listener de
+evento) solo beneficia a los tenants que además revisen el margen por
+vertical en sus reportes — no se justificó hacerlo ahora. Si un tenant
+real necesita el margen de Travel contablemente exacto, el punto de
+entrada es `registrarMovimientoLedger` en `TravelService`.
+
 ## Configuración de plataforma (`backend/src/plataforma-config/`)
 
 Antes de esta fase, la pasarela de pago, SMTP y Twilio solo se
@@ -4707,3 +4724,86 @@ link también se loguea a nivel `debug` en el propio servicio
 un SMTP configurado. **Ese log es solo para desarrollo**: en producción,
 con `EMAIL_HABILITADO=true` y SMTP real, es el único lugar donde el
 token en claro existe fuera de la memoria del proceso.
+
+## Diferido: ¿convertirse en plataforma genérica estilo Odoo?
+
+Discusión 2026-11 (sin código tocado, solo análisis) a raíz de comparar
+la organización del menú ERP con Odoo. Cobertura de dominio de negocio
+(NCF/ITBIS/e-CF/606-607-608, nómina TSS/ISR, partida doble automática,
+CxC/CxP con subledger real, 5 plugins verticales) ya es más específica
+de RD que lo que Odoo trae de fábrica, y el multi-tenant single-DB +
+RLS es más eficiente a escala que el "una base por cliente" de Odoo
+Online/Odoo.sh. La brecha real está en volverse una **plataforma
+genérica extensible**, no en cobertura de negocio:
+
+1. **Herencia de modelos** (`_inherit` de Odoo: un addon extiende
+   `res.partner`/`account.move` sin tocar su código). Prisma no tiene
+   equivalente — su schema es estático y compilado. Alternativa
+   pragmática (no igual de potente): columna JSONB de "campos
+   personalizados" + metadatos por entidad central, ~4-6 semanas por
+   grupo de entidades. Hacerlo "de verdad" (schema dinámico en vez de
+   Prisma) es un rediseño de meses que renuncia al type-safety que hoy
+   es una ventaja real del sistema.
+2. **Motor de reportes genérico** (pivot/graph sobre cualquier modelo,
+   tipo Odoo Studio): query builder seguro multi-tenant (riesgo de
+   inyección + tiene que respetar RLS) + metadatos por modelo + UI de
+   pivot. ~4-8 semanas para una versión acotada a una whitelist de
+   modelos.
+3. **Automatización sin código** (Automated Actions: trigger por
+   cambio de campo + acción, sin escribir código): DSL o builder de
+   condiciones/acciones ejecutado de forma segura. ~6-10 semanas para
+   un MVP de combos fijos trigger+acción.
+4. **Multi-compañía + consolidación**: el más invasivo. RLS y todo el
+   aislamiento hoy están construidos sobre UNA dimensión (`tenantId`);
+   meter una segunda ("empresa" dentro de un tenant) + intercompañía +
+   consolidado toca casi todas las queries scopeadas del sistema.
+   2-3 meses mínimo, alto riesgo de regresión en seguridad ya
+   verificada.
+5. **Cierre de período real** (hoy `balanceGeneral()` inyecta una
+   línea sintética de "Resultado del Ejercicio" porque no hay cierre):
+   bloquear escritura en período cerrado desde Facturación/Compras/
+   Nómina/Bancos. ~3-4 semanas.
+6. **Contabilidad analítica** (centros de costo en `LineaAsiento`):
+   el más barato y el único que vale la pena por sí solo, no solo como
+   parte de "volverse plataforma". ~2-3 semanas, bajo riesgo porque
+   Contabilidad ya es centralizada vía Event Bus.
+7. **Costeo configurable** (FIFO/AVCO/Standard, hoy sin método
+   explícito): reingeniería de cómo Inventario/Compras/Facturación
+   calculan costo y margen + migración de histórico. ~4-6 semanas.
+
+**Decisión**: diferido. Perseguir el combo completo (1-4) son 6-12
+meses de trabajo de plataforma que solo se justifican si el plan de
+negocio real es vender esto como ERP horizontal genérico — no si sigue
+siendo un SaaS vertical de RD con plugins puntuales. Los puntos 5 y 6
+sí valen la pena de forma independiente (son huecos reales de
+contabilidad) y pueden abordarse sueltos cuando se decida, sin que
+implique el resto del combo.
+
+## Diferido: unificar Factura/Cotización/Remisión en un componente compartido
+
+La auditoría de organización (2026-11) marcó como deuda técnica opcional
+"unificar `FacturacionNueva.tsx`/`CotizacionNueva.tsx`/`RemisionNueva.tsx`
+en un componente compartido" — a primera vista parecían 3
+implementaciones paralelas del mismo patrón ("encabezado + líneas
+editables"). Al investigar para ejecutarlo, resultó que:
+
+1. **Lo genuinamente compartido ya está extraído**: `PaginaDocumento`,
+   `TablaLineasEditable`, `CardColapsable`, `useHayCambios`,
+   `estimarLineas` — las 3 páginas ya reusan esta infraestructura común.
+2. **Lo que queda es divergencia real de negocio, no duplicación**:
+   Factura tiene ITBIS/NCF/comprobante fiscal/forma de pago/cambio en
+   efectivo/multi-moneda; Cotización tiene vigencia + estado precargado
+   desde CRM, con precios pero sin movimiento de stock; Remisión no
+   tiene NINGÚN campo de precio (`FORM_VACIO` sin `precioUnitario` ni
+   `aplicaItbis`), solo bodega + cantidades. Forzar un componente único
+   configurable para los tres requeriría una capa de flags/condicionales
+   (`if (tipoDocumento === 'FACTURA') ...`) que empeora la legibilidad a
+   cambio de nada — exactamente el tipo de abstracción prematura que
+   este proyecto evita a propósito.
+
+**Decisión**: diferido/descartado como estaba planteado. El único hueco
+real y chico que sí vale la pena encontrado en el camino: "+ Nuevo
+cliente" inline solo existe en `FacturacionNueva.tsx` — Cotización y
+Remisión no lo tienen (usan `ComboboxBusqueda` plano). Es una mejora
+puntual de una línea de alcance, no una unificación — queda anotada acá
+para cuando se decida hacerla, no se ejecutó en esta ronda.

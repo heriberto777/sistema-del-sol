@@ -22,16 +22,26 @@ import { NotasCredito } from './pages/NotasCredito';
 import { CuentasPorCobrar } from './pages/CuentasPorCobrar';
 import { CuentasPorPagar } from './pages/CuentasPorPagar';
 import { FacturasProveedor } from './pages/FacturasProveedor';
-import { Inventario } from './pages/Inventario';
+import { FacturaProveedorNueva } from './pages/FacturaProveedorNueva';
+import { TerminosPago } from './pages/TerminosPago';
+import { InventarioStock } from './pages/inventario/InventarioStock';
+import { InventarioAjustes } from './pages/inventario/InventarioAjustes';
+import { InventarioTransferencias } from './pages/inventario/InventarioTransferencias';
+import { InventarioAjusteNuevo } from './pages/InventarioAjusteNuevo';
+import { InventarioTransferenciaNueva } from './pages/InventarioTransferenciaNueva';
 import { Conteos } from './pages/Conteos';
 import { ConteoDetalle } from './pages/ConteoDetalle';
 import { InventarioAlertas } from './pages/InventarioAlertas';
 import { ConfiguracionInventario } from './pages/ConfiguracionInventario';
 import { Sucursales } from './pages/Sucursales';
 import { Compras } from './pages/Compras';
+import { OrdenCompraNueva } from './pages/OrdenCompraNueva';
 import { Clientes } from './pages/Clientes';
+import { ClienteFormulario } from './pages/ClienteFormulario';
 import { Proveedores } from './pages/Proveedores';
+import { ProveedorFormulario } from './pages/ProveedorFormulario';
 import { Productos } from './pages/Productos';
+import { ProductoFormulario } from './pages/ProductoFormulario';
 import { EtiquetasCodigoBarras } from './pages/EtiquetasCodigoBarras';
 import { Categorias } from './pages/Categorias';
 import { NivelesPrecio } from './pages/NivelesPrecio';
@@ -41,9 +51,30 @@ import { Bonos } from './pages/Bonos';
 import { Lealtad } from './pages/Lealtad';
 import { Cajas } from './pages/Cajas';
 import { FormasPago } from './pages/FormasPago';
-import { Reportes } from './pages/Reportes';
-import { Contabilidad } from './pages/Contabilidad';
-import { Nomina } from './pages/Nomina';
+import { ReportesVentas } from './pages/reportes/ReportesVentas';
+import { ReportesVentasAgrupadas } from './pages/reportes/ReportesVentasAgrupadas';
+import { ReportesRentabilidad } from './pages/reportes/ReportesRentabilidad';
+import { ReportesComisiones } from './pages/reportes/ReportesComisiones';
+import { ReportesCompras } from './pages/reportes/ReportesCompras';
+import { ReportesInventario } from './pages/reportes/ReportesInventario';
+import { ReportesInmobiliaria } from './pages/reportes/ReportesInmobiliaria';
+import { ReportesPublicacionesSociales } from './pages/reportes/ReportesPublicacionesSociales';
+import { ReportesTiendaOnline } from './pages/reportes/ReportesTiendaOnline';
+import { ReportesRetencionesProveedores } from './pages/reportes/ReportesRetencionesProveedores';
+import { ContabilidadCuentas } from './pages/contabilidad/ContabilidadCuentas';
+import { ContabilidadAsientos } from './pages/contabilidad/ContabilidadAsientos';
+import { AsientoContableNuevo } from './pages/AsientoContableNuevo';
+import { ContabilidadGastoRapido } from './pages/contabilidad/ContabilidadGastoRapido';
+import { ContabilidadBalanceGeneral } from './pages/contabilidad/ContabilidadBalanceGeneral';
+import { ContabilidadEstadoResultados } from './pages/contabilidad/ContabilidadEstadoResultados';
+import { ContabilidadBalanceComprobacion } from './pages/contabilidad/ContabilidadBalanceComprobacion';
+import { ContabilidadLibroMayor } from './pages/contabilidad/ContabilidadLibroMayor';
+import { ContabilidadConciliacion } from './pages/contabilidad/ContabilidadConciliacion';
+import { ContabilidadCierre } from './pages/contabilidad/ContabilidadCierre';
+import { ContabilidadFiscal } from './pages/contabilidad/ContabilidadFiscal';
+import { NominaEmpleados } from './pages/nomina/NominaEmpleados';
+import { NominaPeriodos } from './pages/nomina/NominaPeriodos';
+import { NominaRetenciones } from './pages/nomina/NominaRetenciones';
 import { Puestos } from './pages/Puestos';
 import { PlantillasHorario } from './pages/PlantillasHorario';
 import { Feriados } from './pages/Feriados';
@@ -69,7 +100,11 @@ import { CrmPipeline } from './pages/CrmPipeline';
 import { CrmEtapasPipeline } from './pages/CrmEtapasPipeline';
 import { CrmDashboard } from './pages/CrmDashboard';
 import { CrmMetasVenta } from './pages/CrmMetasVenta';
-import { TravelReservas } from './pages/TravelReservas';
+import { TravelResumen } from './pages/travel/TravelResumen';
+import { TravelReservasLista } from './pages/travel/TravelReservasLista';
+import { TravelBuscarVuelo } from './pages/travel/TravelBuscarVuelo';
+import { TravelBuscarHotel } from './pages/travel/TravelBuscarHotel';
+import { TravelMarkup } from './pages/travel/TravelMarkup';
 import { Contratos } from './pages/Contratos';
 import { CobrosAlquiler } from './pages/CobrosAlquiler';
 import { InmobiliariaPublicaLayout } from './pages/inmobiliaria/InmobiliariaPublicaLayout';
@@ -78,15 +113,20 @@ import { PropiedadPublicoDetalle } from './pages/inmobiliaria/PropiedadPublicoDe
 import { PropiedadesFavoritas } from './pages/inmobiliaria/PropiedadesFavoritas';
 import { ProyectoDetalle } from './pages/ProyectoDetalle';
 import { PublicacionesSociales } from './pages/PublicacionesSociales';
-import { TiendaOnline } from './pages/TiendaOnline';
+import { TiendaOnlineSecciones } from './pages/tienda-online/TiendaOnlineSecciones';
+import { TiendaOnlinePedidos } from './pages/tienda-online/TiendaOnlinePedidos';
+import { TiendaOnlineConfiguracion } from './pages/tienda-online/TiendaOnlineConfiguracion';
 import { Usuarios } from './pages/Usuarios';
 import { RolesPermisos } from './pages/RolesPermisos';
+import { Configuracion } from './pages/Configuracion';
+import { Reportes } from './pages/Reportes';
 import { DatosEmpresa } from './pages/DatosEmpresa';
 import { Ncf } from './pages/Ncf';
 import { Consecutivos } from './pages/Consecutivos';
 import { Autorizaciones } from './pages/Autorizaciones';
 import { PasarelaPago } from './pages/PasarelaPago';
 import { CategoriasCliente } from './pages/CategoriasCliente';
+import { CategoriasProveedor } from './pages/CategoriasProveedor';
 import { LeyesFiscales } from './pages/LeyesFiscales';
 import { TasasCambio } from './pages/TasasCambio';
 import { Parametros } from './pages/Parametros';
@@ -213,7 +253,7 @@ const RUTAS_ADMIN = [
           { path: '/plataforma/admins', element: <PlatformAdmins /> },
           { path: '/plataforma/facturas', element: <PlatformFacturas /> },
           { path: '/plataforma/actividad', element: <PlatformActividad /> },
-          { path: '/plataforma/configuracion', element: <PlatformConfiguracion /> },
+          { path: '/plataforma/configuracion/:tab', element: <PlatformConfiguracion /> },
         ],
       },
     ],
@@ -245,35 +285,78 @@ const RUTAS_ADMIN = [
           { path: '/cuentas-por-cobrar', element: <CuentasPorCobrar /> },
           { path: '/cuentas-por-pagar', element: <CuentasPorPagar /> },
           { path: '/facturas-proveedor', element: <FacturasProveedor /> },
-          { path: '/inventario', element: <Inventario /> },
+          { path: '/facturas-proveedor/nueva', element: <FacturaProveedorNueva /> },
+          { path: '/terminos-pago', element: <TerminosPago /> },
+          { path: '/inventario/stock', element: <InventarioStock /> },
+          { path: '/inventario/ajustes', element: <InventarioAjustes /> },
+          { path: '/inventario/ajustes/nuevo', element: <InventarioAjusteNuevo /> },
+          { path: '/inventario/transferencias', element: <InventarioTransferencias /> },
+          { path: '/inventario/transferencias/nuevo', element: <InventarioTransferenciaNueva /> },
           { path: '/inventario/conteos', element: <Conteos /> },
           { path: '/inventario/conteos/:id', element: <ConteoDetalle /> },
           { path: '/inventario/alertas', element: <InventarioAlertas /> },
           { path: '/inventario/configuracion', element: <ConfiguracionInventario /> },
           { path: '/sucursales', element: <Sucursales /> },
           { path: '/compras', element: <Compras /> },
+          { path: '/compras/nueva', element: <OrdenCompraNueva /> },
           { path: '/clientes', element: <Clientes /> },
+          { path: '/clientes/nuevo', element: <ClienteFormulario /> },
+          { path: '/clientes/:id', element: <ClienteFormulario /> },
+          { path: '/clientes/:id/editar', element: <ClienteFormulario /> },
           { path: '/proveedores', element: <Proveedores /> },
+          { path: '/proveedores/nuevo', element: <ProveedorFormulario /> },
+          { path: '/proveedores/:id', element: <ProveedorFormulario /> },
+          { path: '/proveedores/:id/editar', element: <ProveedorFormulario /> },
           { path: '/contactos', element: <Navigate to="/clientes" replace /> },
           { path: '/productos', element: <Productos /> },
+          { path: '/productos/nuevo', element: <ProductoFormulario /> },
+          { path: '/productos/:id', element: <ProductoFormulario /> },
+          { path: '/productos/:id/editar', element: <ProductoFormulario /> },
           { path: '/productos/etiquetas', element: <EtiquetasCodigoBarras /> },
           { path: '/categorias', element: <Categorias /> },
           { path: '/niveles-precio', element: <NivelesPrecio /> },
           { path: '/atributos', element: <Atributos /> },
-          { path: '/reportes', element: <Reportes /> },
+          { path: '/reportes/ventas', element: <ReportesVentas /> },
+          { path: '/reportes/ventas-agrupadas', element: <ReportesVentasAgrupadas /> },
+          { path: '/reportes/rentabilidad', element: <ReportesRentabilidad /> },
+          { path: '/reportes/comisiones', element: <ReportesComisiones /> },
+          { path: '/reportes/compras', element: <ReportesCompras /> },
+          { path: '/reportes/inventario', element: <ReportesInventario /> },
+          { path: '/reportes/inmobiliaria', element: <ReportesInmobiliaria /> },
+          { path: '/reportes/publicaciones-sociales', element: <ReportesPublicacionesSociales /> },
+          { path: '/reportes/tienda-online', element: <ReportesTiendaOnline /> },
+          { path: '/reportes/retenciones-proveedores', element: <ReportesRetencionesProveedores /> },
           { path: '/mis-tareas', element: <MisTareas /> },
-          { path: '/travel/reservas', element: <TravelReservas /> },
-          { path: '/contabilidad', element: <Contabilidad /> },
+          { path: '/travel/resumen', element: <TravelResumen /> },
+          { path: '/travel/reservas', element: <TravelReservasLista /> },
+          { path: '/travel/buscar-vuelo', element: <TravelBuscarVuelo /> },
+          { path: '/travel/buscar-hotel', element: <TravelBuscarHotel /> },
+          { path: '/travel/markup', element: <TravelMarkup /> },
+          { path: '/contabilidad/cuentas', element: <ContabilidadCuentas /> },
+          { path: '/contabilidad/asientos', element: <ContabilidadAsientos /> },
+          { path: '/contabilidad/asientos/nuevo', element: <AsientoContableNuevo /> },
+          { path: '/contabilidad/gasto-rapido', element: <ContabilidadGastoRapido /> },
+          { path: '/contabilidad/balance-general', element: <ContabilidadBalanceGeneral /> },
+          { path: '/contabilidad/estado-resultados', element: <ContabilidadEstadoResultados /> },
+          { path: '/contabilidad/balance-comprobacion', element: <ContabilidadBalanceComprobacion /> },
+          { path: '/contabilidad/libro-mayor', element: <ContabilidadLibroMayor /> },
+          { path: '/contabilidad/conciliacion', element: <ContabilidadConciliacion /> },
+          { path: '/contabilidad/cierre', element: <ContabilidadCierre /> },
+          { path: '/contabilidad/fiscal', element: <ContabilidadFiscal /> },
           { path: '/bancos', element: <Bancos /> },
           { path: '/gastos-menores', element: <GastosMenores /> },
           { path: '/proyectos', element: <Proyectos /> },
-          { path: '/proyectos/:id', element: <ProyectoDetalle /> },
+          { path: '/proyectos/:id/:tab', element: <ProyectoDetalle /> },
           { path: '/propiedades', element: <Propiedades /> },
           { path: '/contratos-propiedad', element: <Contratos /> },
           { path: '/alquileres', element: <CobrosAlquiler /> },
           { path: '/publicaciones-sociales', element: <PublicacionesSociales /> },
-          { path: '/tienda-online', element: <TiendaOnline /> },
-          { path: '/nomina', element: <Nomina /> },
+          { path: '/tienda-online/secciones', element: <TiendaOnlineSecciones /> },
+          { path: '/tienda-online/pedidos', element: <TiendaOnlinePedidos /> },
+          { path: '/tienda-online/configuracion/:seccion', element: <TiendaOnlineConfiguracion /> },
+          { path: '/nomina/empleados', element: <NominaEmpleados /> },
+          { path: '/nomina/periodos', element: <NominaPeriodos /> },
+          { path: '/nomina/retenciones', element: <NominaRetenciones /> },
           { path: '/puestos', element: <Puestos /> },
           { path: '/plantillas-horario', element: <PlantillasHorario /> },
           { path: '/feriados', element: <Feriados /> },
@@ -288,8 +371,11 @@ const RUTAS_ADMIN = [
           { path: '/formato-documentos', element: <FormatoDocumentos /> },
           { path: '/mensajes', element: <Mensajes /> },
           { path: '/categorias-cliente', element: <CategoriasCliente /> },
+          { path: '/categorias-proveedor', element: <CategoriasProveedor /> },
           { path: '/leyes-fiscales', element: <LeyesFiscales /> },
           { path: '/tasas-cambio', element: <TasasCambio /> },
+          { path: '/configuracion', element: <Configuracion /> },
+          { path: '/reportes', element: <Reportes /> },
           { path: '/usuarios', element: <Usuarios /> },
           { path: '/roles-permisos', element: <RolesPermisos /> },
           { path: '/datos-empresa', element: <DatosEmpresa /> },
@@ -300,7 +386,7 @@ const RUTAS_ADMIN = [
           { path: '/parametros', element: <Parametros /> },
           { path: '/documentos', element: <Documentos /> },
           { path: '/webhooks', element: <Webhooks /> },
-          { path: '/auditoria', element: <Auditoria /> },
+          { path: '/auditoria/:tab', element: <Auditoria /> },
           { path: '/crm/leads', element: <CrmLeads /> },
           { path: '/crm/pipeline', element: <CrmPipeline /> },
           { path: '/crm/etapas-pipeline', element: <CrmEtapasPipeline /> },
