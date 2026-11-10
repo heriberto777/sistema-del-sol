@@ -25,6 +25,7 @@ import {
   TareaPersonalVenceHoyPayload,
   CrmActividadVenceHoyPayload,
   WhatsappRequiereAtencionPayload,
+  ComentarioDocumentoMencionPayload,
 } from '../event-bus/events';
 import { PrismaService } from '../prisma/prisma.service';
 import { CrearPlantillaDto } from './dto/crear-plantilla.dto';
@@ -439,6 +440,28 @@ export class NotificacionesService {
       if (usuario.telefono) {
         await this.enviar({ tenantId: payload.tenantId, canal: 'WHATSAPP', clave: 'tarea_proyecto_comentario_nuevo', destinatario: usuario.telefono, variables });
       }
+    }
+  }
+
+  /**
+   * Fase 11.2 del benchmark — igual patrón que `alComentarTareaProyecto`:
+   * EMAIL siempre + WHATSAPP si el mencionado tiene teléfono. El servicio
+   * emisor (`ComentariosDocumentoService.crear`) ya excluye el caso de
+   * mencionarse a sí mismo, así que este listener no necesita filtrar nada.
+   */
+  @OnEvent(EVENTOS.COMENTARIO_DOCUMENTO_MENCION)
+  async alMencionarEnComentarioDocumento(payload: ComentarioDocumentoMencionPayload) {
+    const usuario = await this.prisma.user.findUnique({ where: { id: payload.mencionadoId } });
+    if (!usuario) return;
+    const variables = {
+      autor_nombre: payload.autorNombre,
+      tipo_documento_etiqueta: payload.tipoDocumentoEtiqueta,
+      documento_etiqueta: payload.documentoEtiqueta,
+      texto: payload.texto,
+    };
+    await this.enviar({ tenantId: payload.tenantId, canal: 'EMAIL', clave: 'comentario_documento_mencion', destinatario: usuario.email, variables });
+    if (usuario.telefono) {
+      await this.enviar({ tenantId: payload.tenantId, canal: 'WHATSAPP', clave: 'comentario_documento_mencion', destinatario: usuario.telefono, variables });
     }
   }
 

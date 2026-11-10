@@ -36,6 +36,8 @@ export const EVENTOS = {
   // Fase 5 (CxP) — FacturaProveedor (gasto a crédito sin orden de compra).
   FACTURA_PROVEEDOR_CREADA: 'facturasproveedor.creada',
   PAGO_FACTURA_PROVEEDOR_REGISTRADO: 'pagos.factura_proveedor_registrado',
+  // Fase 11.2 del benchmark — comentarios/recordatorios por documento (Factura/Cotización).
+  COMENTARIO_DOCUMENTO_MENCION: 'comentarios_documento.mencion',
 } as const;
 
 export type NombreEvento = (typeof EVENTOS)[keyof typeof EVENTOS];
@@ -352,4 +354,21 @@ export interface WhatsappPedidoSugeridoPayload {
   nombre: string | null;
   lineas: LineaPedidoSugerido[];
   textoOriginal: string;
+}
+
+/**
+ * Emitido por ComentariosDocumentoService.crear (Fase 11.2 del benchmark)
+ * — solo cuando el comentario SÍ menciona a alguien y ese alguien no es
+ * el propio autor (no tiene sentido notificarte de tu propio comentario,
+ * mismo criterio que TareaProyectoComentadaPayload).
+ */
+export interface ComentarioDocumentoMencionPayload {
+  tenantId: string;
+  comentarioId: string;
+  autorNombre: string;
+  mencionadoId: string;
+  tipoDocumentoEtiqueta: string;
+  /** NCF (Factura) o número (Cotización) — identificador legible, nunca el UUID interno. */
+  documentoEtiqueta: string;
+  texto: string;
 }

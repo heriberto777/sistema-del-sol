@@ -1,8 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
+import { TipoDocumentoComentario } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificacionesService } from '../notificaciones/notificaciones.service';
 import { CLIENTE_SELECT_BASICO } from '../common/prisma/cliente-select-basico';
+import { ETIQUETA_TIPO_DOCUMENTO } from '../comentarios-documento/tipo-documento';
 
 const MS_POR_DIA = 24 * 60 * 60 * 1000;
 
@@ -68,5 +70,63 @@ export class RecordatoriosService {
     }
 
     return vencidas.length;
+  }
+
+  /**
+   * Fase 11.2 del benchmark — recordatorio opcional de un comentario en
+   * Factura/Cotización. Avisa a `mencionado ?? autor` (un comentario sin
+   * mención es un recordatorio personal del propio autor). `documentoId`
+   * es texto libre sin FK (ver el modelo en schema.prisma) — se resuelve
+   * la etiqueta (NCF/número) acá mismo contra `PrismaService` global,
+   * mismo criterio que el resto de este cron (sin TenantPrismaService,
+   * fuera de contexto de request).
+   */
+  @Cron(CronExpression.EVERY_DAY_AT_8AM)
+  async enviarRecordatoriosDeComentarios() {
+    const pendientes = await this.prisma.comentarioDocumento.findMany({
+      where: { recordatorioEnviado: false, fechaRecordatorio: { lte: new Date() } },
+      include: { autor: true, mencionado: true },
+    });
+
+    this.logger.log(`Recordatorios de comentarios: ${pendientes.length} pendiente(s)`);
+
+    for (const comentario of pendientes) {
+      const destinatario = comentario.mencionado ?? comentario.autor;
+      const variables = {
+        tipo_documento_etiqueta: ETIQUETA_TIPO_DOCUMENTO[comentario.tipoDocumento],
+        documento_etiqueta: await this.resolverEtiquetaDocumento(comentario.tipoDocumento, comentario.documentoId),
+        texto: comentario.texto,
+      };
+
+      await this.notificacionesService.enviar({
+        tenantId: comentario.tenantId,
+        canal: 'EMAIL',
+        clave: 'comentario_documento_recordatorio',
+        destinatario: destinatario.email,
+        variables,
+      });
+      if (destinatario.telefono) {
+        await this.notificacionesService.enviar({
+          tenantId: comentario.tenantId,
+          canal: 'WHATSAPP',
+          clave: 'comentario_documento_recordatorio',
+          destinatario: destinatario.telefono,
+          variables,
+        });
+      }
+
+      await this.prisma.comentarioDocumento.update({ where: { id: comentario.id }, data: { recordatorioEnviado: true } });
+    }
+
+    return pendientes.length;
+  }
+
+  private async resolverEtiquetaDocumento(tipoDocumento: TipoDocumentoComentario, documentoId: string): Promise<string> {
+    if (tipoDocumento === 'FACTURA') {
+      const factura = await this.prisma.factura.findUnique({ where: { id: documentoId }, select: { ncf: true } });
+      return factura?.ncf ?? '';
+    }
+    const cotizacion = await this.prisma.cotizacion.findUnique({ where: { id: documentoId }, select: { numero: true } });
+    return cotizacion?.numero ?? '';
   }
 }

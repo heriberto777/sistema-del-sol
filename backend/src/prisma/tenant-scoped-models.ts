@@ -147,4 +147,7 @@ export const TENANT_SCOPED_MODELS = new Set([
   // criterio que LineaGastoMenor: no tiene tenantId propio, su aislamiento
   // depende de llegar siempre vía una FacturaProveedor ya resuelta.
   'FacturaProveedor',
+  // Fase 11.2 del benchmark — polimórfico (tipoDocumento/documentoId sin
+  // FK, ver el comentario del modelo), pero SÍ tiene tenantId propio.
+  'ComentarioDocumento',
 ]);

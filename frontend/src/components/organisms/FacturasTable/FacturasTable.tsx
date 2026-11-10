@@ -17,6 +17,7 @@ import { SearchInput } from '../../molecules/SearchInput/SearchInput';
 import { Paginacion } from '../../molecules/Paginacion/Paginacion';
 import { RowActionsMenu } from '../../molecules/RowActionsMenu/RowActionsMenu';
 import { TablaArticulosDocumento } from '../../molecules/TablaArticulosDocumento/TablaArticulosDocumento';
+import { PanelComentariosDocumento } from '../PanelComentariosDocumento/PanelComentariosDocumento';
 import { BloqueTotalesDocumento } from '../../molecules/BloqueTotalesDocumento/BloqueTotalesDocumento';
 import { useDebouncedValue } from '../../../hooks/useDebouncedValue';
 import { useAuth } from '../../../hooks/useAuth';
@@ -346,6 +347,8 @@ function ModalDetalleFactura({ factura, onClose, onImprimir }: { factura: Factur
             </div>
           </div>
         )}
+
+        <PanelComentariosDocumento tipoDocumento="FACTURA" documentoId={factura.id} />
       </div>
     </Modal>
   );

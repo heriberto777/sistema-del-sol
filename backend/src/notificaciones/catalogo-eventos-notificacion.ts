@@ -276,4 +276,29 @@ export const CATALOGO_EVENTOS_NOTIFICACION: EventoNotificacion[] = [
       { nombre: 'factura_total', descripcion: 'Total de la factura' },
     ],
   },
+  {
+    clave: 'comentario_documento_mencion',
+    etiqueta: 'Te mencionaron en un comentario (Factura/Cotización)',
+    modulo: 'Ventas',
+    canales: ['EMAIL', 'WHATSAPP'],
+    descripcion: 'Cuando alguien te menciona con @ en un comentario de una Factura o Cotización.',
+    variables: [
+      { nombre: 'autor_nombre', descripcion: 'Quién comentó' },
+      { nombre: 'tipo_documento_etiqueta', descripcion: '"Factura" o "Cotización"' },
+      { nombre: 'documento_etiqueta', descripcion: 'NCF o número del documento' },
+      { nombre: 'texto', descripcion: 'Texto del comentario' },
+    ],
+  },
+  {
+    clave: 'comentario_documento_recordatorio',
+    etiqueta: 'Recordatorio de un comentario (Factura/Cotización)',
+    modulo: 'Ventas',
+    canales: ['EMAIL', 'WHATSAPP'],
+    descripcion: 'Cron diario: llegó la fecha de un recordatorio dejado en un comentario — avisa al mencionado, o si no al autor.',
+    variables: [
+      { nombre: 'tipo_documento_etiqueta', descripcion: '"Factura" o "Cotización"' },
+      { nombre: 'documento_etiqueta', descripcion: 'NCF o número del documento' },
+      { nombre: 'texto', descripcion: 'Texto del comentario' },
+    ],
+  },
 ];

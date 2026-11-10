@@ -55,7 +55,8 @@ BEGIN
       'terminos_pago', 'cuentas_por_cobrar', 'cuentas_por_pagar',
       'recibos_ingreso', 'ordenes_pago',
       'gestiones_cobro', 'provisiones_incobrables',
-      'facturas_proveedor'
+      'facturas_proveedor',
+      'comentarios_documento'
     ])
   LOOP
     EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY;', tabla);

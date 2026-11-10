@@ -5,6 +5,7 @@ import { Badge } from '../../atoms/Badge/Badge';
 import { Button } from '../../atoms/Button/Button';
 import { TablaArticulosDocumento } from '../../molecules/TablaArticulosDocumento/TablaArticulosDocumento';
 import { BloqueTotalesDocumento } from '../../molecules/BloqueTotalesDocumento/BloqueTotalesDocumento';
+import { PanelComentariosDocumento } from '../PanelComentariosDocumento/PanelComentariosDocumento';
 import { Cotizacion, tonoYEtiquetaEstado } from './CotizacionesPanel';
 
 export function ModalDetalleCotizacion({
@@ -58,6 +59,8 @@ export function ModalDetalleCotizacion({
             <BloqueTotalesDocumento subtotal={detalle.subtotal ?? 0} descuento={detalle.descuento} itbis={detalle.itbis ?? 0} total={detalle.total} />
           </>
         )}
+
+        <PanelComentariosDocumento tipoDocumento="COTIZACION" documentoId={cotizacion.id} />
       </div>
     </Modal>
   );

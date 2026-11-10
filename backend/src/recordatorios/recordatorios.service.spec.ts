@@ -4,7 +4,11 @@ import { NotificacionesService } from '../notificaciones/notificaciones.service'
 
 describe('RecordatoriosService', () => {
   let service: RecordatoriosService;
-  let prisma: { factura: { findMany: jest.Mock } };
+  let prisma: {
+    factura: { findMany: jest.Mock; findUnique: jest.Mock };
+    cotizacion: { findUnique: jest.Mock };
+    comentarioDocumento: { findMany: jest.Mock; update: jest.Mock };
+  };
   let notificacionesService: jest.Mocked<NotificacionesService>;
 
   const DIA_MS = 24 * 60 * 60 * 1000;
@@ -23,7 +27,11 @@ describe('RecordatoriosService', () => {
   }
 
   beforeEach(() => {
-    prisma = { factura: { findMany: jest.fn() } };
+    prisma = {
+      factura: { findMany: jest.fn(), findUnique: jest.fn() },
+      cotizacion: { findUnique: jest.fn() },
+      comentarioDocumento: { findMany: jest.fn(), update: jest.fn() },
+    };
     notificacionesService = { enviar: jest.fn() } as unknown as jest.Mocked<NotificacionesService>;
     service = new RecordatoriosService(prisma as unknown as PrismaService, notificacionesService);
   });
@@ -92,5 +100,80 @@ describe('RecordatoriosService', () => {
     expect(prisma.factura.findMany).toHaveBeenCalledWith(
       expect.objectContaining({ where: { estado: 'EMITIDA', tipoFactura: 'CREDITO', pagada: false } }),
     );
+  });
+
+  describe('enviarRecordatoriosDeComentarios', () => {
+    function comentario(overrides: Record<string, unknown> = {}) {
+      return {
+        id: 'c1',
+        tenantId: 't1',
+        tipoDocumento: 'FACTURA',
+        documentoId: 'factura-1',
+        texto: 'Llamar al cliente por el pago',
+        autor: { email: 'autor@demo.com', telefono: null },
+        mencionado: null,
+        ...overrides,
+      };
+    }
+
+    it('avisa al MENCIONADO (no al autor) cuando el comentario tiene una mención', async () => {
+      prisma.comentarioDocumento.findMany.mockResolvedValue([
+        comentario({ mencionado: { email: 'mencionado@demo.com', telefono: '+18095550000' } }),
+      ]);
+      prisma.factura.findUnique.mockResolvedValue({ ncf: 'B0200000010' });
+
+      await service.enviarRecordatoriosDeComentarios();
+
+      expect(notificacionesService.enviar).toHaveBeenCalledWith(
+        expect.objectContaining({ canal: 'EMAIL', clave: 'comentario_documento_recordatorio', destinatario: 'mencionado@demo.com' }),
+      );
+      expect(notificacionesService.enviar).toHaveBeenCalledWith(
+        expect.objectContaining({ canal: 'WHATSAPP', clave: 'comentario_documento_recordatorio', destinatario: '+18095550000' }),
+      );
+    });
+
+    it('sin mención (recordatorio personal): avisa al propio AUTOR', async () => {
+      prisma.comentarioDocumento.findMany.mockResolvedValue([comentario()]);
+      prisma.factura.findUnique.mockResolvedValue({ ncf: 'B0200000010' });
+
+      await service.enviarRecordatoriosDeComentarios();
+
+      expect(notificacionesService.enviar).toHaveBeenCalledWith(
+        expect.objectContaining({ canal: 'EMAIL', clave: 'comentario_documento_recordatorio', destinatario: 'autor@demo.com' }),
+      );
+      // Sin WhatsApp — el autor de este fixture no tiene teléfono.
+      expect(notificacionesService.enviar).toHaveBeenCalledTimes(1);
+    });
+
+    it('resuelve la etiqueta contra Cotizacion.numero cuando tipoDocumento es COTIZACION', async () => {
+      prisma.comentarioDocumento.findMany.mockResolvedValue([comentario({ tipoDocumento: 'COTIZACION', documentoId: 'cot-1' })]);
+      prisma.cotizacion.findUnique.mockResolvedValue({ numero: 'COT-00042' });
+
+      await service.enviarRecordatoriosDeComentarios();
+
+      expect(prisma.factura.findUnique).not.toHaveBeenCalled();
+      expect(notificacionesService.enviar).toHaveBeenCalledWith(
+        expect.objectContaining({ variables: expect.objectContaining({ tipo_documento_etiqueta: 'Cotización', documento_etiqueta: 'COT-00042' }) }),
+      );
+    });
+
+    it('marca recordatorioEnviado=true después de notificar, para no repetir mañana', async () => {
+      prisma.comentarioDocumento.findMany.mockResolvedValue([comentario()]);
+      prisma.factura.findUnique.mockResolvedValue({ ncf: 'B0200000010' });
+
+      await service.enviarRecordatoriosDeComentarios();
+
+      expect(prisma.comentarioDocumento.update).toHaveBeenCalledWith({ where: { id: 'c1' }, data: { recordatorioEnviado: true } });
+    });
+
+    it('solo busca los que tienen recordatorioEnviado=false y fechaRecordatorio ya vencida', async () => {
+      prisma.comentarioDocumento.findMany.mockResolvedValue([]);
+
+      await service.enviarRecordatoriosDeComentarios();
+
+      expect(prisma.comentarioDocumento.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: expect.objectContaining({ recordatorioEnviado: false, fechaRecordatorio: expect.objectContaining({ lte: expect.any(Date) }) }) }),
+      );
+    });
   });
 });

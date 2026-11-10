@@ -65,6 +65,7 @@ import { PosModule } from './pos/pos.module';
 import { IaModule } from './ia/ia.module';
 import { BancosModule } from './bancos/bancos.module';
 import { GastosMenoresModule } from './gastos-menores/gastos-menores.module';
+import { ComentariosDocumentoModule } from './comentarios-documento/comentarios-documento.module';
 import { ProyectosModule } from './proyectos/proyectos.module';
 import { InmobiliariaModule } from './inmobiliaria/inmobiliaria.module';
 import { TareasPersonalesModule } from './tareas-personales/tareas-personales.module';
@@ -183,6 +184,7 @@ import { TenantMiddleware } from './common/middleware/tenant.middleware';
     AtributosModule,
     VariantesModule,
     GastosMenoresModule,
+    ComentariosDocumentoModule,
     ProyectosModule,
     InmobiliariaModule,
     TareasPersonalesModule,

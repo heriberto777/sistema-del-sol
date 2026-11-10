@@ -166,6 +166,7 @@ model Tenant {
   cuentasPorCobrar           CuentaPorCobrar[]
   cuentasPorPagar            CuentaPorPagar[]
   facturasProveedor          FacturaProveedor[]
+  comentariosDocumento       ComentarioDocumento[]
 
   @@map("tenants")
 }
@@ -815,6 +816,8 @@ model User {
   comentariosTareaProyecto              ComentarioTareaProyecto[]
   tareasPersonales                      TareaPersonal[]
   comentariosTareaPersonal              ComentarioTareaPersonal[]
+  comentariosDocumento                  ComentarioDocumento[]      @relation("ComentarioDocumentoAutor")
+  comentariosDocumentoMencionado         ComentarioDocumento[]      @relation("ComentarioDocumentoMencionado")
 
   @@unique([tenantId, email])
   @@map("users")
@@ -5362,6 +5365,44 @@ model ComentarioTareaPersonal {
   updatedAt DateTime      @updatedAt
 
   @@map("comentarios_tarea_personal")
+}
+
+/// Benchmark 2026-11-10, Fase 11.2 — Alegra pega comentarios/recordatorios
+/// (mencionar con @) a Factura/Cotización. Polimórfico (`tipoDocumento` +
+/// `documentoId`, SIN relación FK) a propósito, mismo criterio que
+/// `AuditLog.entidad`/`entidadId` — evita una tabla de comentarios por
+/// cada tipo de documento. Como no hay FK que lo garantice,
+/// `ComentariosDocumentoService` SIEMPRE resuelve primero el documento
+/// real (vía `FacturacionService.buscarPorId`/`CotizacionesService.
+/// buscarPorId`, que ya son tenant-scoped y tiran 404 si no es del
+/// tenant) antes de crear o listar — mismo patrón de IDOR documentado
+/// para tablas hijas sin tenantId (ver ARCHITECTURE.md), aunque esta SÍ
+/// tiene `tenantId` propio (no es hija de nada).
+enum TipoDocumentoComentario {
+  FACTURA
+  COTIZACION
+}
+
+model ComentarioDocumento {
+  id                String                  @id @default(uuid())
+  tenantId          String
+  tenant            Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tipoDocumento     TipoDocumentoComentario
+  documentoId       String
+  autorId           String
+  autor             User                    @relation("ComentarioDocumentoAutor", fields: [autorId], references: [id], onDelete: Cascade)
+  texto             String                  @db.Text
+  // Un solo mencionado por comentario (no un array) — más simple primero,
+  // mismo criterio de alcance que el resto de la Fase 11. SetNull: si se
+  // borra el usuario mencionado, el comentario sigue existiendo.
+  mencionadoId      String?
+  mencionado        User?                   @relation("ComentarioDocumentoMencionado", fields: [mencionadoId], references: [id], onDelete: SetNull)
+  fechaRecordatorio DateTime?
+  recordatorioEnviado Boolean               @default(false)
+  createdAt         DateTime                @default(now())
+
+  @@index([tenantId, tipoDocumento, documentoId])
+  @@map("comentarios_documento")
 }
 
 enum TipoTravelReserva {
