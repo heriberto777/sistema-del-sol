@@ -2,6 +2,7 @@ import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { GastosMenoresService } from './gastos-menores.service';
 import { CrearGastoMenorDto } from './dto/crear-gasto-menor.dto';
+import { ImportarGastosMenoresDto } from './dto/importar-gastos-menores.dto';
 import { Permissions } from '../common/decorators/permissions.decorator';
 import { RequiereModulo } from '../common/decorators/requiere-modulo.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -19,6 +20,12 @@ export class GastosMenoresController {
   @Permissions('gastosmenores.crear')
   crear(@Body() dto: CrearGastoMenorDto, @CurrentUser() user: JwtPayloadUser) {
     return this.gastosMenoresService.crear(dto, user.tenantId);
+  }
+
+  @Post('importar')
+  @Permissions('gastosmenores.crear')
+  importar(@Body() dto: ImportarGastosMenoresDto, @CurrentUser() user: JwtPayloadUser) {
+    return this.gastosMenoresService.importar(dto, user.tenantId);
   }
 
   @Get()

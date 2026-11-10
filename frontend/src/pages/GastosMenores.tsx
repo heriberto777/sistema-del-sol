@@ -11,6 +11,7 @@ import { Paginacion } from '../components/molecules/Paginacion/Paginacion';
 import { SearchInput } from '../components/molecules/SearchInput/SearchInput';
 import { EstadoVacio } from '../components/molecules/EstadoVacio/EstadoVacio';
 import { RequierePermiso } from '../components/organisms/RequierePermiso/RequierePermiso';
+import { ImportarGastosMenoresModal } from '../components/organisms/ImportarGastosMenoresModal/ImportarGastosMenoresModal';
 import { useAuth } from '../hooks/useAuth';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { PaginaResultado } from '../types/pagina-resultado';
@@ -63,10 +64,12 @@ interface GastoMenorDetalle extends GastoMenor {
 const LINEA_VACIA = { cuentaContableId: '', concepto: '', valor: '', porcentajeItbis: '0', cantidad: '1' };
 
 export function GastosMenores() {
+  const queryClient = useQueryClient();
   const { tienePermiso } = useAuth();
   const [pagina, setPagina] = useState(1);
   const [busqueda, setBusqueda] = useState('');
   const [modalAbierto, setModalAbierto] = useState(false);
+  const [modalImportarAbierto, setModalImportarAbierto] = useState(false);
   const [gastoViendo, setGastoViendo] = useState<GastoMenor | null>(null);
   const busquedaDebounced = useDebouncedValue(busqueda);
 
@@ -89,7 +92,14 @@ export function GastosMenores() {
             Registrá tus gastos menores para deducir los pagos y compras que realices en el mercado informal.
           </p>
         </div>
-        {tienePermiso('gastosmenores.crear') && <Button onClick={() => setModalAbierto(true)}>Nuevo gasto menor</Button>}
+        {tienePermiso('gastosmenores.crear') && (
+          <div className="flex gap-2">
+            <Button variante="secundario" onClick={() => setModalImportarAbierto(true)}>
+              Importar Excel
+            </Button>
+            <Button onClick={() => setModalAbierto(true)}>Nuevo gasto menor</Button>
+          </div>
+        )}
       </div>
 
       <RequierePermiso permiso="gastosmenores.ver">
@@ -161,6 +171,11 @@ export function GastosMenores() {
 
       {modalAbierto && <ModalNuevoGastoMenor onClose={() => setModalAbierto(false)} />}
       {gastoViendo && <ModalVerGastoMenor gasto={gastoViendo} onClose={() => setGastoViendo(null)} />}
+      {modalImportarAbierto && (
+        <Modal titulo="Importar gastos menores" ancho="xl" onClose={() => setModalImportarAbierto(false)}>
+          <ImportarGastosMenoresModal onImportado={() => queryClient.invalidateQueries({ queryKey: ['gastos-menores'] })} />
+        </Modal>
+      )}
     </div>
   );
 }

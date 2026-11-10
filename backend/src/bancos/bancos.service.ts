@@ -22,6 +22,11 @@ export class BancosService {
     return this.bancosRepository.buscarPorId(id);
   }
 
+  /** Sin paginar — para resolver referencias en bloque (ej. import masivo de Gastos menores), nunca para listar en la UI. */
+  listarTodasActivas() {
+    return this.bancosRepository.listarTodasActivas();
+  }
+
   actualizar(id: string, dto: Partial<CrearCuentaBancariaDto>) {
     return this.bancosRepository.actualizar(id, dto);
   }

@@ -36,6 +36,11 @@ export class BancosRepository {
     return this.db.cuentaBancaria.findUniqueOrThrow({ where: { id }, include: { cuentaContable: true } });
   }
 
+  /** Sin paginar — para resolver referencias en bloque (ej. import masivo de Gastos menores), nunca para listar en la UI. */
+  listarTodasActivas() {
+    return this.db.cuentaBancaria.findMany({ where: { activa: true }, select: { id: true, banco: true, numeroCuenta: true } });
+  }
+
   actualizar(id: string, dto: Partial<CrearCuentaBancariaDto>) {
     return this.db.cuentaBancaria.update({ where: { id }, data: dto });
   }
