@@ -25,7 +25,17 @@ export const REPORTES_HUB: CategoriaReportesHub[] = [
     etiqueta: 'Ventas',
     descripcion: 'Qué y cuánto vendiste, agrupado y por comisión de vendedor.',
     icono: TrendingUp,
-    items: [{ id: 'reportes-ventas', etiqueta: 'Ventas y comisiones', ruta: '/reportes/ventas', permisos: ['reportes.ver'] }],
+    items: [
+      // Benchmark 2026-11-10 — antes era 1 solo ítem ("Ventas y comisiones")
+      // que escondía los otros 3 reportes detrás de una barra de tabs
+      // redundante (el sidebar solo tenía esta entrada, auditoría de
+      // navegación duplicada). Alegra reparte cada reporte como su propia
+      // card dentro de la categoría — mismo criterio acá.
+      { id: 'reportes-ventas', etiqueta: 'Ventas', ruta: '/reportes/ventas', permisos: ['reportes.ver'] },
+      { id: 'reportes-ventas-agrupadas', etiqueta: 'Ventas agrupadas', ruta: '/reportes/ventas-agrupadas', permisos: ['reportes.ver'] },
+      { id: 'reportes-rentabilidad', etiqueta: 'Rentabilidad', ruta: '/reportes/rentabilidad', permisos: ['reportes.ver'] },
+      { id: 'reportes-comisiones', etiqueta: 'Comisiones', ruta: '/reportes/comisiones', permisos: ['comisiones.ver'] },
+    ],
   },
   {
     id: 'compras',
