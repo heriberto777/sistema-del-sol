@@ -1,4 +1,4 @@
-import { FormEvent, useState } from 'react';
+import { Fragment, FormEvent, useState } from 'react';
 import { Plus, X } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
@@ -50,6 +50,12 @@ const LINEA_VACIA: LineaForm = {
  * siendo posible — solo que como dos ajustes separados. El backend
  * (`motivoAjuste`/`motivo` siguen siendo por línea en el schema) no
  * cambió: esta página simplemente manda el mismo valor en cada línea.
+ *
+ * Mismo pedido — producto y cantidad pasan de dos filas apiladas a una
+ * tabla (producto | cantidad | quitar), igual criterio que
+ * InventarioTransferenciaNueva (que ya usaba este layout). Los campos de
+ * lote, cuando el producto los necesita, van en una fila propia debajo —
+ * no entran en una sola línea de tabla sin amontonarse.
  */
 export function InventarioAjusteNuevo() {
   const navigate = useNavigate();
@@ -200,66 +206,92 @@ export function InventarioAjusteNuevo() {
           {!bodegaId ? (
             <p className="text-sm text-slate-500 dark:text-slate-400">Elegí una bodega arriba para empezar a agregar líneas.</p>
           ) : (
-            <div className="space-y-3">
-              {lineas.map((linea, i) => {
-                const producto = productos?.find((p) => p.id === linea.productoId);
-                const esEntrada = Number(linea.cantidad) > 0;
-                return (
-                  <div key={i} className="space-y-2 rounded-lg border border-slate-200 p-3 dark:border-slate-800">
-                    <div className="flex items-start gap-2">
-                      <div className="flex-1">
-                        <SelectorLineaProducto
-                          productos={productos ?? []}
-                          productoId={linea.productoId}
-                          varianteId={linea.varianteId}
-                          onChange={(productoId, varianteId) => actualizarLinea(i, { productoId, varianteId })}
-                        />
-                      </div>
-                      {lineas.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => setLineas((prev) => prev.filter((_, idx) => idx !== i))}
-                          className="mt-2 text-red-600 hover:text-red-700"
-                          aria-label="Quitar línea"
-                        >
-                          <X size={16} />
-                        </button>
-                      )}
-                    </div>
-                    <input
-                      type="number"
-                      placeholder="Cantidad (negativo para restar)"
-                      value={linea.cantidad}
-                      onChange={(e) => actualizarLinea(i, { cantidad: e.target.value })}
-                      className="w-full rounded-md border border-slate-300 px-2 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-                    />
-                    {producto?.controlaVencimiento && esEntrada && (
-                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                        <input
-                          placeholder="Número de lote"
-                          value={linea.numeroLote}
-                          onChange={(e) => actualizarLinea(i, { numeroLote: e.target.value })}
-                          className="w-full rounded-md border border-slate-300 px-2 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-                        />
-                        <input
-                          type="date"
-                          value={linea.fechaVencimiento}
-                          onChange={(e) => actualizarLinea(i, { fechaVencimiento: e.target.value })}
-                          className="w-full rounded-md border border-slate-300 px-2 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-                        />
-                      </div>
-                    )}
-                    {producto?.controlaVencimiento && linea.cantidad !== '' && !esEntrada && (
-                      <SelectorLoteAjuste
-                        varianteId={linea.varianteId}
-                        bodegaId={bodegaId}
-                        value={linea.loteId}
-                        onChange={(loteId) => actualizarLinea(i, { loteId })}
-                      />
-                    )}
-                  </div>
-                );
-              })}
+            <div className="space-y-2">
+              <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800">
+                <table className="w-full text-left text-sm">
+                  <thead className="bg-slate-50 text-xs text-slate-500 dark:bg-slate-900/60 dark:text-slate-400">
+                    <tr>
+                      <th className="px-3 py-2 font-medium">Producto</th>
+                      <th className="w-40 px-3 py-2 font-medium">Cantidad</th>
+                      <th className="w-px px-3 py-2" />
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                    {lineas.map((linea, i) => {
+                      const producto = productos?.find((p) => p.id === linea.productoId);
+                      const esEntrada = Number(linea.cantidad) > 0;
+                      const necesitaLote = !!producto?.controlaVencimiento;
+                      return (
+                        <Fragment key={i}>
+                          <tr>
+                            <td className="px-3 py-2 align-top">
+                              <SelectorLineaProducto
+                                productos={productos ?? []}
+                                productoId={linea.productoId}
+                                varianteId={linea.varianteId}
+                                onChange={(productoId, varianteId) => actualizarLinea(i, { productoId, varianteId })}
+                              />
+                            </td>
+                            <td className="px-3 py-2 align-top">
+                              <input
+                                type="number"
+                                placeholder="Cant. (neg. para restar)"
+                                value={linea.cantidad}
+                                onChange={(e) => actualizarLinea(i, { cantidad: e.target.value })}
+                                className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                              />
+                            </td>
+                            <td className="px-3 py-2 align-top">
+                              {lineas.length > 1 && (
+                                <button
+                                  type="button"
+                                  onClick={() => setLineas((prev) => prev.filter((_, idx) => idx !== i))}
+                                  className="text-red-600 hover:text-red-700"
+                                  aria-label="Quitar línea"
+                                >
+                                  <X size={16} />
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                          {necesitaLote && esEntrada && (
+                            <tr>
+                              <td colSpan={3} className="px-3 pb-2">
+                                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                                  <input
+                                    placeholder="Número de lote"
+                                    value={linea.numeroLote}
+                                    onChange={(e) => actualizarLinea(i, { numeroLote: e.target.value })}
+                                    className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                                  />
+                                  <input
+                                    type="date"
+                                    value={linea.fechaVencimiento}
+                                    onChange={(e) => actualizarLinea(i, { fechaVencimiento: e.target.value })}
+                                    className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                                  />
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                          {necesitaLote && linea.cantidad !== '' && !esEntrada && (
+                            <tr>
+                              <td colSpan={3} className="px-3 pb-2">
+                                <SelectorLoteAjuste
+                                  varianteId={linea.varianteId}
+                                  bodegaId={bodegaId}
+                                  value={linea.loteId}
+                                  onChange={(loteId) => actualizarLinea(i, { loteId })}
+                                />
+                              </td>
+                            </tr>
+                          )}
+                        </Fragment>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
               <button
                 type="button"
                 onClick={() => setLineas((prev) => [...prev, LINEA_VACIA])}
