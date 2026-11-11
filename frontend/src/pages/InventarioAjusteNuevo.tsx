@@ -18,8 +18,6 @@ interface LineaForm {
   productoId: string;
   varianteId: string;
   cantidad: string;
-  motivoAjuste: string;
-  motivo: string;
   numeroLote: string;
   fechaVencimiento: string;
   loteId: string;
@@ -29,8 +27,6 @@ const LINEA_VACIA: LineaForm = {
   productoId: '',
   varianteId: '',
   cantidad: '',
-  motivoAjuste: '',
-  motivo: '',
   numeroLote: '',
   fechaVencimiento: '',
   loteId: '',
@@ -44,11 +40,23 @@ const LINEA_VACIA: LineaForm = {
  * backend (`CrearAjusteInventarioDto.lineas`) ya soportaba varias líneas
  * desde siempre — el límite de "un producto por ajuste" era solo de esta
  * UI, nunca del modelo de datos.
+ *
+ * Pedido explícito del usuario (2026-11-11) — Motivo/Detalle pasan de ser
+ * un campo por línea a uno solo de cabecera, aplicado a todas las líneas
+ * al guardar: con varios productos por ajuste, repetir el mismo motivo en
+ * cada línea ocupaba demasiado espacio, y en la práctica un ajuste se
+ * agrupa por un solo motivo (el lote de "rotos de hoy", la corrección de
+ * un conteo puntual). Mezclar motivos distintos en un mismo ajuste sigue
+ * siendo posible — solo que como dos ajustes separados. El backend
+ * (`motivoAjuste`/`motivo` siguen siendo por línea en el schema) no
+ * cambió: esta página simplemente manda el mismo valor en cada línea.
  */
 export function InventarioAjusteNuevo() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [bodegaId, setBodegaId] = useState('');
+  const [motivoAjuste, setMotivoAjuste] = useState('');
+  const [motivo, setMotivo] = useState('');
   const [lineas, setLineas] = useState<LineaForm[]>([LINEA_VACIA]);
   const [error, setError] = useState<string | null>(null);
 
@@ -65,7 +73,7 @@ export function InventarioAjusteNuevo() {
     setLineas((prev) => prev.map((l, idx) => (idx === i ? { ...l, ...cambios } : l)));
   }
 
-  const lineasValidas = lineas.filter((l) => l.productoId && l.cantidad !== '' && l.motivoAjuste);
+  const lineasValidas = lineas.filter((l) => l.productoId && l.cantidad !== '');
 
   const crear = useMutation({
     mutationFn: async () =>
@@ -78,8 +86,8 @@ export function InventarioAjusteNuevo() {
             productoId: l.productoId,
             varianteId: l.varianteId || undefined,
             cantidad: Number(l.cantidad),
-            motivoAjuste: l.motivoAjuste,
-            motivo: l.motivo || undefined,
+            motivoAjuste,
+            motivo: motivo || undefined,
             ...(producto?.controlaVencimiento && esEntrada ? { numeroLote: l.numeroLote, fechaVencimiento: l.fechaVencimiento } : {}),
             ...(producto?.controlaVencimiento && !esEntrada ? { loteId: l.loteId } : {}),
           };
@@ -100,15 +108,19 @@ export function InventarioAjusteNuevo() {
       setError('Elegí una bodega.');
       return;
     }
+    if (!motivoAjuste) {
+      setError('Elegí el motivo del ajuste.');
+      return;
+    }
     if (lineasValidas.length === 0) {
-      setError('Agregá al menos una línea con producto, cantidad y motivo.');
+      setError('Agregá al menos una línea con producto y cantidad.');
       return;
     }
     crear.mutate();
   }
 
   const bodegaSeleccionada = (bodegas ?? []).find((b) => b.id === bodegaId);
-  const [haycambios, confirmarGuardado] = useHayCambios({ bodegaId, lineas });
+  const [haycambios, confirmarGuardado] = useHayCambios({ bodegaId, motivoAjuste, motivo, lineas });
 
   return (
     <PaginaDocumento
@@ -143,17 +155,45 @@ export function InventarioAjusteNuevo() {
       }
     >
       <form id="form-nuevo-ajuste" onSubmit={onSubmit} className="space-y-4">
-        <Card titulo="Bodega">
-          <Select value={bodegaId} onChange={(e) => setBodegaId(e.target.value)} required>
-            <option value="">Seleccionar…</option>
-            {(bodegas ?? [])
-              .filter((b) => b.activa)
-              .map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.nombre}
+        <Card titulo="Información del ajuste" descripcion="Un solo motivo/detalle para todas las líneas — si necesitás mezclar motivos, hacelo como dos ajustes separados.">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="flex flex-col gap-1">
+              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Bodega</label>
+              <Select value={bodegaId} onChange={(e) => setBodegaId(e.target.value)} required>
+                <option value="">Seleccionar…</option>
+                {(bodegas ?? [])
+                  .filter((b) => b.activa)
+                  .map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.nombre}
+                    </option>
+                  ))}
+              </Select>
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Motivo</label>
+              <Select value={motivoAjuste} onChange={(e) => setMotivoAjuste(e.target.value)} required>
+                <option value="" disabled>
+                  Motivo…
                 </option>
-              ))}
-          </Select>
+                <option value="MERMA">Merma</option>
+                <option value="ROBO_PERDIDA">Robo o pérdida</option>
+                <option value="DANO">Daño</option>
+                <option value="VENCIMIENTO">Vencimiento</option>
+                <option value="CORRECCION_CONTEO">Corrección de conteo</option>
+                <option value="OTRO">Otro</option>
+              </Select>
+            </div>
+            <div className="flex flex-col gap-1 sm:col-span-2">
+              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Detalle (opcional)</label>
+              <input
+                placeholder="Ej. Conteo del 11/11, pasillo 3…"
+                value={motivo}
+                onChange={(e) => setMotivo(e.target.value)}
+                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+              />
+            </div>
+          </div>
         </Card>
 
         <Card titulo="Líneas" descripcion='Agregá uno o más productos — cantidad positiva para entrada, negativa para salida.'>
@@ -186,26 +226,13 @@ export function InventarioAjusteNuevo() {
                         </button>
                       )}
                     </div>
-                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                      <input
-                        type="number"
-                        placeholder="Cantidad (negativo para restar)"
-                        value={linea.cantidad}
-                        onChange={(e) => actualizarLinea(i, { cantidad: e.target.value })}
-                        className="w-full rounded-md border border-slate-300 px-2 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-                      />
-                      <Select value={linea.motivoAjuste} onChange={(e) => actualizarLinea(i, { motivoAjuste: e.target.value })} required>
-                        <option value="" disabled>
-                          Motivo…
-                        </option>
-                        <option value="MERMA">Merma</option>
-                        <option value="ROBO_PERDIDA">Robo o pérdida</option>
-                        <option value="DANO">Daño</option>
-                        <option value="VENCIMIENTO">Vencimiento</option>
-                        <option value="CORRECCION_CONTEO">Corrección de conteo</option>
-                        <option value="OTRO">Otro</option>
-                      </Select>
-                    </div>
+                    <input
+                      type="number"
+                      placeholder="Cantidad (negativo para restar)"
+                      value={linea.cantidad}
+                      onChange={(e) => actualizarLinea(i, { cantidad: e.target.value })}
+                      className="w-full rounded-md border border-slate-300 px-2 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                    />
                     {producto?.controlaVencimiento && esEntrada && (
                       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                         <input
@@ -230,12 +257,6 @@ export function InventarioAjusteNuevo() {
                         onChange={(loteId) => actualizarLinea(i, { loteId })}
                       />
                     )}
-                    <input
-                      placeholder="Detalle (opcional)"
-                      value={linea.motivo}
-                      onChange={(e) => actualizarLinea(i, { motivo: e.target.value })}
-                      className="w-full rounded-md border border-slate-300 px-2 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-                    />
                   </div>
                 );
               })}
