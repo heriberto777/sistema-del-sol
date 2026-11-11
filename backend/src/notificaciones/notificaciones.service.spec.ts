@@ -67,8 +67,9 @@ describe('NotificacionesService', () => {
       expect(cuerpoEnviado).toContain('Cuerpo');
       // Sin prisma.tenant mockeado en este spec, resolverBrandingTenant degrada al nombre genérico (no debe romper el envío).
       expect(cuerpoEnviado).toContain('El Sistema del Sol');
-      // El registro guardado (lo que ve el admin en el historial) sigue siendo el cuerpo SIN envolver.
-      expect(repository.crearNotificacion).toHaveBeenCalledWith('t1', 'EMAIL', 'a@b.com', 'Hola', 'Cuerpo');
+      // El registro guardado (lo que ve el admin en el historial) sigue siendo el cuerpo SIN envolver en el sobre HTML
+      // — pero para EMAIL ahora pasa por Markdown antes (pedido explícito del usuario, ver plantilla-renderer.ts).
+      expect(repository.crearNotificacion).toHaveBeenCalledWith('t1', 'EMAIL', 'a@b.com', 'Hola', '<p>Cuerpo</p>\n');
     });
 
     it('ítem H-4: reenvía adjuntoPdf a EmailChannel como un array de un elemento', async () => {

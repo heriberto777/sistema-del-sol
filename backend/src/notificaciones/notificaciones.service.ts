@@ -70,7 +70,7 @@ export class NotificacionesService {
     }
 
     const asunto = plantilla.asunto ? renderizarPlantilla(plantilla.asunto, params.variables) : undefined;
-    const cuerpo = renderizarPlantilla(plantilla.cuerpo, params.variables);
+    const cuerpo = renderizarPlantilla(plantilla.cuerpo, params.variables, { markdown: params.canal === 'EMAIL' });
 
     const notificacion = await this.notificacionesRepository.crearNotificacion(
       params.tenantId,
@@ -118,7 +118,7 @@ export class NotificacionesService {
     const valores = evento ? generarValoresEjemplo(evento.variables.map((v) => v.nombre)) : generarValoresEjemploDesdeTexto(dto.asunto, dto.cuerpo);
 
     const asunto = dto.asunto ? renderizarPlantilla(dto.asunto, valores) : undefined;
-    const cuerpo = renderizarPlantilla(dto.cuerpo, valores);
+    const cuerpo = renderizarPlantilla(dto.cuerpo, valores, { markdown: dto.canal === 'EMAIL' });
 
     if (dto.canal === 'EMAIL') {
       const branding = await this.resolverBrandingTenant(tenantId);

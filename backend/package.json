@@ -63,6 +63,7 @@
     "exceljs": "^4.4.0",
     "helmet": "^7.1.0",
     "ioredis": "^5.4.1",
+    "marked": "14.1.4",
     "mssql": "^11.0.1",
     "nodemailer": "^7.0.11",
     "passport": "^0.7.0",

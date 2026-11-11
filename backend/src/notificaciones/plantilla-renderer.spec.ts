@@ -49,4 +49,34 @@ describe('renderizarPlantilla', () => {
       expect(resultado).toBe('<a href="https://app.ejemplo.com/ver-factura/abc-123">Ver</a>');
     });
   });
+
+  describe('markdown (pedido explícito del usuario — bug real: ** y saltos de línea quedaban literales en el email)', () => {
+    it('sin la opción markdown, el cuerpo queda tal cual (comportamiento de siempre, usado por WhatsApp)', () => {
+      expect(renderizarPlantilla('**{{nombre}}**', { nombre: 'Juan' })).toBe('**Juan**');
+    });
+
+    it('con markdown:true, ** se convierte en negrita real', () => {
+      const resultado = renderizarPlantilla('Hola **{{nombre}}**', { nombre: 'Juan' }, { markdown: true });
+      expect(resultado).toContain('<strong>');
+      expect(resultado).toContain('Juan');
+      expect(resultado).not.toContain('**');
+    });
+
+    it('con markdown:true, un salto de línea simple (como lo escribe un no-técnico) se vuelve <br>, no queda ignorado', () => {
+      const resultado = renderizarPlantilla('Línea uno\nLínea dos', {}, { markdown: true });
+      expect(resultado).toContain('<br>');
+    });
+
+    it('con markdown:true, HTML ya escrito a mano (plantillas viejas) sigue funcionando — Markdown no lo vuelve a escapar', () => {
+      const resultado = renderizarPlantilla('<strong>Ya en negrita</strong>', {}, { markdown: true });
+      expect(resultado).toContain('<strong>Ya en negrita</strong>');
+    });
+
+    it('las variables se sustituyen DESPUÉS de convertir Markdown: un valor con ** no dispara formato por accidente', () => {
+      const resultado = renderizarPlantilla('Cliente: {{nombre}}', { nombre: 'Juan **Perez**' }, { markdown: true });
+      // El nombre llega ya escapado dentro del HTML ya generado — nunca como <strong>.
+      expect(resultado).not.toContain('<strong>');
+      expect(resultado).toContain('Juan **Perez**');
+    });
+  });
 });
