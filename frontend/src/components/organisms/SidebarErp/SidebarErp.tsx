@@ -5,10 +5,9 @@ import clsx from 'clsx';
 import { useAuth } from '../../../hooks/useAuth';
 import { useMenuErp } from '../../../hooks/useMenuErp';
 import { useUrlTiendaPublica } from '../../../hooks/useUrlTiendaPublica';
-import { ETIQUETA_CATEGORIA_ERP, type CategoriaErp, type DominioMenu, type GrupoUtilidades, type ItemMenu } from '../../../config/menu-erp';
+import { type CategoriaErp, type DominioMenu, type GrupoUtilidades, type ItemMenu } from '../../../config/menu-erp';
 
 const CLAVE_DOMINIO_ABIERTO = 'sol_sidebar_dominio_abierto';
-const CLAVE_CATEGORIA_ABIERTA = 'sol_sidebar_categoria_abierta';
 const CLAVE_COLAPSADO = 'sol_sidebar_colapsado';
 const ORDEN_CATEGORIAS: CategoriaErp[] = ['catalogos', 'transacciones', 'consultas', 'reportes', 'configuracion'];
 
@@ -45,25 +44,12 @@ function escribirBooleano(clave: string, valor: boolean) {
   }
 }
 
-/**
- * Grupo abierto ("dominioId" o el id de `GRUPO_MI_ESPACIO`) + clave de
- * categoría que contienen la ruta activa, o null si ninguno. `grupoMiEspacio`
- * no tiene categorías propias (ver comentario en menu-erp.ts) — su match
- * abre el grupo sin intentar abrir ninguna sub-categoría.
- */
-function ubicarRutaActiva(
-  pathname: string,
-  dominios: DominioMenu[],
-  grupoMiEspacio: GrupoUtilidades | null,
-): { dominioId: string; claveCategoria: string | null } | null {
-  if (grupoMiEspacio?.items.some((item) => item.ruta === pathname)) {
-    return { dominioId: grupoMiEspacio.id, claveCategoria: null };
-  }
+/** Dominio ("dominioId" o el id de `GRUPO_MI_ESPACIO`) que contiene la ruta activa, o null si ninguno. */
+function ubicarDominioActivo(pathname: string, dominios: DominioMenu[], grupoMiEspacio: GrupoUtilidades | null): string | null {
+  if (grupoMiEspacio?.items.some((item) => item.ruta === pathname)) return grupoMiEspacio.id;
   for (const dominio of dominios) {
     for (const cat of dominio.categorias) {
-      if (cat.items.some((item) => item.ruta === pathname)) {
-        return { dominioId: dominio.id, claveCategoria: `${dominio.id}:${cat.categoria}` };
-      }
+      if (cat.items.some((item) => item.ruta === pathname)) return dominio.id;
     }
   }
   return null;
@@ -84,20 +70,13 @@ export function SidebarErp({ onNavegar }: { onNavegar?: () => void } = {}) {
   const location = useLocation();
 
   const [colapsado, setColapsado] = useState(leerBooleano(CLAVE_COLAPSADO));
-  const [dominioAbierto, setDominioAbierto] = useState<string | null>(() => {
-    const activo = ubicarRutaActiva(location.pathname, dominios, grupoMiEspacio);
-    return activo?.dominioId ?? leerString(CLAVE_DOMINIO_ABIERTO);
-  });
-  const [categoriaAbierta, setCategoriaAbierta] = useState<string | null>(() => {
-    const activo = ubicarRutaActiva(location.pathname, dominios, grupoMiEspacio);
-    return activo?.claveCategoria ?? leerString(CLAVE_CATEGORIA_ABIERTA);
-  });
+  const [dominioAbierto, setDominioAbierto] = useState<string | null>(
+    () => ubicarDominioActivo(location.pathname, dominios, grupoMiEspacio) ?? leerString(CLAVE_DOMINIO_ABIERTO),
+  );
 
   useEffect(() => {
-    const activo = ubicarRutaActiva(location.pathname, dominios, grupoMiEspacio);
-    if (!activo) return;
-    setDominioAbierto(activo.dominioId);
-    setCategoriaAbierta(activo.claveCategoria);
+    const activo = ubicarDominioActivo(location.pathname, dominios, grupoMiEspacio);
+    if (activo) setDominioAbierto(activo);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.pathname]);
 
@@ -119,18 +98,6 @@ export function SidebarErp({ onNavegar }: { onNavegar?: () => void } = {}) {
     setDominioAbierto((prev) => {
       const siguiente = prev === id ? null : id;
       escribirString(CLAVE_DOMINIO_ABIERTO, siguiente);
-      if (siguiente === null) {
-        setCategoriaAbierta(null);
-        escribirString(CLAVE_CATEGORIA_ABIERTA, null);
-      }
-      return siguiente;
-    });
-  }
-
-  function alternarCategoria(clave: string) {
-    setCategoriaAbierta((prev) => {
-      const siguiente = prev === clave ? null : clave;
-      escribirString(CLAVE_CATEGORIA_ABIERTA, siguiente);
       return siguiente;
     });
   }
@@ -273,35 +240,32 @@ export function SidebarErp({ onNavegar }: { onNavegar?: () => void } = {}) {
 
             {domAbierto && (
               <div className="ml-3 flex flex-col border-l border-slate-200 pl-2.5 dark:border-slate-800">
-                {categoriasPresentes.map((cat) => {
-                  const clave = `${dominio.id}:${cat.categoria}`;
-                  const catAbierta = categoriaAbierta === clave;
-                  return (
-                    <div key={clave}>
-                      <button
-                        type="button"
-                        onClick={() => alternarCategoria(clave)}
-                        className="flex w-full items-center gap-1.5 rounded-md px-2 py-1.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:text-slate-500 dark:hover:bg-slate-900 dark:hover:text-slate-300"
+                {/* Benchmark 2026-11-11 (pedido explícito del usuario, comparando
+                    contra el sidebar de Alegra) — antes cada categoría
+                    (Catálogos/Transacciones/Consultas/Reportes) era un acordeón
+                    propio que había que abrir aparte, con su nombre en mayúscula
+                    como único indicio de qué había adentro. Ahora, con el dominio
+                    abierto, se ven todos sus ítems de una — el agrupamiento sigue
+                    existiendo (una línea fina separa cada categoría, sin texto que
+                    la anuncie) pero ya no exige un segundo clic por grupo. */}
+                {categoriasPresentes.map((cat, i) => (
+                  <div
+                    key={`${dominio.id}:${cat.categoria}`}
+                    className={clsx('flex flex-col gap-0.5', i > 0 && 'mt-1.5 border-t border-slate-100 pt-1.5 dark:border-slate-800/70')}
+                  >
+                    {cat.categoria === 'catalogos' && dominio.id === 'tienda' && urlTienda && (
+                      <a
+                        href={urlTienda}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="mb-0.5 flex items-center gap-1 rounded-md px-2 py-1 text-xs text-sol-600 hover:bg-sol-50 dark:text-sol-400 dark:hover:bg-sol-900/20"
                       >
-                        <span className="min-w-0 flex-1 truncate">{ETIQUETA_CATEGORIA_ERP[cat.categoria]}</span>
-                        {cat.categoria === 'catalogos' && dominio.id === 'tienda' && urlTienda && (
-                          <a
-                            href={urlTienda}
-                            target="_blank"
-                            rel="noreferrer"
-                            title="Ver mi tienda"
-                            onClick={(e) => e.stopPropagation()}
-                            className="text-sol-500 hover:text-sol-600"
-                          >
-                            <ExternalLink size={11} />
-                          </a>
-                        )}
-                        <ChevronRight size={11} className={clsx('shrink-0 transition-transform', catAbierta && 'rotate-90')} />
-                      </button>
-                      {catAbierta && <div className="mb-1 ml-1 flex flex-col gap-0.5">{cat.items.map(renderItem)}</div>}
-                    </div>
-                  );
-                })}
+                        <ExternalLink size={11} /> Ver mi tienda
+                      </a>
+                    )}
+                    {cat.items.map(renderItem)}
+                  </div>
+                ))}
               </div>
             )}
           </div>
