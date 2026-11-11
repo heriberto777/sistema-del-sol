@@ -40,8 +40,14 @@ export interface DominioMenu {
  * Dos adaptaciones deliberadas frente al molde ERP clásico, documentadas acá
  * porque no son evidentes mirando solo los datos:
  * - "Reportes" en este sistema es un hub transversal único (`/reportes`,
- *   filtrable por módulo) — nunca una pantalla propia por dominio. Cada
- *   columna "Reportes" de abajo apunta ahí.
+ *   ver config/reportes-hub.ts) — nunca una pantalla propia por dominio.
+ *   La columna "reportes" de cada dominio de abajo queda siempre vacía a
+ *   propósito (mismo patrón que "configuracion") — se conserva el slot por
+ *   si algún día hace falta un reporte genuinamente exclusivo de un
+ *   dominio, pero hoy el hub central ya cubre el 100% (benchmark
+ *   2026-11-11, vuelta atrás de un paso intermedio — "100% ERP",
+ *   2026-11-03 — que había repartido cada reporte de vuelta a su dominio
+ *   y terminó duplicando exactamente lo que el hub ya resolvía).
  * - "Consultas" no es una pantalla aparte de "Transacciones" — el listado de
  *   cada entidad ya es buscador+filtro+tabla en una sola pantalla. La
  *   columna "Consultas" referencia esa misma ruta en su rol de búsqueda.
@@ -90,14 +96,13 @@ export const DOMINIOS_MENU: DominioMenu[] = [
           // con las transacciones de venta (pedido explícito del usuario).
         ],
       },
-      {
-        // Antes todas estas pestañas vivían mezcladas en un solo hub
-        // transversal (/reportes) junto con Compras/Inventario/Finanzas/
-        // Nómina — se disolvió, cada reporte vive ahora en su dominio real
-        // (auditoría de organización, "100% ERP", ver docs/ARCHITECTURE.md).
-        categoria: 'reportes',
-        items: [{ id: 'reportes-ventas', etiqueta: 'Ventas y comisiones', ruta: '/reportes/ventas', permisos: ['reportes.ver'] }],
-      },
+      // Benchmark 2026-11-11 — vuelta atrás deliberada de la disolución de
+      // 2026-11-09 (comentario de arriba): los reportes de este dominio ya
+      // viven como 4 ítems propios en el hub central (/reportes, categoría
+      // "Ventas" — Ventas/Ventas agrupadas/Rentabilidad/Comisiones), mismo
+      // criterio que Configuración. Repetirlos acá quedó duplicado (y
+      // desincronizado: esta categoría nunca llegó a sumar los otros 3).
+      { categoria: 'reportes', items: [] },
       // Benchmark 2026-11-09 (Cuadre.do/Alegra, pedido explícito del
       // usuario): toda la categoría "Configuración" de los dominios se
       // consolidó en un hub central (/configuracion, ver
@@ -134,7 +139,8 @@ export const DOMINIOS_MENU: DominioMenu[] = [
           // dominio ("Cuentas por Cobrar y Pagar", estilo ERP) — ver ahí.
         ],
       },
-      { categoria: 'reportes', items: [{ id: 'reportes-compras', etiqueta: 'Compras', ruta: '/reportes/compras', permisos: ['reportes.ver'] }] },
+      // Benchmark 2026-11-11 — ya vive en el hub central (/reportes, categoría "Compras").
+      { categoria: 'reportes', items: [] },
       { categoria: 'configuracion', items: [] },
     ],
   },
@@ -161,12 +167,8 @@ export const DOMINIOS_MENU: DominioMenu[] = [
           { id: 'facturas-proveedor', etiqueta: 'Facturas de proveedor', ruta: '/facturas-proveedor', permisos: ['facturasproveedor.ver'], modulo: 'compras' },
         ],
       },
-      {
-        categoria: 'reportes',
-        items: [
-          { id: 'reportes-retenciones-proveedores', etiqueta: 'Retenciones a proveedores', ruta: '/reportes/retenciones-proveedores', permisos: ['reportes.ver'] },
-        ],
-      },
+      // Benchmark 2026-11-11 — ya vive en el hub central (/reportes, categoría "Compras").
+      { categoria: 'reportes', items: [] },
       { categoria: 'configuracion', items: [] },
     ],
   },
@@ -232,7 +234,8 @@ export const DOMINIOS_MENU: DominioMenu[] = [
           },
         ],
       },
-      { categoria: 'reportes', items: [{ id: 'reportes-inventario', etiqueta: 'Inventario y rotación', ruta: '/reportes/inventario', permisos: ['reportes.ver'] }] },
+      // Benchmark 2026-11-11 — ya vive en el hub central (/reportes, categoría "Inventario").
+      { categoria: 'reportes', items: [] },
       { categoria: 'configuracion', items: [] },
     ],
   },
@@ -283,19 +286,8 @@ export const DOMINIOS_MENU: DominioMenu[] = [
           { id: 'historial-asientos', etiqueta: 'Historial de asientos', ruta: '/contabilidad/asientos', permisos: ['contabilidad.ver'] },
         ],
       },
-      {
-        // Antes un solo ítem apuntando al hub mixto /reportes — Balance
-        // general/Estado de resultados/Balance de comprobación no tenían
-        // NINGUNA entrada de menú (hallazgo de la auditoría, Contabilidad.tsx
-        // ya tenía esas 3 pestañas desde antes).
-        categoria: 'reportes',
-        items: [
-          { id: 'reportes-fiscal-dgii', etiqueta: 'Fiscal DGII', ruta: '/contabilidad/fiscal', permisos: ['reportes.ver'] },
-          { id: 'balance-general', etiqueta: 'Balance general', ruta: '/contabilidad/balance-general', permisos: ['contabilidad.ver'] },
-          { id: 'estado-resultados', etiqueta: 'Estado de resultados', ruta: '/contabilidad/estado-resultados', permisos: ['contabilidad.ver'] },
-          { id: 'balance-comprobacion', etiqueta: 'Balance de comprobación', ruta: '/contabilidad/balance-comprobacion', permisos: ['contabilidad.ver'] },
-        ],
-      },
+      // Benchmark 2026-11-11 — las 4 ya viven en el hub central (/reportes, categoría "Finanzas y Fiscal").
+      { categoria: 'reportes', items: [] },
       // Benchmark 2026-11-09 — NCF/Consecutivos/Autorizaciones/Pasarela de
       // pago se gestionan ahora desde el hub central (/configuracion).
       { categoria: 'configuracion', items: [] },
@@ -330,14 +322,8 @@ export const DOMINIOS_MENU: DominioMenu[] = [
         ],
       },
       { categoria: 'consultas', items: [{ id: 'historial-nomina', etiqueta: 'Historial de nómina', ruta: '/nomina/periodos', permisos: ['nomina.ver'], modulo: 'nomina' }] },
-      {
-        // Antes apuntaba al hub mixto /reportes — "Retenciones de ISR" es lo
-        // único que ya existía como reporte real de este dominio (extraído
-        // de la pestaña DGII, ver docs/ARCHITECTURE.md). No hay endpoint de
-        // "costo laboral por período" todavía — queda fuera de esta reorganización.
-        categoria: 'reportes',
-        items: [{ id: 'reportes-nomina', etiqueta: 'Retenciones de ISR', ruta: '/nomina/retenciones', permisos: ['reportes.ver'] }],
-      },
+      // Benchmark 2026-11-11 — ya vive en el hub central (/reportes, categoría "Nómina").
+      { categoria: 'reportes', items: [] },
       // Benchmark 2026-11-09 — Tipos de ausencia se gestiona ahora desde el
       // hub central (/configuracion).
       { categoria: 'configuracion', items: [] },
@@ -391,7 +377,8 @@ export const DOMINIOS_MENU: DominioMenu[] = [
       { categoria: 'catalogos', items: [] },
       { categoria: 'transacciones', items: [{ id: 'proyecto-nuevo', etiqueta: 'Crear / gestionar proyecto', ruta: '/proyectos', permisos: ['proyectos.crear'], modulo: 'proyectos' }] },
       { categoria: 'consultas', items: [{ id: 'proyectos', etiqueta: 'Buscar proyectos', ruta: '/proyectos', permisos: ['proyectos.ver'], modulo: 'proyectos' }] },
-      { categoria: 'reportes', items: [{ id: 'rentabilidad', etiqueta: 'Rentabilidad', ruta: '/proyectos', permisos: ['proyectos.rentabilidad.ver'], modulo: 'proyectos' }] },
+      // Benchmark 2026-11-11 — ya vive en el hub central (/reportes, categoría "Módulos activables").
+      { categoria: 'reportes', items: [] },
       { categoria: 'configuracion', items: [] },
     ],
   },
@@ -403,11 +390,8 @@ export const DOMINIOS_MENU: DominioMenu[] = [
       { categoria: 'catalogos', items: [{ id: 'crm-leads', etiqueta: 'Leads', ruta: '/crm/leads', permisos: ['crm.ver'], modulo: 'crm' }] },
       { categoria: 'transacciones', items: [{ id: 'crm-oportunidad-nueva', etiqueta: 'Nueva oportunidad', ruta: '/crm/pipeline', permisos: ['crm.oportunidades.crear'], modulo: 'crm' }] },
       { categoria: 'consultas', items: [{ id: 'crm-pipeline', etiqueta: 'Pipeline', ruta: '/crm/pipeline', permisos: ['crm.ver'], modulo: 'crm' }] },
-      {
-        // Fase 3 — embudo de conversión/forecast/ranking de vendedores.
-        categoria: 'reportes',
-        items: [{ id: 'crm-dashboard', etiqueta: 'Dashboard CRM', ruta: '/crm/dashboard', permisos: ['crm.reportes.ver'], modulo: 'crm' }],
-      },
+      // Benchmark 2026-11-11 — ya vive en el hub central (/reportes, categoría "Módulos activables").
+      { categoria: 'reportes', items: [] },
       // Benchmark 2026-11-09 — Etapas del pipeline y Metas de venta se
       // gestionan ahora desde el hub central (/configuracion).
       { categoria: 'configuracion', items: [] },
@@ -436,11 +420,8 @@ export const DOMINIOS_MENU: DominioMenu[] = [
         ],
       },
       { categoria: 'consultas', items: [] },
-      // Auditoría UX Fase 8 — antes sin reporte propio.
-      {
-        categoria: 'reportes',
-        items: [{ id: 'inmobiliaria-resumen', etiqueta: 'Resumen de Inmobiliaria', ruta: '/reportes/inmobiliaria', permisos: ['reportes.ver'] }],
-      },
+      // Benchmark 2026-11-11 — ya vive en el hub central (/reportes, categoría "Módulos activables").
+      { categoria: 'reportes', items: [] },
       { categoria: 'configuracion', items: [] },
     ],
   },
@@ -467,7 +448,8 @@ export const DOMINIOS_MENU: DominioMenu[] = [
         ],
       },
       { categoria: 'consultas', items: [{ id: 'reservas', etiqueta: 'Mis reservas', ruta: '/travel/reservas', permisos: ['travel.ver'], modulo: 'travel' }] },
-      { categoria: 'reportes', items: [{ id: 'travel-resumen', etiqueta: 'Resumen de Travel', ruta: '/travel/resumen', permisos: ['travel.ver'] }] },
+      // Benchmark 2026-11-11 — ya vive en el hub central (/reportes, categoría "Módulos activables").
+      { categoria: 'reportes', items: [] },
       // Benchmark 2026-11-09 — Cuenta Duffel/Hotelbeds se gestiona ahora
       // desde el hub central (/configuracion).
       { categoria: 'configuracion', items: [] },
@@ -481,11 +463,8 @@ export const DOMINIOS_MENU: DominioMenu[] = [
       { categoria: 'catalogos', items: [] },
       { categoria: 'transacciones', items: [{ id: 'publicacion-nueva', etiqueta: 'Crear publicación', ruta: '/publicaciones-sociales', permisos: ['publicacionessociales.crear'], modulo: 'publicacionessociales' }] },
       { categoria: 'consultas', items: [{ id: 'publicaciones', etiqueta: 'Buscar publicaciones', ruta: '/publicaciones-sociales', permisos: ['publicacionessociales.ver'], modulo: 'publicacionessociales' }] },
-      // Auditoría UX Fase 8 — antes sin reporte propio.
-      {
-        categoria: 'reportes',
-        items: [{ id: 'publicaciones-resumen', etiqueta: 'Resumen de Publicaciones', ruta: '/reportes/publicaciones-sociales', permisos: ['reportes.ver'] }],
-      },
+      // Benchmark 2026-11-11 — ya vive en el hub central (/reportes, categoría "Módulos activables").
+      { categoria: 'reportes', items: [] },
       { categoria: 'configuracion', items: [] },
     ],
   },
@@ -504,13 +483,8 @@ export const DOMINIOS_MENU: DominioMenu[] = [
       },
       { categoria: 'transacciones', items: [{ id: 'pedidos', etiqueta: 'Gestionar pedidos', ruta: '/tienda-online/pedidos', permisos: ['ecommerce.ver'], modulo: 'ecommerce' }] },
       { categoria: 'consultas', items: [] },
-      // Auditoría UX Fase 8 — antes sin reporte propio (el único dato
-      // agregado que existía, resumenPendientes, era un solo número para
-      // la card del Dashboard).
-      {
-        categoria: 'reportes',
-        items: [{ id: 'tienda-resumen', etiqueta: 'Resumen de Tienda Online', ruta: '/reportes/tienda-online', permisos: ['reportes.ver'] }],
-      },
+      // Benchmark 2026-11-11 — ya vive en el hub central (/reportes, categoría "Módulos activables").
+      { categoria: 'reportes', items: [] },
       // Benchmark 2026-11-09 — Dominio propio y branding se gestiona ahora
       // desde el hub central (/configuracion).
       { categoria: 'configuracion', items: [] },

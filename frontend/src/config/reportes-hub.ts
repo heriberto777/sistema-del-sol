@@ -13,11 +13,19 @@ export interface CategoriaReportesHub {
  * Catálogo central de Reportes (`/reportes`) — benchmark 2026-11-09 contra
  * Cuadre.do/Alegra, Fase 3: ambos agrupan TODOS sus reportes en una sola
  * página de categorías con conteo y descripción (Alegra: 34 reportes en 7
- * categorías; Cuadre: 16 en 4). Esto NO mueve ningún reporte de lugar — cada
- * ítem sigue siendo el mismo `ruta`/`permisos`/`modulo` ya definido en la
- * categoría `reportes` de `menu-erp.ts` (que a su vez quedó así, uno por
- * dominio, tras el roadmap "100% ERP" anterior); este archivo solo les da
- * un índice central, mismo criterio que `configuracion-hub.ts`.
+ * categorías; Cuadre: 16 en 4).
+ *
+ * Benchmark 2026-11-11 — este archivo es ahora la ÚNICA fuente de verdad
+ * para navegar a un reporte: la categoría `reportes` de cada dominio en
+ * `menu-erp.ts` quedó vacía a propósito (mismo criterio que
+ * `configuracion-hub.ts`/`configuracion`). Antes cada ítem de acá también
+ * existía duplicado como entrada de sidebar en su propio dominio —
+ * encontrado al auditar el sidebar contra el de Alegra (que tampoco repite
+ * sus reportes en el menú del dominio, solo dentro de `/report`); de paso
+ * se corrigió un ítem desincronizado (Ventas en el sidebar solo tenía 1 de
+ * estos 4). Las rutas/permisos/módulos de abajo no cambiaron — sigue
+ * siendo exactamente el mismo documento real al que apuntaba cada entrada
+ * de sidebar que se quitó.
  */
 export const REPORTES_HUB: CategoriaReportesHub[] = [
   {
