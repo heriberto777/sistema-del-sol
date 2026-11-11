@@ -8,6 +8,7 @@ import { FormField } from '../FormField/FormField';
 import { SelectField } from '../FormField/SelectField';
 import { SelectListaPrecio } from '../SelectListaPrecio/SelectListaPrecio';
 import { SelectCategoriaCliente } from '../SelectCategoriaCliente/SelectCategoriaCliente';
+import { SelectTerminoPago } from '../SelectTerminoPago/SelectTerminoPago';
 import type { ClienteCompleto } from '@backend-src/common/prisma/cliente-select-basico';
 
 export type TipoCliente = 'PERSONA_FISICA' | 'PERSONA_JURIDICA';
@@ -34,6 +35,7 @@ export interface ClienteFormValues {
   comprobanteFiscalPorDefecto: TipoComprobanteFiscal | '';
   condicionPagoPorDefecto: CondicionPago | '';
   plazoPagoDias: string;
+  terminoPagoId: string;
   notificacionesEmailHabilitadas: boolean;
   notificacionesWhatsappHabilitadas: boolean;
 }
@@ -53,6 +55,7 @@ export const CLIENTE_VACIO: ClienteFormValues = {
   comprobanteFiscalPorDefecto: '',
   condicionPagoPorDefecto: '',
   plazoPagoDias: '30',
+  terminoPagoId: '',
   notificacionesEmailHabilitadas: true,
   notificacionesWhatsappHabilitadas: true,
 };
@@ -85,6 +88,7 @@ export function FormularioCliente({ cliente, onGuardado }: { cliente: Cliente | 
           comprobanteFiscalPorDefecto: cliente.comprobanteFiscalPorDefecto ?? '',
           condicionPagoPorDefecto: cliente.condicionPagoPorDefecto ?? '',
           plazoPagoDias: String(cliente.plazoPagoDias),
+          terminoPagoId: cliente.terminoPagoId ?? '',
           notificacionesEmailHabilitadas: cliente.notificacionesEmailHabilitadas ?? true,
           notificacionesWhatsappHabilitadas: cliente.notificacionesWhatsappHabilitadas ?? true,
         }
@@ -108,6 +112,7 @@ export function FormularioCliente({ cliente, onGuardado }: { cliente: Cliente | 
       comprobanteFiscalPorDefecto: valores.comprobanteFiscalPorDefecto || null,
       condicionPagoPorDefecto: valores.condicionPagoPorDefecto || null,
       plazoPagoDias: valores.plazoPagoDias ? Number(valores.plazoPagoDias) : undefined,
+      terminoPagoId: valores.terminoPagoId || null,
       notificacionesEmailHabilitadas: valores.notificacionesEmailHabilitadas,
       notificacionesWhatsappHabilitadas: valores.notificacionesWhatsappHabilitadas,
     };
@@ -259,6 +264,17 @@ export function FormularioCliente({ cliente, onGuardado }: { cliente: Cliente | 
           value={valores.plazoPagoDias}
           onChange={(e) => setValores((v) => ({ ...v, plazoPagoDias: e.target.value }))}
         />
+        <div className="flex flex-col gap-1">
+          <label htmlFor="cliente-termino-pago" className="text-sm font-medium text-slate-700 dark:text-slate-300">
+            Término de pago (opcional)
+          </label>
+          <SelectTerminoPago
+            id="cliente-termino-pago"
+            aplicaA="CLIENTE"
+            value={valores.terminoPagoId}
+            onChange={(id) => setValores((v) => ({ ...v, terminoPagoId: id }))}
+          />
+        </div>
         <div className="flex flex-col gap-2 rounded-lg border border-slate-200 px-3 py-2 dark:border-slate-700 sm:col-span-2">
           <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Notificar automáticamente</p>
           <p className="text-xs text-slate-500 dark:text-slate-400">

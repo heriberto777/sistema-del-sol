@@ -3798,6 +3798,14 @@ model Cliente {
   // de pago" (días de crédito) al facturarle a este cliente cuando la
   // condición de pago es CREDITO.
   plazoPagoDias                     Int                    @default(30)
+  // Fuente catalogada OPCIONAL para los días de crédito (mismo catálogo
+  // compartido que ya usan CuentaPorCobrar/CuentaPorPagar/FacturaProveedor,
+  // ver TerminoPago) — nunca reemplaza plazoPagoDias, solo lo precarga al
+  // elegir este cliente en Facturación/POS (igual criterio que
+  // comprobanteFiscalPorDefecto/condicionPagoPorDefecto). null = sin
+  // término asignado, sigue usando plazoPagoDias tal cual.
+  terminoPagoId                     String?
+  terminoPago                       TerminoPago?           @relation(fields: [terminoPagoId], references: [id], onDelete: SetNull)
   createdAt                         DateTime               @default(now())
   // Ítem A-3 (Lealtad/puntos) — saldo denormalizado, mismo criterio que
   // `Stock.cantidadActual`: la fuente de verdad es la suma de
@@ -3896,6 +3904,7 @@ model TerminoPago {
   cuentasPorCobrar  CuentaPorCobrar[]
   cuentasPorPagar   CuentaPorPagar[]
   facturasProveedor FacturaProveedor[]
+  clientes          Cliente[]
 
   @@unique([tenantId, nombre])
   @@map("terminos_pago")

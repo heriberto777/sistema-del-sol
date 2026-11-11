@@ -12,6 +12,7 @@ import { CardColapsable } from '../components/molecules/CardColapsable/CardColap
 import { SelectListaPrecio } from '../components/molecules/SelectListaPrecio/SelectListaPrecio';
 import { SelectCategoriaCliente } from '../components/molecules/SelectCategoriaCliente/SelectCategoriaCliente';
 import { SelectCategoriaProveedor } from '../components/molecules/SelectCategoriaProveedor/SelectCategoriaProveedor';
+import { SelectTerminoPago } from '../components/molecules/SelectTerminoPago/SelectTerminoPago';
 import { useHayCambios } from '../hooks/useHayCambios';
 import type { TipoCliente, TipoComprobanteFiscal, CondicionPago, Cliente } from '../components/molecules/FormularioCliente/FormularioCliente';
 
@@ -32,6 +33,7 @@ interface ClienteFormValues {
   comprobanteFiscalPorDefecto: TipoComprobanteFiscal | '';
   condicionPagoPorDefecto: CondicionPago | '';
   plazoPagoDias: string;
+  terminoPagoId: string;
   notificacionesEmailHabilitadas: boolean;
   notificacionesWhatsappHabilitadas: boolean;
   // Solo relevantes en modo "crear" — benchmark 2026-11-09 Fase 2 (unificar
@@ -55,6 +57,7 @@ const CLIENTE_VACIO: ClienteFormValues = {
   comprobanteFiscalPorDefecto: '',
   condicionPagoPorDefecto: '',
   plazoPagoDias: '30',
+  terminoPagoId: '',
   notificacionesEmailHabilitadas: true,
   notificacionesWhatsappHabilitadas: true,
   categoriaProveedorId: '',
@@ -77,6 +80,7 @@ function valoresDesdeCliente(c: Cliente): ClienteFormValues {
     comprobanteFiscalPorDefecto: c.comprobanteFiscalPorDefecto ?? '',
     condicionPagoPorDefecto: c.condicionPagoPorDefecto ?? '',
     plazoPagoDias: String(c.plazoPagoDias),
+    terminoPagoId: c.terminoPagoId ?? '',
     notificacionesEmailHabilitadas: c.notificacionesEmailHabilitadas ?? true,
     notificacionesWhatsappHabilitadas: c.notificacionesWhatsappHabilitadas ?? true,
     categoriaProveedorId: '',
@@ -137,6 +141,7 @@ export function ClienteFormulario() {
       comprobanteFiscalPorDefecto: valores.comprobanteFiscalPorDefecto || null,
       condicionPagoPorDefecto: valores.condicionPagoPorDefecto || null,
       plazoPagoDias: valores.plazoPagoDias ? Number(valores.plazoPagoDias) : undefined,
+      terminoPagoId: valores.terminoPagoId || null,
       notificacionesEmailHabilitadas: valores.notificacionesEmailHabilitadas,
       notificacionesWhatsappHabilitadas: valores.notificacionesWhatsappHabilitadas,
     };
@@ -390,6 +395,18 @@ export function ClienteFormulario() {
             disabled={soloLectura}
             onChange={(e) => setValores((v) => ({ ...v, plazoPagoDias: e.target.value }))}
           />
+          <div className="flex flex-col gap-1">
+            <label htmlFor="cliente-termino-pago" className="text-sm font-medium text-slate-700 dark:text-slate-300">
+              Término de pago (opcional)
+            </label>
+            <SelectTerminoPago
+              id="cliente-termino-pago"
+              aplicaA="CLIENTE"
+              value={valores.terminoPagoId}
+              disabled={soloLectura}
+              onChange={(id) => setValores((v) => ({ ...v, terminoPagoId: id }))}
+            />
+          </div>
           <div className="flex flex-col gap-2 rounded-lg border border-slate-200 px-3 py-2 dark:border-slate-700 sm:col-span-2">
             <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Notificar automáticamente</p>
             <div className="flex items-center justify-between gap-3">

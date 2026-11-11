@@ -112,7 +112,11 @@ export function FacturacionNueva() {
     if (cliente?.condicionPagoPorDefecto) setTipoFactura(cliente.condicionPagoPorDefecto);
     if (cliente?.comprobanteFiscalPorDefecto) setComprobanteFiscal(cliente.comprobanteFiscalPorDefecto);
     if (cliente) {
-      setPlazoPagoDias(cliente.plazoPagoDias);
+      // Si el cliente tiene un Término de pago del catálogo, sus días ganan
+      // sobre el plazoPagoDias suelto (mismo criterio que ya usa
+      // FacturaProveedorNueva/facturas-proveedor.service.ts) — sigue siendo
+      // solo un valor inicial, el selector de abajo queda editable.
+      setPlazoPagoDias(cliente.terminoPago?.dias ?? cliente.plazoPagoDias);
       setInfoColapsada(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -87,6 +87,14 @@ export class CrearClienteDto {
 
   @ApiProperty({
     required: false,
+    description: 'Término de pago del catálogo (días + descuento por pronto pago) — opcional, solo precarga plazoPagoDias al elegir este cliente, nunca lo reemplaza.',
+  })
+  @IsOptional()
+  @IsUUID()
+  terminoPagoId?: string | null;
+
+  @ApiProperty({
+    required: false,
     default: true,
     description: 'Si recibe por Email los avisos automáticos de Factura/Nota de Crédito/Nota de Débito/Cotización.',
   })

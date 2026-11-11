@@ -62,10 +62,12 @@ export const CLIENTE_SELECT_COMPLETO = {
   comprobanteFiscalPorDefecto: true,
   condicionPagoPorDefecto: true,
   plazoPagoDias: true,
+  terminoPagoId: true,
   createdAt: true,
   puntosLealtad: true,
   listaPrecio: { select: { id: true, nombre: true } },
   categoria: { select: { id: true, nombre: true } },
+  terminoPago: { select: { id: true, nombre: true, dias: true, descuentoProntoPagoPct: true, diasProntoPago: true } },
 } satisfies Prisma.ClienteSelect;
 
 export type ClienteCompleto = SerializadoHttp<Prisma.ClienteGetPayload<{ select: typeof CLIENTE_SELECT_COMPLETO }>>;

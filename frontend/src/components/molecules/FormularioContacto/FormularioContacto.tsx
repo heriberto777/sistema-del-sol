@@ -9,6 +9,7 @@ import { SelectField } from '../FormField/SelectField';
 import { SelectListaPrecio } from '../SelectListaPrecio/SelectListaPrecio';
 import { SelectCategoriaCliente } from '../SelectCategoriaCliente/SelectCategoriaCliente';
 import { SelectCategoriaProveedor } from '../SelectCategoriaProveedor/SelectCategoriaProveedor';
+import { SelectTerminoPago } from '../SelectTerminoPago/SelectTerminoPago';
 import type { TipoCliente, TipoComprobanteFiscal, CondicionPago } from '../FormularioCliente/FormularioCliente';
 
 export interface ContactoCreado {
@@ -31,6 +32,7 @@ interface ContactoFormValues {
   comprobanteFiscalPorDefecto: TipoComprobanteFiscal | '';
   condicionPagoPorDefecto: CondicionPago | '';
   plazoPagoDiasCliente: string;
+  terminoPagoIdCliente: string;
   notificacionesEmailHabilitadas: boolean;
   notificacionesWhatsappHabilitadas: boolean;
   categoriaProveedorId: string;
@@ -52,6 +54,7 @@ const CONTACTO_VACIO: ContactoFormValues = {
   comprobanteFiscalPorDefecto: '',
   condicionPagoPorDefecto: '',
   plazoPagoDiasCliente: '30',
+  terminoPagoIdCliente: '',
   notificacionesEmailHabilitadas: true,
   notificacionesWhatsappHabilitadas: true,
   categoriaProveedorId: '',
@@ -100,6 +103,7 @@ export function FormularioContacto({
       comprobanteFiscalPorDefecto: valores.comprobanteFiscalPorDefecto || null,
       condicionPagoPorDefecto: valores.condicionPagoPorDefecto || null,
       plazoPagoDias: valores.plazoPagoDiasCliente ? Number(valores.plazoPagoDiasCliente) : undefined,
+      terminoPagoId: valores.terminoPagoIdCliente || null,
       notificacionesEmailHabilitadas: valores.notificacionesEmailHabilitadas,
       notificacionesWhatsappHabilitadas: valores.notificacionesWhatsappHabilitadas,
     };
@@ -288,6 +292,17 @@ export function FormularioContacto({
               value={valores.plazoPagoDiasCliente}
               onChange={(e) => setValores((v) => ({ ...v, plazoPagoDiasCliente: e.target.value }))}
             />
+            <div className="flex flex-col gap-1">
+              <label htmlFor="contacto-termino-pago-cliente" className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                Término de pago (opcional)
+              </label>
+              <SelectTerminoPago
+                id="contacto-termino-pago-cliente"
+                aplicaA="CLIENTE"
+                value={valores.terminoPagoIdCliente}
+                onChange={(id) => setValores((v) => ({ ...v, terminoPagoIdCliente: id }))}
+              />
+            </div>
             <div className="flex flex-col gap-2 rounded-lg border border-slate-200 px-3 py-2 dark:border-slate-700 sm:col-span-2">
               <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Notificar automáticamente</p>
               <div className="flex items-center justify-between gap-3">
