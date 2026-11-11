@@ -40,6 +40,8 @@ const ETIQUETA_COMPROBANTE: Record<'CONSUMO' | 'CREDITO_FISCAL' | 'REGIMEN_ESPEC
   GUBERNAMENTAL: 'Gubernamental (B15)',
 };
 
+const OPCIONES_DIAS_CREDITO_BASE = [15, 30, 45, 60, 90];
+
 export function FacturacionNueva() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -48,6 +50,13 @@ export function FacturacionNueva() {
   const [tipoFactura, setTipoFactura] = useState<'CONTADO' | 'CREDITO'>('CONTADO');
   const [comprobanteFiscal, setComprobanteFiscal] = useState<'CONSUMO' | 'CREDITO_FISCAL' | 'REGIMEN_ESPECIAL' | 'GUBERNAMENTAL'>('CONSUMO');
   const [plazoPagoDias, setPlazoPagoDias] = useState(30);
+  // Bug real: un Término de pago del catálogo puede traer días fuera de las
+  // 5 opciones fijas de abajo (ej. "Contado con Recibo" = 1 día) — sin
+  // agregarlo a la lista, el <select> nativo cae en la PRIMERA opción
+  // (15 días) para mostrar, aunque el valor real guardado sea el correcto.
+  const opcionesDiasCredito = OPCIONES_DIAS_CREDITO_BASE.includes(plazoPagoDias)
+    ? OPCIONES_DIAS_CREDITO_BASE
+    : [...OPCIONES_DIAS_CREDITO_BASE, plazoPagoDias].sort((a, b) => a - b);
   // Ítem Cobranza — captura el cobro al crear una factura CONTADO fuera de
   // POS (igual que POS), para que quede un registro de pago y la factura
   // salga marcada como pagada.
@@ -634,11 +643,11 @@ export function FacturacionNueva() {
                   Condición de pago (plan de integración Cuadre, ítem B-6)
                 </label>
                 <Select value={plazoPagoDias} onChange={(e) => setPlazoPagoDias(Number(e.target.value))}>
-                  <option value={15}>15 días</option>
-                  <option value={30}>30 días</option>
-                  <option value={45}>45 días</option>
-                  <option value={60}>60 días</option>
-                  <option value={90}>90 días</option>
+                  {opcionesDiasCredito.map((dias) => (
+                    <option key={dias} value={dias}>
+                      {dias} {dias === 1 ? 'día' : 'días'}
+                    </option>
+                  ))}
                 </Select>
               </div>
               <div className="flex flex-col gap-1">
