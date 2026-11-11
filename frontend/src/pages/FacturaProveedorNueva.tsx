@@ -12,6 +12,8 @@ import { Button } from '../components/atoms/Button/Button';
 import { FormField } from '../components/molecules/FormField/FormField';
 import { ComboboxBusqueda } from '../components/molecules/ComboboxBusqueda/ComboboxBusqueda';
 import { NuevoProveedorInline, type ProveedorBasico } from '../components/molecules/NuevoProveedorInline/NuevoProveedorInline';
+import { SelectTerminoPago } from '../components/molecules/SelectTerminoPago/SelectTerminoPago';
+import { type TerminoPago } from '../hooks/useTerminosPago';
 import { PaginaResultado } from '../types/pagina-resultado';
 import { useHayCambios } from '../hooks/useHayCambios';
 import { useAuth } from '../hooks/useAuth';
@@ -77,6 +79,8 @@ export function FacturaProveedorNueva() {
   const [tipoNcfProveedor, setTipoNcfProveedor] = useState('B01');
   const [concepto, setConcepto] = useState('');
   const [fecha, setFecha] = useState('');
+  const [terminoPagoId, setTerminoPagoId] = useState('');
+  const [terminoPagoSeleccionado, setTerminoPagoSeleccionado] = useState<TerminoPago | undefined>(undefined);
   const [lineas, setLineas] = useState<LineaForm[]>([LINEA_VACIA]);
   const [error, setError] = useState<string | null>(null);
   const { tienePermiso } = useAuth();
@@ -174,6 +178,7 @@ export function FacturaProveedorNueva() {
         tipoNcfProveedor,
         concepto: concepto || undefined,
         fecha: fecha || undefined,
+        terminoPagoId: terminoPagoId || undefined,
         lineas: lineasValidas.map((l) => ({
           cuentaContableId: l.cuentaContableId,
           concepto: l.concepto || undefined,
@@ -206,7 +211,7 @@ export function FacturaProveedorNueva() {
     crear.mutate();
   }
 
-  const [haycambios, confirmarGuardado] = useHayCambios({ proveedor, ncfProveedor, tipoNcfProveedor, concepto, fecha, lineas });
+  const [haycambios, confirmarGuardado] = useHayCambios({ proveedor, ncfProveedor, tipoNcfProveedor, concepto, fecha, terminoPagoId, lineas });
 
   return (
     <PaginaDocumento
@@ -329,6 +334,31 @@ export function FacturaProveedorNueva() {
             </div>
             <FormField id="fp-concepto" label="Concepto (opcional)" value={concepto} onChange={(e) => setConcepto(e.target.value)} />
             <FormField id="fp-fecha" label="Fecha (opcional)" type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
+            <div className="flex flex-col gap-1">
+              <label htmlFor="fp-termino-pago" className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                Término de pago (opcional)
+              </label>
+              <SelectTerminoPago
+                id="fp-termino-pago"
+                aplicaA="PROVEEDOR"
+                value={terminoPagoId}
+                onChange={(id, termino) => {
+                  setTerminoPagoId(id);
+                  setTerminoPagoSeleccionado(termino);
+                }}
+              />
+              {terminoPagoSeleccionado && fecha && (
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Vence el{' '}
+                  {new Date(new Date(fecha).getTime() + terminoPagoSeleccionado.dias * 86400000).toLocaleDateString('es-DO', {
+                    timeZone: 'UTC',
+                  })}
+                </p>
+              )}
+              {!terminoPagoId && (
+                <p className="text-xs text-slate-500 dark:text-slate-400">Si no elegís uno, se usa el plazo general del proveedor.</p>
+              )}
+            </div>
           </div>
         </Card>
 
