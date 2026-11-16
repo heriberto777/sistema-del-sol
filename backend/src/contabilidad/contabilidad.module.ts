@@ -11,6 +11,7 @@ import { ContabilidadEventosService } from './contabilidad-eventos.service';
 import { CierrePeriodoService } from './cierre-periodo.service';
 import { CierrePeriodoController } from './cierre-periodo.controller';
 import { CierrePeriodoRepository } from './cierre-periodo.repository';
+import { PeriodosContablesCronService } from './periodos-contables-cron.service';
 
 @Module({
   controllers: [CuentasContablesController, AsientosContablesController, EstadosFinancierosController, CierrePeriodoController],
@@ -23,6 +24,7 @@ import { CierrePeriodoRepository } from './cierre-periodo.repository';
     ContabilidadEventosService,
     CierrePeriodoService,
     CierrePeriodoRepository,
+    PeriodosContablesCronService,
   ],
   exports: [CuentasContablesService, CierrePeriodoService],
 })

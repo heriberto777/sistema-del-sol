@@ -9,15 +9,27 @@ export class CierrePeriodoRepository {
     return this.tenantPrisma.client;
   }
 
-  buscarUltimo() {
-    return this.db.periodoContableCerrado.findFirst({ orderBy: { fecha: 'desc' } });
-  }
-
   listar() {
-    return this.db.periodoContableCerrado.findMany({ orderBy: { fecha: 'desc' }, include: { asientoCierre: { include: { lineas: true } } } });
+    return this.db.periodoContable.findMany({ orderBy: { fechaInicio: 'desc' }, include: { asientoCierre: { include: { lineas: true } } } });
   }
 
-  crear(params: { tenantId: string; fecha: Date; utilidadNeta: number; asientoCierreId: string }) {
-    return this.db.periodoContableCerrado.create({ data: params, include: { asientoCierre: { include: { lineas: true } } } });
+  buscarPorFecha(fecha: Date) {
+    return this.db.periodoContable.findFirst({ where: { fechaInicio: { lte: fecha }, fechaFin: { gte: fecha } } });
+  }
+
+  buscarAbiertoMasAntiguo() {
+    return this.db.periodoContable.findFirst({ where: { estado: 'ABIERTO' }, orderBy: { fechaInicio: 'asc' } });
+  }
+
+  crear(params: { tenantId: string; fechaInicio: Date; fechaFin: Date }) {
+    return this.db.periodoContable.create({ data: params });
+  }
+
+  cerrar(id: string, params: { utilidadNeta: number; asientoCierreId: string }) {
+    return this.db.periodoContable.update({
+      where: { id },
+      data: { estado: 'CERRADO', ...params },
+      include: { asientoCierre: { include: { lineas: true } } },
+    });
   }
 }

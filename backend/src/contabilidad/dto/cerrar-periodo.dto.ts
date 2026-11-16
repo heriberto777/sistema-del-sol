@@ -1,8 +1,8 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsDateString } from 'class-validator';
+import { IsUUID } from 'class-validator';
 
 export class CerrarPeriodoDto {
-  @ApiProperty({ description: 'Fecha de corte del período a cerrar (inclusive)' })
-  @IsDateString()
-  fecha!: string;
+  @ApiProperty({ description: 'Período a cerrar — debe ser el ABIERTO más antiguo (ver CierrePeriodoService.cerrarPeriodo)' })
+  @IsUUID()
+  periodoId!: string;
 }

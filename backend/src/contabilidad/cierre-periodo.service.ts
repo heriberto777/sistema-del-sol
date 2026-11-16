@@ -4,21 +4,19 @@ import { AsientosContablesRepository } from './asientos-contables.repository';
 import { CuentasContablesRepository } from './cuentas-contables.repository';
 import { CODIGOS_CUENTA } from './cuentas-base';
 import { CerrarPeriodoDto } from './dto/cerrar-periodo.dto';
+import { rangoDelMesSiguiente } from './periodos-contables.util';
 
 const EPSILON = 0.005;
-
-/** Los movimientos del propio día de corte deben quedar incluidos en el cierre — sin esto, un `fecha` de solo-día (medianoche) excluiría todo lo ocurrido ese mismo día. */
-function finDelDia(fecha: Date): Date {
-  const d = new Date(fecha);
-  d.setHours(23, 59, 59, 999);
-  return d;
-}
 
 interface LineaCierre {
   cuentaContableId: string;
   debito: number;
   credito: number;
   descripcion: string;
+}
+
+function etiquetaPeriodo(fechaInicio: Date) {
+  return fechaInicio.toLocaleDateString('es-DO', { month: 'long', year: 'numeric' });
 }
 
 @Injectable()
@@ -36,47 +34,48 @@ export class CierrePeriodoService {
   }
 
   /**
-   * Único punto donde se valida una fecha contra el último cierre —
-   * usado por AsientosContablesService (crear/crearGasto/anular) y por
-   * PagosService/GastosMenoresService, las dos únicas rutas de negocio
-   * que aceptan una fecha manual retroactiva (facturación/compras/nómina
-   * siempre se fechan a "ahora", nunca caen en un período cerrado).
+   * Reemplaza a la vieja validación contra "el último cierre" — ahora
+   * valida contra un PeriodoContable real (ver schema.prisma). Mismos 4
+   * llamadores de siempre (Asiento manual/Gasto rápido/anulación,
+   * GastosMenoresService, FacturasProveedorService, PagosService) — las
+   * únicas rutas de negocio con fecha manual retroactiva. Extender esto a
+   * Facturación/POS/Compras/Nómina es la Fase 2, deliberadamente fuera de
+   * este cambio.
    */
-  async validarFechaAbierta(fecha: Date) {
-    const ultimo = await this.cierreRepository.buscarUltimo();
-    if (ultimo && fecha <= ultimo.fecha) {
-      throw new BadRequestException(
-        `No se puede registrar con fecha ${fecha.toISOString().slice(0, 10)} — el período hasta ${ultimo.fecha.toISOString().slice(0, 10)} ya está cerrado`,
-      );
+  async validarPeriodoAbierto(fecha: Date) {
+    const periodo = await this.cierreRepository.buscarPorFecha(fecha);
+    if (!periodo) {
+      throw new BadRequestException(`No hay un período contable definido para la fecha ${fecha.toISOString().slice(0, 10)}`);
+    }
+    if (periodo.estado === 'CERRADO') {
+      throw new BadRequestException(`El período que cubre la fecha ${fecha.toISOString().slice(0, 10)} ya está cerrado`);
     }
   }
 
   /**
-   * Traspasa el saldo neto de las cuentas de INGRESO/GASTO acumulado desde
-   * el último cierre (o desde el inicio, si es el primero) hasta `fecha`,
-   * a Utilidades Retenidas — el "cierre de período" que
-   * estados-financieros.service.ts señala como no implementado. Alcance
-   * deliberado (ver ARCHITECTURE.md): solo cierra INGRESO/GASTO contra
-   * patrimonio; no bloquea retroactivamente los asientos AUTOMÁTICOS
-   * (factura/compra/nómina), que siempre se fechan a "ahora" y por lo
-   * tanto nunca caen dentro de un período ya cerrado en la práctica.
-   * `validarFechaAbierta` (arriba) sí valida asientos manuales/gastos
-   * rápidos, anulaciones, y Pago/GastoMenor — las únicas rutas de
-   * negocio con fecha manual retroactiva.
+   * Cierra el período ABIERTO más antiguo (nunca uno arbitrario — evita
+   * huecos sin período, ver el comentario del modelo PeriodoContable).
+   * Traspasa el saldo neto de INGRESO/GASTO de ESE rango exacto
+   * (fechaInicio/fechaFin ya guardados en el período, no hace falta
+   * buscar "el último cierre") a Utilidades Retenidas, con un asiento
+   * automático — el "cierre de período" que estados-financieros.service.ts
+   * señala como no implementado. Si el período siguiente todavía no
+   * existe (se cerró antes de que el cron lo creara), lo crea en el mismo
+   * paso — cerrar nunca deja un hueco que bloquee la operación del día
+   * siguiente.
    */
   async cerrarPeriodo(dto: CerrarPeriodoDto, tenantId: string) {
-    const fecha = new Date(dto.fecha);
-    const ultimo = await this.cierreRepository.buscarUltimo();
-    if (ultimo && fecha <= ultimo.fecha) {
-      throw new BadRequestException(
-        `Ya existe un cierre en o después de esta fecha (último cierre: ${ultimo.fecha.toISOString().slice(0, 10)})`,
-      );
+    const masAntiguo = await this.cierreRepository.buscarAbiertoMasAntiguo();
+    if (!masAntiguo) {
+      throw new BadRequestException('No hay ningún período abierto para cerrar.');
+    }
+    if (masAntiguo.id !== dto.periodoId) {
+      throw new BadRequestException(`Hay que cerrar primero el período más antiguo todavía abierto (${etiquetaPeriodo(masAntiguo.fechaInicio)}).`);
     }
 
-    const desde = ultimo ? new Date(ultimo.fecha.getTime() + 1) : new Date(0);
-    const lineas = await this.asientosRepository.lineasEnRango(desde, finDelDia(fecha));
+    const lineas = await this.asientosRepository.lineasEnRango(masAntiguo.fechaInicio, masAntiguo.fechaFin);
     if (lineas.length === 0) {
-      throw new BadRequestException('No hay movimientos de ingresos/gastos en el período a cerrar');
+      throw new BadRequestException('No hay movimientos de ingresos/gastos en este período.');
     }
 
     const saldosPorCuenta = new Map<string, { id: string; codigo: string; nombre: string; tipo: string; saldo: number }>();
@@ -122,13 +121,28 @@ export class CierrePeriodoService {
 
     const asiento = await this.asientosRepository.crear({
       tenantId,
-      concepto: `Cierre del período al ${dto.fecha.slice(0, 10)}`,
+      concepto: `Cierre del período ${etiquetaPeriodo(masAntiguo.fechaInicio)}`,
       origen: 'CIERRE',
-      fecha,
+      fecha: masAntiguo.fechaFin,
       lineas: lineasCierre,
     });
 
-    return this.cierreRepository.crear({ tenantId, fecha, utilidadNeta, asientoCierreId: asiento.id });
+    const cerrado = await this.cierreRepository.cerrar(masAntiguo.id, { utilidadNeta, asientoCierreId: asiento.id });
+
+    // A partir de fechaFin, no de fechaInicio — para el primer período de
+    // un tenant con historial (backfill-periodos-contables.ts, fechaInicio
+    // = epoch) "el mes después de fechaInicio" no tiene ningún sentido real;
+    // "el mes después de fechaFin" sí lo tiene siempre, y en un período
+    // normal (fechaInicio/fechaFin dentro del mismo mes) da exactamente lo
+    // mismo.
+    const siguiente = rangoDelMesSiguiente(masAntiguo.fechaFin);
+    const siguienteExiste = await this.cierreRepository.buscarPorFecha(siguiente.fechaInicio);
+    if (!siguienteExiste) {
+      await this.cierreRepository.crear({ tenantId, ...siguiente });
+      this.logger.log(`Período ${etiquetaPeriodo(siguiente.fechaInicio)} creado automáticamente al cerrar ${etiquetaPeriodo(masAntiguo.fechaInicio)}.`);
+    }
+
+    return cerrado;
   }
 
   private validarBalance(lineas: { debito: number; credito: number }[]) {

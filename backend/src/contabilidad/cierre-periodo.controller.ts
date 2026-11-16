@@ -19,7 +19,11 @@ export class CierrePeriodoController {
   }
 
   @Post()
-  @Permissions('contabilidad.editar')
+  // Corrección: el permiso real para esta acción era 'contabilidad.editar'
+  // pese a que 'contabilidad.cerrarperiodo' ya existía en PERMISOS_BASE y
+  // gatea este mismo ítem de menú en el frontend (ModuloPestanas) — quedó
+  // huérfano, nunca conectado a ningún endpoint. Ahora coinciden.
+  @Permissions('contabilidad.cerrarperiodo')
   cerrarPeriodo(@Body() dto: CerrarPeriodoDto, @CurrentUser() user: JwtPayloadUser) {
     return this.cierrePeriodoService.cerrarPeriodo(dto, user.tenantId);
   }

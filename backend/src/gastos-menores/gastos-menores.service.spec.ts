@@ -30,7 +30,7 @@ describe('GastosMenoresService', () => {
     } as unknown as jest.Mocked<GastosMenoresRepository>;
     tenantPrisma = { client: { $transaction: jest.fn((callback: (tx: unknown) => unknown) => callback(TX)) } };
     eventBus = { emit: jest.fn(), on: jest.fn() } as unknown as jest.Mocked<EventBusService>;
-    cierrePeriodoService = { validarFechaAbierta: jest.fn().mockResolvedValue(undefined) } as unknown as jest.Mocked<CierrePeriodoService>;
+    cierrePeriodoService = { validarPeriodoAbierto: jest.fn().mockResolvedValue(undefined) } as unknown as jest.Mocked<CierrePeriodoService>;
     cuentasContablesService = { listar: jest.fn().mockResolvedValue([]) } as unknown as jest.Mocked<CuentasContablesService>;
     bancosService = { listarTodasActivas: jest.fn().mockResolvedValue([]) } as unknown as jest.Mocked<BancosService>;
     service = new GastosMenoresService(
@@ -133,7 +133,7 @@ describe('GastosMenoresService', () => {
   });
 
   it('rechaza un gasto menor fechado en un período contable ya cerrado', async () => {
-    cierrePeriodoService.validarFechaAbierta.mockRejectedValue(new BadRequestException('cerrado'));
+    cierrePeriodoService.validarPeriodoAbierto.mockRejectedValue(new BadRequestException('cerrado'));
 
     await expect(service.crear(dto({ fecha: '2026-01-01' }), 'tenant-1')).rejects.toThrow(BadRequestException);
     expect(repository.crearEnTx).not.toHaveBeenCalled();

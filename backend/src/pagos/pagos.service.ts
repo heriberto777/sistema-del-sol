@@ -44,7 +44,7 @@ export class PagosService {
     }
 
     const fecha = dto.fecha ? new Date(dto.fecha) : new Date();
-    await this.cierrePeriodoService.validarFechaAbierta(fecha);
+    await this.cierrePeriodoService.validarPeriodoAbierto(fecha);
     // Tenant-scoped: 404 si formaPagoId es de otro tenant.
     await this.formasPagoRepository.buscarPorId(dto.formaPagoId);
 
@@ -98,7 +98,7 @@ export class PagosService {
     }
 
     const fecha = dto.fecha ? new Date(dto.fecha) : new Date();
-    await this.cierrePeriodoService.validarFechaAbierta(fecha);
+    await this.cierrePeriodoService.validarPeriodoAbierto(fecha);
     await this.formasPagoRepository.buscarPorId(dto.formaPagoId);
 
     const ordenPago = await this.pagosRepository.registrarCobroOrdenCompra({
@@ -153,7 +153,7 @@ export class PagosService {
     }
 
     const fecha = dto.fecha ? new Date(dto.fecha) : new Date();
-    await this.cierrePeriodoService.validarFechaAbierta(fecha);
+    await this.cierrePeriodoService.validarPeriodoAbierto(fecha);
     await this.formasPagoRepository.buscarPorId(dto.formaPagoId);
 
     const ordenPago = await this.pagosRepository.registrarCobroFacturaProveedor({

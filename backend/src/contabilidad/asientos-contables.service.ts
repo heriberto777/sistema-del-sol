@@ -32,7 +32,7 @@ export class AsientosContablesService {
     const lineas = dto.lineas.map((l) => ({ cuentaContableId: l.cuentaContableId, debito: l.debito ?? 0, credito: l.credito ?? 0, descripcion: l.descripcion }));
     this.validarBalance(lineas);
     const fecha = dto.fecha ? new Date(dto.fecha) : new Date();
-    await this.cierrePeriodoService.validarFechaAbierta(fecha);
+    await this.cierrePeriodoService.validarPeriodoAbierto(fecha);
 
     return this.asientosRepository.crear({
       tenantId,
@@ -61,7 +61,7 @@ export class AsientosContablesService {
     if (asiento.anulado) {
       throw new BadRequestException('Este asiento ya está anulado');
     }
-    await this.cierrePeriodoService.validarFechaAbierta(asiento.fecha);
+    await this.cierrePeriodoService.validarPeriodoAbierto(asiento.fecha);
 
     const lineasReversas = asiento.lineas.map((l) => ({
       cuentaContableId: l.cuentaContableId,
@@ -454,7 +454,7 @@ export class AsientosContablesService {
     ];
     this.validarBalance(lineas);
     const fecha = dto.fecha ? new Date(dto.fecha) : new Date();
-    await this.cierrePeriodoService.validarFechaAbierta(fecha);
+    await this.cierrePeriodoService.validarPeriodoAbierto(fecha);
 
     return this.asientosRepository.crear({
       tenantId,

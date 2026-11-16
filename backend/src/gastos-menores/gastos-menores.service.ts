@@ -61,7 +61,7 @@ export class GastosMenoresService {
     const modalidad = await this.gastosMenoresRepository.obtenerModalidadFacturacion(tenantId);
     const tipoNcf: TipoNcf = modalidad === 'ECF' ? 'E43' : 'B11';
     const fecha = dto.fecha ? new Date(dto.fecha) : new Date();
-    await this.cierrePeriodoService.validarFechaAbierta(fecha);
+    await this.cierrePeriodoService.validarPeriodoAbierto(fecha);
 
     // Plugin de Proyectos (opcional) — findFirstOrThrow tenant-scoped (vía
     // $transaction, ya trae el SET LOCAL de esta conexión) para no permitir

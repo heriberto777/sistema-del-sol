@@ -23,7 +23,7 @@ describe('AsientosContablesService', () => {
     } as unknown as jest.Mocked<AsientosContablesRepository>;
     cuentasRepository = { buscarPorCodigo: jest.fn(), buscarPorCodigoGlobal: jest.fn(), listar: jest.fn(), crear: jest.fn() } as unknown as jest.Mocked<CuentasContablesRepository>;
     cuentasRepository.buscarPorCodigoGlobal.mockImplementation(((_tenantId: string, codigo: string) => Promise.resolve(cuenta(codigo))) as never);
-    cierrePeriodoService = { validarFechaAbierta: jest.fn().mockResolvedValue(undefined) } as unknown as jest.Mocked<CierrePeriodoService>;
+    cierrePeriodoService = { validarPeriodoAbierto: jest.fn().mockResolvedValue(undefined) } as unknown as jest.Mocked<CierrePeriodoService>;
     service = new AsientosContablesService(asientosRepository, cuentasRepository, cierrePeriodoService);
   });
 
@@ -63,7 +63,7 @@ describe('AsientosContablesService', () => {
     });
 
     it('rechaza un asiento fechado en o antes del último cierre de período', async () => {
-      cierrePeriodoService.validarFechaAbierta.mockRejectedValue(new BadRequestException('cerrado'));
+      cierrePeriodoService.validarPeriodoAbierto.mockRejectedValue(new BadRequestException('cerrado'));
 
       await expect(
         service.crear(
@@ -83,7 +83,7 @@ describe('AsientosContablesService', () => {
           'tenant-1',
         ),
       ).resolves.toBeDefined();
-      expect(cierrePeriodoService.validarFechaAbierta).toHaveBeenCalledWith(new Date('2026-07-15'));
+      expect(cierrePeriodoService.validarPeriodoAbierto).toHaveBeenCalledWith(new Date('2026-07-15'));
     });
   });
 
@@ -581,7 +581,7 @@ describe('AsientosContablesService', () => {
 
     it('rechaza anular un asiento fechado en un período ya cerrado', async () => {
       asientosRepository.buscarPorId.mockResolvedValue(asientoManual as never);
-      cierrePeriodoService.validarFechaAbierta.mockRejectedValue(new BadRequestException('cerrado'));
+      cierrePeriodoService.validarPeriodoAbierto.mockRejectedValue(new BadRequestException('cerrado'));
 
       await expect(service.anular('a1', 'tenant-1')).rejects.toThrow(BadRequestException);
       expect(asientosRepository.crear).not.toHaveBeenCalled();

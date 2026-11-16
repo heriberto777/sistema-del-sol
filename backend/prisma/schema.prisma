@@ -116,7 +116,7 @@ model Tenant {
   remisiones                 Remision[]
   cuentasContables           CuentaContable[]
   asientosContables          AsientoContable[]
-  periodosContablesCerrados  PeriodoContableCerrado[]
+  periodosContables          PeriodoContable[]
   empleados                  Empleado[]
   periodosNomina             PeriodoNomina[]
   turnosCaja                 TurnoCaja[]
@@ -1809,30 +1809,44 @@ model AsientoContable {
   createdAt DateTime      @default(now())
 
   lineas         LineaAsiento[]
-  periodoCerrado PeriodoContableCerrado?
+  periodo        PeriodoContable?
 
   @@unique([tenantId, numero])
   @@map("asientos_contables")
 }
 
-/// Un registro por período contable ya cerrado (ver CierrePeriodoService).
-/// `fecha` es la fecha de corte; el cierre siguiente debe ser posterior a
-/// ella. `asientoCierre` es el asiento automático (origen CIERRE) que
-/// traspasa el saldo neto de INGRESO/GASTO del período a Utilidades
-/// Retenidas — ver el comentario en estados-financieros.service.ts sobre
-/// por qué esto hacía falta.
-model PeriodoContableCerrado {
-  id              String          @id @default(uuid())
-  tenantId        String
-  tenant          Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  fecha           DateTime
-  utilidadNeta    Decimal         @db.Decimal(14, 2)
-  asientoCierreId String          @unique
-  asientoCierre   AsientoContable @relation(fields: [asientoCierreId], references: [id], onDelete: Cascade)
-  createdAt       DateTime        @default(now())
+enum EstadoPeriodoContable {
+  ABIERTO
+  CERRADO
+}
 
-  @@unique([tenantId, fecha])
-  @@map("periodos_contables_cerrados")
+/// Período contable mensual, por calendario (ítem "Período Contable" —
+/// reemplaza a PeriodoContableCerrado, que solo marcaba un punto de corte
+/// puntual, sin representar un rango real). `PeriodosContablesCronService`
+/// crea el siguiente automáticamente unos días antes de que empiece cada
+/// mes, y `TenantsRepository.crearConProvisioning` siembra el mes en curso
+/// al dar de alta un tenant — nunca hace falta crearlo a mano para poder
+/// seguir facturando/vendiendo. Cerrar (acción manual, ver
+/// CierrePeriodoService) solo se permite sobre el ABIERTO más antiguo, y
+/// crea el siguiente en el mismo paso si todavía no existe — así cerrar
+/// nunca deja un hueco sin período que bloquee la operación del día
+/// siguiente. `asientoCierre` es el asiento automático (origen CIERRE) que
+/// traspasa el saldo neto de INGRESO/GASTO del período a Utilidades
+/// Retenidas — ver el comentario en estados-financieros.service.ts.
+model PeriodoContable {
+  id              String                @id @default(uuid())
+  tenantId        String
+  tenant          Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  fechaInicio     DateTime
+  fechaFin        DateTime
+  estado          EstadoPeriodoContable @default(ABIERTO)
+  utilidadNeta    Decimal?              @db.Decimal(14, 2)
+  asientoCierreId String?               @unique
+  asientoCierre   AsientoContable?      @relation(fields: [asientoCierreId], references: [id], onDelete: SetNull)
+  createdAt       DateTime              @default(now())
+
+  @@unique([tenantId, fechaInicio])
+  @@map("periodos_contables")
 }
 
 /// Cada línea es débito O crédito, nunca ambos (uno de los dos queda en

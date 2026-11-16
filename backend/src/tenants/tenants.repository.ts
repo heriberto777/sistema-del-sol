@@ -16,6 +16,7 @@ import { PLANTILLAS_CRM_BASE } from '../notificaciones/plantillas-crm-base';
 import { PLANTILLAS_VENTAS_BASE } from '../notificaciones/plantillas-ventas-base';
 import { PLANTILLAS_ALERTAS_OPERATIVAS_BASE } from '../notificaciones/plantillas-alertas-operativas-base';
 import { ModoReseteoTenant } from './dto/resetear-tenant.dto';
+import { rangoDelMes } from '../contabilidad/periodos-contables.util';
 
 @Injectable()
 export class TenantsRepository {
@@ -157,6 +158,11 @@ export class TenantsRepository {
         data: CORRELATIVOS_BASE.map((tipo) => ({ tenantId: tenant.id, tipo })),
       });
 
+      // Período Contable — el mes en curso, ABIERTO, para que el tenant
+      // pueda operar desde el día uno sin que nadie tenga que crearlo a
+      // mano (ver PeriodosContablesCronService para el resto del ciclo).
+      await tx.periodoContable.create({ data: { tenantId: tenant.id, ...rangoDelMes(new Date()) } });
+
       // Fase 5 (Publicaciones Sociales) — contenido real por defecto, no
       // en blanco (ver el comentario de PLANTILLAS_PUBLICACIONES_SOCIALES_BASE).
       await tx.notificacionPlantilla.createMany({
@@ -289,8 +295,15 @@ export class TenantsRepository {
     // Cascada: LineaFactura, FacturaRecargo, PagoVenta, CuentaPorCobrar
     // (+AplicacionCobro, Fase 1/3).
     await tx.factura.deleteMany({ where: { tenantId } });
-    // Cascada: LineaAsiento, PeriodoContableCerrado.
+    // Cascada: LineaAsiento. PeriodoContable YA NO cascada (antes
+    // PeriodoContableCerrado sí, con onDelete: Cascade sobre
+    // asientoCierreId) — ahora sobrevive con asientoCierreId en null, así
+    // que hay que vaciarlo explícito y resembrar el período del mes en
+    // curso, igual que un tenant nuevo, para que pueda seguir operando
+    // después del reseteo (en los dos modos, no solo COMPLETO).
     await tx.asientoContable.deleteMany({ where: { tenantId } });
+    await tx.periodoContable.deleteMany({ where: { tenantId } });
+    await tx.periodoContable.create({ data: { tenantId, ...rangoDelMes(new Date()) } });
     // Cascada: LineaGastoMenor.
     await tx.gastoMenor.deleteMany({ where: { tenantId } });
     // Cascada: ReciboNomina.

@@ -35,7 +35,7 @@ export const TENANT_SCOPED_MODELS = new Set([
   'Remision',
   'CuentaContable',
   'AsientoContable',
-  'PeriodoContableCerrado',
+  'PeriodoContable',
   'Empleado',
   'PeriodoNomina',
   'TurnoCaja',

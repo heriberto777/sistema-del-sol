@@ -74,7 +74,7 @@ export class FacturasProveedorService {
     const total = subtotal + itbis;
 
     const fecha = dto.fecha ? new Date(dto.fecha) : new Date();
-    await this.cierrePeriodoService.validarFechaAbierta(fecha);
+    await this.cierrePeriodoService.validarPeriodoAbierto(fecha);
 
     // Tenant-scoped — 404 si el proveedor es de otro tenant.
     const proveedor = await this.proveedoresService.buscarPorId(dto.proveedorId);

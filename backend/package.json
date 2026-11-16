@@ -42,7 +42,8 @@
     "ajustar-permisos-vendedor:migrar": "dotenv -e ../.env -- ts-node scripts/ajustar-permisos-vendedor-pos.ts",
     "webhook-secrets:backfill": "dotenv -e ../.env -- ts-node scripts/backfill-webhook-secrets.ts",
     "migrar-roles-pos": "dotenv -e ../.env -- ts-node scripts/migrar-roles-pos.ts",
-    "plantillas-publicacion-social:seed": "dotenv -e ../.env -- ts-node scripts/seed-plantillas-publicacion-social.ts"
+    "plantillas-publicacion-social:seed": "dotenv -e ../.env -- ts-node scripts/seed-plantillas-publicacion-social.ts",
+    "periodos-contables:backfill": "dotenv -e ../.env -- ts-node scripts/backfill-periodos-contables.ts"
   },
   "dependencies": {
     "@napi-rs/canvas": "1.0.8",

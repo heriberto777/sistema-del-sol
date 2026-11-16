@@ -29,7 +29,7 @@ describe('PagosService', () => {
       listarPorFacturaProveedor: jest.fn(),
     } as unknown as jest.Mocked<PagosRepository>;
     eventBus = { emit: jest.fn(), on: jest.fn() } as unknown as jest.Mocked<EventBusService>;
-    cierrePeriodoService = { validarFechaAbierta: jest.fn().mockResolvedValue(undefined) } as unknown as jest.Mocked<CierrePeriodoService>;
+    cierrePeriodoService = { validarPeriodoAbierto: jest.fn().mockResolvedValue(undefined) } as unknown as jest.Mocked<CierrePeriodoService>;
     formasPagoRepository = { buscarPorId: jest.fn().mockResolvedValue({ id: 'fp1' }) } as unknown as jest.Mocked<FormasPagoRepository>;
     cuentasPorPagarRepository = { pendienteDeOrden: jest.fn().mockResolvedValue(1000) } as unknown as jest.Mocked<CuentasPorPagarRepository>;
     service = new PagosService(repository, eventBus, cierrePeriodoService, formasPagoRepository, cuentasPorPagarRepository);
@@ -91,7 +91,7 @@ describe('PagosService', () => {
 
     it('rechaza un pago fechado en un período contable ya cerrado', async () => {
       repository.pendienteFactura.mockResolvedValue(500);
-      cierrePeriodoService.validarFechaAbierta.mockRejectedValue(new BadRequestException('cerrado'));
+      cierrePeriodoService.validarPeriodoAbierto.mockRejectedValue(new BadRequestException('cerrado'));
 
       await expect(service.registrarPagoFactura(factura, dto, 'user-1', 'tenant-1')).rejects.toThrow(BadRequestException);
       expect(repository.registrarCobroFactura).not.toHaveBeenCalled();
@@ -148,7 +148,7 @@ describe('PagosService', () => {
 
     it('rechaza un pago fechado en un período contable ya cerrado', async () => {
       cuentasPorPagarRepository.pendienteDeOrden.mockResolvedValue(1000);
-      cierrePeriodoService.validarFechaAbierta.mockRejectedValue(new BadRequestException('cerrado'));
+      cierrePeriodoService.validarPeriodoAbierto.mockRejectedValue(new BadRequestException('cerrado'));
       const dtoConFecha = { monto: 1000, formaPagoId: 'fp1', fecha: '2026-01-01' } as never;
 
       await expect(service.registrarPagoOrdenCompra(orden, dtoConFecha, 'user-1', 'tenant-1')).rejects.toThrow(BadRequestException);
@@ -204,7 +204,7 @@ describe('PagosService', () => {
 
     it('rechaza un pago fechado en un período contable ya cerrado', async () => {
       repository.pendienteFacturaProveedor.mockResolvedValue(1000);
-      cierrePeriodoService.validarFechaAbierta.mockRejectedValue(new BadRequestException('cerrado'));
+      cierrePeriodoService.validarPeriodoAbierto.mockRejectedValue(new BadRequestException('cerrado'));
 
       await expect(service.registrarPagoFacturaProveedor(facturaProveedor, dto, 'user-1', 'tenant-1')).rejects.toThrow(BadRequestException);
       expect(repository.registrarCobroFacturaProveedor).not.toHaveBeenCalled();
