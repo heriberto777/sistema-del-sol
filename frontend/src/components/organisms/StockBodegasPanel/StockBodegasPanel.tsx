@@ -81,9 +81,19 @@ export function StockBodegasPanel() {
   const [paginaStock, setPaginaStock] = useState(1);
   const busquedaStockDebounced = useDebouncedValue(busquedaStock);
 
+  // "Ver stock" desde Productos.tsx — llega con `?buscar=<código>` para no
+  // tener que retipear el producto acá. Si el tenant tiene una sola bodega,
+  // se autoselecciona (si tiene varias, el usuario elige cuál mirar).
+  const [buscarAlLlegar] = useState(() => searchParams.get('buscar'));
+  const [busquedaPendienteDePreservar, setBusquedaPendienteDePreservar] = useState(() => !!buscarAlLlegar);
+
   useEffect(() => {
     if (searchParams.get('crear') === '1') {
       setModalNuevaBodega(true);
+      setSearchParams({}, { replace: true });
+    }
+    if (buscarAlLlegar) {
+      setBusquedaStock(buscarAlLlegar);
       setSearchParams({}, { replace: true });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -94,6 +104,13 @@ export function StockBodegasPanel() {
     queryFn: async () =>
       (await apiClient.get<Bodega[]>(mostrarInactivas ? '/inventario/bodegas/todas' : '/inventario/bodegas')).data,
   });
+
+  useEffect(() => {
+    if (buscarAlLlegar && bodegas?.length === 1 && !bodegaSeleccionadaId) {
+      setBodegaSeleccionadaId(bodegas[0].id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bodegas]);
 
   const { data: stock } = useQuery({
     queryKey: ['stock', bodegaSeleccionadaId, paginaStock, busquedaStockDebounced],
@@ -111,7 +128,15 @@ export function StockBodegasPanel() {
   function seleccionarBodega(id: string) {
     setBodegaSeleccionadaId(id);
     setPaginaStock(1);
-    setBusquedaStock('');
+    // Si se llegó con `?buscar=` (botón "Ver stock" de Productos) y había más
+    // de una bodega, esta primera selección es el usuario recién eligiendo
+    // cuál mirar — no hay que borrarle la búsqueda que trajo puesta. Un
+    // cambio de bodega posterior ya vuelve al comportamiento normal.
+    if (busquedaPendienteDePreservar) {
+      setBusquedaPendienteDePreservar(false);
+    } else {
+      setBusquedaStock('');
+    }
   }
 
   return (

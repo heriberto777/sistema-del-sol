@@ -24,7 +24,7 @@ export function Login() {
   const { login, cargando } = useAuth();
   const navigate = useNavigate();
   const [paso, setPaso] = useState<Paso>('email');
-  const [email, setEmail] = useState('admin@demo.com');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
   const [empresaElegida, setEmpresaElegida] = useState<Empresa | null>(null);
@@ -120,7 +120,15 @@ export function Login() {
 
         {paso === 'email' && (
           <form onSubmit={onContinuar} className="space-y-4">
-            <FormField id="email" label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+            <FormField
+              id="email"
+              label="Email"
+              type="email"
+              placeholder="tu@empresa.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
             {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
             <Button type="submit" disabled={buscando} className="w-full">
               {buscando ? 'Verificando…' : 'Continuar'}

@@ -156,6 +156,10 @@ export function Productos() {
                             { etiqueta: 'Ver', onClick: () => navigate(`/productos/${producto.id}`) },
                             { etiqueta: 'Editar', onClick: () => navigate(`/productos/${producto.id}/editar`) },
                             { etiqueta: 'Cambiar precio', onClick: () => setProductoPrecio(producto) },
+                            {
+                              etiqueta: 'Ver stock',
+                              onClick: () => navigate(`/inventario/stock?buscar=${encodeURIComponent(producto.codigo)}`),
+                            },
                           ]}
                         />
                       </td>
