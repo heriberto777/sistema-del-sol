@@ -11,6 +11,7 @@ import { PagosService } from '../pagos/pagos.service';
 import { CorrelativosRepository } from '../correlativos/correlativos.repository';
 import { ProductosService } from '../productos/productos.service';
 import { CuentasPorPagarRepository } from '../cuentas-por-pagar/cuentas-por-pagar.repository';
+import { CierrePeriodoService } from '../contabilidad/cierre-periodo.service';
 
 describe('ComprasService', () => {
   let service: ComprasService;
@@ -23,6 +24,7 @@ describe('ComprasService', () => {
   let correlativosRepository: jest.Mocked<CorrelativosRepository>;
   let productosService: jest.Mocked<ProductosService>;
   let cuentasPorPagarRepository: jest.Mocked<CuentasPorPagarRepository>;
+  let cierrePeriodoService: jest.Mocked<CierrePeriodoService>;
 
   // Ver el mismo patrón en facturacion.service.spec.ts: un tx opaco pasado
   // por $transaction a los métodos *EnTx — no necesita comportarse como un
@@ -69,6 +71,7 @@ describe('ComprasService', () => {
       reducirPorDevolucionEnTx: jest.fn().mockResolvedValue(undefined),
       tieneCuentaDeOrdenCompletaEnTx: jest.fn().mockResolvedValue(false),
     } as unknown as jest.Mocked<CuentasPorPagarRepository>;
+    cierrePeriodoService = { validarPeriodoAbierto: jest.fn().mockResolvedValue(undefined) } as unknown as jest.Mocked<CierrePeriodoService>;
     service = new ComprasService(
       repository,
       inventarioService,
@@ -80,6 +83,7 @@ describe('ComprasService', () => {
       correlativosRepository,
       {} as never,
       cuentasPorPagarRepository,
+      cierrePeriodoService,
     );
   });
 
@@ -147,6 +151,13 @@ describe('ComprasService', () => {
 
       await expect(service.recibir('oc-1', dtoRecepcion, 'user-1', 'tenant-1')).rejects.toThrow(BadRequestException);
       expect(repository.crearRecepcion).not.toHaveBeenCalled();
+    });
+
+    it('Fase 2: rechaza si el período contable que cubre hoy está cerrado', async () => {
+      cierrePeriodoService.validarPeriodoAbierto.mockRejectedValue(new BadRequestException('cerrado'));
+
+      await expect(service.recibir('oc-1', dtoRecepcion, 'user-1', 'tenant-1')).rejects.toThrow(BadRequestException);
+      expect(repository.buscarPorId).not.toHaveBeenCalled();
     });
 
     it('marca RECIBIDA_TOTAL cuando la cantidad recibida acumulada cubre lo pedido', async () => {
@@ -441,6 +452,13 @@ describe('ComprasService', () => {
 
       await expect(service.devolver('oc-1', dtoDevolucion, 'user-1', 'tenant-1')).rejects.toThrow(ForbiddenException);
       expect(inventarioService.validarAccesoBodega).toHaveBeenCalledWith('bodega-1', 'user-1');
+      expect(repository.buscarPorId).not.toHaveBeenCalled();
+    });
+
+    it('Fase 2: rechaza si el período contable que cubre hoy está cerrado (se valida contra "ahora", no contra la fecha de la recepción)', async () => {
+      cierrePeriodoService.validarPeriodoAbierto.mockRejectedValue(new BadRequestException('cerrado'));
+
+      await expect(service.devolver('oc-1', dtoDevolucion, 'user-1', 'tenant-1')).rejects.toThrow(BadRequestException);
       expect(repository.buscarPorId).not.toHaveBeenCalled();
     });
 

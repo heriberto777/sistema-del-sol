@@ -54,6 +54,16 @@ describe('CierrePeriodoService', () => {
       expect(asientosRepository.crear).not.toHaveBeenCalled();
     });
 
+    it('Fase 2: rechaza cerrar un período que todavía no termina (cubre "hoy" o es futuro) — evita bloquear Facturación/POS/Compras/Nómina a mitad de mes', async () => {
+      const dentroDeDiezAnios = new Date();
+      dentroDeDiezAnios.setFullYear(dentroDeDiezAnios.getFullYear() + 10);
+      const periodoEnCurso = { id: 'periodo-en-curso', fechaInicio: new Date(0), fechaFin: dentroDeDiezAnios };
+      cierreRepository.buscarAbiertoMasAntiguo.mockResolvedValue(periodoEnCurso as never);
+
+      await expect(service.cerrarPeriodo({ periodoId: 'periodo-en-curso' }, 'tenant-1')).rejects.toThrow(BadRequestException);
+      expect(asientosRepository.lineasEnRango).not.toHaveBeenCalled();
+    });
+
     it('traspasa el saldo neto de INGRESO/GASTO a Utilidades Retenidas cuando hay utilidad (crédito)', async () => {
       const ingresos = { id: 'c1', codigo: '4010', nombre: 'Ingresos por Ventas', tipo: 'INGRESO' };
       const costo = { id: 'c2', codigo: '5010', nombre: 'Costo de Ventas', tipo: 'GASTO' };

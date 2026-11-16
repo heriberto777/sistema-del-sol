@@ -24,6 +24,7 @@ import { generarDocumentoImpreso } from '../common/pdf/generar-documento-impreso
 import { mapearOrdenCompraAParams } from './mapear-orden-compra-pdf';
 import { CuentasPorPagarRepository } from '../cuentas-por-pagar/cuentas-por-pagar.repository';
 import { calcularFechaVencimiento } from '../common/fecha/dias-vencido.util';
+import { CierrePeriodoService } from '../contabilidad/cierre-periodo.service';
 
 @Injectable()
 export class ComprasService {
@@ -38,6 +39,7 @@ export class ComprasService {
     private readonly correlativosRepository: CorrelativosRepository,
     private readonly prisma: PrismaService,
     private readonly cuentasPorPagarRepository: CuentasPorPagarRepository,
+    private readonly cierrePeriodoService: CierrePeriodoService,
   ) {}
 
   /** Orden de Compra no tiene bodegaId propio (mismo caso que Cotización) — solo aplica el default de tenant para formato/plantilla. */
@@ -140,6 +142,10 @@ export class ComprasService {
    * sin actualizar el estado de la orden ni procesar el resto.
    */
   async recibir(ordenCompraId: string, dto: RecibirOrdenCompraDto, userId: string, tenantId: string) {
+    // Fase 2 de Período Contable — RecepcionCompra.fecha es siempre "ahora"
+    // (no hay fecha manual en RecibirOrdenCompraDto), así que esto solo
+    // puede rechazar si se cerró por error el período que cubre hoy.
+    await this.cierrePeriodoService.validarPeriodoAbierto(new Date());
     // Fase 9: enforcement real de acceso por sucursal (Fase 8 solo filtraba la UX).
     await this.inventarioService.validarAccesoBodega(dto.bodegaId, userId);
     const orden = await this.comprasRepository.buscarPorId(ordenCompraId);
@@ -273,6 +279,12 @@ export class ComprasService {
    * mismo patrón todo-o-nada que `recibir`.
    */
   async devolver(ordenCompraId: string, dto: DevolverOrdenCompraDto, userId: string, tenantId: string) {
+    // Fase 2 de Período Contable — a diferencia de anular una Factura
+    // (que reversa EL MISMO documento, validado contra su fecha original),
+    // devolver() crea una DevolucionCompra NUEVA fechada "ahora" (mismo
+    // criterio que una Nota de Crédito en Facturación) — se valida contra
+    // "ahora", no contra la fecha de la recepción que se está devolviendo.
+    await this.cierrePeriodoService.validarPeriodoAbierto(new Date());
     // Fase 9: enforcement real de acceso por sucursal (Fase 8 solo filtraba la UX).
     await this.inventarioService.validarAccesoBodega(dto.bodegaId, userId);
     const orden = await this.comprasRepository.buscarPorId(ordenCompraId);

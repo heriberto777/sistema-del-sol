@@ -99,6 +99,12 @@ describe('Travel Management (e2e)', () => {
     });
 
     const tenant = await prisma.tenant.create({ data: { nombre: `E2E ${subdominio}`, subdominio, planId: plan.id } });
+    // Fase 2 de Período Contable — facturar una reserva reusa
+    // FacturacionService.crear(), que ahora exige un PeriodoContable
+    // ABIERTO que cubra "hoy" (ver TenantsRepository.crearConProvisioning,
+    // que sí lo siembra; este helper crea el tenant directo con Prisma,
+    // sin pasar por ahí). Rango amplio — no es el foco de este archivo.
+    await prisma.periodoContable.create({ data: { tenantId: tenant.id, fechaInicio: new Date(0), fechaFin: new Date(2100, 0, 1) } });
     const rol = await prisma.role.create({ data: { tenantId: tenant.id, nombre: `Completo ${subdominio}` } });
     for (const clave of PERMISOS) {
       const permiso = await prisma.permission.findUniqueOrThrow({ where: { clave } });

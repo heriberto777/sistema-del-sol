@@ -38,12 +38,16 @@ export class CierrePeriodoService {
 
   /**
    * Reemplaza a la vieja validación contra "el último cierre" — ahora
-   * valida contra un PeriodoContable real (ver schema.prisma). Mismos 4
-   * llamadores de siempre (Asiento manual/Gasto rápido/anulación,
-   * GastosMenoresService, FacturasProveedorService, PagosService) — las
-   * únicas rutas de negocio con fecha manual retroactiva. Extender esto a
-   * Facturación/POS/Compras/Nómina es la Fase 2, deliberadamente fuera de
-   * este cambio.
+   * valida contra un PeriodoContable real (ver schema.prisma). Los 4
+   * llamadores originales (Asiento manual/Gasto rápido/anulación,
+   * GastosMenoresService, FacturasProveedorService, PagosService) son las
+   * únicas rutas de negocio con fecha manual retroactiva, y validan contra
+   * esa fecha elegida. Fase 2 sumó a Facturación (crear/anular, POS lo
+   * hereda gratis al llamar a FacturacionService.crear()), Compras
+   * (recibir/devolver) y Nómina (marcarPagado) — ninguno de estos admite
+   * fecha manual (siempre "ahora"), así que ahí la validación solo puede
+   * rechazar si se cerró por error el período que cubre hoy (ver el
+   * guardarraíl correspondiente en cerrarPeriodo, más abajo).
    */
   async validarPeriodoAbierto(fecha: Date) {
     const periodo = await this.cierreRepository.buscarPorFecha(fecha);
@@ -66,6 +70,16 @@ export class CierrePeriodoService {
    * existe (se cerró antes de que el cron lo creara), lo crea en el mismo
    * paso — cerrar nunca deja un hueco que bloquee la operación del día
    * siguiente.
+   *
+   * Fase 2 — no se puede cerrar el período que todavía cubre "hoy" (ni uno
+   * futuro): a diferencia de los 4 llamadores viejos de
+   * validarPeriodoAbierto (ajustes contables con fecha retroactiva, que un
+   * contador puede re-fechar al mes siguiente), Facturación/POS/Compras/
+   * Nómina nunca traen fecha manual — siempre operan "ahora". Si se
+   * permitiera cerrar el mes en curso a mitad de mes, esos 4 módulos
+   * quedarían bloqueados de inmediato hasta el día 1 del mes siguiente, sin
+   * ningún endpoint de reapertura. Por eso solo se puede cerrar un período
+   * ya terminado (fechaFin < hoy).
    */
   async cerrarPeriodo(dto: CerrarPeriodoDto, tenantId: string) {
     const masAntiguo = await this.cierreRepository.buscarAbiertoMasAntiguo();
@@ -74,6 +88,9 @@ export class CierrePeriodoService {
     }
     if (masAntiguo.id !== dto.periodoId) {
       throw new BadRequestException(`Hay que cerrar primero el período más antiguo todavía abierto (${etiquetaPeriodo(masAntiguo.fechaInicio)}).`);
+    }
+    if (masAntiguo.fechaFin >= new Date()) {
+      throw new BadRequestException(`Todavía no termina el período ${etiquetaPeriodo(masAntiguo.fechaInicio)} — no se puede cerrar hasta que acabe.`);
     }
 
     const lineas = await this.asientosRepository.lineasEnRango(masAntiguo.fechaInicio, masAntiguo.fechaFin);

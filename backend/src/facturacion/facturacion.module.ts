@@ -18,6 +18,7 @@ import { CorrelativosModule } from '../correlativos/correlativos.module';
 import { EmisionECfModule } from '../emision-ecf/emision-ecf.module';
 import { ProductosModule } from '../productos/productos.module';
 import { CuentasPorCobrarModule } from '../cuentas-por-cobrar/cuentas-por-cobrar.module';
+import { ContabilidadModule } from '../contabilidad/contabilidad.module';
 
 @Module({
   // AuthModule: FacturacionService llama a authService.verificarPin() en
@@ -47,6 +48,7 @@ import { CuentasPorCobrarModule } from '../cuentas-por-cobrar/cuentas-por-cobrar
     EmisionECfModule,
     ProductosModule,
     CuentasPorCobrarModule,
+    ContabilidadModule,
   ],
   controllers: [FacturacionController],
   providers: [FacturacionService, FacturacionRepository],

@@ -8,9 +8,10 @@ import { VariantesModule } from '../variantes/variantes.module';
 import { CorrelativosModule } from '../correlativos/correlativos.module';
 import { ProductosModule } from '../productos/productos.module';
 import { CuentasPorPagarModule } from '../cuentas-por-pagar/cuentas-por-pagar.module';
+import { ContabilidadModule } from '../contabilidad/contabilidad.module';
 
 @Module({
-  imports: [InventarioModule, PagosModule, VariantesModule, CorrelativosModule, ProductosModule, CuentasPorPagarModule],
+  imports: [InventarioModule, PagosModule, VariantesModule, CorrelativosModule, ProductosModule, CuentasPorPagarModule, ContabilidadModule],
   controllers: [ComprasController],
   providers: [ComprasService, ComprasRepository],
   exports: [ComprasService],

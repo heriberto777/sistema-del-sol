@@ -21,6 +21,7 @@ import { ConfiguracionesService } from '../configuraciones/configuraciones.servi
 import { CorrelativosService } from '../correlativos/correlativos.service';
 import { ProductosService } from '../productos/productos.service';
 import { CuentasPorCobrarRepository } from '../cuentas-por-cobrar/cuentas-por-cobrar.repository';
+import { CierrePeriodoService } from '../contabilidad/cierre-periodo.service';
 
 describe('FacturacionService', () => {
   let service: FacturacionService;
@@ -43,6 +44,7 @@ describe('FacturacionService', () => {
   let correlativosService: jest.Mocked<CorrelativosService>;
   let productosService: jest.Mocked<ProductosService>;
   let cuentasPorCobrarRepository: jest.Mocked<CuentasPorCobrarRepository>;
+  let cierrePeriodoService: jest.Mocked<CierrePeriodoService>;
 
   // Un tx opaco: crear()/anular() abren la transacción con tenantPrisma.client.$transaction
   // y pasan este objeto a los métodos *EnTx — para las pruebas basta con que sea el mismo
@@ -155,6 +157,7 @@ describe('FacturacionService', () => {
       crearEnTx: jest.fn().mockResolvedValue(undefined),
       anularPorFacturaEnTx: jest.fn().mockResolvedValue(undefined),
     } as unknown as jest.Mocked<CuentasPorCobrarRepository>;
+    cierrePeriodoService = { validarPeriodoAbierto: jest.fn().mockResolvedValue(undefined) } as unknown as jest.Mocked<CierrePeriodoService>;
     service = new FacturacionService(
       repository,
       inventarioService,
@@ -175,6 +178,7 @@ describe('FacturacionService', () => {
       correlativosService,
       productosService,
       cuentasPorCobrarRepository,
+      cierrePeriodoService,
     );
   });
 
@@ -187,6 +191,16 @@ describe('FacturacionService', () => {
       ...overrides,
     } as CrearFacturaDto;
   }
+
+  describe('Fase 2 de Período Contable — validarPeriodoAbierto en crear()', () => {
+    it('rechaza crear si el período contable que cubre hoy está cerrado, antes de calcular/crear la factura', async () => {
+      cierrePeriodoService.validarPeriodoAbierto.mockRejectedValue(new BadRequestException('cerrado'));
+
+      await expect(service.crear(dto(), 'tenant-1', 'vendedor-1')).rejects.toThrow(BadRequestException);
+      expect(repository.crearFacturaEnTx).not.toHaveBeenCalled();
+      expect(inventarioService.validarAccesoBodega).not.toHaveBeenCalled();
+    });
+  });
 
   describe('Fase 9 — enforcement de acceso por sucursal en crear()', () => {
     it('valida acceso a la sucursal de la bodega antes de calcular/crear la factura', async () => {
@@ -1635,6 +1649,16 @@ describe('FacturacionService', () => {
         expect.objectContaining({ tenantId: 'tenant-1', facturaId: 'f1', clienteId: 'cliente-1', total: '200' }),
       );
       expect(resultado).toEqual(expect.objectContaining({ id: 'f1' }));
+    });
+
+    it('Fase 2: valida contra la fecha ORIGINAL de la factura, no contra "ahora" — rechaza si ese período ya cerró', async () => {
+      const fechaOriginal = new Date('2026-01-15');
+      repository.buscarPorId.mockResolvedValue(facturaExistente({ fecha: fechaOriginal }) as never);
+      cierrePeriodoService.validarPeriodoAbierto.mockRejectedValue(new BadRequestException('cerrado'));
+
+      await expect(service.anular('f1', 'Motivo de prueba', 'tenant-1', 'user-1', true)).rejects.toThrow(BadRequestException);
+      expect(cierrePeriodoService.validarPeriodoAbierto).toHaveBeenCalledWith(fechaOriginal);
+      expect(repository.anularEnTx).not.toHaveBeenCalled();
     });
 
     it('CxC como ledger real (Fase 1): cierra la CuentaPorCobrar asociada dentro de la misma transacción', async () => {

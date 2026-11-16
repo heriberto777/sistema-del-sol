@@ -7,6 +7,7 @@ import { AsistenciaRepository } from './asistencia.repository';
 import { EventBusService } from '../event-bus/event-bus.service';
 import { EVENTOS } from '../event-bus/events';
 import { ConfiguracionesService } from '../configuraciones/configuraciones.service';
+import { CierrePeriodoService } from '../contabilidad/cierre-periodo.service';
 
 describe('PeriodosNominaService', () => {
   let service: PeriodosNominaService;
@@ -16,6 +17,7 @@ describe('PeriodosNominaService', () => {
   let asistenciaRepository: jest.Mocked<AsistenciaRepository>;
   let eventBus: jest.Mocked<EventBusService>;
   let configuracionesService: jest.Mocked<ConfiguracionesService>;
+  let cierrePeriodoService: jest.Mocked<CierrePeriodoService>;
 
   beforeEach(() => {
     periodosRepository = { crear: jest.fn(), buscarPorId: jest.fn(), listar: jest.fn(), actualizarEstado: jest.fn() } as unknown as jest.Mocked<PeriodosNominaRepository>;
@@ -28,6 +30,7 @@ describe('PeriodosNominaService', () => {
     configuracionesService = {
       buscarValor: jest.fn((_clave: string, _tenantId: string, valorDefault: string) => Promise.resolve(valorDefault)),
     } as unknown as jest.Mocked<ConfiguracionesService>;
+    cierrePeriodoService = { validarPeriodoAbierto: jest.fn().mockResolvedValue(undefined) } as unknown as jest.Mocked<CierrePeriodoService>;
     service = new PeriodosNominaService(
       periodosRepository,
       empleadosRepository,
@@ -35,6 +38,7 @@ describe('PeriodosNominaService', () => {
       asistenciaRepository,
       eventBus,
       configuracionesService,
+      cierrePeriodoService,
     );
   });
 
@@ -218,6 +222,14 @@ describe('PeriodosNominaService', () => {
 
       await expect(service.marcarPagado('p1')).rejects.toThrow(BadRequestException);
       expect(eventBus.emit).not.toHaveBeenCalled();
+    });
+
+    it('Fase 2: rechaza si el período contable que cubre hoy está cerrado', async () => {
+      periodosRepository.buscarPorId.mockResolvedValue({ id: 'p1', estado: 'PROCESADO' } as never);
+      cierrePeriodoService.validarPeriodoAbierto.mockRejectedValue(new BadRequestException('cerrado'));
+
+      await expect(service.marcarPagado('p1')).rejects.toThrow(BadRequestException);
+      expect(periodosRepository.actualizarEstado).not.toHaveBeenCalled();
     });
   });
 

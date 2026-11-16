@@ -19,6 +19,7 @@ import { EVENTOS } from '../event-bus/events';
 import { paginar } from '../common/types/pagina-resultado';
 import { ListarPeriodosNominaQueryDto } from './dto/listar-periodos-nomina-query.dto';
 import { ConfiguracionesService } from '../configuraciones/configuraciones.service';
+import { CierrePeriodoService } from '../contabilidad/cierre-periodo.service';
 
 @Injectable()
 export class PeriodosNominaService {
@@ -29,6 +30,7 @@ export class PeriodosNominaService {
     private readonly asistenciaRepository: AsistenciaRepository,
     private readonly eventBus: EventBusService,
     private readonly configuracionesService: ConfiguracionesService,
+    private readonly cierrePeriodoService: CierrePeriodoService,
   ) {}
 
   /** Tasas/topes de TSS configurables por tenant (ítem G-6) — cae a TASAS_TSS/TOPES_TSS si el tenant no los personalizó. */
@@ -134,6 +136,10 @@ export class PeriodosNominaService {
     if (periodo.estado !== 'PROCESADO') {
       throw new BadRequestException('Solo un período PROCESADO puede marcarse como pagado');
     }
+    // Fase 2 de Período Contable — la fecha de pago es siempre "ahora" (no
+    // hay fecha manual acá), así que esto solo puede rechazar si se cerró
+    // por error el período contable que cubre hoy.
+    await this.cierrePeriodoService.validarPeriodoAbierto(new Date());
 
     const actualizado = await this.periodosRepository.actualizarEstado(id, 'PAGADO', new Date());
 

@@ -16,9 +16,10 @@ const DIAS_ANTICIPACION = 5;
  * Crea el PeriodoContable del mes siguiente, en ABIERTO, para cada tenant
  * que todavía no lo tenga, cuando faltan DIAS_ANTICIPACION días o menos
  * para que termine el mes en curso. Es la pieza que evita el riesgo
- * discutido con el usuario: si nadie lo creara a mano, facturar/vender en
- * POS se detendría el día 1 del mes siguiente (Fase 2 agrega esa
- * validación a Facturación) — con este cron, nunca hace falta acordarse.
+ * discutido con el usuario: desde que Fase 2 extendió validarPeriodoAbierto
+ * a Facturación/POS/Compras/Nómina, facturar/vender/recibir compras/pagar
+ * nómina se detendría el día 1 del mes siguiente si nadie creara el
+ * próximo período a mano — con este cron, nunca hace falta acordarse.
  */
 @Injectable()
 export class PeriodosContablesCronService {

@@ -36,6 +36,7 @@ import { CorrelativosService } from '../correlativos/correlativos.service';
 import { ProductosService } from '../productos/productos.service';
 import { CuentasPorCobrarRepository } from '../cuentas-por-cobrar/cuentas-por-cobrar.repository';
 import { calcularFechaVencimiento, diasVencidoDesde } from '../common/fecha/dias-vencido.util';
+import { CierrePeriodoService } from '../contabilidad/cierre-periodo.service';
 
 const NCF_POR_TIPO: Record<TipoFactura, TipoNcf> = {
   CREDITO: 'B01',
@@ -93,6 +94,7 @@ export class FacturacionService {
     private readonly correlativosService: CorrelativosService,
     private readonly productosService: ProductosService,
     private readonly cuentasPorCobrarRepository: CuentasPorCobrarRepository,
+    private readonly cierrePeriodoService: CierrePeriodoService,
   ) {}
 
   /**
@@ -463,6 +465,15 @@ export class FacturacionService {
       forzarCreditoBloqueado?: boolean;
     },
   ) {
+    // Fase 2 de Período Contable — Factura.fecha es siempre "ahora" (no hay
+    // fecha manual en CrearFacturaDto, a diferencia de Asiento manual/Gasto
+    // menor/Factura de Proveedor/Pagos), así que esto solo puede rechazar
+    // si alguien cerró por error el período que cubre hoy — ver el
+    // guardarraíl en CierrePeriodoService.cerrarPeriodo (no se puede cerrar
+    // un período que todavía no terminó). POS hereda esta validación gratis
+    // al llamar a este mismo método.
+    await this.cierrePeriodoService.validarPeriodoAbierto(new Date());
+
     // Mejora "Emitir nota" — antes `facturaOrigenId` se usaba a ciegas
     // (ni se validaba que existiera/perteneciera al tenant, ni si la
     // factura ya tenía un cobro registrado). "Tiene cobro" = al menos una
@@ -952,6 +963,10 @@ export class FacturacionService {
     if (factura.estado === 'ANULADA') {
       throw new BadRequestException('La factura ya está anulada');
     }
+    // Contra la fecha ORIGINAL de la factura, no "ahora" — mismo criterio
+    // que AsientosContablesService.anular(): lo que importa es si el
+    // período en que ocurrió la venta sigue abierto, no cuándo se anula.
+    await this.cierrePeriodoService.validarPeriodoAbierto(factura.fecha);
     if (factura.bodegaId) {
       await this.inventarioService.validarAccesoBodega(factura.bodegaId, userId);
     }
