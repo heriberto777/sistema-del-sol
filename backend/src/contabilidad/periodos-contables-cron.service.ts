@@ -29,7 +29,12 @@ export class PeriodosContablesCronService {
   @Cron(CronExpression.EVERY_DAY_AT_7AM)
   async crearPeriodosProximos() {
     const hoy = new Date();
-    const finDeMes = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0);
+    // UTC, no local — consistente con rangoDelMesSiguiente de abajo (ver su
+    // comentario); para este conteo aproximado de "días restantes" la
+    // diferencia es irrelevante en la práctica (el margen de
+    // DIAS_ANTICIPACION ya la absorbe), pero mezclar convenciones confunde
+    // a quien lea esto después.
+    const finDeMes = new Date(Date.UTC(hoy.getUTCFullYear(), hoy.getUTCMonth() + 1, 0));
     const diasRestantes = Math.ceil((finDeMes.getTime() - hoy.getTime()) / 86_400_000);
     if (diasRestantes > DIAS_ANTICIPACION) {
       this.logger.log(`Períodos contables: faltan ${diasRestantes} día(s) para fin de mes, todavía no toca crear el siguiente.`);

@@ -15,8 +15,11 @@ interface LineaCierre {
   descripcion: string;
 }
 
+// timeZone: 'UTC' a propósito — fechaInicio se construye en UTC
+// (rangoDelMes), mostrarla en horario local correría el mes cerca de
+// medianoche.
 function etiquetaPeriodo(fechaInicio: Date) {
-  return fechaInicio.toLocaleDateString('es-DO', { month: 'long', year: 'numeric' });
+  return fechaInicio.toLocaleDateString('es-DO', { month: 'long', year: 'numeric', timeZone: 'UTC' });
 }
 
 @Injectable()

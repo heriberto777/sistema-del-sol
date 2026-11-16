@@ -93,6 +93,15 @@ describe('App (e2e)', () => {
     const tenant = await prisma.tenant.create({
       data: { nombre: `E2E ${params.subdominio}`, subdominio: params.subdominio, planId: await idPlanTodoIncluido() },
     });
+    // Período Contable (Fase 1) — este helper crea el tenant directo por
+    // Prisma, sin pasar por TenantsRepository.crearConProvisioning (que sí
+    // siembra el período del mes en curso) — sin esto, CierrePeriodoService
+    // .validarPeriodoAbierto rechaza TODO asiento/gasto/pago con 400 (bug
+    // real encontrado en CI). Rango bien amplio (no solo el mes en curso) a
+    // propósito, para no depender de qué fecha corra la suite.
+    await prisma.periodoContable.create({
+      data: { tenantId: tenant.id, fechaInicio: new Date(0), fechaFin: new Date(2100, 0, 1) },
+    });
     const rol = await prisma.role.create({
       data: { tenantId: tenant.id, nombre: params.nombreRol },
     });
@@ -1749,36 +1758,79 @@ describe('App (e2e)', () => {
   });
 
   describe('Libro mayor y cierre de período contable', () => {
-    // Fechas deliberadamente en el pasado lejano (2020) para que este bloque
-    // sea inmune a lo que el resto de la suite haga "hoy" — el cierre de
-    // período bloquea asientos MANUALES/GASTO con fecha <= la de corte, así
-    // que cualquier interferencia con los demás describe (que siempre usan
-    // la fecha por defecto = ahora) queda descartada por construcción.
+    // Tenant DEDICADO y aislado (no SUBDOMINIO_A) — Período Contable Fase 1:
+    // cerrar un período bloquea retroactivamente TODO ese rango de fechas,
+    // así que compartir el tenant de siempre rompería todo lo que corre
+    // DESPUÉS de este describe (Nómina, POS, Compras, Pagos, Atomicidad,
+    // Concurrencia...), que necesita que SUBDOMINIO_A siga con su período
+    // de "hoy" abierto. Fechas deliberadamente en 2020 (enero se cierra,
+    // febrero queda abierto después del cierre) — ningún test de este
+    // bloque depende de la fecha real en la que corra la suite.
+    const SUBDOMINIO_CIERRE = 'e2e-cierre-periodo';
+    let tenantCierreId: string;
     let cajaId: string;
     let ingresosId: string;
     let gastosOperativosId: string;
-    // Reutilizados en los tests nuevos de anular/conciliación/balance de
-    // comprobación (en vez de loguear de nuevo en cada uno) para no sumarle
-    // presión innecesaria al rate-limiter global de /auth/login (120/min)
-    // que comparten TODOS los tests de este archivo.
+    let utilidadesId: string;
+    let periodoEneroId: string;
+    // Reutilizados en todos los tests (en vez de loguear de nuevo en cada
+    // uno) para no sumarle presión innecesaria al rate-limiter global de
+    // /auth/login (120/min) que comparten TODOS los tests de este archivo.
     let tokenAdmin: string;
     let tokenB: string;
 
+    afterAll(async () => {
+      // Tenant propio de este describe (no SUBDOMINIO_A/B) — el afterAll
+      // global de arriba no lo conoce, hay que limpiarlo acá o una
+      // corrida local posterior choca con el unique de subdominio (bug
+      // real: encontrado al re-correr la suite dos veces seguidas).
+      await prisma.tenant.deleteMany({ where: { id: tenantCierreId } });
+    });
+
     beforeAll(async () => {
-      const token = await login('admin@e2e-a.com', SUBDOMINIO_A);
-      tokenAdmin = token;
+      const tenant = await crearTenantConUsuario({
+        subdominio: SUBDOMINIO_CIERRE,
+        nombreRol: 'RolCierre',
+        permisos: [
+          'contabilidad.ver', 'contabilidad.editar', 'contabilidad.anular', 'contabilidad.cerrarperiodo', 'contabilidad.conciliar',
+          'bancos.ver', 'bancos.editar',
+        ],
+        email: 'admin@e2e-cierre.com',
+      });
+      tenantCierreId = tenant.id;
+      await prisma.cuentaContable.createMany({
+        data: CUENTAS_BASE.map((c) => ({ tenantId: tenant.id, codigo: c.codigo, nombre: c.nombre, tipo: c.tipo, naturaleza: c.naturaleza })),
+      });
+
+      // El helper ya creó un período amplio (epoch→2100) por defecto — se
+      // reemplaza por uno acotado a enero 2020, el único que este bloque
+      // necesita cerrar (ver CierrePeriodoService.cerrarPeriodo: al cerrar,
+      // crea solo febrero 2020 como siguiente, no "hoy"). UTC, no local —
+      // tiene que coincidir con cómo new Date('2020-01-15') (fecha de los
+      // asientos de abajo) y new Date('2020-02-01') (en los tests de más
+      // abajo) se interpretan al crear un asiento — mezclar convenciones
+      // fue justo el bug real que esto reemplaza.
+      await prisma.periodoContable.deleteMany({ where: { tenantId: tenant.id } });
+      const periodoEnero = await prisma.periodoContable.create({
+        data: { tenantId: tenant.id, fechaInicio: new Date('2020-01-01'), fechaFin: new Date('2020-01-31T23:59:59.999Z') },
+      });
+      periodoEneroId = periodoEnero.id;
+
+      tokenAdmin = await login('admin@e2e-cierre.com', SUBDOMINIO_CIERRE);
       tokenB = await login('admin@e2e-b.com', SUBDOMINIO_B);
+
       const cuentas = await request(app.getHttpServer())
         .get('/api/contabilidad/cuentas')
-        .set('Authorization', `Bearer ${token}`)
+        .set('Authorization', `Bearer ${tokenAdmin}`)
         .expect(200);
       cajaId = cuentas.body.find((c: { codigo: string }) => c.codigo === '1010').id;
       ingresosId = cuentas.body.find((c: { codigo: string }) => c.codigo === '4010').id;
       gastosOperativosId = cuentas.body.find((c: { codigo: string }) => c.codigo === '5020').id;
+      utilidadesId = cuentas.body.find((c: { codigo: string }) => c.codigo === '3020').id;
 
       await request(app.getHttpServer())
         .post('/api/contabilidad/asientos')
-        .set('Authorization', `Bearer ${token}`)
+        .set('Authorization', `Bearer ${tokenAdmin}`)
         .send({
           concepto: 'Venta de prueba 2020',
           fecha: '2020-01-15',
@@ -1788,7 +1840,7 @@ describe('App (e2e)', () => {
 
       await request(app.getHttpServer())
         .post('/api/contabilidad/asientos')
-        .set('Authorization', `Bearer ${token}`)
+        .set('Authorization', `Bearer ${tokenAdmin}`)
         .send({
           concepto: 'Gasto de prueba 2020',
           fecha: '2020-01-20',
@@ -1798,12 +1850,10 @@ describe('App (e2e)', () => {
     });
 
     it('el libro mayor de Caja acumula el saldo cronológicamente', async () => {
-      const token = await login('admin@e2e-a.com', SUBDOMINIO_A);
-
       const respuesta = await request(app.getHttpServer())
         .get(`/api/contabilidad/libro-mayor/${cajaId}`)
         .query({ desde: '2020-01-01', hasta: '2020-01-31' })
-        .set('Authorization', `Bearer ${token}`)
+        .set('Authorization', `Bearer ${tokenAdmin}`)
         .expect(200);
 
       expect(respuesta.body.saldoInicial).toBe(0);
@@ -1815,12 +1865,10 @@ describe('App (e2e)', () => {
     });
 
     it('cerrar el período traspasa la utilidad neta a Utilidades Retenidas con un asiento balanceado', async () => {
-      const token = await login('admin@e2e-a.com', SUBDOMINIO_A);
-
       const cierre = await request(app.getHttpServer())
         .post('/api/contabilidad/cierre-periodo')
-        .set('Authorization', `Bearer ${token}`)
-        .send({ fecha: '2020-01-31' })
+        .set('Authorization', `Bearer ${tokenAdmin}`)
+        .send({ periodoId: periodoEneroId })
         .expect(201);
 
       expect(Number(cierre.body.utilidadNeta)).toBe(600);
@@ -1831,60 +1879,47 @@ describe('App (e2e)', () => {
       const totalCredito = asiento.lineas.reduce((acc: number, l: { credito: string }) => acc + Number(l.credito), 0);
       expect(totalDebito).toBeCloseTo(totalCredito, 2);
 
-      const cuentas = await request(app.getHttpServer())
-        .get('/api/contabilidad/cuentas')
-        .set('Authorization', `Bearer ${token}`)
-        .expect(200);
-      const utilidadesId = cuentas.body.find((c: { codigo: string }) => c.codigo === '3020').id;
       const lineaUtilidades = asiento.lineas.find((l: { cuentaContableId: string }) => l.cuentaContableId === utilidadesId);
       expect(Number(lineaUtilidades.credito)).toBe(600);
     });
 
     it('rechaza un asiento manual con fecha dentro del período ya cerrado', async () => {
-      const token = await login('admin@e2e-a.com', SUBDOMINIO_A);
-
       await request(app.getHttpServer())
         .post('/api/contabilidad/asientos')
-        .set('Authorization', `Bearer ${token}`)
+        .set('Authorization', `Bearer ${tokenAdmin}`)
         .send({ concepto: 'Asiento tardío', fecha: '2020-01-20', lineas: [{ cuentaContableId: cajaId, debito: 10 }, { cuentaContableId: ingresosId, credito: 10 }] })
         .expect(400);
     });
 
-    it('permite un asiento (manual o gasto) con fecha posterior al cierre', async () => {
-      const token = await login('admin@e2e-a.com', SUBDOMINIO_A);
-
+    it('permite un asiento (manual o gasto) con fecha posterior al cierre — el período siguiente se creó solo', async () => {
       await request(app.getHttpServer())
         .post('/api/contabilidad/asientos')
-        .set('Authorization', `Bearer ${token}`)
+        .set('Authorization', `Bearer ${tokenAdmin}`)
         .send({ concepto: 'Asiento normal', fecha: '2020-02-01', lineas: [{ cuentaContableId: cajaId, debito: 10 }, { cuentaContableId: ingresosId, credito: 10 }] })
         .expect(201);
 
       await request(app.getHttpServer())
         .post('/api/contabilidad/asientos/gastos')
-        .set('Authorization', `Bearer ${token}`)
+        .set('Authorization', `Bearer ${tokenAdmin}`)
         .send({ concepto: 'Gasto normal', fecha: '2020-02-02', monto: 20, cuentaGastoId: gastosOperativosId, cuentaOrigenId: cajaId })
         .expect(201);
     });
 
-    it('rechaza cerrar dos veces en o antes de la misma fecha', async () => {
-      const token = await login('admin@e2e-a.com', SUBDOMINIO_A);
-
+    it('rechaza cerrar el mismo período dos veces', async () => {
       await request(app.getHttpServer())
         .post('/api/contabilidad/cierre-periodo')
-        .set('Authorization', `Bearer ${token}`)
-        .send({ fecha: '2020-01-31' })
+        .set('Authorization', `Bearer ${tokenAdmin}`)
+        .send({ periodoId: periodoEneroId })
         .expect(400);
     });
 
-    it('el listado de cierres incluye el cierre realizado', async () => {
-      const token = await login('admin@e2e-a.com', SUBDOMINIO_A);
-
+    it('el listado de períodos incluye el cierre realizado', async () => {
       const respuesta = await request(app.getHttpServer())
         .get('/api/contabilidad/cierre-periodo')
-        .set('Authorization', `Bearer ${token}`)
+        .set('Authorization', `Bearer ${tokenAdmin}`)
         .expect(200);
 
-      expect(respuesta.body.some((c: { utilidadNeta: string }) => Number(c.utilidadNeta) === 600)).toBe(true);
+      expect(respuesta.body.some((p: { utilidadNeta: string | null }) => p.utilidadNeta != null && Number(p.utilidadNeta) === 600)).toBe(true);
     });
 
     it('contabilidad.cerrarperiodo es obligatorio para cerrar un período', async () => {
@@ -1893,50 +1928,50 @@ describe('App (e2e)', () => {
       await request(app.getHttpServer())
         .post('/api/contabilidad/cierre-periodo')
         .set('Authorization', `Bearer ${token}`)
-        .send({ fecha: '2019-01-31' })
+        .send({ periodoId: periodoEneroId })
         .expect(403);
     });
 
     it('anular un asiento manual genera un reverso y ya no aporta al balance general', async () => {
-      const token = tokenAdmin;
-
       // Cuentas dedicadas y nuevas (sin ningún movimiento previo) para que el
-      // saldo de esta prueba sea 100% autocontenido, sin depender de qué otro
-      // test haya tocado Caja/Ingresos antes — el reverso siempre se fecha a
-      // "ahora" (momento real de la anulación, igual que la reversa de
-      // Factura/Compra), no a la fecha del asiento original.
+      // saldo de esta prueba sea 100% autocontenido. Fecha explícita en
+      // febrero 2020 (período abierto tras el cierre de enero) — el
+      // reverso siempre se fecha a "ahora" (momento real de la anulación,
+      // igual que la reversa de Factura/Compra), pero el asiento ORIGINAL
+      // necesita una fecha dentro de un período abierto.
       const cuentas = await request(app.getHttpServer())
         .post('/api/contabilidad/cuentas')
-        .set('Authorization', `Bearer ${token}`)
+        .set('Authorization', `Bearer ${tokenAdmin}`)
         .send({ codigo: '1099', nombre: 'Caja Test Anular', tipo: 'ACTIVO', naturaleza: 'DEUDORA' })
         .expect(201);
       const cajaAnularId = cuentas.body.id;
       const ingresosAnular = await request(app.getHttpServer())
         .post('/api/contabilidad/cuentas')
-        .set('Authorization', `Bearer ${token}`)
+        .set('Authorization', `Bearer ${tokenAdmin}`)
         .send({ codigo: '4099', nombre: 'Ingresos Test Anular', tipo: 'INGRESO', naturaleza: 'ACREEDORA' })
         .expect(201);
       const ingresosAnularId = ingresosAnular.body.id;
 
       const asiento = await request(app.getHttpServer())
         .post('/api/contabilidad/asientos')
-        .set('Authorization', `Bearer ${token}`)
+        .set('Authorization', `Bearer ${tokenAdmin}`)
         .send({
           concepto: 'Aporte a anular',
+          fecha: '2020-02-05',
           lineas: [{ cuentaContableId: cajaAnularId, debito: 777 }, { cuentaContableId: ingresosAnularId, credito: 777 }],
         })
         .expect(201);
 
       const balanceConAsiento = await request(app.getHttpServer())
         .get('/api/contabilidad/balance-general')
-        .set('Authorization', `Bearer ${token}`)
+        .set('Authorization', `Bearer ${tokenAdmin}`)
         .expect(200);
       const cajaConAsiento = balanceConAsiento.body.activo.cuentas.find((c: { codigo: string }) => c.codigo === '1099').saldo;
       expect(cajaConAsiento).toBeCloseTo(777, 2);
 
       const reverso = await request(app.getHttpServer())
         .post(`/api/contabilidad/asientos/${asiento.body.id}/anular`)
-        .set('Authorization', `Bearer ${token}`)
+        .set('Authorization', `Bearer ${tokenAdmin}`)
         .expect(201);
       expect(reverso.body.origen).toBe('ANULACION');
       const totalDebito = reverso.body.lineas.reduce((acc: number, l: { debito: string }) => acc + Number(l.debito), 0);
@@ -1946,13 +1981,13 @@ describe('App (e2e)', () => {
 
       const original = await request(app.getHttpServer())
         .get(`/api/contabilidad/asientos/${asiento.body.id}`)
-        .set('Authorization', `Bearer ${token}`)
+        .set('Authorization', `Bearer ${tokenAdmin}`)
         .expect(200);
       expect(original.body.anulado).toBe(true);
 
       const balanceDespues = await request(app.getHttpServer())
         .get('/api/contabilidad/balance-general')
-        .set('Authorization', `Bearer ${token}`)
+        .set('Authorization', `Bearer ${tokenAdmin}`)
         .expect(200);
       const cajaDespues = balanceDespues.body.activo.cuentas.find((c: { codigo: string }) => c.codigo === '1099');
       // El original sigue contando (no se filtra por anulado), pero el
@@ -1961,23 +1996,24 @@ describe('App (e2e)', () => {
     });
 
     it('rechaza anular un asiento (o registrar un pago/gasto menor) con fecha dentro de un período ya cerrado', async () => {
-      const token = tokenAdmin;
-
       const asientoViejo = await request(app.getHttpServer())
         .get('/api/contabilidad/asientos')
         .query({ busqueda: 'Venta de prueba 2020' })
-        .set('Authorization', `Bearer ${token}`)
+        .set('Authorization', `Bearer ${tokenAdmin}`)
         .expect(200);
       const idAsientoViejo = asientoViejo.body.datos[0].id;
 
       await request(app.getHttpServer())
         .post(`/api/contabilidad/asientos/${idAsientoViejo}/anular`)
-        .set('Authorization', `Bearer ${token}`)
+        .set('Authorization', `Bearer ${tokenAdmin}`)
         .expect(400);
     });
 
     it('rechaza anular un asiento de origen automático', async () => {
-      const token = tokenAdmin;
+      // SUBDOMINIO_A, no el tenant dedicado de este describe — necesita un
+      // asiento real de origen FACTURA, que ya existe ahí desde el describe
+      // 'Contabilidad' ("emitir una factura CONTADO...").
+      const token = await login('admin@e2e-a.com', SUBDOMINIO_A);
 
       const asientos = await request(app.getHttpServer())
         .get('/api/contabilidad/asientos')
@@ -1993,11 +2029,9 @@ describe('App (e2e)', () => {
     });
 
     it('balance de comprobación: los totales de débito y crédito cuadran', async () => {
-      const token = tokenAdmin;
-
       const respuesta = await request(app.getHttpServer())
         .get('/api/contabilidad/balance-comprobacion')
-        .set('Authorization', `Bearer ${token}`)
+        .set('Authorization', `Bearer ${tokenAdmin}`)
         .expect(200);
 
       expect(Math.abs(respuesta.body.totales.debito - respuesta.body.totales.credito)).toBeLessThan(0.01);
@@ -2005,50 +2039,55 @@ describe('App (e2e)', () => {
     });
 
     it('conciliación bancaria: marcar una línea conciliada actualiza el saldo conciliado/pendiente', async () => {
-      const token = tokenAdmin;
-
-      // Cuenta contable dedicada y nueva (sin ningún movimiento previo) para
-      // que el saldo según libros sea 100% predecible, sin arrastrar el
-      // historial acumulado de la cuenta "1010" compartida por media suite.
+      // Cuenta contable dedicada y nueva, fecha explícita en febrero 2020
+      // (período abierto tras el cierre de enero).
       const cuentaNueva = await request(app.getHttpServer())
         .post('/api/contabilidad/cuentas')
-        .set('Authorization', `Bearer ${token}`)
+        .set('Authorization', `Bearer ${tokenAdmin}`)
         .send({ codigo: '1098', nombre: 'Banco Test Conciliación', tipo: 'ACTIVO', naturaleza: 'DEUDORA' })
         .expect(201);
       const cajaIdConciliacion = cuentaNueva.body.id;
 
       const banco = await request(app.getHttpServer())
         .post('/api/bancos')
-        .set('Authorization', `Bearer ${token}`)
+        .set('Authorization', `Bearer ${tokenAdmin}`)
         .send({ banco: 'Banco Conciliación E2E', numeroCuenta: 'CONC-001', tipoCuenta: 'CORRIENTE', cuentaContableId: cajaIdConciliacion })
         .expect(201);
 
       const asiento = await request(app.getHttpServer())
         .post('/api/contabilidad/asientos')
-        .set('Authorization', `Bearer ${token}`)
+        .set('Authorization', `Bearer ${tokenAdmin}`)
         .send({
           concepto: 'Depósito a conciliar',
+          fecha: '2020-02-10',
           lineas: [{ cuentaContableId: cajaIdConciliacion, debito: 500 }, { cuentaContableId: ingresosId, credito: 500 }],
         })
         .expect(201);
       const lineaCaja = asiento.body.lineas.find((l: { cuentaContableId: string }) => l.cuentaContableId === cajaIdConciliacion);
 
+      // desde/hasta explícitos — el default de conciliacionBancaria (sin
+      // query) es "desde el día 1 del mes EN CURSO", y cualquier línea
+      // anterior a eso se absorbe en saldoInicial, invisible en
+      // `movimientos` (de donde sale saldoConciliado por línea) — nuestro
+      // asiento está en febrero 2020 a propósito, fuera de ese default.
       const antes = await request(app.getHttpServer())
         .get(`/api/contabilidad/conciliacion/${banco.body.id}`)
-        .set('Authorization', `Bearer ${token}`)
+        .query({ desde: '2020-02-01', hasta: '2020-02-28' })
+        .set('Authorization', `Bearer ${tokenAdmin}`)
         .expect(200);
       expect(antes.body.saldoConciliado).toBe(0);
       expect(antes.body.saldoPendiente).toBeCloseTo(500, 2);
 
       await request(app.getHttpServer())
         .patch(`/api/contabilidad/conciliacion/lineas/${lineaCaja.id}`)
-        .set('Authorization', `Bearer ${token}`)
+        .set('Authorization', `Bearer ${tokenAdmin}`)
         .send({ conciliado: true })
         .expect(200);
 
       const despues = await request(app.getHttpServer())
         .get(`/api/contabilidad/conciliacion/${banco.body.id}`)
-        .set('Authorization', `Bearer ${token}`)
+        .query({ desde: '2020-02-01', hasta: '2020-02-28' })
+        .set('Authorization', `Bearer ${tokenAdmin}`)
         .expect(200);
       expect(despues.body.saldoConciliado).toBeCloseTo(500, 2);
       expect(despues.body.saldoPendiente).toBeCloseTo(0, 2);

@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import { rangoDelMes } from '../src/contabilidad/periodos-contables.util';
 
 /**
  * Período Contable — ítem "Fase 1". Un tenant creado ANTES de esta
@@ -25,8 +26,11 @@ async function main() {
   const prisma = new PrismaClient();
 
   const tenants = await prisma.tenant.findMany({ select: { id: true } });
-  const hoy = new Date();
-  const fechaFin = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0, 23, 59, 59, 999);
+  // UTC, no local — mismo motivo que rangoDelMes (ver su comentario): tiene
+  // que coincidir con la convención de new Date(dto.fecha) que ya usan
+  // Asientos/GastosMenores/Pagos/FacturasProveedor al parsear una fecha
+  // suelta.
+  const { fechaFin } = rangoDelMes(new Date());
 
   let creados = 0;
   for (const tenant of tenants) {

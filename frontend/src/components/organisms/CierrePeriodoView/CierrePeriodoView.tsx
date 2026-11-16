@@ -22,8 +22,13 @@ function formatoRD(valor: number) {
   return `RD$ ${valor.toLocaleString('es-DO', { minimumFractionDigits: 2 })}`;
 }
 
+// timeZone: 'UTC' a propósito — el backend construye fechaInicio/fechaFin
+// en UTC (rangoDelMes, ver su comentario: tiene que coincidir con cómo
+// new Date(dto.fecha) parsea una fecha suelta al crear un asiento),
+// mostrarlas en horario local acá correría el mes cerca de medianoche
+// (bug real encontrado en e2e, no solo en esta pantalla).
 function mesCapitalizado(fecha: Date) {
-  const texto = fecha.toLocaleDateString('es-DO', { month: 'long', year: 'numeric' });
+  const texto = fecha.toLocaleDateString('es-DO', { month: 'long', year: 'numeric', timeZone: 'UTC' });
   return texto.charAt(0).toUpperCase() + texto.slice(1);
 }
 
@@ -32,14 +37,12 @@ function mesCapitalizado(fecha: Date) {
  * (backfill-periodos-contables.ts) arranca en el epoch a propósito, para
  * arrastrar todo lo acumulado de antes — mostrar "Enero de 1970" tal cual
  * confundiría al usuario, así que ese caso puntual (rango de más de un
- * mes) se etiqueta distinto. Comparación en horario LOCAL, no UTC — las
- * fechas se construyen en local en todo el backend (rangoDelMes), mezclar
- * con UTC acá corre el mes mostrado cerca de medianoche.
+ * mes) se etiqueta distinto.
  */
 function etiquetaPeriodo(p: Pick<Periodo, 'fechaInicio' | 'fechaFin'>) {
   const inicio = new Date(p.fechaInicio);
   const fin = new Date(p.fechaFin);
-  const mismoMes = inicio.getFullYear() === fin.getFullYear() && inicio.getMonth() === fin.getMonth();
+  const mismoMes = inicio.getUTCFullYear() === fin.getUTCFullYear() && inicio.getUTCMonth() === fin.getUTCMonth();
   return mismoMes ? mesCapitalizado(inicio) : `Histórico hasta ${mesCapitalizado(fin)}`;
 }
 

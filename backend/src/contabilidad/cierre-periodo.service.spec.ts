@@ -12,7 +12,10 @@ describe('CierrePeriodoService', () => {
   let cuentasRepository: jest.Mocked<CuentasContablesRepository>;
 
   const cuentaUtilidades = { id: 'cuenta-utilidades', codigo: CODIGOS_CUENTA.UTILIDADES_RETENIDAS, nombre: 'Utilidades Retenidas' };
-  const periodoJulio = { id: 'periodo-julio', fechaInicio: new Date(2026, 6, 1), fechaFin: new Date(2026, 6, 31, 23, 59, 59, 999) };
+  // UTC a propósito (no local) — rangoDelMes/rangoDelMesSiguiente trabajan
+  // en UTC, para coincidir con cómo new Date(dto.fecha) parsea una fecha
+  // suelta al crear un asiento (ver el comentario del propio util).
+  const periodoJulio = { id: 'periodo-julio', fechaInicio: new Date('2026-07-01'), fechaFin: new Date('2026-07-31T23:59:59.999Z') };
 
   function linea(cuenta: { id: string; codigo: string; nombre: string; tipo: string }, debito: number, credito: number) {
     return { debito, credito, cuentaContable: cuenta };
@@ -102,12 +105,12 @@ describe('CierrePeriodoService', () => {
       await service.cerrarPeriodo({ periodoId: 'periodo-julio' }, 'tenant-1');
 
       expect(cierreRepository.crear).toHaveBeenCalledWith(
-        expect.objectContaining({ tenantId: 'tenant-1', fechaInicio: new Date(2026, 7, 1) }),
+        expect.objectContaining({ tenantId: 'tenant-1', fechaInicio: new Date('2026-08-01') }),
       );
     });
 
     it('bug real: calcula el siguiente a partir de fechaFin, no de fechaInicio (el primer período de un tenant con historial arranca en el epoch)', async () => {
-      const periodoHistorico = { id: 'periodo-historico', fechaInicio: new Date(0), fechaFin: new Date(2026, 6, 31, 23, 59, 59, 999) };
+      const periodoHistorico = { id: 'periodo-historico', fechaInicio: new Date(0), fechaFin: new Date('2026-07-31T23:59:59.999Z') };
       cierreRepository.buscarAbiertoMasAntiguo.mockResolvedValue(periodoHistorico as never);
       asientosRepository.lineasEnRango.mockResolvedValue([linea({ id: 'c1', codigo: '4010', nombre: 'Ingresos', tipo: 'INGRESO' }, 0, 100)] as never);
       asientosRepository.crear.mockResolvedValue({ id: 'asiento-cierre' } as never);
@@ -118,7 +121,7 @@ describe('CierrePeriodoService', () => {
       // Antes del fix, esto calculaba "el mes después de 1970" (inválido) en
       // vez de "el mes después de julio 2026" (agosto 2026, correcto).
       expect(cierreRepository.crear).toHaveBeenCalledWith(
-        expect.objectContaining({ tenantId: 'tenant-1', fechaInicio: new Date(2026, 7, 1) }),
+        expect.objectContaining({ tenantId: 'tenant-1', fechaInicio: new Date('2026-08-01') }),
       );
     });
 
