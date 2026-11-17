@@ -1,5 +1,5 @@
-import { FormEvent, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../lib/api-client';
 import { mensajeErrorApi } from '../lib/mensaje-error-api';
@@ -7,8 +7,6 @@ import { Card } from '../components/atoms/Card/Card';
 import { Badge } from '../components/atoms/Badge/Badge';
 import { Select } from '../components/atoms/Select/Select';
 import { Button } from '../components/atoms/Button/Button';
-import { FormField } from '../components/molecules/FormField/FormField';
-import { Modal } from '../components/molecules/Modal/Modal';
 import { Paginacion } from '../components/molecules/Paginacion/Paginacion';
 import { EstadoVacio } from '../components/molecules/EstadoVacio/EstadoVacio';
 import { ConfirmModal } from '../components/molecules/ConfirmModal/ConfirmModal';
@@ -17,109 +15,8 @@ import { useAuth } from '../hooks/useAuth';
 import { PaginaResultado } from '../types/pagina-resultado';
 import { AgenteOpcion, Contrato, ESTADOS_CONTRATO, ETIQUETA_ESTADO_CONTRATO, ETIQUETA_OPERACION_PROPIEDAD, OPERACIONES_PROPIEDAD } from '../types/inmobiliaria';
 
-/** Modelo 2 — activar/pausar la administración recurrente de un alquiler ya cerrado. */
-function AdministracionAlquilerModal({
-  contrato,
-  guardando,
-  error,
-  onClose,
-  onActivar,
-  onDesactivar,
-}: {
-  contrato: Contrato;
-  guardando: boolean;
-  error: string | null;
-  onClose: () => void;
-  onActivar: (porcentaje: number) => void;
-  onDesactivar: () => void;
-}) {
-  const [porcentaje, setPorcentaje] = useState(contrato.porcentajeComisionAdministracion ?? '10');
-
-  function onSubmit(e: FormEvent) {
-    e.preventDefault();
-    onActivar(Number(porcentaje));
-  }
-
-  if (!contrato.propiedad.propietarioId) {
-    return (
-      <Modal titulo="Administración de alquiler" onClose={onClose}>
-        <p className="text-sm text-slate-600 dark:text-slate-300">
-          Esta propiedad no tiene un propietario asignado — asignalo desde Propiedades (campo "Propietario") antes de activar la administración recurrente.
-        </p>
-        <div className="flex justify-end pt-4">
-          <Button type="button" variante="secundario" onClick={onClose}>
-            Cerrar
-          </Button>
-        </div>
-      </Modal>
-    );
-  }
-
-  if (contrato.administracionActiva) {
-    return (
-      <Modal titulo="Administración de alquiler" onClose={onClose}>
-        <div className="space-y-3 text-sm text-slate-600 dark:text-slate-300">
-          <p>
-            Administración <b>activa</b> — comisión de administración: <b>{contrato.porcentajeComisionAdministracion}%</b>.
-          </p>
-          {contrato.proximoCobroAlquilerEn && (
-            <p>Próximo cobro: {new Date(contrato.proximoCobroAlquilerEn).toLocaleDateString('es-DO')}</p>
-          )}
-          <p className="text-xs text-slate-400">
-            El cobro mensual se genera solo (todos los días a las 8am). Los cobros generados están en{' '}
-            <Link to={`/alquileres?contratoPropiedadId=${contrato.id}`} className="text-teal-700 hover:underline dark:text-teal-400">
-              Alquileres administrados
-            </Link>
-            .
-          </p>
-        </div>
-        {error && <p className="mt-3 text-sm text-red-600 dark:text-red-400">{error}</p>}
-        <div className="flex justify-end gap-2 border-t border-slate-100 pt-4 dark:border-slate-800">
-          <Button type="button" variante="secundario" onClick={onClose}>
-            Cerrar
-          </Button>
-          <Button type="button" variante="peligro" disabled={guardando} onClick={onDesactivar}>
-            {guardando ? 'Pausando…' : 'Pausar administración'}
-          </Button>
-        </div>
-      </Modal>
-    );
-  }
-
-  return (
-    <Modal titulo="Activar administración de alquiler" onClose={onClose}>
-      <form onSubmit={onSubmit} className="space-y-4">
-        <p className="text-sm text-slate-600 dark:text-slate-300">
-          A partir de hoy se genera un cobro mensual de renta para este contrato. El propietario (
-          <b>{contrato.propiedad.propietarioId ? 'ya asignado' : 'sin asignar'}</b>) recibe el alquiler cobrado menos la
-          comisión de administración.
-        </p>
-        <FormField
-          id="admin-alquiler-pct"
-          label="% de comisión de administración"
-          type="number"
-          min="0"
-          max="100"
-          step="0.1"
-          required
-          value={porcentaje}
-          onChange={(e) => setPorcentaje(e.target.value)}
-        />
-        {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
-        <div className="flex justify-end gap-2 border-t border-slate-100 pt-4 dark:border-slate-800">
-          <Button type="button" variante="secundario" onClick={onClose}>
-            Cancelar
-          </Button>
-          <Button type="submit" disabled={guardando}>
-            {guardando ? 'Activando…' : 'Activar administración'}
-          </Button>
-        </div>
-      </form>
-    </Modal>
-  );
-}
-
 export function Contratos() {
+  const navigate = useNavigate();
   const { tienePermiso } = useAuth();
   const queryClient = useQueryClient();
   const [pagina, setPagina] = useState(1);
@@ -127,9 +24,7 @@ export function Contratos() {
   const [filtroTipo, setFiltroTipo] = useState('');
   const [filtroAgente, setFiltroAgente] = useState('');
   const [contratoAAnular, setContratoAAnular] = useState<Contrato | null>(null);
-  const [contratoAAdministrar, setContratoAAdministrar] = useState<Contrato | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [errorAdministracion, setErrorAdministracion] = useState<string | null>(null);
   const puedeAnular = tienePermiso('inmobiliaria.contratos.anular');
   const puedeGestionar = tienePermiso('inmobiliaria.contratos.crear');
   const puedeGestionarAlquileres = tienePermiso('inmobiliaria.alquileres.gestionar');
@@ -173,29 +68,6 @@ export function Contratos() {
       setError(mensajeErrorApi(err, 'No se pudo anular el contrato.'));
       setContratoAAnular(null);
     },
-  });
-
-  const activarAdministracion = useMutation({
-    mutationFn: async (porcentaje: number) =>
-      apiClient.patch(`/admin/inmobiliaria/contratos/${contratoAAdministrar?.id}/administracion-alquiler`, {
-        porcentajeComisionAdministracion: porcentaje,
-      }),
-    onSuccess: () => {
-      setContratoAAdministrar(null);
-      setErrorAdministracion(null);
-      invalidar();
-    },
-    onError: (err) => setErrorAdministracion(mensajeErrorApi(err, 'No se pudo activar la administración.')),
-  });
-
-  const desactivarAdministracion = useMutation({
-    mutationFn: async () => apiClient.delete(`/admin/inmobiliaria/contratos/${contratoAAdministrar?.id}/administracion-alquiler`),
-    onSuccess: () => {
-      setContratoAAdministrar(null);
-      setErrorAdministracion(null);
-      invalidar();
-    },
-    onError: (err) => setErrorAdministracion(mensajeErrorApi(err, 'No se pudo pausar la administración.')),
   });
 
   const contratos = data?.datos ?? [];
@@ -294,7 +166,7 @@ export function Contratos() {
                               </Button>
                             )}
                             {puedeGestionarAlquileres && c.tipo === 'ALQUILER' && (
-                              <Button type="button" variante="secundario" onClick={() => setContratoAAdministrar(c)}>
+                              <Button type="button" variante="secundario" onClick={() => navigate(`/contratos-propiedad/${c.id}/administrar-alquiler`)}>
                                 {c.administracionActiva ? 'Administración' : 'Administrar alquiler'}
                               </Button>
                             )}
@@ -332,20 +204,6 @@ export function Contratos() {
             confirmando={anular.isPending}
             onConfirmar={() => anular.mutate(contratoAAnular.id)}
             onCancelar={() => setContratoAAnular(null)}
-          />
-        )}
-
-        {contratoAAdministrar && (
-          <AdministracionAlquilerModal
-            contrato={contratoAAdministrar}
-            guardando={activarAdministracion.isPending || desactivarAdministracion.isPending}
-            error={errorAdministracion}
-            onClose={() => {
-              setContratoAAdministrar(null);
-              setErrorAdministracion(null);
-            }}
-            onActivar={(porcentaje) => activarAdministracion.mutate(porcentaje)}
-            onDesactivar={() => desactivarAdministracion.mutate()}
           />
         )}
       </div>

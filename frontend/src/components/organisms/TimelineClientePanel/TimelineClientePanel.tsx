@@ -1,7 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { MessageCircle, FileText, Receipt, Star } from 'lucide-react';
 import { apiClient } from '../../../lib/api-client';
-import { Modal } from '../../molecules/Modal/Modal';
 import { EstadoVacio } from '../../molecules/EstadoVacio/EstadoVacio';
 import { EntradaTimeline, TipoEntradaTimeline } from '../../../types/crm';
 import { ActividadesCrmPanel } from '../ActividadesCrmPanel/ActividadesCrmPanel';
@@ -35,15 +34,19 @@ const ETIQUETA_POR_TIPO: Record<TipoEntradaTimeline, string> = {
  * 3) sí tiene acciones — es donde el vendedor ve y usa un pedido sugerido
  * por WhatsApp cuando el teléfono ya es un Cliente real (si no se
  * mostrara acá, no tendría ninguna otra pantalla donde verlo).
+ *
+ * Auditoría de modales pendientes (bloque "Medianos") — antes
+ * `ModalTimelineCliente` (modal); embebido ahora como sección propia de
+ * `ClienteFormulario.tsx` en vez de pantalla aparte.
  */
-export function ModalTimelineCliente({ clienteId, nombreCliente, onClose }: { clienteId: string; nombreCliente: string; onClose: () => void }) {
+export function TimelineClientePanel({ clienteId }: { clienteId: string }) {
   const { data, isLoading } = useQuery({
     queryKey: ['crm-timeline-cliente', clienteId],
     queryFn: async () => (await apiClient.get<EntradaTimeline[]>(`/crm/clientes/${clienteId}/timeline`)).data,
   });
 
   return (
-    <Modal titulo={`Timeline — ${nombreCliente}`} onClose={onClose} ancho="xl">
+    <div className="space-y-4">
       {isLoading && <p className="text-sm text-slate-500 dark:text-slate-400">Cargando…</p>}
       {!isLoading && data?.length === 0 && (
         <EstadoVacio titulo="Sin actividad" descripcion="Todavía no hay WhatsApp, cotizaciones, facturas ni movimientos de lealtad para este cliente." />
@@ -68,10 +71,10 @@ export function ModalTimelineCliente({ clienteId, nombreCliente, onClose }: { cl
         })}
       </div>
 
-      <div className="mt-5 border-t border-slate-200 pt-4 dark:border-slate-800">
+      <div className="border-t border-slate-200 pt-4 dark:border-slate-800">
         <h3 className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-300">Actividades CRM</h3>
         <ActividadesCrmPanel referencia={{ clienteId }} />
       </div>
-    </Modal>
+    </div>
   );
 }

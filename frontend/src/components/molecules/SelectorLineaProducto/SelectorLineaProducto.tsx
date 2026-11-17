@@ -71,6 +71,10 @@ export function SelectorLineaProducto({ productos, productoId, varianteId, onCha
   // Mantiene `productoElegido` en sincronía si `productoId` cambia desde
   // afuera (ej. al cargar una línea ya existente al editar, o si React
   // reusa esta instancia para otra línea del array tras quitar una fila).
+  // También depende de `productos` — si `productoId` ya viene seteado
+  // desde el montaje (ej. precarga por query string) y `productos` todavía
+  // no había resuelto en ese primer render, sin esto nunca se reintenta la
+  // búsqueda cuando la lista llega (bug real: el nombre nunca aparecía).
   useEffect(() => {
     if (!productoId) {
       setProductoElegido(null);
@@ -78,7 +82,7 @@ export function SelectorLineaProducto({ productos, productoId, varianteId, onCha
       setProductoElegido(productos.find((p) => p.id === productoId) ?? null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [productoId]);
+  }, [productoId, productos]);
 
   useEffect(() => {
     if (variantes?.length === 1 && varianteId !== variantes[0].id) {

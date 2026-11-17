@@ -1,18 +1,13 @@
-import { FormEvent, useState } from 'react';
-import { IdCard } from 'lucide-react';
+import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../../../lib/api-client';
-import { mensajeErrorApi } from '../../../lib/mensaje-error-api';
 import { Badge } from '../../atoms/Badge/Badge';
 import { Button } from '../../atoms/Button/Button';
 import { Card } from '../../atoms/Card/Card';
-import { FormField } from '../../molecules/FormField/FormField';
-import { Modal } from '../../molecules/Modal/Modal';
-import { ComboboxBusqueda } from '../../molecules/ComboboxBusqueda/ComboboxBusqueda';
 import { SearchInput } from '../../molecules/SearchInput/SearchInput';
 import { Paginacion } from '../../molecules/Paginacion/Paginacion';
 import { SelectPuesto } from '../../molecules/SelectPuesto/SelectPuesto';
-import { SelectPlantillaHorario } from '../../molecules/SelectPlantillaHorario/SelectPlantillaHorario';
 import { useDebouncedValue } from '../../../hooks/useDebouncedValue';
 import { useAuth } from '../../../hooks/useAuth';
 import { PaginaResultado } from '../../../types/pagina-resultado';
@@ -37,14 +32,13 @@ interface Empleado {
 }
 
 export function EmpleadosTable() {
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { tienePermiso } = useAuth();
   const [busqueda, setBusqueda] = useState('');
   const [puestoFiltro, setPuestoFiltro] = useState('');
   const [pagina, setPagina] = useState(1);
   const busquedaDebounced = useDebouncedValue(busqueda);
-  const [modalNuevoEmpleado, setModalNuevoEmpleado] = useState(false);
-  const [empleadoEditando, setEmpleadoEditando] = useState<Empleado | null>(null);
 
   const { data, isLoading, error: errorCarga } = useQuery({
     queryKey: ['nomina-empleados', pagina, busquedaDebounced, puestoFiltro],
@@ -65,7 +59,7 @@ export function EmpleadosTable() {
     <div className="space-y-4">
       {tienePermiso('nomina.editar') && (
         <div className="flex justify-end">
-          <Button onClick={() => setModalNuevoEmpleado(true)}>Nuevo empleado</Button>
+          <Button onClick={() => navigate('/nomina/empleados/nuevo')}>Nuevo empleado</Button>
         </div>
       )}
 
@@ -126,7 +120,7 @@ export function EmpleadosTable() {
                     <td className="px-5 py-3">
                       {tienePermiso('nomina.editar') && (
                         <div className="flex justify-end gap-2">
-                          <Button variante="secundario" onClick={() => setEmpleadoEditando(empleado)}>
+                          <Button variante="secundario" onClick={() => navigate(`/nomina/empleados/${empleado.id}`)}>
                             Editar
                           </Button>
                           {empleado.activo && (
@@ -149,131 +143,6 @@ export function EmpleadosTable() {
           </div>
         )}
       </Card>
-
-      {(modalNuevoEmpleado || empleadoEditando) && (
-        <ModalEmpleado
-          empleado={empleadoEditando}
-          onClose={() => {
-            setModalNuevoEmpleado(false);
-            setEmpleadoEditando(null);
-          }}
-        />
-      )}
     </div>
-  );
-}
-
-function ModalEmpleado({ empleado, onClose }: { empleado: Empleado | null; onClose: () => void }) {
-  const queryClient = useQueryClient();
-  const [nombre, setNombre] = useState(empleado?.nombre ?? '');
-  const [cedula, setCedula] = useState(empleado?.cedula ?? '');
-  const [cargo, setCargo] = useState(empleado?.cargo ?? '');
-  const [puestoId, setPuestoId] = useState(empleado?.puesto?.id ?? '');
-  const [plantillaHorarioId, setPlantillaHorarioId] = useState(empleado?.plantillaHorario?.id ?? '');
-  const [fechaIngreso, setFechaIngreso] = useState(empleado?.fechaIngreso.slice(0, 10) ?? '');
-  const [salarioBrutoMensual, setSalarioBrutoMensual] = useState(empleado?.salarioBrutoMensual ?? '');
-  const [usuario, setUsuario] = useState<Usuario | null>(empleado?.user ?? null);
-  const [error, setError] = useState<string | null>(null);
-
-  const guardar = useMutation({
-    mutationFn: async () => {
-      const datosComunes = {
-        nombre,
-        cedula,
-        cargo,
-        fechaIngreso,
-        salarioBrutoMensual: Number(salarioBrutoMensual),
-      };
-      if (empleado) {
-        return apiClient.patch(`/nomina/empleados/${empleado.id}`, {
-          ...datosComunes,
-          puestoId: puestoId || null,
-          plantillaHorarioId: plantillaHorarioId || null,
-          userId: usuario?.id ?? null,
-        });
-      }
-      return apiClient.post('/nomina/empleados', {
-        ...datosComunes,
-        puestoId: puestoId || undefined,
-        plantillaHorarioId: plantillaHorarioId || undefined,
-        userId: usuario?.id || undefined,
-      });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['nomina-empleados'] });
-      onClose();
-    },
-    onError: (err) =>
-      setError(mensajeErrorApi(err, `No se pudo ${empleado ? 'guardar' : 'crear'} el empleado — revisá que la cédula y el usuario vinculado no estén repetidos.`)),
-  });
-
-  function onSubmit(e: FormEvent) {
-    e.preventDefault();
-    setError(null);
-    guardar.mutate();
-  }
-
-  return (
-    <Modal titulo={empleado ? `Editar empleado — ${empleado.nombre}` : 'Nuevo empleado'} onClose={onClose}>
-      <form onSubmit={onSubmit} className="space-y-3">
-        <FormField id="empleado-nombre" label="Nombre" value={nombre} onChange={(e) => setNombre(e.target.value)} required />
-        <FormField id="empleado-cedula" label="Cédula" value={cedula} onChange={(e) => setCedula(e.target.value)} required />
-        <FormField id="empleado-cargo" label="Cargo" value={cargo} onChange={(e) => setCargo(e.target.value)} required />
-        <div className="flex flex-col gap-1">
-          <label htmlFor="empleado-puesto" className="text-sm font-medium text-slate-700 dark:text-slate-300">
-            Puesto (opcional, para filtrar/reportar)
-          </label>
-          <SelectPuesto id="empleado-puesto" value={puestoId} onChange={setPuestoId} />
-        </div>
-        <div className="flex flex-col gap-1">
-          <label htmlFor="empleado-plantilla-horario" className="text-sm font-medium text-slate-700 dark:text-slate-300">
-            Plantilla de horario (opcional — sin elegir, se auto-asigna la predeterminada si existe)
-          </label>
-          <SelectPlantillaHorario id="empleado-plantilla-horario" value={plantillaHorarioId} onChange={setPlantillaHorarioId} />
-        </div>
-        <div className="flex flex-col gap-1">
-          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
-            Vincular a un usuario existente (opcional, habilita marcar entrada/salida por autoservicio)
-          </label>
-          <ComboboxBusqueda<Usuario>
-            valor={usuario}
-            onSeleccionar={setUsuario}
-            obtenerId={(u) => u.id}
-            obtenerEtiqueta={(u) => `${u.nombre} (${u.email})`}
-            placeholder="Buscar usuario…"
-            icono={<IdCard size={15} />}
-            buscar={async (texto) =>
-              (
-                await apiClient.get<PaginaResultado<Usuario>>('/nomina/empleados/usuarios-disponibles', {
-                  params: { busqueda: texto, tamanoPagina: 10 },
-                })
-              ).data.datos
-            }
-          />
-        </div>
-        <FormField
-          id="empleado-fecha-ingreso"
-          label="Fecha de ingreso"
-          type="date"
-          value={fechaIngreso}
-          onChange={(e) => setFechaIngreso(e.target.value)}
-          required
-        />
-        <FormField
-          id="empleado-salario"
-          label="Salario bruto mensual"
-          type="number"
-          min={0}
-          step="any"
-          value={salarioBrutoMensual}
-          onChange={(e) => setSalarioBrutoMensual(e.target.value)}
-          required
-        />
-        {error && <p className="text-sm text-red-600">{error}</p>}
-        <Button type="submit" disabled={guardar.isPending} className="w-full">
-          {guardar.isPending ? 'Guardando…' : empleado ? 'Guardar cambios' : 'Agregar empleado'}
-        </Button>
-      </form>
-    </Modal>
   );
 }

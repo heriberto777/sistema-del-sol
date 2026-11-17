@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { apiClient } from '../../../lib/api-client';
 import { Card } from '../../atoms/Card/Card';
 import { Badge } from '../../atoms/Badge/Badge';
@@ -13,10 +13,9 @@ import { useDebouncedValue } from '../../../hooks/useDebouncedValue';
 import { useAuth } from '../../../hooks/useAuth';
 import { PaginaResultado } from '../../../types/pagina-resultado';
 import { EstadoLead, ETIQUETA_ESTADO_LEAD, Lead, TONO_ESTADO_LEAD } from '../../../types/crm';
-import { ModalFormLead } from './ModalFormLead';
-import { ModalDetalleLead } from './ModalDetalleLead';
 
 export function CrmLeadsPanel() {
+  const navigate = useNavigate();
   const { tienePermiso } = useAuth();
   const location = useLocation();
   // "El ancla" — la Bandeja de WhatsApp manda para acá con esto en
@@ -26,9 +25,6 @@ export function CrmLeadsPanel() {
   const [estado, setEstado] = useState<EstadoLead | ''>('');
   const [pagina, setPagina] = useState(1);
   const busquedaDebounced = useDebouncedValue(busqueda);
-
-  const [leadEditando, setLeadEditando] = useState<Lead | null | undefined>(undefined);
-  const [leadViendo, setLeadViendo] = useState<Lead | null>(null);
 
   const { data } = useQuery({
     queryKey: ['crm-leads', pagina, busquedaDebounced, estado],
@@ -71,7 +67,7 @@ export function CrmLeadsPanel() {
                 </option>
               ))}
             </select>
-            {tienePermiso('crm.leads.crear') && <Button onClick={() => setLeadEditando(null)}>Nuevo lead</Button>}
+            {tienePermiso('crm.leads.crear') && <Button onClick={() => navigate('/crm/leads/nuevo')}>Nuevo lead</Button>}
           </div>
         }
       >
@@ -89,14 +85,13 @@ export function CrmLeadsPanel() {
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
               {data?.datos.map((lead) => {
-                const acciones = [
-                  { etiqueta: 'Ver detalle', onClick: () => setLeadViendo(lead) },
-                  ...(tienePermiso('crm.leads.editar') && lead.estado !== 'CONVERTIDO'
-                    ? [{ etiqueta: 'Editar', onClick: () => setLeadEditando(lead) }]
-                    : []),
-                ];
+                const acciones = [{ etiqueta: 'Ver detalle', onClick: () => navigate(`/crm/leads/${lead.id}`) }];
                 return (
-                  <tr key={lead.id} onClick={() => setLeadViendo(lead)} className="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                  <tr
+                    key={lead.id}
+                    onClick={() => navigate(`/crm/leads/${lead.id}`)}
+                    className="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/40"
+                  >
                     <td className="px-5 py-3 font-medium text-slate-900 dark:text-slate-100">{lead.nombre}</td>
                     <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{lead.email ?? lead.telefono ?? '—'}</td>
                     <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{lead.origen}</td>
@@ -124,9 +119,6 @@ export function CrmLeadsPanel() {
           </div>
         )}
       </Card>
-
-      {leadEditando !== undefined && <ModalFormLead lead={leadEditando} onClose={() => setLeadEditando(undefined)} />}
-      {leadViendo && <ModalDetalleLead lead={leadViendo} onClose={() => setLeadViendo(null)} />}
     </div>
   );
 }

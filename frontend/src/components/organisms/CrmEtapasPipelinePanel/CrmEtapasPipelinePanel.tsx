@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../../../lib/api-client';
 import { Card } from '../../atoms/Card/Card';
 import { Button } from '../../atoms/Button/Button';
@@ -7,12 +8,11 @@ import { RowActionsMenu } from '../../molecules/RowActionsMenu/RowActionsMenu';
 import { useAuth } from '../../../hooks/useAuth';
 import { mensajeErrorApi } from '../../../lib/mensaje-error-api';
 import { EtapaPipeline } from '../../../types/crm';
-import { ModalFormEtapaPipeline } from './ModalFormEtapaPipeline';
 
 export function CrmEtapasPipelinePanel() {
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { tienePermiso } = useAuth();
-  const [editando, setEditando] = useState<EtapaPipeline | null | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
 
   const { data: etapas } = useQuery({
@@ -37,7 +37,7 @@ export function CrmEtapasPipelinePanel() {
         sinPadding
         titulo="Etapas del pipeline"
         descripcion="El orden acá define las columnas del tablero de Pipeline."
-        acciones={puedeConfigurar ? <Button onClick={() => setEditando(null)}>Nueva etapa</Button> : undefined}
+        acciones={puedeConfigurar ? <Button onClick={() => navigate('/crm/etapas-pipeline/nueva')}>Nueva etapa</Button> : undefined}
       >
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
@@ -66,7 +66,7 @@ export function CrmEtapasPipelinePanel() {
                       {puedeConfigurar && (
                         <RowActionsMenu
                           acciones={[
-                            { etiqueta: 'Editar', onClick: () => setEditando(etapa) },
+                            { etiqueta: 'Editar', onClick: () => navigate(`/crm/etapas-pipeline/${etapa.id}`) },
                             { etiqueta: 'Eliminar', onClick: () => eliminar.mutate(etapa.id), tono: 'peligro' as const },
                           ]}
                         />
@@ -78,8 +78,6 @@ export function CrmEtapasPipelinePanel() {
           </table>
         </div>
       </Card>
-
-      {editando !== undefined && <ModalFormEtapaPipeline etapa={editando} onClose={() => setEditando(undefined)} />}
     </div>
   );
 }

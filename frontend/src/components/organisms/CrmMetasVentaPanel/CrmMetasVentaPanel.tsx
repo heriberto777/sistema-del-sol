@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../../../lib/api-client';
 import { Card } from '../../atoms/Card/Card';
 import { Button } from '../../atoms/Button/Button';
 import { EstadoVacio } from '../../molecules/EstadoVacio/EstadoVacio';
 import { useAuth } from '../../../hooks/useAuth';
 import { MetaVenta } from '../../../types/crm';
-import { ModalFormMetaVenta } from './ModalFormMetaVenta';
 
 const NOMBRES_MES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 
@@ -15,12 +15,12 @@ function formatearMoneda(monto: number) {
 }
 
 export function CrmMetasVentaPanel() {
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { tienePermiso } = useAuth();
   const hoy = new Date();
   const [anio, setAnio] = useState(hoy.getFullYear());
   const [mes, setMes] = useState(hoy.getMonth() + 1);
-  const [creando, setCreando] = useState(false);
 
   const { data: metas, isLoading } = useQuery({
     queryKey: ['crm-metas-venta', anio, mes],
@@ -50,7 +50,9 @@ export function CrmMetasVentaPanel() {
             <Button variante="secundario" onClick={() => cambiarMes(1)}>
               Siguiente →
             </Button>
-            {tienePermiso('crm.metas.configurar') && <Button onClick={() => setCreando(true)}>Nueva meta</Button>}
+            {tienePermiso('crm.metas.configurar') && (
+              <Button onClick={() => navigate(`/crm/metas-venta/nueva?anio=${anio}&mes=${mes}`)}>Nueva meta</Button>
+            )}
           </div>
         }
       >
@@ -89,8 +91,6 @@ export function CrmMetasVentaPanel() {
           })}
         </div>
       </Card>
-
-      {creando && <ModalFormMetaVenta anio={anio} mes={mes} onClose={() => setCreando(false)} />}
     </div>
   );
 }

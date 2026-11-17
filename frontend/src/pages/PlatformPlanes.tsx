@@ -1,17 +1,12 @@
-import { FormEvent, useState } from 'react';
+import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import clsx from 'clsx';
+import { useNavigate } from 'react-router-dom';
 import { platformApiClient } from '../lib/platform-api-client';
-import { mensajeErrorApi } from '../lib/mensaje-error-api';
-import { FormField } from '../components/molecules/FormField/FormField';
 import { Button } from '../components/atoms/Button/Button';
 import { Badge } from '../components/atoms/Badge/Badge';
 import { Card } from '../components/atoms/Card/Card';
-import { Select } from '../components/atoms/Select/Select';
-import { Modal } from '../components/molecules/Modal/Modal';
 import { RowActionsMenu } from '../components/molecules/RowActionsMenu/RowActionsMenu';
 import { usePlatformAuth } from '../hooks/usePlatformAuth';
-import { Check, X } from 'lucide-react';
 
 type CicloFacturacion = 'MENSUAL' | 'ANUAL';
 
@@ -39,13 +34,11 @@ interface Tenant {
 const ETIQUETA_CICLO: Record<CicloFacturacion, string> = { MENSUAL: 'mes', ANUAL: 'año' };
 
 export function PlatformPlanes() {
+  const navigate = useNavigate();
   const { tienePermiso } = usePlatformAuth();
   const puedeGestionar = tienePermiso('platform.planes.gestionar');
   const queryClient = useQueryClient();
 
-  const [modalAbierto, setModalAbierto] = useState(false);
-  const [planEditando, setPlanEditando] = useState<Plan | null>(null);
-  const [planViendoModulos, setPlanViendoModulos] = useState<Plan | null>(null);
   const [mostrarInactivos, setMostrarInactivos] = useState(false);
 
   const { data: planes } = useQuery({
@@ -70,23 +63,13 @@ export function PlatformPlanes() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['platform-planes'] }),
   });
 
-  function abrirNuevo() {
-    setPlanEditando(null);
-    setModalAbierto(true);
-  }
-
-  function abrirEditar(plan: Plan) {
-    setPlanEditando(plan);
-    setModalAbierto(true);
-  }
-
   const planesVisibles = (planes ?? []).filter((p) => mostrarInactivos || p.activo);
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Planes</h1>
-        {puedeGestionar && <Button onClick={abrirNuevo}>Nuevo plan</Button>}
+        {puedeGestionar && <Button onClick={() => navigate('/plataforma/planes/nuevo')}>Nuevo plan</Button>}
       </div>
 
       <Card
@@ -130,7 +113,7 @@ export function PlatformPlanes() {
                       </Badge>
                       <button
                         type="button"
-                        onClick={() => setPlanViendoModulos(plan)}
+                        onClick={() => navigate(`/plataforma/planes/${plan.id}/modulos`)}
                         className="text-xs font-medium text-sol-600 hover:underline dark:text-sol-400"
                       >
                         Ver módulos
@@ -145,7 +128,7 @@ export function PlatformPlanes() {
                     {puedeGestionar && (
                       <RowActionsMenu
                         acciones={[
-                          { etiqueta: 'Editar', onClick: () => abrirEditar(plan) },
+                          { etiqueta: 'Editar', onClick: () => navigate(`/plataforma/planes/${plan.id}`) },
                           plan.activo
                             ? {
                                 etiqueta: 'Inactivar',
@@ -171,207 +154,6 @@ export function PlatformPlanes() {
         </div>
       </Card>
 
-      {modalAbierto && <ModalPlan plan={planEditando} onClose={() => setModalAbierto(false)} />}
-      {planViendoModulos && <ModalVerModulos plan={planViendoModulos} onClose={() => setPlanViendoModulos(null)} />}
     </div>
-  );
-}
-
-/**
- * Solo lectura — a diferencia de ModalPlan (que edita la selección), esta
- * muestra el catálogo completo con check/tachado contra ESTE plan. Evita
- * que la fila de la tabla crezca sin límite a medida que un plan acumula
- * módulos (antes se listaban todos los badges inline en la celda).
- */
-function ModalVerModulos({ plan, onClose }: { plan: Plan; onClose: () => void }) {
-  const { data: catalogoModulos } = useQuery({
-    queryKey: ['platform-planes-modulos'],
-    queryFn: async () => (await platformApiClient.get<Modulo[]>('/platform/planes/modulos')).data,
-  });
-  const clavesIncluidas = new Set(plan.modulos.map((pm) => pm.modulo.clave));
-
-  return (
-    <Modal titulo={`Módulos de "${plan.nombre}"`} onClose={onClose} ancho="xl">
-      <div className="space-y-4">
-        <p className="text-sm text-slate-500 dark:text-slate-400">
-          {plan.modulos.length} de {catalogoModulos?.length ?? '…'} módulos del catálogo incluidos.
-        </p>
-
-        {!catalogoModulos && <p className="text-sm text-slate-400">Cargando catálogo de módulos…</p>}
-
-        {catalogoModulos && (
-          <div className="grid grid-cols-1 gap-x-4 gap-y-2 sm:grid-cols-2 lg:grid-cols-3">
-            {catalogoModulos.map((modulo) => {
-              const activo = clavesIncluidas.has(modulo.clave);
-              return (
-                <div
-                  key={modulo.clave}
-                  className={clsx(
-                    'flex items-center gap-2 text-sm',
-                    activo ? 'text-slate-900 dark:text-slate-100' : 'text-slate-400 dark:text-slate-600',
-                  )}
-                >
-                  {activo ? (
-                    <Check className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
-                  ) : (
-                    <X className="h-4 w-4 shrink-0" />
-                  )}
-                  <span className={activo ? '' : 'line-through'}>{modulo.nombre}</span>
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        <p className="border-t border-slate-100 pt-3 text-xs text-slate-400 dark:border-slate-800">
-          Contabilidad, Contactos, Reportes, Notificaciones y Admin quedan siempre activos, en todos los planes, sin
-          excepción posible.
-        </p>
-      </div>
-    </Modal>
-  );
-}
-
-function ModalPlan({ plan, onClose }: { plan: Plan | null; onClose: () => void }) {
-  const queryClient = useQueryClient();
-  const [nombre, setNombre] = useState(plan?.nombre ?? '');
-  const [descripcion, setDescripcion] = useState(plan?.descripcion ?? '');
-  const [precio, setPrecio] = useState(plan?.precio ?? '0');
-  const [cicloFacturacion, setCicloFacturacion] = useState<CicloFacturacion>(plan?.cicloFacturacion ?? 'MENSUAL');
-  const [activo, setActivo] = useState(plan?.activo ?? true);
-  const [modulosSeleccionados, setModulosSeleccionados] = useState<Set<string>>(
-    new Set(plan?.modulos.map((pm) => pm.modulo.clave) ?? []),
-  );
-  const [error, setError] = useState<string | null>(null);
-
-  const {
-    data: catalogoModulos,
-    isLoading: cargandoModulos,
-    isError: errorModulos,
-  } = useQuery({
-    queryKey: ['platform-planes-modulos'],
-    queryFn: async () => (await platformApiClient.get<Modulo[]>('/platform/planes/modulos')).data,
-  });
-
-  const guardarPlan = useMutation({
-    mutationFn: async () => {
-      const payload = {
-        nombre,
-        descripcion: descripcion || undefined,
-        precio: Number(precio),
-        cicloFacturacion,
-        modulos: Array.from(modulosSeleccionados),
-        ...(plan ? { activo } : {}),
-      };
-      if (plan) return platformApiClient.patch(`/platform/planes/${plan.id}`, payload);
-      return platformApiClient.post('/platform/planes', payload);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['platform-planes'] });
-      onClose();
-    },
-    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo guardar el plan. Revisa que el nombre no esté repetido.')),
-  });
-
-  function alternarModulo(clave: string) {
-    setModulosSeleccionados((prev) => {
-      const siguiente = new Set(prev);
-      if (siguiente.has(clave)) siguiente.delete(clave);
-      else siguiente.add(clave);
-      return siguiente;
-    });
-  }
-
-  function onSubmit(e: FormEvent) {
-    e.preventDefault();
-    setError(null);
-    guardarPlan.mutate();
-  }
-
-  return (
-    <Modal titulo={plan ? `Editar "${plan.nombre}"` : 'Nuevo plan'} onClose={onClose} ancho="xl">
-      <form onSubmit={onSubmit} className="space-y-4">
-        <FormField id="plan-nombre" label="Nombre" value={nombre} onChange={(e) => setNombre(e.target.value)} required />
-        <FormField id="plan-descripcion" label="Descripción (opcional)" value={descripcion} onChange={(e) => setDescripcion(e.target.value)} />
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <FormField
-            id="plan-precio"
-            label="Precio (RD$)"
-            type="number"
-            step="0.01"
-            min="0"
-            value={precio}
-            onChange={(e) => setPrecio(e.target.value)}
-            required
-          />
-          <div>
-            <label htmlFor="plan-ciclo" className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
-              Ciclo
-            </label>
-            <Select id="plan-ciclo" value={cicloFacturacion} onChange={(e) => setCicloFacturacion(e.target.value as CicloFacturacion)}>
-              <option value="MENSUAL">Mensual</option>
-              <option value="ANUAL">Anual</option>
-            </Select>
-          </div>
-        </div>
-
-        <div>
-          <div className="mb-2 flex items-center justify-between">
-            <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Módulos incluidos</p>
-            <span className="text-xs text-slate-400">{modulosSeleccionados.size} seleccionado(s)</span>
-          </div>
-
-          {cargandoModulos && <p className="text-sm text-slate-400">Cargando catálogo de módulos…</p>}
-          {errorModulos && <p className="text-sm text-red-600 dark:text-red-400">No se pudo cargar el catálogo de módulos. Intenta recargar la página.</p>}
-          {catalogoModulos && catalogoModulos.length === 0 && (
-            <p className="text-sm text-slate-400">No hay módulos en el catálogo todavía.</p>
-          )}
-
-          {catalogoModulos && catalogoModulos.length > 0 && (
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-              {catalogoModulos.map((modulo) => {
-                const seleccionado = modulosSeleccionados.has(modulo.clave);
-                return (
-                  <button
-                    key={modulo.clave}
-                    type="button"
-                    aria-pressed={seleccionado}
-                    onClick={() => alternarModulo(modulo.clave)}
-                    className={clsx(
-                      'flex items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm transition-colors',
-                      seleccionado
-                        ? 'border-sol-400 bg-sol-50 text-sol-800 dark:border-sol-600 dark:bg-sol-900/30 dark:text-sol-300'
-                        : 'border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800/60',
-                    )}
-                  >
-                    <span
-                      className={clsx(
-                        'flex h-4 w-4 shrink-0 items-center justify-center rounded border text-[10px] font-bold text-white',
-                        seleccionado ? 'border-sol-500 bg-sol-500' : 'border-slate-300 bg-transparent dark:border-slate-600',
-                      )}
-                    >
-                      {seleccionado && '✓'}
-                    </span>
-                    <span className="truncate">{modulo.nombre}</span>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        {plan && (
-          <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
-            <input type="checkbox" checked={activo} onChange={(e) => setActivo(e.target.checked)} />
-            Plan activo
-          </label>
-        )}
-
-        {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
-        <Button type="submit" disabled={guardarPlan.isPending} className="w-full">
-          {guardarPlan.isPending ? 'Guardando…' : plan ? 'Guardar cambios' : 'Crear plan'}
-        </Button>
-      </form>
-    </Modal>
   );
 }

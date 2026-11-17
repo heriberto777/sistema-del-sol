@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Modal } from '../../molecules/Modal/Modal';
 import { Badge } from '../../atoms/Badge/Badge';
 import { ActividadesCrmPanel } from '../ActividadesCrmPanel/ActividadesCrmPanel';
-import { ModalTimelineCliente } from '../ModalTimelineCliente/ModalTimelineCliente';
+import { TimelineClientePanel } from '../TimelineClientePanel/TimelineClientePanel';
 import { Button } from '../../atoms/Button/Button';
 import { ETIQUETA_ESTADO_COTIZACION_CRM, Oportunidad } from '../../../types/crm';
 
@@ -82,11 +82,13 @@ export function ModalDetalleOportunidad({ oportunidad, onClose }: { oportunidad:
       </div>
 
       {viendoTimeline && oportunidad.clienteId && (
-        <ModalTimelineCliente
-          clienteId={oportunidad.clienteId}
-          nombreCliente={oportunidad.cliente?.nombre ?? oportunidad.lead?.nombre ?? ''}
+        <Modal
+          titulo={`Timeline — ${oportunidad.cliente?.nombre ?? oportunidad.lead?.nombre ?? ''}`}
           onClose={() => setViendoTimeline(false)}
-        />
+          ancho="xl"
+        >
+          <TimelineClientePanel clienteId={oportunidad.clienteId} />
+        </Modal>
       )}
     </Modal>
   );

@@ -1,7 +1,7 @@
 import { Fragment, FormEvent, useState } from 'react';
 import { Plus, X } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { apiClient } from '../lib/api-client';
 import { mensajeErrorApi } from '../lib/mensaje-error-api';
 import { PaginaDocumento } from '../components/molecules/PaginaDocumento/PaginaDocumento';
@@ -56,24 +56,47 @@ const LINEA_VACIA: LineaForm = {
  * InventarioTransferenciaNueva (que ya usaba este layout). Los campos de
  * lote, cuando el producto los necesita, van en una fila propia debajo —
  * no entran en una sola línea de tabla sin amontonarse.
+ *
+ * Auditoría de modales pendientes (bloque "Medianos") — acepta
+ * `?bodegaId=&productoId=&varianteId=` para el atajo "Ajustar stock"/
+ * "Agregar producto" desde una fila de StockBodegasPanel.tsx (unifica esa
+ * acción rápida con esta página en vez de duplicarla en un modal aparte).
  */
 export function InventarioAjusteNuevo() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [bodegaId, setBodegaId] = useState('');
+  const [searchParams] = useSearchParams();
+  const [bodegaId, setBodegaId] = useState(() => searchParams.get('bodegaId') ?? '');
   const [motivoAjuste, setMotivoAjuste] = useState('');
   const [motivo, setMotivo] = useState('');
-  const [lineas, setLineas] = useState<LineaForm[]>([LINEA_VACIA]);
+  const [lineas, setLineas] = useState<LineaForm[]>(() => {
+    const productoId = searchParams.get('productoId');
+    return productoId ? [{ ...LINEA_VACIA, productoId, varianteId: searchParams.get('varianteId') ?? '' }] : [LINEA_VACIA];
+  });
   const [error, setError] = useState<string | null>(null);
 
   const { data: bodegas } = useQuery({
     queryKey: ['bodegas-select'],
     queryFn: async () => (await apiClient.get<Bodega[]>('/inventario/bodegas')).data,
   });
-  const { data: productos } = useQuery({
+  const { data: productosBase } = useQuery({
     queryKey: ['productos-select'],
     queryFn: async () => (await apiClient.get<PaginaResultado<Producto>>('/productos', { params: { tamanoPagina: 100 } })).data.datos,
   });
+  // El producto que llega por `?productoId=` (atajo "Ajustar stock" desde
+  // StockBodegasPanel) puede no estar entre los primeros 100 de
+  // productosBase — sin esto, SelectorLineaProducto no encuentra su
+  // nombre y muestra el buscador vacío aunque el id ya esté cargado.
+  const productoIdInicial = useState(() => searchParams.get('productoId'))[0];
+  const { data: productoPreseleccionado } = useQuery({
+    queryKey: ['producto', productoIdInicial],
+    queryFn: async () => (await apiClient.get<Producto>(`/productos/${productoIdInicial}`)).data,
+    enabled: !!productoIdInicial,
+  });
+  const productos =
+    productoPreseleccionado && !productosBase?.some((p) => p.id === productoPreseleccionado.id)
+      ? [...(productosBase ?? []), productoPreseleccionado]
+      : productosBase;
 
   function actualizarLinea(i: number, cambios: Partial<LineaForm>) {
     setLineas((prev) => prev.map((l, idx) => (idx === i ? { ...l, ...cambios } : l)));

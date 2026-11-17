@@ -29,6 +29,8 @@ import { FacturasProveedor } from './pages/FacturasProveedor';
 import { FacturaProveedorNueva } from './pages/FacturaProveedorNueva';
 import { TerminosPago } from './pages/TerminosPago';
 import { InventarioStock } from './pages/inventario/InventarioStock';
+import { BodegaNueva } from './pages/inventario/BodegaNueva';
+import { BodegaVer } from './pages/inventario/BodegaVer';
 import { InventarioAjustes } from './pages/inventario/InventarioAjustes';
 import { InventarioTransferencias } from './pages/inventario/InventarioTransferencias';
 import { InventarioAjusteNuevo } from './pages/InventarioAjusteNuevo';
@@ -85,6 +87,8 @@ import { ContabilidadConciliacion } from './pages/contabilidad/ContabilidadConci
 import { ContabilidadCierre } from './pages/contabilidad/ContabilidadCierre';
 import { ContabilidadFiscal } from './pages/contabilidad/ContabilidadFiscal';
 import { NominaEmpleados } from './pages/nomina/NominaEmpleados';
+import { EmpleadoNuevo } from './pages/nomina/EmpleadoNuevo';
+import { EmpleadoVer } from './pages/nomina/EmpleadoVer';
 import { NominaPeriodos } from './pages/nomina/NominaPeriodos';
 import { NominaRetenciones } from './pages/nomina/NominaRetenciones';
 import { NominaReciboVer } from './pages/NominaReciboVer';
@@ -115,16 +119,21 @@ import { MisTareas } from './pages/MisTareas';
 import { Soporte } from './pages/Soporte';
 import { Auditoria } from './pages/Auditoria';
 import { CrmLeads } from './pages/CrmLeads';
+import { LeadNuevo } from './pages/crm/LeadNuevo';
+import { LeadVer } from './pages/crm/LeadVer';
 import { CrmPipeline } from './pages/CrmPipeline';
 import { CrmEtapasPipeline } from './pages/CrmEtapasPipeline';
+import { EtapaPipelineVer } from './pages/crm/EtapaPipelineVer';
 import { CrmDashboard } from './pages/CrmDashboard';
 import { CrmMetasVenta } from './pages/CrmMetasVenta';
+import { MetaVentaNueva } from './pages/crm/MetaVentaNueva';
 import { TravelResumen } from './pages/travel/TravelResumen';
 import { TravelReservasLista } from './pages/travel/TravelReservasLista';
 import { TravelBuscarVuelo } from './pages/travel/TravelBuscarVuelo';
 import { TravelBuscarHotel } from './pages/travel/TravelBuscarHotel';
 import { TravelMarkup } from './pages/travel/TravelMarkup';
 import { Contratos } from './pages/Contratos';
+import { ContratoAdministrarAlquiler } from './pages/ContratoAdministrarAlquiler';
 import { CobrosAlquiler } from './pages/CobrosAlquiler';
 import { InmobiliariaPublicaLayout } from './pages/inmobiliaria/InmobiliariaPublicaLayout';
 import { PropiedadesPublico } from './pages/inmobiliaria/PropiedadesPublico';
@@ -135,9 +144,13 @@ import { PublicacionesSociales } from './pages/PublicacionesSociales';
 import { TiendaOnlineSecciones } from './pages/tienda-online/TiendaOnlineSecciones';
 import { SeccionTiendaVer } from './pages/tienda-online/SeccionTiendaVer';
 import { TiendaOnlinePedidos } from './pages/tienda-online/TiendaOnlinePedidos';
+import { PedidoTiendaVer } from './pages/tienda-online/PedidoTiendaVer';
 import { TiendaOnlineConfiguracion } from './pages/tienda-online/TiendaOnlineConfiguracion';
 import { Usuarios } from './pages/Usuarios';
+import { UsuarioNuevo } from './pages/UsuarioNuevo';
+import { UsuarioVer } from './pages/UsuarioVer';
 import { RolesPermisos } from './pages/RolesPermisos';
+import { RolVer } from './pages/RolVer';
 import { Configuracion } from './pages/Configuracion';
 import { Reportes } from './pages/Reportes';
 import { DatosEmpresa } from './pages/DatosEmpresa';
@@ -162,10 +175,15 @@ import { PlatformLogin } from './pages/PlatformLogin';
 import { PlatformDashboard } from './pages/PlatformDashboard';
 import { PlatformTenants } from './pages/PlatformTenants';
 import { PlatformPlanes } from './pages/PlatformPlanes';
+import { PlatformPlanVer } from './pages/PlatformPlanVer';
+import { PlatformPlanModulos } from './pages/PlatformPlanModulos';
 import { PlatformCupones } from './pages/PlatformCupones';
+import { PlatformCuponVer } from './pages/PlatformCuponVer';
+import { PlatformCuponAplicaciones } from './pages/PlatformCuponAplicaciones';
 import { PlatformRoles } from './pages/PlatformRoles';
 import { PlatformAdmins } from './pages/PlatformAdmins';
 import { PlatformFacturas } from './pages/PlatformFacturas';
+import { PlatformFacturaNueva } from './pages/PlatformFacturaNueva';
 import { PlatformActividad } from './pages/PlatformActividad';
 import { PlatformSoporte } from './pages/PlatformSoporte';
 import { PlatformConfiguracion } from './pages/PlatformConfiguracion';
@@ -272,10 +290,17 @@ const RUTAS_ADMIN = [
           { path: '/plataforma/dashboard', element: <PlatformDashboard /> },
           { path: '/plataforma/tenants', element: <PlatformTenants /> },
           { path: '/plataforma/planes', element: <PlatformPlanes /> },
+          { path: '/plataforma/planes/nuevo', element: <PlatformPlanVer /> },
+          { path: '/plataforma/planes/:id', element: <PlatformPlanVer /> },
+          { path: '/plataforma/planes/:id/modulos', element: <PlatformPlanModulos /> },
           { path: '/plataforma/cupones', element: <PlatformCupones /> },
+          { path: '/plataforma/cupones/nuevo', element: <PlatformCuponVer /> },
+          { path: '/plataforma/cupones/:id', element: <PlatformCuponVer /> },
+          { path: '/plataforma/cupones/:id/aplicaciones', element: <PlatformCuponAplicaciones /> },
           { path: '/plataforma/roles', element: <PlatformRoles /> },
           { path: '/plataforma/admins', element: <PlatformAdmins /> },
           { path: '/plataforma/facturas', element: <PlatformFacturas /> },
+          { path: '/plataforma/facturas/nueva', element: <PlatformFacturaNueva /> },
           { path: '/plataforma/actividad', element: <PlatformActividad /> },
           { path: '/plataforma/soporte', element: <PlatformSoporte /> },
           { path: '/plataforma/configuracion/:tab', element: <PlatformConfiguracion /> },
@@ -317,6 +342,8 @@ const RUTAS_ADMIN = [
           { path: '/facturas-proveedor/nueva', element: <FacturaProveedorNueva /> },
           { path: '/terminos-pago', element: <TerminosPago /> },
           { path: '/inventario/stock', element: <InventarioStock /> },
+          { path: '/inventario/bodegas/nueva', element: <BodegaNueva /> },
+          { path: '/inventario/bodegas/:id', element: <BodegaVer /> },
           { path: '/inventario/ajustes', element: <InventarioAjustes /> },
           { path: '/inventario/ajustes/nuevo', element: <InventarioAjusteNuevo /> },
           { path: '/inventario/ajustes/:id', element: <InventarioAjusteVer /> },
@@ -389,14 +416,18 @@ const RUTAS_ADMIN = [
           { path: '/proyectos/:id/:tab', element: <ProyectoDetalle /> },
           { path: '/propiedades', element: <Propiedades /> },
           { path: '/contratos-propiedad', element: <Contratos /> },
+          { path: '/contratos-propiedad/:id/administrar-alquiler', element: <ContratoAdministrarAlquiler /> },
           { path: '/alquileres', element: <CobrosAlquiler /> },
           { path: '/publicaciones-sociales', element: <PublicacionesSociales /> },
           { path: '/tienda-online/secciones', element: <TiendaOnlineSecciones /> },
           { path: '/tienda-online/secciones/nueva', element: <SeccionTiendaVer /> },
           { path: '/tienda-online/secciones/:id', element: <SeccionTiendaVer /> },
           { path: '/tienda-online/pedidos', element: <TiendaOnlinePedidos /> },
+          { path: '/tienda-online/pedidos/:facturaId', element: <PedidoTiendaVer /> },
           { path: '/tienda-online/configuracion/:seccion', element: <TiendaOnlineConfiguracion /> },
           { path: '/nomina/empleados', element: <NominaEmpleados /> },
+          { path: '/nomina/empleados/nuevo', element: <EmpleadoNuevo /> },
+          { path: '/nomina/empleados/:id', element: <EmpleadoVer /> },
           { path: '/nomina/periodos', element: <NominaPeriodos /> },
           { path: '/nomina/periodos/:periodoId/recibos/:reciboId', element: <NominaReciboVer /> },
           { path: '/nomina/retenciones', element: <NominaRetenciones /> },
@@ -423,7 +454,11 @@ const RUTAS_ADMIN = [
           { path: '/configuracion', element: <Configuracion /> },
           { path: '/reportes', element: <Reportes /> },
           { path: '/usuarios', element: <Usuarios /> },
+          { path: '/usuarios/nuevo', element: <UsuarioNuevo /> },
+          { path: '/usuarios/:id', element: <UsuarioVer /> },
           { path: '/roles-permisos', element: <RolesPermisos /> },
+          { path: '/roles-permisos/nuevo', element: <RolVer /> },
+          { path: '/roles-permisos/:id', element: <RolVer /> },
           { path: '/datos-empresa', element: <DatosEmpresa /> },
           { path: '/ncf', element: <Ncf /> },
           { path: '/consecutivos', element: <Consecutivos /> },
@@ -437,10 +472,15 @@ const RUTAS_ADMIN = [
           { path: '/webhooks/:id/entregas', element: <WebhookEntregas /> },
           { path: '/auditoria/:tab', element: <Auditoria /> },
           { path: '/crm/leads', element: <CrmLeads /> },
+          { path: '/crm/leads/nuevo', element: <LeadNuevo /> },
+          { path: '/crm/leads/:id', element: <LeadVer /> },
           { path: '/crm/pipeline', element: <CrmPipeline /> },
           { path: '/crm/etapas-pipeline', element: <CrmEtapasPipeline /> },
+          { path: '/crm/etapas-pipeline/nueva', element: <EtapaPipelineVer /> },
+          { path: '/crm/etapas-pipeline/:id', element: <EtapaPipelineVer /> },
           { path: '/crm/dashboard', element: <CrmDashboard /> },
           { path: '/crm/metas-venta', element: <CrmMetasVenta /> },
+          { path: '/crm/metas-venta/nueva', element: <MetaVentaNueva /> },
           { path: '/whatsapp-config', element: <WhatsappConfig /> },
           { path: '/travel-config', element: <TravelConfig /> },
           { path: '/correo-config', element: <CorreoConfig /> },
