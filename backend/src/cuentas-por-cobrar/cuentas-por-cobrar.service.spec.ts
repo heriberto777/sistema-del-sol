@@ -12,8 +12,30 @@ describe('CuentasPorCobrarService', () => {
     repository = {
       listar: jest.fn().mockResolvedValue([[], 0]),
       listarTodasPendientes: jest.fn().mockResolvedValue([]),
+      buscarPorFacturaId: jest.fn(),
     } as unknown as jest.Mocked<CuentasPorCobrarRepository>;
     service = new CuentasPorCobrarService(repository);
+  });
+
+  describe('buscarPorFacturaId', () => {
+    it('Gestión de Cobro como página — ficha de una sola cuenta, mismo mapeo que listar()', async () => {
+      repository.buscarPorFacturaId.mockResolvedValue({
+        facturaId: 'f1',
+        factura: { numero: '00010', ncf: 'B0200000001' },
+        cliente: { nombre: 'Cliente X' },
+        fecha: hace(45),
+        fechaVencimiento: hace(15),
+        monto: 1000,
+        saldo: 600,
+        estado: 'PARCIAL',
+      } as never);
+
+      const resultado = await service.buscarPorFacturaId('f1');
+
+      expect(resultado).toEqual(
+        expect.objectContaining({ id: 'f1', numero: '00010', cliente: 'Cliente X', total: 1000, pagado: 400, pendiente: 600, bucket: 'D1_30', estado: 'PARCIAL' }),
+      );
+    });
   });
 
   describe('listar', () => {

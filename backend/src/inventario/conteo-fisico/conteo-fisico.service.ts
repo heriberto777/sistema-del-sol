@@ -44,14 +44,25 @@ export class ConteoFisicoService {
     let variantes;
     if (dto.alcance === 'TOTAL') {
       variantes = await this.conteoFisicoRepository.todoElStockDeLaBodega(dto.bodegaId);
+      if (variantes.length === 0) {
+        throw new BadRequestException(
+          'Esta bodega no tiene ningún producto contable para un conteo total (los que controlan vencimiento por lote quedan fuera de esta primera versión).',
+        );
+      }
     } else {
       if (!dto.varianteIds?.length) {
         throw new BadRequestException('Elegí al menos un producto para un conteo por selección.');
       }
       variantes = await this.conteoFisicoRepository.stockDeVariantesEnBodega(dto.varianteIds, dto.bodegaId);
-    }
-    if (variantes.length === 0) {
-      throw new BadRequestException('No hay productos para contar en esta bodega (los que controlan vencimiento por lote quedan fuera de esta primera versión).');
+      if (variantes.length === 0) {
+        // Mensaje distinto al de TOTAL a propósito: acá el usuario sí eligió
+        // productos, pero ninguno es contable en esta primera versión (los
+        // que controlan vencimiento por lote) — el frontend ya los filtra
+        // del selector, pero esto cubre cualquier otro cliente de la API.
+        throw new BadRequestException(
+          'Ninguno de los productos elegidos es contable en este modo (los que controlan vencimiento por lote quedan fuera de esta primera versión).',
+        );
+      }
     }
 
     return this.tenantPrisma.client.$transaction(async (tx) => {

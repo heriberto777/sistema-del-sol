@@ -42,6 +42,26 @@ export class CuentasPorCobrarService {
     return { datos, total, pagina, tamanoPagina };
   }
 
+  /** Ficha de una sola cuenta, por factura — ver controller. */
+  async buscarPorFacturaId(facturaId: string) {
+    const c = await this.cuentasPorCobrarRepository.buscarPorFacturaId(facturaId);
+    const dias = diasVencidoDesde(c.fechaVencimiento);
+    return {
+      id: c.facturaId,
+      numero: c.factura.numero,
+      ncf: c.factura.ncf,
+      cliente: c.cliente.nombre,
+      fecha: c.fecha,
+      vencimiento: c.fechaVencimiento,
+      total: Number(c.monto),
+      pagado: Number(c.monto) - Number(c.saldo),
+      pendiente: Number(c.saldo),
+      diasVencido: dias,
+      bucket: bucketDe(dias),
+      estado: c.estado,
+    };
+  }
+
   async resumen() {
     const cuentas = await this.cuentasPorCobrarRepository.listarTodasPendientes();
 

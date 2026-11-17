@@ -8,7 +8,7 @@ import { SelectFormaPago } from '../../molecules/SelectFormaPago/SelectFormaPago
 import { Button } from '../../atoms/Button/Button';
 import { Remision } from './RemisionesPanel';
 
-export function ModalConvertirRemision({ remision, onClose }: { remision: Remision; onClose: () => void }) {
+export function ModalConvertirRemision({ remision, onClose }: { remision: Pick<Remision, 'id' | 'numero'>; onClose: () => void }) {
   const queryClient = useQueryClient();
   const [tipoFactura, setTipoFactura] = useState<'CONTADO' | 'CREDITO'>('CONTADO');
   const [formaPagoId, setFormaPagoId] = useState('');

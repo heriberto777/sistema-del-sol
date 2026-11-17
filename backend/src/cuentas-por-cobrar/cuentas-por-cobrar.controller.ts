@@ -1,4 +1,4 @@
-import { Controller, Get, Query } from '@nestjs/common';
+import { Controller, Get, Param, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { CuentasPorCobrarService } from './cuentas-por-cobrar.service';
 import { ListadoQueryDto } from '../common/dto/listado-query.dto';
@@ -21,5 +21,12 @@ export class CuentasPorCobrarController {
   @Permissions('cuentasporcobrar.ver')
   listar(@Query() query: ListadoQueryDto) {
     return this.cuentasPorCobrarService.listar(query);
+  }
+
+  /** Ficha de una sola cuenta (por factura) — "Gestión de cobro" como página, ver CuentaPorCobrarVer.tsx. */
+  @Get(':facturaId')
+  @Permissions('cuentasporcobrar.ver')
+  buscarPorFacturaId(@Param('facturaId') facturaId: string) {
+    return this.cuentasPorCobrarService.buscarPorFacturaId(facturaId);
   }
 }

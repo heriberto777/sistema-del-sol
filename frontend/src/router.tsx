@@ -12,14 +12,18 @@ import { PlatformRestablecerPassword } from './pages/PlatformRestablecerPassword
 import { Dashboard } from './pages/Dashboard';
 import { Facturacion } from './pages/Facturacion';
 import { FacturacionNueva } from './pages/FacturacionNueva';
+import { FacturacionVer } from './pages/FacturacionVer';
 import { Cotizaciones } from './pages/Cotizaciones';
 import { CotizacionNueva } from './pages/CotizacionNueva';
 import { CotizacionEditar } from './pages/CotizacionEditar';
+import { CotizacionVer } from './pages/CotizacionVer';
 import { Remisiones } from './pages/Remisiones';
 import { RemisionNueva } from './pages/RemisionNueva';
 import { RemisionEditar } from './pages/RemisionEditar';
+import { RemisionVer } from './pages/RemisionVer';
 import { NotasCredito } from './pages/NotasCredito';
 import { CuentasPorCobrar } from './pages/CuentasPorCobrar';
+import { CuentaPorCobrarVer } from './pages/CuentaPorCobrarVer';
 import { CuentasPorPagar } from './pages/CuentasPorPagar';
 import { FacturasProveedor } from './pages/FacturasProveedor';
 import { FacturaProveedorNueva } from './pages/FacturaProveedorNueva';
@@ -30,6 +34,7 @@ import { InventarioTransferencias } from './pages/inventario/InventarioTransfere
 import { InventarioAjusteNuevo } from './pages/InventarioAjusteNuevo';
 import { InventarioTransferenciaNueva } from './pages/InventarioTransferenciaNueva';
 import { Conteos } from './pages/Conteos';
+import { InventarioConteoNuevo } from './pages/InventarioConteoNuevo';
 import { ConteoDetalle } from './pages/ConteoDetalle';
 import { InventarioAlertas } from './pages/InventarioAlertas';
 import { ConfiguracionInventario } from './pages/ConfiguracionInventario';
@@ -91,6 +96,8 @@ import { FormatoDocumentos } from './pages/FormatoDocumentos';
 import { Mensajes } from './pages/Mensajes';
 import { Bancos } from './pages/Bancos';
 import { GastosMenores } from './pages/GastosMenores';
+import { GastoMenorNuevo } from './pages/GastoMenorNuevo';
+import { GastoMenorVer } from './pages/GastoMenorVer';
 import { Proyectos } from './pages/Proyectos';
 import { Propiedades } from './pages/Propiedades';
 import { MisTareas } from './pages/MisTareas';
@@ -270,12 +277,15 @@ const RUTAS_ADMIN = [
           { path: '/', element: <Dashboard /> },
           { path: '/facturacion', element: <Facturacion /> },
           { path: '/facturacion/nueva', element: <FacturacionNueva /> },
+          { path: '/facturacion/:id', element: <FacturacionVer /> },
           { path: '/cotizaciones', element: <Cotizaciones /> },
           { path: '/cotizaciones/nueva', element: <CotizacionNueva /> },
           { path: '/cotizaciones/:id/editar', element: <CotizacionEditar /> },
+          { path: '/cotizaciones/:id', element: <CotizacionVer /> },
           { path: '/remisiones', element: <Remisiones /> },
           { path: '/remisiones/nueva', element: <RemisionNueva /> },
           { path: '/remisiones/:id/editar', element: <RemisionEditar /> },
+          { path: '/remisiones/:id', element: <RemisionVer /> },
           { path: '/notas-credito', element: <NotasCredito /> },
           { path: '/ofertas', element: <Ofertas /> },
           { path: '/bonos', element: <Bonos /> },
@@ -283,6 +293,7 @@ const RUTAS_ADMIN = [
           { path: '/cajas', element: <Cajas /> },
           { path: '/formas-pago', element: <FormasPago /> },
           { path: '/cuentas-por-cobrar', element: <CuentasPorCobrar /> },
+          { path: '/cuentas-por-cobrar/:facturaId', element: <CuentaPorCobrarVer /> },
           { path: '/cuentas-por-pagar', element: <CuentasPorPagar /> },
           { path: '/facturas-proveedor', element: <FacturasProveedor /> },
           { path: '/facturas-proveedor/nueva', element: <FacturaProveedorNueva /> },
@@ -293,6 +304,7 @@ const RUTAS_ADMIN = [
           { path: '/inventario/transferencias', element: <InventarioTransferencias /> },
           { path: '/inventario/transferencias/nuevo', element: <InventarioTransferenciaNueva /> },
           { path: '/inventario/conteos', element: <Conteos /> },
+          { path: '/inventario/conteos/nuevo', element: <InventarioConteoNuevo /> },
           { path: '/inventario/conteos/:id', element: <ConteoDetalle /> },
           { path: '/inventario/alertas', element: <InventarioAlertas /> },
           { path: '/inventario/configuracion', element: <ConfiguracionInventario /> },
@@ -345,6 +357,8 @@ const RUTAS_ADMIN = [
           { path: '/contabilidad/fiscal', element: <ContabilidadFiscal /> },
           { path: '/bancos', element: <Bancos /> },
           { path: '/gastos-menores', element: <GastosMenores /> },
+          { path: '/gastos-menores/nuevo', element: <GastoMenorNuevo /> },
+          { path: '/gastos-menores/:id', element: <GastoMenorVer /> },
           { path: '/proyectos', element: <Proyectos /> },
           { path: '/proyectos/:id/:tab', element: <ProyectoDetalle /> },
           { path: '/propiedades', element: <Propiedades /> },

@@ -1,11 +1,9 @@
-import { FormEvent, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../lib/api-client';
-import { mensajeErrorApi } from '../lib/mensaje-error-api';
 import { Button } from '../components/atoms/Button/Button';
 import { Card } from '../components/atoms/Card/Card';
-import { Select } from '../components/atoms/Select/Select';
-import { FormField } from '../components/molecules/FormField/FormField';
 import { Modal } from '../components/molecules/Modal/Modal';
 import { Paginacion } from '../components/molecules/Paginacion/Paginacion';
 import { SearchInput } from '../components/molecules/SearchInput/SearchInput';
@@ -15,13 +13,6 @@ import { ImportarGastosMenoresModal } from '../components/organisms/ImportarGast
 import { useAuth } from '../hooks/useAuth';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { PaginaResultado } from '../types/pagina-resultado';
-
-interface CuentaContable {
-  id: string;
-  codigo: string;
-  nombre: string;
-  tipo: string;
-}
 
 interface CuentaBancaria {
   id: string;
@@ -46,31 +37,19 @@ interface GastoMenor {
   proyecto: ProyectoOpcion | null;
 }
 
-interface LineaGastoMenorDetalle {
-  id: string;
-  concepto: string | null;
-  valor: string;
-  porcentajeItbis: string;
-  montoItbis: string;
-  cantidad: string;
-  montoTotal: string;
-  cuentaContable: CuentaContable;
-}
-
-interface GastoMenorDetalle extends GastoMenor {
-  lineas: LineaGastoMenorDetalle[];
-}
-
-const LINEA_VACIA = { cuentaContableId: '', concepto: '', valor: '', porcentajeItbis: '0', cantidad: '1' };
-
+/**
+ * Auditoría UX (post Período Contable, 2026-11) — "Nuevo gasto menor" y
+ * "Ver detalle" pasaron de modal a página real
+ * (`GastoMenorNuevo`/`GastoMenorVer`), mismo criterio que Asiento
+ * Contable.
+ */
 export function GastosMenores() {
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { tienePermiso } = useAuth();
   const [pagina, setPagina] = useState(1);
   const [busqueda, setBusqueda] = useState('');
-  const [modalAbierto, setModalAbierto] = useState(false);
   const [modalImportarAbierto, setModalImportarAbierto] = useState(false);
-  const [gastoViendo, setGastoViendo] = useState<GastoMenor | null>(null);
   const busquedaDebounced = useDebouncedValue(busqueda);
 
   const { data } = useQuery({
@@ -97,7 +76,7 @@ export function GastosMenores() {
             <Button variante="secundario" onClick={() => setModalImportarAbierto(true)}>
               Importar Excel
             </Button>
-            <Button onClick={() => setModalAbierto(true)}>Nuevo gasto menor</Button>
+            <Button onClick={() => navigate('/gastos-menores/nuevo')}>Nuevo gasto menor</Button>
           </div>
         )}
       </div>
@@ -108,7 +87,7 @@ export function GastosMenores() {
             titulo="Todavía no has registrado gastos menores"
             descripcion="Registrá el primero para llevar el control de tus compras informales."
             etiquetaAccion="Nuevo gasto menor"
-            onAccion={() => setModalAbierto(true)}
+            onAccion={() => navigate('/gastos-menores/nuevo')}
           />
         ) : (
           <Card
@@ -141,7 +120,7 @@ export function GastosMenores() {
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                   {data?.datos.map((g) => (
-                    <tr key={g.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                    <tr key={g.id} onClick={() => navigate(`/gastos-menores/${g.id}`)} className="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/40">
                       <td className="px-5 py-3 font-mono text-xs">{g.ncf ?? '—'}</td>
                       <td className="px-5 py-3">{g.notas ?? '—'}</td>
                       <td className="px-5 py-3">{new Date(g.fecha).toLocaleDateString('es-DO')}</td>
@@ -151,7 +130,7 @@ export function GastosMenores() {
                       <td className="px-5 py-3">{g.proyecto?.nombre ?? '—'}</td>
                       <td className="px-5 py-3">RD$ {Number(g.total).toLocaleString('es-DO')}</td>
                       <td className="px-5 py-3 text-right">
-                        <Button variante="secundario" onClick={() => setGastoViendo(g)}>
+                        <Button variante="secundario" onClick={(e) => { e.stopPropagation(); navigate(`/gastos-menores/${g.id}`); }}>
                           Ver detalle
                         </Button>
                       </td>
@@ -169,261 +148,11 @@ export function GastosMenores() {
         )}
       </RequierePermiso>
 
-      {modalAbierto && <ModalNuevoGastoMenor onClose={() => setModalAbierto(false)} />}
-      {gastoViendo && <ModalVerGastoMenor gasto={gastoViendo} onClose={() => setGastoViendo(null)} />}
       {modalImportarAbierto && (
         <Modal titulo="Importar gastos menores" ancho="xl" onClose={() => setModalImportarAbierto(false)}>
           <ImportarGastosMenoresModal onImportado={() => queryClient.invalidateQueries({ queryKey: ['gastos-menores'] })} />
         </Modal>
       )}
     </div>
-  );
-}
-
-function ModalVerGastoMenor({ gasto, onClose }: { gasto: GastoMenor; onClose: () => void }) {
-  const { data } = useQuery({
-    queryKey: ['gasto-menor', gasto.id],
-    queryFn: async () => (await apiClient.get<GastoMenorDetalle>(`/gastos-menores/${gasto.id}`)).data,
-  });
-
-  return (
-    <Modal titulo={`Gasto menor — ${gasto.ncf ?? new Date(gasto.fecha).toLocaleDateString('es-DO')}`} onClose={onClose}>
-      {!data ? (
-        <p className="text-sm text-slate-400">Cargando…</p>
-      ) : (
-        <div className="space-y-4">
-          <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm dark:bg-slate-800/60">
-            <p>
-              Cuenta bancaria: <span className="font-medium">{data.cuentaBancaria.banco} — {data.cuentaBancaria.numeroCuenta}</span>
-            </p>
-            <p className="text-slate-500 dark:text-slate-400">Fecha: {new Date(data.fecha).toLocaleDateString('es-DO')}</p>
-            {data.proyecto && <p className="text-slate-500 dark:text-slate-400">Proyecto: {data.proyecto.nombre}</p>}
-            {data.notas && <p className="text-slate-500 dark:text-slate-400">Notas: {data.notas}</p>}
-          </div>
-
-          <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-slate-50 text-slate-500 dark:bg-slate-900/60 dark:text-slate-400">
-                <tr>
-                  <th className="px-3 py-2">Cuenta contable</th>
-                  <th className="px-3 py-2">Concepto</th>
-                  <th className="px-3 py-2">Cant.</th>
-                  <th className="px-3 py-2">Valor</th>
-                  <th className="px-3 py-2">ITBIS</th>
-                  <th className="px-3 py-2">Total</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {data.lineas.map((linea) => (
-                  <tr key={linea.id}>
-                    <td className="px-3 py-2">
-                      {linea.cuentaContable.codigo} — {linea.cuentaContable.nombre}
-                    </td>
-                    <td className="px-3 py-2">{linea.concepto ?? '—'}</td>
-                    <td className="px-3 py-2">{Number(linea.cantidad)}</td>
-                    <td className="px-3 py-2">RD$ {Number(linea.valor).toLocaleString('es-DO')}</td>
-                    <td className="px-3 py-2">RD$ {Number(linea.montoItbis).toLocaleString('es-DO')}</td>
-                    <td className="px-3 py-2">RD$ {Number(linea.montoTotal).toLocaleString('es-DO')}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          <div className="flex justify-end text-sm font-medium text-slate-900 dark:text-slate-100">
-            Total: RD$ {Number(data.total).toLocaleString('es-DO')}
-          </div>
-        </div>
-      )}
-    </Modal>
-  );
-}
-
-function ModalNuevoGastoMenor({ onClose }: { onClose: () => void }) {
-  const queryClient = useQueryClient();
-  const { tienePermiso, tieneModulo } = useAuth();
-  const [cuentaBancariaId, setCuentaBancariaId] = useState('');
-  const [proyectoId, setProyectoId] = useState('');
-  const [notas, setNotas] = useState('');
-  const [fecha, setFecha] = useState('');
-  const [lineas, setLineas] = useState([{ ...LINEA_VACIA }]);
-  const [error, setError] = useState<string | null>(null);
-
-  const puedeAsociarProyecto = tieneModulo('proyectos') && tienePermiso('proyectos.ver');
-
-  const { data: bancos } = useQuery({
-    queryKey: ['bancos-select'],
-    queryFn: async () =>
-      (await apiClient.get<PaginaResultado<CuentaBancaria>>('/bancos', { params: { tamanoPagina: 100 } })).data.datos,
-  });
-  const { data: cuentas } = useQuery({
-    queryKey: ['contabilidad-cuentas-gasto'],
-    queryFn: async () => (await apiClient.get<CuentaContable[]>('/contabilidad/cuentas')).data,
-  });
-  const cuentasGasto = (cuentas ?? []).filter((c) => c.tipo === 'GASTO');
-
-  const { data: proyectos } = useQuery({
-    queryKey: ['proyectos-opciones'],
-    queryFn: async () => (await apiClient.get<PaginaResultado<ProyectoOpcion>>('/admin/proyectos', { params: { tamanoPagina: 200 } })).data.datos,
-    enabled: puedeAsociarProyecto,
-  });
-
-  function actualizarLinea(i: number, cambios: Partial<(typeof lineas)[number]>) {
-    setLineas((prev) => prev.map((l, idx) => (idx === i ? { ...l, ...cambios } : l)));
-  }
-
-  const totalEstimado = lineas.reduce((acc, l) => {
-    const valor = Number(l.valor) || 0;
-    const cantidad = Number(l.cantidad) || 1;
-    const itbis = Number(l.porcentajeItbis) || 0;
-    return acc + valor * cantidad * (1 + itbis / 100);
-  }, 0);
-
-  const crear = useMutation({
-    mutationFn: async () =>
-      apiClient.post('/gastos-menores', {
-        cuentaBancariaId,
-        proyectoId: puedeAsociarProyecto && proyectoId ? proyectoId : undefined,
-        notas: notas || undefined,
-        fecha: fecha || undefined,
-        lineas: lineas
-          .filter((l) => l.cuentaContableId && l.valor)
-          .map((l) => ({
-            cuentaContableId: l.cuentaContableId,
-            concepto: l.concepto || undefined,
-            valor: Number(l.valor),
-            porcentajeItbis: l.porcentajeItbis ? Number(l.porcentajeItbis) : undefined,
-            cantidad: l.cantidad ? Number(l.cantidad) : undefined,
-          })),
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['gastos-menores'] });
-      onClose();
-    },
-    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo registrar el gasto menor. Revisa los datos.')),
-  });
-
-  function onSubmit(e: FormEvent) {
-    e.preventDefault();
-    setError(null);
-    if (lineas.filter((l) => l.cuentaContableId && l.valor).length === 0) {
-      setError('Agregá al menos una línea con cuenta contable y valor.');
-      return;
-    }
-    crear.mutate();
-  }
-
-  return (
-    <Modal titulo="Nuevo gasto menor" onClose={onClose}>
-      <form onSubmit={onSubmit} className="space-y-3">
-        <div className="flex flex-col gap-1">
-          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Cuenta bancaria</label>
-          <Select value={cuentaBancariaId} onChange={(e) => setCuentaBancariaId(e.target.value)} required>
-            <option value="">Seleccionar…</option>
-            {bancos?.map((b) => (
-              <option key={b.id} value={b.id}>
-                {b.banco} — {b.numeroCuenta}
-              </option>
-            ))}
-          </Select>
-        </div>
-        <FormField id="gasto-menor-fecha" label="Fecha (opcional)" type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
-        <FormField id="gasto-menor-notas" label="Notas de egreso (opcional)" value={notas} onChange={(e) => setNotas(e.target.value)} />
-
-        {puedeAsociarProyecto && (
-          <div className="flex flex-col gap-1">
-            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Proyecto (opcional)</label>
-            <Select value={proyectoId} onChange={(e) => setProyectoId(e.target.value)}>
-              <option value="">Sin proyecto asociado</option>
-              {proyectos?.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.nombre}
-                </option>
-              ))}
-            </Select>
-          </div>
-        )}
-
-        <div className="space-y-2">
-          <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Cuentas contables</p>
-          {lineas.map((linea, i) => (
-            <div key={i} className="flex flex-wrap gap-2">
-              <Select
-                value={linea.cuentaContableId}
-                onChange={(e) => actualizarLinea(i, { cuentaContableId: e.target.value })}
-                required
-                className="min-w-[10rem] flex-1"
-              >
-                <option value="">Cuenta de gasto…</option>
-                {cuentasGasto.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.codigo} — {c.nombre}
-                  </option>
-                ))}
-              </Select>
-              <input
-                type="text"
-                placeholder="Concepto"
-                value={linea.concepto}
-                onChange={(e) => actualizarLinea(i, { concepto: e.target.value })}
-                className="w-32 rounded-md border border-slate-300 px-2 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-              />
-              <input
-                type="number"
-                min={0}
-                step="0.01"
-                placeholder="Valor"
-                value={linea.valor}
-                onChange={(e) => actualizarLinea(i, { valor: e.target.value })}
-                className="w-24 rounded-md border border-slate-300 px-2 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-              />
-              <input
-                type="number"
-                min={0}
-                max={100}
-                placeholder="ITBIS %"
-                value={linea.porcentajeItbis}
-                onChange={(e) => actualizarLinea(i, { porcentajeItbis: e.target.value })}
-                className="w-20 rounded-md border border-slate-300 px-2 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-              />
-              <input
-                type="number"
-                min={1}
-                placeholder="Cant."
-                value={linea.cantidad}
-                onChange={(e) => actualizarLinea(i, { cantidad: e.target.value })}
-                className="w-16 rounded-md border border-slate-300 px-2 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-              />
-              {lineas.length > 1 && (
-                <button
-                  type="button"
-                  onClick={() => setLineas((prev) => prev.filter((_, idx) => idx !== i))}
-                  className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
-                  aria-label="Quitar línea"
-                >
-                  ×
-                </button>
-              )}
-            </div>
-          ))}
-          <button
-            type="button"
-            onClick={() => setLineas((prev) => [...prev, { ...LINEA_VACIA }])}
-            className="text-sm font-medium text-sol-600 hover:text-sol-700 dark:text-sol-400"
-          >
-            + Agregar cuenta contable
-          </button>
-        </div>
-
-        <p className="text-sm text-slate-600 dark:text-slate-400">
-          Total estimado: RD$ {totalEstimado.toLocaleString('es-DO', { maximumFractionDigits: 2 })}
-        </p>
-
-        {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
-        <Button type="submit" disabled={crear.isPending} className="w-full">
-          {crear.isPending ? 'Registrando…' : 'Registrar gasto menor'}
-        </Button>
-      </form>
-    </Modal>
   );
 }

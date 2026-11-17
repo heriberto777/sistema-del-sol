@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { AlertTriangle, CalendarClock, Wallet } from 'lucide-react';
 import { apiClient } from '../lib/api-client';
 import { Card } from '../components/atoms/Card/Card';
@@ -8,8 +9,6 @@ import { Button } from '../components/atoms/Button/Button';
 import { StatCard } from '../components/molecules/StatCard/StatCard';
 import { SearchInput } from '../components/molecules/SearchInput/SearchInput';
 import { Paginacion } from '../components/molecules/Paginacion/Paginacion';
-import { ModalRegistrarCobro } from '../components/molecules/ModalRegistrarCobro/ModalRegistrarCobro';
-import { ModalGestionCobro } from '../components/molecules/ModalGestionCobro/ModalGestionCobro';
 import { RequierePermiso } from '../components/organisms/RequierePermiso/RequierePermiso';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { PaginaResultado } from '../types/pagina-resultado';
@@ -44,11 +43,10 @@ interface Resumen {
  * Cuadre).
  */
 export function CuentasPorCobrar() {
+  const navigate = useNavigate();
   const [busqueda, setBusqueda] = useState('');
   const [pagina, setPagina] = useState(1);
   const busquedaDebounced = useDebouncedValue(busqueda);
-  const [facturaCobrando, setFacturaCobrando] = useState<FilaCxC | null>(null);
-  const [facturaGestionando, setFacturaGestionando] = useState<FilaCxC | null>(null);
 
   const { data: resumen, isLoading: cargandoResumen } = useQuery({
     queryKey: ['cuentas-por-cobrar-resumen'],
@@ -114,7 +112,7 @@ export function CuentasPorCobrar() {
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                   {data.datos.map((fila) => (
-                    <tr key={fila.id}>
+                    <tr key={fila.id} onClick={() => navigate(`/cuentas-por-cobrar/${fila.id}`)} className="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/40">
                       <td className="px-5 py-3 font-mono text-xs font-medium text-slate-900 dark:text-slate-100">
                         {fila.numero ?? fila.ncf ?? fila.id.slice(0, 8)}
                       </td>
@@ -127,14 +125,9 @@ export function CuentasPorCobrar() {
                         <Badge tono={TONO_BUCKET[fila.bucket]}>{ETIQUETA_BUCKET[fila.bucket]}</Badge>
                       </td>
                       <td className="px-5 py-3 text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button variante="secundario" onClick={() => setFacturaGestionando(fila)}>
-                            Gestión
-                          </Button>
-                          <Button variante="secundario" onClick={() => setFacturaCobrando(fila)}>
-                            Registrar cobro
-                          </Button>
-                        </div>
+                        <Button variante="secundario" onClick={(e) => { e.stopPropagation(); navigate(`/cuentas-por-cobrar/${fila.id}`); }}>
+                          Ver / gestionar
+                        </Button>
                       </td>
                     </tr>
                   ))}
@@ -149,20 +142,6 @@ export function CuentasPorCobrar() {
           )}
         </Card>
       </RequierePermiso>
-
-      {facturaCobrando && (
-        <ModalRegistrarCobro
-          factura={{ id: facturaCobrando.id, numero: facturaCobrando.numero, ncf: facturaCobrando.ncf, total: String(facturaCobrando.total) }}
-          onClose={() => setFacturaCobrando(null)}
-        />
-      )}
-
-      {facturaGestionando && (
-        <ModalGestionCobro
-          factura={{ id: facturaGestionando.id, numero: facturaGestionando.numero, ncf: facturaGestionando.ncf }}
-          onClose={() => setFacturaGestionando(null)}
-        />
-      )}
     </div>
   );
 }

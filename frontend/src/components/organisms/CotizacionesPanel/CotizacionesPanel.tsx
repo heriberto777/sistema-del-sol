@@ -15,7 +15,6 @@ import { useAuth } from '../../../hooks/useAuth';
 import { PaginaResultado } from '../../../types/pagina-resultado';
 import type { ClienteBasico } from '@backend-src/common/prisma/cliente-select-basico';
 import type { OfertaVisibleProducto } from '../../../lib/formatear-oferta';
-import { ModalDetalleCotizacion } from './ModalDetalleCotizacion';
 import { ModalConvertirCotizacion } from './ModalConvertirCotizacion';
 
 // Solo id/nombre — es lo único que las páginas de Nueva/Editar cotización
@@ -115,7 +114,6 @@ export function CotizacionesPanel() {
 
   const [cotizacionConvirtiendo, setCotizacionConvirtiendo] = useState<Cotizacion | null>(null);
   const [cotizacionImprimiendo, setCotizacionImprimiendo] = useState<Cotizacion | null>(null);
-  const [cotizacionViendo, setCotizacionViendo] = useState<Cotizacion | null>(null);
 
   const { data } = useQuery({
     queryKey: ['cotizaciones', pagina, busquedaDebounced],
@@ -215,7 +213,7 @@ export function CotizacionesPanel() {
                 return (
                   <tr
                     key={cotizacion.id}
-                    onClick={() => setCotizacionViendo(cotizacion)}
+                    onClick={() => navigate(`/cotizaciones/${cotizacion.id}`)}
                     className="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/40"
                   >
                     <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{cotizacion.numero}</td>
@@ -230,7 +228,7 @@ export function CotizacionesPanel() {
                       <div className="flex items-center justify-end gap-1">
                         <button
                           type="button"
-                          onClick={() => setCotizacionViendo(cotizacion)}
+                          onClick={() => navigate(`/cotizaciones/${cotizacion.id}`)}
                           className="rounded-md border border-slate-200 p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
                           aria-label="Ver detalle"
                           title="Ver detalle"
@@ -261,16 +259,6 @@ export function CotizacionesPanel() {
           urlBase={`/cotizaciones/${cotizacionImprimiendo.id}`}
           titulo={`Imprimir — ${cotizacionImprimiendo.numero}`}
           onClose={() => setCotizacionImprimiendo(null)}
-        />
-      )}
-      {cotizacionViendo && (
-        <ModalDetalleCotizacion
-          cotizacion={cotizacionViendo}
-          onClose={() => setCotizacionViendo(null)}
-          onImprimir={() => {
-            setCotizacionImprimiendo(cotizacionViendo);
-            setCotizacionViendo(null);
-          }}
         />
       )}
     </div>

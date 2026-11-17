@@ -15,7 +15,6 @@ import { Paginacion } from '../../molecules/Paginacion/Paginacion';
 import { useDebouncedValue } from '../../../hooks/useDebouncedValue';
 import { useAuth } from '../../../hooks/useAuth';
 import { PaginaResultado } from '../../../types/pagina-resultado';
-import { ModalDetalleRemision } from './ModalDetalleRemision';
 import { ModalConvertirRemision } from './ModalConvertirRemision';
 
 // Solo id/nombre — es lo único que las páginas de Nueva/Editar remisión
@@ -73,7 +72,6 @@ export function RemisionesPanel() {
 
   const [remisionConvirtiendo, setRemisionConvirtiendo] = useState<Remision | null>(null);
   const [remisionImprimiendo, setRemisionImprimiendo] = useState<Remision | null>(null);
-  const [remisionViendo, setRemisionViendo] = useState<Remision | null>(null);
 
   const { data } = useQuery({
     queryKey: ['remisiones', pagina, busquedaDebounced],
@@ -142,7 +140,7 @@ export function RemisionesPanel() {
                 return (
                   <tr
                     key={remision.id}
-                    onClick={() => setRemisionViendo(remision)}
+                    onClick={() => navigate(`/remisiones/${remision.id}`)}
                     className="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/40"
                   >
                     <td className="px-5 py-3 font-mono text-xs text-slate-700 dark:text-slate-300">{remision.numero}</td>
@@ -155,7 +153,7 @@ export function RemisionesPanel() {
                       <div className="flex items-center justify-end gap-1">
                         <button
                           type="button"
-                          onClick={() => setRemisionViendo(remision)}
+                          onClick={() => navigate(`/remisiones/${remision.id}`)}
                           className="rounded-md border border-slate-200 p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
                           aria-label="Ver detalle"
                           title="Ver detalle"
@@ -186,16 +184,6 @@ export function RemisionesPanel() {
           urlBase={`/remisiones/${remisionImprimiendo.id}`}
           titulo={`Imprimir — ${remisionImprimiendo.numero}`}
           onClose={() => setRemisionImprimiendo(null)}
-        />
-      )}
-      {remisionViendo && (
-        <ModalDetalleRemision
-          remision={remisionViendo}
-          onClose={() => setRemisionViendo(null)}
-          onImprimir={() => {
-            setRemisionImprimiendo(remisionViendo);
-            setRemisionViendo(null);
-          }}
         />
       )}
     </div>

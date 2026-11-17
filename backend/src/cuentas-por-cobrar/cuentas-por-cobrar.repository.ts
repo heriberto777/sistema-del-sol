@@ -47,6 +47,17 @@ export class CuentasPorCobrarRepository {
     ]);
   }
 
+  /**
+   * Una sola cuenta, por su factura — para la "ficha de cuenta por cobrar"
+   * (Gestión de Cobro como página, ver CuentaPorCobrarVer.tsx). Sin filtrar
+   * por `WHERE_PENDIENTE` a propósito: la ficha tiene que poder abrirse
+   * también para una ya `PAGADA`/`CASTIGADA` (consultar su historial), no
+   * solo mientras sigue pendiente.
+   */
+  buscarPorFacturaId(facturaId: string) {
+    return this.db.cuentaPorCobrar.findUniqueOrThrow({ where: { facturaId }, include: INCLUDE_PARA_LISTADO });
+  }
+
   /** Sin paginar — usado por el resumen/aging, mismo criterio que antes (agrega en JS sobre un dataset acotado por tenant). */
   listarTodasPendientes() {
     return this.db.cuentaPorCobrar.findMany({

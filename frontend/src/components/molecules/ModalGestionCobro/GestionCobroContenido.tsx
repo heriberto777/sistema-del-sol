@@ -3,9 +3,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../../lib/api-client';
 import { mensajeErrorApi } from '../../../lib/mensaje-error-api';
 import { useAuth } from '../../../hooks/useAuth';
-import { Modal } from '../Modal/Modal';
 import { FormField } from '../FormField/FormField';
 import { Button } from '../../atoms/Button/Button';
+import { Card } from '../../atoms/Card/Card';
 
 type TipoGestionCobro = 'LLAMADA' | 'EMAIL' | 'WHATSAPP' | 'VISITA' | 'PROMESA_PAGO' | 'OTRO';
 
@@ -39,16 +39,12 @@ const ETIQUETA_TIPO: Record<TipoGestionCobro, string> = {
 
 /**
  * Fase 4 (CxC) — bitácora de gestión de cobro + provisión/castigo de
- * incobrables, sobre una factura puntual (el modelo también admite
- * gestiones generales de cliente sin factura, no usado desde esta UI).
+ * incobrables, sobre una factura puntual. Extraído de `ModalGestionCobro`
+ * (ahora eliminado) para la "ficha de cuenta por cobrar"
+ * (`CuentaPorCobrarVer.tsx`, página en vez de modal) — mismo
+ * comportamiento, sin el `<Modal>` que lo envolvía.
  */
-export function ModalGestionCobro({
-  factura,
-  onClose,
-}: {
-  factura: { id: string; numero: string | null; ncf: string | null };
-  onClose: () => void;
-}) {
+export function GestionCobroContenido({ factura }: { factura: { id: string; numero: string | null; ncf: string | null } }) {
   const queryClient = useQueryClient();
   const { tienePermiso } = useAuth();
   const puedeIncobrables = tienePermiso('cuentasporcobrar.incobrables.gestionar');
@@ -123,36 +119,34 @@ export function ModalGestionCobro({
   }
 
   return (
-    <Modal titulo={`Gestión de cobro — ${factura.numero ?? factura.ncf ?? factura.id.slice(0, 8)}`} onClose={onClose}>
-      <div className="space-y-5">
-        {historial && historial.length > 0 && (
-          <div className="space-y-2">
-            <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Historial</p>
-            <ul className="max-h-48 space-y-2 overflow-y-auto text-sm">
-              {historial.map((g) => (
-                <li key={g.id} className="rounded-md border border-slate-200 p-2 dark:border-slate-800">
-                  <div className="flex items-center justify-between">
-                    <span className="font-medium text-slate-900 dark:text-slate-100">{ETIQUETA_TIPO[g.tipo]}</span>
-                    <span className="text-xs text-slate-500 dark:text-slate-400">{new Date(g.createdAt).toLocaleString('es-DO')}</span>
-                  </div>
-                  <p className="text-slate-600 dark:text-slate-400">{g.resultado}</p>
-                  {g.promesaFecha && (
-                    <p className="text-xs text-emerald-600 dark:text-emerald-400">
-                      Promesa{g.promesaMonto ? ` RD$ ${Number(g.promesaMonto).toLocaleString('es-DO')}` : ''} —{' '}
-                      {new Date(g.promesaFecha).toLocaleDateString('es-DO')}
-                    </p>
-                  )}
-                  <p className="text-xs text-slate-400">por {g.user.nombre}</p>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
+    <>
+      {historial && historial.length > 0 && (
+        <Card titulo="Historial de gestiones">
+          <ul className="max-h-64 space-y-2 overflow-y-auto text-sm">
+            {historial.map((g) => (
+              <li key={g.id} className="rounded-md border border-slate-200 p-2 dark:border-slate-800">
+                <div className="flex items-center justify-between">
+                  <span className="font-medium text-slate-900 dark:text-slate-100">{ETIQUETA_TIPO[g.tipo]}</span>
+                  <span className="text-xs text-slate-500 dark:text-slate-400">{new Date(g.createdAt).toLocaleString('es-DO')}</span>
+                </div>
+                <p className="text-slate-600 dark:text-slate-400">{g.resultado}</p>
+                {g.promesaFecha && (
+                  <p className="text-xs text-emerald-600 dark:text-emerald-400">
+                    Promesa{g.promesaMonto ? ` RD$ ${Number(g.promesaMonto).toLocaleString('es-DO')}` : ''} —{' '}
+                    {new Date(g.promesaFecha).toLocaleDateString('es-DO')}
+                  </p>
+                )}
+                <p className="text-xs text-slate-400">por {g.user.nombre}</p>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
 
-        {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-red-600">{error}</p>}
 
-        <form onSubmit={onSubmitGestion} className="space-y-3 border-t border-slate-200 pt-3 dark:border-slate-800">
-          <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Registrar gestión</p>
+      <Card titulo="Registrar gestión">
+        <form onSubmit={onSubmitGestion} className="space-y-3">
           <div className="flex flex-col gap-1">
             <label htmlFor="gestion-tipo" className="text-sm font-medium text-slate-700 dark:text-slate-300">
               Tipo
@@ -212,11 +206,11 @@ export function ModalGestionCobro({
             {registrar.isPending ? 'Guardando…' : 'Registrar gestión'}
           </Button>
         </form>
+      </Card>
 
-        {puedeIncobrables && (
-          <div className="space-y-2 border-t border-slate-200 pt-3 dark:border-slate-800">
-            <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Incobrables</p>
-
+      {puedeIncobrables && (
+        <Card titulo="Incobrables">
+          <div className="space-y-2">
             {!provision && !mostrandoFormIncobrable && (
               <Button variante="peligro" onClick={() => setMostrandoFormIncobrable(true)}>
                 Provisionar como incobrable
@@ -268,8 +262,8 @@ export function ModalGestionCobro({
               </p>
             )}
           </div>
-        )}
-      </div>
-    </Modal>
+        </Card>
+      )}
+    </>
   );
 }
