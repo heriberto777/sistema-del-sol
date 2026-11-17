@@ -14,6 +14,8 @@ import { WhatsAppChannel } from '../notificaciones/canales/whatsapp.channel';
 import { resolverPersonalizacionDocumento } from '../common/impresion/resolver-personalizacion-documento';
 import { generarEstadoCuentaPdf, LineaEstadoCuentaPdf } from '../common/pdf/estado-cuenta-pdf';
 import { construirEmailEstadoCuentaHtml } from './construir-email-estado-cuenta-html';
+import { ConfiguracionesService } from '../configuraciones/configuraciones.service';
+import { CONFIGURACIONES_BASE } from '../tenants/roles-base';
 
 export interface LineaEstadoCuenta {
   id: string;
@@ -46,6 +48,7 @@ export class ClientesService {
     private readonly prisma: PrismaService,
     private readonly emailChannel: EmailChannel,
     private readonly whatsAppChannel: WhatsAppChannel,
+    private readonly configuracionesService: ConfiguracionesService,
   ) {}
 
   async crear(dto: CrearClienteDto, tenantId: string) {
@@ -57,7 +60,13 @@ export class ClientesService {
     if (dto.categoriaId) {
       await this.categoriasClienteRepository.buscarPorId(dto.categoriaId);
     }
-    const cliente = await this.clientesRepository.crear(dto, tenantId);
+    // Parámetro "Plazo de pago por defecto" (catálogo de configuraciones) —
+    // si el cliente no trae plazoPagoDias explícito (ni Término de Pago, que
+    // lo precarga en el frontend sin reemplazarlo nunca), antes caía al
+    // default hardcodeado de la columna (30), ignorando lo que el tenant
+    // configuró. Solo aplica al crear — nunca pisa un valor ya guardado.
+    const plazoPagoDias = dto.plazoPagoDias ?? Number(await this.configuracionesService.buscarValor('PLAZO_PAGO_DIAS', tenantId, CONFIGURACIONES_BASE.PLAZO_PAGO_DIAS));
+    const cliente = await this.clientesRepository.crear({ ...dto, plazoPagoDias }, tenantId);
     this.eventBus.emit(EVENTOS.CLIENTE_CREADO, { tenantId, clienteId: cliente.id });
     return cliente;
   }

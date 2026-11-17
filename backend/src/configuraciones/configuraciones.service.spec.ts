@@ -18,6 +18,7 @@ describe('ConfiguracionesService', () => {
       listar: jest.fn(),
       actualizar: jest.fn(),
       buscarPorClave: jest.fn(),
+      buscarPorClaveEnTx: jest.fn(),
     } as unknown as jest.Mocked<ConfiguracionesRepository>;
     prisma = { tenant: { findUnique: jest.fn(), update: jest.fn() } };
     service = new ConfiguracionesService(repository, prisma as unknown as PrismaService);
@@ -38,6 +39,27 @@ describe('ConfiguracionesService', () => {
       const resultado = await service.buscarValor('POS_TOLERANCIA_ARQUEO', 'tenant-1', '50');
 
       expect(resultado).toBe('50');
+    });
+  });
+
+  describe('buscarValorEnTx', () => {
+    it('lee con el tx recibido, nunca con el cliente top-level (bug real: RLS filtra la lectura suelta dentro de una transacción ya abierta)', async () => {
+      repository.buscarPorClaveEnTx.mockResolvedValue({ valor: '77' } as never);
+      const txFalso = { esTransaccion: true } as never;
+
+      const resultado = await service.buscarValorEnTx(txFalso, 'STOCK_MINIMO_DEFAULT', 'tenant-1', '10');
+
+      expect(repository.buscarPorClaveEnTx).toHaveBeenCalledWith(txFalso, 'STOCK_MINIMO_DEFAULT', 'tenant-1');
+      expect(repository.buscarPorClave).not.toHaveBeenCalled();
+      expect(resultado).toBe('77');
+    });
+
+    it('cae al valor por defecto si el tenant no tiene la clave sembrada', async () => {
+      repository.buscarPorClaveEnTx.mockResolvedValue(null);
+
+      const resultado = await service.buscarValorEnTx({} as never, 'STOCK_MINIMO_DEFAULT', 'tenant-1', '10');
+
+      expect(resultado).toBe('10');
     });
   });
 

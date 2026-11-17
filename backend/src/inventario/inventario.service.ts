@@ -10,6 +10,8 @@ import { ListadoQueryDto } from '../common/dto/listado-query.dto';
 import { AlertasInventarioQueryDto } from './dto/alertas-inventario-query.dto';
 import { paginar } from '../common/types/pagina-resultado';
 import { AuthService } from '../auth/auth.service';
+import { ConfiguracionesService } from '../configuraciones/configuraciones.service';
+import { CONFIGURACIONES_BASE } from '../tenants/roles-base';
 
 // Plan de integración de brechas Cuadre, ítem E-2: etiqueta legible para
 // cuando el cajero deja "motivo" (detalle libre) en blanco — el Kardex/
@@ -32,7 +34,37 @@ export class InventarioService {
     private readonly sucursalesRepository: SucursalesRepository,
     private readonly eventBus: EventBusService,
     private readonly authService: AuthService,
+    private readonly configuracionesService: ConfiguracionesService,
   ) {}
+
+  /**
+   * Parámetro "Stock mínimo por defecto" (catálogo de configuraciones) —
+   * solo importa la primera vez que se crea la fila de `Stock` de una
+   * variante+bodega (ver `InventarioRepository.ajustarCantidadEnTx`), así
+   * que se resuelve acá, en los puntos de entrada con `tenantId`
+   * disponible, y nunca dentro del repositorio (que solo toca Prisma).
+   */
+  private async resolverStockMinimoDefault(tenantId: string) {
+    const valor = await this.configuracionesService.buscarValor('STOCK_MINIMO_DEFAULT', tenantId, CONFIGURACIONES_BASE.STOCK_MINIMO_DEFAULT);
+    return Number(valor);
+  }
+
+  /**
+   * Variante EnTx — bug real encontrado al conectar este parámetro: los 3
+   * puntos de entrada `*EnTx` (`entradaStockEnTx`, el passthrough
+   * `ajustarCantidadEnTx` que usa `AjustesInventarioService`,
+   * `transferirStockEnTx`) siempre corren DENTRO de una transacción ya
+   * abierta por el servicio que llama (Compras/Ajustes/Transferencias/
+   * Facturación) — `resolverStockMinimoDefault` (la variante suelta) usa
+   * `ConfiguracionesService.buscarValor`, que cae en OTRA conexión sin el
+   * `SET LOCAL app.tenant_id` de esa transacción y RLS la filtra a cero
+   * filas (mismo gotcha ya documentado en ARCHITECTURE.md). Hay que leer
+   * la configuración con ESE `tx`, nunca con el cliente top-level.
+   */
+  private async resolverStockMinimoDefaultEnTx(tx: Prisma.TransactionClient, tenantId: string) {
+    const valor = await this.configuracionesService.buscarValorEnTx(tx, 'STOCK_MINIMO_DEFAULT', tenantId, CONFIGURACIONES_BASE.STOCK_MINIMO_DEFAULT);
+    return Number(valor);
+  }
 
   /**
    * `Stock` no tiene columna `tenantId` propia (como `Producto`/`Bodega`,
@@ -259,7 +291,10 @@ export class InventarioService {
       { productoId: params.productoId, bodegaId: params.bodegaId, userId: params.userId },
       tx,
     );
-    const varianteId = await this.variantesService.resolverObligatoriaEnTx(tx, params.productoId, params.varianteId);
+    const [varianteId, stockMinimoDefault] = await Promise.all([
+      this.variantesService.resolverObligatoriaEnTx(tx, params.productoId, params.varianteId),
+      this.resolverStockMinimoDefaultEnTx(tx, params.tenantId),
+    ]);
     return this.inventarioRepository.ajustarCantidadEnTx(tx, {
       tenantId: params.tenantId,
       productoId: params.productoId,
@@ -274,6 +309,7 @@ export class InventarioService {
       controlaVencimiento: producto!.controlaVencimiento,
       lotesEntrada: params.lotes,
       costoUnitario: params.costoUnitario,
+      stockMinimoDefault,
     });
   }
 
@@ -288,7 +324,10 @@ export class InventarioService {
     lotes?: LoteEntrada[];
   }) {
     const { producto } = await this.validarPertenencia({ productoId: params.productoId, bodegaId: params.bodegaId, userId: params.userId });
-    const varianteId = await this.variantesService.resolverObligatoria(params.productoId, params.varianteId);
+    const [varianteId, stockMinimoDefault] = await Promise.all([
+      this.variantesService.resolverObligatoria(params.productoId, params.varianteId),
+      this.resolverStockMinimoDefault(params.tenantId),
+    ]);
     return this.inventarioRepository.ajustarCantidad({
       tenantId: params.tenantId,
       productoId: params.productoId,
@@ -300,6 +339,7 @@ export class InventarioService {
       motivo: params.motivo,
       controlaVencimiento: producto!.controlaVencimiento,
       lotesEntrada: params.lotes,
+      stockMinimoDefault,
     });
   }
 
@@ -327,7 +367,10 @@ export class InventarioService {
     if (params.cantidad < 0) {
       await this.authService.verificarPin(params.userId, params.pin);
     }
-    const varianteId = await this.variantesService.resolverObligatoria(params.productoId, params.varianteId);
+    const [varianteId, stockMinimoDefault] = await Promise.all([
+      this.variantesService.resolverObligatoria(params.productoId, params.varianteId),
+      this.resolverStockMinimoDefault(params.tenantId),
+    ]);
     return this.inventarioRepository.ajustarCantidad({
       tenantId: params.tenantId,
       productoId: params.productoId,
@@ -344,6 +387,7 @@ export class InventarioService {
           ? [{ numeroLote: params.numeroLote, fechaVencimiento: params.fechaVencimiento, cantidad: params.cantidad }]
           : undefined,
       loteIdSalida: params.cantidad < 0 ? params.loteId : undefined,
+      stockMinimoDefault,
     });
   }
 
@@ -355,8 +399,9 @@ export class InventarioService {
    * Controller→Service→Repository). Reusa `ajustarCantidadEnTx` tal cual
    * — el `controlaVencimiento`/lotes ya vienen resueltos por el caller.
    */
-  ajustarCantidadEnTx(tx: Prisma.TransactionClient, params: Parameters<InventarioRepository['ajustarCantidadEnTx']>[1]) {
-    return this.inventarioRepository.ajustarCantidadEnTx(tx, params);
+  async ajustarCantidadEnTx(tx: Prisma.TransactionClient, params: Parameters<InventarioRepository['ajustarCantidadEnTx']>[1]) {
+    const stockMinimoDefault = params.stockMinimoDefault ?? (await this.resolverStockMinimoDefaultEnTx(tx, params.tenantId));
+    return this.inventarioRepository.ajustarCantidadEnTx(tx, { ...params, stockMinimoDefault });
   }
 
   async transferirStock(params: {
@@ -374,12 +419,14 @@ export class InventarioService {
     // sola sucursal asignada podría sacar/recibir stock de otra sin estar
     // autorizado ahí. Un usuario que legítimamente mueve stock entre
     // locales (ej. un gerente regional) simplemente tiene ambas asignadas.
-    const [{ producto }] = await Promise.all([
+    const [{ producto }, varianteId, stockMinimoDefault] = await Promise.all([
       this.validarPertenencia({ productoId: params.productoId, bodegaId: params.bodegaOrigenId, userId: params.userId }),
-      this.validarPertenencia({ bodegaId: params.bodegaDestinoId, userId: params.userId }),
+      this.validarPertenencia({ bodegaId: params.bodegaDestinoId, userId: params.userId }).then(() =>
+        this.variantesService.resolverObligatoria(params.productoId, params.varianteId),
+      ),
+      this.resolverStockMinimoDefault(params.tenantId),
     ]);
-    const varianteId = await this.variantesService.resolverObligatoria(params.productoId, params.varianteId);
-    return this.inventarioRepository.transferir({ ...params, varianteId, controlaVencimiento: producto!.controlaVencimiento });
+    return this.inventarioRepository.transferir({ ...params, varianteId, controlaVencimiento: producto!.controlaVencimiento, stockMinimoDefault });
   }
 
   /**
@@ -400,12 +447,14 @@ export class InventarioService {
       userId: string;
     },
   ) {
-    const [{ producto }] = await Promise.all([
+    const [{ producto }, varianteId, stockMinimoDefault] = await Promise.all([
       this.validarPertenencia({ productoId: params.productoId, bodegaId: params.bodegaOrigenId, userId: params.userId }, tx),
-      this.validarPertenencia({ bodegaId: params.bodegaDestinoId, userId: params.userId }, tx),
+      this.validarPertenencia({ bodegaId: params.bodegaDestinoId, userId: params.userId }, tx).then(() =>
+        this.variantesService.resolverObligatoriaEnTx(tx, params.productoId, params.varianteId),
+      ),
+      this.resolverStockMinimoDefaultEnTx(tx, params.tenantId),
     ]);
-    const varianteId = await this.variantesService.resolverObligatoriaEnTx(tx, params.productoId, params.varianteId);
-    return this.inventarioRepository.transferirEnTx(tx, { ...params, varianteId, controlaVencimiento: producto!.controlaVencimiento });
+    return this.inventarioRepository.transferirEnTx(tx, { ...params, varianteId, controlaVencimiento: producto!.controlaVencimiento, stockMinimoDefault });
   }
 
   /**

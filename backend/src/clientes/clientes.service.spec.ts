@@ -7,21 +7,24 @@ import { EventBusService } from '../event-bus/event-bus.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { EmailChannel } from '../notificaciones/canales/email.channel';
 import { WhatsAppChannel } from '../notificaciones/canales/whatsapp.channel';
+import { ConfiguracionesService } from '../configuraciones/configuraciones.service';
 
 const CLIENTE = { id: 'c1', nombre: 'Constructora Rivas', rncCedula: '101-88231-4', email: 'rivas@ejemplo.com', telefono: '+18095551234' };
 
 describe('ClientesService', () => {
   let service: ClientesService;
-  let repository: jest.Mocked<Pick<ClientesRepository, 'buscarPorId' | 'buscarFacturasParaEstadoCuenta' | 'sumaPagosPorFacturas'>>;
+  let repository: jest.Mocked<Pick<ClientesRepository, 'buscarPorId' | 'buscarFacturasParaEstadoCuenta' | 'sumaPagosPorFacturas' | 'crear'>>;
   let prisma: { tenant: { findUnique: jest.Mock }; configuracion: { findUnique: jest.Mock } };
   let emailChannel: jest.Mocked<Pick<EmailChannel, 'enviar'>>;
   let whatsAppChannel: jest.Mocked<Pick<WhatsAppChannel, 'enviar'>>;
+  let configuracionesService: jest.Mocked<ConfiguracionesService>;
 
   beforeEach(() => {
     repository = {
       buscarPorId: jest.fn().mockResolvedValue(CLIENTE),
       buscarFacturasParaEstadoCuenta: jest.fn().mockResolvedValue([]),
       sumaPagosPorFacturas: jest.fn().mockResolvedValue([]),
+      crear: jest.fn().mockResolvedValue(CLIENTE),
     };
     prisma = {
       tenant: { findUnique: jest.fn().mockResolvedValue({ logo: null, nombre: 'Ferretería Demo', rnc: null, direccion: null, telefono: null }) },
@@ -29,6 +32,7 @@ describe('ClientesService', () => {
     };
     emailChannel = { enviar: jest.fn().mockResolvedValue(true) };
     whatsAppChannel = { enviar: jest.fn().mockResolvedValue(true) };
+    configuracionesService = { buscarValor: jest.fn().mockResolvedValue('30') } as unknown as jest.Mocked<ConfiguracionesService>;
     service = new ClientesService(
       repository as unknown as ClientesRepository,
       {} as ListasPrecioRepository,
@@ -37,7 +41,26 @@ describe('ClientesService', () => {
       prisma as unknown as PrismaService,
       emailChannel as unknown as EmailChannel,
       whatsAppChannel as unknown as WhatsAppChannel,
+      configuracionesService,
     );
+  });
+
+  describe('crear — PLAZO_PAGO_DIAS (parámetro operativo — plan de parámetros generales)', () => {
+    it('usa el plazoPagoDias explícito del DTO cuando viene, sin consultar la configuración', async () => {
+      await service.crear({ nombre: 'Cliente X', plazoPagoDias: 45 } as never, 't1');
+
+      expect(configuracionesService.buscarValor).not.toHaveBeenCalled();
+      expect(repository.crear).toHaveBeenCalledWith(expect.objectContaining({ plazoPagoDias: 45 }), 't1');
+    });
+
+    it('sin plazoPagoDias explícito, resuelve el default configurado del tenant en vez del hardcodeado de la columna', async () => {
+      configuracionesService.buscarValor.mockResolvedValue('60');
+
+      await service.crear({ nombre: 'Cliente Y' } as never, 't1');
+
+      expect(configuracionesService.buscarValor).toHaveBeenCalledWith('PLAZO_PAGO_DIAS', 't1', '30');
+      expect(repository.crear).toHaveBeenCalledWith(expect.objectContaining({ plazoPagoDias: 60 }), 't1');
+    });
   });
 
   describe('estadoCuenta', () => {

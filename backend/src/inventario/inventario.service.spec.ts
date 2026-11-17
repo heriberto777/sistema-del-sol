@@ -7,6 +7,7 @@ import { SucursalesRepository } from '../sucursales/sucursales.repository';
 import { EventBusService } from '../event-bus/event-bus.service';
 import { EVENTOS } from '../event-bus/events';
 import { AuthService } from '../auth/auth.service';
+import { ConfiguracionesService } from '../configuraciones/configuraciones.service';
 
 describe('InventarioService', () => {
   let service: InventarioService;
@@ -16,6 +17,7 @@ describe('InventarioService', () => {
   let sucursalesRepository: jest.Mocked<SucursalesRepository>;
   let eventBus: jest.Mocked<EventBusService>;
   let authService: jest.Mocked<AuthService>;
+  let configuracionesService: jest.Mocked<ConfiguracionesService>;
 
   beforeEach(() => {
     repository = {
@@ -28,13 +30,20 @@ describe('InventarioService', () => {
       listarBodegas: jest.fn(),
       crearBodega: jest.fn(),
       buscarBodegaPorId: jest.fn().mockResolvedValue({ id: 'b1', sucursalId: 's1' }),
+      buscarBodegaPorIdEnTx: jest.fn().mockResolvedValue({ id: 'b1', sucursalId: 's1' }),
       obtenerVarianteConProducto: jest.fn(),
       movimientosPorVarianteBodega: jest.fn(),
       listarAlertas: jest.fn(),
       bodegaIdsDeSucursal: jest.fn(),
     } as unknown as jest.Mocked<InventarioRepository>;
-    productosService = { buscarPorId: jest.fn().mockResolvedValue({ id: 'p1' }) } as unknown as jest.Mocked<ProductosService>;
-    variantesService = { resolverObligatoria: jest.fn().mockResolvedValue('v1') } as unknown as jest.Mocked<VariantesService>;
+    productosService = {
+      buscarPorId: jest.fn().mockResolvedValue({ id: 'p1' }),
+      buscarPorIdEnTx: jest.fn().mockResolvedValue({ id: 'p1' }),
+    } as unknown as jest.Mocked<ProductosService>;
+    variantesService = {
+      resolverObligatoria: jest.fn().mockResolvedValue('v1'),
+      resolverObligatoriaEnTx: jest.fn().mockResolvedValue('v1'),
+    } as unknown as jest.Mocked<VariantesService>;
     sucursalesRepository = {
       buscarPorId: jest.fn().mockResolvedValue({ id: 's1' }),
       usuarioPuedeOperar: jest.fn().mockResolvedValue(true),
@@ -42,7 +51,14 @@ describe('InventarioService', () => {
     } as unknown as jest.Mocked<SucursalesRepository>;
     eventBus = { emit: jest.fn(), on: jest.fn() } as unknown as jest.Mocked<EventBusService>;
     authService = { verificarPin: jest.fn().mockResolvedValue(undefined) } as unknown as jest.Mocked<AuthService>;
-    service = new InventarioService(repository, productosService, variantesService, sucursalesRepository, eventBus, authService);
+    // STOCK_MINIMO_DEFAULT (plan de integración, catálogo de configuraciones)
+    // — mismo valor que el default viejo de la columna, para no romper los
+    // tests existentes que no verifican este parámetro.
+    configuracionesService = {
+      buscarValor: jest.fn().mockResolvedValue('10'),
+      buscarValorEnTx: jest.fn().mockResolvedValue('10'),
+    } as unknown as jest.Mocked<ConfiguracionesService>;
+    service = new InventarioService(repository, productosService, variantesService, sucursalesRepository, eventBus, authService, configuracionesService);
   });
 
   describe('crearBodega', () => {
@@ -221,6 +237,59 @@ describe('InventarioService', () => {
     });
   });
 
+  describe('STOCK_MINIMO_DEFAULT (parámetro operativo — plan de parámetros generales)', () => {
+    it('ajustarStock resuelve el valor configurado del tenant y lo propaga al repositorio', async () => {
+      configuracionesService.buscarValor.mockResolvedValue('25');
+
+      await service.ajustarStock({ tenantId: 't1', productoId: 'p1', bodegaId: 'b1', cantidad: 5, userId: 'u1', motivoAjuste: 'CORRECCION_CONTEO' });
+
+      expect(configuracionesService.buscarValor).toHaveBeenCalledWith('STOCK_MINIMO_DEFAULT', 't1', '10');
+      expect(repository.ajustarCantidad).toHaveBeenCalledWith(expect.objectContaining({ stockMinimoDefault: 25 }));
+    });
+
+    it('entradaStockEnTx resuelve el valor con la variante EnTx (bug real: una suelta cae en otra conexión sin SET LOCAL y RLS la filtra)', async () => {
+      configuracionesService.buscarValorEnTx.mockResolvedValue('15');
+      repository.ajustarCantidadEnTx = jest.fn();
+      const txFalso = { esTransaccion: true } as never;
+
+      await service.entradaStockEnTx(txFalso, { tenantId: 't1', productoId: 'p1', bodegaId: 'b1', cantidad: 5, userId: 'u1', motivo: 'Recepción' });
+
+      expect(configuracionesService.buscarValorEnTx).toHaveBeenCalledWith(txFalso, 'STOCK_MINIMO_DEFAULT', 't1', '10');
+      expect(configuracionesService.buscarValor).not.toHaveBeenCalled();
+      expect(repository.ajustarCantidadEnTx).toHaveBeenCalledWith(txFalso, expect.objectContaining({ stockMinimoDefault: 15 }));
+    });
+
+    it('el passthrough ajustarCantidadEnTx (usado por AjustesInventarioService) resuelve con la variante EnTx, no con la suelta, solo si el llamador no lo trae ya', async () => {
+      configuracionesService.buscarValorEnTx.mockResolvedValue('30');
+      repository.ajustarCantidadEnTx = jest.fn();
+      const txFalso = { esTransaccion: true } as never;
+
+      await service.ajustarCantidadEnTx(txFalso, { tenantId: 't1', productoId: 'p1', varianteId: 'v1', bodegaId: 'b1', delta: 5, tipo: 'AJUSTE', userId: 'u1' } as never);
+
+      expect(configuracionesService.buscarValorEnTx).toHaveBeenCalledWith(txFalso, 'STOCK_MINIMO_DEFAULT', 't1', '10');
+      expect(configuracionesService.buscarValor).not.toHaveBeenCalled();
+      expect(repository.ajustarCantidadEnTx).toHaveBeenCalledWith(txFalso, expect.objectContaining({ stockMinimoDefault: 30 }));
+    });
+
+    it('transferirStockEnTx también resuelve con la variante EnTx', async () => {
+      configuracionesService.buscarValorEnTx.mockResolvedValue('40');
+      repository.transferirEnTx = jest.fn();
+      const txFalso = { esTransaccion: true } as never;
+
+      await service.transferirStockEnTx(txFalso, {
+        tenantId: 't1',
+        productoId: 'p1',
+        bodegaOrigenId: 'origen',
+        bodegaDestinoId: 'destino',
+        cantidad: 4,
+        userId: 'u1',
+      });
+
+      expect(configuracionesService.buscarValorEnTx).toHaveBeenCalledWith(txFalso, 'STOCK_MINIMO_DEFAULT', 't1', '10');
+      expect(repository.transferirEnTx).toHaveBeenCalledWith(txFalso, expect.objectContaining({ stockMinimoDefault: 40 }));
+    });
+  });
+
   describe('aislamiento de tenant (Stock no tiene tenantId propio)', () => {
     it('verificarYDescontarStock rechaza si el producto no pertenece al tenant actual', async () => {
       productosService.buscarPorId.mockRejectedValue(new Error('No encontrado'));
@@ -261,7 +330,7 @@ describe('InventarioService', () => {
 
     await service.transferirStock(params);
 
-    expect(repository.transferir).toHaveBeenCalledWith({ ...params, varianteId: 'v1' });
+    expect(repository.transferir).toHaveBeenCalledWith({ ...params, varianteId: 'v1', stockMinimoDefault: 10 });
     expect(repository.ajustarCantidad).not.toHaveBeenCalled();
   });
 

@@ -43,6 +43,14 @@ interface ParamsAjuste {
   // promedio queda intacto — comportamiento idéntico al de antes de esta
   // columna. Ver `ajustarCantidadEnTx`.
   costoUnitario?: number;
+  // Parámetro "Stock mínimo por defecto" (plan de integración, catálogo de
+  // configuraciones) — solo tiene efecto la PRIMERA vez que se crea la fila
+  // de `Stock` para esta variante+bodega (columna `stockMinimo`, usada por
+  // las alertas de stock bajo). En entradas siguientes sobre una fila ya
+  // existente, el `UPDATE`/upsert nunca toca `stockMinimo` — no pisa un
+  // valor que el usuario pudo haber ajustado a mano después. Sin este
+  // parámetro, cae al default de columna de Prisma (10).
+  stockMinimoDefault?: number;
 }
 
 interface ParamsDescuento {
@@ -381,7 +389,7 @@ export class InventarioRepository {
    * la factura compartan una sola transacción).
    */
   async ajustarCantidadEnTx(tx: Prisma.TransactionClient, params: ParamsAjuste) {
-    const { tenantId, productoId, varianteId, bodegaId, delta, tipo, userId, motivo, motivoAjuste, referenciaTipo, referenciaId, controlaVencimiento, lotesEntrada, loteIdSalida, costoUnitario } = params;
+    const { tenantId, productoId, varianteId, bodegaId, delta, tipo, userId, motivo, motivoAjuste, referenciaTipo, referenciaId, controlaVencimiento, lotesEntrada, loteIdSalida, costoUnitario, stockMinimoDefault } = params;
     const direccion = delta >= 0 ? 'ENTRADA' : 'SALIDA';
 
     // Motor de costeo (Promedio Ponderado) — solo entra en juego en una
@@ -398,8 +406,8 @@ export class InventarioRepository {
       costoUnitario !== undefined && delta > 0
         ? (
             await tx.$queryRaw<StockRow[]>`
-              INSERT INTO stock (id, "varianteId", "bodegaId", "cantidadActual", "costoPromedio", "updatedAt")
-              VALUES (${randomUUID()}, ${varianteId}, ${bodegaId}, GREATEST(${delta}::numeric, 0), ${costoUnitario}::numeric, now())
+              INSERT INTO stock (id, "varianteId", "bodegaId", "cantidadActual", "costoPromedio", "stockMinimo", "updatedAt")
+              VALUES (${randomUUID()}, ${varianteId}, ${bodegaId}, GREATEST(${delta}::numeric, 0), ${costoUnitario}::numeric, ${stockMinimoDefault ?? 10}::numeric, now())
               ON CONFLICT ("varianteId", "bodegaId") DO UPDATE SET
                 "costoPromedio" = CASE
                   WHEN stock."cantidadActual" <= 0 THEN ${costoUnitario}::numeric
@@ -412,7 +420,7 @@ export class InventarioRepository {
           )[0]
         : await tx.stock.upsert({
             where: { varianteId_bodegaId: { varianteId, bodegaId } },
-            create: { varianteId, bodegaId, cantidadActual: Math.max(delta, 0) },
+            create: { varianteId, bodegaId, cantidadActual: Math.max(delta, 0), ...(stockMinimoDefault !== undefined ? { stockMinimo: stockMinimoDefault } : {}) },
             update: { cantidadActual: { increment: delta } },
           });
 
@@ -552,6 +560,7 @@ export class InventarioRepository {
     cantidad: number;
     userId: string;
     controlaVencimiento?: boolean;
+    stockMinimoDefault?: number;
   }) {
     return this.db.$transaction((tx) => this.transferirEnTx(tx, params));
   }
@@ -573,6 +582,7 @@ export class InventarioRepository {
       cantidad: number;
       userId: string;
       controlaVencimiento?: boolean;
+      stockMinimoDefault?: number;
     },
   ) {
     const origen = await this.descontarStockCondicionalEnTx(tx, {
@@ -606,6 +616,7 @@ export class InventarioRepository {
       userId: params.userId,
       motivo: `Transferencia desde bodega ${params.bodegaOrigenId}`,
       controlaVencimiento: params.controlaVencimiento,
+      stockMinimoDefault: params.stockMinimoDefault,
       lotesEntrada: origen.consumos.map((c) => ({ numeroLote: c.numeroLote, fechaVencimiento: c.fechaVencimiento, cantidad: c.cantidad })),
       // `?? 0` defensivo — `Stock.costoPromedio` tiene @default(0) así que
       // en producción nunca llega null/undefined, pero sin este fallback

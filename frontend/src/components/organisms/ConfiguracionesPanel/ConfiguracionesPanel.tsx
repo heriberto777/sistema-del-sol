@@ -5,6 +5,7 @@ import { Input } from '../../atoms/Input/Input';
 import { Select } from '../../atoms/Select/Select';
 import { Button } from '../../atoms/Button/Button';
 import { Card } from '../../atoms/Card/Card';
+import { Badge } from '../../atoms/Badge/Badge';
 import { FORMATOS_IMPRESION } from '../../../constants/formato-impresion';
 import { PLANTILLAS_DOCUMENTO } from '../../../constants/plantilla-documento';
 
@@ -29,6 +30,14 @@ const CLAVES_CON_PANEL_PROPIO = new Set([
   'AUTORIZACION_2FA_DEVOLUCION',
 ]);
 
+// Plan de parámetros operativos — estas 3 claves no están conectadas a
+// ningún cálculo automático hoy (conectarlas de verdad requiere un flujo
+// de negocio nuevo: tasa reducida por producto, retención al registrar un
+// pago a proveedor — diferido a pedido del usuario, queda para una sesión
+// de diseño aparte). Se marcan acá para que la UI no sugiera un efecto que
+// no existe — cambiar el valor no cambia ningún cálculo todavía.
+const CLAVES_SOLO_REFERENCIA = new Set(['ITBIS_REDUCIDA', 'RETENCION_ISR_TASA', 'RETENCION_ITBIS_TASA']);
+
 function FilaConfiguracion({ configuracion }: { configuracion: Configuracion }) {
   const queryClient = useQueryClient();
   const [valor, setValor] = useState(configuracion.valor);
@@ -42,7 +51,14 @@ function FilaConfiguracion({ configuracion }: { configuracion: Configuracion }) 
 
   return (
     <tr className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-      <td className="px-5 py-3 font-mono text-xs text-slate-700 dark:text-slate-300">{configuracion.clave}</td>
+      <td className="px-5 py-3 font-mono text-xs text-slate-700 dark:text-slate-300">
+        {configuracion.clave}
+        {CLAVES_SOLO_REFERENCIA.has(configuracion.clave) && (
+          <span className="ml-2 inline-block" title="Cambiar este valor no afecta ningún cálculo automático todavía — es solo de referencia.">
+            <Badge tono="neutro">Solo referencia</Badge>
+          </span>
+        )}
+      </td>
       <td className="px-5 py-3">
         {esFormatoImpresion ? (
           <Select value={valor} onChange={(e) => setValor(e.target.value)}>

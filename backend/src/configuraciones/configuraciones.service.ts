@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { ConfiguracionesRepository } from './configuraciones.repository';
 import { PrismaService } from '../prisma/prisma.service';
 import { CONFIGURACIONES_BASE } from '../tenants/roles-base';
@@ -50,6 +51,12 @@ export class ConfiguracionesService {
   /** Único punto donde una Configuracion se lee programáticamente (ver PosService.cerrarTurno) — cae al default si el tenant no la tiene sembrada. */
   async buscarValor(clave: string, tenantId: string, valorDefault: string): Promise<string> {
     const fila = await this.configuracionesRepository.buscarPorClave(clave, tenantId);
+    return fila?.valor ?? valorDefault;
+  }
+
+  /** Para leer desde dentro de una transacción ya abierta — ver ConfiguracionesRepository.buscarPorClaveEnTx. */
+  async buscarValorEnTx(tx: Prisma.TransactionClient, clave: string, tenantId: string, valorDefault: string): Promise<string> {
+    const fila = await this.configuracionesRepository.buscarPorClaveEnTx(tx, clave, tenantId);
     return fila?.valor ?? valorDefault;
   }
 }
