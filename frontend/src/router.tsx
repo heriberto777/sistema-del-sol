@@ -101,6 +101,7 @@ import { GastoMenorVer } from './pages/GastoMenorVer';
 import { Proyectos } from './pages/Proyectos';
 import { Propiedades } from './pages/Propiedades';
 import { MisTareas } from './pages/MisTareas';
+import { Soporte } from './pages/Soporte';
 import { Auditoria } from './pages/Auditoria';
 import { CrmLeads } from './pages/CrmLeads';
 import { CrmPipeline } from './pages/CrmPipeline';
@@ -151,6 +152,7 @@ import { PlatformRoles } from './pages/PlatformRoles';
 import { PlatformAdmins } from './pages/PlatformAdmins';
 import { PlatformFacturas } from './pages/PlatformFacturas';
 import { PlatformActividad } from './pages/PlatformActividad';
+import { PlatformSoporte } from './pages/PlatformSoporte';
 import { PlatformConfiguracion } from './pages/PlatformConfiguracion';
 import { PagarFactura } from './pages/PagarFactura';
 import { PagoExitoso } from './pages/PagoExitoso';
@@ -260,6 +262,7 @@ const RUTAS_ADMIN = [
           { path: '/plataforma/admins', element: <PlatformAdmins /> },
           { path: '/plataforma/facturas', element: <PlatformFacturas /> },
           { path: '/plataforma/actividad', element: <PlatformActividad /> },
+          { path: '/plataforma/soporte', element: <PlatformSoporte /> },
           { path: '/plataforma/configuracion/:tab', element: <PlatformConfiguracion /> },
         ],
       },
@@ -339,6 +342,7 @@ const RUTAS_ADMIN = [
           { path: '/reportes/tienda-online', element: <ReportesTiendaOnline /> },
           { path: '/reportes/retenciones-proveedores', element: <ReportesRetencionesProveedores /> },
           { path: '/mis-tareas', element: <MisTareas /> },
+          { path: '/soporte', element: <Soporte /> },
           { path: '/travel/resumen', element: <TravelResumen /> },
           { path: '/travel/reservas', element: <TravelReservasLista /> },
           { path: '/travel/buscar-vuelo', element: <TravelBuscarVuelo /> },

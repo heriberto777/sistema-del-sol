@@ -535,6 +535,8 @@ export const GRUPO_MI_ESPACIO: GrupoUtilidades = {
     { id: 'notificaciones', etiqueta: 'Notificaciones', ruta: '/notificaciones', permisos: ['notificaciones.ver'] },
     { id: 'mensajes', etiqueta: 'Mensajes', ruta: '/mensajes', permisos: ['whatsapp.mensajes.ver'] },
     { id: 'ia', etiqueta: 'IA', ruta: '/ia', permisos: ['ia.usar'], modulo: 'ia' },
+    // Sin permisos — cualquier usuario autenticado puede reportar (Bloque 4 del backlog UX/operación).
+    { id: 'soporte', etiqueta: 'Soporte', ruta: '/soporte' },
   ],
 };
 

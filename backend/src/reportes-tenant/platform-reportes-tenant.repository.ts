@@ -15,9 +15,20 @@ const INCLUDE_REPORTE = {
 export class PlatformReportesTenantRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  async listar(query: { pagina?: number; tamanoPagina?: number; tenantId?: string; estado?: EstadoReporteTenant }) {
+  async listar(query: { pagina?: number; tamanoPagina?: number; busqueda?: string; tenantId?: string; estado?: EstadoReporteTenant }) {
     const { pagina, tamanoPagina, skip, take } = paginar(query.pagina, query.tamanoPagina);
-    const where = { tenantId: query.tenantId, estado: query.estado };
+    const where = {
+      tenantId: query.tenantId,
+      estado: query.estado,
+      ...(query.busqueda
+        ? {
+            OR: [
+              { asunto: { contains: query.busqueda, mode: 'insensitive' as const } },
+              { tenant: { nombre: { contains: query.busqueda, mode: 'insensitive' as const } } },
+            ],
+          }
+        : {}),
+    };
 
     const [datos, total] = await Promise.all([
       this.prisma.reporteTenant.findMany({ where, include: INCLUDE_REPORTE, orderBy: { createdAt: 'desc' }, skip, take }),

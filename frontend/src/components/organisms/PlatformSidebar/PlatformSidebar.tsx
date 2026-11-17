@@ -6,6 +6,7 @@ import {
   Building2,
   CreditCard,
   LayoutDashboard,
+  LifeBuoy,
   Receipt,
   Settings,
   ShieldCheck,
@@ -15,6 +16,7 @@ import {
 } from 'lucide-react';
 import { usePlatformAuth } from '../../../hooks/usePlatformAuth';
 import { apiClient } from '../../../lib/api-client';
+import { platformApiClient } from '../../../lib/platform-api-client';
 
 interface Enlace {
   ruta: string;
@@ -34,6 +36,7 @@ const ENLACES: Enlace[] = [
   { ruta: '/plataforma/admins', etiqueta: 'Admins', icono: UserCog, permiso: 'platform.admins.ver' },
   { ruta: '/plataforma/roles', etiqueta: 'Roles', icono: ShieldCheck, permiso: 'platform.roles.ver' },
   { ruta: '/plataforma/actividad', etiqueta: 'Actividad', icono: Activity, permiso: 'platform.auditoria.ver' },
+  { ruta: '/plataforma/soporte', etiqueta: 'Soporte', icono: LifeBuoy, permiso: 'platform.soporte.gestionar' },
   {
     ruta: '/plataforma/configuracion/general',
     etiqueta: 'Configuración',
@@ -47,13 +50,14 @@ const ENLACES: Enlace[] = [
  * Sidebar de Plataforma (ítem "estilo y navegación") — mismo patrón
  * visual que el Sidebar de tenant (`components/organisms/Sidebar`),
  * reemplaza al nav horizontal de PlatformHeader. Sin grupos
- * colapsables a propósito: solo 7 enlaces, no hace falta la jerarquía
+ * colapsables a propósito: pocos enlaces, no hace falta la jerarquía
  * que sí necesita el lado tenant.
  */
 export function PlatformSidebar({ onNavegar }: { onNavegar?: () => void } = {}) {
   const { tienePermiso } = usePlatformAuth();
   const location = useLocation();
   const enlacesVisibles = ENLACES.filter((enlace) => !enlace.permiso || tienePermiso(enlace.permiso));
+  const puedeVerSoporte = tienePermiso('platform.soporte.gestionar');
 
   // Mismo endpoint público que Login.tsx (GET /platform/branding) — acá
   // ya hay sesión, pero no hace falta un endpoint protegido aparte.
@@ -61,6 +65,14 @@ export function PlatformSidebar({ onNavegar }: { onNavegar?: () => void } = {}) 
     queryKey: ['platform-branding'],
     queryFn: async () => (await apiClient.get<{ logo: string | null }>('/platform/branding')).data,
     staleTime: 5 * 60 * 1000,
+  });
+
+  const { data: reportesNuevos } = useQuery({
+    queryKey: ['platform-reportes-tenant-contador-nuevos'],
+    queryFn: async () => (await platformApiClient.get<number>('/platform/reportes-tenant/contador-nuevos')).data,
+    enabled: puedeVerSoporte,
+    staleTime: 60 * 1000,
+    refetchInterval: 60 * 1000,
   });
 
   const enlaceClase = ({ isActive }: { isActive: boolean }) =>
@@ -92,7 +104,12 @@ export function PlatformSidebar({ onNavegar }: { onNavegar?: () => void } = {}) 
           return (
             <NavLink key={enlace.ruta} to={enlace.ruta} className={enlaceClase} onClick={onNavegar}>
               <enlace.icono size={17} className="shrink-0" />
-              {enlace.etiqueta}
+              <span className="flex-1">{enlace.etiqueta}</span>
+              {enlace.ruta === '/plataforma/soporte' && !!reportesNuevos && (
+                <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[11px] font-semibold text-white">
+                  {reportesNuevos > 99 ? '99+' : reportesNuevos}
+                </span>
+              )}
             </NavLink>
           );
         }
