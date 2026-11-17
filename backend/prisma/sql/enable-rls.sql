@@ -26,7 +26,7 @@ BEGIN
       'webhooks',
       'notificacion_plantillas', 'notificaciones',
       'cotizaciones', 'remisiones',
-      'cuentas_contables', 'asientos_contables', 'periodos_contables_cerrados',
+      'cuentas_contables', 'asientos_contables', 'periodos_contables',
       'empleados', 'periodos_nomina', 'turnos_caja',
       'devolucion_compra',
       'cuentas_bancarias', 'gastos_menores',
