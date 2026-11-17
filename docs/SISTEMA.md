@@ -223,13 +223,22 @@ resto está siempre disponible (sujeto solo a permisos).
 ### Finanzas, nómina y reportes
 
 - **`contabilidad`** — Partida doble (catálogo de cuentas, asientos,
-  líneas), estados financieros y cierre de período. Modelos:
-  `CuentaContable, AsientoContable, LineaAsiento,
-  PeriodoContableCerrado`. Nadie la importa directo — el resto de los
-  módulos de venta/compra le generan asientos vía Event Bus
+  líneas), estados financieros, y un catálogo real de Período Contable
+  mensual (`CuentaContable, AsientoContable, LineaAsiento,
+  PeriodoContable` — ABIERTO/CERRADO, uno por mes natural, creado solo
+  por `TenantsRepository.crearConProvisioning`/backfill/
+  `PeriodosContablesCronService`, nunca a mano). `CierrePeriodoService.
+  validarPeriodoAbierto` bloquea asientos/pagos/gastos/facturas/
+  recepciones/nómina con fecha dentro de un período ya `CERRADO` — ver
+  ARCHITECTURE.md, "Cierre de período" para el detalle completo
+  (Facturación/POS/Compras/Nómina nunca traen fecha manual, así que ahí
+  solo protege contra cerrar por error el mes en curso). Nadie importa
+  `ContabilidadModule` directo salvo los módulos que necesitan esa
+  validación o generar asientos manuales — el resto de los módulos de
+  venta/compra le generan asientos vía Event Bus
   (`ContabilidadEventosService`). **Siempre activa**, nunca
   `@RequiereModulo`. Permiso base: `contabilidad.ver` / `.editar` /
-  `.anular` / `.conciliar`.
+  `.anular` / `.conciliar` / `.cerrarperiodo`.
 - **`bancos`** — Cuentas bancarias y conciliación. Plugin (`bancos`).
   Permiso base: `bancos.ver` / `.editar`.
 - **`gastos-menores`** — Caja chica, con comprobante de compra al

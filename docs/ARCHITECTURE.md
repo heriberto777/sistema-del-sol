@@ -2873,20 +2873,79 @@ dos veces. `anulado` es puramente informativo (badge en el listado).
 Solo se puede anular un asiento de origen `MANUAL`/`GASTO` (los que crea
 directamente el usuario) — los automáticos ya tienen su propio mecanismo
 de reversa atado al documento que los originó, y `CIERRE` nunca se toca
-directamente. Respeta el cierre de período: no se puede anular un
-asiento fechado en o antes del último cierre.
+directamente. Respeta el período contable: no se puede anular un
+asiento cuya fecha caiga dentro de un `PeriodoContable` ya `CERRADO`
+(ver abajo).
+
+**Período Contable** (modelo `PeriodoContable`, un registro por mes
+natural de calendario, `estado` `ABIERTO`/`CERRADO`) reemplazó al viejo
+`PeriodoContableCerrado` (un simple marcador de "última fecha de
+cierre", sin catálogo real de meses). Un tenant nuevo recibe su primer
+período en `TenantsRepository.crearConProvisioning`; uno con historial
+previo a esta feature lo recibe vía
+`pnpm --filter ./backend periodos-contables:backfill` (idempotente,
+`fechaInicio` fija en el epoch — arrastra todo lo acumulado desde
+siempre, igual semántica que el viejo cierre "desde el inicio").
+`PeriodosContablesCronService` (diario, `PrismaService` global sin
+contexto de tenant, mismo patrón que `RecordatoriosService`) crea el
+período del mes siguiente 5 días antes de que termine el actual, para
+que nunca haga falta acordarse a mano — sin esto, facturar/vender en
+POS/recibir una compra/pagar nómina se detendría el día 1 del mes
+siguiente (ver más abajo por qué esos 4 módulos son especialmente
+sensibles a quedarse sin período).
+
+Los límites de cada período (`rangoDelMes`/`rangoDelMesSiguiente`,
+`periodos-contables.util.ts`) se calculan en **UTC, a propósito** — todo
+el resto del sistema parsea una fecha suelta del DTO (`dto.fecha`) con
+`new Date('YYYY-MM-DD')`, que JS interpreta como medianoche UTC; si los
+límites del período se calcularan en hora local, una fecha cerca de
+medianoche podía caer en el mes equivocado y rechazar un asiento válido
+(bug real encontrado en e2e). Mezclar las dos convenciones en este
+punto es el error más fácil de reintroducir si se toca este código —
+cualquier cálculo de rango de mes nuevo debe usar `Date.UTC(...)`, no
+los getters locales.
+
+**`CierrePeriodoService.validarPeriodoAbierto(fecha)`** es el único
+punto donde se valida una fecha contra el período contable: busca el
+`PeriodoContable` que cubre esa fecha y rechaza si no existe o si está
+`CERRADO`. Dos clases de llamadores, con semántica distinta:
+
+- **Fecha manual retroactiva real** — `AsientosContablesService`
+  (`crear`/`anular`), `GastosMenoresService.crear`,
+  `FacturasProveedorService.crear`, `PagosService` (los 3 puntos donde
+  registra un pago): son las únicas rutas de negocio donde el usuario
+  puede elegir una fecha pasada (`Pago.fecha`, `GastoMenor.fecha`, etc.
+  no tienen default `now()`). Validan contra esa fecha elegida; al
+  anular, contra la fecha ORIGINAL del asiento, no contra "ahora".
+- **Siempre "ahora", Fase 2** — `FacturacionService` (`crear`/`anular`,
+  POS lo hereda gratis al reusar `crear()`), `ComprasService`
+  (`recibir`/`devolver`), `PeriodosNominaService.marcarPagado`: ninguno
+  de estos tiene fecha manual en su DTO (`Factura.fecha`/
+  `RecepcionCompra.fecha` son `DateTime @default(now())`), así que la
+  validación ahí solo puede rechazar si se cerró por error el período
+  que cubre hoy — nunca por backdating. `anular()`/`devolver()` validan
+  contra la fecha ORIGINAL del documento que reversan, salvo
+  `ComprasService.devolver()`: crea un registro NUEVO (`DevolucionCompra`,
+  no reversa el mismo registro, mismo criterio que una Nota de Crédito),
+  así que valida contra "ahora".
+
+Precisamente porque esos 4 módulos de Fase 2 nunca traen fecha manual,
+`cerrarPeriodo()` tiene un guardarraíl explícito: **no se puede cerrar
+un período cuyo `fechaFin` todavía no pasó** (el mes en curso, o uno
+futuro). Sin este guardarraíl, cerrar por error el período que cubre
+"hoy" bloquearía instantáneamente Facturación/POS/Compras/Nómina hasta
+el día 1 del mes siguiente, sin ningún endpoint de reapertura — un
+riesgo mucho más grave que el de los 4 llamadores originales (ajustes
+contables que un contador entiende y puede re-fechar al mes siguiente).
 
 **Cierre de período** (`CierrePeriodoService.cerrarPeriodo`,
 `POST /contabilidad/cierre-periodo`, permiso `contabilidad.cerrarperiodo`):
-traspasa el saldo neto de INGRESO/GASTO acumulado hasta la fecha de
-corte a Utilidades Retenidas. `validarFechaAbierta` (método público,
-único punto donde se valida una fecha contra el último cierre) la usan
-`AsientosContablesService` (`crear`/`crearGasto`/`anular`) y
-`PagosService`/`GastosMenoresService` — estas dos últimas son las
-**únicas rutas de negocio con fecha manual retroactiva** (`Pago.fecha`,
-`GastoMenor.fecha`); Facturación/Compras/Nómina siempre generan su
-asiento con la fecha de "ahora", así que nunca caen dentro de un período
-ya cerrado en la práctica y no necesitan esta validación.
+cierra el `ABIERTO` más antiguo (nunca uno arbitrario — evita huecos sin
+período) y traspasa el saldo neto de INGRESO/GASTO de ESE rango exacto
+a Utilidades Retenidas, con un asiento automático (origen `CIERRE`). Si
+el período siguiente todavía no existe (se cerró antes de que el cron lo
+creara), lo crea en el mismo paso — cerrar nunca deja un hueco que
+bloquee la operación del día siguiente.
 
 **Conciliación bancaria manual** (`EstadosFinancierosService.conciliacionBancaria`/
 `marcarLineaConciliada`, `GET/PATCH /contabilidad/conciliacion/...`,
