@@ -56,7 +56,8 @@ BEGIN
       'recibos_ingreso', 'ordenes_pago',
       'gestiones_cobro', 'provisiones_incobrables',
       'facturas_proveedor',
-      'comentarios_documento'
+      'comentarios_documento',
+      'reportes_tenant'
     ])
   LOOP
     EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY;', tabla);

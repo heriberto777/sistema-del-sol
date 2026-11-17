@@ -20,6 +20,7 @@ export const PERMISOS_PLATAFORMA_BASE = [
   'platform.pagos.registrar',
   'platform.configuracion.ver',
   'platform.configuracion.gestionar',
+  'platform.soporte.gestionar',
 ];
 
 export const ROLES_PLATAFORMA_BASE: Record<string, string[]> = {
@@ -33,5 +34,5 @@ export const ROLES_PLATAFORMA_BASE: Record<string, string[]> = {
     'platform.facturacion.gestionar',
     'platform.pagos.registrar',
   ],
-  Soporte: ['platform.tenants.ver', 'platform.planes.ver', 'platform.auditoria.ver', 'platform.facturacion.ver'],
+  Soporte: ['platform.tenants.ver', 'platform.planes.ver', 'platform.auditoria.ver', 'platform.facturacion.ver', 'platform.soporte.gestionar'],
 };

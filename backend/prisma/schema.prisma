@@ -167,6 +167,7 @@ model Tenant {
   cuentasPorPagar            CuentaPorPagar[]
   facturasProveedor          FacturaProveedor[]
   comentariosDocumento       ComentarioDocumento[]
+  reportesTenant             ReporteTenant[]
 
   @@map("tenants")
 }
@@ -189,6 +190,7 @@ model PlatformAdmin {
 
   auditLogs                  PlatformAuditLog[]
   pagosPlataformaRegistrados PagoPlataforma[]
+  reportesTenantRespondidos  ReporteTenant[]
 
   @@map("platform_admins")
 }
@@ -818,6 +820,7 @@ model User {
   comentariosTareaPersonal              ComentarioTareaPersonal[]
   comentariosDocumento                  ComentarioDocumento[]      @relation("ComentarioDocumentoAutor")
   comentariosDocumentoMencionado         ComentarioDocumento[]      @relation("ComentarioDocumentoMencionado")
+  reportesTenant                         ReporteTenant[]
 
   @@unique([tenantId, email])
   @@map("users")
@@ -5776,4 +5779,47 @@ model MetaVentaCrm {
 
   @@unique([tenantId, vendedorId, anio, mes])
   @@map("crm_metas_venta")
+}
+
+enum CategoriaReporteTenant {
+  BUG
+  DUDA
+  SOLICITUD
+  OTRO
+}
+
+enum EstadoReporteTenant {
+  NUEVO
+  EN_REVISION
+  RESUELTO
+}
+
+/// Canal para que un usuario del tenant le reporte un problema o duda a
+/// la plataforma (super admin) — v1 deliberadamente liviano, sin
+/// notificación por email ni SLA: el super admin ve los pendientes por
+/// un contador en PlatformSidebar (`estado: NUEVO`, ver
+/// PlatformReportesTenantRepository.contarNuevos). Cualquier usuario
+/// autenticado del tenant puede crear uno, sin permiso nuevo — mismo
+/// criterio que GRUPO_MI_ESPACIO en el frontend (utilidad personal, no
+/// un módulo de negocio).
+model ReporteTenant {
+  id              String                 @id @default(uuid())
+  tenantId        String
+  tenant          Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  usuarioId       String
+  usuario         User                   @relation(fields: [usuarioId], references: [id])
+  asunto          String
+  descripcion     String                 @db.Text
+  categoria       CategoriaReporteTenant
+  estado          EstadoReporteTenant    @default(NUEVO)
+  respuesta       String?                @db.Text
+  respondidoPorId String?
+  // SetNull: borrar el admin de plataforma que respondió no debe hacer
+  // desaparecer la respuesta ya dada — mismo criterio que
+  // PlatformAuditLog.adminId.
+  respondidoPor   PlatformAdmin?         @relation(fields: [respondidoPorId], references: [id], onDelete: SetNull)
+  respondidoEn    DateTime?
+  createdAt       DateTime               @default(now())
+
+  @@map("reportes_tenant")
 }

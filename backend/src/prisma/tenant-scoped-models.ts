@@ -143,6 +143,7 @@ export const TENANT_SCOPED_MODELS = new Set([
   'OrdenPago',
   'GestionCobro',
   'ProvisionIncobrable',
+  'ReporteTenant',
   // Fase 5 (CxP) — `FacturaProveedorLinea` queda AFUERA a propósito, mismo
   // criterio que LineaGastoMenor: no tiene tenantId propio, su aislamiento
   // depende de llegar siempre vía una FacturaProveedor ya resuelta.
