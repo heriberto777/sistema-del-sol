@@ -32,13 +32,19 @@ import { InventarioStock } from './pages/inventario/InventarioStock';
 import { InventarioAjustes } from './pages/inventario/InventarioAjustes';
 import { InventarioTransferencias } from './pages/inventario/InventarioTransferencias';
 import { InventarioAjusteNuevo } from './pages/InventarioAjusteNuevo';
+import { InventarioAjusteVer } from './pages/InventarioAjusteVer';
 import { InventarioTransferenciaNueva } from './pages/InventarioTransferenciaNueva';
+import { InventarioTransferenciaVer } from './pages/InventarioTransferenciaVer';
+import { BancoNuevo } from './pages/BancoNuevo';
+import { BancoVer } from './pages/BancoVer';
 import { Conteos } from './pages/Conteos';
 import { InventarioConteoNuevo } from './pages/InventarioConteoNuevo';
 import { ConteoDetalle } from './pages/ConteoDetalle';
 import { InventarioAlertas } from './pages/InventarioAlertas';
 import { ConfiguracionInventario } from './pages/ConfiguracionInventario';
 import { Sucursales } from './pages/Sucursales';
+import { SucursalNueva } from './pages/SucursalNueva';
+import { SucursalVer } from './pages/SucursalVer';
 import { Compras } from './pages/Compras';
 import { OrdenCompraNueva } from './pages/OrdenCompraNueva';
 import { Clientes } from './pages/Clientes';
@@ -67,6 +73,7 @@ import { ReportesPublicacionesSociales } from './pages/reportes/ReportesPublicac
 import { ReportesTiendaOnline } from './pages/reportes/ReportesTiendaOnline';
 import { ReportesRetencionesProveedores } from './pages/reportes/ReportesRetencionesProveedores';
 import { ContabilidadCuentas } from './pages/contabilidad/ContabilidadCuentas';
+import { CatalogoCuentaNueva } from './pages/CatalogoCuentaNueva';
 import { ContabilidadAsientos } from './pages/contabilidad/ContabilidadAsientos';
 import { AsientoContableNuevo } from './pages/AsientoContableNuevo';
 import { ContabilidadGastoRapido } from './pages/contabilidad/ContabilidadGastoRapido';
@@ -80,12 +87,16 @@ import { ContabilidadFiscal } from './pages/contabilidad/ContabilidadFiscal';
 import { NominaEmpleados } from './pages/nomina/NominaEmpleados';
 import { NominaPeriodos } from './pages/nomina/NominaPeriodos';
 import { NominaRetenciones } from './pages/nomina/NominaRetenciones';
+import { NominaReciboVer } from './pages/NominaReciboVer';
 import { Puestos } from './pages/Puestos';
 import { PlantillasHorario } from './pages/PlantillasHorario';
+import { PlantillaHorarioDias } from './pages/PlantillaHorarioDias';
 import { Feriados } from './pages/Feriados';
 import { TiposAusencia } from './pages/TiposAusencia';
 import { Asistencia } from './pages/Asistencia';
+import { AsistenciaNueva } from './pages/AsistenciaNueva';
 import { Ausencias } from './pages/Ausencias';
+import { AusenciaNueva } from './pages/AusenciaNueva';
 import { HorariosEmpleado } from './pages/HorariosEmpleado';
 import { Pos } from './pages/Pos';
 import { PosCaja } from './pages/PosCaja';
@@ -122,6 +133,7 @@ import { PropiedadesFavoritas } from './pages/inmobiliaria/PropiedadesFavoritas'
 import { ProyectoDetalle } from './pages/ProyectoDetalle';
 import { PublicacionesSociales } from './pages/PublicacionesSociales';
 import { TiendaOnlineSecciones } from './pages/tienda-online/TiendaOnlineSecciones';
+import { SeccionTiendaVer } from './pages/tienda-online/SeccionTiendaVer';
 import { TiendaOnlinePedidos } from './pages/tienda-online/TiendaOnlinePedidos';
 import { TiendaOnlineConfiguracion } from './pages/tienda-online/TiendaOnlineConfiguracion';
 import { Usuarios } from './pages/Usuarios';
@@ -131,6 +143,7 @@ import { Reportes } from './pages/Reportes';
 import { DatosEmpresa } from './pages/DatosEmpresa';
 import { Ncf } from './pages/Ncf';
 import { Consecutivos } from './pages/Consecutivos';
+import { ConsecutivoVer } from './pages/ConsecutivoVer';
 import { Autorizaciones } from './pages/Autorizaciones';
 import { PasarelaPago } from './pages/PasarelaPago';
 import { CategoriasCliente } from './pages/CategoriasCliente';
@@ -140,6 +153,8 @@ import { TasasCambio } from './pages/TasasCambio';
 import { Parametros } from './pages/Parametros';
 import { Documentos } from './pages/Documentos';
 import { Webhooks } from './pages/Webhooks';
+import { WebhookNuevo } from './pages/WebhookNuevo';
+import { WebhookEntregas } from './pages/WebhookEntregas';
 import { WhatsappConfig } from './pages/WhatsappConfig';
 import { TravelConfig } from './pages/TravelConfig';
 import { CorreoConfig } from './pages/CorreoConfig';
@@ -304,14 +319,18 @@ const RUTAS_ADMIN = [
           { path: '/inventario/stock', element: <InventarioStock /> },
           { path: '/inventario/ajustes', element: <InventarioAjustes /> },
           { path: '/inventario/ajustes/nuevo', element: <InventarioAjusteNuevo /> },
+          { path: '/inventario/ajustes/:id', element: <InventarioAjusteVer /> },
           { path: '/inventario/transferencias', element: <InventarioTransferencias /> },
           { path: '/inventario/transferencias/nuevo', element: <InventarioTransferenciaNueva /> },
+          { path: '/inventario/transferencias/:id', element: <InventarioTransferenciaVer /> },
           { path: '/inventario/conteos', element: <Conteos /> },
           { path: '/inventario/conteos/nuevo', element: <InventarioConteoNuevo /> },
           { path: '/inventario/conteos/:id', element: <ConteoDetalle /> },
           { path: '/inventario/alertas', element: <InventarioAlertas /> },
           { path: '/inventario/configuracion', element: <ConfiguracionInventario /> },
           { path: '/sucursales', element: <Sucursales /> },
+          { path: '/sucursales/nueva', element: <SucursalNueva /> },
+          { path: '/sucursales/:id', element: <SucursalVer /> },
           { path: '/compras', element: <Compras /> },
           { path: '/compras/nueva', element: <OrdenCompraNueva /> },
           { path: '/clientes', element: <Clientes /> },
@@ -349,6 +368,7 @@ const RUTAS_ADMIN = [
           { path: '/travel/buscar-hotel', element: <TravelBuscarHotel /> },
           { path: '/travel/markup', element: <TravelMarkup /> },
           { path: '/contabilidad/cuentas', element: <ContabilidadCuentas /> },
+          { path: '/contabilidad/cuentas/nueva', element: <CatalogoCuentaNueva /> },
           { path: '/contabilidad/asientos', element: <ContabilidadAsientos /> },
           { path: '/contabilidad/asientos/nuevo', element: <AsientoContableNuevo /> },
           { path: '/contabilidad/gasto-rapido', element: <ContabilidadGastoRapido /> },
@@ -360,6 +380,8 @@ const RUTAS_ADMIN = [
           { path: '/contabilidad/cierre', element: <ContabilidadCierre /> },
           { path: '/contabilidad/fiscal', element: <ContabilidadFiscal /> },
           { path: '/bancos', element: <Bancos /> },
+          { path: '/bancos/nuevo', element: <BancoNuevo /> },
+          { path: '/bancos/:id', element: <BancoVer /> },
           { path: '/gastos-menores', element: <GastosMenores /> },
           { path: '/gastos-menores/nuevo', element: <GastoMenorNuevo /> },
           { path: '/gastos-menores/:id', element: <GastoMenorVer /> },
@@ -370,17 +392,23 @@ const RUTAS_ADMIN = [
           { path: '/alquileres', element: <CobrosAlquiler /> },
           { path: '/publicaciones-sociales', element: <PublicacionesSociales /> },
           { path: '/tienda-online/secciones', element: <TiendaOnlineSecciones /> },
+          { path: '/tienda-online/secciones/nueva', element: <SeccionTiendaVer /> },
+          { path: '/tienda-online/secciones/:id', element: <SeccionTiendaVer /> },
           { path: '/tienda-online/pedidos', element: <TiendaOnlinePedidos /> },
           { path: '/tienda-online/configuracion/:seccion', element: <TiendaOnlineConfiguracion /> },
           { path: '/nomina/empleados', element: <NominaEmpleados /> },
           { path: '/nomina/periodos', element: <NominaPeriodos /> },
+          { path: '/nomina/periodos/:periodoId/recibos/:reciboId', element: <NominaReciboVer /> },
           { path: '/nomina/retenciones', element: <NominaRetenciones /> },
           { path: '/puestos', element: <Puestos /> },
           { path: '/plantillas-horario', element: <PlantillasHorario /> },
+          { path: '/plantillas-horario/:id/dias', element: <PlantillaHorarioDias /> },
           { path: '/feriados', element: <Feriados /> },
           { path: '/tipos-ausencia', element: <TiposAusencia /> },
           { path: '/asistencia', element: <Asistencia /> },
+          { path: '/asistencia/nueva', element: <AsistenciaNueva /> },
           { path: '/ausencias', element: <Ausencias /> },
+          { path: '/ausencias/nueva', element: <AusenciaNueva /> },
           { path: '/horarios-empleado', element: <HorariosEmpleado /> },
           { path: '/pos', element: <Pos /> },
           { path: '/ia', element: <Ia /> },
@@ -399,11 +427,14 @@ const RUTAS_ADMIN = [
           { path: '/datos-empresa', element: <DatosEmpresa /> },
           { path: '/ncf', element: <Ncf /> },
           { path: '/consecutivos', element: <Consecutivos /> },
+          { path: '/consecutivos/:tipo', element: <ConsecutivoVer /> },
           { path: '/autorizaciones', element: <Autorizaciones /> },
           { path: '/pasarela-pago', element: <PasarelaPago /> },
           { path: '/parametros', element: <Parametros /> },
           { path: '/documentos', element: <Documentos /> },
           { path: '/webhooks', element: <Webhooks /> },
+          { path: '/webhooks/nuevo', element: <WebhookNuevo /> },
+          { path: '/webhooks/:id/entregas', element: <WebhookEntregas /> },
           { path: '/auditoria/:tab', element: <Auditoria /> },
           { path: '/crm/leads', element: <CrmLeads /> },
           { path: '/crm/pipeline', element: <CrmPipeline /> },

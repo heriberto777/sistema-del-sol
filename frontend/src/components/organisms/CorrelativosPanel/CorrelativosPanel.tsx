@@ -1,11 +1,8 @@
-import { FormEvent, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../../../lib/api-client';
-import { mensajeErrorApi } from '../../../lib/mensaje-error-api';
 import { Button } from '../../atoms/Button/Button';
 import { Card } from '../../atoms/Card/Card';
-import { FormField } from '../../molecules/FormField/FormField';
-import { Modal } from '../../molecules/Modal/Modal';
 
 type TipoCorrelativo = 'COTIZACION' | 'REMISION' | 'ORDEN_COMPRA' | 'CAJA' | 'PRODUCTO' | 'CUENTA_CONTABLE' | 'FACTURA' | 'AJUSTE' | 'TRANSFERENCIA';
 
@@ -41,7 +38,7 @@ const ETIQUETA_TIPO: Record<TipoCorrelativo, string> = {
  * en sus propios formularios (el campo sigue aceptando texto libre).
  */
 export function CorrelativosPanel() {
-  const [editando, setEditando] = useState<Correlativo | null>(null);
+  const navigate = useNavigate();
 
   const { data: correlativos } = useQuery({
     queryKey: ['admin-correlativos'],
@@ -78,7 +75,7 @@ export function CorrelativosPanel() {
                   {String(c.siguienteNumero).padStart(c.digitos, '0')}
                 </td>
                 <td className="px-5 py-3 text-right">
-                  <Button variante="secundario" onClick={() => setEditando(c)}>
+                  <Button variante="secundario" onClick={() => navigate(`/consecutivos/${c.tipo}`)}>
                     Editar
                   </Button>
                 </td>
@@ -87,66 +84,6 @@ export function CorrelativosPanel() {
           </tbody>
         </table>
       </div>
-
-      {editando && <ModalEditarCorrelativo correlativo={editando} onClose={() => setEditando(null)} />}
     </Card>
-  );
-}
-
-function ModalEditarCorrelativo({ correlativo, onClose }: { correlativo: Correlativo; onClose: () => void }) {
-  const queryClient = useQueryClient();
-  const [prefijo, setPrefijo] = useState(correlativo.prefijo);
-  const [siguienteNumero, setSiguienteNumero] = useState(String(correlativo.siguienteNumero));
-  const [digitos, setDigitos] = useState(String(correlativo.digitos));
-  const [error, setError] = useState<string | null>(null);
-
-  const guardar = useMutation({
-    mutationFn: async () =>
-      apiClient.patch(`/admin/correlativos/${correlativo.tipo}`, {
-        prefijo,
-        siguienteNumero: Number(siguienteNumero),
-        digitos: Number(digitos),
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin-correlativos'] });
-      onClose();
-    },
-    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo guardar el consecutivo.')),
-  });
-
-  function onSubmit(e: FormEvent) {
-    e.preventDefault();
-    setError(null);
-    guardar.mutate();
-  }
-
-  return (
-    <Modal titulo={`Editar consecutivo — ${ETIQUETA_TIPO[correlativo.tipo]}`} onClose={onClose}>
-      <form onSubmit={onSubmit} className="space-y-3">
-        <FormField id="correlativo-prefijo" label="Prefijo (opcional)" value={prefijo} onChange={(e) => setPrefijo(e.target.value)} />
-        <FormField
-          id="correlativo-siguiente"
-          label="Próximo número a asignar (no el último usado)"
-          type="number"
-          min={1}
-          value={siguienteNumero}
-          onChange={(e) => setSiguienteNumero(e.target.value)}
-          required
-        />
-        <FormField
-          id="correlativo-digitos"
-          label="Dígitos (padding con ceros a la izquierda)"
-          type="number"
-          min={1}
-          value={digitos}
-          onChange={(e) => setDigitos(e.target.value)}
-          required
-        />
-        {error && <p className="text-sm text-red-600">{error}</p>}
-        <Button type="submit" disabled={guardar.isPending} className="w-full">
-          {guardar.isPending ? 'Guardando…' : 'Guardar'}
-        </Button>
-      </form>
-    </Modal>
   );
 }

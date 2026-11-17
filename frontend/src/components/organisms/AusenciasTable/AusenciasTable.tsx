@@ -1,24 +1,13 @@
-import { FormEvent, useState } from 'react';
-import { User } from 'lucide-react';
+import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../../../lib/api-client';
 import { Badge } from '../../atoms/Badge/Badge';
 import { Button } from '../../atoms/Button/Button';
 import { Card } from '../../atoms/Card/Card';
-import { FormField } from '../../molecules/FormField/FormField';
-import { Modal } from '../../molecules/Modal/Modal';
 import { Paginacion } from '../../molecules/Paginacion/Paginacion';
-import { ComboboxBusqueda } from '../../molecules/ComboboxBusqueda/ComboboxBusqueda';
-import { Select } from '../../atoms/Select/Select';
 import { useAuth } from '../../../hooks/useAuth';
 import { PaginaResultado } from '../../../types/pagina-resultado';
-import { useTiposAusenciaConfig } from '../../../hooks/useTiposAusenciaConfig';
-
-interface Empleado {
-  id: string;
-  nombre: string;
-  cedula: string;
-}
 
 type TipoAusencia = 'VACACIONES' | 'ENFERMEDAD' | 'PERMISO' | 'INJUSTIFICADA' | 'MATERNIDAD_PATERNIDAD' | 'OTRO';
 type EstadoAusencia = 'SOLICITADA' | 'APROBADA' | 'RECHAZADA';
@@ -54,10 +43,10 @@ function formatearFecha(fecha: string) {
 }
 
 export function AusenciasTable() {
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { tienePermiso } = useAuth();
   const [pagina, setPagina] = useState(1);
-  const [modalNueva, setModalNueva] = useState(false);
 
   const { data, isLoading, error: errorCarga } = useQuery({
     queryKey: ['rrhh-ausencias', pagina],
@@ -73,7 +62,7 @@ export function AusenciasTable() {
   return (
     <div className="space-y-4">
       <div className="flex justify-end">
-        {tienePermiso('rrhh.editar') && <Button onClick={() => setModalNueva(true)}>Solicitar ausencia</Button>}
+        {tienePermiso('rrhh.editar') && <Button onClick={() => navigate('/ausencias/nueva')}>Solicitar ausencia</Button>}
       </div>
 
       <Card sinPadding titulo="Ausencias" descripcion={data ? `${data.total} solicitud(es)` : undefined}>
@@ -142,147 +131,6 @@ export function AusenciasTable() {
           </div>
         )}
       </Card>
-
-      {modalNueva && (
-        <ModalSolicitarAusencia
-          onClose={() => setModalNueva(false)}
-          onCreada={() => queryClient.invalidateQueries({ queryKey: ['rrhh-ausencias'] })}
-        />
-      )}
     </div>
-  );
-}
-
-const CON_GOCE_POR_DEFECTO: Record<TipoAusencia, boolean> = {
-  VACACIONES: true,
-  ENFERMEDAD: true,
-  PERMISO: true,
-  MATERNIDAD_PATERNIDAD: true,
-  INJUSTIFICADA: false,
-  OTRO: true,
-};
-
-interface BalanceVacaciones {
-  aniosCompletos: number;
-  diasAcumulados: number;
-  diasDisponibles: number;
-  diasPagoPorAntiguedad: number;
-}
-
-function ModalSolicitarAusencia({ onClose, onCreada }: { onClose: () => void; onCreada: () => void }) {
-  const { data: tiposConfig } = useTiposAusenciaConfig();
-  const [empleado, setEmpleado] = useState<Empleado | null>(null);
-  const [tipo, setTipo] = useState<TipoAusencia>('VACACIONES');
-  const [fechaDesde, setFechaDesde] = useState('');
-  const [fechaHasta, setFechaHasta] = useState('');
-  const [conGoceDeSueldo, setConGoceDeSueldo] = useState(true);
-  const [motivo, setMotivo] = useState('');
-  const [error, setError] = useState<string | null>(null);
-
-  const tiposActivos = (Object.keys(ETIQUETAS_TIPO) as TipoAusencia[]).filter(
-    (t) => (tiposConfig?.find((c) => c.tipo === t)?.activo ?? true),
-  );
-  const configTipoActual = tiposConfig?.find((c) => c.tipo === tipo);
-
-  const { data: balance } = useQuery({
-    queryKey: ['rrhh-balance-vacaciones', empleado?.id],
-    queryFn: async () => (await apiClient.get<BalanceVacaciones>(`/nomina/empleados/${empleado!.id}/balance-vacaciones`)).data,
-    enabled: !!empleado && tipo === 'VACACIONES',
-  });
-
-  const crear = useMutation({
-    mutationFn: async () =>
-      apiClient.post('/nomina/ausencias', {
-        empleadoId: empleado!.id,
-        tipo,
-        fechaDesde,
-        fechaHasta,
-        conGoceDeSueldo,
-        motivo: motivo || undefined,
-      }),
-    onSuccess: () => {
-      onCreada();
-      onClose();
-    },
-    onError: (e: unknown) => {
-      const mensaje = (e as { response?: { data?: { message?: string } } })?.response?.data?.message;
-      setError(mensaje ?? 'No se pudo registrar la solicitud.');
-    },
-  });
-
-  function onSubmit(e: FormEvent) {
-    e.preventDefault();
-    setError(null);
-    if (!empleado) {
-      setError('Seleccioná un empleado.');
-      return;
-    }
-    crear.mutate();
-  }
-
-  return (
-    <Modal titulo="Solicitar ausencia" onClose={onClose}>
-      <form onSubmit={onSubmit} className="space-y-3">
-        <div className="flex flex-col gap-1">
-          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Empleado</label>
-          <ComboboxBusqueda<Empleado>
-            valor={empleado}
-            onSeleccionar={setEmpleado}
-            buscar={async (texto) =>
-              (await apiClient.get<PaginaResultado<Empleado>>('/nomina/empleados', { params: { busqueda: texto, tamanoPagina: 20 } })).data
-                .datos
-            }
-            obtenerId={(e) => e.id}
-            obtenerEtiqueta={(e) => `${e.nombre} — ${e.cedula}`}
-            placeholder="Buscar empleado por nombre o cédula…"
-            icono={<User size={15} />}
-          />
-        </div>
-        <div className="flex flex-col gap-1">
-          <label htmlFor="ausencia-tipo" className="text-sm font-medium text-slate-700 dark:text-slate-300">
-            Tipo
-          </label>
-          <Select
-            id="ausencia-tipo"
-            value={tipo}
-            onChange={(e) => {
-              const nuevoTipo = e.target.value as TipoAusencia;
-              setTipo(nuevoTipo);
-              setConGoceDeSueldo(tiposConfig?.find((c) => c.tipo === nuevoTipo)?.conGoceDeSueldoPorDefecto ?? CON_GOCE_POR_DEFECTO[nuevoTipo]);
-            }}
-          >
-            {tiposActivos.map((t) => (
-              <option key={t} value={t}>
-                {ETIQUETAS_TIPO[t]}
-              </option>
-            ))}
-          </Select>
-        </div>
-        {tipo === 'VACACIONES' && empleado && (
-          <p className="text-sm text-slate-600 dark:text-slate-400">
-            {balance
-              ? `Balance disponible: ${balance.diasDisponibles} día(s) (${balance.aniosCompletos} año(s) de antigüedad, ${balance.diasAcumulados} acumulado(s))`
-              : 'Calculando balance de vacaciones…'}
-          </p>
-        )}
-        {tipo !== 'VACACIONES' && configTipoActual?.maximoDiasPorAnio != null && (
-          <p className="text-sm text-slate-600 dark:text-slate-400">Tope configurado: {configTipoActual.maximoDiasPorAnio} día(s)/año.</p>
-        )}
-        {configTipoActual?.requiereAprobacion === false && (
-          <p className="text-sm text-amber-600 dark:text-amber-400">Este tipo se auto-aprueba al solicitarse.</p>
-        )}
-        <FormField id="ausencia-desde" label="Desde" type="date" value={fechaDesde} onChange={(e) => setFechaDesde(e.target.value)} required />
-        <FormField id="ausencia-hasta" label="Hasta" type="date" value={fechaHasta} onChange={(e) => setFechaHasta(e.target.value)} required />
-        <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
-          <input type="checkbox" checked={conGoceDeSueldo} onChange={(e) => setConGoceDeSueldo(e.target.checked)} />
-          Con goce de sueldo (no descuenta salario en nómina)
-        </label>
-        <FormField id="ausencia-motivo" label="Motivo (opcional)" value={motivo} onChange={(e) => setMotivo(e.target.value)} />
-        {error && <p className="text-sm text-red-600">{error}</p>}
-        <Button type="submit" disabled={crear.isPending} className="w-full">
-          {crear.isPending ? 'Guardando…' : 'Solicitar ausencia'}
-        </Button>
-      </form>
-    </Modal>
   );
 }

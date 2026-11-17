@@ -1,5 +1,6 @@
 import { FormEvent, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../../../lib/api-client';
 import { mensajeErrorApi } from '../../../lib/mensaje-error-api';
 import { Badge } from '../../atoms/Badge/Badge';
@@ -7,7 +8,6 @@ import { Button } from '../../atoms/Button/Button';
 import { Card } from '../../atoms/Card/Card';
 import { Select } from '../../atoms/Select/Select';
 import { FormField } from '../../molecules/FormField/FormField';
-import { Modal } from '../../molecules/Modal/Modal';
 import { Paginacion } from '../../molecules/Paginacion/Paginacion';
 import { useAuth } from '../../../hooks/useAuth';
 import { PaginaResultado } from '../../../types/pagina-resultado';
@@ -106,40 +106,11 @@ function ReporteAportesView({ id }: { id: string }) {
   );
 }
 
-function ModalDetalleRecibo({ recibo, onClose }: { recibo: ReciboNomina; onClose: () => void }) {
-  return (
-    <Modal titulo={`Recibo — ${recibo.empleado.nombre}`} onClose={onClose}>
-      <div className="space-y-1 text-sm text-slate-700 dark:text-slate-300">
-        <div className="flex justify-between"><span>Salario bruto</span><span>{formatoRD(recibo.salarioBruto)}</span></div>
-        <div className="flex justify-between"><span>SFS (empleado)</span><span>{formatoRD(recibo.sfsEmpleado)}</span></div>
-        <div className="flex justify-between"><span>AFP (empleado)</span><span>{formatoRD(recibo.afpEmpleado)}</span></div>
-        <div className="flex justify-between"><span>ISR</span><span>{formatoRD(recibo.isr)}</span></div>
-        <div className="flex justify-between"><span>Otras deducciones</span><span>{formatoRD(recibo.otrasDeducciones)}</span></div>
-        {Number(recibo.descuentoAusencias) > 0 && (
-          <div className="flex justify-between"><span>Descuento por ausencias</span><span>{formatoRD(recibo.descuentoAusencias)}</span></div>
-        )}
-        {Number(recibo.montoHorasExtra) > 0 && (
-          <div className="flex justify-between"><span>Horas extra</span><span>{formatoRD(recibo.montoHorasExtra)}</span></div>
-        )}
-        <hr className="border-slate-200 dark:border-slate-800" />
-        <div className="flex justify-between font-medium text-slate-900 dark:text-slate-100">
-          <span>Salario neto</span><span>{formatoRD(recibo.salarioNeto)}</span>
-        </div>
-        <hr className="border-slate-200 dark:border-slate-800" />
-        <p className="pt-1 text-xs text-slate-500 dark:text-slate-400">Aportes patronales (no descontados del recibo)</p>
-        <div className="flex justify-between"><span>SFS (patronal)</span><span>{formatoRD(recibo.sfsEmpleador)}</span></div>
-        <div className="flex justify-between"><span>AFP (patronal)</span><span>{formatoRD(recibo.afpEmpleador)}</span></div>
-        <div className="flex justify-between"><span>INFOTEP</span><span>{formatoRD(recibo.infotep)}</span></div>
-      </div>
-    </Modal>
-  );
-}
-
 function PeriodoDetalle({ id }: { id: string }) {
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { tienePermiso } = useAuth();
   const [verAportes, setVerAportes] = useState(false);
-  const [reciboAbierto, setReciboAbierto] = useState<ReciboNomina | null>(null);
   const { data, isLoading } = useQuery({
     queryKey: ['nomina-periodo', id],
     queryFn: async () => (await apiClient.get<PeriodoNominaDetalle>(`/nomina/periodos/${id}`)).data,
@@ -199,7 +170,7 @@ function PeriodoDetalle({ id }: { id: string }) {
                   <button
                     type="button"
                     className="text-xs text-sol-600 hover:underline dark:text-sol-400"
-                    onClick={() => setReciboAbierto(recibo)}
+                    onClick={() => navigate(`/nomina/periodos/${id}/recibos/${recibo.id}`)}
                   >
                     Ver detalle
                   </button>
@@ -214,7 +185,6 @@ function PeriodoDetalle({ id }: { id: string }) {
         {verAportes ? 'Ocultar reporte de aportes (TSS/ISR)' : 'Ver reporte de aportes (TSS/ISR)'}
       </Button>
       {verAportes && <ReporteAportesView id={id} />}
-      {reciboAbierto && <ModalDetalleRecibo recibo={reciboAbierto} onClose={() => setReciboAbierto(null)} />}
     </div>
   );
 }

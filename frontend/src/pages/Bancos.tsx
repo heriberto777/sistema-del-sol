@@ -1,12 +1,9 @@
-import { FormEvent, useState } from 'react';
+import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../lib/api-client';
-import { mensajeErrorApi } from '../lib/mensaje-error-api';
 import { Button } from '../components/atoms/Button/Button';
 import { Card } from '../components/atoms/Card/Card';
-import { Select } from '../components/atoms/Select/Select';
-import { FormField } from '../components/molecules/FormField/FormField';
-import { Modal } from '../components/molecules/Modal/Modal';
 import { ConfirmModal } from '../components/molecules/ConfirmModal/ConfirmModal';
 import { SearchInput } from '../components/molecules/SearchInput/SearchInput';
 import { Paginacion } from '../components/molecules/Paginacion/Paginacion';
@@ -33,12 +30,11 @@ interface CuentaBancaria {
 }
 
 export function Bancos() {
+  const navigate = useNavigate();
   const { tienePermiso } = useAuth();
   const [busqueda, setBusqueda] = useState('');
   const [pagina, setPagina] = useState(1);
   const busquedaDebounced = useDebouncedValue(busqueda);
-  const [modalAbierto, setModalAbierto] = useState(false);
-  const [cuentaEditando, setCuentaEditando] = useState<CuentaBancaria | null>(null);
   const [cuentaADesactivar, setCuentaADesactivar] = useState<CuentaBancaria | null>(null);
   const queryClient = useQueryClient();
 
@@ -64,7 +60,7 @@ export function Bancos() {
           <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Bancos</h1>
           <p className="text-sm text-slate-500 dark:text-slate-400">Cuentas bancarias del tenant, usadas para pagos y gastos menores.</p>
         </div>
-        {tienePermiso('bancos.editar') && <Button onClick={() => setModalAbierto(true)}>Nueva cuenta bancaria</Button>}
+        {tienePermiso('bancos.editar') && <Button onClick={() => navigate('/bancos/nuevo')}>Nueva cuenta bancaria</Button>}
       </div>
 
       <RequierePermiso permiso="bancos.ver">
@@ -73,7 +69,7 @@ export function Bancos() {
             titulo="Todavía no hay cuentas bancarias"
             descripcion="Creá la primera para poder registrar gastos menores desde ahí."
             etiquetaAccion="Nueva cuenta bancaria"
-            onAccion={() => setModalAbierto(true)}
+            onAccion={() => navigate('/bancos/nuevo')}
           />
         ) : (
           <Card
@@ -115,7 +111,7 @@ export function Bancos() {
                         {tienePermiso('bancos.editar') && (
                           <RowActionsMenu
                             acciones={[
-                              { etiqueta: 'Editar', onClick: () => setCuentaEditando(c) },
+                              { etiqueta: 'Editar', onClick: () => navigate(`/bancos/${c.id}`) },
                               {
                                 etiqueta: 'Desactivar',
                                 tono: 'peligro',
@@ -139,16 +135,6 @@ export function Bancos() {
         )}
       </RequierePermiso>
 
-      {modalAbierto && (
-        <Modal titulo="Nueva cuenta bancaria" onClose={() => setModalAbierto(false)}>
-          <FormularioCuentaBancaria onGuardado={() => setModalAbierto(false)} />
-        </Modal>
-      )}
-      {cuentaEditando && (
-        <Modal titulo={`Editar cuenta — ${cuentaEditando.banco}`} onClose={() => setCuentaEditando(null)}>
-          <FormularioCuentaBancaria cuenta={cuentaEditando} onGuardado={() => setCuentaEditando(null)} />
-        </Modal>
-      )}
       {cuentaADesactivar && (
         <ConfirmModal
           titulo="¿Desactivar esta cuenta?"
@@ -170,70 +156,3 @@ export function Bancos() {
   );
 }
 
-function FormularioCuentaBancaria({ cuenta, onGuardado }: { cuenta?: CuentaBancaria; onGuardado: () => void }) {
-  const queryClient = useQueryClient();
-  const [banco, setBanco] = useState(cuenta?.banco ?? '');
-  const [numeroCuenta, setNumeroCuenta] = useState(cuenta?.numeroCuenta ?? '');
-  const [tipoCuenta, setTipoCuenta] = useState<'CORRIENTE' | 'AHORROS'>(cuenta?.tipoCuenta ?? 'CORRIENTE');
-  const [cuentaContableId, setCuentaContableId] = useState(cuenta?.cuentaContable.id ?? '');
-  const [error, setError] = useState<string | null>(null);
-
-  const { data: cuentas } = useQuery({
-    queryKey: ['contabilidad-cuentas-activo'],
-    queryFn: async () => (await apiClient.get<CuentaContable[]>('/contabilidad/cuentas')).data,
-  });
-  const cuentasActivo = (cuentas ?? []).filter((c) => c.tipo === 'ACTIVO');
-
-  const guardar = useMutation({
-    mutationFn: async () => {
-      const datos = { banco, numeroCuenta, tipoCuenta, cuentaContableId };
-      return cuenta ? apiClient.patch(`/bancos/${cuenta.id}`, datos) : apiClient.post('/bancos', datos);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['bancos'] });
-      onGuardado();
-    },
-    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo guardar la cuenta bancaria. Revisa los datos.')),
-  });
-
-  function onSubmit(e: FormEvent) {
-    e.preventDefault();
-    setError(null);
-    guardar.mutate();
-  }
-
-  return (
-    <form onSubmit={onSubmit} className="space-y-3">
-      <FormField id="banco-nombre" label="Banco" value={banco} onChange={(e) => setBanco(e.target.value)} required />
-      <FormField
-        id="banco-numero"
-        label="Número de cuenta"
-        value={numeroCuenta}
-        onChange={(e) => setNumeroCuenta(e.target.value)}
-        required
-      />
-      <div className="flex flex-col gap-1">
-        <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Tipo de cuenta</label>
-        <Select value={tipoCuenta} onChange={(e) => setTipoCuenta(e.target.value as 'CORRIENTE' | 'AHORROS')}>
-          <option value="CORRIENTE">Corriente</option>
-          <option value="AHORROS">Ahorros</option>
-        </Select>
-      </div>
-      <div className="flex flex-col gap-1">
-        <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Cuenta contable</label>
-        <Select value={cuentaContableId} onChange={(e) => setCuentaContableId(e.target.value)} required>
-          <option value="">Seleccionar…</option>
-          {cuentasActivo.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.codigo} — {c.nombre}
-            </option>
-          ))}
-        </Select>
-      </div>
-      {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
-      <Button type="submit" disabled={guardar.isPending} className="w-full">
-        {guardar.isPending ? 'Guardando…' : cuenta ? 'Guardar cambios' : 'Guardar'}
-      </Button>
-    </form>
-  );
-}

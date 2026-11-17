@@ -1,12 +1,11 @@
-import { FormEvent, useState } from 'react';
+import { useState } from 'react';
 import { User } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../../../lib/api-client';
 import { Badge } from '../../atoms/Badge/Badge';
 import { Button } from '../../atoms/Button/Button';
 import { Card } from '../../atoms/Card/Card';
-import { FormField } from '../../molecules/FormField/FormField';
-import { Modal } from '../../molecules/Modal/Modal';
 import { Paginacion } from '../../molecules/Paginacion/Paginacion';
 import { ComboboxBusqueda } from '../../molecules/ComboboxBusqueda/ComboboxBusqueda';
 import { useAuth } from '../../../hooks/useAuth';
@@ -43,11 +42,11 @@ function formatearFecha(fecha: string) {
 }
 
 export function AsistenciaTable() {
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { tienePermiso } = useAuth();
   const [empleadoFiltro, setEmpleadoFiltro] = useState<Empleado | null>(null);
   const [pagina, setPagina] = useState(1);
-  const [modalManual, setModalManual] = useState(false);
 
   const { data, isLoading, error: errorCarga } = useQuery({
     queryKey: ['rrhh-asistencia', empleadoFiltro?.id, pagina],
@@ -85,7 +84,7 @@ export function AsistenciaTable() {
             icono={<User size={15} />}
           />
         </div>
-        {tienePermiso('rrhh.editar') && <Button onClick={() => setModalManual(true)}>Registrar manualmente</Button>}
+        {tienePermiso('rrhh.editar') && <Button onClick={() => navigate('/asistencia/nueva')}>Registrar manualmente</Button>}
       </div>
 
       <Card sinPadding titulo="Asistencia" descripcion={data ? `${data.total} registro(s)` : undefined}>
@@ -157,78 +156,6 @@ export function AsistenciaTable() {
           </div>
         )}
       </Card>
-
-      {modalManual && (
-        <ModalRegistrarManual
-          onClose={() => setModalManual(false)}
-          onCreado={() => queryClient.invalidateQueries({ queryKey: ['rrhh-asistencia'] })}
-        />
-      )}
     </div>
-  );
-}
-
-function ModalRegistrarManual({ onClose, onCreado }: { onClose: () => void; onCreado: () => void }) {
-  const [empleado, setEmpleado] = useState<Empleado | null>(null);
-  const [fecha, setFecha] = useState('');
-  const [horaEntrada, setHoraEntrada] = useState('');
-  const [horaSalida, setHoraSalida] = useState('');
-  const [error, setError] = useState<string | null>(null);
-
-  const registrar = useMutation({
-    mutationFn: async () =>
-      apiClient.post('/nomina/asistencia', {
-        empleadoId: empleado!.id,
-        fecha,
-        horaEntrada: horaEntrada || undefined,
-        horaSalida: horaSalida || undefined,
-      }),
-    onSuccess: () => {
-      onCreado();
-      onClose();
-    },
-    onError: (e: unknown) => {
-      const mensaje = (e as { response?: { data?: { message?: string } } })?.response?.data?.message;
-      setError(mensaje ?? 'No se pudo registrar la asistencia.');
-    },
-  });
-
-  function onSubmit(e: FormEvent) {
-    e.preventDefault();
-    setError(null);
-    if (!empleado) {
-      setError('Seleccioná un empleado.');
-      return;
-    }
-    registrar.mutate();
-  }
-
-  return (
-    <Modal titulo="Registrar asistencia manualmente" onClose={onClose}>
-      <form onSubmit={onSubmit} className="space-y-3">
-        <div className="flex flex-col gap-1">
-          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Empleado</label>
-          <ComboboxBusqueda<Empleado>
-            valor={empleado}
-            onSeleccionar={setEmpleado}
-            buscar={async (texto) =>
-              (await apiClient.get<PaginaResultado<Empleado>>('/nomina/empleados', { params: { busqueda: texto, tamanoPagina: 20 } })).data
-                .datos
-            }
-            obtenerId={(e) => e.id}
-            obtenerEtiqueta={(e) => `${e.nombre} — ${e.cedula}`}
-            placeholder="Buscar empleado por nombre o cédula…"
-            icono={<User size={15} />}
-          />
-        </div>
-        <FormField id="asistencia-fecha" label="Fecha" type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} required />
-        <FormField id="asistencia-entrada" label="Hora de entrada (opcional)" type="time" value={horaEntrada} onChange={(e) => setHoraEntrada(e.target.value)} />
-        <FormField id="asistencia-salida" label="Hora de salida (opcional)" type="time" value={horaSalida} onChange={(e) => setHoraSalida(e.target.value)} />
-        {error && <p className="text-sm text-red-600">{error}</p>}
-        <Button type="submit" disabled={registrar.isPending} className="w-full">
-          {registrar.isPending ? 'Guardando…' : 'Guardar registro'}
-        </Button>
-      </form>
-    </Modal>
   );
 }

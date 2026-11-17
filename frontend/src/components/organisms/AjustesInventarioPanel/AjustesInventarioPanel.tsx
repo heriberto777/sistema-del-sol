@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../../../lib/api-client';
@@ -6,8 +6,6 @@ import { mensajeErrorApi } from '../../../lib/mensaje-error-api';
 import { Badge } from '../../atoms/Badge/Badge';
 import { Button } from '../../atoms/Button/Button';
 import { Card } from '../../atoms/Card/Card';
-import { Select } from '../../atoms/Select/Select';
-import { FormField } from '../../molecules/FormField/FormField';
 import { Modal } from '../../molecules/Modal/Modal';
 import { ConfirmModal } from '../../molecules/ConfirmModal/ConfirmModal';
 import { CampoPin } from '../../molecules/CampoPin/CampoPin';
@@ -41,11 +39,11 @@ interface AjusteInventarioDetalle extends AjusteInventario {
 }
 
 /**
- * Auditoría UX Fase 2 — extraído de Inventario.tsx. "Nuevo ajuste" ahora
- * navega a una página propia multi-línea (`InventarioAjusteNuevo`) en vez de
- * abrir un modal de un solo producto — el resto (ver/editar/confirmar/
- * cancelar un documento ya existente) se queda como modal, es un ajuste
- * puntual sobre un registro ya elegido de esta lista.
+ * Auditoría UX Fase 2 — extraído de Inventario.tsx. "Nuevo ajuste" navega a
+ * una página propia multi-línea (`InventarioAjusteNuevo`). "Ver
+ * detalle"/"Editar" (auditoría de modales pendientes) navegan a
+ * `InventarioAjusteVer` — solo Confirmar/Cancelar (transición de estado de
+ * un registro ya elegido en esta lista) se quedan como modal.
  */
 export function AjustesInventarioPanel() {
   const navigate = useNavigate();
@@ -53,8 +51,6 @@ export function AjustesInventarioPanel() {
   const tienePermisoAjustar = tienePermiso('inventario.ajustar');
   const queryClient = useQueryClient();
   const [paginaAjustes, setPaginaAjustes] = useState(1);
-  const [ajusteViendo, setAjusteViendo] = useState<AjusteInventario | null>(null);
-  const [ajusteEditando, setAjusteEditando] = useState<AjusteInventario | null>(null);
   const [ajusteConfirmando, setAjusteConfirmando] = useState<AjusteInventario | null>(null);
   const [ajusteACancelar, setAjusteACancelar] = useState<AjusteInventario | null>(null);
 
@@ -108,10 +104,9 @@ export function AjustesInventarioPanel() {
                     <td className="px-5 py-3 text-right">
                       <RowActionsMenu
                         acciones={[
-                          { etiqueta: 'Ver detalle', onClick: () => setAjusteViendo(aj) },
+                          { etiqueta: 'Ver detalle', onClick: () => navigate(`/inventario/ajustes/${aj.id}`) },
                           ...(aj.estado === 'BORRADOR' && tienePermisoAjustar
                             ? [
-                                { etiqueta: 'Editar', onClick: () => setAjusteEditando(aj) },
                                 { etiqueta: 'Confirmar', onClick: () => setAjusteConfirmando(aj) },
                                 {
                                   etiqueta: 'Cancelar',
@@ -136,8 +131,6 @@ export function AjustesInventarioPanel() {
         )}
       </Card>
 
-      {ajusteViendo && <ModalVerAjuste ajuste={ajusteViendo} onClose={() => setAjusteViendo(null)} />}
-      {ajusteEditando && <ModalEditarAjuste ajuste={ajusteEditando} onClose={() => setAjusteEditando(null)} />}
       {ajusteConfirmando && <ModalConfirmarAjuste ajuste={ajusteConfirmando} onClose={() => setAjusteConfirmando(null)} />}
       {ajusteACancelar && (
         <ConfirmModal
@@ -157,155 +150,6 @@ export function AjustesInventarioPanel() {
         />
       )}
     </div>
-  );
-}
-
-function ModalVerAjuste({ ajuste, onClose }: { ajuste: AjusteInventario; onClose: () => void }) {
-  const { data } = useQuery({
-    queryKey: ['ajuste-inventario', ajuste.id],
-    queryFn: async () => (await apiClient.get<AjusteInventarioDetalle>(`/ajustes-inventario/${ajuste.id}`)).data,
-  });
-
-  return (
-    <Modal titulo={`Ajuste de inventario — ${ajuste.numero}`} onClose={onClose}>
-      {!data ? (
-        <p className="text-sm text-slate-400">Cargando…</p>
-      ) : (
-        <div className="space-y-4">
-          <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm dark:bg-slate-800/60">
-            <p>
-              Bodega: <span className="font-medium">{data.bodega.nombre}</span>
-            </p>
-            <p className="text-slate-500 dark:text-slate-400">
-              Fecha: {new Date(data.fecha).toLocaleDateString('es-DO')} — Estado: <Badge>{data.estado}</Badge>
-            </p>
-          </div>
-          <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-slate-50 text-slate-500 dark:bg-slate-900/60 dark:text-slate-400">
-                <tr>
-                  <th className="px-3 py-2">Producto</th>
-                  <th className="px-3 py-2">Cantidad</th>
-                  <th className="px-3 py-2">Motivo</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {data.lineas.map((linea, i) => (
-                  <tr key={i}>
-                    <td className="px-3 py-2">
-                      {linea.producto.codigo} — {linea.producto.nombre}
-                    </td>
-                    <td className="px-3 py-2">{Number(linea.cantidad)}</td>
-                    <td className="px-3 py-2">{linea.motivo ?? linea.motivoAjuste}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-    </Modal>
-  );
-}
-
-/** Ítem E-1 — editar un ajuste en BORRADOR (la bodega no se puede cambiar, solo la cantidad/motivo de cada línea existente — agregar/quitar líneas solo al crear, ver InventarioAjusteNuevo). */
-function ModalEditarAjuste({ ajuste, onClose }: { ajuste: AjusteInventario; onClose: () => void }) {
-  const queryClient = useQueryClient();
-  const [lineas, setLineas] = useState<{ productoId: string; cantidad: string; motivoAjuste: string; motivo: string; nombreProducto: string }[]>([]);
-  const [error, setError] = useState<string | null>(null);
-
-  const { data: detalle } = useQuery({
-    queryKey: ['ajuste-inventario', ajuste.id],
-    queryFn: async () => (await apiClient.get<AjusteInventarioDetalle>(`/ajustes-inventario/${ajuste.id}`)).data,
-  });
-
-  useEffect(() => {
-    if (detalle && lineas.length === 0) {
-      setLineas(
-        detalle.lineas.map((l) => ({
-          productoId: l.productoId,
-          cantidad: String(l.cantidad),
-          motivoAjuste: l.motivoAjuste,
-          motivo: l.motivo ?? '',
-          nombreProducto: `${l.producto.codigo} — ${l.producto.nombre}`,
-        })),
-      );
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [detalle]);
-
-  function actualizarLinea(i: number, cambios: Partial<(typeof lineas)[number]>) {
-    setLineas((prev) => prev.map((l, idx) => (idx === i ? { ...l, ...cambios } : l)));
-  }
-
-  const guardar = useMutation({
-    mutationFn: async () =>
-      apiClient.patch(`/ajustes-inventario/${ajuste.id}`, {
-        lineas: lineas.map((l) => ({
-          productoId: l.productoId,
-          cantidad: Number(l.cantidad),
-          motivoAjuste: l.motivoAjuste,
-          motivo: l.motivo || undefined,
-        })),
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ajustes-inventario'] });
-      queryClient.invalidateQueries({ queryKey: ['ajuste-inventario', ajuste.id] });
-      onClose();
-    },
-    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo guardar el ajuste. Revisa los datos.')),
-  });
-
-  function onSubmit(e: FormEvent) {
-    e.preventDefault();
-    setError(null);
-    guardar.mutate();
-  }
-
-  return (
-    <Modal titulo={`Editar ajuste — ${ajuste.numero}`} onClose={onClose} ancho="xl">
-      {!detalle ? (
-        <p className="text-sm text-slate-400">Cargando…</p>
-      ) : (
-        <form onSubmit={onSubmit} className="space-y-3">
-          {/* Alto fijo + scroll propio (mismo criterio que el panel de notas de Proyectos/Mis Tareas) — antes crecía sin límite con cada línea. */}
-          <div className="max-h-[24rem] space-y-2 overflow-y-auto pr-1">
-            {lineas.map((linea, i) => (
-              <div key={i} className="space-y-2 rounded-lg border border-slate-200 p-3 dark:border-slate-800">
-                <p className="text-sm font-medium text-slate-700 dark:text-slate-300">{linea.nombreProducto}</p>
-                <div className="flex gap-2">
-                  <input
-                    type="number"
-                    placeholder="Cantidad"
-                    value={linea.cantidad}
-                    onChange={(e) => actualizarLinea(i, { cantidad: e.target.value })}
-                    className="w-28 rounded-md border border-slate-300 px-2 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-                  />
-                  <Select value={linea.motivoAjuste} onChange={(e) => actualizarLinea(i, { motivoAjuste: e.target.value })} required>
-                    <option value="MERMA">Merma</option>
-                    <option value="ROBO_PERDIDA">Robo o pérdida</option>
-                    <option value="DANO">Daño</option>
-                    <option value="VENCIMIENTO">Vencimiento</option>
-                    <option value="CORRECCION_CONTEO">Corrección de conteo</option>
-                    <option value="OTRO">Otro</option>
-                  </Select>
-                </div>
-                <FormField
-                  id={`ajuste-editar-motivo-${i}`}
-                  label="Detalle (opcional)"
-                  value={linea.motivo}
-                  onChange={(e) => actualizarLinea(i, { motivo: e.target.value })}
-                />
-              </div>
-            ))}
-          </div>
-          {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
-          <Button type="submit" disabled={guardar.isPending} className="w-full">
-            {guardar.isPending ? 'Guardando…' : 'Guardar cambios'}
-          </Button>
-        </form>
-      )}
-    </Modal>
   );
 }
 
