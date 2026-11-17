@@ -1,35 +1,20 @@
-import { DragEvent, MouseEvent, useEffect, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
+import { DragEvent, MouseEvent, useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { ChevronDown, ChevronRight, ChevronsDownUp, ChevronsLeft, ChevronsRight, ChevronsUpDown, MessageSquare, Pause, Play, Sparkles, Trash2, UserPlus } from 'lucide-react';
+import { ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown, MessageSquare, Pause, Play, Sparkles } from 'lucide-react';
 import { apiClient } from '../../../lib/api-client';
 import { mensajeErrorApi } from '../../../lib/mensaje-error-api';
-import { useAuth } from '../../../hooks/useAuth';
-import { useAutoAlturaTextarea } from '../../../hooks/useAutoAlturaTextarea';
 import { Button } from '../../atoms/Button/Button';
 import { Card } from '../../atoms/Card/Card';
 import { Select } from '../../atoms/Select/Select';
-import { FormField } from '../../molecules/FormField/FormField';
-import { Modal } from '../../molecules/Modal/Modal';
 import { SearchInput } from '../../molecules/SearchInput/SearchInput';
 import { ConfirmModal } from '../../molecules/ConfirmModal/ConfirmModal';
 import { RowActionsMenu } from '../../molecules/RowActionsMenu/RowActionsMenu';
 import { RequierePermiso } from '../RequierePermiso/RequierePermiso';
-import { BarraFormato, ContenidoComentario } from '../../molecules/ComentarioFormato/ComentarioFormato';
-import { TareaFormModal, TareaFormValues } from '../TareaFormModal/TareaFormModal';
 import { GenerarTareasIaModal, PlanIaParaCrear } from '../GenerarTareasIaModal/GenerarTareasIaModal';
-import {
-  EmpleadoOpcion,
-  ESTADOS_TAREA,
-  ETIQUETA_ESTADO_TAREA,
-  ESTILO_PRIORIDAD_TAREA,
-  ETIQUETA_PRIORIDAD_TAREA,
-  Hito,
-  PRIORIDADES_TAREA,
-  Tarea,
-} from '../../../types/proyectos';
-import { soloFecha, formatoFechaHoraComentario, formatearDuracion } from '../../../lib/fecha';
+import { ESTILO_PRIORIDAD_TAREA, ETIQUETA_PRIORIDAD_TAREA, Hito, Tarea } from '../../../types/proyectos';
+import { soloFecha, formatearDuracion } from '../../../lib/fecha';
 import { inicialesDe } from '../../../lib/iniciales';
 
 /** Re-renderiza el Kanban cada `intervaloMs` para que el tiempo del cronómetro corriendo se vea en vivo, sin pedirle nada nuevo al backend hasta que se pause. */
@@ -93,25 +78,14 @@ interface KanbanTareasProps {
 }
 
 export function KanbanTareas({ proyectoId, proyectoNombre, proyectoDescripcion, tareas, hitos, onInvalidar, onError }: KanbanTareasProps) {
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { usuario, tienePermiso } = useAuth();
-  const puedeModerarComentarios = tienePermiso('proyectos.editar');
   const [vista, setVista] = useState<'clasico' | 'compacto'>(() => {
     const guardada = localStorage.getItem(CLAVE_VISTA);
     return guardada === 'compacto' ? 'compacto' : 'clasico';
   });
   const [columnaDestacada, setColumnaDestacada] = useState<string | null>(null);
-  const [tareaAbierta, setTareaAbierta] = useState<Tarea | null>(null);
-  // Panel lateral de comentarios (dentro del modal de detalle) — abierto por
-  // defecto, con un botón para ocultarlo y ganar ancho para Responsables/
-  // Horas. Se resetea a abierto cada vez que se abre una tarea a propósito
-  // (no persiste): es una preferencia de "estoy leyendo esto ahora", no una
-  // configuración de largo plazo como el colapso del Sidebar.
-  const [panelComentariosAbierto, setPanelComentariosAbierto] = useState(true);
-  const [modalCrearAbierto, setModalCrearAbierto] = useState(false);
-  const [tareaEditando, setTareaEditando] = useState<Tarea | null>(null);
   const [tareaAEliminar, setTareaAEliminar] = useState<Tarea | null>(null);
-  const [errorForm, setErrorForm] = useState<string | null>(null);
   const [modalIaAbierto, setModalIaAbierto] = useState(false);
   const [creandoDesdeIa, setCreandoDesdeIa] = useState(false);
   const [busqueda, setBusqueda] = useState('');
@@ -146,26 +120,10 @@ export function KanbanTareas({ proyectoId, proyectoNombre, proyectoDescripcion, 
   });
   const miEmpleadoId = miEmpleado?.empleadoId ?? null;
 
-  const { data: empleados } = useQuery({
-    queryKey: ['proyectos-empleados-opciones'],
-    queryFn: async () => (await apiClient.get<EmpleadoOpcion[]>('/admin/proyectos/empleados')).data,
-    enabled: !!tareaAbierta,
-  });
-
   const invalidar = () => {
     queryClient.invalidateQueries({ queryKey: ['proyecto', proyectoId] });
     onInvalidar();
   };
-
-  const crearTarea = useMutation({
-    mutationFn: async (valores: TareaFormValues) => apiClient.post(`/admin/proyectos/${proyectoId}/tareas`, valores),
-    onSuccess: () => {
-      setModalCrearAbierto(false);
-      setErrorForm(null);
-      invalidar();
-    },
-    onError: (err) => setErrorForm(mensajeErrorApi(err, 'No se pudo crear la tarea.')),
-  });
 
   async function crearPlanDesdeIa(plan: PlanIaParaCrear) {
     setCreandoDesdeIa(true);
@@ -189,16 +147,6 @@ export function KanbanTareas({ proyectoId, proyectoNombre, proyectoDescripcion, 
     }
   }
 
-  const editarTarea = useMutation({
-    mutationFn: async (valores: TareaFormValues) => apiClient.patch(`/admin/proyectos/tareas/${tareaEditando?.id}`, valores),
-    onSuccess: () => {
-      setTareaEditando(null);
-      setErrorForm(null);
-      invalidar();
-    },
-    onError: (err) => setErrorForm(mensajeErrorApi(err, 'No se pudo guardar la tarea.')),
-  });
-
   const eliminarTarea = useMutation({
     mutationFn: async (tareaId: string) => apiClient.delete(`/admin/proyectos/tareas/${tareaId}`),
     onSuccess: () => {
@@ -217,21 +165,6 @@ export function KanbanTareas({ proyectoId, proyectoNombre, proyectoDescripcion, 
     onError: (err) => onError(mensajeErrorApi(err, 'No se pudo cambiar el estado de la tarea.')),
   });
 
-  /**
-   * Genérica para los campos editables directo desde el panel de detalle
-   * (Estado/Prioridad/Hito/Fecha/Descripción) — antes esa información solo
-   * se veía/editaba reabriendo `TareaFormModal` por separado (bug real
-   * reportado: la Descripción capturada al crear nunca se mostraba en el
-   * detalle). Mismo endpoint que ya usa `cambiarEstadoTarea`, que se deja
-   * intacta porque el drag-and-drop del tablero depende de su firma exacta.
-   */
-  const actualizarTarea = useMutation({
-    mutationFn: async ({ tareaId, valores }: { tareaId: string; valores: Partial<TareaFormValues> }) =>
-      apiClient.patch(`/admin/proyectos/tareas/${tareaId}`, valores),
-    onSuccess: invalidar,
-    onError: (err) => onError(mensajeErrorApi(err, 'No se pudo actualizar la tarea.')),
-  });
-
   const iniciarCronometro = useMutation({
     mutationFn: async (tareaId: string) => apiClient.post(`/admin/proyectos/tareas/${tareaId}/cronometro/iniciar`),
     onSuccess: invalidar,
@@ -244,41 +177,6 @@ export function KanbanTareas({ proyectoId, proyectoNombre, proyectoDescripcion, 
     onError: (err) => onError(mensajeErrorApi(err, 'No se pudo pausar el cronómetro.')),
   });
 
-  const asignarResponsable = useMutation({
-    mutationFn: async ({ tareaId, empleadoId }: { tareaId: string; empleadoId: string }) =>
-      apiClient.post(`/admin/proyectos/tareas/${tareaId}/responsables/${empleadoId}`),
-    onSuccess: invalidar,
-    onError: (err) => onError(mensajeErrorApi(err, 'No se pudo asignar el responsable.')),
-  });
-
-  const quitarResponsable = useMutation({
-    mutationFn: async ({ tareaId, empleadoId }: { tareaId: string; empleadoId: string }) =>
-      apiClient.delete(`/admin/proyectos/tareas/${tareaId}/responsables/${empleadoId}`),
-    onSuccess: invalidar,
-    onError: (err) => onError(mensajeErrorApi(err, 'No se pudo quitar el responsable.')),
-  });
-
-  const registrarHora = useMutation({
-    mutationFn: async ({ tareaId, empleadoId, fecha, horas }: { tareaId: string; empleadoId: string; fecha: string; horas: string }) =>
-      apiClient.post(`/admin/proyectos/tareas/${tareaId}/horas`, { empleadoId, fecha, horas: Number(horas) }),
-    onSuccess: invalidar,
-    onError: (err) => onError(mensajeErrorApi(err, 'No se pudo registrar la hora.')),
-  });
-
-  const agregarComentario = useMutation({
-    mutationFn: async ({ tareaId, contenido }: { tareaId: string; contenido: string }) =>
-      apiClient.post(`/admin/proyectos/tareas/${tareaId}/comentarios`, { contenido }),
-    onSuccess: invalidar,
-    onError: (err) => onError(mensajeErrorApi(err, 'No se pudo agregar el comentario.')),
-  });
-
-  const eliminarComentario = useMutation({
-    mutationFn: async (comentarioId: string) => apiClient.delete(`/admin/proyectos/comentarios/${comentarioId}`),
-    onSuccess: invalidar,
-    onError: (err) => onError(mensajeErrorApi(err, 'No se pudo eliminar el comentario.')),
-  });
-
-  const tareaActual = tareaAbierta ? tareas.find((t) => t.id === tareaAbierta.id) ?? tareaAbierta : null;
   const hitoPorId = Object.fromEntries(hitos.map((h) => [h.id, h.nombre]));
 
   function onDragStart(e: DragEvent<HTMLDivElement>, tareaId: string) {
@@ -339,7 +237,7 @@ export function KanbanTareas({ proyectoId, proyectoNombre, proyectoDescripcion, 
 
   function accionesTarea(t: Tarea) {
     return [
-      { etiqueta: 'Editar', onClick: () => setTareaEditando(t) },
+      { etiqueta: 'Editar', onClick: () => navigate(`/proyectos/${proyectoId}/tareas/${t.id}`) },
       { etiqueta: 'Eliminar', tono: 'peligro' as const, onClick: () => setTareaAEliminar(t) },
     ];
   }
@@ -428,7 +326,7 @@ export function KanbanTareas({ proyectoId, proyectoNombre, proyectoDescripcion, 
             </Button>
           </RequierePermiso>
           <RequierePermiso permiso="proyectos.crear">
-            <Button onClick={() => setModalCrearAbierto(true)}>Nueva tarea</Button>
+            <Button onClick={() => navigate(`/proyectos/${proyectoId}/tareas/nueva`)}>Nueva tarea</Button>
           </RequierePermiso>
         </div>
       }
@@ -565,7 +463,7 @@ export function KanbanTareas({ proyectoId, proyectoNombre, proyectoDescripcion, 
                             key={t.id}
                             draggable
                             onDragStart={(e) => onDragStart(e, t.id)}
-                            onClick={() => setTareaAbierta(t)}
+                            onClick={() => navigate(`/proyectos/${proyectoId}/tareas/${t.id}`)}
                             className="cursor-pointer rounded-lg border border-slate-200 bg-white p-3 shadow-sm hover:border-sol-300 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-sol-500/50"
                           >
                             <div className="flex items-center justify-between gap-2">
@@ -643,7 +541,7 @@ export function KanbanTareas({ proyectoId, proyectoNombre, proyectoDescripcion, 
                           key={t.id}
                           draggable
                           onDragStart={(e) => onDragStart(e, t.id)}
-                          onClick={() => setTareaAbierta(t)}
+                          onClick={() => navigate(`/proyectos/${proyectoId}/tareas/${t.id}`)}
                           className="flex cursor-pointer items-center justify-between gap-2 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs hover:border-sol-300 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-sol-500/50"
                         >
                           <div className="flex min-w-0 items-center gap-2">
@@ -671,19 +569,6 @@ export function KanbanTareas({ proyectoId, proyectoNombre, proyectoDescripcion, 
         </div>
       )}
 
-      {modalCrearAbierto && (
-        <TareaFormModal
-          hitos={hitos}
-          guardando={crearTarea.isPending}
-          error={errorForm}
-          onClose={() => {
-            setModalCrearAbierto(false);
-            setErrorForm(null);
-          }}
-          onGuardar={(valores) => crearTarea.mutate(valores)}
-        />
-      )}
-
       {modalIaAbierto && (
         <GenerarTareasIaModal
           nombreProyecto={proyectoNombre}
@@ -691,20 +576,6 @@ export function KanbanTareas({ proyectoId, proyectoNombre, proyectoDescripcion, 
           onClose={() => setModalIaAbierto(false)}
           onCrear={crearPlanDesdeIa}
           creando={creandoDesdeIa}
-        />
-      )}
-
-      {tareaEditando && (
-        <TareaFormModal
-          tareaInicial={tareaEditando}
-          hitos={hitos}
-          guardando={editarTarea.isPending}
-          error={errorForm}
-          onClose={() => {
-            setTareaEditando(null);
-            setErrorForm(null);
-          }}
-          onGuardar={(valores) => editarTarea.mutate(valores)}
         />
       )}
 
@@ -723,442 +594,6 @@ export function KanbanTareas({ proyectoId, proyectoNombre, proyectoDescripcion, 
         />
       )}
 
-      {tareaActual && (
-        <Modal titulo={tareaActual.titulo} onClose={() => setTareaAbierta(null)} ancho="full">
-          <div className="mb-3 flex justify-end">
-            <button
-              type="button"
-              onClick={() => setPanelComentariosAbierto((v) => !v)}
-              className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
-            >
-              <MessageSquare size={13} />
-              Comentarios
-              {tareaActual.comentarios.length > 0 && (
-                <span className="rounded-full bg-sol-500 px-1.5 text-[10px] font-bold text-white">{tareaActual.comentarios.length}</span>
-              )}
-              {panelComentariosAbierto ? <ChevronsRight size={13} /> : <ChevronsLeft size={13} />}
-            </button>
-          </div>
-
-          <div className={clsx('flex flex-col gap-5 md:items-start', panelComentariosAbierto && 'md:flex-row')}>
-            <div className="min-w-0 flex-1 space-y-5">
-              {/* Información — antes esto (Descripción, Prioridad, Hito, Fecha,
-                  Estado) se capturaba bien al crear/editar pero nunca se veía
-                  acá (bug real reportado: solo aparecía reabriendo "Editar").
-                  Editable directo, mismo endpoint que ya usa `cambiarEstadoTarea`. */}
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Estado</label>
-                  <Select
-                    value={tareaActual.estado}
-                    onChange={(e) => actualizarTarea.mutate({ tareaId: tareaActual.id, valores: { estado: e.target.value } })}
-                    className="text-sm"
-                  >
-                    {ESTADOS_TAREA.map((es) => (
-                      <option key={es} value={es}>
-                        {ETIQUETA_ESTADO_TAREA[es]}
-                      </option>
-                    ))}
-                  </Select>
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Prioridad</label>
-                  <Select
-                    value={tareaActual.prioridad}
-                    onChange={(e) => actualizarTarea.mutate({ tareaId: tareaActual.id, valores: { prioridad: e.target.value } })}
-                    className="text-sm"
-                  >
-                    {PRIORIDADES_TAREA.map((p) => (
-                      <option key={p} value={p}>
-                        {ETIQUETA_PRIORIDAD_TAREA[p]}
-                      </option>
-                    ))}
-                  </Select>
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Hito</label>
-                  <Select
-                    value={tareaActual.hitoId ?? ''}
-                    onChange={(e) => actualizarTarea.mutate({ tareaId: tareaActual.id, valores: { hitoId: e.target.value || null } })}
-                    className="text-sm"
-                  >
-                    <option value="">Sin hito</option>
-                    {hitos.map((h) => (
-                      <option key={h.id} value={h.id}>
-                        {h.nombre}
-                      </option>
-                    ))}
-                  </Select>
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Vencimiento</label>
-                  <input
-                    type="date"
-                    value={tareaActual.fechaVencimiento ? tareaActual.fechaVencimiento.slice(0, 10) : ''}
-                    onChange={(e) => actualizarTarea.mutate({ tareaId: tareaActual.id, valores: { fechaVencimiento: e.target.value || undefined } })}
-                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none transition-colors focus:border-sol-500 focus:ring-2 focus:ring-sol-500/30 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <h3 className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-300">Descripción</h3>
-                <DescripcionTarea
-                  valorInicial={tareaActual.descripcion ?? ''}
-                  onGuardar={(descripcion) => actualizarTarea.mutate({ tareaId: tareaActual.id, valores: { descripcion } })}
-                />
-              </div>
-
-              <div>
-                <h3 className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-300">Responsables</h3>
-                <SelectorResponsablesAvatar
-                  responsables={tareaActual.responsables}
-                  empleados={empleados ?? []}
-                  onAsignar={(empleadoId) => asignarResponsable.mutate({ tareaId: tareaActual.id, empleadoId })}
-                  onQuitar={(empleadoId) => quitarResponsable.mutate({ tareaId: tareaActual.id, empleadoId })}
-                />
-              </div>
-
-              <div>
-                <h3 className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-300">Horas registradas</h3>
-                <div className="space-y-1">
-                  {tareaActual.registrosHoras.length === 0 && <p className="text-xs text-slate-400">Sin horas cargadas todavía.</p>}
-                  {tareaActual.registrosHoras.map((r) => (
-                    <div key={r.id} className="flex justify-between text-xs text-slate-600 dark:text-slate-300">
-                      <span>
-                        {r.empleado.nombre} — {new Date(r.fecha).toLocaleDateString('es-DO')}
-                      </span>
-                      <span className="font-medium">{r.horas}h</span>
-                    </div>
-                  ))}
-                </div>
-                <FormularioHora
-                  empleados={empleados ?? []}
-                  miEmpleadoId={miEmpleadoId}
-                  onRegistrar={(empleadoId, fecha, horas) => registrarHora.mutate({ tareaId: tareaActual.id, empleadoId, fecha, horas })}
-                  guardando={registrarHora.isPending}
-                />
-              </div>
-            </div>
-
-            {panelComentariosAbierto && (
-              <div className="flex flex-col border-t border-slate-100 pt-5 dark:border-slate-800 md:h-[36rem] md:w-96 md:shrink-0 md:border-l md:border-t-0 md:pl-5 md:pt-0">
-                <h3 className="mb-1 shrink-0 text-sm font-semibold text-slate-700 dark:text-slate-300">
-                  Comentarios{tareaActual.comentarios.length > 0 && <span className="ml-1 font-normal text-slate-400">({tareaActual.comentarios.length})</span>}
-                </h3>
-                {/* min-h-0 es lo que hace que un flex item pueda encogerse por debajo de su contenido — sin esto, overflow-y-auto no scrollea nunca dentro de un flex column (bug real, confirmado: antes esta columna vivía en un `grid`, donde `flex-1` no hacía nada). */}
-                <div className="min-h-0 flex-1 overflow-y-auto pr-1">
-                  {tareaActual.comentarios.length === 0 && <p className="py-2 text-xs text-slate-400">Sin comentarios todavía.</p>}
-                  {tareaActual.comentarios.map((c, i) => (
-                    <div key={c.id} className="group flex gap-2.5 border-b border-slate-100 py-2.5 first:pt-0 last:border-0 dark:border-slate-800">
-                      <div
-                        className={clsx(
-                          'flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white',
-                          PALETA_AVATAR[i % PALETA_AVATAR.length],
-                        )}
-                      >
-                        {inicialesDe(c.autor.nombre)}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-start justify-between gap-2">
-                          <p className="min-w-0 truncate text-xs">
-                            <span className="font-semibold text-slate-700 dark:text-slate-200">{c.autor.nombre}</span>{' '}
-                            <span className="text-slate-400">{formatoFechaHoraComentario(c.createdAt)}</span>
-                          </p>
-                          {(c.autor.id === usuario?.id || puedeModerarComentarios) && (
-                            <button
-                              type="button"
-                              onClick={() => eliminarComentario.mutate(c.id)}
-                              className="shrink-0 text-slate-300 opacity-0 transition-opacity hover:text-red-600 group-hover:opacity-100"
-                              aria-label="Eliminar comentario"
-                            >
-                              <Trash2 size={12} />
-                            </button>
-                          )}
-                        </div>
-                        <div className="mt-0.5">
-                          <ContenidoComentario contenido={c.contenido} />
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <div className="shrink-0">
-                  <FormularioComentario
-                    onComentar={(contenido) => agregarComentario.mutate({ tareaId: tareaActual.id, contenido })}
-                    guardando={agregarComentario.isPending}
-                  />
-                </div>
-              </div>
-            )}
-          </div>
-        </Modal>
-      )}
     </Card>
-  );
-}
-
-function FormularioHora({
-  empleados,
-  miEmpleadoId,
-  onRegistrar,
-  guardando,
-}: {
-  empleados: EmpleadoOpcion[];
-  /** Precarga el select con quien está logueado (mismo criterio que el cronómetro) — sigue siendo editable para que un supervisor pueda cargar horas de otra persona. */
-  miEmpleadoId: string | null;
-  onRegistrar: (empleadoId: string, fecha: string, horas: string) => void;
-  guardando: boolean;
-}) {
-  const [empleadoId, setEmpleadoId] = useState(miEmpleadoId ?? '');
-  const [fecha, setFecha] = useState(() => new Date().toISOString().slice(0, 10));
-  const [horas, setHoras] = useState('');
-
-  // Si `miEmpleado` todavía no había resuelto en el primer render (la query
-  // no tiene ningún `enabled` que la demore, pero puede tardar un toque),
-  // esto lo completa apenas llega — sin pisar una elección manual ya hecha.
-  useEffect(() => {
-    if (!empleadoId && miEmpleadoId) setEmpleadoId(miEmpleadoId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [miEmpleadoId]);
-
-  return (
-    <form
-      className="mt-3 flex flex-wrap items-end gap-2"
-      onSubmit={(e) => {
-        e.preventDefault();
-        if (empleadoId && horas) {
-          onRegistrar(empleadoId, fecha, horas);
-          setHoras('');
-        }
-      }}
-    >
-      <Select value={empleadoId} onChange={(e) => setEmpleadoId(e.target.value)} className="w-auto">
-        <option value="">Empleado…</option>
-        {empleados.map((emp) => (
-          <option key={emp.id} value={emp.id}>
-            {emp.nombre}
-          </option>
-        ))}
-      </Select>
-      <FormField id="hora-fecha" label="" type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} className="w-auto" />
-      <FormField id="hora-cantidad" label="" type="number" min="0" step="0.5" placeholder="Horas" value={horas} onChange={(e) => setHoras(e.target.value)} className="w-24" />
-      <Button type="submit" variante="secundario" disabled={guardando}>
-        Registrar
-      </Button>
-    </form>
-  );
-}
-
-/** Guarda al salir del campo (blur), y solo si de verdad cambió — evita un PATCH por cada tecla. Deja de resincronizar con `valorInicial` mientras el usuario está escribiendo (foco activo), para no pisarle lo que está tipeando si en el medio se invalida la query. */
-function DescripcionTarea({ valorInicial, onGuardar }: { valorInicial: string; onGuardar: (valor: string) => void }) {
-  const [valor, setValor] = useState(valorInicial);
-  const [editando, setEditando] = useState(false);
-
-  useEffect(() => {
-    if (!editando) setValor(valorInicial);
-  }, [valorInicial, editando]);
-
-  return (
-    <textarea
-      rows={4}
-      placeholder="Sin descripción — agregá una para que el equipo tenga contexto."
-      value={valor}
-      onFocus={() => setEditando(true)}
-      onChange={(e) => setValor(e.target.value)}
-      onBlur={() => {
-        setEditando(false);
-        if (valor !== valorInicial) onGuardar(valor);
-      }}
-      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none transition-colors placeholder:text-slate-400 focus:border-sol-500 focus:ring-2 focus:ring-sol-500/30 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500"
-    />
-  );
-}
-
-/**
- * Avatares + popover para elegir responsables — reemplaza los chips de
- * texto + `<select>` de antes (pedido explícito, estilo ClickUp). Mismo
- * patrón de portal+posición ya usado en `RowActionsMenu` para escapar de
- * cualquier `overflow` recortado (acá, el propio `Modal`).
- */
-function SelectorResponsablesAvatar({
-  responsables,
-  empleados,
-  onAsignar,
-  onQuitar,
-}: {
-  responsables: { empleado: { id: string; nombre: string } }[];
-  empleados: EmpleadoOpcion[];
-  onAsignar: (empleadoId: string) => void;
-  onQuitar: (empleadoId: string) => void;
-}) {
-  const [abierto, setAbierto] = useState(false);
-  const [posicion, setPosicion] = useState<{ top: number; left: number } | null>(null);
-  const botonRef = useRef<HTMLButtonElement>(null);
-  const panelRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!abierto) return;
-    // `globalThis.MouseEvent` a propósito — este archivo ya importa el
-    // `MouseEvent` de React (para el cronómetro), que no es asignable al
-    // listener nativo de `document.addEventListener`.
-    function onClickFuera(e: globalThis.MouseEvent) {
-      const objetivo = e.target as Node;
-      if (panelRef.current?.contains(objetivo) || botonRef.current?.contains(objetivo)) return;
-      setAbierto(false);
-    }
-    function cerrar() {
-      setAbierto(false);
-    }
-    document.addEventListener('mousedown', onClickFuera);
-    window.addEventListener('scroll', cerrar, true);
-    window.addEventListener('resize', cerrar);
-    return () => {
-      document.removeEventListener('mousedown', onClickFuera);
-      window.removeEventListener('scroll', cerrar, true);
-      window.removeEventListener('resize', cerrar);
-    };
-  }, [abierto]);
-
-  function alternar() {
-    if (!abierto && botonRef.current) {
-      const rect = botonRef.current.getBoundingClientRect();
-      const ANCHO_PANEL = 240;
-      setPosicion({ top: rect.bottom + 6, left: Math.min(rect.left, window.innerWidth - ANCHO_PANEL - 8) });
-    }
-    setAbierto((v) => !v);
-  }
-
-  const idsAsignados = new Set(responsables.map((r) => r.empleado.id));
-
-  return (
-    <div className="flex flex-wrap items-center gap-1.5">
-      {responsables.map((r, i) => (
-        <div key={r.empleado.id} className="group relative">
-          <span
-            title={r.empleado.nombre}
-            className={clsx(
-              'flex h-8 w-8 items-center justify-center rounded-full border-2 border-white text-[11px] font-bold text-white dark:border-slate-900',
-              PALETA_AVATAR[i % PALETA_AVATAR.length],
-            )}
-          >
-            {inicialesDe(r.empleado.nombre)}
-          </span>
-          <button
-            type="button"
-            onClick={() => onQuitar(r.empleado.id)}
-            aria-label={`Quitar a ${r.empleado.nombre}`}
-            className="absolute -right-1 -top-1 hidden h-4 w-4 items-center justify-center rounded-full bg-slate-700 text-[9px] text-white hover:bg-red-600 group-hover:flex"
-          >
-            ×
-          </button>
-        </div>
-      ))}
-      <button
-        ref={botonRef}
-        type="button"
-        onClick={alternar}
-        aria-label="Agregar responsable"
-        title="Agregar responsable"
-        className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-dashed border-slate-300 text-slate-400 hover:border-sol-400 hover:text-sol-600 dark:border-slate-700 dark:text-slate-500"
-      >
-        <UserPlus size={14} />
-      </button>
-
-      {abierto &&
-        posicion &&
-        createPortal(
-          <div
-            ref={panelRef}
-            style={{ position: 'fixed', top: posicion.top, left: posicion.left }}
-            className="z-50 max-h-64 w-60 overflow-auto rounded-lg border border-slate-200 bg-white py-1 shadow-lg dark:border-slate-800 dark:bg-slate-900"
-          >
-            <p className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400">Responsables</p>
-            {empleados.length === 0 && <p className="px-3 py-2 text-xs text-slate-400">Sin empleados disponibles.</p>}
-            {empleados.map((emp, i) => {
-              const asignado = idsAsignados.has(emp.id);
-              return (
-                <button
-                  key={emp.id}
-                  type="button"
-                  onClick={() => (asignado ? onQuitar(emp.id) : onAsignar(emp.id))}
-                  className={clsx(
-                    'flex w-full items-center gap-2 px-3 py-2 text-left text-sm',
-                    asignado
-                      ? 'bg-sol-50 text-sol-700 dark:bg-sol-900/20 dark:text-sol-300'
-                      : 'text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800',
-                  )}
-                >
-                  <span
-                    className={clsx(
-                      'flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[9px] font-bold text-white',
-                      PALETA_AVATAR[i % PALETA_AVATAR.length],
-                    )}
-                  >
-                    {inicialesDe(emp.nombre)}
-                  </span>
-                  <span className="min-w-0 flex-1 truncate">{emp.nombre}</span>
-                  {asignado && <span className="text-xs">✓</span>}
-                </button>
-              );
-            })}
-          </div>,
-          document.body,
-        )}
-    </div>
-  );
-}
-
-// Debe calzar con LARGO_MAXIMO_COMENTARIO del backend
-// (`crear-comentario-tarea.dto.ts`) — acá solo para el contador y el
-// `maxLength` nativo del textarea (que trunca un paste largo en vez de
-// dejar que el usuario descubra el límite con un 400 recién al enviar).
-const LARGO_MAXIMO_COMENTARIO = 20000;
-const UMBRAL_AVISO_LARGO_COMENTARIO = LARGO_MAXIMO_COMENTARIO * 0.9;
-
-function FormularioComentario({ onComentar, guardando }: { onComentar: (contenido: string) => void; guardando: boolean }) {
-  const [contenido, setContenido] = useState('');
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-  useAutoAlturaTextarea(textareaRef, contenido);
-
-  return (
-    <form
-      className="mt-3 rounded-xl border border-slate-200 p-2.5 dark:border-slate-700"
-      onSubmit={(e) => {
-        e.preventDefault();
-        if (contenido.trim()) {
-          onComentar(contenido.trim());
-          setContenido('');
-        }
-      }}
-    >
-      <textarea
-        ref={textareaRef}
-        rows={2}
-        maxLength={LARGO_MAXIMO_COMENTARIO}
-        placeholder="Escribí un comentario para el equipo — usá ``` para un bloque de código…"
-        value={contenido}
-        onChange={(e) => setContenido(e.target.value)}
-        className="w-full resize-none border-none bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400 dark:text-slate-100 dark:placeholder:text-slate-500"
-      />
-      <div className="flex items-center justify-between gap-2">
-        <BarraFormato textareaRef={textareaRef} valor={contenido} onChange={setContenido} />
-        <div className="flex items-center gap-2">
-          {contenido.length >= UMBRAL_AVISO_LARGO_COMENTARIO && (
-            <span
-              className={clsx(
-                'text-xs tabular-nums',
-                contenido.length >= LARGO_MAXIMO_COMENTARIO ? 'text-red-500' : 'text-slate-400 dark:text-slate-500',
-              )}
-            >
-              {contenido.length.toLocaleString('es-DO')} / {LARGO_MAXIMO_COMENTARIO.toLocaleString('es-DO')}
-            </span>
-          )}
-          <Button type="submit" disabled={!contenido.trim() || guardando}>
-            {guardando ? 'Enviando…' : 'Comentar'}
-          </Button>
-        </div>
-      </div>
-    </form>
   );
 }

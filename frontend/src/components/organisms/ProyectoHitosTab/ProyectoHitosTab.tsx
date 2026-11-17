@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import clsx from 'clsx';
 import { apiClient } from '../../../lib/api-client';
 import { mensajeErrorApi } from '../../../lib/mensaje-error-api';
@@ -10,10 +11,8 @@ import { EstadoVacio } from '../../molecules/EstadoVacio/EstadoVacio';
 import { RowActionsMenu } from '../../molecules/RowActionsMenu/RowActionsMenu';
 import { ConfirmModal } from '../../molecules/ConfirmModal/ConfirmModal';
 import { RequierePermiso } from '../RequierePermiso/RequierePermiso';
-import { HitoFormModal, HitoFormValues } from '../HitoFormModal/HitoFormModal';
 import { FacturarHitoModal } from '../FacturarHitoModal/FacturarHitoModal';
 import { FacturarConsolidadoModal } from '../FacturarConsolidadoModal/FacturarConsolidadoModal';
-import { HitoDetalleModal } from '../HitoDetalleModal/HitoDetalleModal';
 import { useAuth } from '../../../hooks/useAuth';
 import { ESTADOS_HITO, ETIQUETA_ESTADO_HITO, Hito, Tarea } from '../../../types/proyectos';
 
@@ -32,16 +31,13 @@ interface ProyectoHitosTabProps {
 }
 
 export function ProyectoHitosTab({ proyectoId, hitos, tareas, onInvalidar, onError, onFacturado }: ProyectoHitosTabProps) {
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { tienePermiso } = useAuth();
   const puedeVerCosto = tienePermiso('proyectos.rentabilidad.ver');
-  const [modalAbierto, setModalAbierto] = useState(false);
-  const [hitoEditando, setHitoEditando] = useState<Hito | null>(null);
   const [hitoAEliminar, setHitoAEliminar] = useState<Hito | null>(null);
   const [hitoAFacturar, setHitoAFacturar] = useState<Hito | null>(null);
-  const [hitoDetalle, setHitoDetalle] = useState<Hito | null>(null);
   const [facturarTodoAbierto, setFacturarTodoAbierto] = useState(false);
-  const [errorForm, setErrorForm] = useState<string | null>(null);
 
   // Fase 5 — costo interno (salario) de las horas ya cargadas en cada hito,
   // para avisar si `montoFijo` no lo cubre. Mismo permiso que Rentabilidad:
@@ -56,26 +52,6 @@ export function ProyectoHitosTab({ proyectoId, hitos, tareas, onInvalidar, onErr
     queryClient.invalidateQueries({ queryKey: ['proyecto', proyectoId] });
     onInvalidar();
   };
-
-  const crearHito = useMutation({
-    mutationFn: async (valores: HitoFormValues) => apiClient.post(`/admin/proyectos/${proyectoId}/hitos`, valores),
-    onSuccess: () => {
-      setModalAbierto(false);
-      setErrorForm(null);
-      invalidar();
-    },
-    onError: (err) => setErrorForm(mensajeErrorApi(err, 'No se pudo crear el hito.')),
-  });
-
-  const editarHito = useMutation({
-    mutationFn: async (valores: HitoFormValues) => apiClient.patch(`/admin/proyectos/hitos/${hitoEditando?.id}`, valores),
-    onSuccess: () => {
-      setHitoEditando(null);
-      setErrorForm(null);
-      invalidar();
-    },
-    onError: (err) => setErrorForm(mensajeErrorApi(err, 'No se pudo guardar el hito.')),
-  });
 
   const eliminarHito = useMutation({
     mutationFn: async (hitoId: string) => apiClient.delete(`/admin/proyectos/hitos/${hitoId}`),
@@ -148,7 +124,7 @@ export function ProyectoHitosTab({ proyectoId, hitos, tareas, onInvalidar, onErr
             </RequierePermiso>
           )}
           <RequierePermiso permiso="proyectos.crear">
-            <Button onClick={() => setModalAbierto(true)}>Nuevo hito</Button>
+            <Button onClick={() => navigate(`/proyectos/${proyectoId}/hitos/nuevo`)}>Nuevo hito</Button>
           </RequierePermiso>
         </div>
       }
@@ -162,7 +138,7 @@ export function ProyectoHitosTab({ proyectoId, hitos, tareas, onInvalidar, onErr
           return (
           <div
             key={h.id}
-            onClick={() => setHitoDetalle(h)}
+            onClick={() => navigate(`/proyectos/${proyectoId}/hitos/${h.id}`)}
             className="flex cursor-pointer items-center justify-between rounded-lg border border-slate-200 px-3 py-2 hover:border-sol-300 dark:border-slate-800 dark:hover:border-sol-500/50"
           >
             <div>
@@ -210,7 +186,7 @@ export function ProyectoHitosTab({ proyectoId, hitos, tareas, onInvalidar, onErr
               <RequierePermiso permiso="proyectos.editar">
                 <RowActionsMenu
                   acciones={[
-                    { etiqueta: 'Editar', onClick: () => setHitoEditando(h) },
+                    { etiqueta: 'Editar', onClick: () => navigate(`/proyectos/${proyectoId}/hitos/${h.id}`) },
                     { etiqueta: 'Eliminar', tono: 'peligro', onClick: () => setHitoAEliminar(h) },
                   ]}
                 />
@@ -221,57 +197,12 @@ export function ProyectoHitosTab({ proyectoId, hitos, tareas, onInvalidar, onErr
         })}
       </div>
 
-      {modalAbierto && (
-        <HitoFormModal
-          guardando={crearHito.isPending}
-          error={errorForm}
-          onClose={() => {
-            setModalAbierto(false);
-            setErrorForm(null);
-          }}
-          onGuardar={(valores) => crearHito.mutate(valores)}
-        />
-      )}
-
-      {hitoEditando && (
-        <HitoFormModal
-          hitoInicial={hitoEditando}
-          guardando={editarHito.isPending}
-          error={errorForm}
-          onClose={() => {
-            setHitoEditando(null);
-            setErrorForm(null);
-          }}
-          onGuardar={(valores) => editarHito.mutate(valores)}
-        />
-      )}
-
       {hitoAFacturar && (
         <FacturarHitoModal
           hitoId={hitoAFacturar.id}
           confirmando={facturarHito.isPending}
           onConfirmar={() => facturarHito.mutate(hitoAFacturar.id)}
           onCancelar={() => setHitoAFacturar(null)}
-        />
-      )}
-
-      {hitoDetalle && (
-        <HitoDetalleModal
-          hito={hitoDetalle}
-          tareas={tareas}
-          onClose={() => setHitoDetalle(null)}
-          onEditar={() => {
-            setHitoDetalle(null);
-            setHitoEditando(hitoDetalle);
-          }}
-          onFacturar={() => {
-            setHitoDetalle(null);
-            setHitoAFacturar(hitoDetalle);
-          }}
-          onEliminar={() => {
-            setHitoDetalle(null);
-            setHitoAEliminar(hitoDetalle);
-          }}
         />
       )}
 

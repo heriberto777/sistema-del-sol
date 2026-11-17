@@ -1,5 +1,6 @@
 import { DragEvent, FormEvent, useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import clsx from 'clsx';
 import { AlertTriangle, CalendarCheck, Check, CheckCircle2, Copy, ListTodo, MessageSquare, Search, Send, Settings, Sparkles, Trash2, Plus } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -9,8 +10,6 @@ import { soloFecha } from '../lib/fecha';
 import { Button } from '../components/atoms/Button/Button';
 import { Card } from '../components/atoms/Card/Card';
 import { Select } from '../components/atoms/Select/Select';
-import { TareaPersonalModal } from '../components/organisms/TareaPersonalModal/TareaPersonalModal';
-import { CategoriasIncentivoModal } from '../components/organisms/CategoriasIncentivoModal/CategoriasIncentivoModal';
 import { Modal } from '../components/molecules/Modal/Modal';
 import {
   CategoriaIncentivo,
@@ -1104,14 +1103,13 @@ function VistaIncentivos() {
 }
 
 export function MisTareas() {
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [vista, setVista] = useState<Vista>(() => {
     const guardada = localStorage.getItem(CLAVE_VISTA);
     return guardada === 'kanban' || guardada === 'agenda' || guardada === 'estadisticas' || guardada === 'incentivos' ? (guardada as Vista) : 'lista';
   });
   const [tituloNuevo, setTituloNuevo] = useState('');
-  const [tareaAbiertaId, setTareaAbiertaId] = useState<string | null>(null);
-  const [categoriasAbierto, setCategoriasAbierto] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => localStorage.setItem(CLAVE_VISTA, vista), [vista]);
@@ -1176,7 +1174,6 @@ export function MisTareas() {
   }
 
   const lista = tareas ?? [];
-  const tareaActual = tareaAbiertaId ? lista.find((t) => t.id === tareaAbiertaId) ?? null : null;
 
   return (
     <div className="space-y-4">
@@ -1187,7 +1184,7 @@ export function MisTareas() {
         </div>
         <button
           type="button"
-          onClick={() => setCategoriasAbierto(true)}
+          onClick={() => navigate('/mis-tareas/categorias-incentivo')}
           className="flex shrink-0 items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
         >
           <Settings size={13} />
@@ -1230,7 +1227,7 @@ export function MisTareas() {
       {!isLoading && vista === 'lista' && (
         <VistaLista
           tareas={lista}
-          onAbrir={(t) => setTareaAbiertaId(t.id)}
+          onAbrir={(t) => navigate(`/mis-tareas/${t.id}`)}
           onCambiarEstado={(id, estado) => cambiarEstado.mutate({ id, estado })}
           onEliminar={(id) => eliminar.mutate(id)}
           onDuplicar={(t) => duplicar.mutate([t])}
@@ -1240,17 +1237,14 @@ export function MisTareas() {
       {!isLoading && vista === 'kanban' && (
         <VistaKanban
           tareas={lista}
-          onAbrir={(t) => setTareaAbiertaId(t.id)}
+          onAbrir={(t) => navigate(`/mis-tareas/${t.id}`)}
           onCambiarEstado={(id, estado) => cambiarEstado.mutate({ id, estado })}
           onDuplicar={(t) => duplicar.mutate([t])}
         />
       )}
-      {!isLoading && vista === 'agenda' && <VistaAgenda tareas={lista} onAbrir={(t) => setTareaAbiertaId(t.id)} />}
+      {!isLoading && vista === 'agenda' && <VistaAgenda tareas={lista} onAbrir={(t) => navigate(`/mis-tareas/${t.id}`)} />}
       {!isLoading && vista === 'estadisticas' && <VistaEstadisticas tareas={lista} />}
       {!isLoading && vista === 'incentivos' && <VistaIncentivos />}
-
-      {tareaActual && <TareaPersonalModal tarea={tareaActual} onClose={() => setTareaAbiertaId(null)} />}
-      {categoriasAbierto && <CategoriasIncentivoModal onClose={() => setCategoriasAbierto(false)} />}
     </div>
   );
 }

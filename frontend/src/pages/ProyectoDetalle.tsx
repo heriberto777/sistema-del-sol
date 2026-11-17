@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { apiClient } from '../lib/api-client';
 import { mensajeErrorApi } from '../lib/mensaje-error-api';
@@ -10,7 +10,6 @@ import { Select } from '../components/atoms/Select/Select';
 import { RequierePermiso } from '../components/organisms/RequierePermiso/RequierePermiso';
 import { SubNavTabs, type SubNavTab } from '../components/molecules/SubNavTabs/SubNavTabs';
 import { useAuth } from '../hooks/useAuth';
-import { EditarProyectoModal } from '../components/organisms/EditarProyectoModal/EditarProyectoModal';
 import { ProyectoHitosTab } from '../components/organisms/ProyectoHitosTab/ProyectoHitosTab';
 import { KanbanTareas } from '../components/organisms/KanbanTareas/KanbanTareas';
 import {
@@ -41,6 +40,7 @@ type PestanaId = (typeof PESTANAS)[number]['id'];
 
 export function ProyectoDetalle() {
   const { id, tab } = useParams<{ id: string; tab: string }>();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { tienePermiso } = useAuth();
   const puedeVerRentabilidad = tienePermiso('proyectos.rentabilidad.ver');
@@ -56,7 +56,6 @@ export function ProyectoDetalle() {
     etiqueta: p.etiqueta,
     ...(p.id === 'rentabilidad' ? { permiso: 'proyectos.rentabilidad.ver' } : {}),
   }));
-  const [modalEditarAbierto, setModalEditarAbierto] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [mensajeFactura, setMensajeFactura] = useState<string | null>(null);
 
@@ -116,7 +115,7 @@ export function ProyectoDetalle() {
                 ))}
               </Select>
               <RequierePermiso permiso="proyectos.editar">
-                <Button variante="secundario" onClick={() => setModalEditarAbierto(true)}>
+                <Button variante="secundario" onClick={() => navigate(`/proyectos/${id}/editar`)}>
                   Editar
                 </Button>
               </RequierePermiso>
@@ -253,9 +252,6 @@ export function ProyectoDetalle() {
           </RequierePermiso>
         )}
 
-        {modalEditarAbierto && (
-          <EditarProyectoModal proyecto={proyecto} onClose={() => setModalEditarAbierto(false)} onGuardado={() => { setModalEditarAbierto(false); invalidar(); }} />
-        )}
       </div>
     </RequierePermiso>
   );

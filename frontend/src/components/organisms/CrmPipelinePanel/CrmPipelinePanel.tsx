@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../../lib/api-client';
 import { Card } from '../../atoms/Card/Card';
@@ -7,10 +7,6 @@ import { RowActionsMenu } from '../../molecules/RowActionsMenu/RowActionsMenu';
 import { EstadoVacio } from '../../molecules/EstadoVacio/EstadoVacio';
 import { useAuth } from '../../../hooks/useAuth';
 import { EtapaPipeline, ETIQUETA_ESTADO_COTIZACION_CRM, Oportunidad } from '../../../types/crm';
-import { ModalFormOportunidad } from './ModalFormOportunidad';
-import { ModalCerrarOportunidad } from './ModalCerrarOportunidad';
-import { ModalDetalleOportunidad } from './ModalDetalleOportunidad';
-import { ModalGenerarCotizacionOportunidad } from './ModalGenerarCotizacionOportunidad';
 
 interface PipelineResponse {
   abiertas: Oportunidad[];
@@ -18,19 +14,7 @@ interface PipelineResponse {
   perdidasRecientes: Oportunidad[];
 }
 
-function TarjetaOportunidad({
-  oportunidad,
-  etapas,
-  onVerDetalle,
-  onCerrar,
-  onGenerarCotizacion,
-}: {
-  oportunidad: Oportunidad;
-  etapas: EtapaPipeline[];
-  onVerDetalle: () => void;
-  onCerrar: (estado: 'GANADA' | 'PERDIDA') => void;
-  onGenerarCotizacion: () => void;
-}) {
+function TarjetaOportunidad({ oportunidad, etapas, onVerDetalle }: { oportunidad: Oportunidad; etapas: EtapaPipeline[]; onVerDetalle: () => void }) {
   const queryClient = useQueryClient();
   const { tienePermiso } = useAuth();
 
@@ -45,15 +29,15 @@ function TarjetaOportunidad({
   });
 
   const puedeEditar = tienePermiso('crm.oportunidades.editar') && oportunidad.estado === 'ABIERTA';
-  const puedeGenerarCotizacion = puedeEditar && tienePermiso('crm.oportunidades.convertir') && !oportunidad.cotizacionId;
+  // Marcar ganada/perdida y Generar cotización pasaron a la página de
+  // detalle (OportunidadVer) — acá solo quedan acciones puntuales sobre
+  // la tarjeta (mover de etapa, eliminar), igual criterio que "marcar
+  // cobrado" en otros Kanban/listados.
   const acciones = [
     { etiqueta: 'Ver detalle', onClick: onVerDetalle },
-    ...(puedeGenerarCotizacion ? [{ etiqueta: 'Generar cotización', onClick: onGenerarCotizacion }] : []),
     ...(puedeEditar
       ? etapas.filter((e) => e.id !== oportunidad.etapaId).map((e) => ({ etiqueta: `Mover a: ${e.nombre}`, onClick: () => moverEtapa.mutate(e.id) }))
       : []),
-    ...(puedeEditar ? [{ etiqueta: 'Marcar ganada', onClick: () => onCerrar('GANADA') }] : []),
-    ...(puedeEditar ? [{ etiqueta: 'Marcar perdida', onClick: () => onCerrar('PERDIDA'), tono: 'peligro' as const }] : []),
     ...(tienePermiso('crm.oportunidades.eliminar') && !oportunidad.cotizacionId
       ? [{ etiqueta: 'Eliminar', onClick: () => eliminar.mutate(), tono: 'peligro' as const }]
       : []),
@@ -91,10 +75,7 @@ function TarjetaOportunidad({
 
 export function CrmPipelinePanel() {
   const { tienePermiso } = useAuth();
-  const [creando, setCreando] = useState(false);
-  const [viendo, setViendo] = useState<Oportunidad | null>(null);
-  const [cerrando, setCerrando] = useState<{ oportunidad: Oportunidad; estado: 'GANADA' | 'PERDIDA' } | null>(null);
-  const [generandoCotizacion, setGenerandoCotizacion] = useState<Oportunidad | null>(null);
+  const navigate = useNavigate();
 
   const { data: etapas } = useQuery({
     queryKey: ['crm-etapas-pipeline'],
@@ -115,7 +96,11 @@ export function CrmPipelinePanel() {
       <Card
         titulo="Pipeline"
         descripcion="Oportunidades abiertas por etapa — últimas ganadas/perdidas de los últimos 30 días."
-        acciones={tienePermiso('crm.oportunidades.crear') && etapasOrdenadas.length > 0 ? <Button onClick={() => setCreando(true)}>Nueva oportunidad</Button> : undefined}
+        acciones={
+          tienePermiso('crm.oportunidades.crear') && etapasOrdenadas.length > 0 ? (
+            <Button onClick={() => navigate('/crm/oportunidades/nueva')}>Nueva oportunidad</Button>
+          ) : undefined
+        }
       >
         {isLoading && <p className="text-sm text-slate-500 dark:text-slate-400">Cargando…</p>}
         {etapasOrdenadas.length === 0 && !isLoading && (
@@ -136,14 +121,7 @@ export function CrmPipelinePanel() {
                     <span className="font-mono text-[11px] text-slate-400">{oportunidades.length}</span>
                   </div>
                   {oportunidades.map((o) => (
-                    <TarjetaOportunidad
-                      key={o.id}
-                      oportunidad={o}
-                      etapas={etapasOrdenadas}
-                      onVerDetalle={() => setViendo(o)}
-                      onCerrar={(estado) => setCerrando({ oportunidad: o, estado })}
-                      onGenerarCotizacion={() => setGenerandoCotizacion(o)}
-                    />
+                    <TarjetaOportunidad key={o.id} oportunidad={o} etapas={etapasOrdenadas} onVerDetalle={() => navigate(`/crm/oportunidades/${o.id}`)} />
                   ))}
                 </div>
               );
@@ -155,7 +133,7 @@ export function CrmPipelinePanel() {
                 <span className="font-mono text-[11px] text-slate-400">{pipeline.ganadasRecientes.length}</span>
               </div>
               {pipeline.ganadasRecientes.map((o) => (
-                <TarjetaOportunidad key={o.id} oportunidad={o} etapas={etapasOrdenadas} onVerDetalle={() => setViendo(o)} onCerrar={() => {}} onGenerarCotizacion={() => {}} />
+                <TarjetaOportunidad key={o.id} oportunidad={o} etapas={etapasOrdenadas} onVerDetalle={() => navigate(`/crm/oportunidades/${o.id}`)} />
               ))}
             </div>
 
@@ -165,17 +143,12 @@ export function CrmPipelinePanel() {
                 <span className="font-mono text-[11px] text-slate-400">{pipeline.perdidasRecientes.length}</span>
               </div>
               {pipeline.perdidasRecientes.map((o) => (
-                <TarjetaOportunidad key={o.id} oportunidad={o} etapas={etapasOrdenadas} onVerDetalle={() => setViendo(o)} onCerrar={() => {}} onGenerarCotizacion={() => {}} />
+                <TarjetaOportunidad key={o.id} oportunidad={o} etapas={etapasOrdenadas} onVerDetalle={() => navigate(`/crm/oportunidades/${o.id}`)} />
               ))}
             </div>
           </div>
         )}
       </Card>
-
-      {creando && <ModalFormOportunidad etapas={etapasOrdenadas} onClose={() => setCreando(false)} />}
-      {viendo && <ModalDetalleOportunidad oportunidad={viendo} onClose={() => setViendo(null)} />}
-      {cerrando && <ModalCerrarOportunidad oportunidad={cerrando.oportunidad} estado={cerrando.estado} onClose={() => setCerrando(null)} />}
-      {generandoCotizacion && <ModalGenerarCotizacionOportunidad oportunidad={generandoCotizacion} onClose={() => setGenerandoCotizacion(null)} />}
     </div>
   );
 }
