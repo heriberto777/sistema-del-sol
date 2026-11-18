@@ -71,10 +71,15 @@ export function LeadVer() {
     mutationFn: async () =>
       apiClient.patch<Lead>(`/crm/leads/${id}`, { nombre, email: email || undefined, telefono: telefono || undefined, origen, notas: notas || undefined }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['crm-leads'] });
-      queryClient.invalidateQueries({ queryKey: ['crm-lead', id] });
       confirmarGuardado();
       setEditando(false);
+      // Diferido un macrotask — ver el comentario equivalente en
+      // OrdenCompraVer.tsx (bug real de removeChild, intermitente, por la
+      // carrera entre este refetch y el cambio de editando→false).
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ['crm-leads'] });
+        queryClient.invalidateQueries({ queryKey: ['crm-lead', id] });
+      }, 0);
     },
     onError: (err) => setError(mensajeErrorApi(err, 'No se pudo guardar el lead.')),
   });

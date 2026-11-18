@@ -72,10 +72,15 @@ export function OportunidadVer() {
   const guardar = useMutation({
     mutationFn: async () => apiClient.patch(`/crm/oportunidades/${id}`, { titulo, etapaId, montoEstimado: Number(montoEstimado), fechaCierreEstimada }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['crm-pipeline'] });
-      queryClient.invalidateQueries({ queryKey: ['crm-oportunidad', id] });
       confirmarGuardado();
       setEditando(false);
+      // Diferido un macrotask — ver el comentario equivalente en
+      // OrdenCompraVer.tsx (bug real de removeChild, intermitente, por la
+      // carrera entre este refetch y el cambio de editando→false).
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ['crm-pipeline'] });
+        queryClient.invalidateQueries({ queryKey: ['crm-oportunidad', id] });
+      }, 0);
     },
     onError: (err) => setError(mensajeErrorApi(err, 'No se pudo guardar la oportunidad.')),
   });

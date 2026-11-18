@@ -133,10 +133,19 @@ export function OrdenCompraVer() {
         })),
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ordenes-compra'] });
-      queryClient.invalidateQueries({ queryKey: ['orden-compra', id] });
       confirmarGuardado();
       setEditando(false);
+      // Diferido un macrotask — invalidar esta query dispara un refetch que
+      // notifica a este mismo componente casi en el mismo instante en que
+      // `editando` lo hace pasar de <form> a <div> (unmount de
+      // SelectorLineaProducto y sus efectos propios); sin el defer, React
+      // puede intentar commitear ambas actualizaciones pisadas una sobre
+      // otra y romper con "Failed to execute 'removeChild'" (bug real,
+      // intermitente — reproducido activando/guardando dos veces seguidas).
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ['ordenes-compra'] });
+        queryClient.invalidateQueries({ queryKey: ['orden-compra', id] });
+      }, 0);
     },
     onError: (err) => setError(mensajeErrorApi(err, 'No se pudo guardar la orden de compra. Revisa los datos.')),
   });

@@ -174,10 +174,15 @@ export function TenantVer() {
         logo: logo ?? '',
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['platform-tenants'] });
-      queryClient.invalidateQueries({ queryKey: ['platform-tenant', id] });
       confirmarGuardado();
       setEditando(false);
+      // Diferido un macrotask — ver el comentario equivalente en
+      // OrdenCompraVer.tsx (bug real de removeChild, intermitente, por la
+      // carrera entre este refetch y el cambio de editando→false).
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ['platform-tenants'] });
+        queryClient.invalidateQueries({ queryKey: ['platform-tenant', id] });
+      }, 0);
     },
     onError: (err) => setError(mensajeErrorApi(err, 'No se pudo guardar. Revisa que el subdominio no esté repetido.')),
   });

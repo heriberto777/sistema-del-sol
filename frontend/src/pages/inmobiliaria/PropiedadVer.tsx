@@ -172,6 +172,18 @@ export function PropiedadVer() {
     }
   }, [propiedad, cargado]);
 
+  // Tras crear, `navigate()` reutiliza esta misma instancia (misma ruta,
+  // ahora con `id`) — sin esto, `editando` queda pegado en `true` (su valor
+  // inicial de cuando `esNuevo` todavía era true) y la página se queda en
+  // modo edición con datos recién cargados, en vez de pasar a "ver" como
+  // cualquier propiedad ya existente (bug real: guardar en ese estado
+  // colgado disparaba una carrera con el efecto de arriba y rompía el commit
+  // de React al cambiar de `<form>` a `<div>`).
+  useEffect(() => {
+    if (!esNuevo && cargado) setEditando(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [esNuevo, cargado]);
+
   function alternarAmenidad(nombre: string) {
     setForm((actual) => ({
       ...actual,
@@ -183,8 +195,6 @@ export function PropiedadVer() {
     mutationFn: async () =>
       esNuevo ? apiClient.post('/admin/inmobiliaria/propiedades', dtoDesdeForm(form)) : apiClient.patch(`/admin/inmobiliaria/propiedades/${id}`, dtoDesdeForm(form)),
     onSuccess: (respuesta) => {
-      queryClient.invalidateQueries({ queryKey: ['propiedades'] });
-      queryClient.invalidateQueries({ queryKey: ['propiedad', id] });
       confirmarGuardado();
       if (esNuevo) {
         const nuevaId = (respuesta.data as { id: string }).id;
@@ -192,6 +202,13 @@ export function PropiedadVer() {
       } else {
         setEditando(false);
       }
+      // Diferido un macrotask — ver el comentario equivalente en
+      // OrdenCompraVer.tsx (bug real de removeChild, intermitente, por la
+      // carrera entre este refetch y el cambio de editando→false/navigate).
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ['propiedades'] });
+        queryClient.invalidateQueries({ queryKey: ['propiedad', id] });
+      }, 0);
     },
     onError: (err) => setError(mensajeErrorApi(err, 'No se pudo guardar la propiedad.')),
   });

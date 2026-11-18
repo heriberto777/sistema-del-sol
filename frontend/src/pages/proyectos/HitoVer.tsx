@@ -68,9 +68,12 @@ export function HitoVer() {
         montoFijo: montoFijo !== '' ? Number(montoFijo) : undefined,
       }),
     onSuccess: () => {
-      invalidar();
       confirmarGuardado();
       setEditando(false);
+      // Diferido un macrotask — ver el comentario equivalente en
+      // OrdenCompraVer.tsx (bug real de removeChild, intermitente, por la
+      // carrera entre este refetch y el cambio de editando→false).
+      setTimeout(invalidar, 0);
     },
     onError: (err) => setError(mensajeErrorApi(err, 'No se pudo guardar el hito.')),
   });
