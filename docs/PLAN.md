@@ -20,7 +20,7 @@ Convención de estado: `🔲 Pendiente de diseño` · `🟡 En diseño` ·
 | Parametrización de cuentas contables y centros de costo — los 4 puntos (banco real en Pagos; cuenta de ingreso/costo por categoría; Centro de Costo por línea; override de los 15 códigos fijos) | ✅ Implementado 2026-11-23 — plan completo |
 | Depósito bancario (Caja → Banco) | 🔲 Pendiente de diseño |
 | Bug "removeChild" por ícono inferido del `<Button>` (variante nueva) | 🔲 2 casos encontrados sin corregir (ProductoNuevo, FacturacionNueva) — ver ARCHITECTURE.md |
-| Backlog UX/operación (Conteo Físico, modales→página, parámetros operativos, reporte de problemas, manual) | 🔲 Pendiente — ver detalle en `memoized-noodling-moore.md` (plan de Claude Code) |
+| Backlog UX/operación (Conteo Físico, modales→página, parámetros operativos, reporte de problemas, manual) | ✅ Ya estaba completo — los 5 bloques tienen commit (ver detalle abajo), `memoized-noodling-moore.md` estaba desactualizado |
 
 ---
 
@@ -231,13 +231,27 @@ ningún camino para moverlo a una cuenta bancaria puntual.
 
 ## Backlog UX/operación (heredado de sesión de plan mode)
 
-Ver detalle completo en el plan de Claude Code guardado en
-`C:\Users\longb\.claude\plans\memoized-noodling-moore.md`. Resumen:
+**Estado:** ✅ Completo — al retomarlo 2026-11-23 se confirmó que los 5
+bloques del plan guardado en
+`C:\Users\longb\.claude\plans\memoized-noodling-moore.md` ya tenían
+commit (ese archivo de plan mode había quedado desactualizado, nunca se
+tachó al cerrarlo):
 
-- [ ] Bloque 1 — Conteo Físico a página, selector real
-- [ ] Bloque 2 — Modales → páginas completas (Factura/Cotización/Remisión
-      "Ver detalle", Gestión de Cobro, Gasto Menor)
-- [ ] Bloque 3 — Parámetros Generales operativos (`STOCK_MINIMO_DEFAULT`,
-      `PLAZO_PAGO_DIAS`)
-- [ ] Bloque 4 — Sistema de reporte de problemas (tenant → plataforma)
-- [ ] Bloque 5 — Manual de Finanzas y Contabilidad (documento, Claude Docs)
+- [x] Bloque 1 — Conteo Físico a página, selector real — commit `fc678f1`
+      (`InventarioConteoNuevo.tsx`, filtra `controlaVencimiento` del lado
+      del frontend, bodega siempre primero, mensajes de error TOTAL vs.
+      SELECCION distintos en `ConteoFisicoService.crear`).
+- [x] Bloque 2 — Modales → páginas completas (Factura/Cotización/Remisión
+      "Ver detalle", Gestión de Cobro, Gasto Menor) — mismo commit
+      `fc678f1`.
+- [x] Bloque 3 — Parámetros Generales operativos (`STOCK_MINIMO_DEFAULT`,
+      `PLAZO_PAGO_DIAS` conectados; `ITBIS_REDUCIDA`/retenciones marcadas
+      "solo referencia") — commit `e6e8ff0`.
+- [x] Bloque 4 — Sistema de reporte de problemas (tenant → plataforma) —
+      commits `4244ec6`/`9044d6f`/`281486e`/`dcdbb58` (modelo
+      `ReporteTenant`, permiso `platform.soporte.gestionar`).
+- [x] Bloque 5 — Manual de Finanzas y Contabilidad (documento, Claude
+      Docs) — publicado ("Manual de Finanzas y Contabilidad" /
+      "Manual de Contabilidad" en la galería de artifacts).
+
+No queda nada abierto de este backlog.
