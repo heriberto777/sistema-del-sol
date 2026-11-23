@@ -2,9 +2,11 @@ import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { CierrePeriodoRepository } from './cierre-periodo.repository';
 import { AsientosContablesRepository } from './asientos-contables.repository';
 import { CuentasContablesRepository } from './cuentas-contables.repository';
+import { EstadosFinancierosService } from './estados-financieros.service';
 import { CODIGOS_CUENTA } from './cuentas-base';
 import { CerrarPeriodoDto } from './dto/cerrar-periodo.dto';
 import { rangoDelMes, rangoDelMesSiguiente } from './periodos-contables.util';
+import { BancosService } from '../bancos/bancos.service';
 
 const EPSILON = 0.005;
 
@@ -30,6 +32,8 @@ export class CierrePeriodoService {
     private readonly cierreRepository: CierrePeriodoRepository,
     private readonly asientosRepository: AsientosContablesRepository,
     private readonly cuentasRepository: CuentasContablesRepository,
+    private readonly estadosFinancierosService: EstadosFinancierosService,
+    private readonly bancosService: BancosService,
   ) {}
 
   listar() {
@@ -108,6 +112,60 @@ export class CierrePeriodoService {
     if (periodo.estado === 'CERRADO') {
       throw new BadRequestException(`El período que cubre la fecha ${fecha.toISOString().slice(0, 10)} ya está cerrado`);
     }
+  }
+
+  /**
+   * Asistente de pre-cierre (docs/PLAN.md) — checklist informativo que se
+   * muestra antes de cerrar un período, NUNCA bloquea (decisión
+   * confirmada, mismo criterio que `excedioSaldo` de Depósito Bancario).
+   * Dos categorías con semántica distinta, deliberadamente separadas:
+   *
+   * - `riesgosContables`: conciliación bancaria pendiente y turnos de POS
+   *   sin cerrar/revisar — nada de esto genera ni bloquea un asiento por
+   *   sí mismo, pero sí deja un cabo suelto real sobre la exactitud del
+   *   efectivo de este período.
+   * - `pendientesComerciales`: cotizaciones sin convertir y remisiones
+   *   entregadas sin facturar — ninguna de las dos generó jamás un
+   *   asiento ni puede reabrir retroactivamente este período al
+   *   resolverse después (usan la fecha del momento en que se conviertan,
+   *   no la original). Es un recordatorio de proceso de ventas, no un
+   *   riesgo contable — por eso va aparte.
+   */
+  async asistentePrecierre(periodoId: string) {
+    const periodo = await this.cierreRepository.buscarPorId(periodoId);
+    const desde = periodo.fechaInicio;
+    const hasta = periodo.fechaFin;
+
+    const cuentasBancarias = await this.bancosService.listarTodasActivas();
+    const conciliaciones = await Promise.all(
+      cuentasBancarias.map((cb) => this.estadosFinancierosService.conciliacionBancaria(cb.id, desde.toISOString(), hasta.toISOString())),
+    );
+    const conciliacionPendiente = conciliaciones
+      .filter((c) => Math.abs(c.saldoPendiente) > EPSILON)
+      .map((c) => ({ cuentaBancariaId: c.cuentaBancaria.id, banco: c.cuentaBancaria.banco, numeroCuenta: c.cuentaBancaria.numeroCuenta, saldoPendiente: c.saldoPendiente }));
+
+    const turnosSinCerrar = await this.cierreRepository.turnosSinCerrarEnRango(desde, hasta);
+
+    const cotizaciones = await this.cierreRepository.cotizacionesSinConvertirEnRango(desde, hasta);
+    const remisiones = await this.cierreRepository.remisionesSinFacturarEnRango(desde, hasta);
+
+    return {
+      periodo: { id: periodo.id, fechaInicio: periodo.fechaInicio, fechaFin: periodo.fechaFin },
+      riesgosContables: {
+        conciliacionPendiente,
+        turnosSinCerrar: turnosSinCerrar.map((t) => ({
+          id: t.id,
+          bodega: t.bodega.nombre,
+          cajero: t.cajero.nombre,
+          abiertoEn: t.abiertoEn,
+          estado: t.estado,
+        })),
+      },
+      pendientesComerciales: {
+        cotizacionesSinConvertir: cotizaciones.map((c) => ({ id: c.id, numero: c.numero, cliente: c.cliente.nombre, fecha: c.createdAt, total: c.total })),
+        remisionesSinFacturar: remisiones.map((r) => ({ id: r.id, numero: r.numero, cliente: r.cliente.nombre, fecha: r.fecha })),
+      },
+    };
   }
 
   /**

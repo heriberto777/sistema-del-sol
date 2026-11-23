@@ -12,8 +12,10 @@ import { CierrePeriodoService } from './cierre-periodo.service';
 import { CierrePeriodoController } from './cierre-periodo.controller';
 import { CierrePeriodoRepository } from './cierre-periodo.repository';
 import { PeriodosContablesCronService } from './periodos-contables-cron.service';
+import { BancosModule } from '../bancos/bancos.module';
 
 @Module({
+  imports: [BancosModule],
   controllers: [CuentasContablesController, AsientosContablesController, EstadosFinancierosController, CierrePeriodoController],
   providers: [
     CuentasContablesService,

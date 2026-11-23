@@ -26,6 +26,37 @@ export class CierrePeriodoRepository {
     return this.db.periodoContable.findFirst({ orderBy: { fechaInicio: 'desc' } });
   }
 
+  buscarPorId(id: string) {
+    return this.db.periodoContable.findUniqueOrThrow({ where: { id } });
+  }
+
+  /** Asistente de pre-cierre (docs/PLAN.md) — turnos de POS sin cerrar/revisar abiertos dentro del rango. No genera ningún asiento (ver AsientosContablesService) — es un control de efectivo, no un riesgo contable. */
+  turnosSinCerrarEnRango(desde: Date, hasta: Date) {
+    return this.db.turnoCaja.findMany({
+      where: { estado: { in: ['ABIERTO', 'PENDIENTE_REVISION'] }, abiertoEn: { gte: desde, lte: hasta } },
+      orderBy: { abiertoEn: 'asc' },
+      include: { bodega: { select: { nombre: true } }, cajero: { select: { nombre: true } } },
+    });
+  }
+
+  /** Asistente de pre-cierre — cotizaciones sin convertir (ni rechazadas/vencidas) dentro del rango. Recordatorio comercial, no riesgo contable: una cotización nunca generó ningún asiento. */
+  cotizacionesSinConvertirEnRango(desde: Date, hasta: Date) {
+    return this.db.cotizacion.findMany({
+      where: { facturaId: null, estado: { in: ['BORRADOR', 'ENVIADA'] }, createdAt: { gte: desde, lte: hasta } },
+      orderBy: { createdAt: 'asc' },
+      include: { cliente: { select: { nombre: true } } },
+    });
+  }
+
+  /** Asistente de pre-cierre — remisiones ENTREGADA sin facturar dentro del rango: el caso real ("se entregó, nunca se cobró"), a diferencia de una BORRADOR (nada salió todavía). */
+  remisionesSinFacturarEnRango(desde: Date, hasta: Date) {
+    return this.db.remision.findMany({
+      where: { facturaId: null, estado: 'ENTREGADA', fecha: { gte: desde, lte: hasta } },
+      orderBy: { fecha: 'asc' },
+      include: { cliente: { select: { nombre: true } } },
+    });
+  }
+
   crear(params: { tenantId: string; fechaInicio: Date; fechaFin: Date }) {
     return this.db.periodoContable.create({ data: params });
   }

@@ -4,6 +4,7 @@ import { apiClient } from '../../../lib/api-client';
 import { Badge } from '../../atoms/Badge/Badge';
 import { Button } from '../../atoms/Button/Button';
 import { Card } from '../../atoms/Card/Card';
+import { ConfirmModal } from '../../molecules/ConfirmModal/ConfirmModal';
 import { useAuth } from '../../../hooks/useAuth';
 import { mensajeErrorApi } from '../../../lib/mensaje-error-api';
 
@@ -46,6 +47,89 @@ function etiquetaPeriodo(p: Pick<Periodo, 'fechaInicio' | 'fechaFin'>) {
   return mismoMes ? mesCapitalizado(inicio) : `Histórico hasta ${mesCapitalizado(fin)}`;
 }
 
+interface AsistentePrecierre {
+  riesgosContables: {
+    conciliacionPendiente: { cuentaBancariaId: string; banco: string; numeroCuenta: string; saldoPendiente: number }[];
+    turnosSinCerrar: { id: string; bodega: string; cajero: string; abiertoEn: string; estado: 'ABIERTO' | 'PENDIENTE_REVISION' }[];
+  };
+  pendientesComerciales: {
+    cotizacionesSinConvertir: { id: string; numero: string; cliente: string; fecha: string; total: string }[];
+    remisionesSinFacturar: { id: string; numero: string; cliente: string; fecha: string }[];
+  };
+}
+
+/**
+ * Asistente de pre-cierre (docs/PLAN.md) — checklist INFORMATIVO, nunca
+ * bloquea: se muestra dentro del `ConfirmModal` de "Cerrar período".
+ * "Riesgos contables" (conciliación/turnos de caja) es distinto de
+ * "Pendientes comerciales" (cotizaciones/remisiones sin convertir) a
+ * propósito — lo segundo nunca generó ni puede reabrir retroactivamente
+ * un asiento de este período, es solo un recordatorio de proceso de
+ * ventas (ver el comentario de `CierrePeriodoService.asistentePrecierre`).
+ */
+function AsistentePrecierreChecklist({ periodoId }: { periodoId: string }) {
+  const { data, isLoading } = useQuery({
+    queryKey: ['asistente-precierre', periodoId],
+    queryFn: async () => (await apiClient.get<AsistentePrecierre>(`/contabilidad/cierre-periodo/${periodoId}/asistente-precierre`)).data,
+  });
+
+  if (isLoading || !data) {
+    return <p className="text-sm text-slate-500 dark:text-slate-400">Revisando conciliación, turnos de caja y pendientes comerciales…</p>;
+  }
+
+  const { conciliacionPendiente, turnosSinCerrar } = data.riesgosContables;
+  const { cotizacionesSinConvertir, remisionesSinFacturar } = data.pendientesComerciales;
+  const sinRiesgos = conciliacionPendiente.length === 0 && turnosSinCerrar.length === 0;
+  const sinPendientesComerciales = cotizacionesSinConvertir.length === 0 && remisionesSinFacturar.length === 0;
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-400">Riesgos contables</p>
+        {sinRiesgos ? (
+          <p className="text-sm text-emerald-700 dark:text-emerald-400">Sin pendientes — conciliación al día y sin turnos de caja abiertos.</p>
+        ) : (
+          <ul className="space-y-1">
+            {conciliacionPendiente.map((c) => (
+              <li key={c.cuentaBancariaId} className="rounded-md bg-amber-50 px-2 py-1.5 text-sm text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
+                {c.banco} — {c.numeroCuenta}: RD$ {c.saldoPendiente.toLocaleString('es-DO', { minimumFractionDigits: 2 })} sin conciliar
+              </li>
+            ))}
+            {turnosSinCerrar.map((t) => (
+              <li key={t.id} className="rounded-md bg-amber-50 px-2 py-1.5 text-sm text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
+                Turno de caja {t.estado === 'ABIERTO' ? 'abierto' : 'pendiente de revisión'} — {t.bodega} ({t.cajero}), desde{' '}
+                {new Date(t.abiertoEn).toLocaleDateString('es-DO')}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+      <div>
+        <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+          Pendientes comerciales (no afecta la contabilidad)
+        </p>
+        {sinPendientesComerciales ? (
+          <p className="text-sm text-slate-500 dark:text-slate-400">Sin cotizaciones ni remisiones sueltas en este rango.</p>
+        ) : (
+          <ul className="space-y-1">
+            {cotizacionesSinConvertir.map((c) => (
+              <li key={c.id} className="rounded-md bg-slate-50 px-2 py-1.5 text-sm text-slate-600 dark:bg-slate-800/60 dark:text-slate-300">
+                Cotización {c.numero} — {c.cliente} sin convertir (RD$ {Number(c.total).toLocaleString('es-DO', { minimumFractionDigits: 2 })})
+              </li>
+            ))}
+            {remisionesSinFacturar.map((r) => (
+              <li key={r.id} className="rounded-md bg-slate-50 px-2 py-1.5 text-sm text-slate-600 dark:bg-slate-800/60 dark:text-slate-300">
+                Remisión {r.numero} — {r.cliente} entregada sin facturar
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+      <p className="text-xs text-slate-400">Nada de esto bloquea el cierre — es solo informativo.</p>
+    </div>
+  );
+}
+
 /**
  * Período Contable, Fase 1 — ya no se elige una fecha libre: los períodos
  * (mensuales, por calendario) se crean solos (ver
@@ -59,6 +143,7 @@ export function CierrePeriodoView() {
   const { tienePermiso } = useAuth();
   const [error, setError] = useState<string | null>(null);
   const [mensajeCompletar, setMensajeCompletar] = useState<string | null>(null);
+  const [periodoParaCerrar, setPeriodoParaCerrar] = useState<Periodo | null>(null);
 
   const { data, isLoading, error: errorCarga } = useQuery({
     queryKey: ['contabilidad-periodos'],
@@ -74,6 +159,7 @@ export function CierrePeriodoView() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['contabilidad-periodos'] });
       setError(null);
+      setPeriodoParaCerrar(null);
     },
     onError: (err) =>
       setError(
@@ -156,8 +242,8 @@ export function CierrePeriodoView() {
                       </td>
                       <td className="px-5 py-3 text-right">
                         {esElMasAntiguoAbierto && tienePermiso('contabilidad.cerrarperiodo') && (
-                          <Button variante="secundario" disabled={cerrar.isPending} onClick={() => cerrar.mutate(p.id)}>
-                            {cerrar.isPending ? 'Cerrando…' : 'Cerrar'}
+                          <Button variante="secundario" onClick={() => setPeriodoParaCerrar(p)}>
+                            Cerrar
                           </Button>
                         )}
                       </td>
@@ -175,6 +261,18 @@ export function CierrePeriodoView() {
             </table>
           </div>
         </Card>
+      )}
+
+      {periodoParaCerrar && (
+        <ConfirmModal
+          titulo={`¿Cerrar ${etiquetaPeriodo(periodoParaCerrar)}?`}
+          descripcion={<AsistentePrecierreChecklist periodoId={periodoParaCerrar.id} />}
+          confirmarTexto="Cerrar de todas formas"
+          peligro={false}
+          confirmando={cerrar.isPending}
+          onConfirmar={() => cerrar.mutate(periodoParaCerrar.id)}
+          onCancelar={() => setPeriodoParaCerrar(null)}
+        />
       )}
     </div>
   );

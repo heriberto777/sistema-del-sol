@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { CierrePeriodoService } from './cierre-periodo.service';
 import { CerrarPeriodoDto } from './dto/cerrar-periodo.dto';
@@ -37,6 +37,14 @@ export class CierrePeriodoController {
   @Permissions('contabilidad.cerrarperiodo')
   completarFaltantes(@CurrentUser() user: JwtPayloadUser) {
     return this.cierrePeriodoService.completarFaltantes(user.tenantId);
+  }
+
+  // Mismo permiso que cerrar — el checklist solo tiene sentido para quien
+  // va a decidir si cierra o no.
+  @Get(':id/asistente-precierre')
+  @Permissions('contabilidad.cerrarperiodo')
+  asistentePrecierre(@Param('id') id: string) {
+    return this.cierrePeriodoService.asistentePrecierre(id);
   }
 
   @Post()

@@ -3,6 +3,8 @@ import { CierrePeriodoService } from './cierre-periodo.service';
 import { CierrePeriodoRepository } from './cierre-periodo.repository';
 import { AsientosContablesRepository } from './asientos-contables.repository';
 import { CuentasContablesRepository } from './cuentas-contables.repository';
+import { EstadosFinancierosService } from './estados-financieros.service';
+import { BancosService } from '../bancos/bancos.service';
 import { CODIGOS_CUENTA } from './cuentas-base';
 
 describe('CierrePeriodoService', () => {
@@ -10,6 +12,8 @@ describe('CierrePeriodoService', () => {
   let cierreRepository: jest.Mocked<CierrePeriodoRepository>;
   let asientosRepository: jest.Mocked<AsientosContablesRepository>;
   let cuentasRepository: jest.Mocked<CuentasContablesRepository>;
+  let estadosFinancierosService: jest.Mocked<EstadosFinancierosService>;
+  let bancosService: jest.Mocked<BancosService>;
 
   const cuentaUtilidades = { id: 'cuenta-utilidades', codigo: CODIGOS_CUENTA.UTILIDADES_RETENIDAS, nombre: 'Utilidades Retenidas' };
   // UTC a propósito (no local) — rangoDelMes/rangoDelMesSiguiente trabajan
@@ -29,13 +33,19 @@ describe('CierrePeriodoService', () => {
       listar: jest.fn(),
       crear: jest.fn(),
       cerrar: jest.fn().mockResolvedValue({ id: 'periodo-julio-cerrado' }),
+      buscarPorId: jest.fn().mockResolvedValue(periodoJulio),
+      turnosSinCerrarEnRango: jest.fn().mockResolvedValue([]),
+      cotizacionesSinConvertirEnRango: jest.fn().mockResolvedValue([]),
+      remisionesSinFacturarEnRango: jest.fn().mockResolvedValue([]),
     } as unknown as jest.Mocked<CierrePeriodoRepository>;
     asientosRepository = { lineasEnRango: jest.fn(), crear: jest.fn() } as unknown as jest.Mocked<AsientosContablesRepository>;
     cuentasRepository = {
       buscarPorCodigo: jest.fn().mockResolvedValue(cuentaUtilidades),
       resolverRolDeCuenta: jest.fn().mockResolvedValue(cuentaUtilidades),
     } as unknown as jest.Mocked<CuentasContablesRepository>;
-    service = new CierrePeriodoService(cierreRepository, asientosRepository, cuentasRepository);
+    estadosFinancierosService = { conciliacionBancaria: jest.fn() } as unknown as jest.Mocked<EstadosFinancierosService>;
+    bancosService = { listarTodasActivas: jest.fn().mockResolvedValue([]) } as unknown as jest.Mocked<BancosService>;
+    service = new CierrePeriodoService(cierreRepository, asientosRepository, cuentasRepository, estadosFinancierosService, bancosService);
   });
 
   describe('cerrarPeriodo', () => {
@@ -258,6 +268,57 @@ describe('CierrePeriodoService', () => {
       cierreRepository.buscarPorFecha.mockResolvedValue({ estado: 'ABIERTO' } as never);
 
       await expect(service.validarPeriodoAbierto(new Date('2026-07-15'))).resolves.toBeUndefined();
+    });
+  });
+
+  describe('asistentePrecierre (docs/PLAN.md — checklist informativo, nunca bloquea)', () => {
+    it('descarta una cuenta bancaria con saldo pendiente ~0 (dentro de EPSILON) y conserva la que sí tiene pendiente real', async () => {
+      bancosService.listarTodasActivas.mockResolvedValue([
+        { id: 'banco-ok', banco: 'Banco OK', numeroCuenta: '111' },
+        { id: 'banco-pendiente', banco: 'Banco Pendiente', numeroCuenta: '222' },
+      ] as never);
+      estadosFinancierosService.conciliacionBancaria.mockImplementation((async (cuentaBancariaId: string) => ({
+        cuentaBancaria: { id: cuentaBancariaId, banco: cuentaBancariaId === 'banco-ok' ? 'Banco OK' : 'Banco Pendiente', numeroCuenta: '' },
+        saldoPendiente: cuentaBancariaId === 'banco-ok' ? 0.001 : 1500,
+      })) as never);
+
+      const resultado = await service.asistentePrecierre('periodo-julio');
+
+      expect(resultado.riesgosContables.conciliacionPendiente).toEqual([
+        expect.objectContaining({ cuentaBancariaId: 'banco-pendiente', saldoPendiente: 1500 }),
+      ]);
+    });
+
+    it('arma riesgosContables/pendientesComerciales a partir de lo que devuelve el repositorio', async () => {
+      cierreRepository.turnosSinCerrarEnRango.mockResolvedValue([
+        { id: 't1', bodega: { nombre: 'Principal' }, cajero: { nombre: 'Juan' }, abiertoEn: new Date('2026-07-10'), estado: 'ABIERTO' },
+      ] as never);
+      cierreRepository.cotizacionesSinConvertirEnRango.mockResolvedValue([
+        { id: 'c1', numero: 'COT-001', cliente: { nombre: 'Cliente A' }, createdAt: new Date('2026-07-05'), total: 1000 },
+      ] as never);
+      cierreRepository.remisionesSinFacturarEnRango.mockResolvedValue([
+        { id: 'r1', numero: 'REM-001', cliente: { nombre: 'Cliente B' }, fecha: new Date('2026-07-06') },
+      ] as never);
+
+      const resultado = await service.asistentePrecierre('periodo-julio');
+
+      expect(resultado.riesgosContables.turnosSinCerrar).toEqual([
+        expect.objectContaining({ id: 't1', bodega: 'Principal', cajero: 'Juan', estado: 'ABIERTO' }),
+      ]);
+      expect(resultado.pendientesComerciales.cotizacionesSinConvertir).toEqual([
+        expect.objectContaining({ id: 'c1', numero: 'COT-001', cliente: 'Cliente A' }),
+      ]);
+      expect(resultado.pendientesComerciales.remisionesSinFacturar).toEqual([
+        expect.objectContaining({ id: 'r1', numero: 'REM-001', cliente: 'Cliente B' }),
+      ]);
+    });
+
+    it('consulta el rango exacto del período (fechaInicio/fechaFin), no un rango inventado', async () => {
+      await service.asistentePrecierre('periodo-julio');
+
+      expect(cierreRepository.turnosSinCerrarEnRango).toHaveBeenCalledWith(periodoJulio.fechaInicio, periodoJulio.fechaFin);
+      expect(cierreRepository.cotizacionesSinConvertirEnRango).toHaveBeenCalledWith(periodoJulio.fechaInicio, periodoJulio.fechaFin);
+      expect(cierreRepository.remisionesSinFacturarEnRango).toHaveBeenCalledWith(periodoJulio.fechaInicio, periodoJulio.fechaFin);
     });
   });
 });

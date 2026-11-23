@@ -15,7 +15,7 @@ Convención de estado: `🔲 Pendiente de diseño` · `🟡 En diseño` ·
 |---|---|
 | Período Contable — Fases 1+2 (aviso de período faltante + completar períodos) | ✅ Implementado — commits `88ea628`/`8eae640` |
 | "Ver Stock" en Productos | ✅ Implementado — commit `dbccd79` |
-| Asistente de pre-cierre contable | 🔲 Pendiente de diseño |
+| Asistente de pre-cierre contable | ✅ Implementado 2026-11-23 — ver detalle abajo |
 | Período de trabajo + advertencia blanda | 🔲 Pendiente de diseño |
 | Parametrización de cuentas contables y centros de costo — los 4 puntos (banco real en Pagos; cuenta de ingreso/costo por categoría; Centro de Costo por línea; override de los 15 códigos fijos) | ✅ Implementado 2026-11-23 — plan completo |
 | Depósito bancario (Caja → Banco) | ✅ Implementado 2026-11-23 — ver detalle abajo |
@@ -26,18 +26,50 @@ Convención de estado: `🔲 Pendiente de diseño` · `🟡 En diseño` ·
 
 ## 1. Asistente de pre-cierre contable
 
-**Estado:** 🔲 Pendiente de diseño (acordado dejarlo para otra sesión, 2026-11-23).
+**Estado:** ✅ Implementado 2026-11-23.
 
-Contexto: hoy `CierrePeriodoService.cerrarPeriodo()` es puramente mecánico
-— no exige ninguna conciliación/arqueo antes de permitir el cierre, el
-operador tiene que cuadrar todo por su cuenta fuera del sistema. La sesión
-de diseño pendiente debe cubrir, como mínimo:
+Contexto: hasta ahora `CierrePeriodoService.cerrarPeriodo()` era
+puramente mecánico — no exigía ninguna conciliación/arqueo antes de
+permitir el cierre, el operador tenía que cuadrar todo por su cuenta
+fuera del sistema.
 
-- Checklist de conciliación bancaria pendiente del rango (módulo Bancos).
-- Turnos de caja/arqueos de POS sin cerrar dentro del rango.
-- Documentos en borrador (facturas/compras/gastos) con fecha dentro del
-  período que se quiere cerrar.
-- Si el checklist **bloquea** el cierre o solo **advierte**.
+**Investigación previa al diseño** (cambió el alcance del borrador
+original): se verificó contra el código real qué documentos pueden de
+verdad amenazar la exactitud de los libros de un período ya cerrado.
+`Factura.estado` nunca llega a `BORRADOR` en la práctica (ningún código
+lo setea — estado vestigial del enum), y Compras/Gastos Menores nunca
+quedan "a medias" con una fecha retroactiva pendiente. Por eso el
+checklist final tiene **dos secciones con semántica distinta**, a
+propósito separadas:
+
+- **Riesgos contables** (si se ignoran, queda un cabo suelto real sobre
+  la exactitud del efectivo del período): conciliación bancaria
+  pendiente por cuenta (reusa `EstadosFinancierosService.
+  conciliacionBancaria`, solo cuentas con saldo pendiente ≠ 0) + turnos
+  de POS `ABIERTO`/`PENDIENTE_REVISION` con `abiertoEn` dentro del rango
+  — esto último es un control de efectivo, no genera ni depende de
+  ningún asiento (cerrar un turno no postea nada).
+- **Pendientes comerciales** (recordatorio de proceso de ventas, NUNCA
+  un riesgo contable — rotulado y coloreado distinto a propósito):
+  Cotizaciones `BORRADOR`/`ENVIADA` sin `facturaId`, y Remisiones
+  `ENTREGADA` sin `facturaId` (el caso real: "se entregó, nunca se
+  cobró") dentro del rango. Ninguna de las dos generó jamás un asiento
+  ni puede reabrir retroactivamente el período al resolverse después
+  (usan la fecha del momento en que se conviertan, no la original).
+
+**Nunca bloquea** (decisión confirmada, mismo criterio que
+`excedioSaldo` de Depósito Bancario): `GET /contabilidad/cierre-periodo/
+:id/asistente-precierre` (permiso `contabilidad.cerrarperiodo`, sin
+migración — solo lecturas) se consulta dentro de un `ConfirmModal` que
+reemplaza el "Cerrar" directo en `CierrePeriodoView.tsx` — el checklist
+se muestra, y el botón real sigue siendo "Cerrar de todas formas".
+
+Verificado en vivo contra datos reales del tenant demo: el período de
+noviembre mostró correctamente la conciliación pendiente de Banreservas
+(-RD$16,933.58, dato real ya existente) y una cotización sin convertir
+(00003, creada dentro del rango) — ambos números confirmados contra la
+base de datos. 2346 unitarios + 260 e2e en verde, `tsc --noEmit` limpio
+en ambos paquetes.
 
 ## 2. Período de trabajo + advertencia blanda
 
