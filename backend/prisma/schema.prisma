@@ -116,6 +116,7 @@ model Tenant {
   remisiones                 Remision[]
   cuentasContables           CuentaContable[]
   centrosCosto               CentroCosto[]
+  configuracionesCuentaContable ConfiguracionCuentaContable[]
   asientosContables          AsientoContable[]
   periodosContables          PeriodoContable[]
   empleados                  Empleado[]
@@ -1696,9 +1697,32 @@ model CuentaContable {
   lineasFacturaProveedor FacturaProveedorLinea[]
   categoriasIngreso      Categoria[]             @relation("CategoriaCuentaIngreso")
   categoriasCosto        Categoria[]             @relation("CategoriaCuentaCosto")
+  configuracionesSistema ConfiguracionCuentaContable[]
 
   @@unique([tenantId, codigo])
   @@map("cuentas_contables")
+}
+
+/// Override por tenant de los códigos fijos que el motor de asientos
+/// automáticos resuelve por ROL (docs/PLAN.md, punto 4 — CODIGOS_CUENTA
+/// en cuentas-base.ts). `clave` es una de esas 15 claves (ej.
+/// "CAJA_BANCOS") — String, no un enum de Postgres: agregar un rol nuevo
+/// no debería requerir una migración, mismo criterio que CODIGOS_CUENTA
+/// (constante de TypeScript). Sin fila para una clave dada, el motor cae
+/// en el código fijo de siempre (retrocompatible) — ver
+/// CuentasContablesRepository.resolverRolDeCuenta.
+model ConfiguracionCuentaContable {
+  id               String         @id @default(uuid())
+  tenantId         String
+  tenant           Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  clave            String
+  cuentaContableId String
+  cuentaContable   CuentaContable @relation(fields: [cuentaContableId], references: [id], onDelete: Cascade)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  @@unique([tenantId, clave])
+  @@map("configuraciones_cuenta_contable")
 }
 
 /// Centro de Costo (docs/PLAN.md, punto 3) — dimensión transversal

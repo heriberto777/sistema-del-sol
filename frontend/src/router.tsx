@@ -78,6 +78,7 @@ import { ReportesPublicacionesSociales } from './pages/reportes/ReportesPublicac
 import { ReportesTiendaOnline } from './pages/reportes/ReportesTiendaOnline';
 import { ReportesRetencionesProveedores } from './pages/reportes/ReportesRetencionesProveedores';
 import { ContabilidadCuentas } from './pages/contabilidad/ContabilidadCuentas';
+import { ConfiguracionCuentasSistema } from './pages/contabilidad/ConfiguracionCuentasSistema';
 import { CatalogoCuentaNueva } from './pages/CatalogoCuentaNueva';
 import { ContabilidadAsientos } from './pages/contabilidad/ContabilidadAsientos';
 import { AsientoContableNuevo } from './pages/AsientoContableNuevo';
@@ -420,6 +421,7 @@ const RUTAS_ADMIN = [
           { path: '/travel/buscar-hotel', element: <TravelBuscarHotel /> },
           { path: '/travel/markup', element: <TravelMarkup /> },
           { path: '/contabilidad/cuentas', element: <ContabilidadCuentas /> },
+          { path: '/contabilidad/cuentas/configuracion-sistema', element: <ConfiguracionCuentasSistema /> },
           { path: '/contabilidad/cuentas/nueva', element: <CatalogoCuentaNueva /> },
           { path: '/contabilidad/asientos', element: <ContabilidadAsientos /> },
           { path: '/contabilidad/asientos/nuevo', element: <AsientoContableNuevo /> },

@@ -31,7 +31,10 @@ describe('CierrePeriodoService', () => {
       cerrar: jest.fn().mockResolvedValue({ id: 'periodo-julio-cerrado' }),
     } as unknown as jest.Mocked<CierrePeriodoRepository>;
     asientosRepository = { lineasEnRango: jest.fn(), crear: jest.fn() } as unknown as jest.Mocked<AsientosContablesRepository>;
-    cuentasRepository = { buscarPorCodigo: jest.fn().mockResolvedValue(cuentaUtilidades) } as unknown as jest.Mocked<CuentasContablesRepository>;
+    cuentasRepository = {
+      buscarPorCodigo: jest.fn().mockResolvedValue(cuentaUtilidades),
+      resolverRolDeCuenta: jest.fn().mockResolvedValue(cuentaUtilidades),
+    } as unknown as jest.Mocked<CuentasContablesRepository>;
     service = new CierrePeriodoService(cierreRepository, asientosRepository, cuentasRepository);
   });
 

@@ -1,7 +1,7 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { CuentasContablesRepository } from './cuentas-contables.repository';
 import { CrearCuentaContableDto } from './dto/crear-cuenta-contable.dto';
-import { CUENTAS_CATALOGO_COMPLETO } from './cuentas-base';
+import { CUENTAS_CATALOGO_COMPLETO, CODIGOS_CUENTA, TIPO_ESPERADO_POR_ROL } from './cuentas-base';
 
 @Injectable()
 export class CuentasContablesService {
@@ -49,5 +49,51 @@ export class CuentasContablesService {
     }
 
     return { creadas: creadas.length, total: CUENTAS_CATALOGO_COMPLETO.length };
+  }
+
+  /**
+   * Override por tenant de los 15 códigos fijos que el motor de asientos
+   * automáticos resuelve por rol (docs/PLAN.md, punto 4). Devuelve los 15
+   * roles siempre (no solo los configurados), con `cuentaConfigurada:
+   * null` para los que siguen en el código fijo de siempre — así la
+   * pantalla de administración puede listarlos todos de una.
+   */
+  async listarConfiguracionCuentasSistema(tenantId: string) {
+    const configuraciones = await this.repository.listarConfiguracionCuentasSistema(tenantId);
+    const porClave = new Map(configuraciones.map((c) => [c.clave, c]));
+    return Object.entries(CODIGOS_CUENTA).map(([clave, codigoFijo]) => ({
+      clave,
+      tipoEsperado: TIPO_ESPERADO_POR_ROL[clave as keyof typeof CODIGOS_CUENTA],
+      codigoFijo,
+      cuentaConfigurada: porClave.get(clave)?.cuentaContable ?? null,
+    }));
+  }
+
+  /**
+   * Valida que `clave` sea uno de los 15 roles reales y que la cuenta
+   * elegida pertenezca al tenant (`buscarPorId`, tenant-scoped — 404 si
+   * no), esté activa, y sea del mismo `tipo` que la cuenta fija que
+   * reemplaza (ej. no se puede reasignar CAJA_BANCOS, tipo ACTIVO, a una
+   * cuenta de GASTO) — sin esto, el motor de asientos quedaría
+   * silenciosamente desbalanceado o mal clasificado.
+   */
+  async configurarCuentaSistema(clave: string, cuentaContableId: string, tenantId: string) {
+    if (!(clave in CODIGOS_CUENTA)) {
+      throw new BadRequestException(`"${clave}" no es un rol de cuenta contable válido`);
+    }
+    const cuenta = await this.repository.buscarPorId(cuentaContableId);
+    if (!cuenta.activa) {
+      throw new BadRequestException('No se puede asignar una cuenta inactiva');
+    }
+    const tipoEsperado = TIPO_ESPERADO_POR_ROL[clave as keyof typeof CODIGOS_CUENTA];
+    if (cuenta.tipo !== tipoEsperado) {
+      throw new BadRequestException(`Esta cuenta debe ser de tipo ${tipoEsperado} (la elegida es de tipo ${cuenta.tipo})`);
+    }
+    return this.repository.guardarConfiguracionCuentaSistema(tenantId, clave, cuentaContableId);
+  }
+
+  /** Vuelve al código fijo de siempre para ese rol — simplemente borra el override, si existía. */
+  quitarConfiguracionCuentaSistema(clave: string, tenantId: string) {
+    return this.repository.eliminarConfiguracionCuentaSistema(tenantId, clave);
   }
 }

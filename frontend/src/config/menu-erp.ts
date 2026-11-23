@@ -255,6 +255,14 @@ export const DOMINIOS_MENU: DominioMenu[] = [
           // permiso de Facturación (auditoría de organización).
           { id: 'tasas-cambio', etiqueta: 'Tasas de cambio', ruta: '/tasas-cambio', permisos: ['facturacion.crear', 'travel.ver'] },
           { id: 'catalogo-cuentas', etiqueta: 'Catálogo de cuentas', ruta: '/contabilidad/cuentas', permisos: ['contabilidad.ver'] },
+          // docs/PLAN.md, punto 4 — override por tenant de los códigos
+          // fijos que el motor de asientos automáticos resuelve por rol.
+          {
+            id: 'configuracion-cuentas-sistema',
+            etiqueta: 'Configuración de cuentas del sistema',
+            ruta: '/contabilidad/cuentas/configuracion-sistema',
+            permisos: ['contabilidad.ver'],
+          },
           // Antes en Ventas > Catálogos — infraestructura financiera
           // transversal (la usan también Compras, Facturas de proveedor,
           // Lealtad, Bonos y POS), no exclusiva de Ventas.

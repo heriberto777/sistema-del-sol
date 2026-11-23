@@ -17,7 +17,7 @@ Convención de estado: `🔲 Pendiente de diseño` · `🟡 En diseño` ·
 | "Ver Stock" en Productos | ✅ Implementado — commit `dbccd79` |
 | Asistente de pre-cierre contable | 🔲 Pendiente de diseño |
 | Período de trabajo + advertencia blanda | 🔲 Pendiente de diseño |
-| Parametrización de cuentas contables y centros de costo — puntos 1, 2 y 3 (banco real en Pagos; cuenta de ingreso/costo por categoría; Centro de Costo por línea) | ✅ Implementado 2026-11-23 — punto 4 (override de códigos fijos) sigue 🟡 en diseño |
+| Parametrización de cuentas contables y centros de costo — los 4 puntos (banco real en Pagos; cuenta de ingreso/costo por categoría; Centro de Costo por línea; override de los 15 códigos fijos) | ✅ Implementado 2026-11-23 — plan completo |
 | Depósito bancario (Caja → Banco) | 🔲 Pendiente de diseño |
 | Bug "removeChild" por ícono inferido del `<Button>` (variante nueva) | 🔲 2 casos encontrados sin corregir (ProductoNuevo, FacturacionNueva) — ver ARCHITECTURE.md |
 | Backlog UX/operación (Conteo Físico, modales→página, parámetros operativos, reporte de problemas, manual) | 🔲 Pendiente — ver detalle en `memoized-noodling-moore.md` (plan de Claude Code) |
@@ -160,12 +160,53 @@ Hoy conviven dos mecanismos:
    `EstadoResultadosQueryDto extends ReporteFiscalQueryDto` con el campo
    agregado ahí (mismo patrón que `ReporteFiscalExportarQueryDto`).
 
-4. **Override de los 15 códigos fijos (`CODIGOS_CUENTA`) por tenant** — el
-   más riesgoso: requiere poder editar/reasignar una `CuentaContable` sin
-   romper el motor de asientos automáticos. Probablemente el último en
-   hacerse, y solo si de verdad hace falta (hoy ningún tenant real lo
-   pidió explícitamente, es un hueco teórico encontrado en el
-   diagnóstico).
+4. **Override de los 15 códigos fijos (`CODIGOS_CUENTA`) por tenant** — ✅
+   implementado 2026-11-23. Modelo nuevo `ConfiguracionCuentaContable`
+   (tenantId + clave, único, FK a `CuentaContable` con `onDelete:
+   Cascade`) — migración `20261123182037_configuracion_cuenta_contable`.
+
+   Mecanismo: `CuentasContablesRepository.resolverRolDeCuenta(tenantId,
+   clave, codigoFijo)` reemplaza, en **los 27 puntos del motor** donde
+   antes se llamaba `buscarPorCodigoGlobal(tenantId, CODIGOS_CUENTA.X)`
+   (`AsientosContablesService` completo + el único uso en
+   `CierrePeriodoService`), buscando primero un override configurado y
+   cayendo al código fijo de siempre si no hay ninguno — refactor
+   mecánico vía `sed`, con un solo caso manual (el ternario
+   CONTADO/CAJA_BANCOS vs. CUENTAS_POR_COBRAR en `generarDesdeFactura`).
+
+   Validación al configurar un override
+   (`CuentasContablesService.configurarCuentaSistema`): la `clave` tiene
+   que ser un rol real de `CODIGOS_CUENTA`, la cuenta elegida tiene que
+   pertenecer al tenant (404 vía `buscarPorId`), estar `activa`, y ser
+   del mismo `tipo` contable que la cuenta fija que reemplaza (nuevo
+   `TIPO_ESPERADO_POR_ROL` en `cuentas-base.ts`, derivado de
+   `CUENTAS_BASE` en vez de hardcodeado aparte) — así no se puede, por
+   ejemplo, apuntar "Caja y Bancos" (ACTIVO) a una cuenta de GASTO.
+   `listarConfiguracionCuentasSistema` siempre devuelve los 15 roles
+   (con `cuentaConfigurada: null` si no hay override), para que la UI
+   pinte una fila fija por rol.
+
+   Página nueva `/contabilidad/cuentas/configuracion-sistema`
+   (`ConfiguracionCuentasSistema.tsx`, aparte de Catálogo de Cuentas,
+   mismo criterio que "Formas de pago"): tabla de 15 filas (rol/código
+   fijo/selector de cuenta filtrado por el tipo esperado), autoguardado
+   al cambiar el selector (`POST` si elige cuenta, `DELETE` si lo deja en
+   blanco).
+
+   **Bug real encontrado y corregido de paso**: el filtro de Estado de
+   Resultados por centro de costo (punto 3) devolvía 400 ("property
+   centroCostoId should not exist") — mismo patrón de bug que el de la
+   nota de abajo, por un `@Query('centroCostoId')` suelto en vez de en
+   el DTO; se corrigió junto con este punto creando
+   `EstadoResultadosQueryDto extends ReporteFiscalQueryDto`.
+
+   Verificado en el sistema real (no solo con mocks): configurar
+   CAJA_BANCOS → cuenta 1050 vía la UI, confirmar en BD que la factura
+   CONTADO generada después asienta contra 1050 y no contra 1010, quitar
+   el override y confirmar que vuelve a 1010; más los 3 rechazos
+   (`clave` inválida, cuenta inactiva, tipo incorrecto) probados por
+   `curl` directo. 2331 unitarios + 259 e2e en verde, `tsc --noEmit`
+   limpio en ambos paquetes.
 
 ### Nota de BD
 

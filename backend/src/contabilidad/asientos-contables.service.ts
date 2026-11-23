@@ -143,8 +143,10 @@ export class AsientosContablesService {
     costosPorCuenta?: { cuentaContableId: string | null; centroCostoId?: string | null; monto: number }[];
   }) {
     const [cuentaCobro, cuentaItbis] = await Promise.all([
-      this.cuentasRepository.buscarPorCodigoGlobal(params.tenantId, params.tipoFactura === 'CONTADO' ? CODIGOS_CUENTA.CAJA_BANCOS : CODIGOS_CUENTA.CUENTAS_POR_COBRAR),
-      this.cuentasRepository.buscarPorCodigoGlobal(params.tenantId, CODIGOS_CUENTA.ITBIS_POR_PAGAR),
+      params.tipoFactura === 'CONTADO'
+        ? this.cuentasRepository.resolverRolDeCuenta(params.tenantId, 'CAJA_BANCOS', CODIGOS_CUENTA.CAJA_BANCOS)
+        : this.cuentasRepository.resolverRolDeCuenta(params.tenantId, 'CUENTAS_POR_COBRAR', CODIGOS_CUENTA.CUENTAS_POR_COBRAR),
+      this.cuentasRepository.resolverRolDeCuenta(params.tenantId, 'ITBIS_POR_PAGAR', CODIGOS_CUENTA.ITBIS_POR_PAGAR),
     ]);
 
     const lineas = [this.lineaSegunSigno(cuentaCobro.id, params.total, 'debito', `Factura ${params.facturaId}`)];
@@ -157,7 +159,7 @@ export class AsientosContablesService {
     // falta ni consultar la cuenta fija de siempre.
     const necesitaIngresoGenerica = params.recargos || params.ingresosPorCuenta.some((g) => g.cuentaContableId === null);
     const cuentaIngresosGenerica = necesitaIngresoGenerica
-      ? await this.cuentasRepository.buscarPorCodigoGlobal(params.tenantId, CODIGOS_CUENTA.INGRESOS_POR_VENTAS)
+      ? await this.cuentasRepository.resolverRolDeCuenta(params.tenantId, 'INGRESOS_POR_VENTAS', CODIGOS_CUENTA.INGRESOS_POR_VENTAS)
       : null;
 
     // Recargos (sin producto/categoría detrás, y por lo tanto sin Centro
@@ -175,8 +177,8 @@ export class AsientosContablesService {
     if (params.costosPorCuenta?.length) {
       const necesitaCostoGenerica = params.costosPorCuenta.some((g) => g.cuentaContableId === null);
       const [cuentaCostoGenerica, cuentaInventario] = await Promise.all([
-        necesitaCostoGenerica ? this.cuentasRepository.buscarPorCodigoGlobal(params.tenantId, CODIGOS_CUENTA.COSTO_DE_VENTAS) : null,
-        this.cuentasRepository.buscarPorCodigoGlobal(params.tenantId, CODIGOS_CUENTA.INVENTARIO),
+        necesitaCostoGenerica ? this.cuentasRepository.resolverRolDeCuenta(params.tenantId, 'COSTO_DE_VENTAS', CODIGOS_CUENTA.COSTO_DE_VENTAS) : null,
+        this.cuentasRepository.resolverRolDeCuenta(params.tenantId, 'INVENTARIO', CODIGOS_CUENTA.INVENTARIO),
       ]);
       const gruposCosto = this.agruparPorCuentaYCentroCosto(params.costosPorCuenta, cuentaCostoGenerica?.id);
       let totalCosto = 0;
@@ -265,9 +267,9 @@ export class AsientosContablesService {
     inventarioPorCentro: { centroCostoId: string | null; monto: number }[];
   }) {
     const [cuentaInventario, cuentaItbis, cuentaPorPagar] = await Promise.all([
-      this.cuentasRepository.buscarPorCodigoGlobal(params.tenantId, CODIGOS_CUENTA.INVENTARIO),
-      this.cuentasRepository.buscarPorCodigoGlobal(params.tenantId, CODIGOS_CUENTA.ITBIS_ADELANTADO),
-      this.cuentasRepository.buscarPorCodigoGlobal(params.tenantId, CODIGOS_CUENTA.CUENTAS_POR_PAGAR),
+      this.cuentasRepository.resolverRolDeCuenta(params.tenantId, 'INVENTARIO', CODIGOS_CUENTA.INVENTARIO),
+      this.cuentasRepository.resolverRolDeCuenta(params.tenantId, 'ITBIS_ADELANTADO', CODIGOS_CUENTA.ITBIS_ADELANTADO),
+      this.cuentasRepository.resolverRolDeCuenta(params.tenantId, 'CUENTAS_POR_PAGAR', CODIGOS_CUENTA.CUENTAS_POR_PAGAR),
     ]);
 
     const monto = params.inventarioPorCentro.reduce((acc, g) => acc + g.monto, 0);
@@ -298,9 +300,9 @@ export class AsientosContablesService {
   /** Reversa exacta del asiento de compra — misma fórmula que `generarDesdeCompra`, montos negados (reduce Inventario/ITBIS Adelantado y lo que se le debe al proveedor). */
   async generarReversaCompra(params: { tenantId: string; devolucionId: string; monto: number; itbis: number }) {
     const [cuentaInventario, cuentaItbis, cuentaPorPagar] = await Promise.all([
-      this.cuentasRepository.buscarPorCodigoGlobal(params.tenantId, CODIGOS_CUENTA.INVENTARIO),
-      this.cuentasRepository.buscarPorCodigoGlobal(params.tenantId, CODIGOS_CUENTA.ITBIS_ADELANTADO),
-      this.cuentasRepository.buscarPorCodigoGlobal(params.tenantId, CODIGOS_CUENTA.CUENTAS_POR_PAGAR),
+      this.cuentasRepository.resolverRolDeCuenta(params.tenantId, 'INVENTARIO', CODIGOS_CUENTA.INVENTARIO),
+      this.cuentasRepository.resolverRolDeCuenta(params.tenantId, 'ITBIS_ADELANTADO', CODIGOS_CUENTA.ITBIS_ADELANTADO),
+      this.cuentasRepository.resolverRolDeCuenta(params.tenantId, 'CUENTAS_POR_PAGAR', CODIGOS_CUENTA.CUENTAS_POR_PAGAR),
     ]);
 
     const total = params.monto + params.itbis;
@@ -354,9 +356,9 @@ export class AsientosContablesService {
     totalInfotep: number;
   }) {
     const [cuentaGastoNomina, cuentaCaja, cuentaTssIsr] = await Promise.all([
-      this.cuentasRepository.buscarPorCodigoGlobal(params.tenantId, CODIGOS_CUENTA.GASTOS_DE_NOMINA),
-      this.cuentasRepository.buscarPorCodigoGlobal(params.tenantId, CODIGOS_CUENTA.CAJA_BANCOS),
-      this.cuentasRepository.buscarPorCodigoGlobal(params.tenantId, CODIGOS_CUENTA.TSS_ISR_POR_PAGAR),
+      this.cuentasRepository.resolverRolDeCuenta(params.tenantId, 'GASTOS_DE_NOMINA', CODIGOS_CUENTA.GASTOS_DE_NOMINA),
+      this.cuentasRepository.resolverRolDeCuenta(params.tenantId, 'CAJA_BANCOS', CODIGOS_CUENTA.CAJA_BANCOS),
+      this.cuentasRepository.resolverRolDeCuenta(params.tenantId, 'TSS_ISR_POR_PAGAR', CODIGOS_CUENTA.TSS_ISR_POR_PAGAR),
     ]);
 
     // Las horas extra suman al costo laboral (débito) porque ya están
@@ -405,8 +407,8 @@ export class AsientosContablesService {
    */
   async generarDesdePagoFactura(params: { tenantId: string; pagoId: string; monto: number; cuentaCajaId?: string }) {
     const [cuentaCajaFija, cuentaCobro] = await Promise.all([
-      params.cuentaCajaId ? null : this.cuentasRepository.buscarPorCodigoGlobal(params.tenantId, CODIGOS_CUENTA.CAJA_BANCOS),
-      this.cuentasRepository.buscarPorCodigoGlobal(params.tenantId, CODIGOS_CUENTA.CUENTAS_POR_COBRAR),
+      params.cuentaCajaId ? null : this.cuentasRepository.resolverRolDeCuenta(params.tenantId, 'CAJA_BANCOS', CODIGOS_CUENTA.CAJA_BANCOS),
+      this.cuentasRepository.resolverRolDeCuenta(params.tenantId, 'CUENTAS_POR_COBRAR', CODIGOS_CUENTA.CUENTAS_POR_COBRAR),
     ]);
     const cuentaCajaId = params.cuentaCajaId ?? cuentaCajaFija!.id;
 
@@ -448,10 +450,10 @@ export class AsientosContablesService {
     const descripcion = `Pago a proveedor — ${params.pagoId}`;
 
     const [cuentaPorPagar, cuentaCajaFija, cuentaIsrRetenido, cuentaItbisRetenido] = await Promise.all([
-      this.cuentasRepository.buscarPorCodigoGlobal(params.tenantId, CODIGOS_CUENTA.CUENTAS_POR_PAGAR),
-      params.cuentaCajaId ? null : this.cuentasRepository.buscarPorCodigoGlobal(params.tenantId, CODIGOS_CUENTA.CAJA_BANCOS),
-      retencionIsr > 0 ? this.cuentasRepository.buscarPorCodigoGlobal(params.tenantId, CODIGOS_CUENTA.ISR_RETENIDO_TERCEROS) : null,
-      retencionItbis > 0 ? this.cuentasRepository.buscarPorCodigoGlobal(params.tenantId, CODIGOS_CUENTA.ITBIS_RETENIDO_TERCEROS) : null,
+      this.cuentasRepository.resolverRolDeCuenta(params.tenantId, 'CUENTAS_POR_PAGAR', CODIGOS_CUENTA.CUENTAS_POR_PAGAR),
+      params.cuentaCajaId ? null : this.cuentasRepository.resolverRolDeCuenta(params.tenantId, 'CAJA_BANCOS', CODIGOS_CUENTA.CAJA_BANCOS),
+      retencionIsr > 0 ? this.cuentasRepository.resolverRolDeCuenta(params.tenantId, 'ISR_RETENIDO_TERCEROS', CODIGOS_CUENTA.ISR_RETENIDO_TERCEROS) : null,
+      retencionItbis > 0 ? this.cuentasRepository.resolverRolDeCuenta(params.tenantId, 'ITBIS_RETENIDO_TERCEROS', CODIGOS_CUENTA.ITBIS_RETENIDO_TERCEROS) : null,
     ]);
     const cuentaCajaId = params.cuentaCajaId ?? cuentaCajaFija!.id;
 
@@ -494,7 +496,7 @@ export class AsientosContablesService {
     const lineas = params.lineas.map((l) => this.lineaSegunSigno(l.cuentaContableId, l.monto, 'debito', descripcion, l.centroCostoId));
 
     if (params.itbis !== 0) {
-      const cuentaItbis = await this.cuentasRepository.buscarPorCodigoGlobal(params.tenantId, CODIGOS_CUENTA.ITBIS_ADELANTADO);
+      const cuentaItbis = await this.cuentasRepository.resolverRolDeCuenta(params.tenantId, 'ITBIS_ADELANTADO', CODIGOS_CUENTA.ITBIS_ADELANTADO);
       lineas.push(this.lineaSegunSigno(cuentaItbis.id, params.itbis, 'debito', descripcion));
     }
 
@@ -534,11 +536,11 @@ export class AsientosContablesService {
     const lineas = params.lineas.map((l) => this.lineaSegunSigno(l.cuentaContableId, l.monto, 'debito', descripcion, l.centroCostoId));
 
     if (params.itbis !== 0) {
-      const cuentaItbis = await this.cuentasRepository.buscarPorCodigoGlobal(params.tenantId, CODIGOS_CUENTA.ITBIS_ADELANTADO);
+      const cuentaItbis = await this.cuentasRepository.resolverRolDeCuenta(params.tenantId, 'ITBIS_ADELANTADO', CODIGOS_CUENTA.ITBIS_ADELANTADO);
       lineas.push(this.lineaSegunSigno(cuentaItbis.id, params.itbis, 'debito', descripcion));
     }
 
-    const cuentaPorPagar = await this.cuentasRepository.buscarPorCodigoGlobal(params.tenantId, CODIGOS_CUENTA.CUENTAS_POR_PAGAR);
+    const cuentaPorPagar = await this.cuentasRepository.resolverRolDeCuenta(params.tenantId, 'CUENTAS_POR_PAGAR', CODIGOS_CUENTA.CUENTAS_POR_PAGAR);
     const total = params.lineas.reduce((acc, l) => acc + l.monto, 0) + params.itbis;
     lineas.push(this.lineaSegunSigno(cuentaPorPagar.id, total, 'credito', descripcion));
 
@@ -583,8 +585,8 @@ export class AsientosContablesService {
    */
   async generarDesdeProvisionIncobrable(params: { tenantId: string; provisionId: string; monto: number }) {
     const [cuentaGasto, cuentaProvision] = await Promise.all([
-      this.cuentasRepository.buscarPorCodigoGlobal(params.tenantId, CODIGOS_CUENTA.GASTO_CUENTAS_INCOBRABLES),
-      this.cuentasRepository.buscarPorCodigoGlobal(params.tenantId, CODIGOS_CUENTA.PROVISION_CUENTAS_INCOBRABLES),
+      this.cuentasRepository.resolverRolDeCuenta(params.tenantId, 'GASTO_CUENTAS_INCOBRABLES', CODIGOS_CUENTA.GASTO_CUENTAS_INCOBRABLES),
+      this.cuentasRepository.resolverRolDeCuenta(params.tenantId, 'PROVISION_CUENTAS_INCOBRABLES', CODIGOS_CUENTA.PROVISION_CUENTAS_INCOBRABLES),
     ]);
     const descripcion = `Provisión de incobrable — ${params.provisionId}`;
     const lineas = [
@@ -600,8 +602,8 @@ export class AsientosContablesService {
    */
   async generarDesdeCastigoIncobrable(params: { tenantId: string; provisionId: string; monto: number }) {
     const [cuentaProvision, cuentaCobrar] = await Promise.all([
-      this.cuentasRepository.buscarPorCodigoGlobal(params.tenantId, CODIGOS_CUENTA.PROVISION_CUENTAS_INCOBRABLES),
-      this.cuentasRepository.buscarPorCodigoGlobal(params.tenantId, CODIGOS_CUENTA.CUENTAS_POR_COBRAR),
+      this.cuentasRepository.resolverRolDeCuenta(params.tenantId, 'PROVISION_CUENTAS_INCOBRABLES', CODIGOS_CUENTA.PROVISION_CUENTAS_INCOBRABLES),
+      this.cuentasRepository.resolverRolDeCuenta(params.tenantId, 'CUENTAS_POR_COBRAR', CODIGOS_CUENTA.CUENTAS_POR_COBRAR),
     ]);
     const descripcion = `Castigo de incobrable — ${params.provisionId}`;
     const lineas = [

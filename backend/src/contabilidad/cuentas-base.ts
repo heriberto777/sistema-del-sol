@@ -108,3 +108,20 @@ export const CODIGOS_CUENTA = {
   GASTO_CUENTAS_INCOBRABLES: '5040',
   UTILIDADES_RETENIDAS: '3020',
 } as const;
+
+/**
+ * Tipo esperado de cada rol de `CODIGOS_CUENTA` (docs/PLAN.md, punto 4) —
+ * derivado de `CUENTAS_BASE`, no hardcodeado aparte, para que no se
+ * desincronice si alguna vez cambia el tipo de una cuenta semilla. Se usa
+ * para validar que un override de `ConfiguracionCuentaContable` (un
+ * tenant reasignando qué cuenta real cumple un rol) sea del mismo tipo
+ * que la cuenta fija que reemplaza — ej. no se puede reasignar
+ * CAJA_BANCOS a una cuenta de tipo GASTO.
+ */
+export const TIPO_ESPERADO_POR_ROL: Record<keyof typeof CODIGOS_CUENTA, TipoCuentaContable> = Object.fromEntries(
+  Object.entries(CODIGOS_CUENTA).map(([clave, codigo]) => {
+    const cuenta = CUENTAS_BASE.find((c) => c.codigo === codigo);
+    if (!cuenta) throw new Error(`CODIGOS_CUENTA.${clave} (${codigo}) no está en CUENTAS_BASE`);
+    return [clave, cuenta.tipo];
+  }),
+) as Record<keyof typeof CODIGOS_CUENTA, TipoCuentaContable>;

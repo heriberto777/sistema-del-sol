@@ -181,7 +181,7 @@ export class CierrePeriodoService {
       }
     }
 
-    const cuentaUtilidades = await this.cuentasRepository.buscarPorCodigo(CODIGOS_CUENTA.UTILIDADES_RETENIDAS);
+    const cuentaUtilidades = await this.cuentasRepository.resolverRolDeCuenta(tenantId, 'UTILIDADES_RETENIDAS', CODIGOS_CUENTA.UTILIDADES_RETENIDAS);
     lineasCierre.push(
       utilidadNeta >= 0
         ? { cuentaContableId: cuentaUtilidades.id, debito: 0, credito: utilidadNeta, descripcion: 'Cierre — utilidad del período' }

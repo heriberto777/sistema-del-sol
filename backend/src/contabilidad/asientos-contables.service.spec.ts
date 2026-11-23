@@ -21,8 +21,18 @@ describe('AsientosContablesService', () => {
       listar: jest.fn(),
       marcarAnulado: jest.fn(),
     } as unknown as jest.Mocked<AsientosContablesRepository>;
-    cuentasRepository = { buscarPorCodigo: jest.fn(), buscarPorCodigoGlobal: jest.fn(), listar: jest.fn(), crear: jest.fn() } as unknown as jest.Mocked<CuentasContablesRepository>;
+    cuentasRepository = {
+      buscarPorCodigo: jest.fn(),
+      buscarPorCodigoGlobal: jest.fn(),
+      resolverRolDeCuenta: jest.fn(),
+      listar: jest.fn(),
+      crear: jest.fn(),
+    } as unknown as jest.Mocked<CuentasContablesRepository>;
     cuentasRepository.buscarPorCodigoGlobal.mockImplementation(((_tenantId: string, codigo: string) => Promise.resolve(cuenta(codigo))) as never);
+    // Sin override configurado (docs/PLAN.md, punto 4) — se comporta
+    // igual que buscarPorCodigoGlobal, resolviendo por el código fijo
+    // (3er argumento). Los tests de "override" lo sobreescriben puntual.
+    cuentasRepository.resolverRolDeCuenta.mockImplementation(((_tenantId: string, _clave: string, codigoFijo: string) => Promise.resolve(cuenta(codigoFijo))) as never);
     cierrePeriodoService = { validarPeriodoAbierto: jest.fn().mockResolvedValue(undefined) } as unknown as jest.Mocked<CierrePeriodoService>;
     service = new AsientosContablesService(asientosRepository, cuentasRepository, cierrePeriodoService);
   });
@@ -100,7 +110,7 @@ describe('AsientosContablesService', () => {
         ingresosPorCuenta: [{ cuentaContableId: null, monto: 300 }],
       });
 
-      expect(cuentasRepository.buscarPorCodigoGlobal).toHaveBeenCalledWith('t1', CODIGOS_CUENTA.CAJA_BANCOS);
+      expect(cuentasRepository.resolverRolDeCuenta).toHaveBeenCalledWith('t1', 'CAJA_BANCOS', CODIGOS_CUENTA.CAJA_BANCOS);
       const [llamada] = asientosRepository.crearGlobal.mock.calls[0];
       const lineas = llamada.lineas;
       expect(lineas).toEqual(
@@ -128,7 +138,7 @@ describe('AsientosContablesService', () => {
         ingresosPorCuenta: [{ cuentaContableId: null, monto: 300 }],
       });
 
-      expect(cuentasRepository.buscarPorCodigoGlobal).toHaveBeenCalledWith('t1', CODIGOS_CUENTA.CUENTAS_POR_COBRAR);
+      expect(cuentasRepository.resolverRolDeCuenta).toHaveBeenCalledWith('t1', 'CUENTAS_POR_COBRAR', CODIGOS_CUENTA.CUENTAS_POR_COBRAR);
     });
 
     it('NOTA_CREDITO (montos ya negativos) invierte débito/crédito y sigue balanceando', async () => {
@@ -315,7 +325,7 @@ describe('AsientosContablesService', () => {
             expect.objectContaining({ cuentaContableId: `cuenta-${CODIGOS_CUENTA.INVENTARIO}`, credito: 180 }),
           ]),
         );
-        expect(cuentasRepository.buscarPorCodigoGlobal).not.toHaveBeenCalledWith('t1', CODIGOS_CUENTA.COSTO_DE_VENTAS);
+        expect(cuentasRepository.resolverRolDeCuenta).not.toHaveBeenCalledWith('t1', 'COSTO_DE_VENTAS', CODIGOS_CUENTA.COSTO_DE_VENTAS);
       });
 
       it('sin costosPorCuenta (SERVICIO, línea manual, NOTA_DEBITO), no agrega ninguna línea de Costo de Ventas', async () => {
@@ -332,7 +342,7 @@ describe('AsientosContablesService', () => {
 
         const [llamada] = asientosRepository.crearGlobal.mock.calls[0];
         expect(llamada.lineas).toHaveLength(3);
-        expect(cuentasRepository.buscarPorCodigoGlobal).not.toHaveBeenCalledWith('t1', CODIGOS_CUENTA.COSTO_DE_VENTAS);
+        expect(cuentasRepository.resolverRolDeCuenta).not.toHaveBeenCalledWith('t1', 'COSTO_DE_VENTAS', CODIGOS_CUENTA.COSTO_DE_VENTAS);
       });
 
       it('NOTA_CREDITO con costosPorCuenta negativo invierte Costo de Ventas/Inventario también', async () => {
@@ -560,7 +570,7 @@ describe('AsientosContablesService', () => {
         totalInfotep: 350,
       });
 
-      expect(cuentasRepository.buscarPorCodigoGlobal).toHaveBeenCalledWith('t1', CODIGOS_CUENTA.GASTOS_DE_NOMINA);
+      expect(cuentasRepository.resolverRolDeCuenta).toHaveBeenCalledWith('t1', 'GASTOS_DE_NOMINA', CODIGOS_CUENTA.GASTOS_DE_NOMINA);
       const [llamada] = asientosRepository.crearGlobal.mock.calls[0];
       const lineas = llamada.lineas;
       expect(lineas).toEqual(
@@ -692,7 +702,7 @@ describe('AsientosContablesService', () => {
         expect.arrayContaining([expect.objectContaining({ cuentaContableId: `cuenta-${CODIGOS_CUENTA.CAJA_BANCOS}` })]),
       );
       // No debería ni consultar la cuenta genérica si ya le dieron una puntual.
-      expect(cuentasRepository.buscarPorCodigoGlobal).not.toHaveBeenCalledWith('t1', CODIGOS_CUENTA.CAJA_BANCOS);
+      expect(cuentasRepository.resolverRolDeCuenta).not.toHaveBeenCalledWith('t1', 'CAJA_BANCOS', CODIGOS_CUENTA.CAJA_BANCOS);
     });
   });
 
