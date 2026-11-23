@@ -1,6 +1,7 @@
 import { Plus, X } from 'lucide-react';
 import { SelectorLineaProducto, ProductoOpcion } from '../SelectorLineaProducto/SelectorLineaProducto';
 import { SelectorUnidadLinea } from '../SelectorUnidadLinea/SelectorUnidadLinea';
+import { SelectCentroCosto } from '../SelectCentroCosto/SelectCentroCosto';
 import { formatearOferta, type OfertaVisibleProducto } from '../../../lib/formatear-oferta';
 
 export interface LineaEditable {
@@ -21,6 +22,8 @@ export interface LineaEditable {
   aplicaItbis?: boolean;
   /** Descuento en RD$ de esta línea puntual (plan de integración Cuadre, ítem B-8 ya lo soporta el backend — `LineaFacturaDto.descuento`) — mutuamente independiente del descuento automático de Ofertas: si se omite (string vacío), el backend sigue resolviendo el descuento automático solo; mandar un valor explícito (aunque sea 0) lo desactiva para esa línea. */
   descuento?: string;
+  /** Centro de Costo (docs/PLAN.md, punto 3) — opcional, solo tiene efecto contable real en Facturación (ver `mostrarCentroCosto`). */
+  centroCostoId?: string;
 }
 
 function formatearPrecio(precio: string | number) {
@@ -58,6 +61,7 @@ export function TablaLineasEditable<T extends LineaEditable>({
   mostrarItbis = false,
   precioSoloManual = false,
   mostrarDescuento = false,
+  mostrarCentroCosto = false,
 }: {
   lineas: T[];
   productos: ProductoOpcion[];
@@ -70,6 +74,8 @@ export function TablaLineasEditable<T extends LineaEditable>({
   precioSoloManual?: boolean;
   /** Benchmark 2026-11-09 — columnas "Descuento" y "Subtotal" por línea, estilo Alegra. Opt-in: el backend de Cotización también soporta `descuento` por línea, pero esto solo se habilitó para Facturación (pedido puntual del usuario); otros llamadores quedan igual que antes. */
   mostrarDescuento?: boolean;
+  /** docs/PLAN.md, punto 3 — solo Facturación (genera asiento real); Cotización/Remisión no lo exponen (se elegiría recién al convertir a factura). */
+  mostrarCentroCosto?: boolean;
 }) {
   return (
     <div className="space-y-2">
@@ -81,6 +87,7 @@ export function TablaLineasEditable<T extends LineaEditable>({
               <th className="w-20 px-3 py-2 font-medium">Cant</th>
               <th className="w-32 px-3 py-2 font-medium">Precio</th>
               {mostrarDescuento && <th className="w-28 px-3 py-2 font-medium">Descuento</th>}
+              {mostrarCentroCosto && <th className="px-3 py-2 font-medium">Centro de costo</th>}
               {mostrarItbis && <th className="w-16 px-3 py-2 text-center font-medium">ITBIS</th>}
               {mostrarDescuento && <th className="w-28 px-3 py-2 text-right font-medium">Subtotal</th>}
               <th className="w-px px-3 py-2" />
@@ -184,6 +191,11 @@ export function TablaLineasEditable<T extends LineaEditable>({
                       onChange={(e) => onActualizar(i, { descuento: e.target.value } as Partial<T>)}
                       className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
                     />
+                  </td>
+                )}
+                {mostrarCentroCosto && (
+                  <td className="px-3 py-2 align-top">
+                    <SelectCentroCosto value={linea.centroCostoId ?? ''} onChange={(centroCostoId) => onActualizar(i, { centroCostoId } as Partial<T>)} />
                   </td>
                 )}
                 {mostrarItbis && (

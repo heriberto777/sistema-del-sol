@@ -30,6 +30,11 @@ export class LineaOcDto {
   @IsNumber()
   @IsPositive()
   costoUnitario: number;
+
+  @ApiProperty({ required: false, description: 'Centro de Costo (docs/PLAN.md, punto 3) — opcional, por línea. Se hereda a la línea de recepción al recibir, nunca se vuelve a elegir ahí.' })
+  @IsOptional()
+  @IsUUID()
+  centroCostoId?: string;
 }
 
 export class CrearOrdenCompraDto {

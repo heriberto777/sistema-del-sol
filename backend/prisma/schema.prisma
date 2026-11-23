@@ -115,6 +115,7 @@ model Tenant {
   cotizaciones               Cotizacion[]
   remisiones                 Remision[]
   cuentasContables           CuentaContable[]
+  centrosCosto               CentroCosto[]
   asientosContables          AsientoContable[]
   periodosContables          PeriodoContable[]
   empleados                  Empleado[]
@@ -1494,6 +1495,12 @@ model LineaFactura {
   // para facturas creadas antes de este campo. Es la base del Débito
   // Costo de Ventas/Crédito Inventario que arma ContabilidadEventosService.
   costoUnitario     Decimal?          @db.Decimal(14, 4)
+  // Ver el comentario equivalente en LineaAsiento.centroCostoId — en una
+  // Nota de Crédito/Débito se hereda de la línea de la factura origen
+  // (mismo criterio que unidadMedidaId/factorConversion), nunca se
+  // vuelve a elegir.
+  centroCostoId     String?
+  centroCosto       CentroCosto?      @relation(fields: [centroCostoId], references: [id], onDelete: SetNull)
 
   @@map("linea_factura")
 }
@@ -1694,6 +1701,33 @@ model CuentaContable {
   @@map("cuentas_contables")
 }
 
+/// Centro de Costo (docs/PLAN.md, punto 3) — dimensión transversal
+/// (sucursal/departamento/área), independiente de la cuenta contable y
+/// de Proyecto (plugin Proyectos, rentabilidad de una obra/consultoría
+/// puntual): un gasto/venta puede llevar los dos a la vez, no se
+/// fusionan en un solo catálogo (decisión confirmada 2026-11-23). Mismo
+/// patrón simple que FormaPago (catálogo plano, sin jerarquía, listado
+/// sin permiso restrictivo porque lo necesita cualquiera que registre un
+/// gasto/venta/asiento, no solo quien administra el catálogo).
+model CentroCosto {
+  id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  nombre    String
+  activo    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  lineasAsiento          LineaAsiento[]
+  lineasGastoMenor       LineaGastoMenor[]
+  lineasFacturaProveedor FacturaProveedorLinea[]
+  lineasFactura          LineaFactura[]
+  lineasOc               LineaOc[]
+  lineasRecepcion        LineaRecepcion[]
+
+  @@unique([tenantId, nombre])
+  @@map("centros_costo")
+}
+
 enum OrigenAsiento {
   FACTURA
   COMPRA
@@ -1799,6 +1833,9 @@ model LineaGastoMenor {
   montoItbis       Decimal        @db.Decimal(14, 2)
   cantidad         Decimal        @default(1) @db.Decimal(14, 4)
   montoTotal       Decimal        @db.Decimal(14, 2)
+  // Ver el comentario equivalente en LineaAsiento.centroCostoId.
+  centroCostoId    String?
+  centroCosto      CentroCosto?   @relation(fields: [centroCostoId], references: [id], onDelete: SetNull)
 
   @@map("lineas_gasto_menor")
 }
@@ -1879,6 +1916,13 @@ model LineaAsiento {
   // que ya confirmó contra el estado de cuenta del banco.
   conciliado       Boolean         @default(false)
   conciliadoEn     DateTime?
+  // Centro de Costo (docs/PLAN.md, punto 3) — opcional, por línea. En un
+  // asiento generado automáticamente (Factura/Compra/GastoMenor/
+  // FacturaProveedor) se propaga desde la línea de origen (ver
+  // ContabilidadEventosService); en un asiento manual, lo elige quien lo
+  // crea (ver CrearAsientoDto).
+  centroCostoId    String?
+  centroCosto      CentroCosto?    @relation(fields: [centroCostoId], references: [id], onDelete: SetNull)
 
   @@map("lineas_asiento")
 }
@@ -3483,6 +3527,11 @@ model LineaOc {
   cantidad         Decimal          @db.Decimal(14, 4)
   costoUnitario    Decimal          @db.Decimal(14, 4)
   cantidadRecibida Decimal          @default(0) @db.Decimal(14, 4)
+  // Ver el comentario equivalente en LineaAsiento.centroCostoId —
+  // heredado a LineaRecepcion al recibir (mismo criterio que
+  // unidadMedidaId/factorConversion), nunca se vuelve a elegir ahí.
+  centroCostoId    String?
+  centroCosto      CentroCosto?     @relation(fields: [centroCostoId], references: [id], onDelete: SetNull)
 
   @@map("linea_oc")
 }
@@ -3699,6 +3748,9 @@ model LineaRecepcion {
   factorConversion Decimal          @default(1) @db.Decimal(14, 4)
   cantidadRecibida Decimal          @db.Decimal(14, 4)
   costoUnitario    Decimal          @db.Decimal(14, 4)
+  // Heredado de LineaOc.centroCostoId al recibir — ver el comentario ahí.
+  centroCostoId    String?
+  centroCosto      CentroCosto?     @relation(fields: [centroCostoId], references: [id], onDelete: SetNull)
 
   @@map("linea_recepcion")
 }
@@ -4323,6 +4375,9 @@ model FacturaProveedorLinea {
   montoItbis         Decimal          @db.Decimal(14, 2)
   cantidad           Decimal          @default(1) @db.Decimal(14, 4)
   montoTotal         Decimal          @db.Decimal(14, 2)
+  // Ver el comentario equivalente en LineaAsiento.centroCostoId.
+  centroCostoId      String?
+  centroCosto        CentroCosto?     @relation(fields: [centroCostoId], references: [id], onDelete: SetNull)
 
   @@map("lineas_factura_proveedor")
 }

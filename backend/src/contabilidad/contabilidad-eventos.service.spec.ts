@@ -185,10 +185,10 @@ describe('ContabilidadEventosService', () => {
   });
 
   describe('alRecibirCompra', () => {
-    it('calcula monto e itbis desde las líneas de la recepción y genera el asiento', async () => {
+    it('calcula itbis desde las líneas de la recepción y arma inventarioPorCentro, sin centro de costo elegido', async () => {
       prisma.recepcionCompra.findUniqueOrThrow.mockResolvedValue({
         id: 'r1',
-        lineas: [{ costoUnitario: 100, cantidadRecibida: 2, producto: { porcentajeItbis: 18 } }],
+        lineas: [{ costoUnitario: 100, cantidadRecibida: 2, centroCostoId: null, producto: { porcentajeItbis: 18 } }],
       });
 
       await service.alRecibirCompra({ tenantId: 't1', ordenCompraId: 'oc1', recepcionId: 'r1', proveedorId: 'p1', total: '236' });
@@ -196,9 +196,30 @@ describe('ContabilidadEventosService', () => {
       expect(asientosContablesService.generarDesdeCompra).toHaveBeenCalledWith({
         tenantId: 't1',
         recepcionId: 'r1',
-        monto: 200,
+        inventarioPorCentro: [{ centroCostoId: null, monto: 200 }],
         itbis: 36,
       });
+    });
+
+    it('con varias líneas con distinto centro de costo, arma un grupo por línea (docs/PLAN.md, punto 3)', async () => {
+      prisma.recepcionCompra.findUniqueOrThrow.mockResolvedValue({
+        id: 'r1',
+        lineas: [
+          { costoUnitario: 100, cantidadRecibida: 2, centroCostoId: 'centro-santiago', producto: { porcentajeItbis: 0 } },
+          { costoUnitario: 50, cantidadRecibida: 1, centroCostoId: 'centro-santo-domingo', producto: { porcentajeItbis: 0 } },
+        ],
+      });
+
+      await service.alRecibirCompra({ tenantId: 't1', ordenCompraId: 'oc1', recepcionId: 'r1', proveedorId: 'p1', total: '250' });
+
+      expect(asientosContablesService.generarDesdeCompra).toHaveBeenCalledWith(
+        expect.objectContaining({
+          inventarioPorCentro: [
+            { centroCostoId: 'centro-santiago', monto: 200 },
+            { centroCostoId: 'centro-santo-domingo', monto: 50 },
+          ],
+        }),
+      );
     });
 
     it('no propaga el error si falla generar el asiento', async () => {

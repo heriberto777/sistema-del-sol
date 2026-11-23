@@ -31,7 +31,17 @@ interface Producto {
   nombre: string;
 }
 
-const LINEA_VACIA: LineaEditable = { productoId: '', varianteId: '', descripcionManual: '', esManual: false, cantidad: '1', precioUnitario: '', aplicaItbis: true, descuento: '' };
+const LINEA_VACIA: LineaEditable = {
+  productoId: '',
+  varianteId: '',
+  descripcionManual: '',
+  esManual: false,
+  cantidad: '1',
+  precioUnitario: '',
+  aplicaItbis: true,
+  descuento: '',
+  centroCostoId: '',
+};
 
 const ETIQUETA_COMPROBANTE: Record<'CONSUMO' | 'CREDITO_FISCAL' | 'REGIMEN_ESPECIAL' | 'GUBERNAMENTAL', string> = {
   CONSUMO: 'Consumo (B02)',
@@ -220,6 +230,7 @@ export function FacturacionNueva() {
                   // Ofertas — mandar un valor (aunque sea 0) lo desactiva para esta
                   // línea, por eso NUNCA se manda '' como 0 (ver TablaLineasEditable).
                   descuento: l.descuento ? Number(l.descuento) : undefined,
+                  centroCostoId: l.centroCostoId || undefined,
                 }
               : {
                   productoId: l.productoId,
@@ -229,6 +240,7 @@ export function FacturacionNueva() {
                   precioUnitario: l.precioUnitario ? Number(l.precioUnitario) : undefined,
                   aplicaItbis: l.aplicaItbis,
                   descuento: l.descuento ? Number(l.descuento) : undefined,
+                  centroCostoId: l.centroCostoId || undefined,
                 },
           ),
       }),
@@ -702,6 +714,7 @@ export function FacturacionNueva() {
             onAgregar={(vacia) => setLineas((prev) => [...prev, vacia])}
             mostrarItbis
             mostrarDescuento
+            mostrarCentroCosto
           />
         </Card>
       </form>

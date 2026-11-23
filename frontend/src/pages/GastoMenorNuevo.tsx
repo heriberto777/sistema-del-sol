@@ -9,6 +9,7 @@ import { Card } from '../components/atoms/Card/Card';
 import { Select } from '../components/atoms/Select/Select';
 import { Button } from '../components/atoms/Button/Button';
 import { FormField } from '../components/molecules/FormField/FormField';
+import { SelectCentroCosto } from '../components/molecules/SelectCentroCosto/SelectCentroCosto';
 import { useHayCambios } from '../hooks/useHayCambios';
 import { useAuth } from '../hooks/useAuth';
 import { PaginaResultado } from '../types/pagina-resultado';
@@ -37,10 +38,11 @@ interface LineaForm {
   valor: string;
   porcentajeItbis: string;
   cantidad: string;
+  centroCostoId: string;
 }
 
 function lineaVacia(): LineaForm {
-  return { cuentaContableId: '', concepto: '', valor: '', porcentajeItbis: '0', cantidad: '1' };
+  return { cuentaContableId: '', concepto: '', valor: '', porcentajeItbis: '0', cantidad: '1', centroCostoId: '' };
 }
 
 /**
@@ -106,6 +108,7 @@ export function GastoMenorNuevo() {
           valor: Number(l.valor),
           porcentajeItbis: l.porcentajeItbis ? Number(l.porcentajeItbis) : undefined,
           cantidad: l.cantidad ? Number(l.cantidad) : undefined,
+          centroCostoId: l.centroCostoId || undefined,
         })),
       }),
     onSuccess: () => {
@@ -206,6 +209,7 @@ export function GastoMenorNuevo() {
                   <tr>
                     <th className="px-3 py-2 font-medium">Cuenta de gasto</th>
                     <th className="px-3 py-2 font-medium">Concepto</th>
+                    <th className="px-3 py-2 font-medium">Centro de costo</th>
                     <th className="w-24 px-3 py-2 font-medium">Valor</th>
                     <th className="w-20 px-3 py-2 font-medium">ITBIS %</th>
                     <th className="w-16 px-3 py-2 font-medium">Cant.</th>
@@ -238,6 +242,9 @@ export function GastoMenorNuevo() {
                           onChange={(e) => actualizarLinea(i, { concepto: e.target.value })}
                           className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
                         />
+                      </td>
+                      <td className="px-3 py-2 align-top">
+                        <SelectCentroCosto value={linea.centroCostoId} onChange={(centroCostoId) => actualizarLinea(i, { centroCostoId })} />
                       </td>
                       <td className="px-3 py-2 align-top">
                         <input

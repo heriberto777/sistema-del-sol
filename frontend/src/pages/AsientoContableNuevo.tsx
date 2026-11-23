@@ -8,6 +8,7 @@ import { PaginaDocumento } from '../components/molecules/PaginaDocumento/PaginaD
 import { Card } from '../components/atoms/Card/Card';
 import { Button } from '../components/atoms/Button/Button';
 import { FormField } from '../components/molecules/FormField/FormField';
+import { SelectCentroCosto } from '../components/molecules/SelectCentroCosto/SelectCentroCosto';
 import { useHayCambios } from '../hooks/useHayCambios';
 
 interface CuentaContable {
@@ -21,10 +22,11 @@ interface LineaForm {
   descripcion: string;
   debito: string;
   credito: string;
+  centroCostoId: string;
 }
 
 function lineaVacia(): LineaForm {
-  return { cuentaContableId: '', descripcion: '', debito: '', credito: '' };
+  return { cuentaContableId: '', descripcion: '', debito: '', credito: '', centroCostoId: '' };
 }
 
 /**
@@ -67,6 +69,7 @@ export function AsientoContableNuevo() {
           debito: Number(l.debito || 0),
           credito: Number(l.credito || 0),
           descripcion: l.descripcion || undefined,
+          centroCostoId: l.centroCostoId || undefined,
         })),
       }),
     onSuccess: () => {
@@ -147,6 +150,7 @@ export function AsientoContableNuevo() {
                   <tr>
                     <th className="px-3 py-2 font-medium">Cuenta</th>
                     <th className="px-3 py-2 font-medium">Descripción</th>
+                    <th className="px-3 py-2 font-medium">Centro de costo</th>
                     <th className="w-28 px-3 py-2 font-medium">Debe</th>
                     <th className="w-28 px-3 py-2 font-medium">Haber</th>
                     <th className="w-px px-3 py-2" />
@@ -178,6 +182,9 @@ export function AsientoContableNuevo() {
                           onChange={(e) => actualizarLinea(indice, { descripcion: e.target.value })}
                           className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
                         />
+                      </td>
+                      <td className="px-3 py-2 align-top">
+                        <SelectCentroCosto value={linea.centroCostoId} onChange={(centroCostoId) => actualizarLinea(indice, { centroCostoId })} />
                       </td>
                       <td className="px-3 py-2 align-top">
                         <input
@@ -218,7 +225,7 @@ export function AsientoContableNuevo() {
                 </tbody>
                 <tfoot>
                   <tr className="border-t border-slate-200 bg-slate-50 font-medium dark:border-slate-800 dark:bg-slate-900/60">
-                    <td className="px-3 py-2" colSpan={2}>
+                    <td className="px-3 py-2" colSpan={3}>
                       Totales
                     </td>
                     <td className="px-3 py-2 tabular-nums">RD$ {totalDebito.toLocaleString('es-DO')}</td>

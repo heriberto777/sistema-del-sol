@@ -11,6 +11,7 @@ import { ComboboxBusqueda } from '../components/molecules/ComboboxBusqueda/Combo
 import { SelectorLineaProducto } from '../components/molecules/SelectorLineaProducto/SelectorLineaProducto';
 import { SelectorUnidadLinea } from '../components/molecules/SelectorUnidadLinea/SelectorUnidadLinea';
 import { NuevoProveedorInline, type ProveedorBasico } from '../components/molecules/NuevoProveedorInline/NuevoProveedorInline';
+import { SelectCentroCosto } from '../components/molecules/SelectCentroCosto/SelectCentroCosto';
 import { PaginaResultado } from '../types/pagina-resultado';
 import { useHayCambios } from '../hooks/useHayCambios';
 
@@ -27,9 +28,10 @@ interface LineaForm {
   unidadMedidaId: string;
   cantidad: string;
   costoUnitario: string;
+  centroCostoId: string;
 }
 
-const LINEA_VACIA: LineaForm = { productoId: '', varianteId: '', unidadMedidaId: '', cantidad: '1', costoUnitario: '' };
+const LINEA_VACIA: LineaForm = { productoId: '', varianteId: '', unidadMedidaId: '', cantidad: '1', costoUnitario: '', centroCostoId: '' };
 
 /**
  * Auditoría UX Fase 3 — reemplaza a `ModalNuevaOrdenCompra` (modal ancho xl)
@@ -69,6 +71,7 @@ export function OrdenCompraNueva() {
           unidadMedidaId: l.unidadMedidaId || undefined,
           cantidad: Number(l.cantidad),
           costoUnitario: Number(l.costoUnitario),
+          centroCostoId: l.centroCostoId || undefined,
         })),
       }),
     onSuccess: () => {
@@ -196,6 +199,9 @@ export function OrdenCompraNueva() {
                   onChange={(e) => actualizarLinea(i, { costoUnitario: e.target.value })}
                   className="w-24 rounded-md border border-slate-300 px-2 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
                 />
+                <div className="w-40">
+                  <SelectCentroCosto value={linea.centroCostoId} onChange={(centroCostoId) => actualizarLinea(i, { centroCostoId })} />
+                </div>
                 {lineas.length > 1 && (
                   <button
                     type="button"

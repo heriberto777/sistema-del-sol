@@ -79,6 +79,7 @@ import { UnidadesMedidaModule } from './unidades-medida/unidades-medida.module';
 import { CategoriasModule } from './categorias/categorias.module';
 import { CategoriasClienteModule } from './categorias-cliente/categorias-cliente.module';
 import { CategoriasProveedorModule } from './categorias-proveedor/categorias-proveedor.module';
+import { CentrosCostoModule } from './centros-costo/centros-costo.module';
 import { ListasPrecioModule } from './listas-precio/listas-precio.module';
 import { AtributosModule } from './atributos/atributos.module';
 import { VariantesModule } from './variantes/variantes.module';
@@ -181,6 +182,7 @@ import { TenantMiddleware } from './common/middleware/tenant.middleware';
     CategoriasModule,
     CategoriasClienteModule,
     CategoriasProveedorModule,
+    CentrosCostoModule,
     ListasPrecioModule,
     AtributosModule,
     VariantesModule,

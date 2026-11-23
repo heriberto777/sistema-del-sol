@@ -25,6 +25,8 @@ interface LineaCalculada {
   // Undefined para SERVICIO/línea manual (nunca mueven stock) — ver
   // FacturacionService.crear().
   costoUnitario?: number;
+  // Centro de Costo (docs/PLAN.md, punto 3) — opcional, por línea.
+  centroCostoId?: string | null;
 }
 
 @Injectable()
@@ -272,6 +274,7 @@ export class FacturacionRepository {
             montoTotal: linea.montoTotal,
             pagaComision: linea.pagaComision,
             costoUnitario: linea.costoUnitario,
+            centroCostoId: linea.centroCostoId,
           })),
         },
         ...(params.pagos?.length

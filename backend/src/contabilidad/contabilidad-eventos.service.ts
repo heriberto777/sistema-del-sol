@@ -98,20 +98,21 @@ export class ContabilidadEventosService {
             costoUnitario: true,
             montoTotal: true,
             montoItbis: true,
+            centroCostoId: true,
             producto: { select: { categoria: { select: { cuentaIngresoId: true, cuentaCostoId: true } } } },
           },
         },
       },
     });
     const signo = tipoFactura === 'NOTA_CREDITO' ? -1 : 1;
-    const ingresosPorCuenta: { cuentaContableId: string | null; monto: number }[] = [];
-    const costosPorCuenta: { cuentaContableId: string | null; monto: number }[] = [];
+    const ingresosPorCuenta: { cuentaContableId: string | null; centroCostoId: string | null; monto: number }[] = [];
+    const costosPorCuenta: { cuentaContableId: string | null; centroCostoId: string | null; monto: number }[] = [];
     for (const l of factura.lineas) {
       const subtotalLinea = (Number(l.montoTotal) - Number(l.montoItbis)) * signo;
-      ingresosPorCuenta.push({ cuentaContableId: l.producto?.categoria?.cuentaIngresoId ?? null, monto: subtotalLinea });
+      ingresosPorCuenta.push({ cuentaContableId: l.producto?.categoria?.cuentaIngresoId ?? null, centroCostoId: l.centroCostoId, monto: subtotalLinea });
       if (l.costoUnitario != null) {
         const costoLinea = Number(l.cantidad) * Number(l.costoUnitario) * signo;
-        costosPorCuenta.push({ cuentaContableId: l.producto?.categoria?.cuentaCostoId ?? null, monto: costoLinea });
+        costosPorCuenta.push({ cuentaContableId: l.producto?.categoria?.cuentaCostoId ?? null, centroCostoId: l.centroCostoId, monto: costoLinea });
       }
     }
     return { ingresosPorCuenta, costosPorCuenta };
@@ -125,16 +126,22 @@ export class ContabilidadEventosService {
         include: { lineas: { include: { producto: true } } },
       });
 
-      const monto = recepcion.lineas.reduce((acc, l) => acc + Number(l.costoUnitario) * Number(l.cantidadRecibida), 0);
       const itbis = recepcion.lineas.reduce(
         (acc, l) => acc + Number(l.costoUnitario) * Number(l.cantidadRecibida) * (Number(l.producto.porcentajeItbis) / 100),
         0,
       );
+      // Centro de Costo (docs/PLAN.md, punto 3) — heredado de LineaOc a
+      // LineaRecepcion al recibir (ver ComprasService.recibir), un grupo
+      // por línea; generarDesdeCompra los funde por centro de costo.
+      const inventarioPorCentro = recepcion.lineas.map((l) => ({
+        centroCostoId: l.centroCostoId,
+        monto: Number(l.costoUnitario) * Number(l.cantidadRecibida),
+      }));
 
       await this.asientosContablesService.generarDesdeCompra({
         tenantId: payload.tenantId,
         recepcionId: payload.recepcionId,
-        monto,
+        inventarioPorCentro,
         itbis,
       });
     } catch (error) {
@@ -268,6 +275,7 @@ export class ContabilidadEventosService {
         lineas: gastoMenor.lineas.map((l) => ({
           cuentaContableId: l.cuentaContableId,
           monto: Number(l.valor) * Number(l.cantidad),
+          centroCostoId: l.centroCostoId ?? undefined,
         })),
       });
     } catch (error) {
@@ -297,6 +305,7 @@ export class ContabilidadEventosService {
         lineas: facturaProveedor.lineas.map((l) => ({
           cuentaContableId: l.cuentaContableId,
           monto: Number(l.valor) * Number(l.cantidad) * factor,
+          centroCostoId: l.centroCostoId ?? undefined,
         })),
       });
     } catch (error) {

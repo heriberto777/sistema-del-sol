@@ -3,6 +3,7 @@ import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { EstadosFinancierosService } from './estados-financieros.service';
 import { Permissions } from '../common/decorators/permissions.decorator';
 import { ReporteFiscalQueryDto } from '../reportes-fiscales/dto/reporte-fiscal-query.dto';
+import { EstadoResultadosQueryDto } from './dto/estado-resultados-query.dto';
 import { MarcarLineaConciliadaDto } from './dto/marcar-linea-conciliada.dto';
 
 @ApiBearerAuth()
@@ -19,8 +20,8 @@ export class EstadosFinancierosController {
 
   @Get('estado-resultados')
   @Permissions('contabilidad.ver')
-  estadoResultados(@Query() query: ReporteFiscalQueryDto) {
-    return this.estadosFinancierosService.estadoResultados(query.desde, query.hasta);
+  estadoResultados(@Query() query: EstadoResultadosQueryDto) {
+    return this.estadosFinancierosService.estadoResultados(query.desde, query.hasta, query.centroCostoId);
   }
 
   @Get('balance-comprobacion')

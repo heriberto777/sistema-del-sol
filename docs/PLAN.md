@@ -17,7 +17,7 @@ Convención de estado: `🔲 Pendiente de diseño` · `🟡 En diseño` ·
 | "Ver Stock" en Productos | ✅ Implementado — commit `dbccd79` |
 | Asistente de pre-cierre contable | 🔲 Pendiente de diseño |
 | Período de trabajo + advertencia blanda | 🔲 Pendiente de diseño |
-| Parametrización de cuentas contables y centros de costo — puntos 1 y 2 (banco real en Pagos; cuenta de ingreso/costo por categoría) | ✅ Implementado 2026-11-23 — resto (3, 4) sigue 🟡 en diseño |
+| Parametrización de cuentas contables y centros de costo — puntos 1, 2 y 3 (banco real en Pagos; cuenta de ingreso/costo por categoría; Centro de Costo por línea) | ✅ Implementado 2026-11-23 — punto 4 (override de códigos fijos) sigue 🟡 en diseño |
 | Depósito bancario (Caja → Banco) | 🔲 Pendiente de diseño |
 | Bug "removeChild" por ícono inferido del `<Button>` (variante nueva) | 🔲 2 casos encontrados sin corregir (ProductoNuevo, FacturacionNueva) — ver ARCHITECTURE.md |
 | Backlog UX/operación (Conteo Físico, modales→página, parámetros operativos, reporte de problemas, manual) | 🔲 Pendiente — ver detalle en `memoized-noodling-moore.md` (plan de Claude Code) |
@@ -117,24 +117,48 @@ Hoy conviven dos mecanismos:
    corregir** (fuera de alcance de este punto): crear un producto nuevo
    (navegación post-creación) y seleccionar un cliente en Facturación
    Nueva — candidatos a una ronda de auditoría propia.
-3. **Centro de Costo — catálogo nuevo, transversal** — modelo
-   `CentroCosto` (tenantId, código, nombre, activo), parametrizable desde
-   Catálogo de Cuentas o una pantalla hermana. Campo opcional
-   `centroCostoId` en `LineaAsiento`/`LineaGastoMenor`/
-   `FacturaProveedorLinea` (y quizás a nivel de cabecera de
-   Factura/Compra). Reporte nuevo: P&L por centro de costo.
+3. ✅ **Centro de Costo — catálogo nuevo, transversal** —
+   implementado y verificado 2026-11-23. Modelo `CentroCosto` (tenantId,
+   nombre, activo — catálogo plano sin jerarquía, mismo patrón CRUD que
+   `FormaPago`: listado sin permiso restrictivo, crear/editar con
+   `admin.configuracion`), página propia en Finanzas y Contabilidad →
+   Catálogos. `centroCostoId` opcional **por línea** (decisión confirmada
+   2026-11-23: más trabajo de UI que la cabecera, pero permite dividir un
+   mismo documento entre varios centros) en `LineaAsiento` (manual y
+   todos los generados), `LineaGastoMenor`, `FacturaProveedorLinea`,
+   `LineaFactura` (ventas — hereda en Nota de Crédito/Débito, igual
+   criterio que unidadMedidaId) y `LineaOc`/`LineaRecepcion` (Compras —
+   heredado de LineaOc a LineaRecepcion al recibir, igual criterio que
+   factorConversion).
 
-   **Decisión confirmada (2026-11-23)**: Centro de Costo y Proyecto son
-   **dos dimensiones independientes que se pueden combinar** en el mismo
+   **Decisión confirmada**: Centro de Costo y Proyecto son **dos
+   dimensiones independientes que se pueden combinar** en el mismo
    gasto/asiento — no se fusionan en un solo catálogo. Centro de Costo
    (sucursal/departamento/área) vive en el núcleo, disponible para
-   cualquier tenant tenga o no el plugin Proyectos activo; Proyecto sigue
-   respondiendo "¿para qué proyecto puntual es esto?" (rentabilidad de
-   una obra/consultoría concreta). Un gasto podría llevar ambos a la vez
-   (ej. Proyecto "Casa López" + Centro de Costo "Sucursal Santiago").
-   Implica dos campos opcionales independientes donde aplique
-   (`centroCostoId` además de `proyectoId`), no un campo que sustituya al
-   otro.
+   cualquier tenant tenga o no el plugin Proyectos activo.
+
+   Motor de asientos: `AsientosContablesService.generarDesdeFactura` ahora
+   agrupa por la combinación cuenta+centro de costo (no solo cuenta, ver
+   punto 2) vía el helper `agruparPorCuentaYCentroCosto`, reusado también
+   por `generarDesdeCompra` para segmentar el débito a Inventario por
+   centro de costo entre las líneas de una recepción. Gasto Menor/Factura
+   de Proveedor/Asiento manual ya posteaban línea a línea, solo se
+   propaga el campo. **Límite de alcance conocido**: la devolución a
+   proveedor (`generarReversaCompra`/`LineaDevolucionCompra`) sigue
+   revirtiendo en bloque, sin segmentar por centro de costo — no se tocó.
+
+   Reporte: filtro por un Centro de Costo puntual (o "todos") en el
+   Estado de Resultados existente (`GET /contabilidad/estado-resultados
+   ?centroCostoId=`) — decisión confirmada de no construir un comparativo
+   nuevo por columnas en esta ronda.
+
+   **Bug real encontrado y corregido de paso**: el filtro devolvía 400
+   ("property centroCostoId should not exist") — el `ValidationPipe`
+   global rechaza cualquier query param no declarado en el DTO usado por
+   `@Query()`, y `centroCostoId` se había agregado como un
+   `@Query('centroCostoId')` suelto en vez de en el DTO. Fix:
+   `EstadoResultadosQueryDto extends ReporteFiscalQueryDto` con el campo
+   agregado ahí (mismo patrón que `ReporteFiscalExportarQueryDto`).
 
 4. **Override de los 15 códigos fijos (`CODIGOS_CUENTA`) por tenant** — el
    más riesgoso: requiere poder editar/reasignar una `CuentaContable` sin

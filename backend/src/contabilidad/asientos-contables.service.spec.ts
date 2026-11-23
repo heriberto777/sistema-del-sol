@@ -445,7 +445,12 @@ describe('AsientosContablesService', () => {
     it('debita Inventario e ITBIS Adelantado, acredita Cuentas por Pagar por el total', async () => {
       asientosRepository.crearGlobal.mockResolvedValue({ id: 'a1' } as never);
 
-      await service.generarDesdeCompra({ tenantId: 't1', recepcionId: 'r1', monto: 200, itbis: 36 });
+      await service.generarDesdeCompra({
+        tenantId: 't1',
+        recepcionId: 'r1',
+        itbis: 36,
+        inventarioPorCentro: [{ centroCostoId: null, monto: 200 }],
+      });
 
       const [llamada] = asientosRepository.crearGlobal.mock.calls[0];
       const lineas = llamada.lineas;
@@ -459,6 +464,30 @@ describe('AsientosContablesService', () => {
       const totalDebito = lineas.reduce((acc: number, l: { debito: number }) => acc + l.debito, 0);
       const totalCredito = lineas.reduce((acc: number, l: { credito: number }) => acc + l.credito, 0);
       expect(totalDebito).toBeCloseTo(totalCredito, 5);
+    });
+
+    it('con varios centros de costo, genera una línea de débito a Inventario por cada uno (docs/PLAN.md, punto 3)', async () => {
+      asientosRepository.crearGlobal.mockResolvedValue({ id: 'a1' } as never);
+
+      await service.generarDesdeCompra({
+        tenantId: 't1',
+        recepcionId: 'r1',
+        itbis: 0,
+        inventarioPorCentro: [
+          { centroCostoId: 'centro-santiago', monto: 120 },
+          { centroCostoId: 'centro-santo-domingo', monto: 80 },
+        ],
+      });
+
+      const [llamada] = asientosRepository.crearGlobal.mock.calls[0];
+      const lineas = llamada.lineas;
+      expect(lineas).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ cuentaContableId: `cuenta-${CODIGOS_CUENTA.INVENTARIO}`, centroCostoId: 'centro-santiago', debito: 120 }),
+          expect.objectContaining({ cuentaContableId: `cuenta-${CODIGOS_CUENTA.INVENTARIO}`, centroCostoId: 'centro-santo-domingo', debito: 80 }),
+          expect.objectContaining({ cuentaContableId: `cuenta-${CODIGOS_CUENTA.CUENTAS_POR_PAGAR}`, credito: 200 }),
+        ]),
+      );
     });
   });
 

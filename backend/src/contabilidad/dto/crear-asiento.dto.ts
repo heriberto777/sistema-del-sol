@@ -21,6 +21,11 @@ export class LineaAsientoDto {
   @IsOptional()
   @IsString()
   descripcion?: string;
+
+  @ApiProperty({ required: false, description: 'Centro de Costo (docs/PLAN.md, punto 3) — opcional, por línea' })
+  @IsOptional()
+  @IsUUID()
+  centroCostoId?: string;
 }
 
 export class CrearAsientoDto {

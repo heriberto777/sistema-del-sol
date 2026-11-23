@@ -176,6 +176,7 @@ import { Autorizaciones } from './pages/Autorizaciones';
 import { PasarelaPago } from './pages/PasarelaPago';
 import { CategoriasCliente } from './pages/CategoriasCliente';
 import { CategoriasProveedor } from './pages/CategoriasProveedor';
+import { CentrosCosto } from './pages/CentrosCosto';
 import { LeyesFiscales } from './pages/LeyesFiscales';
 import { TasasCambio } from './pages/TasasCambio';
 import { Parametros } from './pages/Parametros';
@@ -481,6 +482,7 @@ const RUTAS_ADMIN = [
           { path: '/mensajes', element: <Mensajes /> },
           { path: '/categorias-cliente', element: <CategoriasCliente /> },
           { path: '/categorias-proveedor', element: <CategoriasProveedor /> },
+          { path: '/centros-costo', element: <CentrosCosto /> },
           { path: '/leyes-fiscales', element: <LeyesFiscales /> },
           { path: '/tasas-cambio', element: <TasasCambio /> },
           { path: '/configuracion', element: <Configuracion /> },

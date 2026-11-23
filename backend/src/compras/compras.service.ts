@@ -167,7 +167,7 @@ export class ComprasService {
         const lineaOc = orden.lineas.find((l) => l.productoId === linea.productoId);
         const varianteId = lineaOc?.varianteId ?? (await this.variantesService.resolverObligatoria(linea.productoId));
         const factorConversion = Number(lineaOc?.factorConversion ?? 1);
-        return { ...linea, varianteId, unidadMedidaId: lineaOc?.unidadMedidaId ?? undefined, factorConversion };
+        return { ...linea, varianteId, unidadMedidaId: lineaOc?.unidadMedidaId ?? undefined, factorConversion, centroCostoId: lineaOc?.centroCostoId ?? undefined };
       }),
     );
 

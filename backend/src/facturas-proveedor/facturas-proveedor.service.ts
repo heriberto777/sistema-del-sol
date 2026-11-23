@@ -66,6 +66,7 @@ export class FacturasProveedorService {
         montoItbis,
         cantidad,
         montoTotal: linea.valor * cantidad + montoItbis,
+        centroCostoId: linea.centroCostoId,
       };
     });
 

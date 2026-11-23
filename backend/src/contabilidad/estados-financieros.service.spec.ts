@@ -101,6 +101,14 @@ describe('EstadosFinancierosService', () => {
 
       expect(rango.desde.getDate()).toBe(1);
     });
+
+    it('con centroCostoId, lo propaga al repositorio para filtrar (docs/PLAN.md, punto 3)', async () => {
+      repository.lineasEnRango.mockResolvedValue([]);
+
+      await service.estadoResultados('2026-11-01', '2026-11-30', 'centro-santiago');
+
+      expect(repository.lineasEnRango).toHaveBeenCalledWith(expect.any(Date), expect.any(Date), 'centro-santiago');
+    });
   });
 
   describe('libroMayor', () => {

@@ -19,7 +19,7 @@ export class ComprasRepository {
       numero: string;
       userId: string;
       total: number;
-      lineas: { productoId: string; varianteId: string; unidadMedidaId?: string; factorConversion: number; cantidad: number; costoUnitario: number }[];
+      lineas: { productoId: string; varianteId: string; unidadMedidaId?: string; factorConversion: number; cantidad: number; costoUnitario: number; centroCostoId?: string }[];
     },
   ) {
     return tx.ordenCompra.create({
@@ -40,7 +40,7 @@ export class ComprasRepository {
     id: string,
     params: {
       total: number;
-      lineas: { productoId: string; varianteId: string; unidadMedidaId?: string; factorConversion: number; cantidad: number; costoUnitario: number }[];
+      lineas: { productoId: string; varianteId: string; unidadMedidaId?: string; factorConversion: number; cantidad: number; costoUnitario: number; centroCostoId?: string }[];
     },
   ) {
     return this.db.$transaction(async (tx) => {
@@ -159,7 +159,15 @@ export class ComprasRepository {
       // factorConversion se heredan de la LineaOc (ver ComprasService.recibir)
       // — solo para mostrar/auditar, cantidadRecibida/costoUnitario ya
       // quedan en esa unidad tal cual llegaron del DTO.
-      lineas: { productoId: string; varianteId: string; unidadMedidaId?: string; factorConversion: number; cantidadRecibida: number; costoUnitario: number }[];
+      lineas: {
+        productoId: string;
+        varianteId: string;
+        unidadMedidaId?: string;
+        factorConversion: number;
+        cantidadRecibida: number;
+        costoUnitario: number;
+        centroCostoId?: string;
+      }[];
     },
   ) {
     return tx.recepcionCompra.create({
@@ -176,6 +184,7 @@ export class ComprasRepository {
             factorConversion: l.factorConversion,
             cantidadRecibida: l.cantidadRecibida,
             costoUnitario: l.costoUnitario,
+            centroCostoId: l.centroCostoId,
           })),
         },
       },

@@ -132,7 +132,7 @@ export class FacturacionService {
     // devuelva "2 Cajas" contra una venta de "20 Unidades" y descuadre la
     // comparación de cantidades ya devueltas en anular(). Sin esto
     // (CONTADO/CREDITO), cada línea resuelve su propia unidad desde el DTO.
-    facturaOrigenLineas?: { productoId: string | null; unidadMedidaId: string | null; factorConversion: Prisma.Decimal }[],
+    facturaOrigenLineas?: { productoId: string | null; unidadMedidaId: string | null; factorConversion: Prisma.Decimal; centroCostoId: string | null }[],
   ) {
     if (dto.descuentoGeneralPct && dto.descuentoGeneralMonto) {
       throw new BadRequestException('Enviá descuentoGeneralPct o descuentoGeneralMonto, no ambos');
@@ -194,6 +194,7 @@ export class FacturacionService {
             // Motor de costeo — una línea manual nunca mueve stock, nunca
             // tiene Costo de Ventas (ver ContabilidadEventosService).
             costoUnitario: undefined as number | undefined,
+            centroCostoId: linea.centroCostoId ?? null,
           };
         }
         // La variante se resuelve UNA vez por línea y se reusa tanto para el
@@ -206,13 +207,16 @@ export class FacturacionService {
         // `facturaOrigenLineas` más arriba.
         let unidadMedidaId: string | null;
         let factorConversion: number;
+        let centroCostoId: string | null;
         if (facturaOrigenLineas) {
           const lineaOrigen = facturaOrigenLineas.find((l) => l.productoId === linea.productoId);
           unidadMedidaId = lineaOrigen?.unidadMedidaId ?? null;
           factorConversion = Number(lineaOrigen?.factorConversion ?? 1);
+          centroCostoId = lineaOrigen?.centroCostoId ?? null;
         } else {
           unidadMedidaId = linea.unidadMedidaId ?? null;
           factorConversion = await this.productosService.resolverFactorConversion(linea.productoId, linea.unidadMedidaId);
+          centroCostoId = linea.centroCostoId ?? null;
         }
         // Ítem E-8: un producto con permiteDevolucion:false no puede
         // incluirse en una Nota de Crédito (ej. productos perecederos que
@@ -292,6 +296,7 @@ export class FacturacionService {
           porcentajeItbis: porcentajeItbisD.toNumber(),
           montoItbis: montoItbisD.toNumber(),
           montoTotal: totalLineaD.plus(montoItbisD).toNumber(),
+          centroCostoId,
           // Ítem A-1 — persistido en LineaFactura; ComisionesEventosService
           // relee la factura ya creada (join a Producto) y no necesita
           // ningún otro dato transiente de este cálculo.

@@ -13,6 +13,7 @@ import { FormField } from '../components/molecules/FormField/FormField';
 import { ComboboxBusqueda } from '../components/molecules/ComboboxBusqueda/ComboboxBusqueda';
 import { NuevoProveedorInline, type ProveedorBasico } from '../components/molecules/NuevoProveedorInline/NuevoProveedorInline';
 import { SelectTerminoPago } from '../components/molecules/SelectTerminoPago/SelectTerminoPago';
+import { SelectCentroCosto } from '../components/molecules/SelectCentroCosto/SelectCentroCosto';
 import { type TerminoPago } from '../hooks/useTerminosPago';
 import { PaginaResultado } from '../types/pagina-resultado';
 import { useHayCambios } from '../hooks/useHayCambios';
@@ -42,9 +43,10 @@ interface LineaForm {
   valor: string;
   porcentajeItbis: string;
   cantidad: string;
+  centroCostoId: string;
 }
 
-const LINEA_VACIA: LineaForm = { cuentaContableId: '', concepto: '', valor: '', porcentajeItbis: '18', cantidad: '1' };
+const LINEA_VACIA: LineaForm = { cuentaContableId: '', concepto: '', valor: '', porcentajeItbis: '18', cantidad: '1', centroCostoId: '' };
 
 interface FacturaExtraida {
   proveedorNombre: string | null;
@@ -185,6 +187,7 @@ export function FacturaProveedorNueva() {
           valor: Number(l.valor),
           porcentajeItbis: l.porcentajeItbis ? Number(l.porcentajeItbis) : undefined,
           cantidad: l.cantidad ? Number(l.cantidad) : undefined,
+          centroCostoId: l.centroCostoId || undefined,
         })),
       }),
     onSuccess: () => {
@@ -386,6 +389,9 @@ export function FacturaProveedorNueva() {
                   onChange={(e) => actualizarLinea(i, { concepto: e.target.value })}
                   className="w-32 rounded-md border border-slate-300 px-2 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
                 />
+                <div className="w-40">
+                  <SelectCentroCosto value={linea.centroCostoId} onChange={(centroCostoId) => actualizarLinea(i, { centroCostoId })} />
+                </div>
                 <input
                   type="number"
                   min={0}

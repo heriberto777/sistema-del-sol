@@ -16,6 +16,7 @@ interface LineaCalculada {
   debito: number;
   credito: number;
   descripcion?: string;
+  centroCostoId?: string;
 }
 
 @Injectable()
@@ -29,7 +30,13 @@ export class AsientosContablesService {
   ) {}
 
   async crear(dto: CrearAsientoDto, tenantId: string) {
-    const lineas = dto.lineas.map((l) => ({ cuentaContableId: l.cuentaContableId, debito: l.debito ?? 0, credito: l.credito ?? 0, descripcion: l.descripcion }));
+    const lineas = dto.lineas.map((l) => ({
+      cuentaContableId: l.cuentaContableId,
+      debito: l.debito ?? 0,
+      credito: l.credito ?? 0,
+      descripcion: l.descripcion,
+      centroCostoId: l.centroCostoId,
+    }));
     this.validarBalance(lineas);
     const fecha = dto.fecha ? new Date(dto.fecha) : new Date();
     await this.cierrePeriodoService.validarPeriodoAbierto(fecha);
@@ -68,6 +75,7 @@ export class AsientosContablesService {
       debito: Number(l.credito),
       credito: Number(l.debito),
       descripcion: `Anulación — asiento ${asiento.numero}`,
+      centroCostoId: l.centroCostoId ?? undefined,
     }));
 
     const reverso = await this.asientosRepository.crear({
@@ -131,8 +139,8 @@ export class AsientosContablesService {
     itbis: number;
     total: number;
     recargos?: number;
-    ingresosPorCuenta: { cuentaContableId: string | null; monto: number }[];
-    costosPorCuenta?: { cuentaContableId: string | null; monto: number }[];
+    ingresosPorCuenta: { cuentaContableId: string | null; centroCostoId?: string | null; monto: number }[];
+    costosPorCuenta?: { cuentaContableId: string | null; centroCostoId?: string | null; monto: number }[];
   }) {
     const [cuentaCobro, cuentaItbis] = await Promise.all([
       this.cuentasRepository.buscarPorCodigoGlobal(params.tenantId, params.tipoFactura === 'CONTADO' ? CODIGOS_CUENTA.CAJA_BANCOS : CODIGOS_CUENTA.CUENTAS_POR_COBRAR),
@@ -152,17 +160,16 @@ export class AsientosContablesService {
       ? await this.cuentasRepository.buscarPorCodigoGlobal(params.tenantId, CODIGOS_CUENTA.INGRESOS_POR_VENTAS)
       : null;
 
-    const gruposIngreso = new Map<string, number>();
-    for (const grupo of params.ingresosPorCuenta) {
-      const cuentaId = grupo.cuentaContableId ?? cuentaIngresosGenerica!.id;
-      gruposIngreso.set(cuentaId, (gruposIngreso.get(cuentaId) ?? 0) + grupo.monto);
-    }
-    if (params.recargos) {
-      gruposIngreso.set(cuentaIngresosGenerica!.id, (gruposIngreso.get(cuentaIngresosGenerica!.id) ?? 0) + params.recargos);
-    }
-    for (const [cuentaId, monto] of gruposIngreso) {
-      if (Math.abs(monto) < EPSILON) continue;
-      lineas.push(this.lineaSegunSigno(cuentaId, monto, 'credito', `Factura ${params.facturaId}`));
+    // Recargos (sin producto/categoría detrás, y por lo tanto sin Centro
+    // de Costo propio) se suman como un grupo sintético más, a la
+    // genérica, antes de agrupar — evita un caso especial aparte.
+    const ingresosConRecargos = params.recargos
+      ? [...params.ingresosPorCuenta, { cuentaContableId: null, centroCostoId: null, monto: params.recargos }]
+      : params.ingresosPorCuenta;
+    const gruposIngreso = this.agruparPorCuentaYCentroCosto(ingresosConRecargos, cuentaIngresosGenerica?.id);
+    for (const grupo of gruposIngreso) {
+      if (Math.abs(grupo.monto) < EPSILON) continue;
+      lineas.push(this.lineaSegunSigno(grupo.cuentaContableId, grupo.monto, 'credito', `Factura ${params.facturaId}`, grupo.centroCostoId ?? undefined));
     }
 
     if (params.costosPorCuenta?.length) {
@@ -171,16 +178,12 @@ export class AsientosContablesService {
         necesitaCostoGenerica ? this.cuentasRepository.buscarPorCodigoGlobal(params.tenantId, CODIGOS_CUENTA.COSTO_DE_VENTAS) : null,
         this.cuentasRepository.buscarPorCodigoGlobal(params.tenantId, CODIGOS_CUENTA.INVENTARIO),
       ]);
-      const gruposCosto = new Map<string, number>();
-      for (const grupo of params.costosPorCuenta) {
-        const cuentaId = grupo.cuentaContableId ?? cuentaCostoGenerica!.id;
-        gruposCosto.set(cuentaId, (gruposCosto.get(cuentaId) ?? 0) + grupo.monto);
-      }
+      const gruposCosto = this.agruparPorCuentaYCentroCosto(params.costosPorCuenta, cuentaCostoGenerica?.id);
       let totalCosto = 0;
-      for (const [cuentaId, monto] of gruposCosto) {
-        if (Math.abs(monto) < EPSILON) continue;
-        lineas.push(this.lineaSegunSigno(cuentaId, monto, 'debito', `Costo de venta — factura ${params.facturaId}`));
-        totalCosto += monto;
+      for (const grupo of gruposCosto) {
+        if (Math.abs(grupo.monto) < EPSILON) continue;
+        lineas.push(this.lineaSegunSigno(grupo.cuentaContableId, grupo.monto, 'debito', `Costo de venta — factura ${params.facturaId}`, grupo.centroCostoId ?? undefined));
+        totalCosto += grupo.monto;
       }
       if (Math.abs(totalCosto) >= EPSILON) {
         lineas.push(this.lineaSegunSigno(cuentaInventario.id, totalCosto, 'credito', `Costo de venta — factura ${params.facturaId}`));
@@ -196,6 +199,33 @@ export class AsientosContablesService {
     });
   }
 
+  /**
+   * Agrupa grupos sueltos {cuentaContableId (null = genérica)/
+   * centroCostoId/monto} en uno por cada combinación real de cuenta +
+   * centro de costo — reusado por generarDesdeFactura (ingresos/costos) y
+   * generarDesdeCompra (Inventario por recepción, docs/PLAN.md punto 3).
+   * `cuentaGenericaId` debe venir resuelto si algún grupo trae
+   * `cuentaContableId: null`.
+   */
+  private agruparPorCuentaYCentroCosto(
+    grupos: { cuentaContableId: string | null; centroCostoId?: string | null; monto: number }[],
+    cuentaGenericaId: string | undefined,
+  ): { cuentaContableId: string; centroCostoId: string | null; monto: number }[] {
+    const acumulado = new Map<string, { cuentaContableId: string; centroCostoId: string | null; monto: number }>();
+    for (const g of grupos) {
+      const cuentaId = g.cuentaContableId ?? cuentaGenericaId!;
+      const centroCostoId = g.centroCostoId ?? null;
+      const clave = `${cuentaId}::${centroCostoId ?? ''}`;
+      const actual = acumulado.get(clave);
+      if (actual) {
+        actual.monto += g.monto;
+      } else {
+        acumulado.set(clave, { cuentaContableId: cuentaId, centroCostoId, monto: g.monto });
+      }
+    }
+    return [...acumulado.values()];
+  }
+
   /** Reversa exacta del asiento de venta — misma fórmula, montos negados. */
   async generarReversaFactura(params: {
     tenantId: string;
@@ -204,8 +234,8 @@ export class AsientosContablesService {
     itbis: number;
     total: number;
     recargos?: number;
-    ingresosPorCuenta: { cuentaContableId: string | null; monto: number }[];
-    costosPorCuenta?: { cuentaContableId: string | null; monto: number }[];
+    ingresosPorCuenta: { cuentaContableId: string | null; centroCostoId?: string | null; monto: number }[];
+    costosPorCuenta?: { cuentaContableId: string | null; centroCostoId?: string | null; monto: number }[];
   }) {
     return this.generarDesdeFactura({
       ...params,
@@ -218,15 +248,39 @@ export class AsientosContablesService {
   }
 
   /** Compra recibida -> Inventario + ITBIS adelantado, contra Cuentas por Pagar. */
-  async generarDesdeCompra(params: { tenantId: string; recepcionId: string; monto: number; itbis: number }) {
+  /**
+   * `inventarioPorCentro` (docs/PLAN.md, punto 3) — un grupo por cada
+   * Centro de Costo distinto entre las líneas de la recepción (`null` =
+   * sin elegir), siempre contra la MISMA cuenta Inventario (a diferencia
+   * de Factura, acá no hay una cuenta de categoría que resolver — solo se
+   * segmenta por centro de costo). Reemplaza el viejo `monto` plano: sin
+   * ningún centro de costo elegido, un solo grupo `{centroCostoId: null,
+   * monto: total}` se comporta exactamente igual que antes
+   * (retrocompatible).
+   */
+  async generarDesdeCompra(params: {
+    tenantId: string;
+    recepcionId: string;
+    itbis: number;
+    inventarioPorCentro: { centroCostoId: string | null; monto: number }[];
+  }) {
     const [cuentaInventario, cuentaItbis, cuentaPorPagar] = await Promise.all([
       this.cuentasRepository.buscarPorCodigoGlobal(params.tenantId, CODIGOS_CUENTA.INVENTARIO),
       this.cuentasRepository.buscarPorCodigoGlobal(params.tenantId, CODIGOS_CUENTA.ITBIS_ADELANTADO),
       this.cuentasRepository.buscarPorCodigoGlobal(params.tenantId, CODIGOS_CUENTA.CUENTAS_POR_PAGAR),
     ]);
 
-    const total = params.monto + params.itbis;
-    const lineas = [this.lineaSegunSigno(cuentaInventario.id, params.monto, 'debito', `Recepción ${params.recepcionId}`)];
+    const monto = params.inventarioPorCentro.reduce((acc, g) => acc + g.monto, 0);
+    const total = monto + params.itbis;
+    const lineas = [];
+    const gruposInventario = this.agruparPorCuentaYCentroCosto(
+      params.inventarioPorCentro.map((g) => ({ cuentaContableId: cuentaInventario.id, centroCostoId: g.centroCostoId, monto: g.monto })),
+      cuentaInventario.id,
+    );
+    for (const grupo of gruposInventario) {
+      if (Math.abs(grupo.monto) < EPSILON) continue;
+      lineas.push(this.lineaSegunSigno(grupo.cuentaContableId, grupo.monto, 'debito', `Recepción ${params.recepcionId}`, grupo.centroCostoId ?? undefined));
+    }
     if (params.itbis !== 0) {
       lineas.push(this.lineaSegunSigno(cuentaItbis.id, params.itbis, 'debito', `Recepción ${params.recepcionId}`));
     }
@@ -434,10 +488,10 @@ export class AsientosContablesService {
     gastoMenorId: string;
     cuentaBancariaCuentaContableId: string;
     itbis: number;
-    lineas: { cuentaContableId: string; monto: number }[];
+    lineas: { cuentaContableId: string; monto: number; centroCostoId?: string }[];
   }) {
     const descripcion = `Gasto menor — ${params.gastoMenorId}`;
-    const lineas = params.lineas.map((l) => this.lineaSegunSigno(l.cuentaContableId, l.monto, 'debito', descripcion));
+    const lineas = params.lineas.map((l) => this.lineaSegunSigno(l.cuentaContableId, l.monto, 'debito', descripcion, l.centroCostoId));
 
     if (params.itbis !== 0) {
       const cuentaItbis = await this.cuentasRepository.buscarPorCodigoGlobal(params.tenantId, CODIGOS_CUENTA.ITBIS_ADELANTADO);
@@ -474,10 +528,10 @@ export class AsientosContablesService {
     tenantId: string;
     facturaProveedorId: string;
     itbis: number;
-    lineas: { cuentaContableId: string; monto: number }[];
+    lineas: { cuentaContableId: string; monto: number; centroCostoId?: string }[];
   }) {
     const descripcion = `Factura de proveedor — ${params.facturaProveedorId}`;
-    const lineas = params.lineas.map((l) => this.lineaSegunSigno(l.cuentaContableId, l.monto, 'debito', descripcion));
+    const lineas = params.lineas.map((l) => this.lineaSegunSigno(l.cuentaContableId, l.monto, 'debito', descripcion, l.centroCostoId));
 
     if (params.itbis !== 0) {
       const cuentaItbis = await this.cuentasRepository.buscarPorCodigoGlobal(params.tenantId, CODIGOS_CUENTA.ITBIS_ADELANTADO);
@@ -569,10 +623,16 @@ export class AsientosContablesService {
   }
 
   /** monto>=0 va a `cuandoPositivo`; si es negativo (p. ej. una nota de crédito), se refleja en la cuenta contraria, con valor absoluto. */
-  private lineaSegunSigno(cuentaContableId: string, monto: number, cuandoPositivo: 'debito' | 'credito', descripcion: string): LineaCalculada {
+  private lineaSegunSigno(
+    cuentaContableId: string,
+    monto: number,
+    cuandoPositivo: 'debito' | 'credito',
+    descripcion: string,
+    centroCostoId?: string,
+  ): LineaCalculada {
     const cuandoNegativo = cuandoPositivo === 'debito' ? 'credito' : 'debito';
     const columna = monto >= 0 ? cuandoPositivo : cuandoNegativo;
-    return { cuentaContableId, debito: 0, credito: 0, [columna]: Math.abs(monto), descripcion } as LineaCalculada;
+    return { cuentaContableId, debito: 0, credito: 0, [columna]: Math.abs(monto), descripcion, centroCostoId } as LineaCalculada;
   }
 
   private validarBalance(lineas: { debito: number; credito: number }[]) {

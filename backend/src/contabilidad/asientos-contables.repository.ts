@@ -8,9 +8,11 @@ interface LineaAsientoInput {
   debito: number;
   credito: number;
   descripcion?: string;
+  /** Centro de Costo (docs/PLAN.md, punto 3) — opcional, por línea. */
+  centroCostoId?: string;
 }
 
-const INCLUDE_ASIENTO = { lineas: { include: { cuentaContable: true } } } as const;
+const INCLUDE_ASIENTO = { lineas: { include: { cuentaContable: true, centroCosto: true } } } as const;
 const MAX_INTENTOS_NUMERO = 5;
 
 @Injectable()
@@ -173,11 +175,13 @@ export class AsientosContablesRepository {
   }
 
   /** Líneas de cuentas de INGRESO/GASTO dentro de un rango — para el estado de resultados y el cierre de período. */
-  lineasEnRango(desde: Date, hasta: Date) {
+  /** `centroCostoId` (docs/PLAN.md, punto 3) — filtro opcional del Estado de Resultados por Centro de Costo. */
+  lineasEnRango(desde: Date, hasta: Date, centroCostoId?: string) {
     return this.db.lineaAsiento.findMany({
       where: {
         asiento: { fecha: { gte: desde, lte: hasta } },
         cuentaContable: { tipo: { in: ['INGRESO', 'GASTO'] } },
+        ...(centroCostoId ? { centroCostoId } : {}),
       },
       include: { cuentaContable: true },
     });

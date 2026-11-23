@@ -74,6 +74,11 @@ export class LineaFacturaDto {
   @IsOptional()
   @IsBoolean()
   aplicaItbis?: boolean;
+
+  @ApiProperty({ required: false, description: 'Centro de Costo (docs/PLAN.md, punto 3) — opcional, por línea. En una Nota de Crédito/Débito se hereda de la línea de la factura origen, nunca se vuelve a elegir.' })
+  @IsOptional()
+  @IsUUID()
+  centroCostoId?: string;
 }
 
 export class RecargoFacturaDto {

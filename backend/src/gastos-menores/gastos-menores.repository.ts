@@ -10,6 +10,7 @@ interface LineaCalculada {
   montoItbis: number;
   cantidad: number;
   montoTotal: number;
+  centroCostoId?: string;
 }
 
 @Injectable()
@@ -96,6 +97,7 @@ export class GastosMenoresRepository {
             montoItbis: linea.montoItbis,
             cantidad: linea.cantidad,
             montoTotal: linea.montoTotal,
+            centroCostoId: linea.centroCostoId,
           })),
         },
       },

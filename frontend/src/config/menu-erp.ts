@@ -259,6 +259,9 @@ export const DOMINIOS_MENU: DominioMenu[] = [
           // transversal (la usan también Compras, Facturas de proveedor,
           // Lealtad, Bonos y POS), no exclusiva de Ventas.
           { id: 'formas-pago', etiqueta: 'Formas de pago', ruta: '/formas-pago', permisos: ['admin.configuracion'] },
+          // docs/PLAN.md, punto 3 — dimensión transversal (sucursal/
+          // departamento/área), igual criterio que Formas de pago.
+          { id: 'centros-costo', etiqueta: 'Centros de costo', ruta: '/centros-costo', permisos: ['admin.configuracion'] },
         ],
       },
       {

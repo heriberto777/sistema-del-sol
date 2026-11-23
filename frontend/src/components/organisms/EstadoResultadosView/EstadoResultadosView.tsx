@@ -4,6 +4,7 @@ import { apiClient } from '../../../lib/api-client';
 import { Input } from '../../atoms/Input/Input';
 import { StatCard } from '../../molecules/StatCard/StatCard';
 import { GrupoCuentasContables } from '../../molecules/GrupoCuentasContables/GrupoCuentasContables';
+import { SelectCentroCosto } from '../../molecules/SelectCentroCosto/SelectCentroCosto';
 
 interface SaldoCuenta {
   codigo: string;
@@ -25,13 +26,14 @@ function formatoRD(valor: number) {
 export function EstadoResultadosView() {
   const [desde, setDesde] = useState('');
   const [hasta, setHasta] = useState('');
+  const [centroCostoId, setCentroCostoId] = useState('');
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ['contabilidad-estado-resultados', desde, hasta],
+    queryKey: ['contabilidad-estado-resultados', desde, hasta, centroCostoId],
     queryFn: async () =>
       (
         await apiClient.get<EstadoResultados>('/contabilidad/estado-resultados', {
-          params: { desde: desde || undefined, hasta: hasta || undefined },
+          params: { desde: desde || undefined, hasta: hasta || undefined, centroCostoId: centroCostoId || undefined },
         })
       ).data,
   });
@@ -47,7 +49,11 @@ export function EstadoResultadosView() {
           <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Hasta</label>
           <Input type="date" value={hasta} onChange={(e) => setHasta(e.target.value)} />
         </div>
-        <p className="text-xs text-slate-500 dark:text-slate-400">Por defecto: mes actual</p>
+        <div className="w-56">
+          <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Centro de costo</label>
+          <SelectCentroCosto value={centroCostoId} onChange={setCentroCostoId} />
+        </div>
+        <p className="text-xs text-slate-500 dark:text-slate-400">Por defecto: mes actual, todos los centros de costo</p>
       </div>
 
       {isLoading && <p className="text-sm text-slate-500 dark:text-slate-400">Calculando estado de resultados…</p>}

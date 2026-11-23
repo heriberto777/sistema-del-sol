@@ -72,10 +72,11 @@ export class EstadosFinancierosService {
     };
   }
 
-  async estadoResultados(desde?: string, hasta?: string) {
+  /** `centroCostoId` (docs/PLAN.md, punto 3) — filtro opcional: "todos" (sin mandarlo) o un Centro de Costo puntual. */
+  async estadoResultados(desde?: string, hasta?: string, centroCostoId?: string) {
     const hastaFecha = hasta ? new Date(hasta) : new Date();
     const desdeFecha = desde ? new Date(desde) : new Date(hastaFecha.getFullYear(), hastaFecha.getMonth(), 1);
-    const lineas = await this.asientosRepository.lineasEnRango(desdeFecha, hastaFecha);
+    const lineas = await this.asientosRepository.lineasEnRango(desdeFecha, hastaFecha, centroCostoId);
 
     const saldosPorCuenta = new Map<string, SaldoCuenta & { tipo: string }>();
     for (const linea of lineas) {

@@ -30,6 +30,11 @@ export class LineaFacturaProveedorDto {
   @IsNumber()
   @IsPositive()
   cantidad?: number;
+
+  @ApiProperty({ required: false, description: 'Centro de Costo (docs/PLAN.md, punto 3) — opcional, por línea' })
+  @IsOptional()
+  @IsUUID()
+  centroCostoId?: string;
 }
 
 export class CrearFacturaProveedorDto {
