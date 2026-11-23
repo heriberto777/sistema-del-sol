@@ -4838,6 +4838,125 @@ sí valen la pena de forma independiente (son huecos reales de
 contabilidad) y pueden abordarse sueltos cuando se decida, sin que
 implique el resto del combo.
 
+## Auditoría UX: modal → página (regla permanente, no solo esta ronda)
+
+Pedido explícito del usuario (2026-11): **el modal queda reservado
+exclusivamente para gestionar notificaciones** — cualquier Crear/Editar/
+Ver de una entidad real (factura, cliente, orden de compra, tenant,
+tarea, lo que sea) va en una página con ruta propia, nunca en un modal.
+Esto **no es una limpieza puntual de esta sesión — es una convención
+permanente** que aplica a todo módulo o plugin nuevo de acá en adelante
+(ver `GUIA_PLUGINS.md` → sección 7a, que la repite en el contexto de un
+plugin nuevo).
+
+### Alcance de la regla — qué SÍ sigue siendo modal
+
+No todo uso de `Modal`/`ConfirmModal` rompe la regla. Quedan exceptuados,
+a propósito:
+
+- **Confirmaciones sin formulario real** (`ConfirmModal`: "¿eliminar
+  esto?", "¿cancelar la orden?") — es una confirmación de una acción, no
+  una pantalla de gestión de la entidad.
+- **Alta rápida embebida dentro de OTRO formulario en curso**
+  (`ModalCrearProductoRapido`, `ModalCrearClienteRapido`,
+  `NuevoProveedorInline`-style) — el usuario no "gestiona" esa entidad
+  ahí, solo resuelve una dependencia sin perder el documento que está
+  armando.
+- **Mensajería** (`ModalEnviarDocumentoWhatsapp`) — es el mismo criterio
+  que notificaciones, no gestión de la entidad.
+- **Previsualización + confirmar sin campos editables reales**
+  (`FacturarHitoModal`/`FacturarConsolidadoModal` en Proyectos,
+  `ModalImprimir`) — el usuario no edita nada, solo revisa un cálculo ya
+  hecho por el backend antes de confirmar.
+- **Asistente que arma un borrador para OTRO formulario**
+  (`GenerarTareasIaModal`) — el resultado se aplica al formulario
+  anfitrión, el asistente en sí no persiste nada por su cuenta.
+
+Fuera de esas 5 categorías, si hay un formulario con datos propios de
+una entidad → es página.
+
+### El patrón de página resultante (usarlo tal cual en código nuevo)
+
+- **Crear**: `PaginaDocumento` (columna principal + panel lateral
+  `resumen`/`acciones` sticky, con `useHayCambios` para el guard de
+  "¿salir sin guardar?") — ver `OrdenCompraNueva.tsx`, `ProyectoNuevo.tsx`.
+- **Ver + Editar de la misma entidad, formulario chico**: una sola
+  página con toggle local `editando` (sin ruta aparte) — los datos
+  siempre visibles en modo lectura, "Editar" arriba del panel de
+  acciones pasa a mostrar el formulario in-place. Ver `HitoVer.tsx`,
+  `PropiedadVer.tsx`, `TenantVer.tsx`, `LeadVer.tsx`,
+  `OportunidadVer.tsx`, `OrdenCompraVer.tsx`.
+- **Acción puntual con formulario grande** (ej. "Recibir"/"Devolver" de
+  una Orden de Compra, "Generar cotización" de una Oportunidad): ruta
+  propia (`/compras/:id/recibir`), no un toggle inline — demasiado
+  formulario para convivir en la misma página que el "ver".
+- **Secciones auxiliares de una ficha** (ej. Suscripción/Módulos/
+  Dominios de un Tenant, Historial de puntos/Estado de cuenta/Timeline
+  de un Cliente): `CardColapsable` dentro de la misma página de "ver",
+  no modal ni ruta aparte.
+
+### Bug real recurrente de este patrón — invalidar queries en el mismo
+### tick que el toggle `editando`
+
+Si la mutación de "Guardar" de una página con toggle `editando` invalida
+una query que la MISMA página observa (típico: `['entidad', id]`), y esa
+invalidación corre en el mismo tick que `setEditando(false)` (el cambio
+que desmonta el `<form>` y monta la vista de lectura), React puede
+fallar el commit con `Failed to execute 'removeChild' on 'Node'` —
+**intermitente** (no en el primer guardado, sí en el segundo o tercero
+de la misma sesión de edición; confirmado con instrumentación directa
+del DOM, descartando herramientas de automatización/caché de Vite como
+causa). Encontrado y corregido en las 6 páginas que ya tenían el patrón
+(`OrdenCompraVer.tsx`, `PropiedadVer.tsx`, `TenantVer.tsx`,
+`HitoVer.tsx`, `LeadVer.tsx`, `OportunidadVer.tsx`): diferir la
+invalidación un macrotask, DESPUÉS de los `setState` locales —
+
+```ts
+onSuccess: () => {
+  confirmarGuardado();
+  setEditando(false);
+  setTimeout(() => {
+    queryClient.invalidateQueries({ queryKey: ['entidad', id] });
+  }, 0);
+},
+```
+
+Verificado con 10+ ciclos seguidos de Editar→Guardar sin error tras el
+fix. **Cualquier página nueva con este patrón tiene que diferir así la
+invalidación desde el día uno** — no es optativo, el bug es real y
+reproducible, no una rareza del entorno de pruebas.
+
+### Otro bug real encontrado en el camino — `editando` pegado tras crear
+
+`PropiedadVer.tsx` atiende tanto `/propiedades/nuevo` (crear) como
+`/propiedades/:id` (ver/editar) en el mismo componente (`esNuevo = !id`).
+Al crear, `navigate()` hacia la nueva URL reutiliza la MISMA instancia de
+React (React Router no remonta solo porque cambió el string de ruta
+coincidente) — sin resetear `editando` (que arrancó en `true` porque
+`esNuevo` era `true` al montar), la página quedaba pegada en modo
+edición en vez de pasar a "ver" como cualquier propiedad ya existente.
+Fix: un efecto que resetea `editando` a `false` apenas `esNuevo` pasa a
+`false` y el registro ya cargó. Cualquier página que comparta un mismo
+componente entre su ruta de "crear" y su ruta de "ver/editar" (patrón
+`esNuevo = !id`) tiene que tener este mismo guard si además usa un
+toggle `editando` separado de `esNuevo`.
+
+### Gotcha de entorno que generó falsas alarmas durante esta auditoría
+
+En Docker Desktop sobre Windows, el watcher de archivos de Vite **no
+detecta de forma confiable** los cambios hechos en el bind-mount del
+host — sirve código viejo indefinidamente hasta un
+`docker restart sistema-del-sol-web-1`, aunque el archivo en disco (y
+dentro del propio contenedor, confirmado con
+`docker exec ... grep`) ya esté actualizado. Un `docker restart` tampoco
+alcanza por sí solo si la pestaña del navegador ya estaba abierta desde
+antes — hay que además recargar/renavegar esa pestaña después del
+restart para que tome el bundle nuevo. Sin este paso, un fix real
+recién aplicado parece "no funcionar" en pruebas en vivo cuando en
+realidad el navegador sigue corriendo el bundle de antes del fix — esto
+fue la causa de varias falsas conclusiones intermedias durante esta
+investigación.
+
 ## Diferido: unificar Factura/Cotización/Remisión en un componente compartido
 
 La auditoría de organización (2026-11) marcó como deuda técnica opcional

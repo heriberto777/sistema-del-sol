@@ -164,6 +164,40 @@ a) **Páginas**: creá en `frontend/src/pages/` una página por pantalla
    del plugin, siguiendo Atomic Design para los componentes que arme
    cada una (ver `SISTEMA.md` → "Mapa del frontend").
 
+   **Modal solo para gestionar notificaciones — todo lo demás es
+   página** (regla confirmada por el usuario, ver "Auditoría UX:
+   modal → página" en `ARCHITECTURE.md`). Crear/Editar/Ver de
+   cualquier entidad del plugin van en una página con el patrón ya
+   establecido (ver `OrdenCompraVer.tsx`, `HitoVer.tsx`,
+   `PropiedadVer.tsx` como referencia):
+   - `PaginaDocumento` (columna principal + panel lateral
+     `resumen`/`acciones` sticky) para crear/editar formularios reales.
+   - Página única por entidad para "ver" + "editar" cuando el
+     formulario es chico: toggle local `editando` (sin ruta aparte),
+     con los datos siempre visibles y el botón "Editar" al tope del
+     panel de acciones.
+   - Ruta separada (`/mi-plugin/:id/accion`) cuando el formulario de
+     una acción puntual (ej. "recibir", "facturar") es demasiado
+     grande para un toggle inline.
+   - Acciones de confirmación simple (sin formulario real, ej.
+     "¿eliminar esto?") siguen usando `ConfirmModal` — no son la
+     excepción que rompe la regla, son confirmaciones, no pantallas de
+     gestión.
+   - Alta rápida embebida dentro de OTRO formulario (ej. "+ Nuevo
+     cliente" sin salir de la pantalla donde se está facturando) sigue
+     siendo modal — tampoco rompe la regla, es parte del flujo en
+     curso, no una pantalla de gestión propia de esa entidad.
+
+   Si una página usa un toggle `editando` local y su mutación de
+   guardar invalida queries que esa misma página observa, diferí esa
+   invalidación un macrotask (`setTimeout(() => invalidar(), 0)`)
+   DESPUÉS de los `setState` locales — invalidar en el mismo tick que
+   el cambio de `editando` puede romper el commit de React
+   ("`Failed to execute 'removeChild'`", intermitente) al desmontar el
+   `<form>` — bug real, encontrado y corregido en la auditoría de este
+   patrón (ver `OrdenCompraVer.tsx`/`PropiedadVer.tsx`/`TenantVer.tsx`/
+   `HitoVer.tsx`/`LeadVer.tsx`/`OportunidadVer.tsx`).
+
 b) **Rutas**: agregalas en `frontend/src/router.tsx`, dentro del árbol
    `RUTAS_ADMIN` (bajo `RutaProtegida` + `AppLayout`, salvo que el
    plugin necesite una pantalla pública tipo storefront — en ese caso

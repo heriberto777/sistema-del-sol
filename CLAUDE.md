@@ -338,6 +338,16 @@ ahora solo guarda el dato de conexión — no dispara nada todavía.
   `frontend/src/pages/`, rutas en `frontend/src/router.tsx`. Tema
   claro/oscuro vía clase `dark` de Tailwind (`ThemeContext`) — un
   componente nuevo solo necesita clases `dark:*`.
+- **Modal solo para gestionar notificaciones — todo lo demás es
+  página**: Crear/Editar/Ver de cualquier entidad (de un módulo nuevo o
+  un plugin) va en una página con ruta propia, nunca en un modal.
+  Excepciones: confirmaciones sin formulario (`ConfirmModal`), alta
+  rápida embebida dentro de otro formulario en curso, mensajería,
+  previsualizar-antes-de-confirmar sin campos editables, y un asistente
+  que arma un borrador para OTRO formulario. Patrón de página y gotcha
+  real de invalidar queries en el mismo tick que un toggle `editando`
+  (rompe el commit de React, intermitente) — ver `ARCHITECTURE.md` →
+  "Auditoría UX: modal → página".
 - **Listados que pueden crecer sin límite**: seguir el contrato
   `ListadoQueryDto`/`PaginaResultado<T>`
   (`backend/src/common/dto/listado-query.dto.ts`,
