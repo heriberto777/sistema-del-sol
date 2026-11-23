@@ -117,6 +117,9 @@ import { Bancos } from './pages/Bancos';
 import { GastosMenores } from './pages/GastosMenores';
 import { GastoMenorNuevo } from './pages/GastoMenorNuevo';
 import { GastoMenorVer } from './pages/GastoMenorVer';
+import { DepositosBancarios } from './pages/DepositosBancarios';
+import { DepositoBancarioNuevo } from './pages/DepositoBancarioNuevo';
+import { DepositoBancarioVer } from './pages/DepositoBancarioVer';
 import { Proyectos } from './pages/Proyectos';
 import { Propiedades } from './pages/Propiedades';
 import { PropiedadVer } from './pages/inmobiliaria/PropiedadVer';
@@ -439,6 +442,9 @@ const RUTAS_ADMIN = [
           { path: '/gastos-menores', element: <GastosMenores /> },
           { path: '/gastos-menores/nuevo', element: <GastoMenorNuevo /> },
           { path: '/gastos-menores/:id', element: <GastoMenorVer /> },
+          { path: '/depositos-bancarios', element: <DepositosBancarios /> },
+          { path: '/depositos-bancarios/nuevo', element: <DepositoBancarioNuevo /> },
+          { path: '/depositos-bancarios/:id', element: <DepositoBancarioVer /> },
           { path: '/proyectos', element: <Proyectos /> },
           { path: '/proyectos/nuevo', element: <ProyectoNuevo /> },
           { path: '/proyectos/:id/editar', element: <ProyectoEditar /> },

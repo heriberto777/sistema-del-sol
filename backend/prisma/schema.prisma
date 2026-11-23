@@ -124,6 +124,7 @@ model Tenant {
   turnosCaja                 TurnoCaja[]
   recibosIngreso             ReciboIngreso[]
   ordenesPago                OrdenPago[]
+  depositosBancarios         DepositoBancario[]
   gestionesCobro             GestionCobro[]
   provisionesIncobrables     ProvisionIncobrable[]
   formasPago                 FormaPago[]
@@ -803,6 +804,7 @@ model User {
   turnosCajaRevisados                   TurnoCaja[]                @relation("TurnoCajaRevisadoPor")
   recibosIngreso                        ReciboIngreso[]
   ordenesPago                           OrdenPago[]
+  depositosBancarios                    DepositoBancario[]
   gestionesCobroRegistradas             GestionCobro[]
   provisionesIncobrablesRegistradas     ProvisionIncobrable[]
   facturasProveedorRegistradas          FacturaProveedor[]
@@ -1032,6 +1034,8 @@ enum TipoCorrelativo {
   // El año se arma en la capa de aplicación, no acá (mismo criterio que
   // el resto de estos tipos: el correlativo solo aporta el secuencial).
   TRAVEL_RESERVA
+  // docs/PLAN.md — Depósito bancario (Caja → Banco).
+  DEPOSITO_BANCARIO
 }
 
 /// Correlativo automático genérico (plan de integración Cuadre, ítem de
@@ -1768,6 +1772,8 @@ enum OrigenAsiento {
   // Fase 5 (CxP) — FacturaProveedor (gasto a crédito sin orden de compra) y
   // su NotaCreditoProveedor, ver AsientosContablesService.generarDesdeFacturaProveedor.
   FACTURA_PROVEEDOR
+  // docs/PLAN.md — Depósito bancario (Caja → Banco), ver DepositoBancario.
+  DEPOSITO
 }
 
 enum TipoCuentaBancaria {
@@ -1799,12 +1805,61 @@ model CuentaBancaria {
   activa           Boolean            @default(true)
   createdAt        DateTime           @default(now())
 
-  gastosMenores  GastoMenor[]
-  recibosIngreso ReciboIngreso[]
-  ordenesPago    OrdenPago[]
+  gastosMenores     GastoMenor[]
+  recibosIngreso    ReciboIngreso[]
+  ordenesPago       OrdenPago[]
+  depositosBancarios DepositoBancario[]
 
   @@unique([tenantId, numeroCuenta])
   @@map("cuentas_bancarias")
+}
+
+enum EstadoDepositoBancario {
+  ABIERTO
+  ANULADO
+}
+
+/// docs/PLAN.md — Depósito bancario (Caja → Banco): el efectivo cobrado
+/// (POS o cobros manuales) cae siempre en la cuenta genérica "Caja y
+/// Bancos" (ver CODIGOS_CUENTA.CAJA_BANCOS) — este documento modela el
+/// movimiento real de llevarlo físicamente a una cuenta bancaria puntual,
+/// generando Débito [cuenta del banco elegido] / Crédito Caja y Bancos.
+/// `bodegaId` es solo informativo (de dónde salió el efectivo) — el
+/// asiento siempre es contra el saldo tenant-wide de Caja y Bancos, no
+/// hay desglose contable por sucursal hoy. `excedioSaldo`/
+/// `saldoDisponibleAlMomento` son una bandera fija calculada al
+/// crear/editar (no se recalculan solos después) — decisión confirmada:
+/// solo advierte, nunca bloquea. Editar/anular NUNCA tocan un asiento ya
+/// posteado — generan una reversa nueva (mismo criterio que
+/// AsientosContablesService.generarReversaCompra/generarReversaFactura),
+/// reusando el mismo `origenId` (este documento) en todas sus entradas.
+model DepositoBancario {
+  id                       String                 @id @default(uuid())
+  tenantId                 String
+  tenant                   Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  numero                   String
+  fecha                    DateTime               @default(now())
+  cuentaBancariaId         String
+  // Cascade: mismo patrón de ramas hermanas desde Tenant que el resto de
+  // FKs de este modelo — nunca se ejecuta vía la API (no hay DELETE de
+  // CuentaBancaria, solo `activa: false`), solo importa al borrar un
+  // tenant completo.
+  cuentaBancaria           CuentaBancaria         @relation(fields: [cuentaBancariaId], references: [id], onDelete: Cascade)
+  monto                    Decimal                @db.Decimal(14, 2)
+  numeroComprobante        String?
+  bodegaId                 String?
+  bodega                   Bodega?                @relation(fields: [bodegaId], references: [id], onDelete: SetNull)
+  notas                    String?
+  estado                   EstadoDepositoBancario @default(ABIERTO)
+  excedioSaldo             Boolean                @default(false)
+  saldoDisponibleAlMomento Decimal                @db.Decimal(14, 2)
+  userId                   String
+  user                     User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt                DateTime               @default(now())
+  updatedAt                DateTime               @updatedAt
+
+  @@unique([tenantId, numero])
+  @@map("depositos_bancarios")
 }
 
 model GastoMenor {
@@ -3250,6 +3305,7 @@ model Bodega {
   transferenciasOrigen  TransferenciaInventario[] @relation("TransferenciaOrigen")
   transferenciasDestino TransferenciaInventario[] @relation("TransferenciaDestino")
   conteosFisicos        ConteoFisico[]
+  depositosBancarios    DepositoBancario[]
 
   @@unique([tenantId, nombre])
   @@map("bodegas")

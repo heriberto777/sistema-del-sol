@@ -3515,4 +3515,33 @@ describe('App (e2e)', () => {
         .expect(403);
     });
   });
+
+  describe('Centros de Costo (aislamiento)', () => {
+    // Bug real encontrado 2026-11-23 (ver tenant-scoped-models.ts): CentroCosto
+    // no estaba en TENANT_SCOPED_MODELS — listar()/buscarPorId() no filtraban
+    // tenantId por su cuenta, dependían 100% de la inyección automática que
+    // nunca se activaba para este modelo.
+    it('el tenant B no ve en su listado un Centro de Costo creado por el tenant A', async () => {
+      const tokenA = await login('admin@e2e-a.com', SUBDOMINIO_A);
+      const tokenB = await login('admin@e2e-b.com', SUBDOMINIO_B);
+
+      const centro = await request(app.getHttpServer())
+        .post('/api/centros-costo')
+        .set('Authorization', `Bearer ${tokenA}`)
+        .send({ nombre: 'Centro aislamiento e2e' })
+        .expect(201);
+
+      const listadoB = await request(app.getHttpServer())
+        .get('/api/centros-costo')
+        .set('Authorization', `Bearer ${tokenB}`)
+        .expect(200);
+      expect(listadoB.body.some((c: { id: string }) => c.id === centro.body.id)).toBe(false);
+
+      await request(app.getHttpServer())
+        .patch(`/api/centros-costo/${centro.body.id}`)
+        .set('Authorization', `Bearer ${tokenB}`)
+        .send({ nombre: 'Secuestrado por tenant B' })
+        .expect(404);
+    });
+  });
 });

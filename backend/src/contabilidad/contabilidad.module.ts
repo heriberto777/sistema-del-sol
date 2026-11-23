@@ -26,6 +26,6 @@ import { PeriodosContablesCronService } from './periodos-contables-cron.service'
     CierrePeriodoRepository,
     PeriodosContablesCronService,
   ],
-  exports: [CuentasContablesService, CierrePeriodoService],
+  exports: [CuentasContablesService, CierrePeriodoService, EstadosFinancierosService],
 })
 export class ContabilidadModule {}

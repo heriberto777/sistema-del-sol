@@ -551,6 +551,49 @@ describe('AsientosContablesService', () => {
     });
   });
 
+  describe('generarDesdeDeposito (docs/PLAN.md — Depósito bancario Caja → Banco)', () => {
+    it('debita la cuenta del banco elegido y acredita Caja y Bancos, por el monto', async () => {
+      asientosRepository.crearGlobal.mockResolvedValue({ id: 'a1' } as never);
+
+      await service.generarDesdeDeposito({
+        tenantId: 't1',
+        depositoId: 'dep1',
+        cuentaBancariaCuentaContableId: 'cuenta-banco-1',
+        monto: 500,
+      });
+
+      const [llamada] = asientosRepository.crearGlobal.mock.calls[0];
+      expect(llamada.origen).toBe('DEPOSITO');
+      expect(llamada.origenId).toBe('dep1');
+      expect(llamada.lineas).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ cuentaContableId: 'cuenta-banco-1', debito: 500, credito: 0 }),
+          expect.objectContaining({ cuentaContableId: `cuenta-${CODIGOS_CUENTA.CAJA_BANCOS}`, debito: 0, credito: 500 }),
+        ]),
+      );
+    });
+
+    it('con un monto negativo (reversa de editar/anular), invierte los lados — acredita el banco y debita Caja', async () => {
+      asientosRepository.crearGlobal.mockResolvedValue({ id: 'a2' } as never);
+
+      await service.generarDesdeDeposito({
+        tenantId: 't1',
+        depositoId: 'dep1',
+        cuentaBancariaCuentaContableId: 'cuenta-banco-1',
+        monto: -500,
+      });
+
+      const [llamada] = asientosRepository.crearGlobal.mock.calls[0];
+      expect(llamada.origenId).toBe('dep1');
+      expect(llamada.lineas).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ cuentaContableId: 'cuenta-banco-1', debito: 0, credito: 500 }),
+          expect.objectContaining({ cuentaContableId: `cuenta-${CODIGOS_CUENTA.CAJA_BANCOS}`, debito: 500, credito: 0 }),
+        ]),
+      );
+    });
+  });
+
   describe('generarDesdeNomina', () => {
     it('debita Gastos de Nómina (bruto + aportes patronales), acredita Caja (neto) y TSS/ISR por Pagar (retenciones + aportes)', async () => {
       asientosRepository.crearGlobal.mockResolvedValue({ id: 'a1' } as never);

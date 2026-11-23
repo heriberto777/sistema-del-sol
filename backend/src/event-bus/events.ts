@@ -38,6 +38,10 @@ export const EVENTOS = {
   PAGO_FACTURA_PROVEEDOR_REGISTRADO: 'pagos.factura_proveedor_registrado',
   // Fase 11.2 del benchmark — comentarios/recordatorios por documento (Factura/Cotización).
   COMENTARIO_DOCUMENTO_MENCION: 'comentarios_documento.mencion',
+  // docs/PLAN.md — Depósito bancario (Caja → Banco).
+  DEPOSITO_BANCARIO_CREADO: 'depositos_bancarios.creado',
+  DEPOSITO_BANCARIO_EDITADO: 'depositos_bancarios.editado',
+  DEPOSITO_BANCARIO_ANULADO: 'depositos_bancarios.anulado',
 } as const;
 
 export type NombreEvento = (typeof EVENTOS)[keyof typeof EVENTOS];
@@ -158,6 +162,36 @@ export interface CotizacionEnviadaPayload {
 export interface GastoMenorCreadoPayload {
   tenantId: string;
   gastoMenorId: string;
+}
+
+/**
+ * Depósito bancario (Caja → Banco, docs/PLAN.md) — a diferencia del resto de
+ * estos payloads, NO sigue el patrón "mínimo + el listener re-consulta":
+ * editar/anular cambian `monto`/`cuentaBancariaId` en la fila antes de
+ * emitir, así que para la REVERSA el listener necesita el valor ANTERIOR, ya
+ * perdido si solo re-consultara la fila actual — por eso viaja explícito acá.
+ */
+export interface DepositoBancarioCreadoPayload {
+  tenantId: string;
+  depositoId: string;
+  cuentaBancariaCuentaContableId: string;
+  monto: string;
+}
+
+export interface DepositoBancarioEditadoPayload {
+  tenantId: string;
+  depositoId: string;
+  cuentaBancariaCuentaContableIdAnterior: string;
+  montoAnterior: string;
+  cuentaBancariaCuentaContableIdNuevo: string;
+  montoNuevo: string;
+}
+
+export interface DepositoBancarioAnuladoPayload {
+  tenantId: string;
+  depositoId: string;
+  cuentaBancariaCuentaContableId: string;
+  monto: string;
 }
 
 /** Emitido por LotesCronService (Fase 5b) — uno por lote con saldo próximo a vencer, mismo criterio que StockBajoPayload. */

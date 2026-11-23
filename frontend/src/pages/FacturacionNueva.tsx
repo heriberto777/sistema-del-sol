@@ -136,7 +136,13 @@ export function FacturacionNueva() {
       // FacturaProveedorNueva/facturas-proveedor.service.ts) — sigue siendo
       // solo un valor inicial, el selector de abajo queda editable.
       setPlazoPagoDias(cliente.terminoPago?.dias ?? cliente.plazoPagoDias);
-      setInfoColapsada(true);
+      // Diferido un macrotask (ver ARCHITECTURE.md → "Auditoría UX: modal →
+      // página") — colapsar "Información" en el mismo tick en que
+      // `ComboboxBusqueda` todavía está desmontando su propio listado
+      // desplegable (al elegir un cliente) hace que dos commits intenten
+      // sacar nodos superpuestos del DOM (removeChild intermitente, bug
+      // real encontrado y confirmado acá).
+      setTimeout(() => setInfoColapsada(true), 0);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cliente?.id]);

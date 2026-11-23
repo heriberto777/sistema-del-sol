@@ -20,4 +20,6 @@ export const CORRELATIVOS_BASE: TipoCorrelativo[] = [
   'CONTEO_FISICO',
   'CODIGO_BARRAS',
   'TRAVEL_RESERVA',
+  // docs/PLAN.md — Depósito bancario (Caja → Banco).
+  'DEPOSITO_BANCARIO',
 ];

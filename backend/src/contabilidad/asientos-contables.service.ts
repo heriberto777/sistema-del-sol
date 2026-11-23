@@ -554,6 +554,34 @@ export class AsientosContablesService {
   }
 
   /**
+   * Depósito bancario (Caja → Banco, docs/PLAN.md) -> Débito [cuenta
+   * contable del banco elegido] / Crédito Caja y Bancos, por `monto`.
+   * `DepositosBancariosService` reusa esta MISMA función para la reversa
+   * (editar/anular) pasando `monto` negado — `lineaSegunSigno` refleja un
+   * monto negativo en la columna contraria (mismo truco que
+   * `generarReversaCompra`/`generarDesdeFacturaProveedor`), así el asiento
+   * queda invertido sin duplicar código. `origenId` es siempre el mismo
+   * `depositoId` en las 3 llamadas (alta, reversa de editar, reversa de
+   * anular) — nunca se edita/borra un asiento ya posteado.
+   */
+  async generarDesdeDeposito(params: { tenantId: string; depositoId: string; cuentaBancariaCuentaContableId: string; monto: number }) {
+    const cuentaCaja = await this.cuentasRepository.resolverRolDeCuenta(params.tenantId, 'CAJA_BANCOS', CODIGOS_CUENTA.CAJA_BANCOS);
+    const descripcion = `Depósito bancario — ${params.depositoId}`;
+    const lineas = [
+      this.lineaSegunSigno(params.cuentaBancariaCuentaContableId, params.monto, 'debito', descripcion),
+      this.lineaSegunSigno(cuentaCaja.id, params.monto, 'credito', descripcion),
+    ];
+
+    return this.crearAsientoAutomatico({
+      tenantId: params.tenantId,
+      concepto: descripcion,
+      origen: 'DEPOSITO',
+      origenId: params.depositoId,
+      lineas,
+    });
+  }
+
+  /**
    * "Gasto rápido": envoltorio amigable sobre `crear()` para quien no
    * conoce partida doble — el usuario solo elige la cuenta de gasto y de
    * dónde sale el dinero (Caja/Bancos si es al contado, Cuentas por Pagar
@@ -616,7 +644,7 @@ export class AsientosContablesService {
   private async crearAsientoAutomatico(params: {
     tenantId: string;
     concepto: string;
-    origen: 'FACTURA' | 'COMPRA' | 'NOMINA' | 'PAGO' | 'GASTO_MENOR' | 'INCOBRABLE' | 'FACTURA_PROVEEDOR';
+    origen: 'FACTURA' | 'COMPRA' | 'NOMINA' | 'PAGO' | 'GASTO_MENOR' | 'INCOBRABLE' | 'FACTURA_PROVEEDOR' | 'DEPOSITO';
     origenId: string;
     lineas: LineaCalculada[];
   }) {

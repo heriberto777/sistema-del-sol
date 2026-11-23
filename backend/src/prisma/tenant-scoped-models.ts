@@ -151,4 +151,16 @@ export const TENANT_SCOPED_MODELS = new Set([
   // Fase 11.2 del benchmark — polimórfico (tipoDocumento/documentoId sin
   // FK, ver el comentario del modelo), pero SÍ tiene tenantId propio.
   'ComentarioDocumento',
+  // docs/PLAN.md — Depósito bancario (Caja → Banco).
+  'DepositoBancario',
+  // Bug real encontrado 2026-11-23 al diseñar Depósito Bancario: estos 2
+  // modelos del punto 3/4 de parametrización de cuentas (2026-11-23) tienen
+  // tenantId propio pero quedaron afuera de esta lista — `CentroCosto` SÍ
+  // era un bug activo (CentrosCostoRepository.listar()/buscarPorId() no
+  // filtran tenantId por su cuenta, dependían 100% de esta inyección
+  // automática que nunca se activó). `ConfiguracionCuentaContable` no (todas
+  // sus queries ya filtran tenantId a mano), pero igual se agrega acá por
+  // consistencia/defensa en profundidad.
+  'CentroCosto',
+  'ConfiguracionCuentaContable',
 ]);

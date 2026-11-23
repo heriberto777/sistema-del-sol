@@ -23,6 +23,7 @@ describe('ContabilidadEventosService', () => {
       generarDesdePagoFactura: jest.fn(),
       generarDesdePagoOrdenCompra: jest.fn(),
       generarReversaCompra: jest.fn(),
+      generarDesdeDeposito: jest.fn(),
     } as unknown as jest.Mocked<AsientosContablesService>;
     prisma = {
       recepcionCompra: { findUniqueOrThrow: jest.fn() },
@@ -409,6 +410,66 @@ describe('ContabilidadEventosService', () => {
       prisma.gastoMenor.findUniqueOrThrow.mockRejectedValue(new Error('no encontrado'));
 
       await expect(service.alCrearGastoMenor({ tenantId: 't1', gastoMenorId: 'gm1' })).resolves.not.toThrow();
+    });
+  });
+
+  describe('alCrearDeposito (docs/PLAN.md — Depósito bancario)', () => {
+    it('genera el asiento con el monto y la cuenta del payload', async () => {
+      await service.alCrearDeposito({ tenantId: 't1', depositoId: 'dep1', cuentaBancariaCuentaContableId: 'cuenta-banco-1', monto: '500' });
+
+      expect(asientosContablesService.generarDesdeDeposito).toHaveBeenCalledWith({
+        tenantId: 't1',
+        depositoId: 'dep1',
+        cuentaBancariaCuentaContableId: 'cuenta-banco-1',
+        monto: 500,
+      });
+    });
+
+    it('no propaga el error si falla generar el asiento', async () => {
+      asientosContablesService.generarDesdeDeposito.mockRejectedValue(new Error('cuenta no encontrada'));
+
+      await expect(
+        service.alCrearDeposito({ tenantId: 't1', depositoId: 'dep1', cuentaBancariaCuentaContableId: 'cuenta-banco-1', monto: '500' }),
+      ).resolves.not.toThrow();
+    });
+  });
+
+  describe('alEditarDeposito', () => {
+    it('reversa el valor anterior (negado) y genera un asiento nuevo con el valor corregido, en ese orden', async () => {
+      await service.alEditarDeposito({
+        tenantId: 't1',
+        depositoId: 'dep1',
+        cuentaBancariaCuentaContableIdAnterior: 'cuenta-banco-viejo',
+        montoAnterior: '500',
+        cuentaBancariaCuentaContableIdNuevo: 'cuenta-banco-nuevo',
+        montoNuevo: '700',
+      });
+
+      expect(asientosContablesService.generarDesdeDeposito).toHaveBeenNthCalledWith(1, {
+        tenantId: 't1',
+        depositoId: 'dep1',
+        cuentaBancariaCuentaContableId: 'cuenta-banco-viejo',
+        monto: -500,
+      });
+      expect(asientosContablesService.generarDesdeDeposito).toHaveBeenNthCalledWith(2, {
+        tenantId: 't1',
+        depositoId: 'dep1',
+        cuentaBancariaCuentaContableId: 'cuenta-banco-nuevo',
+        monto: 700,
+      });
+    });
+  });
+
+  describe('alAnularDeposito', () => {
+    it('genera la reversa con el monto negado', async () => {
+      await service.alAnularDeposito({ tenantId: 't1', depositoId: 'dep1', cuentaBancariaCuentaContableId: 'cuenta-banco-1', monto: '500' });
+
+      expect(asientosContablesService.generarDesdeDeposito).toHaveBeenCalledWith({
+        tenantId: 't1',
+        depositoId: 'dep1',
+        cuentaBancariaCuentaContableId: 'cuenta-banco-1',
+        monto: -500,
+      });
     });
   });
 

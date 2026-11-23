@@ -65,6 +65,7 @@ import { PosModule } from './pos/pos.module';
 import { IaModule } from './ia/ia.module';
 import { BancosModule } from './bancos/bancos.module';
 import { GastosMenoresModule } from './gastos-menores/gastos-menores.module';
+import { DepositosBancariosModule } from './depositos-bancarios/depositos-bancarios.module';
 import { ComentariosDocumentoModule } from './comentarios-documento/comentarios-documento.module';
 import { ReportesTenantModule } from './reportes-tenant/reportes-tenant.module';
 import { ProyectosModule } from './proyectos/proyectos.module';
@@ -187,6 +188,7 @@ import { TenantMiddleware } from './common/middleware/tenant.middleware';
     AtributosModule,
     VariantesModule,
     GastosMenoresModule,
+    DepositosBancariosModule,
     ComentariosDocumentoModule,
     ReportesTenantModule,
     ProyectosModule,

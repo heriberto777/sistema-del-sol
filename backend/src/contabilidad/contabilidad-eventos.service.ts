@@ -6,6 +6,9 @@ import {
   EVENTOS,
   CuentaPorCobrarCastigadaPayload,
   CuentaPorCobrarProvisionadaPayload,
+  DepositoBancarioCreadoPayload,
+  DepositoBancarioEditadoPayload,
+  DepositoBancarioAnuladoPayload,
   FacturaCreadaPayload,
   FacturaProveedorCreadaPayload,
   GastoMenorCreadoPayload,
@@ -280,6 +283,55 @@ export class ContabilidadEventosService {
       });
     } catch (error) {
       this.logger.error(`No se pudo generar el asiento del gasto menor ${payload.gastoMenorId}`, error as Error);
+    }
+  }
+
+  @OnEvent(EVENTOS.DEPOSITO_BANCARIO_CREADO)
+  async alCrearDeposito(payload: DepositoBancarioCreadoPayload) {
+    try {
+      await this.asientosContablesService.generarDesdeDeposito({
+        tenantId: payload.tenantId,
+        depositoId: payload.depositoId,
+        cuentaBancariaCuentaContableId: payload.cuentaBancariaCuentaContableId,
+        monto: Number(payload.monto),
+      });
+    } catch (error) {
+      this.logger.error(`No se pudo generar el asiento del depósito bancario ${payload.depositoId}`, error as Error);
+    }
+  }
+
+  /** Reversa de los valores viejos (asiento negado) + asiento nuevo con los valores corregidos — nunca toca el asiento original, ver DepositoBancario en schema.prisma. */
+  @OnEvent(EVENTOS.DEPOSITO_BANCARIO_EDITADO)
+  async alEditarDeposito(payload: DepositoBancarioEditadoPayload) {
+    try {
+      await this.asientosContablesService.generarDesdeDeposito({
+        tenantId: payload.tenantId,
+        depositoId: payload.depositoId,
+        cuentaBancariaCuentaContableId: payload.cuentaBancariaCuentaContableIdAnterior,
+        monto: -Number(payload.montoAnterior),
+      });
+      await this.asientosContablesService.generarDesdeDeposito({
+        tenantId: payload.tenantId,
+        depositoId: payload.depositoId,
+        cuentaBancariaCuentaContableId: payload.cuentaBancariaCuentaContableIdNuevo,
+        monto: Number(payload.montoNuevo),
+      });
+    } catch (error) {
+      this.logger.error(`No se pudo generar la reversa/reemplazo del depósito bancario ${payload.depositoId}`, error as Error);
+    }
+  }
+
+  @OnEvent(EVENTOS.DEPOSITO_BANCARIO_ANULADO)
+  async alAnularDeposito(payload: DepositoBancarioAnuladoPayload) {
+    try {
+      await this.asientosContablesService.generarDesdeDeposito({
+        tenantId: payload.tenantId,
+        depositoId: payload.depositoId,
+        cuentaBancariaCuentaContableId: payload.cuentaBancariaCuentaContableId,
+        monto: -Number(payload.monto),
+      });
+    } catch (error) {
+      this.logger.error(`No se pudo generar la reversa del depósito bancario ${payload.depositoId}`, error as Error);
     }
   }
 

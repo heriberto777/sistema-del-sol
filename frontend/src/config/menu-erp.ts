@@ -282,6 +282,8 @@ export const DOMINIOS_MENU: DominioMenu[] = [
           // conciliación y abría el CRUD de cuentas bancarias, porque esa
           // ruta nunca coincidía con ninguna pestaña; ver docs/ARCHITECTURE.md).
           { id: 'conciliacion', etiqueta: 'Conciliación bancaria', ruta: '/contabilidad/conciliacion', permisos: ['contabilidad.conciliar'] },
+          // docs/PLAN.md — Depósito bancario (Caja → Banco).
+          { id: 'deposito-bancario', etiqueta: 'Depósito bancario', ruta: '/depositos-bancarios', permisos: ['contabilidad.ver'] },
           { id: 'gasto-rapido', etiqueta: 'Gasto rápido (2 líneas)', ruta: '/contabilidad/gasto-rapido', permisos: ['contabilidad.editar'] },
           { id: 'gasto-menor', etiqueta: 'Registrar gasto menor', ruta: '/gastos-menores', permisos: ['gastosmenores.crear', 'gastosmenores.ver'], modulo: 'gastosmenores' },
           { id: 'cierre-periodo', etiqueta: 'Cierre de período', ruta: '/contabilidad/cierre', permisos: ['contabilidad.cerrarperiodo'] },

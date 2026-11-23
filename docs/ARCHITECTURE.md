@@ -38,6 +38,25 @@ El aislamiento tiene dos capas:
    antes de llegar a la tabla hija. Cualquier módulo nuevo que reciba un
    id de una tabla padre tenant-scoped para operar sobre una tabla hija
    sin `tenantId` propio debe seguir este mismo patrón.
+
+   **Otra variante del mismo tipo de bug, más simple pero igual de real**:
+   un modelo que SÍ tiene su propia columna `tenantId` pero simplemente se
+   olvidó agregar a `TENANT_SCOPED_MODELS` al crearlo. Encontrado
+   2026-11-23 (al diseñar Depósito bancario, docs/PLAN.md) en `CentroCosto`
+   (punto 3 de parametrización de cuentas, 2026-11-23): su repositorio
+   (`listar()`/`buscarPorId()`) no filtraba `tenantId` a mano en ningún
+   lado — un comentario del propio código incluso afirmaba "tenant-scoped
+   vía TenantPrismaService" dando por sentado que la inyección automática
+   estaba activa, sin verificarlo. Sin esa entrada, `listar()` devolvía
+   centros de costo de TODOS los tenants, y `buscarPorId()` aceptaba el id
+   de cualquier tenant. Corregido agregando `CentroCosto` y
+   `ConfiguracionCuentaContable` (mismo punto, sin bug activo porque ese sí
+   filtraba tenantId a mano, pero igual faltaba por consistencia) a
+   `TENANT_SCOPED_MODELS` y a `enable-rls.sql`. **Al agregar un modelo
+   nuevo con columna `tenantId` propia, agregarlo a la lista es el primer
+   paso, no un detalle a repasar después** — un repositorio que confía en
+   la inyección automática sin agregarlo falla en silencio (sin error, sin
+   excepción — simplemente no filtra nada).
 2. **Base de datos** (defensa en profundidad — implementada y verificada):
    `prisma/sql/enable-rls.sql` activa Row-Level Security en Postgres
    (`ENABLE` + `FORCE`) para las tablas tenant-scoped, con una policy que
@@ -4949,18 +4968,34 @@ pendiente/ícono inferido** (patrón usado en casi todos los formularios)
 — candidato real a una ronda de auditoría propia si vuelve a aparecer en
 otra página.
 
-**2 casos más encontrados, sin corregir** (2026-11-23, durante la misma
-sesión de QA, mismo síntoma `removeChild`, no investigados a fondo —
-quedan para esa ronda de auditoría):
-- Crear un producto nuevo (`/productos/nuevo`) — falla la navegación
-  posterior a guardar, hacia `/productos/:id`.
-- Seleccionar un cliente en Facturación Nueva (`FacturacionNueva.tsx`) —
-  falla al cerrar el buscador y pintar el cliente elegido.
+**2 casos más encontrados, corregidos 2026-11-23** (misma sesión de QA,
+mismo síntoma `removeChild`, investigados al retomarlos — ninguno de los
+dos tenía realmente un ícono inferido de por medio, cada uno con su
+propio disparador):
 
-Ninguno de los dos está relacionado con la parametrización de cuentas
-por categoría (la causa que originó esta sección) — son hallazgos
-incidentales de la misma clase de bug, en páginas no tocadas por ese
-cambio.
+- **Crear un producto nuevo** (`ProductoFormulario.tsx`) — el `onSuccess`
+  de `guardar` invalidaba `['productos']`/`['producto', id]` de forma
+  síncrona, en el mismo tick en que `guardar.isPending` pasa a `false` y
+  en que el `id` nuevo monta `VariantesProductoPanel` donde antes había
+  solo un párrafo (swap de subárbol real). Fix: mover las 2
+  invalidaciones dentro del mismo `setTimeout(…, 0)` que ya difería el
+  `navigate`.
+- **Seleccionar un cliente en Facturación Nueva** (`FacturacionNueva.tsx`)
+  — un `useEffect` sobre `cliente?.id` llamaba `setInfoColapsada(true)`
+  de forma síncrona, colapsando `CardColapsable` (que retorna un
+  `<button>` en vez de la `<section>` completa — swap de subárbol, no
+  solo CSS) en el mismo tick en que `ComboboxBusqueda`/el modal
+  "Explorar toda la lista" todavía estaban desmontando su propio listado
+  al cerrarse tras la selección. Fix: diferir `setInfoColapsada(true)`
+  en un `setTimeout(…, 0)` dentro del mismo efecto.
+
+No se pudo forzar el crash de nuevo en varios intentos en vivo (con la
+misma instrumentación directa de `removeChild`) ni antes ni después del
+fix — consistente con ser intermitente de verdad. El fix se aplicó
+igual, preventivamente, por ser el mismo patrón ya probado en
+`CategoriasPanel`/`CentrosCostoPanel`: diferir a un macrotask separado
+cualquier invalidación o cambio de estado que pueda disparar un swap de
+subárbol. Ver `docs/PLAN.md` para el detalle de verificación.
 
 ### Otro bug real encontrado en el camino — `editando` pegado tras crear
 

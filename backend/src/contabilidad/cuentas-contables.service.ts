@@ -96,4 +96,9 @@ export class CuentasContablesService {
   quitarConfiguracionCuentaSistema(clave: string, tenantId: string) {
     return this.repository.eliminarConfiguracionCuentaSistema(tenantId, clave);
   }
+
+  /** Para que otros módulos (ej. DepositosBancariosService) resuelvan la cuenta "Caja y Bancos" vigente de este tenant (código fijo u override) sin importar CuentasContablesRepository directo. */
+  resolverCuentaCaja(tenantId: string) {
+    return this.repository.resolverRolDeCuenta(tenantId, 'CAJA_BANCOS', CODIGOS_CUENTA.CAJA_BANCOS);
+  }
 }

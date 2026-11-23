@@ -57,7 +57,12 @@ BEGIN
       'gestiones_cobro', 'provisiones_incobrables',
       'facturas_proveedor',
       'comentarios_documento',
-      'reportes_tenant'
+      'reportes_tenant',
+      -- Bug real encontrado 2026-11-23 (ver tenant-scoped-models.ts): estas 2
+      -- tablas del punto 3/4 de parametrización de cuentas quedaron afuera.
+      'centros_costo', 'configuraciones_cuenta_contable',
+      -- Depósito bancario (Caja → Banco).
+      'depositos_bancarios'
     ])
   LOOP
     EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY;', tabla);

@@ -266,11 +266,18 @@ export function ProductoFormulario() {
   const guardar = useMutation({
     mutationFn: async () => (id ? apiClient.patch(`/productos/${id}`, payload()) : apiClient.post('/productos', payload())),
     onSuccess: ({ data }) => {
-      queryClient.invalidateQueries({ queryKey: ['productos'] });
-      queryClient.invalidateQueries({ queryKey: ['producto', id] });
       confirmarGuardado();
       const nuevoId = (data as { id?: string })?.id ?? id;
-      setTimeout(() => navigate(nuevoId ? `/productos/${nuevoId}` : '/productos'), 0);
+      // Invalidar+navegar diferido un macrotask (ver ARCHITECTURE.md →
+      // "Auditoría UX: modal → página") — invalidar en el mismo tick que
+      // `guardar.isPending` pasa a false puede colisionar con el swap de
+      // VariantesProductoPanel al llegar el `id` nuevo (removeChild
+      // intermitente).
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ['productos'] });
+        queryClient.invalidateQueries({ queryKey: ['producto', id] });
+        navigate(nuevoId ? `/productos/${nuevoId}` : '/productos');
+      }, 0);
     },
     onError: (err) =>
       setError(

@@ -18,8 +18,8 @@ Convención de estado: `🔲 Pendiente de diseño` · `🟡 En diseño` ·
 | Asistente de pre-cierre contable | 🔲 Pendiente de diseño |
 | Período de trabajo + advertencia blanda | 🔲 Pendiente de diseño |
 | Parametrización de cuentas contables y centros de costo — los 4 puntos (banco real en Pagos; cuenta de ingreso/costo por categoría; Centro de Costo por línea; override de los 15 códigos fijos) | ✅ Implementado 2026-11-23 — plan completo |
-| Depósito bancario (Caja → Banco) | 🔲 Pendiente de diseño |
-| Bug "removeChild" por ícono inferido del `<Button>` (variante nueva) | 🔲 2 casos encontrados sin corregir (ProductoNuevo, FacturacionNueva) — ver ARCHITECTURE.md |
+| Depósito bancario (Caja → Banco) | ✅ Implementado 2026-11-23 — ver detalle abajo |
+| Bug "removeChild" intermitente — 2 casos pendientes | ✅ Corregidos 2026-11-23 (`ProductoFormulario`, `FacturacionNueva`) — ver detalle abajo |
 | Backlog UX/operación (Conteo Físico, modales→página, parámetros operativos, reporte de problemas, manual) | ✅ Ya estaba completo — los 5 bloques tienen commit (ver detalle abajo), `memoized-noodling-moore.md` estaba desactualizado |
 
 ---
@@ -214,18 +214,119 @@ Los puntos 2 y 3 requieren migración de Prisma (campos/modelo nuevo) —
 avisar explícitamente antes de aplicarla, como ya es regla en este
 proyecto.
 
-### Pendiente nuevo — Depósito bancario (Caja → Banco)
+### Depósito bancario (Caja → Banco)
 
-**Estado:** 🔲 Pendiente de diseño (surgió 2026-11-23, al decidir cómo
-tratar el efectivo en el punto 1).
+**Estado:** ✅ Implementado 2026-11-23. Surgió al decidir cómo tratar el
+efectivo en el punto 1 de parametrización de cuentas: el efectivo cobrado
+no entra directo a una cuenta bancaria, primero queda en Caja (billetes
+en mano) y solo se vuelve "banco" cuando alguien deposita — hasta ahora
+no existía ningún camino para modelar ese movimiento.
 
-El efectivo cobrado no entra directo a una cuenta bancaria — primero
-queda en Caja (billetes en mano), y solo se vuelve "banco" cuando alguien
-deposita. Falta modelar ese movimiento Caja → Banco como su propio
-proceso, con asiento contable real (débito Banco, crédito Caja) validado
-contra un recibo/comprobante de depósito — hoy ese efectivo simplemente
-se queda contabilizado en la cuenta genérica `1010 Caja y Bancos` sin
-ningún camino para moverlo a una cuenta bancaria puntual.
+Modelo nuevo `DepositoBancario` (numero correlativo propio
+`DEPOSITO_BANCARIO`, cuentaBancariaId destino, monto, numeroComprobante y
+bodegaId opcionales — este último **solo informativo**, de qué sucursal
+salió el efectivo, decisión confirmada de no desglosar el asiento por
+sucursal porque hoy TODO el efectivo cae en una sola cuenta contable
+tenant-wide) — migración `20261123193726_deposito_bancario`.
+
+Al crear: genera **Débito [cuenta contable del banco elegido] / Crédito
+Caja y Bancos** por el monto, vía evento (`DEPOSITO_BANCARIO_CREADO` →
+`ContabilidadEventosService.alCrearDeposito` → nuevo
+`AsientosContablesService.generarDesdeDeposito` — mismo criterio
+desacoplado que el resto de módulos de negocio, nunca llama a
+Asientos directo). Calcula el saldo actual de Caja y Bancos
+(`EstadosFinancierosService.libroMayor`) y guarda `excedioSaldo`/
+`saldoDisponibleAlMomento` como una bandera **fija** (no se recalcula
+sola después) — decisión confirmada: solo advierte, nunca bloquea.
+
+**Editar** (decisión confirmada, se desvía del patrón "sin edición, se
+anula y se recrea" que usa el resto de documentos contables, a pedido
+explícito del usuario para poder corregir un depósito marcado en rojo):
+por dentro reversa el asiento con los valores viejos (negados) y postea
+uno nuevo con los valores corregidos — mismo mecanismo que
+`generarReversaCompra`/`generarDesdeFacturaProveedor` (nunca edita/borra
+un asiento ya posteado), invisible para el usuario, que solo ve "Editar"
+como una sola acción. El saldo "sin el depósito viejo" se calcula
+sumando de vuelta su monto al saldo actual (era un crédito a Caja) —
+matemática síncrona, no depende de que el listener async ya haya
+corrido. **Anular** sigue el mismo patrón de reversa, una sola vez, y
+deja el depósito en estado `ANULADO` (no editable después).
+
+Página propia (`/depositos-bancarios`, lista con fila roja si
+`excedioSaldo`, "Nuevo depósito" página + "Ver/Editar/Anular" en una
+sola página con toggle `editando`, mismo criterio que `OrdenCompraVer`),
+menú bajo Finanzas y Contabilidad → Transacciones.
+
+**Bug real encontrado de paso (no relacionado con este punto)**: al
+diseñar esto se notó que `CentroCosto`/`ConfiguracionCuentaContable`
+(punto 3/4 de parametrización de cuentas, 2026-11-23) habían quedado
+afuera de `TENANT_SCOPED_MODELS`/`enable-rls.sql` — `CentroCosto` era un
+bug de aislamiento ACTIVO de verdad (`CentrosCostoRepository.listar()`/
+`buscarPorId()` no filtraban tenantId por su cuenta, dependían 100% de
+esa inyección automática que nunca se activó). Corregido agregando
+ambos modelos a las 2 listas + aplicando RLS (`pnpm run db:rls`) +
+sumando un caso de aislamiento e2e nuevo para Centro de Costo (regla ya
+establecida del proyecto).
+
+Verificado en el sistema real: crear un depósito con un banco cuya
+cuenta contable coincidía por datos de prueba con la propia "Caja y
+Bancos" (asiento degenerado pero balanceado, no es un bug, es la data de
+prueba), editarlo a una cuenta bancaria distinta (confirmado en BD: el
+asiento 33 original se reversa en el 34, el 35 postea correctamente
+Débito banco nuevo/Crédito Caja con cuentas DISTINTAS), anularlo
+(asiento 36 reversa el 35), y confirmar que ni "editar" ni "anular" se
+pueden repetir sobre uno ya anulado (400 en ambos casos). UI confirmada:
+banner rojo de saldo excedido solo mientras `ABIERTO`, desaparece al
+anular; botones Editar/Anular desaparecen al anular. 2343 unitarios +
+260 e2e en verde, `tsc --noEmit` limpio en ambos paquetes. Todos los
+datos de prueba (depósito, asientos, cuenta bancaria de prueba) limpiados
+de la BD al terminar.
+
+**Nota de despliegue**: el nuevo tipo de correlativo `DEPOSITO_BANCARIO`
+no necesita backfill — `CorrelativosRepository.siguienteEnTx` crea la
+fila con defaults sola la primera vez que se usa, para cualquier tenant
+(ya existente o nuevo). Sí hace falta correr `pnpm run db:rls` en
+producción tras el deploy (ya se corrió acá en dev) para que las 3 tablas
+nuevas (`depositos_bancarios`, `centros_costo`,
+`configuraciones_cuenta_contable`) queden con RLS real.
+
+### Bug "removeChild" intermitente — 2 casos encontrados en la auditoría del punto 2, corregidos
+
+**Estado:** ✅ Corregido 2026-11-23.
+
+Los 2 casos quedaron documentados como pendientes al cerrar el punto 2 de
+parametrización de cuentas. Al retomarlos, el diagnóstico original
+("ícono inferido cambia de texto") no aplicaba a ninguno de los dos —
+ambos son variantes del mismo patrón general (un swap de subárbol DOM en
+el mismo tick/macrotask que otro) pero con un disparador distinto cada
+uno:
+
+1. **`ProductoFormulario.tsx` (crear producto)**: el `onSuccess` de
+   `guardar` llamaba `queryClient.invalidateQueries(...)` de forma
+   síncrona, en el mismo tick en que `guardar.isPending` pasa a `false`
+   — y ese mismo cambio de `id` (al navegar a `/productos/:id`) monta
+   `VariantesProductoPanel` donde antes había solo un párrafo. Fix:
+   diferir las 2 invalidaciones + el `navigate` dentro del mismo
+   `setTimeout(…, 0)` que ya usaba el `navigate`.
+2. **`FacturacionNueva.tsx` (elegir cliente)**: un `useEffect` sobre
+   `cliente?.id` llamaba `setInfoColapsada(true)` de forma síncrona,
+   colapsando `CardColapsable` (que retorna un `<button>` en vez de la
+   `<section>` completa — swap de subárbol real, no solo CSS) en el
+   mismo tick en que `ComboboxBusqueda`/el modal "Explorar toda la
+   lista" todavía estaban desmontando su propio listado al cerrarse tras
+   la selección. Fix: diferir `setInfoColapsada(true)` en un
+   `setTimeout(…, 0)` dentro del mismo efecto.
+
+**No se pudo forzar el crash de nuevo** en varios intentos en vivo
+(instrumentando `Node.prototype.removeChild` para capturar el error) ni
+antes ni después del fix — consistente con ser intermitente de verdad.
+El fix aplicado es el mismo patrón ya probado y confirmado en
+`CategoriasPanel`/`CentrosCostoPanel` (diferir cualquier
+invalidación/cambio de estado que pueda disparar un swap de subárbol a
+un macrotask separado), así que se aplicó preventivamente sin depender
+de reproducirlo a voluntad. `tsc --noEmit` limpio; QA en vivo confirmó
+que ambos flujos (crear producto, elegir cliente) siguen funcionando
+igual que antes.
 
 ---
 
