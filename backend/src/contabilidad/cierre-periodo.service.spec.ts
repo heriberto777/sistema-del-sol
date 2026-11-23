@@ -25,6 +25,7 @@ describe('CierrePeriodoService', () => {
     cierreRepository = {
       buscarPorFecha: jest.fn().mockResolvedValue(null),
       buscarAbiertoMasAntiguo: jest.fn().mockResolvedValue(periodoJulio),
+      buscarMasReciente: jest.fn(),
       listar: jest.fn(),
       crear: jest.fn(),
       cerrar: jest.fn().mockResolvedValue({ id: 'periodo-julio-cerrado' }),
@@ -143,6 +144,97 @@ describe('CierrePeriodoService', () => {
       await service.cerrarPeriodo({ periodoId: 'periodo-julio' }, 'tenant-1');
 
       expect(cierreRepository.crear).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('completarFaltantes', () => {
+    // Fecha fija dentro del test para no depender del reloj real del CI —
+    // "hoy" simulado: 2026-11-18 (el incidente real que originó este método).
+    const hoy = new Date('2026-11-18T12:00:00.000Z');
+
+    beforeEach(() => {
+      jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate'] });
+      jest.setSystemTime(hoy);
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('no crea nada si el período más reciente ya cubre hoy', async () => {
+      cierreRepository.buscarMasReciente.mockResolvedValue({
+        id: 'periodo-nov',
+        fechaInicio: new Date('2026-11-01'),
+        fechaFin: new Date('2026-11-30T23:59:59.999Z'),
+      } as never);
+
+      const creados = await service.completarFaltantes('tenant-1');
+
+      expect(creados).toEqual([]);
+      expect(cierreRepository.crear).not.toHaveBeenCalled();
+      expect(cierreRepository.cerrar).not.toHaveBeenCalled();
+    });
+
+    it('crea el período faltante cuando el cron se saltó la ventana de fin de mes (incidente real)', async () => {
+      cierreRepository.buscarMasReciente.mockResolvedValue({
+        id: 'periodo-oct',
+        fechaInicio: new Date('2026-10-01'),
+        fechaFin: new Date('2026-10-31T23:59:59.999Z'),
+      } as never);
+      cierreRepository.crear.mockResolvedValue({
+        id: 'periodo-nov',
+        fechaInicio: new Date('2026-11-01'),
+        fechaFin: new Date('2026-11-30T23:59:59.999Z'),
+      } as never);
+
+      const creados = await service.completarFaltantes('tenant-1');
+
+      expect(cierreRepository.crear).toHaveBeenCalledTimes(1);
+      expect(cierreRepository.crear).toHaveBeenCalledWith(
+        expect.objectContaining({ tenantId: 'tenant-1', fechaInicio: new Date('2026-11-01') }),
+      );
+      expect(creados).toHaveLength(1);
+    });
+
+    it('crea TODOS los meses faltantes en orden si el hueco duró varios meses', async () => {
+      cierreRepository.buscarMasReciente.mockResolvedValue({
+        id: 'periodo-ago',
+        fechaInicio: new Date('2026-08-01'),
+        fechaFin: new Date('2026-08-31T23:59:59.999Z'),
+      } as never);
+      cierreRepository.crear
+        .mockResolvedValueOnce({ id: 'p-sep', fechaInicio: new Date('2026-09-01'), fechaFin: new Date('2026-09-30T23:59:59.999Z') } as never)
+        .mockResolvedValueOnce({ id: 'p-oct', fechaInicio: new Date('2026-10-01'), fechaFin: new Date('2026-10-31T23:59:59.999Z') } as never)
+        .mockResolvedValueOnce({ id: 'p-nov', fechaInicio: new Date('2026-11-01'), fechaFin: new Date('2026-11-30T23:59:59.999Z') } as never);
+
+      const creados = await service.completarFaltantes('tenant-1');
+
+      expect(cierreRepository.crear).toHaveBeenCalledTimes(3);
+      expect(creados.map((p) => p.id)).toEqual(['p-sep', 'p-oct', 'p-nov']);
+    });
+
+    it('defensivo: si el tenant no tiene ningún período, crea el de hoy directamente', async () => {
+      cierreRepository.buscarMasReciente.mockResolvedValue(null);
+      cierreRepository.crear.mockResolvedValue({ id: 'periodo-nov', fechaInicio: new Date('2026-11-01'), fechaFin: new Date('2026-11-30T23:59:59.999Z') } as never);
+
+      const creados = await service.completarFaltantes('tenant-1');
+
+      expect(cierreRepository.crear).toHaveBeenCalledWith(expect.objectContaining({ tenantId: 'tenant-1', fechaInicio: new Date('2026-11-01') }));
+      expect(creados).toHaveLength(1);
+    });
+
+    it('no toca ni cierra los períodos ABIERTOS más viejos — crear y cerrar quedan desacoplados', async () => {
+      cierreRepository.buscarMasReciente.mockResolvedValue({
+        id: 'periodo-oct',
+        fechaInicio: new Date('2026-10-01'),
+        fechaFin: new Date('2026-10-31T23:59:59.999Z'),
+      } as never);
+      cierreRepository.crear.mockResolvedValue({ id: 'periodo-nov', fechaInicio: new Date('2026-11-01'), fechaFin: new Date('2026-11-30T23:59:59.999Z') } as never);
+
+      await service.completarFaltantes('tenant-1');
+
+      expect(cierreRepository.buscarAbiertoMasAntiguo).not.toHaveBeenCalled();
+      expect(cierreRepository.cerrar).not.toHaveBeenCalled();
     });
   });
 

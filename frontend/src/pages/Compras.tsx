@@ -12,6 +12,7 @@ import { SearchInput } from '../components/molecules/SearchInput/SearchInput';
 import { Paginacion } from '../components/molecules/Paginacion/Paginacion';
 import { EstadoVacio } from '../components/molecules/EstadoVacio/EstadoVacio';
 import { RowActionsMenu } from '../components/molecules/RowActionsMenu/RowActionsMenu';
+import { AvisoPeriodoContable } from '../components/molecules/AvisoPeriodoContable/AvisoPeriodoContable';
 import { RequierePermiso } from '../components/organisms/RequierePermiso/RequierePermiso';
 import { useAuth } from '../hooks/useAuth';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
@@ -68,6 +69,7 @@ export function Compras() {
 
   return (
     <div className="space-y-4">
+      <AvisoPeriodoContable />
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Compras</h1>

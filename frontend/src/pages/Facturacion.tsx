@@ -4,6 +4,7 @@ import { Button } from '../components/atoms/Button/Button';
 import { FacturasTable } from '../components/organisms/FacturasTable/FacturasTable';
 import { EmitirNotaForm } from '../components/organisms/EmitirNotaForm/EmitirNotaForm';
 import { RequierePermiso } from '../components/organisms/RequierePermiso/RequierePermiso';
+import { AvisoPeriodoContable } from '../components/molecules/AvisoPeriodoContable/AvisoPeriodoContable';
 import { useAuth } from '../hooks/useAuth';
 
 export function Facturacion() {
@@ -21,6 +22,7 @@ export function Facturacion() {
 
   return (
     <div className="space-y-6">
+      <AvisoPeriodoContable />
       {avisoNotificacion && (
         <div className="flex items-start justify-between gap-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-300">
           <p>{avisoNotificacion}</p>

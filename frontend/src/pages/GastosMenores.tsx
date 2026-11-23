@@ -9,6 +9,7 @@ import { Paginacion } from '../components/molecules/Paginacion/Paginacion';
 import { SearchInput } from '../components/molecules/SearchInput/SearchInput';
 import { EstadoVacio } from '../components/molecules/EstadoVacio/EstadoVacio';
 import { RequierePermiso } from '../components/organisms/RequierePermiso/RequierePermiso';
+import { AvisoPeriodoContable } from '../components/molecules/AvisoPeriodoContable/AvisoPeriodoContable';
 import { ImportarGastosMenoresModal } from '../components/organisms/ImportarGastosMenoresModal/ImportarGastosMenoresModal';
 import { useAuth } from '../hooks/useAuth';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
@@ -64,6 +65,7 @@ export function GastosMenores() {
 
   return (
     <div className="space-y-4">
+      <AvisoPeriodoContable />
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Gastos menores</h1>

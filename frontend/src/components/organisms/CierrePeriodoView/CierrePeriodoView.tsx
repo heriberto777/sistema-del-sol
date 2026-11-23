@@ -58,6 +58,7 @@ export function CierrePeriodoView() {
   const queryClient = useQueryClient();
   const { tienePermiso } = useAuth();
   const [error, setError] = useState<string | null>(null);
+  const [mensajeCompletar, setMensajeCompletar] = useState<string | null>(null);
 
   const { data, isLoading, error: errorCarga } = useQuery({
     queryKey: ['contabilidad-periodos'],
@@ -80,14 +81,48 @@ export function CierrePeriodoView() {
       ),
   });
 
+  // Manual, además del cron (que crea el mes siguiente 5 días antes de
+  // fin de mes y no reintenta si se lo pierde) — incidente real
+  // 2026-11-18: no hace falta cerrar nada viejo para destrabar esto,
+  // "crear" y "cerrar" quedan desacoplados a propósito.
+  const completarFaltantes = useMutation({
+    mutationFn: async () => (await apiClient.post<Periodo[]>('/contabilidad/cierre-periodo/completar-faltantes')).data,
+    onSuccess: (creados) => {
+      queryClient.invalidateQueries({ queryKey: ['contabilidad-periodos'] });
+      queryClient.invalidateQueries({ queryKey: ['contabilidad-periodo-vigente'] });
+      setError(null);
+      setMensajeCompletar(
+        creados.length === 0
+          ? 'Ya estaba al día — no hacía falta crear ningún período.'
+          : `Se creó ${creados.length === 1 ? 'el período' : `${creados.length} período(s)`}: ${creados.map((p) => etiquetaPeriodo(p)).join(', ')}.`,
+      );
+    },
+    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo completar los períodos faltantes.')),
+  });
+
   return (
     <div className="space-y-4">
-      <p className="rounded-md bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
-        Los períodos (mensuales) se crean solos, no hace falta abrirlos a mano. Cerrar el más antiguo todavía abierto
-        traspasa su saldo neto de ingresos y gastos a Utilidades Retenidas, con un asiento automático, y deja firme
-        ese mes — ya no se pueden crear asientos manuales ni gastos con fecha dentro de él.
-      </p>
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-md bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
+        <p>
+          Los períodos (mensuales) se crean solos todos los días a las 7am, 5 días antes de fin de mes — no hace falta
+          abrirlos a mano. Si por algún motivo no se creó el que cubre hoy (ej. el servidor estuvo caído esa ventana),
+          usá el botón de al lado para crearlo sin esperar al cron. Cerrar el más antiguo todavía abierto traspasa su
+          saldo neto de ingresos y gastos a Utilidades Retenidas, con un asiento automático, y deja firme ese mes —
+          ya no se pueden crear asientos manuales ni gastos con fecha dentro de él.
+        </p>
+        {tienePermiso('contabilidad.cerrarperiodo') && (
+          <Button
+            variante="secundario"
+            className="shrink-0"
+            disabled={completarFaltantes.isPending}
+            onClick={() => completarFaltantes.mutate()}
+          >
+            {completarFaltantes.isPending ? 'Revisando…' : 'Completar períodos faltantes'}
+          </Button>
+        )}
+      </div>
 
+      {mensajeCompletar && <p className="text-sm text-emerald-700 dark:text-emerald-400">{mensajeCompletar}</p>}
       {error && <p className="text-sm text-red-600">{error}</p>}
       {isLoading && <p className="text-sm text-slate-500 dark:text-slate-400">Cargando períodos…</p>}
       {errorCarga && <p className="text-sm text-red-600">No se pudieron cargar los períodos.</p>}

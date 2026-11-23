@@ -4,7 +4,7 @@ import { AsientosContablesRepository } from './asientos-contables.repository';
 import { CuentasContablesRepository } from './cuentas-contables.repository';
 import { CODIGOS_CUENTA } from './cuentas-base';
 import { CerrarPeriodoDto } from './dto/cerrar-periodo.dto';
-import { rangoDelMesSiguiente } from './periodos-contables.util';
+import { rangoDelMes, rangoDelMesSiguiente } from './periodos-contables.util';
 
 const EPSILON = 0.005;
 
@@ -34,6 +34,57 @@ export class CierrePeriodoService {
 
   listar() {
     return this.cierreRepository.listar();
+  }
+
+  /**
+   * Para el aviso en Facturación/Compras/Nómina/Gastos Menores — "¿hoy
+   * está cubierto?" sin exponer toda la lista de períodos (eso requiere
+   * `contabilidad.ver`, esto no requiere ningún permiso puntual, solo
+   * estar autenticado — lo consultan pantallas de otros módulos).
+   */
+  obtenerVigente() {
+    return this.cierreRepository.buscarPorFecha(new Date());
+  }
+
+  /**
+   * Pedido explícito del usuario (2026-11-18, incidente real en
+   * producción: el cron se saltó la ventana de 5 días antes de fin de
+   * mes — ver PeriodosContablesCronService — y nadie se dio cuenta hasta
+   * que Facturación empezó a rechazar con "No hay un período contable
+   * definido" el día 1). El cron NO reintenta ejecuciones perdidas
+   * (mira siempre hacia el mes siguiente al actual, nunca hacia atrás),
+   * así que hacía falta una vía manual — esta la complementa, no la
+   * reemplaza.
+   *
+   * Crea, en orden, todos los períodos que falten entre el último que
+   * existe y hoy (puede ser más de uno, si el hueco duró varios meses).
+   * A propósito NO cierra ni toca los períodos ABIERTOS más viejos —
+   * "crear período" y "cerrar período" quedan desacoplados (pedido
+   * explícito: "dejar el del mes pasado abierto, para después cerrarlo
+   * cuando se cuadre todo, la flexibilidad es lo importante"). El modelo
+   * ya soporta varios `PeriodoContable` en estado ABIERTO a la vez — solo
+   * `cerrarPeriodo` exige que sea el más antiguo, crear no tiene esa
+   * restricción.
+   */
+  async completarFaltantes(tenantId: string) {
+    const hoy = new Date();
+    let ultimo = await this.cierreRepository.buscarMasReciente();
+    const creados = [];
+
+    if (!ultimo) {
+      // Defensivo — en teoría todo tenant arranca con uno vía provisioning,
+      // pero si llegó a faltar por completo, igual hay que destrabarlo.
+      ultimo = await this.cierreRepository.crear({ tenantId, ...rangoDelMes(hoy) });
+      creados.push(ultimo);
+      return creados;
+    }
+
+    while (ultimo.fechaFin < hoy) {
+      ultimo = await this.cierreRepository.crear({ tenantId, ...rangoDelMesSiguiente(ultimo.fechaFin) });
+      creados.push(ultimo);
+    }
+
+    return creados;
   }
 
   /**

@@ -9,6 +9,7 @@ import { Card } from '../../atoms/Card/Card';
 import { Select } from '../../atoms/Select/Select';
 import { FormField } from '../../molecules/FormField/FormField';
 import { Paginacion } from '../../molecules/Paginacion/Paginacion';
+import { AvisoPeriodoContable } from '../../molecules/AvisoPeriodoContable/AvisoPeriodoContable';
 import { useAuth } from '../../../hooks/useAuth';
 import { PaginaResultado } from '../../../types/pagina-resultado';
 
@@ -230,6 +231,7 @@ export function PeriodosNominaTable() {
 
   return (
     <div className="space-y-4">
+      <AvisoPeriodoContable />
       {tienePermiso('nomina.editar') && (
         <Card titulo="Generar período" descripcion="Crea los recibos de todos los empleados activos para el rango elegido.">
           <form onSubmit={onSubmit} className="flex flex-wrap items-end gap-3">
