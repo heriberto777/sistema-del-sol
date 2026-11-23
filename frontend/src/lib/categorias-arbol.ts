@@ -6,6 +6,8 @@ export interface CategoriaPlana {
   categoriaPadreId: string | null;
   activa: boolean;
   color?: ColorCategoria | null;
+  cuentaIngresoId?: string | null;
+  cuentaCostoId?: string | null;
 }
 
 export interface CategoriaConProfundidad extends CategoriaPlana {

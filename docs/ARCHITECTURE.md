@@ -4926,6 +4926,42 @@ fix. **Cualquier página nueva con este patrón tiene que diferir así la
 invalidación desde el día uno** — no es optativo, el bug es real y
 reproducible, no una rareza del entorno de pruebas.
 
+### Variante del mismo bug — el ícono inferido del `<Button>` también cuenta como "swap de subárbol"
+
+Encontrado en `CategoriasPanel.tsx` (2026-11-23, al agregar los campos de
+cuenta de ingreso/costo por categoría) — **no hace falta un toggle
+`editando`** para disparar este bug, cualquier cambio de subárbol
+sincronizado con la invalidación alcanza. `Button` (`components/atoms/
+Button/Button.tsx`) infiere un ícono distinto según el TEXTO del botón
+(`inferirIconoAccion` — "Crear" → `Plus`, "Guardando…" → `Save`). Un
+botón de submit con label `{isPending ? 'Guardando…' : 'Crear'}` monta y
+desmonta un `<Icon>` distinto en cada transición de `isPending` — si esa
+misma página además invalida una query que ELLA MISMA renderiza (tabla +
+`<SelectCategoria>` en este caso, ambos dependientes de `['categorias']`),
+el swap de ícono del botón puede chocar con el commit de la
+invalidación, mismo síntoma (`removeChild`), confirmado con la misma
+instrumentación directa de `Node.prototype.removeChild` (no bastó con
+diferir la invalidación vía `setTimeout` sola — el swap de ícono seguía
+ocurriendo en el mismo tick que `limpiar()`). Fix puntual: `icon={null}`
+en ese botón, para que no infiera ningún ícono y el swap desaparezca.
+**No se auditaron todavía los demás botones de la app con label
+pendiente/ícono inferido** (patrón usado en casi todos los formularios)
+— candidato real a una ronda de auditoría propia si vuelve a aparecer en
+otra página.
+
+**2 casos más encontrados, sin corregir** (2026-11-23, durante la misma
+sesión de QA, mismo síntoma `removeChild`, no investigados a fondo —
+quedan para esa ronda de auditoría):
+- Crear un producto nuevo (`/productos/nuevo`) — falla la navegación
+  posterior a guardar, hacia `/productos/:id`.
+- Seleccionar un cliente en Facturación Nueva (`FacturacionNueva.tsx`) —
+  falla al cerrar el buscador y pintar el cliente elegido.
+
+Ninguno de los dos está relacionado con la parametrización de cuentas
+por categoría (la causa que originó esta sección) — son hallazgos
+incidentales de la misma clase de bug, en páginas no tocadas por ese
+cambio.
+
 ### Otro bug real encontrado en el camino — `editando` pegado tras crear
 
 `PropiedadVer.tsx` atiende tanto `/propiedades/nuevo` (crear) como

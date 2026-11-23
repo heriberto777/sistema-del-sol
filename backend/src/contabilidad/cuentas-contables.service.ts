@@ -11,6 +11,11 @@ export class CuentasContablesService {
     return this.repository.listar();
   }
 
+  /** Tenant-scoped (findUniqueOrThrow vía TenantPrismaService) — para que otros módulos (ej. Categorías) validen un id de cuenta contable sin tocar el repositorio directo. */
+  buscarPorId(id: string) {
+    return this.repository.buscarPorId(id);
+  }
+
   crear(dto: CrearCuentaContableDto, tenantId: string) {
     return this.repository.crear({ ...dto, tenantId });
   }

@@ -103,49 +103,88 @@ export class AsientosContablesService {
    */
   /**
    * `recargos` (ítem B-4, opcional/default 0) — cargos post-subtotal ya
-   * incluidos en `total` pero NO en `subtotal` (que sigue siendo solo las
-   * líneas de producto). Sin sumarlos acá, el asiento queda desbalanceado
-   * exactamente por ese monto: débito (Cobro, sobre `total`) > crédito
-   * (Ingresos + ITBIS, que sin esto no lo cubren) — bug real, encontrado
-   * verificando B-4 en vivo. Se acreditan a la MISMA cuenta de Ingresos
-   * por Ventas — simplificación de v1, igual criterio que "otrasDeducciones"
-   * de nómina agrupadas en una sola sub-cuenta; una cuenta de "Otros
-   * Ingresos" separada es la extensión natural si el negocio la necesita.
+   * incluidos en `total` pero NO en ninguna línea de producto. Sin
+   * sumarlos acá, el asiento queda desbalanceado exactamente por ese
+   * monto: débito (Cobro, sobre `total`) > crédito (Ingresos + ITBIS, que
+   * sin esto no lo cubren) — bug real, encontrado verificando B-4 en
+   * vivo. Un recargo no tiene producto/categoría detrás, así que siempre
+   * va a la cuenta genérica de Ingresos por Ventas, nunca a una de
+   * `ingresosPorCuenta` — mismo criterio para líneas manuales (ítem B-9,
+   * sin producto del catálogo, `cuentaContableId: null` en su grupo).
+   *
+   * `ingresosPorCuenta`/`costosPorCuenta` (parametrización de cuentas por
+   * categoría, docs/PLAN.md punto 2) — un grupo por cada cuenta contable
+   * distinta que resultó de agrupar las líneas de la factura por
+   * `producto.categoria.cuentaIngresoId`/`cuentaCostoId` (ver
+   * ContabilidadEventosService.agruparVentaPorCuenta). `cuentaContableId:
+   * null` en un grupo significa "sin override, va a la genérica fija" —
+   * se resuelve acá, agrupando todos los `null` junto con los recargos en
+   * una sola línea. Reemplaza los viejos `subtotal`/`costoVenta` planos:
+   * sin ningún override configurado, un solo grupo con `cuentaContableId:
+   * null` por el subtotal/costo total se comporta exactamente igual que
+   * antes (retrocompatible).
    */
   async generarDesdeFactura(params: {
     tenantId: string;
     facturaId: string;
     tipoFactura: string;
-    subtotal: number;
     itbis: number;
     total: number;
     recargos?: number;
-    // Motor de costeo — Débito Costo de Ventas / Crédito Inventario,
-    // además de lo de siempre. Omitido o 0 cuando la factura es
-    // NOTA_DEBITO o está hecha enteramente de SERVICIO/líneas manuales
-    // (nunca tuvieron Costo de Ventas real) — ver ContabilidadEventosService.
-    costoVenta?: number;
+    ingresosPorCuenta: { cuentaContableId: string | null; monto: number }[];
+    costosPorCuenta?: { cuentaContableId: string | null; monto: number }[];
   }) {
-    const [cuentaCobro, cuentaIngresos, cuentaItbis] = await Promise.all([
+    const [cuentaCobro, cuentaItbis] = await Promise.all([
       this.cuentasRepository.buscarPorCodigoGlobal(params.tenantId, params.tipoFactura === 'CONTADO' ? CODIGOS_CUENTA.CAJA_BANCOS : CODIGOS_CUENTA.CUENTAS_POR_COBRAR),
-      this.cuentasRepository.buscarPorCodigoGlobal(params.tenantId, CODIGOS_CUENTA.INGRESOS_POR_VENTAS),
       this.cuentasRepository.buscarPorCodigoGlobal(params.tenantId, CODIGOS_CUENTA.ITBIS_POR_PAGAR),
     ]);
 
-    const lineas = [
-      this.lineaSegunSigno(cuentaCobro.id, params.total, 'debito', `Factura ${params.facturaId}`),
-      this.lineaSegunSigno(cuentaIngresos.id, params.subtotal + (params.recargos ?? 0), 'credito', `Factura ${params.facturaId}`),
-    ];
+    const lineas = [this.lineaSegunSigno(cuentaCobro.id, params.total, 'debito', `Factura ${params.facturaId}`)];
     if (params.itbis !== 0) {
       lineas.push(this.lineaSegunSigno(cuentaItbis.id, params.itbis, 'credito', `Factura ${params.facturaId}`));
     }
-    if (params.costoVenta) {
-      const [cuentaCostoVentas, cuentaInventario] = await Promise.all([
-        this.cuentasRepository.buscarPorCodigoGlobal(params.tenantId, CODIGOS_CUENTA.COSTO_DE_VENTAS),
+
+    // Genéricas resueltas de forma perezosa — si TODAS las líneas ya
+    // tienen una cuenta de categoría propia (y no hay recargos), no hace
+    // falta ni consultar la cuenta fija de siempre.
+    const necesitaIngresoGenerica = params.recargos || params.ingresosPorCuenta.some((g) => g.cuentaContableId === null);
+    const cuentaIngresosGenerica = necesitaIngresoGenerica
+      ? await this.cuentasRepository.buscarPorCodigoGlobal(params.tenantId, CODIGOS_CUENTA.INGRESOS_POR_VENTAS)
+      : null;
+
+    const gruposIngreso = new Map<string, number>();
+    for (const grupo of params.ingresosPorCuenta) {
+      const cuentaId = grupo.cuentaContableId ?? cuentaIngresosGenerica!.id;
+      gruposIngreso.set(cuentaId, (gruposIngreso.get(cuentaId) ?? 0) + grupo.monto);
+    }
+    if (params.recargos) {
+      gruposIngreso.set(cuentaIngresosGenerica!.id, (gruposIngreso.get(cuentaIngresosGenerica!.id) ?? 0) + params.recargos);
+    }
+    for (const [cuentaId, monto] of gruposIngreso) {
+      if (Math.abs(monto) < EPSILON) continue;
+      lineas.push(this.lineaSegunSigno(cuentaId, monto, 'credito', `Factura ${params.facturaId}`));
+    }
+
+    if (params.costosPorCuenta?.length) {
+      const necesitaCostoGenerica = params.costosPorCuenta.some((g) => g.cuentaContableId === null);
+      const [cuentaCostoGenerica, cuentaInventario] = await Promise.all([
+        necesitaCostoGenerica ? this.cuentasRepository.buscarPorCodigoGlobal(params.tenantId, CODIGOS_CUENTA.COSTO_DE_VENTAS) : null,
         this.cuentasRepository.buscarPorCodigoGlobal(params.tenantId, CODIGOS_CUENTA.INVENTARIO),
       ]);
-      lineas.push(this.lineaSegunSigno(cuentaCostoVentas.id, params.costoVenta, 'debito', `Costo de venta — factura ${params.facturaId}`));
-      lineas.push(this.lineaSegunSigno(cuentaInventario.id, params.costoVenta, 'credito', `Costo de venta — factura ${params.facturaId}`));
+      const gruposCosto = new Map<string, number>();
+      for (const grupo of params.costosPorCuenta) {
+        const cuentaId = grupo.cuentaContableId ?? cuentaCostoGenerica!.id;
+        gruposCosto.set(cuentaId, (gruposCosto.get(cuentaId) ?? 0) + grupo.monto);
+      }
+      let totalCosto = 0;
+      for (const [cuentaId, monto] of gruposCosto) {
+        if (Math.abs(monto) < EPSILON) continue;
+        lineas.push(this.lineaSegunSigno(cuentaId, monto, 'debito', `Costo de venta — factura ${params.facturaId}`));
+        totalCosto += monto;
+      }
+      if (Math.abs(totalCosto) >= EPSILON) {
+        lineas.push(this.lineaSegunSigno(cuentaInventario.id, totalCosto, 'credito', `Costo de venta — factura ${params.facturaId}`));
+      }
     }
 
     return this.crearAsientoAutomatico({
@@ -162,19 +201,19 @@ export class AsientosContablesService {
     tenantId: string;
     facturaId: string;
     tipoFactura: string;
-    subtotal: number;
     itbis: number;
     total: number;
     recargos?: number;
-    costoVenta?: number;
+    ingresosPorCuenta: { cuentaContableId: string | null; monto: number }[];
+    costosPorCuenta?: { cuentaContableId: string | null; monto: number }[];
   }) {
     return this.generarDesdeFactura({
       ...params,
-      subtotal: -params.subtotal,
       itbis: -params.itbis,
       total: -params.total,
       recargos: -(params.recargos ?? 0),
-      costoVenta: params.costoVenta ? -params.costoVenta : undefined,
+      ingresosPorCuenta: params.ingresosPorCuenta.map((g) => ({ ...g, monto: -g.monto })),
+      costosPorCuenta: params.costosPorCuenta?.map((g) => ({ ...g, monto: -g.monto })),
     });
   }
 

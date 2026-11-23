@@ -6,6 +6,7 @@ import { aplanarArbolCategorias, type CategoriaPlana } from '../../../lib/catego
 import { COLORES_CATEGORIA, ETIQUETA_COLOR_CATEGORIA, CLASE_PUNTO_COLOR_CATEGORIA, type ColorCategoria } from '../../../lib/color-categoria';
 import { FormField } from '../../molecules/FormField/FormField';
 import { SelectCategoria } from '../../molecules/SelectCategoria/SelectCategoria';
+import { SelectCuentaContable } from '../../molecules/SelectCuentaContable/SelectCuentaContable';
 import { Select } from '../../atoms/Select/Select';
 import { Button } from '../../atoms/Button/Button';
 import { Badge } from '../../atoms/Badge/Badge';
@@ -17,6 +18,8 @@ export function CategoriasPanel() {
   const [nombre, setNombre] = useState('');
   const [categoriaPadreId, setCategoriaPadreId] = useState('');
   const [color, setColor] = useState<ColorCategoria | ''>('');
+  const [cuentaIngresoId, setCuentaIngresoId] = useState('');
+  const [cuentaCostoId, setCuentaCostoId] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   const { data: categorias } = useQuery({
@@ -33,17 +36,30 @@ export function CategoriasPanel() {
     setNombre('');
     setCategoriaPadreId('');
     setColor('');
+    setCuentaIngresoId('');
+    setCuentaCostoId('');
     setError(null);
   }
 
   const guardar = useMutation({
     mutationFn: async () => {
-      const payload = { nombre, categoriaPadreId: categoriaPadreId || null, color: color || null };
+      const payload = {
+        nombre,
+        categoriaPadreId: categoriaPadreId || null,
+        color: color || null,
+        cuentaIngresoId: cuentaIngresoId || null,
+        cuentaCostoId: cuentaCostoId || null,
+      };
       return editandoId ? apiClient.patch(`/categorias/${editandoId}`, payload) : apiClient.post('/categorias', payload);
     },
     onSuccess: () => {
-      invalidar();
+      // removeChild intermitente (ver ARCHITECTURE.md "Auditoría UX: modal
+      // → página") — invalidar la lista en el mismo tick que limpiar()
+      // puede chocar con React si esa invalidación cambia la estructura
+      // del DOM (ej. de "Sin categorías todavía" a una tabla con filas).
+      // limpiar() primero, invalidar() diferido.
       limpiar();
+      setTimeout(invalidar, 0);
     },
     onError: (err) => setError(mensajeErrorApi(err, 'No se pudo guardar (¿ya existe una categoría con ese nombre, o se creó un ciclo?).')),
   });
@@ -65,6 +81,8 @@ export function CategoriasPanel() {
     setNombre(c.nombre);
     setCategoriaPadreId(c.categoriaPadreId ?? '');
     setColor(c.color ?? '');
+    setCuentaIngresoId(c.cuentaIngresoId ?? '');
+    setCuentaCostoId(c.cuentaCostoId ?? '');
   }
 
   const plano = aplanarArbolCategorias(categorias ?? []);
@@ -89,9 +107,31 @@ export function CategoriasPanel() {
               ))}
             </Select>
           </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Cuenta de ingreso (opcional)</label>
+            <SelectCuentaContable value={cuentaIngresoId} onChange={setCuentaIngresoId} tipo="INGRESO" />
+            <p className="text-xs text-slate-400">
+              Las ventas de productos de esta categoría se contabilizan acá en vez de la cuenta genérica de Ingresos por
+              Ventas.
+            </p>
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Cuenta de costo (opcional)</label>
+            <SelectCuentaContable value={cuentaCostoId} onChange={setCuentaCostoId} tipo="GASTO" />
+            <p className="text-xs text-slate-400">
+              El costo de venta de productos de esta categoría se contabiliza acá en vez de la cuenta genérica de Costo
+              de Ventas.
+            </p>
+          </div>
           {error && <p className="text-sm text-red-600">{error}</p>}
           <div className="flex gap-2">
-            <Button type="submit" disabled={guardar.isPending} className="flex-1">
+            {/* icon={null}: sin esto, el texto "Guardando…"/"Crear categoría"/"Guardar
+                cambios" infiere un ícono distinto cada vez (Save vs. Plus) — ese swap de
+                ícono, justo cuando onSuccess invalida ['categorias'] (que esta misma
+                página renderiza como tabla + <SelectCategoria>), reproduce el removeChild
+                intermitente documentado en ARCHITECTURE.md (confirmado con
+                instrumentación directa de Node.prototype.removeChild). */}
+            <Button type="submit" icon={null} disabled={guardar.isPending} className="flex-1">
               {guardar.isPending ? 'Guardando…' : editandoId ? 'Guardar cambios' : 'Crear categoría'}
             </Button>
             {editandoId && (

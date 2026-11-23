@@ -1,17 +1,23 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { CategoriasRepository } from './categorias.repository';
 import { CrearCategoriaDto } from './dto/crear-categoria.dto';
+import { CuentasContablesService } from '../contabilidad/cuentas-contables.service';
 
 @Injectable()
 export class CategoriasService {
-  constructor(private readonly categoriasRepository: CategoriasRepository) {}
+  constructor(
+    private readonly categoriasRepository: CategoriasRepository,
+    private readonly cuentasContablesService: CuentasContablesService,
+  ) {}
 
   async crear(dto: CrearCategoriaDto, tenantId: string) {
-    // findUniqueOrThrow tenant-scoped: si categoriaPadreId es de otro tenant, 404 —
-    // mismo patrón de prevención de IDOR ya documentado para FKs cliente-suministradas.
+    // findUniqueOrThrow tenant-scoped: si categoriaPadreId/cuentaIngresoId/
+    // cuentaCostoId es de otro tenant, 404 — mismo patrón de prevención de
+    // IDOR ya documentado para FKs cliente-suministradas.
     if (dto.categoriaPadreId) {
       await this.categoriasRepository.buscarPorId(dto.categoriaPadreId);
     }
+    await this.validarCuentasContables(dto);
     return this.categoriasRepository.crear(dto, tenantId);
   }
 
@@ -26,7 +32,17 @@ export class CategoriasService {
       }
       await this.validarNoEsDescendiente(id, dto.categoriaPadreId);
     }
+    await this.validarCuentasContables(dto);
     return this.categoriasRepository.actualizar(id, dto);
+  }
+
+  private async validarCuentasContables(dto: Partial<CrearCategoriaDto>) {
+    if (dto.cuentaIngresoId) {
+      await this.cuentasContablesService.buscarPorId(dto.cuentaIngresoId);
+    }
+    if (dto.cuentaCostoId) {
+      await this.cuentasContablesService.buscarPorId(dto.cuentaCostoId);
+    }
   }
 
   async eliminar(id: string) {

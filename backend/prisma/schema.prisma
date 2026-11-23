@@ -1687,6 +1687,8 @@ model CuentaContable {
   cuentasBancarias       CuentaBancaria[]
   lineasGastoMenor       LineaGastoMenor[]
   lineasFacturaProveedor FacturaProveedorLinea[]
+  categoriasIngreso      Categoria[]             @relation("CategoriaCuentaIngreso")
+  categoriasCosto        Categoria[]             @relation("CategoriaCuentaCosto")
 
   @@unique([tenantId, codigo])
   @@map("cuentas_contables")
@@ -2780,6 +2782,17 @@ model Categoria {
   subcategorias    Categoria[]     @relation("JerarquiaCategoria")
   activa           Boolean         @default(true)
   color            ColorCategoria?
+  // Parametrización de cuentas contables (docs/PLAN.md, punto 2) —
+  // opcionales, sin herencia de categoriaPadre (decisión 2026-11-23:
+  // simple y explícito, cada categoría que quiera cuenta propia la
+  // configura ella misma). Sin esto, una venta de un producto de esta
+  // categoría cae en la cuenta genérica fija de siempre
+  // (CODIGOS_CUENTA.INGRESOS_POR_VENTAS/COSTO_DE_VENTAS) — ver
+  // ContabilidadEventosService.agruparVentaPorCuenta.
+  cuentaIngresoId  String?
+  cuentaIngreso    CuentaContable? @relation("CategoriaCuentaIngreso", fields: [cuentaIngresoId], references: [id])
+  cuentaCostoId    String?
+  cuentaCosto      CuentaContable? @relation("CategoriaCuentaCosto", fields: [cuentaCostoId], references: [id])
   createdAt        DateTime        @default(now())
 
   productos               Producto[]

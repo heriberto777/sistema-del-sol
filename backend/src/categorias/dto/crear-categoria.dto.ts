@@ -17,4 +17,12 @@ export class CrearCategoriaDto {
   @IsOptional()
   @IsEnum(ColorCategoria)
   color?: ColorCategoria;
+
+  @IsOptional()
+  @IsUUID()
+  cuentaIngresoId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  cuentaCostoId?: string;
 }

@@ -17,8 +17,9 @@ Convención de estado: `🔲 Pendiente de diseño` · `🟡 En diseño` ·
 | "Ver Stock" en Productos | ✅ Implementado — commit `dbccd79` |
 | Asistente de pre-cierre contable | 🔲 Pendiente de diseño |
 | Período de trabajo + advertencia blanda | 🔲 Pendiente de diseño |
-| Parametrización de cuentas contables y centros de costo — punto 1 (banco real en Pagos) | ✅ Implementado 2026-11-23 — resto (2, 3, 4) sigue 🟡 en diseño |
+| Parametrización de cuentas contables y centros de costo — puntos 1 y 2 (banco real en Pagos; cuenta de ingreso/costo por categoría) | ✅ Implementado 2026-11-23 — resto (3, 4) sigue 🟡 en diseño |
 | Depósito bancario (Caja → Banco) | 🔲 Pendiente de diseño |
+| Bug "removeChild" por ícono inferido del `<Button>` (variante nueva) | 🔲 2 casos encontrados sin corregir (ProductoNuevo, FacturacionNueva) — ver ARCHITECTURE.md |
 | Backlog UX/operación (Conteo Físico, modales→página, parámetros operativos, reporte de problemas, manual) | 🔲 Pendiente — ver detalle en `memoized-noodling-moore.md` (plan de Claude Code) |
 
 ---
@@ -94,10 +95,28 @@ Hoy conviven dos mecanismos:
    de compra) no generaba NINGÚN asiento contable (evento sin listener).
    **Nómina queda fuera** — se pospuso a la sesión de rediseño completo
    de Nómina/RRHH (decisión 2026-11-23), sigue usando la cuenta genérica.
-2. **Cuenta de ingreso/costo por Categoría de producto** — agregar
-   `cuentaIngresoId`/`cuentaCostoId` opcionales en `Categoria`, con
-   fallback a 4010/5010 si no están seteados (retrocompatible, ningún
-   tenant existente se rompe).
+2. ✅ **Cuenta de ingreso/costo por Categoría de producto** —
+   implementado y verificado 2026-11-23. `cuentaIngresoId`/`cuentaCostoId`
+   opcionales en `Categoria` (migración
+   `20261123153327_categoria_cuenta_ingreso_costo`), configurables desde
+   el panel de Categorías. `AsientosContablesService.generarDesdeFactura`
+   ahora agrupa el ingreso/costo de cada línea por la cuenta de su
+   categoría (`ContabilidadEventosService.agruparVentaPorCuenta`), en vez
+   de una sola línea agregada — sin override, cae en la genérica de
+   siempre (retrocompatible). Recargos y líneas manuales siempre van a la
+   genérica (sin categoría que atribuirles). Verificado end-to-end vía
+   API: una venta de un producto con cuenta de ingreso propia contabilizó
+   en esa cuenta, no en la 4010 genérica.
+
+   **Bug real encontrado y corregido de paso** (`CategoriasPanel.tsx`):
+   variante nueva del "removeChild intermitente" (ver ARCHITECTURE.md) —
+   no hacía falta un toggle `editando`, bastaba con que el texto del
+   botón de submit cambiara ("Crear categoría" ↔ "Guardando…"), porque
+   `Button` infiere un ícono distinto según el texto. Fix: `icon={null}`
+   en ese botón. **Se encontraron 2 casos más del mismo bug, sin
+   corregir** (fuera de alcance de este punto): crear un producto nuevo
+   (navegación post-creación) y seleccionar un cliente en Facturación
+   Nueva — candidatos a una ronda de auditoría propia.
 3. **Centro de Costo — catálogo nuevo, transversal** — modelo
    `CentroCosto` (tenantId, código, nombre, activo), parametrizable desde
    Catálogo de Cuentas o una pantalla hermana. Campo opcional

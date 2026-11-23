@@ -1,10 +1,12 @@
 import { BadRequestException } from '@nestjs/common';
 import { CategoriasService } from './categorias.service';
 import { CategoriasRepository } from './categorias.repository';
+import { CuentasContablesService } from '../contabilidad/cuentas-contables.service';
 
 describe('CategoriasService', () => {
   let service: CategoriasService;
   let repository: jest.Mocked<CategoriasRepository>;
+  let cuentasContablesService: jest.Mocked<CuentasContablesService>;
 
   beforeEach(() => {
     repository = {
@@ -14,7 +16,8 @@ describe('CategoriasService', () => {
       actualizar: jest.fn(),
       eliminar: jest.fn(),
     } as unknown as jest.Mocked<CategoriasRepository>;
-    service = new CategoriasService(repository);
+    cuentasContablesService = { buscarPorId: jest.fn().mockResolvedValue({ id: 'cuenta-1' }) } as unknown as jest.Mocked<CuentasContablesService>;
+    service = new CategoriasService(repository, cuentasContablesService);
   });
 
   describe('crear', () => {
@@ -32,6 +35,23 @@ describe('CategoriasService', () => {
 
       expect(repository.buscarPorId).toHaveBeenCalledWith('padre-1');
       expect(repository.crear).toHaveBeenCalledWith({ nombre: 'Gaseosas', categoriaPadreId: 'padre-1' }, 'tenant-1');
+    });
+
+    it('valida que cuentaIngresoId/cuentaCostoId pertenezcan al tenant antes de crear (docs/PLAN.md, punto 2)', async () => {
+      const dto = { nombre: 'Servicios', cuentaIngresoId: 'cuenta-ingreso-1', cuentaCostoId: 'cuenta-costo-1' };
+
+      await service.crear(dto, 'tenant-1');
+
+      expect(cuentasContablesService.buscarPorId).toHaveBeenCalledWith('cuenta-ingreso-1');
+      expect(cuentasContablesService.buscarPorId).toHaveBeenCalledWith('cuenta-costo-1');
+      expect(repository.crear).toHaveBeenCalledWith(dto, 'tenant-1');
+    });
+
+    it('propaga el 404 si cuentaIngresoId es de otro tenant (findUniqueOrThrow tenant-scoped)', async () => {
+      cuentasContablesService.buscarPorId.mockRejectedValue(new Error('no encontrada'));
+
+      await expect(service.crear({ nombre: 'Servicios', cuentaIngresoId: 'cuenta-otro-tenant' }, 'tenant-1')).rejects.toThrow();
+      expect(repository.crear).not.toHaveBeenCalled();
     });
   });
 

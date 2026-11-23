@@ -27,8 +27,9 @@ describe('ContabilidadEventosService', () => {
     prisma = {
       recepcionCompra: { findUniqueOrThrow: jest.fn() },
       gastoMenor: { findUniqueOrThrow: jest.fn() },
-      // Motor de costeo — default sin líneas (costoVenta: 0); los tests
-      // que sí verifican el Costo de Ventas lo sobreescriben puntual.
+      // Motor de costeo + parametrización por categoría — default sin
+      // líneas (ingresosPorCuenta/costosPorCuenta vacíos); los tests que
+      // sí verifican esto lo sobreescriben puntual.
       factura: { findUniqueOrThrow: jest.fn().mockResolvedValue({ lineas: [] }) },
       // Default sin cuenta bancaria elegida (cae en la cuenta genérica) —
       // los tests que sí verifican la cuenta real lo sobreescriben puntual.
@@ -39,18 +40,22 @@ describe('ContabilidadEventosService', () => {
   });
 
   describe('alFacturarse', () => {
-    it('genera el asiento con los montos convertidos a número', async () => {
+    it('genera el asiento con los montos convertidos a número, agrupando las líneas (sin categoría -> cuentaContableId null)', async () => {
+      prisma.factura.findUniqueOrThrow.mockResolvedValue({
+        lineas: [{ cantidad: 1, costoUnitario: null, montoTotal: 354, montoItbis: 54, producto: null }],
+      });
+
       await service.alFacturarse({ tenantId: 't1', facturaId: 'f1', clienteId: 'c1', total: '354', subtotal: '300', itbis: '54', tipoFactura: 'CONTADO' });
 
       expect(asientosContablesService.generarDesdeFactura).toHaveBeenCalledWith({
         tenantId: 't1',
         facturaId: 'f1',
         tipoFactura: 'CONTADO',
-        subtotal: 300,
         itbis: 54,
         total: 354,
         recargos: 0,
-        costoVenta: 0,
+        ingresosPorCuenta: [{ cuentaContableId: null, monto: 300 }],
+        costosPorCuenta: [],
       });
     });
 
@@ -77,44 +82,104 @@ describe('ContabilidadEventosService', () => {
       ).resolves.not.toThrow();
     });
 
-    describe('motor de costeo (Costo de Ventas)', () => {
-      it('suma cantidad×costoUnitario de las líneas con producto, y lo manda como costoVenta', async () => {
+    describe('parametrización de cuentas por categoría (docs/PLAN.md, punto 2)', () => {
+      it('una línea cuyo producto tiene categoría con cuenta de ingreso/costo propia las propaga en vez de null', async () => {
         prisma.factura.findUniqueOrThrow.mockResolvedValue({
           lineas: [
-            { cantidad: 2, costoUnitario: 100 },
-            { cantidad: 1, costoUnitario: 50 },
-            { cantidad: 3, costoUnitario: null }, // SERVICIO/línea manual — no suma nada
+            {
+              cantidad: 2,
+              costoUnitario: 80,
+              montoTotal: 236,
+              montoItbis: 36,
+              producto: { categoria: { cuentaIngresoId: 'cuenta-ingreso-servicios', cuentaCostoId: 'cuenta-costo-servicios' } },
+            },
+          ],
+        });
+
+        await service.alFacturarse({ tenantId: 't1', facturaId: 'f1', clienteId: 'c1', total: '236', subtotal: '200', itbis: '36', tipoFactura: 'CONTADO' });
+
+        expect(asientosContablesService.generarDesdeFactura).toHaveBeenCalledWith(
+          expect.objectContaining({
+            ingresosPorCuenta: [{ cuentaContableId: 'cuenta-ingreso-servicios', monto: 200 }],
+            costosPorCuenta: [{ cuentaContableId: 'cuenta-costo-servicios', monto: 160 }],
+          }),
+        );
+      });
+
+      it('un producto sin categoría, o una categoría sin cuenta propia, da cuentaContableId null (cae en la genérica)', async () => {
+        prisma.factura.findUniqueOrThrow.mockResolvedValue({
+          lineas: [
+            { cantidad: 1, costoUnitario: 50, montoTotal: 118, montoItbis: 18, producto: { categoria: null } },
+            { cantidad: 1, costoUnitario: 30, montoTotal: 118, montoItbis: 18, producto: { categoria: { cuentaIngresoId: null, cuentaCostoId: null } } },
+          ],
+        });
+
+        await service.alFacturarse({ tenantId: 't1', facturaId: 'f1', clienteId: 'c1', total: '236', subtotal: '200', itbis: '36', tipoFactura: 'CONTADO' });
+
+        expect(asientosContablesService.generarDesdeFactura).toHaveBeenCalledWith(
+          expect.objectContaining({
+            ingresosPorCuenta: [
+              { cuentaContableId: null, monto: 100 },
+              { cuentaContableId: null, monto: 100 },
+            ],
+          }),
+        );
+      });
+    });
+
+    describe('motor de costeo (Costo de Ventas)', () => {
+      it('suma cantidad×costoUnitario de las líneas con producto, y lo manda en costosPorCuenta', async () => {
+        prisma.factura.findUniqueOrThrow.mockResolvedValue({
+          lineas: [
+            { cantidad: 2, costoUnitario: 100, montoTotal: 150, montoItbis: 0, producto: null },
+            { cantidad: 1, costoUnitario: 50, montoTotal: 100, montoItbis: 0, producto: null },
+            { cantidad: 3, costoUnitario: null, montoTotal: 50, montoItbis: 0, producto: null }, // SERVICIO/línea manual — no suma nada
           ],
         });
 
         await service.alFacturarse({ tenantId: 't1', facturaId: 'f1', clienteId: 'c1', total: '354', subtotal: '300', itbis: '54', tipoFactura: 'CONTADO' });
 
-        expect(asientosContablesService.generarDesdeFactura).toHaveBeenCalledWith(expect.objectContaining({ costoVenta: 250 }));
+        expect(asientosContablesService.generarDesdeFactura).toHaveBeenCalledWith(
+          expect.objectContaining({
+            costosPorCuenta: [
+              { cuentaContableId: null, monto: 200 },
+              { cuentaContableId: null, monto: 50 },
+            ],
+          }),
+        );
       });
 
-      it('NOTA_CREDITO: el costoVenta sale en negativo (mismo signo que subtotal/itbis/total)', async () => {
-        prisma.factura.findUniqueOrThrow.mockResolvedValue({ lineas: [{ cantidad: 2, costoUnitario: 100 }] });
+      it('NOTA_CREDITO: el costo sale en negativo (mismo signo que subtotal/itbis/total)', async () => {
+        prisma.factura.findUniqueOrThrow.mockResolvedValue({
+          lineas: [{ cantidad: 2, costoUnitario: 100, montoTotal: 200, montoItbis: 0, producto: null }],
+        });
 
         await service.alFacturarse({ tenantId: 't1', facturaId: 'f1', clienteId: 'c1', total: '-354', subtotal: '-300', itbis: '-54', tipoFactura: 'NOTA_CREDITO' });
 
-        expect(asientosContablesService.generarDesdeFactura).toHaveBeenCalledWith(expect.objectContaining({ costoVenta: -200 }));
+        expect(asientosContablesService.generarDesdeFactura).toHaveBeenCalledWith(
+          expect.objectContaining({ costosPorCuenta: [{ cuentaContableId: null, monto: -200 }] }),
+        );
       });
     });
   });
 
   describe('alAnularFactura', () => {
     it('genera la reversa contable', async () => {
+      prisma.factura.findUniqueOrThrow.mockResolvedValue({
+        lineas: [{ cantidad: 1, costoUnitario: null, montoTotal: 354, montoItbis: 54, producto: null }],
+      });
+
       await service.alAnularFactura({ tenantId: 't1', facturaId: 'f1', clienteId: 'c1', total: '354', subtotal: '300', itbis: '54', tipoFactura: 'CONTADO' });
 
       expect(asientosContablesService.generarReversaFactura).toHaveBeenCalledWith({
         tenantId: 't1',
         facturaId: 'f1',
         tipoFactura: 'CONTADO',
-        subtotal: 300,
         itbis: 54,
         total: 354,
         recargos: 0,
-        costoVenta: 0,
+        ingresosPorCuenta: [{ cuentaContableId: null, monto: 300 }],
+        costosPorCuenta: [],
       });
     });
   });

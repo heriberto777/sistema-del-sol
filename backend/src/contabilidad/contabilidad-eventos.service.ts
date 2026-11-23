@@ -36,15 +36,16 @@ export class ContabilidadEventosService {
   @OnEvent(EVENTOS.FACTURA_CREADA)
   async alFacturarse(payload: FacturaCreadaPayload) {
     try {
+      const { ingresosPorCuenta, costosPorCuenta } = await this.agruparVentaPorCuenta(payload.facturaId, payload.tipoFactura);
       await this.asientosContablesService.generarDesdeFactura({
         tenantId: payload.tenantId,
         facturaId: payload.facturaId,
         tipoFactura: payload.tipoFactura,
-        subtotal: Number(payload.subtotal),
         itbis: Number(payload.itbis),
         total: Number(payload.total),
         recargos: Number(payload.recargos ?? '0'),
-        costoVenta: await this.calcularCostoVenta(payload.facturaId, payload.tipoFactura),
+        ingresosPorCuenta,
+        costosPorCuenta,
       });
     } catch (error) {
       // Un fallo contable nunca debe tumbar la venta — ya se facturó y
@@ -56,15 +57,16 @@ export class ContabilidadEventosService {
   @OnEvent(EVENTOS.FACTURA_ANULADA)
   async alAnularFactura(payload: FacturaCreadaPayload) {
     try {
+      const { ingresosPorCuenta, costosPorCuenta } = await this.agruparVentaPorCuenta(payload.facturaId, payload.tipoFactura);
       await this.asientosContablesService.generarReversaFactura({
         tenantId: payload.tenantId,
         facturaId: payload.facturaId,
         tipoFactura: payload.tipoFactura,
-        subtotal: Number(payload.subtotal),
         itbis: Number(payload.itbis),
         total: Number(payload.total),
         recargos: Number(payload.recargos ?? '0'),
-        costoVenta: await this.calcularCostoVenta(payload.facturaId, payload.tipoFactura),
+        ingresosPorCuenta,
+        costosPorCuenta,
       });
     } catch (error) {
       this.logger.error(`No se pudo generar la reversa contable de la factura ${payload.facturaId}`, error as Error);
@@ -72,23 +74,47 @@ export class ContabilidadEventosService {
   }
 
   /**
-   * Motor de costeo — releída de `LineaFactura.costoUnitario` (snapshot
-   * tomado por FacturacionService.crear() al mover el stock), igual
-   * patrón que `alRecibirCompra` releyendo `LineaRecepcion`. NOTA_CREDITO
+   * Motor de costeo + parametrización de cuentas por categoría
+   * (docs/PLAN.md, punto 2) — releída de `LineaFactura` (igual patrón que
+   * `alRecibirCompra` releyendo `LineaRecepcion`). Agrupa cada línea por
+   * `producto.categoria.cuentaIngresoId`/`cuentaCostoId` — `null` cuando
+   * el producto no tiene categoría, la categoría no tiene cuenta propia,
+   * o la línea es manual/sin producto (ítem B-9): `generarDesdeFactura`
+   * resuelve esos `null` a la cuenta genérica fija de siempre. NOTA_CREDITO
    * aplica el mismo signo que ya usa `FacturacionService` para
    * subtotal/itbis/total (sus líneas se guardan en positivo, el signo es
    * a nivel de documento) — así `lineaSegunSigno` invierte Débito/Crédito
    * automáticamente, sin una rama de código aparte. NOTA_DEBITO y líneas
-   * de SERVICIO/manuales nunca tienen `costoUnitario`, dan 0 (sin efecto,
-   * ver el `if (params.costoVenta)` en `generarDesdeFactura`).
+   * de SERVICIO/manuales nunca tienen `costoUnitario` (no aportan a
+   * `costosPorCuenta`, sin efecto — mismo comportamiento que antes).
    */
-  private async calcularCostoVenta(facturaId: string, tipoFactura: string): Promise<number> {
+  private async agruparVentaPorCuenta(facturaId: string, tipoFactura: string) {
     const factura = await this.prisma.factura.findUniqueOrThrow({
       where: { id: facturaId },
-      select: { lineas: { select: { cantidad: true, costoUnitario: true } } },
+      select: {
+        lineas: {
+          select: {
+            cantidad: true,
+            costoUnitario: true,
+            montoTotal: true,
+            montoItbis: true,
+            producto: { select: { categoria: { select: { cuentaIngresoId: true, cuentaCostoId: true } } } },
+          },
+        },
+      },
     });
-    const costoBruto = factura.lineas.reduce((acc, l) => acc + Number(l.cantidad) * Number(l.costoUnitario ?? 0), 0);
-    return tipoFactura === 'NOTA_CREDITO' ? -costoBruto : costoBruto;
+    const signo = tipoFactura === 'NOTA_CREDITO' ? -1 : 1;
+    const ingresosPorCuenta: { cuentaContableId: string | null; monto: number }[] = [];
+    const costosPorCuenta: { cuentaContableId: string | null; monto: number }[] = [];
+    for (const l of factura.lineas) {
+      const subtotalLinea = (Number(l.montoTotal) - Number(l.montoItbis)) * signo;
+      ingresosPorCuenta.push({ cuentaContableId: l.producto?.categoria?.cuentaIngresoId ?? null, monto: subtotalLinea });
+      if (l.costoUnitario != null) {
+        const costoLinea = Number(l.cantidad) * Number(l.costoUnitario) * signo;
+        costosPorCuenta.push({ cuentaContableId: l.producto?.categoria?.cuentaCostoId ?? null, monto: costoLinea });
+      }
+    }
+    return { ingresosPorCuenta, costosPorCuenta };
   }
 
   @OnEvent(EVENTOS.ORDEN_COMPRA_RECIBIDA)

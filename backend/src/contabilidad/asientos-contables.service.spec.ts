@@ -91,7 +91,14 @@ describe('AsientosContablesService', () => {
     it('CONTADO debita Caja, acredita Ingresos e ITBIS por Pagar', async () => {
       asientosRepository.crearGlobal.mockResolvedValue({ id: 'a1' } as never);
 
-      await service.generarDesdeFactura({ tenantId: 't1', facturaId: 'f1', tipoFactura: 'CONTADO', subtotal: 300, itbis: 54, total: 354 });
+      await service.generarDesdeFactura({
+        tenantId: 't1',
+        facturaId: 'f1',
+        tipoFactura: 'CONTADO',
+        itbis: 54,
+        total: 354,
+        ingresosPorCuenta: [{ cuentaContableId: null, monto: 300 }],
+      });
 
       expect(cuentasRepository.buscarPorCodigoGlobal).toHaveBeenCalledWith('t1', CODIGOS_CUENTA.CAJA_BANCOS);
       const [llamada] = asientosRepository.crearGlobal.mock.calls[0];
@@ -112,7 +119,14 @@ describe('AsientosContablesService', () => {
     it('CREDITO usa Cuentas por Cobrar en vez de Caja', async () => {
       asientosRepository.crearGlobal.mockResolvedValue({ id: 'a1' } as never);
 
-      await service.generarDesdeFactura({ tenantId: 't1', facturaId: 'f1', tipoFactura: 'CREDITO', subtotal: 300, itbis: 54, total: 354 });
+      await service.generarDesdeFactura({
+        tenantId: 't1',
+        facturaId: 'f1',
+        tipoFactura: 'CREDITO',
+        itbis: 54,
+        total: 354,
+        ingresosPorCuenta: [{ cuentaContableId: null, monto: 300 }],
+      });
 
       expect(cuentasRepository.buscarPorCodigoGlobal).toHaveBeenCalledWith('t1', CODIGOS_CUENTA.CUENTAS_POR_COBRAR);
     });
@@ -120,7 +134,14 @@ describe('AsientosContablesService', () => {
     it('NOTA_CREDITO (montos ya negativos) invierte débito/crédito y sigue balanceando', async () => {
       asientosRepository.crearGlobal.mockResolvedValue({ id: 'a1' } as never);
 
-      await service.generarDesdeFactura({ tenantId: 't1', facturaId: 'nc1', tipoFactura: 'NOTA_CREDITO', subtotal: -300, itbis: -54, total: -354 });
+      await service.generarDesdeFactura({
+        tenantId: 't1',
+        facturaId: 'nc1',
+        tipoFactura: 'NOTA_CREDITO',
+        itbis: -54,
+        total: -354,
+        ingresosPorCuenta: [{ cuentaContableId: null, monto: -300 }],
+      });
 
       const [llamada] = asientosRepository.crearGlobal.mock.calls[0];
       const lineas = llamada.lineas;
@@ -136,7 +157,14 @@ describe('AsientosContablesService', () => {
     it('no agrega línea de ITBIS si el itbis es 0', async () => {
       asientosRepository.crearGlobal.mockResolvedValue({ id: 'a1' } as never);
 
-      await service.generarDesdeFactura({ tenantId: 't1', facturaId: 'f1', tipoFactura: 'CONTADO', subtotal: 100, itbis: 0, total: 100 });
+      await service.generarDesdeFactura({
+        tenantId: 't1',
+        facturaId: 'f1',
+        tipoFactura: 'CONTADO',
+        itbis: 0,
+        total: 100,
+        ingresosPorCuenta: [{ cuentaContableId: null, monto: 100 }],
+      });
 
       const [llamada] = asientosRepository.crearGlobal.mock.calls[0];
       expect(llamada.lineas).toHaveLength(2);
@@ -145,7 +173,15 @@ describe('AsientosContablesService', () => {
     it('ítem B-4: sin `recargos`, el crédito a Ingresos NO cubre un total que sí los incluye — bug real, encontrado verificando B-4 en vivo', async () => {
       asientosRepository.crearGlobal.mockResolvedValue({ id: 'a1' } as never);
       // subtotal (líneas) 299.70 + itbis 62.95 (línea + recargo) + recargo crudo 50 = total 412.65
-      await service.generarDesdeFactura({ tenantId: 't1', facturaId: 'f1', tipoFactura: 'CONTADO', subtotal: 299.7, itbis: 62.95, total: 412.65, recargos: 50 });
+      await service.generarDesdeFactura({
+        tenantId: 't1',
+        facturaId: 'f1',
+        tipoFactura: 'CONTADO',
+        itbis: 62.95,
+        total: 412.65,
+        recargos: 50,
+        ingresosPorCuenta: [{ cuentaContableId: null, monto: 299.7 }],
+      });
 
       const [llamada] = asientosRepository.crearGlobal.mock.calls[0];
       const lineas = llamada.lineas;
@@ -157,11 +193,94 @@ describe('AsientosContablesService', () => {
       expect(totalDebito).toBeCloseTo(totalCredito, 5);
     });
 
-    describe('motor de costeo (Costo de Ventas)', () => {
-      it('con costoVenta, agrega Débito Costo de Ventas / Crédito Inventario y sigue balanceando', async () => {
+    describe('parametrización de cuentas por categoría (docs/PLAN.md, punto 2)', () => {
+      it('con varios grupos de ingreso (categorías distintas), genera una línea de crédito por cada cuenta involucrada', async () => {
         asientosRepository.crearGlobal.mockResolvedValue({ id: 'a1' } as never);
 
-        await service.generarDesdeFactura({ tenantId: 't1', facturaId: 'f1', tipoFactura: 'CONTADO', subtotal: 300, itbis: 54, total: 354, costoVenta: 180 });
+        await service.generarDesdeFactura({
+          tenantId: 't1',
+          facturaId: 'f1',
+          tipoFactura: 'CONTADO',
+          itbis: 54,
+          total: 354,
+          ingresosPorCuenta: [
+            { cuentaContableId: 'cuenta-ingreso-servicios', monto: 100 },
+            { cuentaContableId: 'cuenta-ingreso-mercaderia', monto: 150 },
+            { cuentaContableId: null, monto: 50 }, // producto sin categoría con cuenta propia -> genérica
+          ],
+        });
+
+        const [llamada] = asientosRepository.crearGlobal.mock.calls[0];
+        const lineas = llamada.lineas;
+        expect(lineas).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({ cuentaContableId: 'cuenta-ingreso-servicios', credito: 100 }),
+            expect.objectContaining({ cuentaContableId: 'cuenta-ingreso-mercaderia', credito: 150 }),
+            expect.objectContaining({ cuentaContableId: `cuenta-${CODIGOS_CUENTA.INGRESOS_POR_VENTAS}`, credito: 50 }),
+          ]),
+        );
+        const totalDebito = lineas.reduce((acc: number, l: { debito: number }) => acc + l.debito, 0);
+        const totalCredito = lineas.reduce((acc: number, l: { credito: number }) => acc + l.credito, 0);
+        expect(totalDebito).toBeCloseTo(totalCredito, 5);
+      });
+
+      it('los recargos siempre van a la cuenta genérica, nunca a una cuenta de categoría', async () => {
+        asientosRepository.crearGlobal.mockResolvedValue({ id: 'a1' } as never);
+
+        await service.generarDesdeFactura({
+          tenantId: 't1',
+          facturaId: 'f1',
+          tipoFactura: 'CONTADO',
+          itbis: 54,
+          total: 404,
+          recargos: 50,
+          ingresosPorCuenta: [{ cuentaContableId: 'cuenta-ingreso-servicios', monto: 300 }],
+        });
+
+        const [llamada] = asientosRepository.crearGlobal.mock.calls[0];
+        expect(llamada.lineas).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({ cuentaContableId: 'cuenta-ingreso-servicios', credito: 300 }),
+            expect.objectContaining({ cuentaContableId: `cuenta-${CODIGOS_CUENTA.INGRESOS_POR_VENTAS}`, credito: 50 }),
+          ]),
+        );
+      });
+
+      it('dos grupos con la misma cuenta se funden en una sola línea (no duplica la cuenta)', async () => {
+        asientosRepository.crearGlobal.mockResolvedValue({ id: 'a1' } as never);
+
+        await service.generarDesdeFactura({
+          tenantId: 't1',
+          facturaId: 'f1',
+          tipoFactura: 'CONTADO',
+          itbis: 0,
+          total: 300,
+          ingresosPorCuenta: [
+            { cuentaContableId: 'cuenta-ingreso-servicios', monto: 100 },
+            { cuentaContableId: 'cuenta-ingreso-servicios', monto: 200 },
+          ],
+        });
+
+        const [llamada] = asientosRepository.crearGlobal.mock.calls[0];
+        const lineasIngreso = llamada.lineas.filter((l: { cuentaContableId: string }) => l.cuentaContableId === 'cuenta-ingreso-servicios');
+        expect(lineasIngreso).toHaveLength(1);
+        expect(lineasIngreso[0].credito).toBe(300);
+      });
+    });
+
+    describe('motor de costeo (Costo de Ventas)', () => {
+      it('con costosPorCuenta, agrega Débito Costo de Ventas / Crédito Inventario y sigue balanceando', async () => {
+        asientosRepository.crearGlobal.mockResolvedValue({ id: 'a1' } as never);
+
+        await service.generarDesdeFactura({
+          tenantId: 't1',
+          facturaId: 'f1',
+          tipoFactura: 'CONTADO',
+          itbis: 54,
+          total: 354,
+          ingresosPorCuenta: [{ cuentaContableId: null, monto: 300 }],
+          costosPorCuenta: [{ cuentaContableId: null, monto: 180 }],
+        });
 
         const [llamada] = asientosRepository.crearGlobal.mock.calls[0];
         const lineas = llamada.lineas;
@@ -176,20 +295,58 @@ describe('AsientosContablesService', () => {
         expect(totalDebito).toBeCloseTo(totalCredito, 5);
       });
 
-      it('sin costoVenta (0/undefined — SERVICIO, línea manual, NOTA_DEBITO), no agrega ninguna línea de Costo de Ventas', async () => {
+      it('con una cuenta de costo propia por categoría, debita esa cuenta en vez de la genérica', async () => {
         asientosRepository.crearGlobal.mockResolvedValue({ id: 'a1' } as never);
 
-        await service.generarDesdeFactura({ tenantId: 't1', facturaId: 'f1', tipoFactura: 'CONTADO', subtotal: 300, itbis: 54, total: 354 });
+        await service.generarDesdeFactura({
+          tenantId: 't1',
+          facturaId: 'f1',
+          tipoFactura: 'CONTADO',
+          itbis: 54,
+          total: 354,
+          ingresosPorCuenta: [{ cuentaContableId: null, monto: 300 }],
+          costosPorCuenta: [{ cuentaContableId: 'cuenta-costo-servicios', monto: 180 }],
+        });
+
+        const [llamada] = asientosRepository.crearGlobal.mock.calls[0];
+        expect(llamada.lineas).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({ cuentaContableId: 'cuenta-costo-servicios', debito: 180 }),
+            expect.objectContaining({ cuentaContableId: `cuenta-${CODIGOS_CUENTA.INVENTARIO}`, credito: 180 }),
+          ]),
+        );
+        expect(cuentasRepository.buscarPorCodigoGlobal).not.toHaveBeenCalledWith('t1', CODIGOS_CUENTA.COSTO_DE_VENTAS);
+      });
+
+      it('sin costosPorCuenta (SERVICIO, línea manual, NOTA_DEBITO), no agrega ninguna línea de Costo de Ventas', async () => {
+        asientosRepository.crearGlobal.mockResolvedValue({ id: 'a1' } as never);
+
+        await service.generarDesdeFactura({
+          tenantId: 't1',
+          facturaId: 'f1',
+          tipoFactura: 'CONTADO',
+          itbis: 54,
+          total: 354,
+          ingresosPorCuenta: [{ cuentaContableId: null, monto: 300 }],
+        });
 
         const [llamada] = asientosRepository.crearGlobal.mock.calls[0];
         expect(llamada.lineas).toHaveLength(3);
         expect(cuentasRepository.buscarPorCodigoGlobal).not.toHaveBeenCalledWith('t1', CODIGOS_CUENTA.COSTO_DE_VENTAS);
       });
 
-      it('NOTA_CREDITO con costoVenta negativo invierte Costo de Ventas/Inventario también', async () => {
+      it('NOTA_CREDITO con costosPorCuenta negativo invierte Costo de Ventas/Inventario también', async () => {
         asientosRepository.crearGlobal.mockResolvedValue({ id: 'a1' } as never);
 
-        await service.generarDesdeFactura({ tenantId: 't1', facturaId: 'nc1', tipoFactura: 'NOTA_CREDITO', subtotal: -300, itbis: -54, total: -354, costoVenta: -180 });
+        await service.generarDesdeFactura({
+          tenantId: 't1',
+          facturaId: 'nc1',
+          tipoFactura: 'NOTA_CREDITO',
+          itbis: -54,
+          total: -354,
+          ingresosPorCuenta: [{ cuentaContableId: null, monto: -300 }],
+          costosPorCuenta: [{ cuentaContableId: null, monto: -180 }],
+        });
 
         const [llamada] = asientosRepository.crearGlobal.mock.calls[0];
         expect(llamada.lineas).toEqual(
@@ -203,10 +360,17 @@ describe('AsientosContablesService', () => {
   });
 
   describe('generarReversaFactura', () => {
-    it('genera el asiento contrario exacto (monta negados)', async () => {
+    it('genera el asiento contrario exacto (montos negados)', async () => {
       asientosRepository.crearGlobal.mockResolvedValue({ id: 'a1' } as never);
 
-      await service.generarReversaFactura({ tenantId: 't1', facturaId: 'f1', tipoFactura: 'CONTADO', subtotal: 300, itbis: 54, total: 354 });
+      await service.generarReversaFactura({
+        tenantId: 't1',
+        facturaId: 'f1',
+        tipoFactura: 'CONTADO',
+        itbis: 54,
+        total: 354,
+        ingresosPorCuenta: [{ cuentaContableId: null, monto: 300 }],
+      });
 
       const [llamada] = asientosRepository.crearGlobal.mock.calls[0];
       const lineas = llamada.lineas;
@@ -219,7 +383,15 @@ describe('AsientosContablesService', () => {
     it('ítem B-4: niega también los recargos, la reversa sigue balanceando', async () => {
       asientosRepository.crearGlobal.mockResolvedValue({ id: 'a1' } as never);
 
-      await service.generarReversaFactura({ tenantId: 't1', facturaId: 'f1', tipoFactura: 'CONTADO', subtotal: 299.7, itbis: 62.95, total: 412.65, recargos: 50 });
+      await service.generarReversaFactura({
+        tenantId: 't1',
+        facturaId: 'f1',
+        tipoFactura: 'CONTADO',
+        itbis: 62.95,
+        total: 412.65,
+        recargos: 50,
+        ingresosPorCuenta: [{ cuentaContableId: null, monto: 299.7 }],
+      });
 
       const [llamada] = asientosRepository.crearGlobal.mock.calls[0];
       const lineas = llamada.lineas;
@@ -228,10 +400,18 @@ describe('AsientosContablesService', () => {
       expect(totalDebito).toBeCloseTo(totalCredito, 5);
     });
 
-    it('niega también costoVenta — la reversa de Costo de Ventas/Inventario sale invertida', async () => {
+    it('niega también costosPorCuenta — la reversa de Costo de Ventas/Inventario sale invertida', async () => {
       asientosRepository.crearGlobal.mockResolvedValue({ id: 'a1' } as never);
 
-      await service.generarReversaFactura({ tenantId: 't1', facturaId: 'f1', tipoFactura: 'CONTADO', subtotal: 300, itbis: 54, total: 354, costoVenta: 180 });
+      await service.generarReversaFactura({
+        tenantId: 't1',
+        facturaId: 'f1',
+        tipoFactura: 'CONTADO',
+        itbis: 54,
+        total: 354,
+        ingresosPorCuenta: [{ cuentaContableId: null, monto: 300 }],
+        costosPorCuenta: [{ cuentaContableId: null, monto: 180 }],
+      });
 
       const [llamada] = asientosRepository.crearGlobal.mock.calls[0];
       expect(llamada.lineas).toEqual(
@@ -239,6 +419,24 @@ describe('AsientosContablesService', () => {
           expect.objectContaining({ cuentaContableId: `cuenta-${CODIGOS_CUENTA.COSTO_DE_VENTAS}`, credito: 180 }),
           expect.objectContaining({ cuentaContableId: `cuenta-${CODIGOS_CUENTA.INVENTARIO}`, debito: 180 }),
         ]),
+      );
+    });
+
+    it('con una cuenta de ingreso propia por categoría, niega esa cuenta específica (no la genérica)', async () => {
+      asientosRepository.crearGlobal.mockResolvedValue({ id: 'a1' } as never);
+
+      await service.generarReversaFactura({
+        tenantId: 't1',
+        facturaId: 'f1',
+        tipoFactura: 'CONTADO',
+        itbis: 54,
+        total: 354,
+        ingresosPorCuenta: [{ cuentaContableId: 'cuenta-ingreso-servicios', monto: 300 }],
+      });
+
+      const [llamada] = asientosRepository.crearGlobal.mock.calls[0];
+      expect(llamada.lineas).toEqual(
+        expect.arrayContaining([expect.objectContaining({ cuentaContableId: 'cuenta-ingreso-servicios', debito: 300 })]),
       );
     });
   });
