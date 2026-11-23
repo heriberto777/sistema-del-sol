@@ -7,6 +7,7 @@ import type { CrearPagoOrdenCompraDto } from '../compras/dto/crear-pago-orden-co
 import { CierrePeriodoService } from '../contabilidad/cierre-periodo.service';
 import { FormasPagoRepository } from '../formas-pago/formas-pago.repository';
 import { CuentasPorPagarRepository } from '../cuentas-por-pagar/cuentas-por-pagar.repository';
+import { BancosService } from '../bancos/bancos.service';
 
 const EPSILON = 0.005; // tolerancia de redondeo en centavos, igual que AsientosContablesService/PagosPlataformaService
 
@@ -18,7 +19,25 @@ export class PagosService {
     private readonly cierrePeriodoService: CierrePeriodoService,
     private readonly formasPagoRepository: FormasPagoRepository,
     private readonly cuentasPorPagarRepository: CuentasPorPagarRepository,
+    private readonly bancosService: BancosService,
   ) {}
+
+  /**
+   * Compartido por los 3 flujos de pago (factura/orden de compra/factura de
+   * proveedor) — valida que la cuenta bancaria, si se eligió, pertenezca al
+   * tenant (404 si no) y que no se haya elegido junto a una forma de pago en
+   * efectivo (el efectivo no entra directo a un banco — ver docs/PLAN.md,
+   * punto 1, decisión 2026-11-23: la conexión Caja→Banco real, vía
+   * depósito, queda para otra sesión de diseño).
+   */
+  private async validarCuentaBancaria(cuentaBancariaId: string | undefined, formaPagoId: string) {
+    if (!cuentaBancariaId) return;
+    const forma = await this.formasPagoRepository.buscarPorId(formaPagoId);
+    if (forma.esEfectivo) {
+      throw new BadRequestException('Una forma de pago en efectivo no debería llevar cuenta bancaria asociada.');
+    }
+    await this.bancosService.buscarPorId(cuentaBancariaId);
+  }
 
   /**
    * Compartido por Facturación y Compras — cada uno valida las reglas
@@ -47,6 +66,7 @@ export class PagosService {
     await this.cierrePeriodoService.validarPeriodoAbierto(fecha);
     // Tenant-scoped: 404 si formaPagoId es de otro tenant.
     await this.formasPagoRepository.buscarPorId(dto.formaPagoId);
+    await this.validarCuentaBancaria(dto.cuentaBancariaId, dto.formaPagoId);
 
     const reciboIngreso = await this.pagosRepository.registrarCobroFactura({
       tenantId,
@@ -57,6 +77,7 @@ export class PagosService {
       facturaTotal: Number(factura.total),
       monto: dto.monto,
       formaPagoId: dto.formaPagoId,
+      cuentaBancariaId: dto.cuentaBancariaId,
       referencia: dto.referencia,
       fecha,
       userId,
@@ -100,6 +121,7 @@ export class PagosService {
     const fecha = dto.fecha ? new Date(dto.fecha) : new Date();
     await this.cierrePeriodoService.validarPeriodoAbierto(fecha);
     await this.formasPagoRepository.buscarPorId(dto.formaPagoId);
+    await this.validarCuentaBancaria(dto.cuentaBancariaId, dto.formaPagoId);
 
     const ordenPago = await this.pagosRepository.registrarCobroOrdenCompra({
       tenantId,
@@ -112,6 +134,7 @@ export class PagosService {
       retencionIsr,
       retencionItbis,
       formaPagoId: dto.formaPagoId,
+      cuentaBancariaId: dto.cuentaBancariaId,
       referencia: dto.referencia,
       fecha,
       userId,
@@ -155,6 +178,7 @@ export class PagosService {
     const fecha = dto.fecha ? new Date(dto.fecha) : new Date();
     await this.cierrePeriodoService.validarPeriodoAbierto(fecha);
     await this.formasPagoRepository.buscarPorId(dto.formaPagoId);
+    await this.validarCuentaBancaria(dto.cuentaBancariaId, dto.formaPagoId);
 
     const ordenPago = await this.pagosRepository.registrarCobroFacturaProveedor({
       tenantId,
@@ -164,6 +188,7 @@ export class PagosService {
       retencionIsr,
       retencionItbis,
       formaPagoId: dto.formaPagoId,
+      cuentaBancariaId: dto.cuentaBancariaId,
       referencia: dto.referencia,
       fecha,
       userId,

@@ -4,7 +4,8 @@ import { apiClient } from '../../../lib/api-client';
 import { mensajeErrorApi } from '../../../lib/mensaje-error-api';
 import { Modal } from '../Modal/Modal';
 import { FormField } from '../FormField/FormField';
-import { SelectFormaPago } from '../SelectFormaPago/SelectFormaPago';
+import { SelectFormaPago, FormaPago } from '../SelectFormaPago/SelectFormaPago';
+import { SelectCuentaBancaria } from '../SelectCuentaBancaria/SelectCuentaBancaria';
 import { Button } from '../../atoms/Button/Button';
 import type { PagoHistoricoBasico } from '@backend-src/common/prisma/pago-historico-basico';
 
@@ -21,6 +22,8 @@ export function ModalRegistrarPagoFacturaProveedor({
   const queryClient = useQueryClient();
   const [monto, setMonto] = useState('');
   const [formaPagoId, setFormaPagoId] = useState('');
+  const [formaPago, setFormaPago] = useState<FormaPago | undefined>(undefined);
+  const [cuentaBancariaId, setCuentaBancariaId] = useState('');
   const [aplicaRetencion, setAplicaRetencion] = useState(false);
   const [retencionIsr, setRetencionIsr] = useState('');
   const [retencionItbis, setRetencionItbis] = useState('');
@@ -40,6 +43,7 @@ export function ModalRegistrarPagoFacturaProveedor({
       apiClient.post(`/facturas-proveedor/${factura.id}/pagos`, {
         monto: Number(monto),
         formaPagoId,
+        ...(cuentaBancariaId ? { cuentaBancariaId } : {}),
         ...(aplicaRetencion && Number(retencionIsr) > 0 ? { retencionIsr: Number(retencionIsr) } : {}),
         ...(aplicaRetencion && Number(retencionItbis) > 0 ? { retencionItbis: Number(retencionItbis) } : {}),
       }),
@@ -52,6 +56,7 @@ export function ModalRegistrarPagoFacturaProveedor({
       // la tabla de ahí quedaba desactualizada tras pagar.
       queryClient.invalidateQueries({ queryKey: ['cuentas-por-pagar'] });
       setMonto('');
+      setCuentaBancariaId('');
       setAplicaRetencion(false);
       setRetencionIsr('');
       setRetencionItbis('');
@@ -104,8 +109,21 @@ export function ModalRegistrarPagoFacturaProveedor({
             />
             <div className="flex flex-col gap-1">
               <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Forma de pago</label>
-              <SelectFormaPago value={formaPagoId} onChange={setFormaPagoId} />
+              <SelectFormaPago
+                value={formaPagoId}
+                onChange={(id, forma) => {
+                  setFormaPagoId(id);
+                  setFormaPago(forma);
+                  if (forma?.esEfectivo) setCuentaBancariaId('');
+                }}
+              />
             </div>
+            {formaPago && !formaPago.esEfectivo && (
+              <div className="flex flex-col gap-1">
+                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Cuenta bancaria (opcional)</label>
+                <SelectCuentaBancaria value={cuentaBancariaId} onChange={setCuentaBancariaId} />
+              </div>
+            )}
 
             <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
               <input type="checkbox" checked={aplicaRetencion} onChange={(e) => setAplicaRetencion(e.target.checked)} />

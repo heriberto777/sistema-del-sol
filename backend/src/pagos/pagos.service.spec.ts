@@ -6,6 +6,7 @@ import { EVENTOS } from '../event-bus/events';
 import { CierrePeriodoService } from '../contabilidad/cierre-periodo.service';
 import { FormasPagoRepository } from '../formas-pago/formas-pago.repository';
 import { CuentasPorPagarRepository } from '../cuentas-por-pagar/cuentas-por-pagar.repository';
+import { BancosService } from '../bancos/bancos.service';
 
 describe('PagosService', () => {
   let service: PagosService;
@@ -14,6 +15,7 @@ describe('PagosService', () => {
   let cierrePeriodoService: jest.Mocked<CierrePeriodoService>;
   let formasPagoRepository: jest.Mocked<FormasPagoRepository>;
   let cuentasPorPagarRepository: jest.Mocked<CuentasPorPagarRepository>;
+  let bancosService: jest.Mocked<BancosService>;
 
   beforeEach(() => {
     repository = {
@@ -30,9 +32,10 @@ describe('PagosService', () => {
     } as unknown as jest.Mocked<PagosRepository>;
     eventBus = { emit: jest.fn(), on: jest.fn() } as unknown as jest.Mocked<EventBusService>;
     cierrePeriodoService = { validarPeriodoAbierto: jest.fn().mockResolvedValue(undefined) } as unknown as jest.Mocked<CierrePeriodoService>;
-    formasPagoRepository = { buscarPorId: jest.fn().mockResolvedValue({ id: 'fp1' }) } as unknown as jest.Mocked<FormasPagoRepository>;
+    formasPagoRepository = { buscarPorId: jest.fn().mockResolvedValue({ id: 'fp1', esEfectivo: false }) } as unknown as jest.Mocked<FormasPagoRepository>;
     cuentasPorPagarRepository = { pendienteDeOrden: jest.fn().mockResolvedValue(1000) } as unknown as jest.Mocked<CuentasPorPagarRepository>;
-    service = new PagosService(repository, eventBus, cierrePeriodoService, formasPagoRepository, cuentasPorPagarRepository);
+    bancosService = { buscarPorId: jest.fn().mockResolvedValue({ id: 'banco-1' }) } as unknown as jest.Mocked<BancosService>;
+    service = new PagosService(repository, eventBus, cierrePeriodoService, formasPagoRepository, cuentasPorPagarRepository, bancosService);
   });
 
   describe('registrarPagoFactura (CxC como ledger real — Fase 3)', () => {
@@ -87,6 +90,35 @@ describe('PagosService', () => {
       await service.registrarPagoFactura(factura, dto, 'user-1', 'tenant-1');
 
       expect(formasPagoRepository.buscarPorId).toHaveBeenCalledWith('fp1');
+    });
+
+    it('con cuentaBancariaId, valida que pertenezca al tenant y la pasa al repositorio (punto 1 de docs/PLAN.md)', async () => {
+      repository.pendienteFactura.mockResolvedValue(500);
+      repository.registrarCobroFactura.mockResolvedValue({ id: 'recibo-1' } as never);
+      const dtoConBanco = { monto: 200, formaPagoId: 'fp1', cuentaBancariaId: 'banco-1' } as never;
+
+      await service.registrarPagoFactura(factura, dtoConBanco, 'user-1', 'tenant-1');
+
+      expect(bancosService.buscarPorId).toHaveBeenCalledWith('banco-1');
+      expect(repository.registrarCobroFactura).toHaveBeenCalledWith(expect.objectContaining({ cuentaBancariaId: 'banco-1' }));
+    });
+
+    it('rechaza cuentaBancariaId si la forma de pago elegida es efectivo', async () => {
+      repository.pendienteFactura.mockResolvedValue(500);
+      formasPagoRepository.buscarPorId.mockResolvedValue({ id: 'fp1', esEfectivo: true } as never);
+      const dtoConBanco = { monto: 200, formaPagoId: 'fp1', cuentaBancariaId: 'banco-1' } as never;
+
+      await expect(service.registrarPagoFactura(factura, dtoConBanco, 'user-1', 'tenant-1')).rejects.toThrow(BadRequestException);
+      expect(repository.registrarCobroFactura).not.toHaveBeenCalled();
+    });
+
+    it('rechaza una cuentaBancariaId que no pertenece al tenant (404 propagado por BancosService)', async () => {
+      repository.pendienteFactura.mockResolvedValue(500);
+      bancosService.buscarPorId.mockRejectedValue(new Error('no encontrado'));
+      const dtoConBanco = { monto: 200, formaPagoId: 'fp1', cuentaBancariaId: 'banco-otro-tenant' } as never;
+
+      await expect(service.registrarPagoFactura(factura, dtoConBanco, 'user-1', 'tenant-1')).rejects.toThrow();
+      expect(repository.registrarCobroFactura).not.toHaveBeenCalled();
     });
 
     it('rechaza un pago fechado en un período contable ya cerrado', async () => {

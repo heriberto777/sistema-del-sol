@@ -303,14 +303,22 @@ export class AsientosContablesService {
   }
 
   /** Pago (parcial o total) recibido de un cliente contra una factura a crédito -> mueve de Cuentas por Cobrar a Caja/Bancos. */
-  async generarDesdePagoFactura(params: { tenantId: string; pagoId: string; monto: number }) {
-    const [cuentaCaja, cuentaCobro] = await Promise.all([
-      this.cuentasRepository.buscarPorCodigoGlobal(params.tenantId, CODIGOS_CUENTA.CAJA_BANCOS),
+  /**
+   * `cuentaCajaId` opcional — si el cobro eligió una `CuentaBancaria` real
+   * (ver ContabilidadEventosService.alRegistrarPagoFactura, mismo criterio
+   * que generarDesdeGastoMenor), el asiento impacta esa cuenta puntual en
+   * vez de la genérica fija `CAJA_BANCOS`. Sin ella (pago en efectivo, o
+   * cobro sin banco elegido), cae en la genérica de siempre.
+   */
+  async generarDesdePagoFactura(params: { tenantId: string; pagoId: string; monto: number; cuentaCajaId?: string }) {
+    const [cuentaCajaFija, cuentaCobro] = await Promise.all([
+      params.cuentaCajaId ? null : this.cuentasRepository.buscarPorCodigoGlobal(params.tenantId, CODIGOS_CUENTA.CAJA_BANCOS),
       this.cuentasRepository.buscarPorCodigoGlobal(params.tenantId, CODIGOS_CUENTA.CUENTAS_POR_COBRAR),
     ]);
+    const cuentaCajaId = params.cuentaCajaId ?? cuentaCajaFija!.id;
 
     const lineas = [
-      this.lineaSegunSigno(cuentaCaja.id, params.monto, 'debito', `Pago recibido — ${params.pagoId}`),
+      this.lineaSegunSigno(cuentaCajaId, params.monto, 'debito', `Pago recibido — ${params.pagoId}`),
       this.lineaSegunSigno(cuentaCobro.id, params.monto, 'credito', `Pago recibido — ${params.pagoId}`),
     ];
 
@@ -332,22 +340,31 @@ export class AsientosContablesService {
    * Cuentas por Pagar es siempre el monto BRUTO (lo que salda la orden);
    * Caja solo se mueve por el neto efectivamente desembolsado.
    */
-  async generarDesdePagoOrdenCompra(params: { tenantId: string; pagoId: string; monto: number; retencionIsr?: number; retencionItbis?: number }) {
+  /** `cuentaCajaId` opcional — mismo criterio que generarDesdePagoFactura. Reusado tal cual para el pago de una FacturaProveedor directa (ver ContabilidadEventosService.alRegistrarPagoFacturaProveedor). */
+  async generarDesdePagoOrdenCompra(params: {
+    tenantId: string;
+    pagoId: string;
+    monto: number;
+    retencionIsr?: number;
+    retencionItbis?: number;
+    cuentaCajaId?: string;
+  }) {
     const retencionIsr = params.retencionIsr ?? 0;
     const retencionItbis = params.retencionItbis ?? 0;
     const netoCaja = params.monto - retencionIsr - retencionItbis;
     const descripcion = `Pago a proveedor — ${params.pagoId}`;
 
-    const [cuentaPorPagar, cuentaCaja, cuentaIsrRetenido, cuentaItbisRetenido] = await Promise.all([
+    const [cuentaPorPagar, cuentaCajaFija, cuentaIsrRetenido, cuentaItbisRetenido] = await Promise.all([
       this.cuentasRepository.buscarPorCodigoGlobal(params.tenantId, CODIGOS_CUENTA.CUENTAS_POR_PAGAR),
-      this.cuentasRepository.buscarPorCodigoGlobal(params.tenantId, CODIGOS_CUENTA.CAJA_BANCOS),
+      params.cuentaCajaId ? null : this.cuentasRepository.buscarPorCodigoGlobal(params.tenantId, CODIGOS_CUENTA.CAJA_BANCOS),
       retencionIsr > 0 ? this.cuentasRepository.buscarPorCodigoGlobal(params.tenantId, CODIGOS_CUENTA.ISR_RETENIDO_TERCEROS) : null,
       retencionItbis > 0 ? this.cuentasRepository.buscarPorCodigoGlobal(params.tenantId, CODIGOS_CUENTA.ITBIS_RETENIDO_TERCEROS) : null,
     ]);
+    const cuentaCajaId = params.cuentaCajaId ?? cuentaCajaFija!.id;
 
     const lineas = [this.lineaSegunSigno(cuentaPorPagar.id, params.monto, 'debito', descripcion)];
     if (netoCaja > EPSILON) {
-      lineas.push(this.lineaSegunSigno(cuentaCaja.id, netoCaja, 'credito', descripcion));
+      lineas.push(this.lineaSegunSigno(cuentaCajaId, netoCaja, 'credito', descripcion));
     }
     if (cuentaIsrRetenido) {
       lineas.push(this.lineaSegunSigno(cuentaIsrRetenido.id, retencionIsr, 'credito', descripcion));

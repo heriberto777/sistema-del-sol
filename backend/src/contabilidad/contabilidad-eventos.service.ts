@@ -13,6 +13,7 @@ import {
   OrdenCompraDevueltaPayload,
   OrdenCompraRecibidaPayload,
   PagoFacturaRegistradoPayload,
+  PagoFacturaProveedorRegistradoPayload,
   PagoOrdenCompraRegistradoPayload,
 } from '../event-bus/events';
 
@@ -132,10 +133,18 @@ export class ContabilidadEventosService {
   @OnEvent(EVENTOS.PAGO_FACTURA_REGISTRADO)
   async alRegistrarPagoFactura(payload: PagoFacturaRegistradoPayload) {
     try {
+      // Mismo criterio que alCrearGastoMenor: el payload solo trae el id,
+      // se relee acá con la CuentaBancaria incluida (si se eligió una real
+      // al cobrar) para resolver su cuenta contable real.
+      const reciboIngreso = await this.prisma.reciboIngreso.findUniqueOrThrow({
+        where: { id: payload.pagoId },
+        include: { cuentaBancaria: true },
+      });
       await this.asientosContablesService.generarDesdePagoFactura({
         tenantId: payload.tenantId,
         pagoId: payload.pagoId,
         monto: Number(payload.monto),
+        cuentaCajaId: reciboIngreso.cuentaBancaria?.cuentaContableId,
       });
     } catch (error) {
       this.logger.error(`No se pudo generar el asiento del pago ${payload.pagoId}`, error as Error);
@@ -145,15 +154,49 @@ export class ContabilidadEventosService {
   @OnEvent(EVENTOS.PAGO_ORDEN_COMPRA_REGISTRADO)
   async alRegistrarPagoOrdenCompra(payload: PagoOrdenCompraRegistradoPayload) {
     try {
+      const ordenPago = await this.prisma.ordenPago.findUniqueOrThrow({
+        where: { id: payload.pagoId },
+        include: { cuentaBancaria: true },
+      });
       await this.asientosContablesService.generarDesdePagoOrdenCompra({
         tenantId: payload.tenantId,
         pagoId: payload.pagoId,
         monto: Number(payload.monto),
         retencionIsr: Number(payload.retencionIsr),
         retencionItbis: Number(payload.retencionItbis),
+        cuentaCajaId: ordenPago.cuentaBancaria?.cuentaContableId,
       });
     } catch (error) {
       this.logger.error(`No se pudo generar el asiento del pago a proveedor ${payload.pagoId}`, error as Error);
+    }
+  }
+
+  /**
+   * Bug real preexistente, encontrado al conectar la cuenta bancaria real
+   * (2026-11-23): pagar una FacturaProveedor directa (sin orden de compra
+   * de por medio — ver PagosService.registrarPagoFacturaProveedor) emitía
+   * este evento, pero nadie lo escuchaba — ningún asiento se generaba. Se
+   * reusa generarDesdePagoOrdenCompra tal cual (misma forma contable:
+   * Cuentas por Pagar ↔ Caja/Banco, con las mismas retenciones de
+   * ISR/ITBIS si aplican).
+   */
+  @OnEvent(EVENTOS.PAGO_FACTURA_PROVEEDOR_REGISTRADO)
+  async alRegistrarPagoFacturaProveedor(payload: PagoFacturaProveedorRegistradoPayload) {
+    try {
+      const ordenPago = await this.prisma.ordenPago.findUniqueOrThrow({
+        where: { id: payload.pagoId },
+        include: { cuentaBancaria: true },
+      });
+      await this.asientosContablesService.generarDesdePagoOrdenCompra({
+        tenantId: payload.tenantId,
+        pagoId: payload.pagoId,
+        monto: Number(payload.monto),
+        retencionIsr: Number(payload.retencionIsr),
+        retencionItbis: Number(payload.retencionItbis),
+        cuentaCajaId: ordenPago.cuentaBancaria?.cuentaContableId,
+      });
+    } catch (error) {
+      this.logger.error(`No se pudo generar el asiento del pago a factura de proveedor ${payload.pagoId}`, error as Error);
     }
   }
 

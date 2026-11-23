@@ -9,6 +9,8 @@ describe('ContabilidadEventosService', () => {
     recepcionCompra: { findUniqueOrThrow: jest.Mock };
     gastoMenor: { findUniqueOrThrow: jest.Mock };
     factura: { findUniqueOrThrow: jest.Mock };
+    reciboIngreso: { findUniqueOrThrow: jest.Mock };
+    ordenPago: { findUniqueOrThrow: jest.Mock };
   };
 
   beforeEach(() => {
@@ -28,6 +30,10 @@ describe('ContabilidadEventosService', () => {
       // Motor de costeo — default sin líneas (costoVenta: 0); los tests
       // que sí verifican el Costo de Ventas lo sobreescriben puntual.
       factura: { findUniqueOrThrow: jest.fn().mockResolvedValue({ lineas: [] }) },
+      // Default sin cuenta bancaria elegida (cae en la cuenta genérica) —
+      // los tests que sí verifican la cuenta real lo sobreescriben puntual.
+      reciboIngreso: { findUniqueOrThrow: jest.fn().mockResolvedValue({ cuentaBancaria: null }) },
+      ordenPago: { findUniqueOrThrow: jest.fn().mockResolvedValue({ cuentaBancaria: null }) },
     };
     service = new ContabilidadEventosService(asientosContablesService, prisma as unknown as PrismaService);
   });
@@ -156,10 +162,25 @@ describe('ContabilidadEventosService', () => {
   });
 
   describe('alRegistrarPagoFactura', () => {
-    it('genera el asiento con el monto convertido a número', async () => {
+    it('genera el asiento con el monto convertido a número, sin cuenta bancaria elegida', async () => {
       await service.alRegistrarPagoFactura({ tenantId: 't1', pagoId: 'pago-1', facturaId: 'f1', monto: '200' });
 
-      expect(asientosContablesService.generarDesdePagoFactura).toHaveBeenCalledWith({ tenantId: 't1', pagoId: 'pago-1', monto: 200 });
+      expect(asientosContablesService.generarDesdePagoFactura).toHaveBeenCalledWith({
+        tenantId: 't1',
+        pagoId: 'pago-1',
+        monto: 200,
+        cuentaCajaId: undefined,
+      });
+    });
+
+    it('si el cobro eligió una cuenta bancaria real, propaga su cuenta contable', async () => {
+      prisma.reciboIngreso.findUniqueOrThrow.mockResolvedValue({ cuentaBancaria: { cuentaContableId: 'cuenta-banco-1' } });
+
+      await service.alRegistrarPagoFactura({ tenantId: 't1', pagoId: 'pago-1', facturaId: 'f1', monto: '200' });
+
+      expect(asientosContablesService.generarDesdePagoFactura).toHaveBeenCalledWith(
+        expect.objectContaining({ cuentaCajaId: 'cuenta-banco-1' }),
+      );
     });
 
     it('no propaga el error si falla generar el asiento (el pago ya se registró)', async () => {
@@ -172,7 +193,7 @@ describe('ContabilidadEventosService', () => {
   });
 
   describe('alRegistrarPagoOrdenCompra', () => {
-    it('genera el asiento con el monto y la retención convertidos a número', async () => {
+    it('genera el asiento con el monto y la retención convertidos a número, sin cuenta bancaria elegida', async () => {
       await service.alRegistrarPagoOrdenCompra({
         tenantId: 't1',
         pagoId: 'pago-1',
@@ -188,7 +209,25 @@ describe('ContabilidadEventosService', () => {
         monto: 500,
         retencionIsr: 75,
         retencionItbis: 30,
+        cuentaCajaId: undefined,
       });
+    });
+
+    it('si el pago eligió una cuenta bancaria real, propaga su cuenta contable', async () => {
+      prisma.ordenPago.findUniqueOrThrow.mockResolvedValue({ cuentaBancaria: { cuentaContableId: 'cuenta-banco-2' } });
+
+      await service.alRegistrarPagoOrdenCompra({
+        tenantId: 't1',
+        pagoId: 'pago-1',
+        ordenCompraId: 'oc1',
+        monto: '500',
+        retencionIsr: '0',
+        retencionItbis: '0',
+      });
+
+      expect(asientosContablesService.generarDesdePagoOrdenCompra).toHaveBeenCalledWith(
+        expect.objectContaining({ cuentaCajaId: 'cuenta-banco-2' }),
+      );
     });
 
     it('no propaga el error si falla generar el asiento', async () => {
@@ -196,6 +235,60 @@ describe('ContabilidadEventosService', () => {
 
       await expect(
         service.alRegistrarPagoOrdenCompra({ tenantId: 't1', pagoId: 'pago-1', ordenCompraId: 'oc1', monto: '500', retencionIsr: '0', retencionItbis: '0' }),
+      ).resolves.not.toThrow();
+    });
+  });
+
+  describe('alRegistrarPagoFacturaProveedor', () => {
+    it('reusa generarDesdePagoOrdenCompra (mismo tratamiento contable) — bug real: este evento no tenía listener', async () => {
+      await service.alRegistrarPagoFacturaProveedor({
+        tenantId: 't1',
+        pagoId: 'pago-1',
+        facturaProveedorId: 'fp1',
+        monto: '300',
+        retencionIsr: '0',
+        retencionItbis: '0',
+      });
+
+      expect(asientosContablesService.generarDesdePagoOrdenCompra).toHaveBeenCalledWith({
+        tenantId: 't1',
+        pagoId: 'pago-1',
+        monto: 300,
+        retencionIsr: 0,
+        retencionItbis: 0,
+        cuentaCajaId: undefined,
+      });
+    });
+
+    it('si el pago eligió una cuenta bancaria real, propaga su cuenta contable', async () => {
+      prisma.ordenPago.findUniqueOrThrow.mockResolvedValue({ cuentaBancaria: { cuentaContableId: 'cuenta-banco-3' } });
+
+      await service.alRegistrarPagoFacturaProveedor({
+        tenantId: 't1',
+        pagoId: 'pago-1',
+        facturaProveedorId: 'fp1',
+        monto: '300',
+        retencionIsr: '0',
+        retencionItbis: '0',
+      });
+
+      expect(asientosContablesService.generarDesdePagoOrdenCompra).toHaveBeenCalledWith(
+        expect.objectContaining({ cuentaCajaId: 'cuenta-banco-3' }),
+      );
+    });
+
+    it('no propaga el error si falla generar el asiento', async () => {
+      asientosContablesService.generarDesdePagoOrdenCompra.mockRejectedValue(new Error('cuenta no encontrada'));
+
+      await expect(
+        service.alRegistrarPagoFacturaProveedor({
+          tenantId: 't1',
+          pagoId: 'pago-1',
+          facturaProveedorId: 'fp1',
+          monto: '300',
+          retencionIsr: '0',
+          retencionItbis: '0',
+        }),
       ).resolves.not.toThrow();
     });
   });

@@ -4,7 +4,8 @@ import { apiClient } from '../../../lib/api-client';
 import { mensajeErrorApi } from '../../../lib/mensaje-error-api';
 import { Modal } from '../Modal/Modal';
 import { FormField } from '../FormField/FormField';
-import { SelectFormaPago } from '../SelectFormaPago/SelectFormaPago';
+import { SelectFormaPago, FormaPago } from '../SelectFormaPago/SelectFormaPago';
+import { SelectCuentaBancaria } from '../SelectCuentaBancaria/SelectCuentaBancaria';
 import { Button } from '../../atoms/Button/Button';
 import type { PagoHistoricoBasico } from '@backend-src/common/prisma/pago-historico-basico';
 
@@ -26,6 +27,8 @@ export function ModalRegistrarCobro({
   const queryClient = useQueryClient();
   const [monto, setMonto] = useState('');
   const [formaPagoId, setFormaPagoId] = useState('');
+  const [formaPago, setFormaPago] = useState<FormaPago | undefined>(undefined);
+  const [cuentaBancariaId, setCuentaBancariaId] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   const { data: historial } = useQuery({
@@ -37,12 +40,18 @@ export function ModalRegistrarCobro({
   const pendiente = Number(factura.total) - totalPagado;
 
   const registrar = useMutation({
-    mutationFn: async () => apiClient.post(`/facturas/${factura.id}/pagos`, { monto: Number(monto), formaPagoId }),
+    mutationFn: async () =>
+      apiClient.post(`/facturas/${factura.id}/pagos`, {
+        monto: Number(monto),
+        formaPagoId,
+        ...(cuentaBancariaId ? { cuentaBancariaId } : {}),
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['pagos-factura', factura.id] });
       queryClient.invalidateQueries({ queryKey: ['facturas'] });
       queryClient.invalidateQueries({ queryKey: ['cuentas-por-cobrar'] });
       setMonto('');
+      setCuentaBancariaId('');
       setError(null);
     },
     onError: (err) => setError(mensajeErrorApi(err, 'No se pudo registrar el cobro. Revisa el monto.')),
@@ -92,8 +101,21 @@ export function ModalRegistrarCobro({
             />
             <div className="flex flex-col gap-1">
               <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Forma de pago</label>
-              <SelectFormaPago value={formaPagoId} onChange={setFormaPagoId} />
+              <SelectFormaPago
+                value={formaPagoId}
+                onChange={(id, forma) => {
+                  setFormaPagoId(id);
+                  setFormaPago(forma);
+                  if (forma?.esEfectivo) setCuentaBancariaId('');
+                }}
+              />
             </div>
+            {formaPago && !formaPago.esEfectivo && (
+              <div className="flex flex-col gap-1">
+                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Cuenta bancaria (opcional)</label>
+                <SelectCuentaBancaria value={cuentaBancariaId} onChange={setCuentaBancariaId} />
+              </div>
+            )}
             {error && <p className="text-sm text-red-600">{error}</p>}
             <Button type="submit" disabled={registrar.isPending} className="w-full">
               {registrar.isPending ? 'Registrando…' : 'Registrar cobro'}

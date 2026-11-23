@@ -1739,7 +1739,9 @@ model CuentaBancaria {
   activa           Boolean            @default(true)
   createdAt        DateTime           @default(now())
 
-  gastosMenores GastoMenor[]
+  gastosMenores  GastoMenor[]
+  recibosIngreso ReciboIngreso[]
+  ordenesPago    OrdenPago[]
 
   @@unique([tenantId, numeroCuenta])
   @@map("cuentas_bancarias")
@@ -3997,6 +3999,12 @@ model ReciboIngreso {
   monto       Decimal   @db.Decimal(14, 2)
   formaPagoId String
   formaPago   FormaPago @relation(fields: [formaPagoId], references: [id])
+  // Opcional — solo tiene sentido si la forma de pago no es efectivo (ver
+  // FormaPago.esEfectivo). Si no se elige, el asiento cae en la cuenta
+  // genérica fija "Caja y Bancos" (CODIGOS_CUENTA.CAJA_BANCOS), igual que
+  // antes de este campo — ver ContabilidadEventosService.
+  cuentaBancariaId String?
+  cuentaBancaria   CuentaBancaria? @relation(fields: [cuentaBancariaId], references: [id])
   referencia  String?
   fecha       DateTime  @default(now())
   // Nullable — un cobro de la pasarela pública no tiene operador humano,
@@ -4190,6 +4198,11 @@ model OrdenPago {
   retencionItbis Decimal   @default(0) @db.Decimal(14, 2)
   formaPagoId    String
   formaPago      FormaPago @relation(fields: [formaPagoId], references: [id])
+  // Ver el comentario equivalente en ReciboIngreso.cuentaBancariaId — mismo
+  // criterio, cubre tanto el pago a una OrdenCompra como a una
+  // FacturaProveedor directa (este modelo respalda ambos flujos).
+  cuentaBancariaId String?
+  cuentaBancaria   CuentaBancaria? @relation(fields: [cuentaBancariaId], references: [id])
   referencia     String?
   fecha          DateTime  @default(now())
   userId         String?

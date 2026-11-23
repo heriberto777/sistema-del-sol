@@ -451,6 +451,22 @@ describe('AsientosContablesService', () => {
         ]),
       );
     });
+
+    it('con cuentaCajaId (banco real elegido al cobrar), debita esa cuenta en vez de la genérica Caja/Bancos', async () => {
+      asientosRepository.crearGlobal.mockResolvedValue({ id: 'a1' } as never);
+
+      await service.generarDesdePagoFactura({ tenantId: 't1', pagoId: 'pago-1', monto: 200, cuentaCajaId: 'banco-real-1' });
+
+      const [llamada] = asientosRepository.crearGlobal.mock.calls[0];
+      expect(llamada.lineas).toEqual(
+        expect.arrayContaining([expect.objectContaining({ cuentaContableId: 'banco-real-1', debito: 200 })]),
+      );
+      expect(llamada.lineas).not.toEqual(
+        expect.arrayContaining([expect.objectContaining({ cuentaContableId: `cuenta-${CODIGOS_CUENTA.CAJA_BANCOS}` })]),
+      );
+      // No debería ni consultar la cuenta genérica si ya le dieron una puntual.
+      expect(cuentasRepository.buscarPorCodigoGlobal).not.toHaveBeenCalledWith('t1', CODIGOS_CUENTA.CAJA_BANCOS);
+    });
   });
 
   describe('generarDesdePagoOrdenCompra', () => {
@@ -503,6 +519,20 @@ describe('AsientosContablesService', () => {
           expect.objectContaining({ cuentaContableId: `cuenta-${CODIGOS_CUENTA.ISR_RETENIDO_TERCEROS}`, credito: 70 }),
           expect.objectContaining({ cuentaContableId: `cuenta-${CODIGOS_CUENTA.ITBIS_RETENIDO_TERCEROS}`, credito: 30 }),
         ]),
+      );
+    });
+
+    it('con cuentaCajaId (banco real elegido al pagar), acredita esa cuenta en vez de la genérica Caja/Bancos', async () => {
+      asientosRepository.crearGlobal.mockResolvedValue({ id: 'a1' } as never);
+
+      await service.generarDesdePagoOrdenCompra({ tenantId: 't1', pagoId: 'pago-1', monto: 500, cuentaCajaId: 'banco-real-2' });
+
+      const [llamada] = asientosRepository.crearGlobal.mock.calls[0];
+      expect(llamada.lineas).toEqual(
+        expect.arrayContaining([expect.objectContaining({ cuentaContableId: 'banco-real-2', credito: 500 })]),
+      );
+      expect(llamada.lineas).not.toEqual(
+        expect.arrayContaining([expect.objectContaining({ cuentaContableId: `cuenta-${CODIGOS_CUENTA.CAJA_BANCOS}` })]),
       );
     });
   });

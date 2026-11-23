@@ -20,4 +20,12 @@ export class CrearPagoDto {
   @IsOptional()
   @IsDateString()
   fecha?: string;
+
+  @ApiProperty({
+    required: false,
+    description: 'Cuenta bancaria real donde entró/salió el dinero — solo aplica si la forma de pago no es efectivo',
+  })
+  @IsOptional()
+  @IsUUID()
+  cuentaBancariaId?: string;
 }

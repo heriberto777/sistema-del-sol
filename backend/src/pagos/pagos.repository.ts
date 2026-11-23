@@ -35,6 +35,7 @@ export class PagosRepository {
     facturaTotal: number;
     monto: number;
     formaPagoId: string;
+    cuentaBancariaId?: string;
     referencia?: string;
     fecha: Date;
     userId: string | null;
@@ -68,6 +69,7 @@ export class PagosRepository {
           clienteId: params.clienteId,
           monto: params.monto,
           formaPagoId: params.formaPagoId,
+          cuentaBancariaId: params.cuentaBancariaId,
           referencia: params.referencia,
           fecha: params.fecha,
           userId: params.userId,
@@ -108,6 +110,7 @@ export class PagosRepository {
     retencionIsr: number;
     retencionItbis: number;
     formaPagoId: string;
+    cuentaBancariaId?: string;
     referencia?: string;
     fecha: Date;
     userId: string | null;
@@ -136,6 +139,7 @@ export class PagosRepository {
           retencionIsr: params.retencionIsr,
           retencionItbis: params.retencionItbis,
           formaPagoId: params.formaPagoId,
+          cuentaBancariaId: params.cuentaBancariaId,
           referencia: params.referencia,
           fecha: params.fecha,
           userId: params.userId,
@@ -167,6 +171,7 @@ export class PagosRepository {
     retencionIsr: number;
     retencionItbis: number;
     formaPagoId: string;
+    cuentaBancariaId?: string;
     referencia?: string;
     fecha: Date;
     userId: string | null;
@@ -187,6 +192,7 @@ export class PagosRepository {
           retencionIsr: params.retencionIsr,
           retencionItbis: params.retencionItbis,
           formaPagoId: params.formaPagoId,
+          cuentaBancariaId: params.cuentaBancariaId,
           referencia: params.referencia,
           fecha: params.fecha,
           userId: params.userId,

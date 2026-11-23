@@ -4,9 +4,10 @@ import { PagosRepository } from './pagos.repository';
 import { ContabilidadModule } from '../contabilidad/contabilidad.module';
 import { FormasPagoModule } from '../formas-pago/formas-pago.module';
 import { CuentasPorPagarModule } from '../cuentas-por-pagar/cuentas-por-pagar.module';
+import { BancosModule } from '../bancos/bancos.module';
 
 @Module({
-  imports: [ContabilidadModule, FormasPagoModule, CuentasPorPagarModule],
+  imports: [ContabilidadModule, FormasPagoModule, CuentasPorPagarModule, BancosModule],
   providers: [PagosService, PagosRepository],
   exports: [PagosService],
 })
