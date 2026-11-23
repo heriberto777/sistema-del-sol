@@ -9,7 +9,9 @@ import { Card } from '../components/atoms/Card/Card';
 import { Button } from '../components/atoms/Button/Button';
 import { FormField } from '../components/molecules/FormField/FormField';
 import { SelectCentroCosto } from '../components/molecules/SelectCentroCosto/SelectCentroCosto';
+import { AvisoFechaPeriodoTrabajo } from '../components/molecules/AvisoFechaPeriodoTrabajo/AvisoFechaPeriodoTrabajo';
 import { useHayCambios } from '../hooks/useHayCambios';
+import { usePeriodoTrabajo } from '../hooks/usePeriodoTrabajo';
 
 interface CuentaContable {
   id: string;
@@ -40,8 +42,9 @@ function lineaVacia(): LineaForm {
 export function AsientoContableNuevo() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { fecha: periodoTrabajo } = usePeriodoTrabajo();
   const [concepto, setConcepto] = useState('');
-  const [fecha, setFecha] = useState('');
+  const [fecha, setFecha] = useState(periodoTrabajo);
   const [lineas, setLineas] = useState<LineaForm[]>([lineaVacia(), lineaVacia()]);
   const [error, setError] = useState<string | null>(null);
 
@@ -138,7 +141,10 @@ export function AsientoContableNuevo() {
         <Card titulo="Datos del asiento">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <FormField id="asiento-concepto" label="Concepto" value={concepto} onChange={(e) => setConcepto(e.target.value)} required />
-            <FormField id="asiento-fecha" label="Fecha (opcional)" type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
+            <div className="flex flex-col gap-1">
+              <FormField id="asiento-fecha" label="Fecha (opcional)" type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
+              <AvisoFechaPeriodoTrabajo fecha={fecha} />
+            </div>
           </div>
         </Card>
 

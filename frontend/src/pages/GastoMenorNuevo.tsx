@@ -10,8 +10,10 @@ import { Select } from '../components/atoms/Select/Select';
 import { Button } from '../components/atoms/Button/Button';
 import { FormField } from '../components/molecules/FormField/FormField';
 import { SelectCentroCosto } from '../components/molecules/SelectCentroCosto/SelectCentroCosto';
+import { AvisoFechaPeriodoTrabajo } from '../components/molecules/AvisoFechaPeriodoTrabajo/AvisoFechaPeriodoTrabajo';
 import { useHayCambios } from '../hooks/useHayCambios';
 import { useAuth } from '../hooks/useAuth';
+import { usePeriodoTrabajo } from '../hooks/usePeriodoTrabajo';
 import { PaginaResultado } from '../types/pagina-resultado';
 
 interface CuentaContable {
@@ -58,10 +60,11 @@ export function GastoMenorNuevo() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { tienePermiso, tieneModulo } = useAuth();
+  const { fecha: periodoTrabajo } = usePeriodoTrabajo();
   const [cuentaBancariaId, setCuentaBancariaId] = useState('');
   const [proyectoId, setProyectoId] = useState('');
   const [notas, setNotas] = useState('');
-  const [fecha, setFecha] = useState('');
+  const [fecha, setFecha] = useState(periodoTrabajo);
   const [lineas, setLineas] = useState<LineaForm[]>([lineaVacia()]);
   const [error, setError] = useState<string | null>(null);
 
@@ -183,7 +186,10 @@ export function GastoMenorNuevo() {
                 ))}
               </Select>
             </div>
-            <FormField id="gasto-menor-fecha" label="Fecha (opcional)" type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
+            <div className="flex flex-col gap-1">
+              <FormField id="gasto-menor-fecha" label="Fecha (opcional)" type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
+              <AvisoFechaPeriodoTrabajo fecha={fecha} />
+            </div>
             <FormField id="gasto-menor-notas" label="Notas de egreso (opcional)" value={notas} onChange={(e) => setNotas(e.target.value)} />
             {puedeAsociarProyecto && (
               <div className="flex flex-col gap-1">

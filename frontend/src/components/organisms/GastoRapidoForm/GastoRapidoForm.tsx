@@ -6,6 +6,8 @@ import { Button } from '../../atoms/Button/Button';
 import { Card } from '../../atoms/Card/Card';
 import { Select } from '../../atoms/Select/Select';
 import { FormField } from '../../molecules/FormField/FormField';
+import { AvisoFechaPeriodoTrabajo } from '../../molecules/AvisoFechaPeriodoTrabajo/AvisoFechaPeriodoTrabajo';
+import { usePeriodoTrabajo } from '../../../hooks/usePeriodoTrabajo';
 
 interface CuentaContable {
   id: string;
@@ -16,9 +18,10 @@ interface CuentaContable {
 
 export function GastoRapidoForm() {
   const queryClient = useQueryClient();
+  const { fecha: periodoTrabajo } = usePeriodoTrabajo();
   const [concepto, setConcepto] = useState('');
   const [monto, setMonto] = useState('');
-  const [fecha, setFecha] = useState('');
+  const [fecha, setFecha] = useState(periodoTrabajo);
   const [cuentaGastoId, setCuentaGastoId] = useState('');
   const [cuentaOrigenId, setCuentaOrigenId] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -80,7 +83,10 @@ export function GastoRapidoForm() {
         required
         className="w-32"
       />
-      <FormField id="gasto-fecha" label="Fecha (opcional)" type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
+      <div className="flex flex-col gap-1">
+        <FormField id="gasto-fecha" label="Fecha (opcional)" type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
+        <AvisoFechaPeriodoTrabajo fecha={fecha} />
+      </div>
       <div>
         <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Cuenta de gasto</label>
         <Select value={cuentaGastoId} onChange={(e) => setCuentaGastoId(e.target.value)} required>

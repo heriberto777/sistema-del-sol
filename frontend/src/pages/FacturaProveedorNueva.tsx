@@ -18,6 +18,8 @@ import { type TerminoPago } from '../hooks/useTerminosPago';
 import { PaginaResultado } from '../types/pagina-resultado';
 import { useHayCambios } from '../hooks/useHayCambios';
 import { useAuth } from '../hooks/useAuth';
+import { usePeriodoTrabajo } from '../hooks/usePeriodoTrabajo';
+import { AvisoFechaPeriodoTrabajo } from '../components/molecules/AvisoFechaPeriodoTrabajo/AvisoFechaPeriodoTrabajo';
 
 interface CuentaContable {
   id: string;
@@ -75,12 +77,13 @@ function derivarTipoNcf(ncf: string): string | null {
 export function FacturaProveedorNueva() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { fecha: periodoTrabajo } = usePeriodoTrabajo();
   const [proveedor, setProveedor] = useState<ProveedorBasico | null>(null);
   const [mostrarNuevoProveedor, setMostrarNuevoProveedor] = useState(false);
   const [ncfProveedor, setNcfProveedor] = useState('');
   const [tipoNcfProveedor, setTipoNcfProveedor] = useState('B01');
   const [concepto, setConcepto] = useState('');
-  const [fecha, setFecha] = useState('');
+  const [fecha, setFecha] = useState(periodoTrabajo);
   const [terminoPagoId, setTerminoPagoId] = useState('');
   const [terminoPagoSeleccionado, setTerminoPagoSeleccionado] = useState<TerminoPago | undefined>(undefined);
   const [lineas, setLineas] = useState<LineaForm[]>([LINEA_VACIA]);
@@ -336,7 +339,10 @@ export function FacturaProveedorNueva() {
               </Select>
             </div>
             <FormField id="fp-concepto" label="Concepto (opcional)" value={concepto} onChange={(e) => setConcepto(e.target.value)} />
-            <FormField id="fp-fecha" label="Fecha (opcional)" type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
+            <div className="flex flex-col gap-1">
+              <FormField id="fp-fecha" label="Fecha (opcional)" type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
+              <AvisoFechaPeriodoTrabajo fecha={fecha} />
+            </div>
             <div className="flex flex-col gap-1">
               <label htmlFor="fp-termino-pago" className="text-sm font-medium text-slate-700 dark:text-slate-300">
                 Término de pago (opcional)

@@ -6,6 +6,7 @@ import { SidebarErp } from '../../organisms/SidebarErp/SidebarErp';
 import { AccountMenu } from '../../organisms/AccountMenu/AccountMenu';
 import { GlobalCrearMenu } from '../../organisms/GlobalCrearMenu/GlobalCrearMenu';
 import { MarcarAsistenciaWidget } from '../../organisms/MarcarAsistenciaWidget/MarcarAsistenciaWidget';
+import { PeriodoTrabajoWidget } from '../../organisms/PeriodoTrabajoWidget/PeriodoTrabajoWidget';
 import { BandejaWhatsappWidget } from '../../organisms/BandejaWhatsappWidget/BandejaWhatsappWidget';
 import { BandejaWhatsappDrawer } from '../../organisms/BandejaWhatsappDrawer/BandejaWhatsappDrawer';
 import { BandejaWhatsappDrawerProvider } from '../../organisms/BandejaWhatsappDrawer/BandejaWhatsappDrawerContext';
@@ -49,6 +50,7 @@ export function AppLayout() {
             </div>
             <div className="flex items-center gap-3">
               <MarcarAsistenciaWidget />
+              <PeriodoTrabajoWidget />
               <BandejaWhatsappWidget />
               <GlobalCrearMenu />
             </div>

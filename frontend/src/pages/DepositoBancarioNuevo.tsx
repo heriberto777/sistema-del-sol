@@ -9,7 +9,9 @@ import { Button } from '../components/atoms/Button/Button';
 import { FormField } from '../components/molecules/FormField/FormField';
 import { SelectCuentaBancaria } from '../components/molecules/SelectCuentaBancaria/SelectCuentaBancaria';
 import { SelectorBodega } from '../components/molecules/SelectorBodega/SelectorBodega';
+import { AvisoFechaPeriodoTrabajo } from '../components/molecules/AvisoFechaPeriodoTrabajo/AvisoFechaPeriodoTrabajo';
 import { useHayCambios } from '../hooks/useHayCambios';
+import { usePeriodoTrabajo } from '../hooks/usePeriodoTrabajo';
 
 /**
  * docs/PLAN.md — Depósito bancario (Caja → Banco). Página propia
@@ -21,9 +23,10 @@ import { useHayCambios } from '../hooks/useHayCambios';
 export function DepositoBancarioNuevo() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { fecha: periodoTrabajo } = usePeriodoTrabajo();
   const [cuentaBancariaId, setCuentaBancariaId] = useState('');
   const [monto, setMonto] = useState('');
-  const [fecha, setFecha] = useState('');
+  const [fecha, setFecha] = useState(periodoTrabajo);
   const [numeroComprobante, setNumeroComprobante] = useState('');
   const [bodegaId, setBodegaId] = useState('');
   const [notas, setNotas] = useState('');
@@ -104,7 +107,10 @@ export function DepositoBancarioNuevo() {
               <SelectCuentaBancaria value={cuentaBancariaId} onChange={setCuentaBancariaId} />
             </div>
             <FormField id="deposito-monto" label="Monto depositado" type="number" min={0.01} step="0.01" value={monto} onChange={(e) => setMonto(e.target.value)} required />
-            <FormField id="deposito-fecha" label="Fecha (opcional)" type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
+            <div className="flex flex-col gap-1">
+              <FormField id="deposito-fecha" label="Fecha (opcional)" type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
+              <AvisoFechaPeriodoTrabajo fecha={fecha} />
+            </div>
             <FormField
               id="deposito-comprobante"
               label="Número de comprobante del banco (opcional)"

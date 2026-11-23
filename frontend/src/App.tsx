@@ -6,6 +6,7 @@ import { AuthProvider } from './contexts/AuthContext';
 import { PlatformAuthProvider } from './contexts/PlatformAuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { SucursalActivaProvider } from './contexts/SucursalActivaContext';
+import { PeriodoTrabajoProvider } from './contexts/PeriodoTrabajoContext';
 import { crearRouter } from './router';
 import { resolverContextoTiendaSincrono, resolverSubdominioPorDominioPropio, SubdominioTiendaContext } from './lib/resolver-subdominio-tienda';
 
@@ -34,15 +35,17 @@ export function App() {
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
           <SucursalActivaProvider>
-            <PlatformAuthProvider>
-              <SubdominioTiendaContext.Provider value={subdominio ?? null}>
-                {router ? (
-                  <RouterProvider router={router} />
-                ) : (
-                  <div className="flex h-screen items-center justify-center text-sm text-slate-400">Cargando…</div>
-                )}
-              </SubdominioTiendaContext.Provider>
-            </PlatformAuthProvider>
+            <PeriodoTrabajoProvider>
+              <PlatformAuthProvider>
+                <SubdominioTiendaContext.Provider value={subdominio ?? null}>
+                  {router ? (
+                    <RouterProvider router={router} />
+                  ) : (
+                    <div className="flex h-screen items-center justify-center text-sm text-slate-400">Cargando…</div>
+                  )}
+                </SubdominioTiendaContext.Provider>
+              </PlatformAuthProvider>
+            </PeriodoTrabajoProvider>
           </SucursalActivaProvider>
         </AuthProvider>
       </QueryClientProvider>

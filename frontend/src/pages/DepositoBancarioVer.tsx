@@ -11,6 +11,7 @@ import { FormField } from '../components/molecules/FormField/FormField';
 import { ConfirmModal } from '../components/molecules/ConfirmModal/ConfirmModal';
 import { SelectCuentaBancaria } from '../components/molecules/SelectCuentaBancaria/SelectCuentaBancaria';
 import { SelectorBodega } from '../components/molecules/SelectorBodega/SelectorBodega';
+import { AvisoFechaPeriodoTrabajo } from '../components/molecules/AvisoFechaPeriodoTrabajo/AvisoFechaPeriodoTrabajo';
 import { useAuth } from '../hooks/useAuth';
 import { useHayCambios } from '../hooks/useHayCambios';
 
@@ -209,7 +210,10 @@ export function DepositoBancarioVer() {
                     <SelectCuentaBancaria value={cuentaBancariaId} onChange={setCuentaBancariaId} />
                   </div>
                   <FormField id="deposito-ver-monto" label="Monto depositado" type="number" min={0.01} step="0.01" value={monto} onChange={(e) => setMonto(e.target.value)} required />
-                  <FormField id="deposito-ver-fecha" label="Fecha" type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
+                  <div className="flex flex-col gap-1">
+                    <FormField id="deposito-ver-fecha" label="Fecha" type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
+                    <AvisoFechaPeriodoTrabajo fecha={fecha} />
+                  </div>
                   <FormField
                     id="deposito-ver-comprobante"
                     label="Número de comprobante del banco (opcional)"

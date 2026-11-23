@@ -16,7 +16,7 @@ Convención de estado: `🔲 Pendiente de diseño` · `🟡 En diseño` ·
 | Período Contable — Fases 1+2 (aviso de período faltante + completar períodos) | ✅ Implementado — commits `88ea628`/`8eae640` |
 | "Ver Stock" en Productos | ✅ Implementado — commit `dbccd79` |
 | Asistente de pre-cierre contable | ✅ Implementado 2026-11-23 — ver detalle abajo |
-| Período de trabajo + advertencia blanda | 🔲 Pendiente de diseño |
+| Período de trabajo + advertencia blanda | ✅ Implementado 2026-11-23 — ver detalle abajo |
 | Parametrización de cuentas contables y centros de costo — los 4 puntos (banco real en Pagos; cuenta de ingreso/costo por categoría; Centro de Costo por línea; override de los 15 códigos fijos) | ✅ Implementado 2026-11-23 — plan completo |
 | Depósito bancario (Caja → Banco) | ✅ Implementado 2026-11-23 — ver detalle abajo |
 | Bug "removeChild" intermitente — 2 casos pendientes | ✅ Corregidos 2026-11-23 (`ProductoFormulario`, `FacturacionNueva`) — ver detalle abajo |
@@ -73,18 +73,44 @@ en ambos paquetes.
 
 ## 2. Período de trabajo + advertencia blanda
 
-**Estado:** 🔲 Pendiente de diseño (acordado dejarlo para otra sesión, 2026-11-23).
+**Estado:** ✅ Implementado 2026-11-23.
 
 Contexto: inspirado en un ERP de referencia que usa el usuario — un
-"período de trabajo" configurado (ej. noviembre 2026) que:
+"período de trabajo" (una fecha, no necesariamente un mes entero) que:
 
 - Precarga esa fecha por defecto en los formularios nuevos, en vez de "hoy".
-- Avisa (sin bloquear) si se elige una fecha fuera de un rango "con
-  advertencia" configurado.
+- Avisa (sin bloquear) si se elige una fecha de un mes distinto al del
+  período de trabajo activo.
 
 Convive con la validación dura existente (`validarPeriodoAbierto`), no la
 reemplaza — esa sigue siendo el único control real de "¿se puede postear
 acá?".
+
+**100% frontend, sin backend ni migración** — investigación previa: casi
+ningún módulo admite fecha manual (Facturación/POS/Compras/Nómina
+siempre usan "ahora"); los únicos 5 formularios con un campo de fecha
+editable son Asiento Contable, Gasto Rápido, Gasto Menor, Factura de
+Proveedor y Depósito Bancario (los 3 modales de pago NO tienen campo de
+fecha en absoluto, se descartaron de este alcance).
+
+`PeriodoTrabajoContext` (`frontend/src/contexts/PeriodoTrabajoContext.tsx`)
+— mismo patrón exacto que `SucursalActivaContext` (localStorage, por
+navegador/usuario, **no** tenant-wide): si fuera una sola fecha para todo
+el tenant, alguien haciendo catch-up de un mes viejo le rompería el
+default a cualquier otro cargando algo de hoy en simultáneo. Widget
+nuevo en el header (`PeriodoTrabajoWidget`, al lado de Bandeja de
+WhatsApp) para ver/cambiar la fecha, con "Volver a hoy". Componente
+`AvisoFechaPeriodoTrabajo` (comparación simple de `YYYY-MM`, sin líos de
+zona horaria) conectado en los 5 formularios — advertencia inline, nunca
+bloquea.
+
+Verificado en vivo: cambiar el período de trabajo a otro mes precarga
+esa fecha en Asiento Contable Nuevo tras recargar la página (persiste en
+localStorage); elegir una fecha de un tercer mes distinto muestra el
+aviso; volver al mismo mes lo oculta; "Volver a hoy" resetea
+correctamente. `tsc --noEmit` limpio en ambos paquetes (sin tests de
+frontend en este proyecto — no hay ningún archivo `*.test.*`/`*.spec.*`
+en `frontend/src` todavía).
 
 ## 3. Parametrización de cuentas contables y centros de costo
 
