@@ -1,0 +1,17 @@
+{
+  "agente-caja/README.md": { "hash": "sha256:a51ae30a5b90ec34eec1b28f0d900c8d276bffe46403db718907c7e357ec59a5", "ingested": "2026-11-24", "topic": "subprojects" },
+  "n8n/README.md": { "hash": "sha256:e4e346e49e25a00896f0aa7965c7f29586fba77484a0dd195d1f41727de8cba3", "ingested": "2026-11-24", "topic": "subprojects" },
+  "plugins/inmobiliaria/README.md": { "hash": "sha256:5d9cf2bdb6d7f2e2473b27289206d084d0b86388a3aafd9e1eaeb90676a9f7e9", "ingested": "2026-11-24", "topic": "subprojects" },
+  "plugins/proyectos/README.md": { "hash": "sha256:a3b496e918a8a0380d8033caa5d31a76c9e0186a3f6efb1bc6f3a9c3e77fe507", "ingested": "2026-11-24", "topic": "subprojects" },
+  "plugins/ecommerce/README.md": { "hash": "sha256:462658dc93e55b313acf3b5aa1702daa44740d9286201c309f6df46602a9a403", "ingested": "2026-11-24", "topic": "subprojects" },
+  "plugins/publicaciones-sociales/README.md": { "hash": "sha256:217af2203bd46e2749b23a5f0f64596ecaf9581711cd09b124445c503df2bab7", "ingested": "2026-11-24", "topic": "subprojects" },
+  "01-TOOLS/README.md": { "hash": "sha256:d0d3a88eec1de63f483edb1f0a0875b01b8e872fe98f348eb4f0c17704e66ecb", "ingested": "2026-11-24", "topic": "operations" },
+  "01-TOOLS/ANTHROPIC/README.md": { "hash": "sha256:82d4cf8e69d06402806be135be9ef6c97d8ab4bf51fde8c4a315fadbdcf9c812", "ingested": "2026-11-24", "topic": "operations" },
+  "01-TOOLS/ANTHROPIC/CREDENTIALS.md": { "hash": "sha256:c6b75a471eff507dd777610fa48f4d5302692955449615eeabbb6c770192ffc7", "ingested": "2026-11-24", "topic": "operations" },
+  "01-TOOLS/STRIPE/README.md": { "hash": "sha256:a043650232573d64f63980a781ffe53580f7bf6cfb63c0349ec6a10256d4b40e", "ingested": "2026-11-24", "topic": "operations" },
+  "01-TOOLS/STRIPE/CREDENTIALS.md": { "hash": "sha256:b87d1f3e463fe9385a19849f3f519d3f4b8a066ed13195663065d6aa64951f3c", "ingested": "2026-11-24", "topic": "operations" },
+  "01-TOOLS/TWILIO/README.md": { "hash": "sha256:92e42a3ed0c15e097ed224a3b697b8e63696aa155dce96d00ce497ee9f53ebed", "ingested": "2026-11-24", "topic": "operations" },
+  "01-TOOLS/TWILIO/CREDENTIALS.md": { "hash": "sha256:081596000b8da72b8e9899ebe9642027b808f6847077dce6a93d3824c3011c51", "ingested": "2026-11-24", "topic": "operations" },
+  "CLAUDE.md": { "hash": "sha256:43e85b3158b2dba3e4292a7c3254c2665e3f1a9734a45fe95d22327e1d154882", "ingested": "2026-11-24", "topic": "meta" },
+  "AGENTS.md": { "hash": "sha256:14d84cff9a4b2be79b11cbc9fc535e9e0aaeb579ecb5771fb3385c6f4754f0b5", "ingested": "2026-11-24", "topic": "meta" }
+}

@@ -1,0 +1,173 @@
+# Plugin: Publicaciones Sociales — README
+
+> Source: `plugins/publicaciones-sociales/README.md`
+> Collected: 2026-11-24
+> Published: Unknown
+
+# Plugin: Publicaciones Sociales
+
+Fábrica de contenido de marketing a partir del catálogo de productos —
+**nunca publica directo en ninguna red social**: eso exigiría OAuth por
+tenant + revisión de app de Meta + auditoría de TikTok, un trámite
+externo que puede tardar semanas y no depende de nosotros (ver
+investigación previa a esta Fase 1). En cambio, genera un diseño, un
+responsable lo aprueba o rechaza dentro de la plataforma, y una vez
+aprobado el tenant se lo lleva por **descarga** o por **WhatsApp**
+(botones manuales, nunca envío automático) — el tenant lo publica él
+mismo donde quiera.
+
+**Implementación real**: `backend/src/publicaciones-sociales/` (mismo
+criterio que `proyectos`/`ecommerce` — este directorio es solo el
+manifiesto que lee `PluginLoaderService` al boot, no el código).
+
+## Fase 1 (entregada) — solo imagen
+
+- Modelo de datos: `PlantillaPublicacionSocial` (catálogo global de
+  layouts) → `PublicacionSocial` (una fila por diseño generado, estado
+  `BORRADOR → PENDIENTE_APROBACION → APROBADA|RECHAZADA`).
+- Generación server-side con `@napi-rs/canvas` (banner 1080×1080, foto
+  real del producto + nombre + precio + logo del tenant si está
+  configurado) — 3 plantillas: `precio-destacado`, `minimalista`,
+  `oferta`. Fuente embebida (Inter, `backend/assets/fonts/`) para no
+  depender de fuentes del sistema operativo en el contenedor de
+  producción.
+- Aprobación dentro de la plataforma: rechazar exige un motivo.
+- Entrega solo tras `APROBADA`: descarga del PNG, o envío por WhatsApp
+  (reusa la infraestructura de Twilio ya existente) — ambos son
+  acciones manuales, nunca automáticas.
+- Permisos opt-in: `publicacionessociales.ver` / `.crear` / `.editar` /
+  `.aprobar` — Admin Total/Gerente los heredan automático, cualquier
+  otro rol necesita que se lo asignen a mano desde Roles y Permisos.
+- Activación por tenant: clave `publicacionessociales` en
+  `MODULOS_BASE` — vía Plan o `TenantModuloOverride`, nunca la activa
+  el propio tenant.
+
+## Fase 2 (entregada, superada por la Fase 3) — generación de fondo por IA
+
+Un prompt de texto opcional manda la foto real del producto a Gemini
+(`gemini-3-pro-image-preview`, proveedor activo por defecto) u OpenAI
+(`gpt-image-1.5`, alternativa) — `backend/src/ia/generador-fondo/`,
+mismo patrón multi-proveedor que `AnalizadorImagenService` pero para
+generación (no vision); Claude no participa, no genera imágenes. Reusa
+las API keys de OpenAI/Gemini ya guardadas en `/plataforma/configuración`
+→ "IA para productos" (más su propio selector de proveedor/modelo,
+porque la familia de modelos de generación es distinta a la de
+vision/chat). Límite fijo de generaciones IA por tenant por mes
+(`PlataformaConfiguracion.iaFondoLimiteMensual`, default 20, global) —
+el costo por imagen lo paga la plataforma.
+
+Originalmente (Fase 2 tal cual se entregó) la IA solo generaba el
+FONDO y el Canvas de la Fase 1 dibujaba el precio encima — la Fase 3
+cambió esa parte, ver abajo.
+
+## Fase 3 (entregada) — la IA diseña la pieza completa, con datos reales
+
+Bug real reportado con una captura: si el prompt le pedía a la IA su
+propio texto de precio, la imagen terminaba con **dos precios
+distintos superpuestos** (el inventado en el prompt y el real dibujado
+por Canvas). Decisión del usuario: cuando se usa IA, la IA diseña la
+pieza COMPLETA (precio, oferta/descuento si aplica, nombre) — nunca se
+le vuelve a superponer Canvas encima.
+
+- `construir-prompt-fondo-ia.ts`: arma el prompt con el precio
+  formateado exacto y, si el producto tiene una oferta vigente, precio
+  antes/después + % OFF o la mecánica de la promo (BOGO) — reusa
+  `OfertasService.resolverOfertaVisibleProducto`, la MISMA lógica que
+  ya usa la venta real (Facturación/POS), nunca un cálculo propio. El
+  usuario nunca escribe el precio a mano en el prompt — solo describe
+  ambientación/estilo.
+- Los adapters de OpenAI/Gemini aceptan una segunda imagen de
+  referencia opcional (el logo del tenant) para que la IA lo incluya
+  nítido; salida forzada a cuadrado (1024×1024 / `aspectRatio: '1:1'`).
+- El camino sin IA (plantillas fijas, Fase 1) no cambió — sigue
+  dibujando con Canvas exactamente igual.
+- **Mitigación del riesgo restante** (ninguna IA garantiza 100% que el
+  texto salga perfecto): el detalle de cada publicación siempre muestra
+  el precio/oferta REAL como texto al lado de la imagen, para que quien
+  aprueba pueda comparar de un vistazo antes de aprobar — la aprobación
+  humana sigue siendo la barrera real, igual que en la Fase 1.
+
+## Fase 4 (entregada) — formato por red + presets de estilo
+
+El usuario pidió poder publicar en distintas redes (Instagram, Facebook,
+WhatsApp) y no solo en el feed — explícitamente **no es video/reels**
+(sigue como fase futura grande, ver abajo), solo variedad de
+diseños/formatos de imagen.
+
+- `formato` (`CUADRADO` default / `VERTICAL`) en `PublicacionSocial`.
+  `VERTICAL` (9:16, Estados/Historias) **solo está disponible generando
+  con IA** — las 3 plantillas fijas de Canvas de la Fase 1 están
+  maquetadas en pixeles absolutos para 1080×1080; pedir `VERTICAL` sin
+  `promptIa` responde 400 con un mensaje claro
+  (`PublicacionesSocialesService.crear`).
+- Gemini soporta `generationConfig.imageConfig.aspectRatio: '9:16'`
+  directo; OpenAI's `images.edit` no tiene un tamaño 9:16 exacto —
+  `1024x1536` es la aproximación portrait (2:3) más cercana que soporta.
+- **Presets de estilo**: selector "Estilo sugerido" 100% frontend
+  (`PRESETS_ESTILO_IA` en `PublicacionesSociales.tsx`), sin tocar el
+  backend — 6 puntos de partida genéricos (sin importar el rubro del
+  negocio) que reemplazan el texto del textarea de `promptIa`, editable
+  después. Se puede ampliar la lista sin migración ni cambio de API.
+
+## Fase 5 (entregada) — avisar aprobación pendiente + pedir cambios
+
+Antes de esta fase, nadie se enteraba de que había algo pendiente de
+aprobar — el estado pasaba a `PENDIENTE_APROBACION` sin disparar ningún
+aviso. Tampoco existía forma de pedir cambios sin rechazar
+definitivamente.
+
+- **Aviso por Email** (`NotificacionesService`, Event Bus): 4 eventos
+  nuevos (`publicaciones_sociales.{pendiente_aprobacion,
+  cambios_solicitados,aprobada,rechazada}`). Los destinatarios de
+  `pendiente_aprobacion` se resuelven por el **permiso real**
+  `publicacionessociales.aprobar` (JOIN vía `role.rolePermissions` —
+  mismo patrón que ya usaba `AutorizacionesRepository`), no por nombre
+  de rol hardcodeado como el resto de `NotificacionesService`.
+  Plantillas (`NotificacionPlantilla`) con contenido real por defecto
+  (`plantillas-publicaciones-sociales-base.ts`), sembradas en tenants
+  nuevos vía `TenantsRepository.crearConProvisioning` y en los ya
+  existentes vía `scripts/backfill-plantillas-publicaciones-sociales.ts`
+  (correr una vez tras el deploy, ver `docker-compose.prod.yml`).
+- **Aviso por WhatsApp (opcional)**: usa el número del **TENANT**
+  (Integraciones), no el de plataforma — requiere que el aprobador
+  tenga `User.telefono` cargado y el tenant tenga
+  `WhatsappConfigTenant.twilioTemplateAprobacionSid` configurado (una
+  plantilla de Content API de Twilio, creada y aprobada por Meta FUERA
+  del sistema — trámite externo, puede tardar). Sin eso, solo sale el
+  email — nunca queda nadie sin enterarse. Solo 2 botones: "Aprobar"
+  (aprueba directo, interceptado en `WhatsappWebhookController` ANTES
+  del bot conversacional — solo si hay EXACTAMENTE una publicación
+  pendiente, si hay más de una no adivina) y "Ver detalle" (manda a
+  la app). Rechazar/pedir cambios siempre se hacen en la app.
+- **Nuevo estado no-terminal**: `CAMBIOS_SOLICITADOS` — a diferencia de
+  `RECHAZADA`, el creador regenera (`PATCH :id/regenerar`) y vuelve a
+  `BORRADOR`, listo para reenviarse a aprobación cuantas veces haga
+  falta.
+- **Historial de versiones** (`PublicacionSocialVersion`, tabla hija,
+  nunca se pisa — mismo criterio que `WhatsappMensaje`): un row por
+  generación/regeneración, con el comentario del aprobador que
+  originó cada ronda.
+- **Bug real encontrado probando en vivo** (no lo agarraba ningún test
+  unitario): `WhatsappConfigRepository` usa `TenantPrismaService`
+  (request-scoped, exige `request.user.tenantId`) — llamarlo desde un
+  `@OnEvent` o desde el webhook público (sin JWT) revienta con
+  `ForbiddenException` y tumba el proceso entero. Fix: `this.prisma`
+  (global) directo en ambos casos, mismo criterio que
+  `WhatsappBotService`.
+
+## Fases futuras (no implementadas, a propósito no se dejó nada a medio camino)
+
+- **Video** (reels/shorts): plantillas animadas (Remotion) y generación
+  por IA (clips cortos concatenados, ej. Runway) — necesita una cola de
+  trabajos en segundo plano (BullMQ sobre el Redis ya desplegado, hoy
+  el proyecto solo tiene crons de intervalo fijo, nada on-demand).
+- Rechazar o pedir cambios respondiendo texto libre por WhatsApp — solo
+  "Aprobar" tiene acción directa por botón (ver Fase 5).
+- Publicación directa en alguna red — fuera de alcance a propósito,
+  ver el análisis de factibilidad previo a esta fase.
+- Elegir entre varias variantes de fondo por IA antes de guardar, y
+  límite configurable por plan/tenant individual (hoy es un solo número
+  global).
+- Formato vertical para las 3 plantillas fijas de Canvas (Fase 1 sin
+  IA) — implicaría rehacer la matemática de layout de las 3.
+- Más presets de estilo, o presets editables por el tenant.

@@ -1,0 +1,14 @@
+{
+  "_meta": { "interactions_since_improve": 1 },
+  "meta/control-plane.md": 6.0,
+  "subprojects/agente-caja.md": 4.0,
+  "subprojects/n8n-automatizacion.md": 4.0,
+  "subprojects/plugin-inmobiliaria.md": 8.0,
+  "subprojects/plugin-proyectos.md": 6.0,
+  "subprojects/plugin-ecommerce.md": 4.0,
+  "subprojects/plugin-publicaciones-sociales.md": 6.0,
+  "operations/01-tools-overview.md": 12.0,
+  "operations/anthropic.md": 6.0,
+  "operations/stripe.md": 6.0,
+  "operations/twilio.md": 8.0
+}
