@@ -5,7 +5,7 @@ import {
   IsArray,
   IsBoolean,
   IsEnum,
-  IsIn,
+  IsInt,
   IsNotEmpty,
   IsNumber,
   IsOptional,
@@ -163,12 +163,12 @@ export class CrearFacturaDto {
   @ApiProperty({
     required: false,
     default: 30,
-    enum: [15, 30, 45, 60, 90],
     description:
-      'Condición de pago en días (plan de integración Cuadre, ítem B-6) — el vencimiento se calcula como fecha + este plazo (ya usado por RecordatoriosService para facturas vencidas). Sin enviar, cae al default del schema (30).',
+      'Condición de pago en días (plan de integración Cuadre, ítem B-6) — el vencimiento se calcula como fecha + este plazo (ya usado por RecordatoriosService para facturas vencidas). Sin enviar, cae al default del schema (30). Antes limitado a [15,30,45,60,90] — hardcodeado, de antes de que "Condición de pago" se conectara al catálogo real de TerminoPago (Cliente.terminoPago, días libres); mismo criterio sin restringir que CrearClienteDto/CrearProveedorDto.',
   })
   @IsOptional()
-  @IsIn([15, 30, 45, 60, 90])
+  @IsInt()
+  @Min(1)
   plazoPagoDias?: number;
 
   @ApiProperty({
