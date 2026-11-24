@@ -369,3 +369,40 @@ delgados aportan poco unit-testeados aislados.
   atrapa ese tipo de bug (ya encontró dos: `TenantPrismaService`
   instanciándose antes de que el guard poblara `request.user`, y
   `findUniqueOrThrow` devolviendo 500 en vez de 404 entre tenants).
+
+<!-- added by harness 2026-11-24 -->
+## Knowledge map
+
+El índice completo del conocimiento acumulado del proyecto (más allá de
+lo que ya cubre este archivo) vive en **`02-DOCS/wiki/index.md`** —
+mantenido por la skill `harness`. Antes de trabajar en un área nueva,
+conviene revisar el artículo correspondiente; al aprender algo reusable,
+se actualiza ahí, no en este archivo.
+
+| Área | Artículo |
+|------|----------|
+| Perfil del usuario (registro: técnico o con analogías) | `02-DOCS/wiki/harness/user-profile.md` |
+| Decisiones significativas (append-only) | `02-DOCS/wiki/harness/decisions.md` |
+| Constitución SDD (no negociables del proyecto) | `02-DOCS/wiki/sdd/constitution.md` |
+| **Todo lo demás — índice completo** | `02-DOCS/wiki/index.md` |
+
+<!-- added by harness 2026-11-24 -->
+## Herramientas operativas (`01-TOOLS/`)
+
+Operaciones manuales contra servicios externos viven en `01-TOOLS/`. Cada
+carpeta trae su propio `.env` real (nunca commiteado), `CREDENTIALS.md` y
+un `test_connection.sh` como smoke-test.
+
+| Herramienta | Para qué |
+|-------------|----------|
+| `ANTHROPIC` | API de Claude usada por `backend/src/ia/` (sugerencias; degrada a heurística sin API key) |
+| `STRIPE` | Pasarela de pago de la suscripción de plataforma (`backend/src/facturacion-plataforma/pasarela/`) |
+| `TWILIO` | Mensajería de WhatsApp (bandeja, bot, notificaciones) |
+
+CARDNET/AZUL/DUFFEL/ALANUBE son reales en el código pero no tienen
+carpeta en `01-TOOLS/` todavía (fuera del catálogo de la skill `harness`;
+se agregan puntuales con `connect-tool` si hace falta operarlos desde
+terminal).
+
+Para sumar una herramienta nueva: `cp -r 01-TOOLS/_TEMPLATE 01-TOOLS/<NOMBRE>`
+y seguir el README de `01-TOOLS/`.
