@@ -1,152 +1,105 @@
-import { FormEvent, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../lib/api-client';
-import { mensajeErrorApi } from '../lib/mensaje-error-api';
+import { textoPlanoDesdeTiptap } from '../lib/tiptap-texto-plano';
 import { Button } from '../components/atoms/Button/Button';
 import { Badge } from '../components/atoms/Badge/Badge';
-import { Card } from '../components/atoms/Card/Card';
-import { Select } from '../components/atoms/Select/Select';
-import { FormField } from '../components/molecules/FormField/FormField';
 import { EstadoVacio } from '../components/molecules/EstadoVacio/EstadoVacio';
+import { ConversacionSoporte } from '../components/organisms/ConversacionSoporte/ConversacionSoporte';
+import { ETIQUETA_CATEGORIA_SOPORTE, ETIQUETA_ESTADO_SOPORTE, TONO_ESTADO_SOPORTE, type Categoria, type Estado, type MensajeSoporte } from '../types/soporte';
 import { PaginaResultado } from '../types/pagina-resultado';
 
-type Categoria = 'BUG' | 'DUDA' | 'SOLICITUD' | 'OTRO';
-type Estado = 'NUEVO' | 'EN_REVISION' | 'RESUELTO';
-
-interface ReporteTenant {
+interface TicketConUltimoMensaje {
   id: string;
   asunto: string;
-  descripcion: string;
   categoria: Categoria;
   estado: Estado;
-  respuesta: string | null;
-  respondidoEn: string | null;
+  ultimoMensajeEn: string;
   createdAt: string;
+  mensajes: MensajeSoporte[];
 }
 
-const ETIQUETA_CATEGORIA: Record<Categoria, string> = {
-  BUG: 'Algo no funciona',
-  DUDA: 'Duda',
-  SOLICITUD: 'Solicitud / idea',
-  OTRO: 'Otro',
-};
-
-const ETIQUETA_ESTADO: Record<Estado, string> = { NUEVO: 'Enviado', EN_REVISION: 'En revisión', RESUELTO: 'Resuelto' };
-const TONO_ESTADO: Record<Estado, 'neutro' | 'advertencia' | 'exito'> = { NUEVO: 'neutro', EN_REVISION: 'advertencia', RESUELTO: 'exito' };
-
 /**
- * "Reportar un problema" (Bloque 4 del backlog UX/operación) — canal
- * directo tenant → plataforma, deliberadamente liviano (sin SLA, sin
- * notificación por email todavía). Vive en GRUPO_MI_ESPACIO (menu-erp.ts)
- * sin permiso restrictivo — cualquier usuario autenticado puede reportar.
+ * "Soporte" (rediseño v2) — bandeja estilo inbox (lista + conversación
+ * lado a lado), mismo patrón que `Mensajes.tsx` (inbox de WhatsApp). La
+ * creación de un ticket vive en su propia página (`/soporte/nuevo`,
+ * regla "Crear va en página, nunca en modal").
  */
 export function Soporte() {
-  const queryClient = useQueryClient();
-  const [asunto, setAsunto] = useState('');
-  const [descripcion, setDescripcion] = useState('');
-  const [categoria, setCategoria] = useState<Categoria>('DUDA');
-  const [error, setError] = useState<string | null>(null);
+  const navigate = useNavigate();
+  const [ticketSeleccionado, setTicketSeleccionado] = useState<string | null>(null);
 
-  const { data } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ['reportes-tenant'],
-    queryFn: async () => (await apiClient.get<PaginaResultado<ReporteTenant>>('/reportes-tenant', { params: { tamanoPagina: 50 } })).data,
+    queryFn: async () =>
+      (await apiClient.get<PaginaResultado<TicketConUltimoMensaje>>('/reportes-tenant', { params: { tamanoPagina: 50 } })).data,
+    refetchInterval: 20_000,
   });
 
-  const crear = useMutation({
-    mutationFn: async () => apiClient.post('/reportes-tenant', { asunto, descripcion, categoria }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['reportes-tenant'] });
-      setAsunto('');
-      setDescripcion('');
-      setCategoria('DUDA');
-      setError(null);
-    },
-    onError: (err) => setError(mensajeErrorApi(err, 'No se pudo enviar el reporte. Revisá los datos.')),
-  });
-
-  function onSubmit(e: FormEvent) {
-    e.preventDefault();
-    setError(null);
-    crear.mutate();
-  }
+  const ticketActivo = data?.datos.find((t) => t.id === ticketSeleccionado);
 
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Soporte</h1>
-        <p className="text-sm text-slate-500 dark:text-slate-400">
-          Reportá un problema, una duda o una idea — lo recibe directamente el equipo de la plataforma.
-        </p>
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Soporte</h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            Reportá un problema, una duda o una idea — lo recibe directamente el equipo de la plataforma.
+          </p>
+        </div>
+        <Button onClick={() => navigate('/soporte/nuevo')}>Nuevo reporte</Button>
       </div>
 
-      <Card titulo="Nuevo reporte">
-        <form onSubmit={onSubmit} className="space-y-3">
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_12rem]">
-            <FormField id="soporte-asunto" label="Asunto" value={asunto} onChange={(e) => setAsunto(e.target.value)} required />
-            <div className="flex flex-col gap-1">
-              <label htmlFor="soporte-categoria" className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                Categoría
-              </label>
-              <Select id="soporte-categoria" value={categoria} onChange={(e) => setCategoria(e.target.value as Categoria)}>
-                {Object.entries(ETIQUETA_CATEGORIA).map(([valor, etiqueta]) => (
-                  <option key={valor} value={valor}>
-                    {etiqueta}
-                  </option>
-                ))}
-              </Select>
+      <div className="flex h-[calc(100vh-220px)] min-h-[420px] overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
+        <div className="flex w-80 shrink-0 flex-col border-r border-slate-200 dark:border-slate-800">
+          <div className="flex-1 overflow-y-auto">
+            {isLoading && <p className="p-4 text-sm text-slate-500 dark:text-slate-400">Cargando…</p>}
+            {!isLoading && data?.datos.length === 0 && (
+              <div className="p-4">
+                <EstadoVacio titulo="Sin tickets todavía" descripcion="Cuando crees uno, lo vas a ver listado acá con su estado y la conversación completa." />
+              </div>
+            )}
+            <div className="divide-y divide-slate-100 dark:divide-slate-800">
+              {data?.datos.map((t) => {
+                const seleccionado = ticketSeleccionado === t.id;
+                const ultimoMensaje = t.mensajes[0];
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => setTicketSeleccionado(t.id)}
+                    className={`flex w-full flex-col gap-1 px-4 py-3 text-left hover:bg-slate-50 dark:hover:bg-slate-800/60 ${
+                      seleccionado ? 'bg-slate-50 dark:bg-slate-800/60' : ''
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="truncate font-medium text-slate-900 dark:text-slate-100">{t.asunto}</span>
+                      <span className="shrink-0 text-xs text-slate-400">{new Date(t.ultimoMensajeEn).toLocaleDateString('es-DO')}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="truncate text-xs text-slate-500 dark:text-slate-400">
+                        {ultimoMensaje ? textoPlanoDesdeTiptap(ultimoMensaje.cuerpo) : ETIQUETA_CATEGORIA_SOPORTE[t.categoria]}
+                      </span>
+                      <Badge tono={TONO_ESTADO_SOPORTE[t.estado]}>{ETIQUETA_ESTADO_SOPORTE[t.estado]}</Badge>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           </div>
-          <div className="flex flex-col gap-1">
-            <label htmlFor="soporte-descripcion" className="text-sm font-medium text-slate-700 dark:text-slate-300">
-              Descripción
-            </label>
-            <textarea
-              id="soporte-descripcion"
-              rows={4}
-              value={descripcion}
-              onChange={(e) => setDescripcion(e.target.value)}
-              placeholder="Contanos qué pasó o qué necesitás — cuanto más detalle, más rápido lo podemos resolver."
-              required
-              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-            />
-          </div>
-          {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
-          <Button type="submit" disabled={crear.isPending}>
-            {crear.isPending ? 'Enviando…' : 'Enviar reporte'}
-          </Button>
-        </form>
-      </Card>
+        </div>
 
-      <Card sinPadding titulo="Tus reportes" descripcion={data ? `${data.total} reporte(s)` : undefined}>
-        {data?.datos.length === 0 ? (
-          <div className="p-5">
-            <EstadoVacio titulo="Sin reportes todavía" descripcion="Cuando envíes uno, lo vas a ver listado acá con su estado y la respuesta del equipo." />
-          </div>
-        ) : (
-          <div className="divide-y divide-slate-100 dark:divide-slate-800">
-            {data?.datos.map((r) => (
-              <div key={r.id} className="space-y-2 p-5">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="font-medium text-slate-900 dark:text-slate-100">{r.asunto}</p>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">
-                      {ETIQUETA_CATEGORIA[r.categoria]} — {new Date(r.createdAt).toLocaleDateString('es-DO')}
-                    </p>
-                  </div>
-                  <Badge tono={TONO_ESTADO[r.estado]}>{ETIQUETA_ESTADO[r.estado]}</Badge>
-                </div>
-                <p className="whitespace-pre-wrap text-sm text-slate-600 dark:text-slate-400">{r.descripcion}</p>
-                {r.respuesta && (
-                  <div className="rounded-lg border border-sol-200 bg-sol-50 p-3 text-sm dark:border-sol-900 dark:bg-sol-900/20">
-                    <p className="font-medium text-sol-800 dark:text-sol-300">Respuesta del equipo</p>
-                    <p className="text-slate-700 dark:text-slate-300">{r.respuesta}</p>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-      </Card>
+        <div className="flex-1">
+          {ticketActivo ? (
+            <ConversacionSoporte key={ticketActivo.id} ticket={ticketActivo} />
+          ) : (
+            <div className="flex h-full items-center justify-center p-6">
+              <EstadoVacio titulo="Elegí un ticket" descripcion="Seleccioná uno de la lista para ver la conversación completa." />
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

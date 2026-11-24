@@ -1,7 +1,8 @@
-import { Body, Controller, Get, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { ReportesTenantService } from './reportes-tenant.service';
 import { CrearReporteTenantDto } from './dto/crear-reporte-tenant.dto';
+import { CrearMensajeReporteTenantDto } from './dto/crear-mensaje-reporte-tenant.dto';
 import { ListadoQueryDto } from '../common/dto/listado-query.dto';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtPayloadUser } from '../common/types/authenticated-request';
@@ -26,5 +27,15 @@ export class ReportesTenantController {
   @Get()
   listar(@Query() query: ListadoQueryDto) {
     return this.reportesTenantService.listarPropios(query);
+  }
+
+  @Get(':id/mensajes')
+  listarMensajes(@Param('id') id: string) {
+    return this.reportesTenantService.listarMensajes(id);
+  }
+
+  @Post(':id/mensajes')
+  agregarMensaje(@Param('id') id: string, @Body() dto: CrearMensajeReporteTenantDto, @CurrentUser() user: JwtPayloadUser) {
+    return this.reportesTenantService.agregarMensaje(id, dto, user.userId);
   }
 }
