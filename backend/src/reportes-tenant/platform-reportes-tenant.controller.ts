@@ -1,8 +1,9 @@
-import { Body, Controller, Get, Param, Patch, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { PlatformReportesTenantService } from './platform-reportes-tenant.service';
 import { ListarReportesTenantQueryDto } from './dto/listar-reportes-tenant-query.dto';
-import { ResponderReporteTenantDto } from './dto/responder-reporte-tenant.dto';
+import { CrearMensajeReporteTenantDto } from './dto/crear-mensaje-reporte-tenant.dto';
+import { CambiarEstadoReporteTenantDto } from './dto/cambiar-estado-reporte-tenant.dto';
 import { Public } from '../common/decorators/public.decorator';
 import { PlatformPermissions } from '../common/decorators/platform-permissions.decorator';
 import { PlatformAuthGuard } from '../platform-auth/guards/platform-auth.guard';
@@ -31,9 +32,27 @@ export class PlatformReportesTenantController {
     return this.platformReportesTenantService.contarNuevos();
   }
 
-  @Patch(':id')
+  @Get(':id')
   @PlatformPermissions('platform.soporte.gestionar')
-  responder(@Param('id') id: string, @Body() dto: ResponderReporteTenantDto, @CurrentPlatformAdmin() admin: PlatformAdminPayload) {
-    return this.platformReportesTenantService.responder(id, dto, admin.adminId);
+  buscarPorId(@Param('id') id: string) {
+    return this.platformReportesTenantService.buscarPorId(id);
+  }
+
+  @Get(':id/mensajes')
+  @PlatformPermissions('platform.soporte.gestionar')
+  listarMensajes(@Param('id') id: string) {
+    return this.platformReportesTenantService.listarMensajes(id);
+  }
+
+  @Post(':id/mensajes')
+  @PlatformPermissions('platform.soporte.gestionar')
+  agregarMensaje(@Param('id') id: string, @Body() dto: CrearMensajeReporteTenantDto, @CurrentPlatformAdmin() admin: PlatformAdminPayload) {
+    return this.platformReportesTenantService.agregarMensaje(id, dto, admin.adminId);
+  }
+
+  @Patch(':id/estado')
+  @PlatformPermissions('platform.soporte.gestionar')
+  cambiarEstado(@Param('id') id: string, @Body() dto: CambiarEstadoReporteTenantDto) {
+    return this.platformReportesTenantService.cambiarEstado(id, dto);
   }
 }

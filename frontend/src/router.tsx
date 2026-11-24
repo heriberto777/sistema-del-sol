@@ -127,6 +127,7 @@ import { MisTareas } from './pages/MisTareas';
 import { TareaPersonalVer } from './pages/TareaPersonalVer';
 import { CategoriasIncentivo } from './pages/CategoriasIncentivo';
 import { Soporte } from './pages/Soporte';
+import { SoporteNuevo } from './pages/SoporteNuevo';
 import { Auditoria } from './pages/Auditoria';
 import { CrmLeads } from './pages/CrmLeads';
 import { LeadNuevo } from './pages/crm/LeadNuevo';
@@ -418,6 +419,7 @@ const RUTAS_ADMIN = [
           { path: '/mis-tareas/categorias-incentivo', element: <CategoriasIncentivo /> },
           { path: '/mis-tareas/:id', element: <TareaPersonalVer /> },
           { path: '/soporte', element: <Soporte /> },
+          { path: '/soporte/nuevo', element: <SoporteNuevo /> },
           { path: '/travel/resumen', element: <TravelResumen /> },
           { path: '/travel/reservas', element: <TravelReservasLista /> },
           { path: '/travel/buscar-vuelo', element: <TravelBuscarVuelo /> },

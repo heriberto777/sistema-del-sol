@@ -193,7 +193,7 @@ model PlatformAdmin {
 
   auditLogs                  PlatformAuditLog[]
   pagosPlataformaRegistrados PagoPlataforma[]
-  reportesTenantRespondidos  ReporteTenant[]
+  mensajesReporteTenant      ReporteTenantMensaje[]
 
   @@map("platform_admins")
 }
@@ -825,6 +825,7 @@ model User {
   comentariosDocumento                  ComentarioDocumento[]      @relation("ComentarioDocumentoAutor")
   comentariosDocumentoMencionado         ComentarioDocumento[]      @relation("ComentarioDocumentoMencionado")
   reportesTenant                         ReporteTenant[]
+  mensajesReporteTenant                  ReporteTenantMensaje[]
 
   @@unique([tenantId, email])
   @@map("users")
@@ -5955,6 +5956,11 @@ enum EstadoReporteTenant {
   RESUELTO
 }
 
+enum AutorMensajeReporte {
+  TENANT
+  SOPORTE
+}
+
 /// Canal para que un usuario del tenant le reporte un problema o duda a
 /// la plataforma (super admin) — v1 deliberadamente liviano, sin
 /// notificación por email ni SLA: el super admin ve los pendientes por
@@ -5963,6 +5969,11 @@ enum EstadoReporteTenant {
 /// autenticado del tenant puede crear uno, sin permiso nuevo — mismo
 /// criterio que GRUPO_MI_ESPACIO en el frontend (utilidad personal, no
 /// un módulo de negocio).
+///
+/// Rediseño (v2): el ticket es ahora un "shell" — asunto/categoría/estado
+/// más el hilo completo en `ReporteTenantMensaje` (el `descripcion`
+/// original pasó a ser el mensaje #1). `ultimoMensajeEn` ordena la
+/// bandeja estilo inbox (ver Mensajes.tsx de WhatsApp, mismo patrón).
 model ReporteTenant {
   id              String                 @id @default(uuid())
   tenantId        String
@@ -5970,17 +5981,40 @@ model ReporteTenant {
   usuarioId       String
   usuario         User                   @relation(fields: [usuarioId], references: [id])
   asunto          String
-  descripcion     String                 @db.Text
   categoria       CategoriaReporteTenant
   estado          EstadoReporteTenant    @default(NUEVO)
-  respuesta       String?                @db.Text
-  respondidoPorId String?
-  // SetNull: borrar el admin de plataforma que respondió no debe hacer
-  // desaparecer la respuesta ya dada — mismo criterio que
-  // PlatformAuditLog.adminId.
-  respondidoPor   PlatformAdmin?         @relation(fields: [respondidoPorId], references: [id], onDelete: SetNull)
-  respondidoEn    DateTime?
+  ultimoMensajeEn DateTime               @default(now())
   createdAt       DateTime               @default(now())
+  mensajes        ReporteTenantMensaje[]
 
+  @@index([tenantId, estado])
   @@map("reportes_tenant")
+}
+
+/// Hija sin tenantId propio (mismo patrón que LineaFactura/Stock) — su
+/// aislamiento depende de llegar siempre vía un ReporteTenant ya resuelto
+/// contra el tenant (ver ReportesTenantService/PlatformReportesTenantService).
+/// `cuerpo` es un documento de Tiptap (JSON), validado server-side contra
+/// una lista blanca de tipos de nodo/marca antes de guardar — nunca HTML
+/// crudo. `adjuntoBase64` sigue el mismo criterio que `ImagenProducto.imagen`
+/// (sin storage externo), con límite de tamaño en el DTO.
+model ReporteTenantMensaje {
+  id             String              @id @default(uuid())
+  reporteId      String
+  reporte        ReporteTenant       @relation(fields: [reporteId], references: [id], onDelete: Cascade)
+  autorTipo      AutorMensajeReporte
+  autorUsuarioId String?
+  autorUsuario   User?               @relation(fields: [autorUsuarioId], references: [id], onDelete: SetNull)
+  autorAdminId   String?
+  // SetNull: borrar el admin de plataforma que respondió no debe hacer
+  // desaparecer el mensaje ya enviado — mismo criterio que
+  // PlatformAuditLog.adminId.
+  autorAdmin     PlatformAdmin?      @relation(fields: [autorAdminId], references: [id], onDelete: SetNull)
+  cuerpo         Json
+  adjuntoBase64  String?             @db.Text
+  adjuntoNombre  String?
+  createdAt      DateTime            @default(now())
+
+  @@index([reporteId, createdAt])
+  @@map("reportes_tenant_mensajes")
 }
