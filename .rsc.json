@@ -55,6 +55,7 @@
     "emoji",
     "trunk-open"
   ],
+  "memory": false,
   "gitPermissions": false,
   "onboarding": {
     "schemaVersion": 1,
