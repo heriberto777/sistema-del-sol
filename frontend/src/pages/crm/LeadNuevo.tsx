@@ -33,8 +33,11 @@ export function LeadNuevo() {
     },
     onSuccess: ({ data: lead }) => {
       queryClient.invalidateQueries({ queryKey: ['crm-leads'] });
+      // Ver el comentario equivalente en FacturacionNueva.tsx — sin esto,
+      // el guard de salir sin guardar bloqueaba este mismo `navigate()`
+      // justo después de crear bien.
       confirmarGuardado();
-      navigate(`/crm/leads/${lead.id}`);
+      setTimeout(() => navigate(`/crm/leads/${lead.id}`), 0);
     },
     onError: (err) => setError(mensajeErrorApi(err, 'No se pudo guardar el lead.')),
   });

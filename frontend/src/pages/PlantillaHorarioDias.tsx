@@ -73,8 +73,11 @@ export function PlantillaHorarioDias() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['plantilla-horario-dias', id] });
       queryClient.invalidateQueries({ queryKey: ['admin-plantillas-horario'] });
+      // Ver el comentario equivalente en FacturacionNueva.tsx — sin esto,
+      // el guard de salir sin guardar bloqueaba este mismo `navigate()`
+      // justo después de guardar bien.
       confirmarGuardado();
-      navigate('/plantillas-horario');
+      setTimeout(() => navigate('/plantillas-horario'), 0);
     },
     onError: (e: unknown) => {
       const mensaje = (e as { response?: { data?: { message?: string } } })?.response?.data?.message;

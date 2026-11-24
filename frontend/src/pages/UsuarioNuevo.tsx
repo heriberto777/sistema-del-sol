@@ -34,8 +34,11 @@ export function UsuarioNuevo() {
     mutationFn: async () => apiClient.post('/admin/usuarios', { email, nombre, password, rolIds, telefono: telefono || undefined }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-usuarios'] });
+      // Ver el comentario equivalente en FacturacionNueva.tsx — sin esto,
+      // el guard de salir sin guardar bloqueaba este mismo `navigate()`
+      // justo después de crear bien.
       confirmarGuardado();
-      navigate('/usuarios');
+      setTimeout(() => navigate('/usuarios'), 0);
     },
     onError: (err) => setError(mensajeErrorApi(err, 'No se pudo crear el usuario. Revisa los datos.')),
   });

@@ -89,8 +89,11 @@ export function InventarioAjusteVer() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ajustes-inventario'] });
       queryClient.invalidateQueries({ queryKey: ['ajuste-inventario', id] });
+      // Ver el comentario equivalente en FacturacionNueva.tsx — sin esto,
+      // el guard de salir sin guardar bloqueaba este mismo `navigate()`
+      // justo después de guardar bien.
       confirmarGuardado();
-      navigate('/inventario/ajustes');
+      setTimeout(() => navigate('/inventario/ajustes'), 0);
     },
     onError: (err) => setError(mensajeErrorApi(err, 'No se pudo guardar el ajuste. Revisa los datos.')),
   });

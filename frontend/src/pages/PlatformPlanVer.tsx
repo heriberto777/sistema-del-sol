@@ -87,8 +87,11 @@ export function PlatformPlanVer() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['platform-planes'] });
+      // Ver el comentario equivalente en FacturacionNueva.tsx — sin esto,
+      // el guard de salir sin guardar bloqueaba este mismo `navigate()`
+      // justo después de guardar bien.
       confirmarGuardado();
-      navigate('/plataforma/planes');
+      setTimeout(() => navigate('/plataforma/planes'), 0);
     },
     onError: (err) => setError(mensajeErrorApi(err, 'No se pudo guardar el plan. Revisa que el nombre no esté repetido.')),
   });

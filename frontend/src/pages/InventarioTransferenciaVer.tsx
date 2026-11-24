@@ -77,8 +77,11 @@ export function InventarioTransferenciaVer() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['transferencias-inventario'] });
       queryClient.invalidateQueries({ queryKey: ['transferencia-inventario', id] });
+      // Ver el comentario equivalente en FacturacionNueva.tsx — sin esto,
+      // el guard de salir sin guardar bloqueaba este mismo `navigate()`
+      // justo después de guardar bien.
       confirmarGuardado();
-      navigate('/inventario/transferencias');
+      setTimeout(() => navigate('/inventario/transferencias'), 0);
     },
     onError: (err) => setError(mensajeErrorApi(err, 'No se pudo guardar la transferencia. Revisa los datos.')),
   });

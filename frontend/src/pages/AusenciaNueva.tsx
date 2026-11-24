@@ -80,8 +80,11 @@ export function AusenciaNueva() {
         motivo: motivo || undefined,
       }),
     onSuccess: () => {
+      // Ver el comentario equivalente en FacturacionNueva.tsx — sin esto,
+      // el guard de salir sin guardar bloqueaba este mismo `navigate()`
+      // justo después de crear bien.
       confirmarGuardado();
-      navigate('/ausencias');
+      setTimeout(() => navigate('/ausencias'), 0);
     },
     onError: (e: unknown) => {
       const mensaje = (e as { response?: { data?: { message?: string } } })?.response?.data?.message;

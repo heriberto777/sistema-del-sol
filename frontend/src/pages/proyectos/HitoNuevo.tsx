@@ -32,8 +32,11 @@ export function HitoNuevo() {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['proyecto', proyectoId] });
+      // Ver el comentario equivalente en FacturacionNueva.tsx — sin esto,
+      // el guard de salir sin guardar bloqueaba este mismo `navigate()`
+      // justo después de crear bien.
       confirmarGuardado();
-      navigate(`/proyectos/${proyectoId}/hitos`);
+      setTimeout(() => navigate(`/proyectos/${proyectoId}/hitos`), 0);
     },
     onError: (err) => setError(mensajeErrorApi(err, 'No se pudo crear el hito.')),
   });

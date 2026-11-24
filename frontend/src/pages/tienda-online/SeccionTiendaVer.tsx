@@ -133,8 +133,11 @@ export function SeccionTiendaVer() {
       esNueva ? apiClient.post('/admin/ecommerce/secciones', dto) : apiClient.patch(`/admin/ecommerce/secciones/${id}`, dto),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-secciones-tienda'] });
+      // Ver el comentario equivalente en FacturacionNueva.tsx — sin esto,
+      // el guard de salir sin guardar bloqueaba este mismo `navigate()`
+      // justo después de guardar bien.
       confirmarGuardado();
-      navigate('/tienda-online/secciones');
+      setTimeout(() => navigate('/tienda-online/secciones'), 0);
     },
     onError: (err: unknown) => {
       const mensaje =

@@ -47,8 +47,11 @@ export function EtapaPipelineVer() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['crm-etapas-pipeline'] });
+      // Ver el comentario equivalente en FacturacionNueva.tsx — sin esto,
+      // el guard de salir sin guardar bloqueaba este mismo `navigate()`
+      // justo después de guardar bien.
       confirmarGuardado();
-      navigate('/crm/etapas-pipeline');
+      setTimeout(() => navigate('/crm/etapas-pipeline'), 0);
     },
     onError: (err) => setError(mensajeErrorApi(err, 'No se pudo guardar la etapa.')),
   });

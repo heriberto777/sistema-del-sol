@@ -77,8 +77,11 @@ export function RolVer() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-roles'] });
+      // Ver el comentario equivalente en FacturacionNueva.tsx — sin esto,
+      // el guard de salir sin guardar bloqueaba este mismo `navigate()`
+      // justo después de guardar bien.
       confirmarGuardado();
-      navigate('/roles-permisos');
+      setTimeout(() => navigate('/roles-permisos'), 0);
     },
     onError: (err) => setError(mensajeErrorApi(err, 'No se pudo guardar el rol. Revisa que el nombre no esté repetido y que haya al menos un permiso.')),
   });

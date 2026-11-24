@@ -89,8 +89,11 @@ export function ProyectoEditar() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['proyectos'] });
       queryClient.invalidateQueries({ queryKey: ['proyecto', id] });
+      // Ver el comentario equivalente en FacturacionNueva.tsx — sin esto,
+      // el guard de salir sin guardar bloqueaba este mismo `navigate()`
+      // justo después de guardar bien.
       confirmarGuardado();
-      navigate(`/proyectos/${id}/resumen`);
+      setTimeout(() => navigate(`/proyectos/${id}/resumen`), 0);
     },
     onError: (err) => setError(mensajeErrorApi(err, 'No se pudo guardar el proyecto.')),
   });

@@ -80,8 +80,11 @@ export function ProyectoNuevo() {
     },
     onSuccess: (proyecto) => {
       queryClient.invalidateQueries({ queryKey: ['proyectos'] });
+      // Ver el comentario equivalente en FacturacionNueva.tsx — sin esto,
+      // el guard de salir sin guardar bloqueaba este mismo `navigate()`
+      // justo después de crear bien.
       confirmarGuardado();
-      navigate(`/proyectos/${proyecto.id}/resumen`);
+      setTimeout(() => navigate(`/proyectos/${proyecto.id}/resumen`), 0);
     },
     onError: (err) => setError(mensajeErrorApi(err, 'No se pudo crear el proyecto.')),
   });

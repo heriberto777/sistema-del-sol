@@ -39,8 +39,11 @@ export function CatalogoCuentaNueva() {
     mutationFn: async () => apiClient.post('/contabilidad/cuentas', { codigo, nombre, tipo, naturaleza, cuentaPadreId: cuentaPadreId || undefined }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['contabilidad-cuentas'] });
+      // Ver el comentario equivalente en FacturacionNueva.tsx — sin esto,
+      // el guard de salir sin guardar bloqueaba este mismo `navigate()`
+      // justo después de crear bien.
       confirmarGuardado();
-      navigate('/contabilidad/cuentas');
+      setTimeout(() => navigate('/contabilidad/cuentas'), 0);
     },
     onError: (err) => setError(mensajeErrorApi(err, 'No se pudo crear la cuenta — revisá que el código no esté repetido.')),
   });

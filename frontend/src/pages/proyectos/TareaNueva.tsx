@@ -44,8 +44,13 @@ export function TareaNueva() {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['proyecto', proyectoId] });
+      // Ver el comentario equivalente en FacturacionNueva.tsx — sin esto,
+      // el guard de salir sin guardar bloqueaba este mismo `navigate()`
+      // justo después de crear bien (bug real: la tarea quedaba creada en
+      // el backend pero el usuario se quedaba atascado en "¿Salir sin
+      // guardar?", y si reenviaba el formulario, duplicaba la tarea).
       confirmarGuardado();
-      navigate(`/proyectos/${proyectoId}/tablero`);
+      setTimeout(() => navigate(`/proyectos/${proyectoId}/tablero`), 0);
     },
     onError: (err) => setError(mensajeErrorApi(err, 'No se pudo crear la tarea.')),
   });

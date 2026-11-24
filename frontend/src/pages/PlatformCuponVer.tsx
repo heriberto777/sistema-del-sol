@@ -80,8 +80,11 @@ export function PlatformCuponVer() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['platform-cupones'] });
+      // Ver el comentario equivalente en FacturacionNueva.tsx — sin esto,
+      // el guard de salir sin guardar bloqueaba este mismo `navigate()`
+      // justo después de guardar bien.
       confirmarGuardado();
-      navigate('/plataforma/cupones');
+      setTimeout(() => navigate('/plataforma/cupones'), 0);
     },
     onError: (err) => setError(mensajeErrorApi(err, 'No se pudo guardar el cupón. Revisa que el código no esté repetido.')),
   });

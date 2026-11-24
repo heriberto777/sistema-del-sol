@@ -48,8 +48,11 @@ export function EmpleadoNuevo() {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['nomina-empleados'] });
+      // Ver el comentario equivalente en FacturacionNueva.tsx — sin esto,
+      // el guard de salir sin guardar bloqueaba este mismo `navigate()`
+      // justo después de crear bien.
       confirmarGuardado();
-      navigate('/nomina/empleados');
+      setTimeout(() => navigate('/nomina/empleados'), 0);
     },
     onError: (err) => setError(mensajeErrorApi(err, 'No se pudo crear el empleado — revisá que la cédula y el usuario vinculado no estén repetidos.')),
   });

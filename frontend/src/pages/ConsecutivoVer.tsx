@@ -66,8 +66,11 @@ export function ConsecutivoVer() {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-correlativos'] });
+      // Ver el comentario equivalente en FacturacionNueva.tsx — sin esto,
+      // el guard de salir sin guardar bloqueaba este mismo `navigate()`
+      // justo después de guardar bien.
       confirmarGuardado();
-      navigate('/consecutivos');
+      setTimeout(() => navigate('/consecutivos'), 0);
     },
     onError: (err) => setError(mensajeErrorApi(err, 'No se pudo guardar el consecutivo.')),
   });

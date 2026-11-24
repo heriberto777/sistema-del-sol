@@ -33,8 +33,11 @@ export function BodegaNueva() {
     mutationFn: async () => apiClient.post('/inventario/bodegas', { nombre, direccion: direccion || undefined, sucursalId }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['bodegas'] });
+      // Ver el comentario equivalente en FacturacionNueva.tsx — sin esto,
+      // el guard de salir sin guardar bloqueaba este mismo `navigate()`
+      // justo después de crear bien.
       confirmarGuardado();
-      navigate('/inventario/stock');
+      setTimeout(() => navigate('/inventario/stock'), 0);
     },
     onError: (err) => setError(mensajeErrorApi(err, 'No se pudo crear la bodega.')),
   });

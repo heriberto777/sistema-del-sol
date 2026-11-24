@@ -30,8 +30,11 @@ export function SucursalNueva() {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['sucursales'] });
+      // Ver el comentario equivalente en FacturacionNueva.tsx — sin esto,
+      // el guard de salir sin guardar bloqueaba este mismo `navigate()`
+      // justo después de crear bien.
       confirmarGuardado();
-      navigate('/sucursales');
+      setTimeout(() => navigate('/sucursales'), 0);
     },
     onError: (e: unknown) => {
       const mensaje = (e as { response?: { data?: { message?: string } } })?.response?.data?.message;

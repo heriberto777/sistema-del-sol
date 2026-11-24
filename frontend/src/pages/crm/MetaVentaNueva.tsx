@@ -33,8 +33,11 @@ export function MetaVentaNueva() {
     mutationFn: async () => apiClient.post('/crm/metas-venta', { vendedorId, anio, mes, montoMeta: Number(montoMeta) }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['crm-metas-venta'] });
+      // Ver el comentario equivalente en FacturacionNueva.tsx — sin esto,
+      // el guard de salir sin guardar bloqueaba este mismo `navigate()`
+      // justo después de crear bien.
       confirmarGuardado();
-      navigate('/crm/metas-venta');
+      setTimeout(() => navigate('/crm/metas-venta'), 0);
     },
     onError: (err) => setError(mensajeErrorApi(err, 'No se pudo guardar la meta.')),
   });

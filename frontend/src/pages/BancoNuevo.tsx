@@ -37,8 +37,11 @@ export function BancoNuevo() {
     mutationFn: async () => apiClient.post('/bancos', { banco, numeroCuenta, tipoCuenta, cuentaContableId }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['bancos'] });
+      // Ver el comentario equivalente en FacturacionNueva.tsx — sin esto,
+      // el guard de salir sin guardar bloqueaba este mismo `navigate()`
+      // justo después de crear bien.
       confirmarGuardado();
-      navigate('/bancos');
+      setTimeout(() => navigate('/bancos'), 0);
     },
     onError: (err) => setError(mensajeErrorApi(err, 'No se pudo guardar la cuenta bancaria. Revisa los datos.')),
   });

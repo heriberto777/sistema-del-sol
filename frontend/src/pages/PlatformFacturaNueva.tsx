@@ -50,8 +50,11 @@ export function PlatformFacturaNueva() {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['platform-facturas'] });
+      // Ver el comentario equivalente en FacturacionNueva.tsx — sin esto,
+      // el guard de salir sin guardar bloqueaba este mismo `navigate()`
+      // justo después de crear bien.
       confirmarGuardado();
-      navigate('/plataforma/facturas');
+      setTimeout(() => navigate('/plataforma/facturas'), 0);
     },
     onError: (err) => setError(mensajeErrorApi(err, 'No se pudo crear la factura — revisa el tenant y los montos.')),
   });
