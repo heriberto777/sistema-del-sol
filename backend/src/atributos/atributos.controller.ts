@@ -6,9 +6,11 @@ import { CrearValorAtributoDto } from './dto/crear-valor-atributo.dto';
 import { Permissions } from '../common/decorators/permissions.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtPayloadUser } from '../common/types/authenticated-request';
+import { RequiereModulo } from '../common/decorators/requiere-modulo.decorator';
 
 @ApiBearerAuth()
 @ApiTags('atributos')
+@RequiereModulo('productos')
 @Controller('atributos')
 export class AtributosController {
   constructor(private readonly atributosService: AtributosService) {}

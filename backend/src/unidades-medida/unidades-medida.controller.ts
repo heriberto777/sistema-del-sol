@@ -5,9 +5,11 @@ import { CrearUnidadMedidaDto } from './dto/crear-unidad-medida.dto';
 import { Permissions } from '../common/decorators/permissions.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtPayloadUser } from '../common/types/authenticated-request';
+import { RequiereModulo } from '../common/decorators/requiere-modulo.decorator';
 
 @ApiBearerAuth()
 @ApiTags('unidades-medida')
+@RequiereModulo('productos')
 @Controller('unidades-medida')
 export class UnidadesMedidaController {
   constructor(private readonly unidadesMedidaService: UnidadesMedidaService) {}

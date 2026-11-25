@@ -5,10 +5,12 @@ import { CrearCajaDto } from './dto/crear-caja.dto';
 import { Permissions } from '../common/decorators/permissions.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtPayloadUser } from '../common/types/authenticated-request';
+import { RequiereModulo } from '../common/decorators/requiere-modulo.decorator';
 
 /** Ítem E-7 — "Caja" como entidad propia (terminal física de POS), distinta de Bodega y de TurnoCaja. */
 @ApiBearerAuth()
 @ApiTags('cajas')
+@RequiereModulo('pos')
 @Controller('cajas')
 export class CajasController {
   constructor(private readonly cajasService: CajasService) {}

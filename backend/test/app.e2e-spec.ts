@@ -3304,6 +3304,19 @@ describe('App (e2e)', () => {
         update: {},
         create: { clave: 'facturacion', nombre: 'Facturación' },
       });
+      // Auditoría de menú (reportada por el usuario): "Reglas de markup" de
+      // Travel aparecía sin el módulo activo, y varios catálogos de
+      // Productos (Categorías/Atributos/Unidades de medida/Leyes
+      // fiscales/Niveles de precio) y Cajas (POS) no tenían NINGÚN
+      // @RequiereModulo en su controller — no solo un ítem de menú de más,
+      // el backend tampoco bloqueaba nada. Se agregó acá el módulo
+      // `productos` al mismo par de planes ya existente para probar el
+      // enforcement real de esos 5 controllers, sin duplicar todo el setup.
+      const moduloProductos = await prisma.modulo.upsert({
+        where: { clave: 'productos' },
+        update: {},
+        create: { clave: 'productos', nombre: 'Productos' },
+      });
 
       const planSinPos = await prisma.plan.upsert({
         where: { nombre: 'E2E Básico Sin POS' },
@@ -3325,12 +3338,14 @@ describe('App (e2e)', () => {
         data: [
           { planId: planConPosId, moduloId: moduloFacturacion.id },
           { planId: planConPosId, moduloId: moduloPosId },
+          { planId: planConPosId, moduloId: moduloProductos.id },
         ],
       });
 
-      // 'pos.ver'/'contabilidad.ver' ya fueron sembrados por crearPermisos() más arriba.
+      // 'pos.ver'/'contabilidad.ver'/'precios.ver' ya fueron sembrados por crearPermisos() más arriba.
       const permisoPosVer = await prisma.permission.findUniqueOrThrow({ where: { clave: 'pos.ver' } });
       const permisoContabilidadVer = await prisma.permission.findUniqueOrThrow({ where: { clave: 'contabilidad.ver' } });
+      const permisoPreciosVer = await prisma.permission.findUniqueOrThrow({ where: { clave: 'precios.ver' } });
       const passwordHash = await bcrypt.hash(PASSWORD, 10);
 
       const tenantSinPos = await prisma.tenant.create({
@@ -3342,6 +3357,7 @@ describe('App (e2e)', () => {
         data: [
           { roleId: rolSinPos.id, permissionId: permisoPosVer.id },
           { roleId: rolSinPos.id, permissionId: permisoContabilidadVer.id },
+          { roleId: rolSinPos.id, permissionId: permisoPreciosVer.id },
         ],
       });
       const usuarioSinPos = await prisma.user.create({
@@ -3358,6 +3374,7 @@ describe('App (e2e)', () => {
         data: [
           { roleId: rolConPos.id, permissionId: permisoPosVer.id },
           { roleId: rolConPos.id, permissionId: permisoContabilidadVer.id },
+          { roleId: rolConPos.id, permissionId: permisoPreciosVer.id },
         ],
       });
       const usuarioConPos = await prisma.user.create({
@@ -3367,7 +3384,7 @@ describe('App (e2e)', () => {
 
       tokenSinPos = await login('admin@e2e-sin-pos.com', 'e2e-tenant-sin-pos');
       tokenConPos = await login('admin@e2e-con-pos.com', 'e2e-tenant-con-pos');
-    });
+    }, 30_000);
 
     afterAll(async () => {
       await prisma.tenant.deleteMany({ where: { id: { in: [tenantSinPosId, tenantConPosId] } } });
@@ -3385,6 +3402,13 @@ describe('App (e2e)', () => {
         .get('/api/contabilidad/cuentas')
         .set('Authorization', `Bearer ${tokenSinPos}`)
         .expect(200);
+    });
+
+    it('un tenant sin el módulo POS recibe 403 en /api/cajas (controller sin @RequiereModulo hasta ahora — bug real reportado)', async () => {
+      await request(app.getHttpServer())
+        .get('/api/cajas')
+        .set('Authorization', `Bearer ${tokenSinPos}`)
+        .expect(403);
     });
 
     it('una excepción pos:true habilita el módulo sin cambiar de plan', async () => {
@@ -3406,6 +3430,33 @@ describe('App (e2e)', () => {
         .set('Authorization', `Bearer ${tokenConPos}`)
         .expect(200);
     });
+
+    it('un tenant con el módulo POS accede bien a /api/cajas', async () => {
+      await request(app.getHttpServer())
+        .get('/api/cajas')
+        .set('Authorization', `Bearer ${tokenConPos}`)
+        .expect(200);
+    });
+
+    it.each(['/api/categorias', '/api/atributos', '/api/unidades-medida', '/api/leyes-fiscales', '/api/listas-precio'])(
+      'un tenant sin el módulo Productos recibe 403 en %s (controller sin @RequiereModulo hasta ahora — bug real reportado)',
+      async (ruta) => {
+        await request(app.getHttpServer())
+          .get(ruta)
+          .set('Authorization', `Bearer ${tokenSinPos}`)
+          .expect(403);
+      },
+    );
+
+    it.each(['/api/categorias', '/api/atributos', '/api/unidades-medida', '/api/leyes-fiscales', '/api/listas-precio'])(
+      'un tenant con el módulo Productos accede bien a %s',
+      async (ruta) => {
+        await request(app.getHttpServer())
+          .get(ruta)
+          .set('Authorization', `Bearer ${tokenConPos}`)
+          .expect(200);
+      },
+    );
   });
 
   /**

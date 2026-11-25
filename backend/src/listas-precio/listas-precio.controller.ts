@@ -5,9 +5,11 @@ import { CrearListaPrecioDto } from './dto/crear-lista-precio.dto';
 import { Permissions } from '../common/decorators/permissions.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtPayloadUser } from '../common/types/authenticated-request';
+import { RequiereModulo } from '../common/decorators/requiere-modulo.decorator';
 
 @ApiBearerAuth()
 @ApiTags('listas-precio')
+@RequiereModulo('productos')
 @Controller('listas-precio')
 export class ListasPrecioController {
   constructor(private readonly listasPrecioService: ListasPrecioService) {}

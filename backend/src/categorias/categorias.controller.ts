@@ -5,9 +5,11 @@ import { CrearCategoriaDto } from './dto/crear-categoria.dto';
 import { Permissions } from '../common/decorators/permissions.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtPayloadUser } from '../common/types/authenticated-request';
+import { RequiereModulo } from '../common/decorators/requiere-modulo.decorator';
 
 @ApiBearerAuth()
 @ApiTags('categorias')
+@RequiereModulo('productos')
 @Controller('categorias')
 export class CategoriasController {
   constructor(private readonly categoriasService: CategoriasService) {}
