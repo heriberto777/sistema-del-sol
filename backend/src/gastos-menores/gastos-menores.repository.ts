@@ -37,6 +37,22 @@ export class GastosMenoresRepository {
   }
 
   /**
+   * Mismo cuerpo que `FacturacionRepository.obtenerRequiereComprobanteFiscal`
+   * — duplicado a propósito, misma razón que `obtenerModalidadFacturacion`
+   * arriba. Con esto en `false`, `GastosMenoresService.crear()` tampoco
+   * resuelve `tipoNcf` ni consume una secuencia — un negocio que no es
+   * contribuyente de la DGII (o que apagó el comprobante fiscal) no debería
+   * quedar bloqueado por no tener una secuencia B11/E43 configurada.
+   */
+  async obtenerRequiereComprobanteFiscal(tenantId: string): Promise<boolean> {
+    const tenant = await this.db.tenant.findUniqueOrThrow({
+      where: { id: tenantId },
+      select: { requiereComprobanteFiscal: true },
+    });
+    return tenant.requiereComprobanteFiscal;
+  }
+
+  /**
    * Mismo cuerpo atómico que `FacturacionRepository.siguienteNcfEnTx` (ver
    * ese archivo para la explicación completa de por qué `{ increment: 1 }`
    * es seguro bajo concurrencia) — duplicado a propósito, no importado,

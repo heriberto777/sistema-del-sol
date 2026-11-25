@@ -456,7 +456,11 @@ export function TenantVer() {
             titulo="Módulos"
             colapsada={modulosColapsada}
             onToggle={() => setModulosColapsada((v) => !v)}
-            resumen={tenant.modulosOverride.length === 0 ? 'Sin excepciones' : `${tenant.modulosOverride.length} excepción(es) sobre el plan`}
+            resumen={
+              !tenant.modulosOverride || tenant.modulosOverride.length === 0
+                ? 'Sin excepciones'
+                : `${tenant.modulosOverride.length} excepción(es) sobre el plan`
+            }
           >
             <div className="sm:col-span-2">
               <SeccionModulos tenantId={tenant.id} planNombre={tenant.plan?.nombre ?? 'Sin plan'} />

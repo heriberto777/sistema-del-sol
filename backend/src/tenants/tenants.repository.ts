@@ -34,8 +34,22 @@ export class TenantsRepository {
     });
   }
 
+  /**
+   * Mismo `include` que `listar()` — bug real reportado: sin esto,
+   * `GET /platform/tenants/:id` devolvía `plan`/`modulosOverride`/
+   * `suscripcion` como `undefined` (nunca `[]`/`null`), y la pantalla de
+   * detalle (`TenantVer.tsx`) reventaba en `tenant.modulosOverride.length`
+   * — además de mostrar "Sin plan" aunque el tenant sí tuviera uno.
+   */
   buscarPorId(id: string) {
-    return this.prisma.tenant.findUniqueOrThrow({ where: { id } });
+    return this.prisma.tenant.findUniqueOrThrow({
+      where: { id },
+      include: {
+        plan: true,
+        modulosOverride: { include: { modulo: true } },
+        suscripcion: { select: { fechaProximoCorte: true } },
+      },
+    });
   }
 
   async actualizar(

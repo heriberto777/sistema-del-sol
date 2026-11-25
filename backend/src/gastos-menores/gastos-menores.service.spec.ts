@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { GastosMenoresService } from './gastos-menores.service';
 import { GastosMenoresRepository } from './gastos-menores.repository';
@@ -23,6 +23,7 @@ describe('GastosMenoresService', () => {
   beforeEach(() => {
     repository = {
       obtenerModalidadFacturacion: jest.fn().mockResolvedValue('NCF'),
+      obtenerRequiereComprobanteFiscal: jest.fn().mockResolvedValue(true),
       siguienteNumeroEnTx: jest.fn().mockResolvedValue('B1100000001'),
       crearEnTx: jest.fn(),
       listar: jest.fn(),
@@ -130,6 +131,26 @@ describe('GastosMenoresService', () => {
     expect(tenantPrisma.client.$transaction).toHaveBeenCalledTimes(1);
     expect(repository.siguienteNumeroEnTx).toHaveBeenCalledWith(TX, expect.anything());
     expect(repository.crearEnTx).toHaveBeenCalledWith(TX, expect.anything());
+  });
+
+  it('con requiereComprobanteFiscal apagado, no resuelve NCF ni consume una secuencia', async () => {
+    repository.obtenerRequiereComprobanteFiscal.mockResolvedValue(false);
+    repository.crearEnTx.mockResolvedValue({ id: 'gm1' } as never);
+
+    await service.crear(dto(), 'tenant-1');
+
+    expect(repository.obtenerModalidadFacturacion).not.toHaveBeenCalled();
+    expect(repository.siguienteNumeroEnTx).not.toHaveBeenCalled();
+    expect(repository.crearEnTx).toHaveBeenCalledWith(TX, expect.objectContaining({ ncf: undefined, tipoNcf: undefined }));
+  });
+
+  it('sin ninguna secuencia B11/E43 activa (P2025 de Prisma): mensaje claro en vez del genérico "Recurso no encontrado"', async () => {
+    const errorPrisma = new Prisma.PrismaClientKnownRequestError('No NcfAsignado found', { code: 'P2025', clientVersion: 'test' });
+    repository.siguienteNumeroEnTx.mockRejectedValue(errorPrisma);
+
+    await expect(service.crear(dto(), 'tenant-1')).rejects.toThrow(NotFoundException);
+    await expect(service.crear(dto(), 'tenant-1')).rejects.toThrow(/secuencia de NCF B11 activa/);
+    expect(repository.crearEnTx).not.toHaveBeenCalled();
   });
 
   it('rechaza un gasto menor fechado en un período contable ya cerrado', async () => {

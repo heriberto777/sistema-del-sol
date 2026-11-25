@@ -173,7 +173,10 @@ export function GastoMenorNuevo() {
       }
     >
       <form id="form-nuevo-gasto-menor" onSubmit={onSubmit} className="space-y-4">
-        <Card titulo="Datos del gasto">
+        <Card
+          titulo="Datos del gasto"
+          descripcion="¿Esta compra ya tiene un NCF real del proveedor? Cargala como Factura de proveedor en su lugar — acá se genera un comprobante propio (B11), pensado para compras chicas o informales sin NCF."
+        >
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="flex flex-col gap-1">
               <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Cuenta bancaria</label>

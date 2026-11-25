@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma, TipoNcf } from '@prisma/client';
 import { GastosMenoresRepository } from './gastos-menores.repository';
 import { TenantPrismaService } from '../prisma/tenant-prisma.service';
@@ -35,8 +35,14 @@ export class GastosMenoresService {
   /**
    * Requiere que el tenant tenga una secuencia de NCF activa para B11
    * (tradicional) o E43 (modalidad ECF) — mismo requisito que Facturación
-   * tiene para B02/E32. Si no existe, `siguienteNumeroEnTx` lanza (404) —
-   * mismo comportamiento que si Facturación se quedara sin secuencia.
+   * tiene para B02/E32. Con `requiereComprobanteFiscal` apagado (negocio
+   * que no es contribuyente de la DGII, o que decidió no emitir
+   * comprobantes — ver NcfPanel), se salta esta resolución por completo,
+   * igual criterio que `FacturacionService.crear()`: queda
+   * `ncf: null, tipoNcf: null`. Si está prendido y no hay secuencia activa,
+   * `siguienteNumeroEnTx` lanza P2025 — lo atrapamos para dar un mensaje
+   * explícito en vez del genérico "Recurso no encontrado" del filtro global
+   * (bug real reportado: el mensaje genérico no decía qué faltaba).
    */
   async crear(dto: CrearGastoMenorDto, tenantId: string) {
     const lineasCalculadas = dto.lineas.map((linea) => {
@@ -59,8 +65,7 @@ export class GastosMenoresService {
     const itbis = lineasCalculadas.reduce((acc, l) => acc + l.montoItbis, 0);
     const total = monto + itbis;
 
-    const modalidad = await this.gastosMenoresRepository.obtenerModalidadFacturacion(tenantId);
-    const tipoNcf: TipoNcf = modalidad === 'ECF' ? 'E43' : 'B11';
+    const requiereComprobanteFiscal = await this.gastosMenoresRepository.obtenerRequiereComprobanteFiscal(tenantId);
     const fecha = dto.fecha ? new Date(dto.fecha) : new Date();
     await this.cierrePeriodoService.validarPeriodoAbierto(fecha);
 
@@ -72,7 +77,22 @@ export class GastosMenoresService {
     }
 
     const gastoMenor = await this.tenantPrisma.client.$transaction(async (tx) => {
-      const ncf = await this.gastosMenoresRepository.siguienteNumeroEnTx(tx, tipoNcf);
+      let ncf: string | undefined;
+      let tipoNcf: TipoNcf | undefined;
+      if (requiereComprobanteFiscal) {
+        const modalidad = await this.gastosMenoresRepository.obtenerModalidadFacturacion(tenantId);
+        tipoNcf = modalidad === 'ECF' ? 'E43' : 'B11';
+        try {
+          ncf = await this.gastosMenoresRepository.siguienteNumeroEnTx(tx, tipoNcf);
+        } catch (err) {
+          if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2025') {
+            throw new NotFoundException(
+              `No hay una secuencia de NCF ${tipoNcf} activa — configurá una en Administración → NCF antes de registrar un gasto menor.`,
+            );
+          }
+          throw err;
+        }
+      }
       return this.gastosMenoresRepository.crearEnTx(tx, {
         tenantId,
         ncf,
@@ -205,14 +225,17 @@ export class GastosMenoresService {
 
   /**
    * `siguienteNumeroEnTx` lanza un `Error` explícito si la secuencia existe
-   * pero se quedó sin números, o deja que Prisma lance `P2025` (record no
-   * encontrado) si no hay NINGUNA secuencia activa para este tipo — acá no
-   * se llama nada más con `findFirstOrThrow`/`findUniqueOrThrow` dentro de
-   * `crear()` en el camino del import (no se manda `proyectoId`), así que
-   * cualquier P2025 en este contexto es inequívocamente esto.
+   * pero se quedó sin números; si no hay NINGUNA secuencia activa para este
+   * tipo, `crear()` ya atrapa el `P2025` crudo de Prisma y lo convierte en
+   * un `NotFoundException` con mensaje explícito (ver su comentario) — acá
+   * no se llama nada más con `findFirstOrThrow`/`findUniqueOrThrow` dentro
+   * de `crear()` en el camino del import (no se manda `proyectoId`), así
+   * que cualquier `NotFoundException`/`P2025` en este contexto es
+   * inequívocamente esto.
    */
   private esFalloDeSecuenciaNcf(err: unknown): boolean {
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2025') return true;
+    if (err instanceof NotFoundException) return true;
     return err instanceof Error && /Secuencia de NCF .* agotada/.test(err.message);
   }
 }
