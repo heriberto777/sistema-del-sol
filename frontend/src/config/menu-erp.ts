@@ -68,7 +68,7 @@ export const DOMINIOS_MENU: DominioMenu[] = [
         items: [
           { id: 'ofertas', etiqueta: 'Ofertas', ruta: '/ofertas', permisos: ['ofertas.ver'] },
           { id: 'bonos', etiqueta: 'Bonos', ruta: '/bonos', permisos: ['bonos.ver'] },
-          { id: 'cajas', etiqueta: 'Cajas', ruta: '/cajas', permisos: ['pos.ver'] },
+          { id: 'cajas', etiqueta: 'Cajas', ruta: '/cajas', permisos: ['pos.ver'], modulo: 'pos' },
           { id: 'clientes', etiqueta: 'Clientes', ruta: '/clientes', permisos: ['clientes.ver', 'compras.ver'] },
           // Antes vivía en Seguridad y Administración — no tiene nada que
           // ver con seguridad, es dato de Ventas/CRM igual que Clientes.
@@ -185,17 +185,17 @@ export const DOMINIOS_MENU: DominioMenu[] = [
         categoria: 'catalogos',
         items: [
           { id: 'productos', etiqueta: 'Productos', ruta: '/productos', permisos: ['precios.ver'], modulo: 'productos' },
-          { id: 'categorias', etiqueta: 'Categorías', ruta: '/categorias', permisos: ['precios.ver'] },
-          { id: 'niveles-precio', etiqueta: 'Niveles de precio', ruta: '/niveles-precio', permisos: ['precios.ver'] },
-          { id: 'atributos', etiqueta: 'Atributos', ruta: '/atributos', permisos: ['precios.ver'] },
+          { id: 'categorias', etiqueta: 'Categorías', ruta: '/categorias', permisos: ['precios.ver'], modulo: 'productos' },
+          { id: 'niveles-precio', etiqueta: 'Niveles de precio', ruta: '/niveles-precio', permisos: ['precios.ver'], modulo: 'productos' },
+          { id: 'atributos', etiqueta: 'Atributos', ruta: '/atributos', permisos: ['precios.ver'], modulo: 'productos' },
           // Antes en Configuración con permiso admin.configuracion — mismo
           // patrón de catálogo que Categorías/Niveles de precio/Atributos,
           // sin razón para el trato distinto (auditoría de organización).
-          { id: 'unidades-medida', etiqueta: 'Unidades de medida', ruta: '/inventario/configuracion', permisos: ['precios.ver'] },
+          { id: 'unidades-medida', etiqueta: 'Unidades de medida', ruta: '/inventario/configuracion', permisos: ['precios.ver'], modulo: 'productos' },
           // Huérfana hasta ahora (sin ninguna entrada de menú) — catálogo de
           // clasificación fiscal de productos, usado solo por el formulario
           // de Producto (SelectLeyFiscal), mismo permiso que sus hermanos.
-          { id: 'leyes-fiscales', etiqueta: 'Leyes fiscales', ruta: '/leyes-fiscales', permisos: ['precios.ver'] },
+          { id: 'leyes-fiscales', etiqueta: 'Leyes fiscales', ruta: '/leyes-fiscales', permisos: ['precios.ver'], modulo: 'productos' },
           { id: 'bodegas', etiqueta: 'Bodegas (Sucursales)', ruta: '/sucursales', permisos: ['sucursales.ver'] },
         ],
       },
@@ -451,7 +451,7 @@ export const DOMINIOS_MENU: DominioMenu[] = [
       // propia ruta.
       {
         categoria: 'catalogos',
-        items: [{ id: 'travel-markup', etiqueta: 'Reglas de markup', ruta: '/travel/markup', permisos: ['travel.ver'] }],
+        items: [{ id: 'travel-markup', etiqueta: 'Reglas de markup', ruta: '/travel/markup', permisos: ['travel.ver'], modulo: 'travel' }],
       },
       {
         categoria: 'transacciones',

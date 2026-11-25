@@ -5,9 +5,11 @@ import { CrearLeyFiscalDto } from './dto/crear-ley-fiscal.dto';
 import { Permissions } from '../common/decorators/permissions.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtPayloadUser } from '../common/types/authenticated-request';
+import { RequiereModulo } from '../common/decorators/requiere-modulo.decorator';
 
 @ApiBearerAuth()
 @ApiTags('leyes-fiscales')
+@RequiereModulo('productos')
 @Controller('leyes-fiscales')
 export class LeyesFiscalesController {
   constructor(private readonly leyesFiscalesService: LeyesFiscalesService) {}
